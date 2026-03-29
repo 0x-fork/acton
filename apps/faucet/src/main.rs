@@ -2,8 +2,7 @@ use anyhow::Context;
 use apalis::layers::WorkerBuilderExt;
 use apalis::prelude::json::JsonCodec;
 use apalis::prelude::{Data, TaskSink, WorkerBuilder};
-use apalis_sqlite::fetcher::SqliteFetcher;
-use apalis_sqlite::{CompactType, SqliteStorage};
+use apalis_sqlite::{CompactType, Config as SqliteConfig, HookCallbackListener, SqliteStorage};
 use axum::extract::State;
 use axum::{
     Json, Router,
@@ -61,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
         default: RuleConfig::new(Duration::seconds(1), 5),
         max_memory: Some(64 * 1024 * 1024),
         routes: [
-            ("/claim", RuleConfig::new(Duration::hours(24), 2)), // 2 req/24h
+            ("/claim", RuleConfig::new(Duration::hours(24), 100)), // 2 req/24h
         ]
     )
     .await;
@@ -69,7 +68,8 @@ async fn main() -> anyhow::Result<()> {
     SqliteStorage::setup(&pool)
         .await
         .context("Failed to setup storage")?;
-    let storage = SqliteStorage::new(&pool);
+    let storage_config = SqliteConfig::new(std::any::type_name::<CreateClaim>());
+    let storage = SqliteStorage::new_with_callback(&config.database_url, &storage_config);
 
     let wallet = Wallet::new(&config.mnemonic).context("Failed to create faucet wallet")?;
     let client =
@@ -161,7 +161,7 @@ async fn shutdown_signal() {
 
 #[derive(Clone)]
 struct AppState {
-    storage: SqliteStorage<CreateClaim, JsonCodec<CompactType>, SqliteFetcher>,
+    storage: SqliteStorage<CreateClaim, JsonCodec<CompactType>, HookCallbackListener>,
     wallet: Arc<Wallet>,
     client: Arc<ToncenterClient>,
     config: Arc<Config>,
