@@ -44,9 +44,9 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let config = Config::from_env().context("Failed to load config")?;
 
-    let bind_addr = format!("{}:{}", config.host, config.port);
+    let bind_addr = format!("{}:{}", config.server.host, config.server.port);
 
-    let opts = SqliteConnectOptions::from_str(&config.database_url)
+    let opts = SqliteConnectOptions::from_str(&config.database.url)
         .context("Invalid database URL")?
         .create_if_missing(true);
 
@@ -69,9 +69,9 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Failed to setup storage")?;
     let storage_config = SqliteConfig::new(std::any::type_name::<CreateClaim>());
-    let storage = SqliteStorage::new_with_callback(&config.database_url, &storage_config);
+    let storage = SqliteStorage::new_with_callback(&config.database.url, &storage_config);
 
-    let wallet = Wallet::new(&config.mnemonic).context("Failed to create faucet wallet")?;
+    let wallet = Wallet::new(&config.faucet.mnemonic).context("Failed to create faucet wallet")?;
     let client =
         Arc::new(ToncenterClient::new(&config).context("Failed to create Toncenter client")?);
 
@@ -174,10 +174,10 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
 
     info!("Processing claim for address: {}", task.address);
 
-    let max_retries = state.config.worker_max_retries;
+    let max_retries = state.config.worker.max_retries;
 
     for attempt in 0..=max_retries {
-        match process_send_tokens(wallet, client, &task.address, state.config.faucet_amount).await {
+        match process_send_tokens(wallet, client, &task.address, state.config.faucet.amount).await {
             Ok(_) => {
                 info!("Successfully sent claim to {}", task.address);
                 return Ok(());
@@ -185,7 +185,7 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
             Err(err) => {
                 if attempt < max_retries {
                     let delay =
-                        exponential_backoff(state.config.worker_retry_base_delay_ms, attempt);
+                        exponential_backoff(state.config.worker.retry_base_delay_ms, attempt);
                     warn!(
                         address = %task.address,
                         attempt = attempt + 1,
@@ -294,7 +294,7 @@ async fn get_challenge(State(state): State<AppState>) -> Json<Value> {
 
     Json(json!({
         "challenge": challenge,
-        "difficulty": state.config.pow_difficulty
+        "difficulty": state.config.pow.difficulty
     }))
 }
 
@@ -346,7 +346,7 @@ async fn create_claim(
     if !verify_pow(
         &payload.challenge,
         payload.nonce,
-        state.config.pow_difficulty,
+        state.config.pow.difficulty,
     ) {
         return Err((
             StatusCode::BAD_REQUEST,

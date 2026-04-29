@@ -22,19 +22,19 @@ pub struct GetMethodResult {
 impl ToncenterClient {
     pub fn new(config: &Config) -> anyhow::Result<Self> {
         let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(config.toncenter_timeout_seconds))
+            .timeout(Duration::from_secs(config.toncenter.timeout_seconds))
             .connect_timeout(Duration::from_secs(
-                config.toncenter_connect_timeout_seconds,
+                config.toncenter.connect_timeout_seconds,
             ))
             .build()
             .context("Failed to build Toncenter HTTP client")?;
 
         Ok(Self {
             client,
-            base_url: config.toncenter_url.clone(),
-            api_key: config.toncenter_api_key.clone(),
-            max_retries: config.toncenter_max_retries,
-            retry_base_delay: Duration::from_millis(config.toncenter_retry_base_delay_ms),
+            base_url: config.toncenter.url.clone(),
+            api_key: config.toncenter.api_key.clone(),
+            max_retries: config.toncenter.max_retries,
+            retry_base_delay: Duration::from_millis(config.toncenter.retry_base_delay_ms),
         })
     }
 
