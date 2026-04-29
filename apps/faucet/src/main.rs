@@ -44,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let config = Config::from_env().context("Failed to load config")?;
 
-    let port = config.port;
+    let bind_addr = format!("{}:{}", config.host, config.port);
 
     let opts = SqliteConnectOptions::from_str(&config.database_url)
         .context("Invalid database URL")?
@@ -112,8 +112,8 @@ async fn main() -> anyhow::Result<()> {
         )
         .with_state(shared_state);
 
-    info!("Listening on 127.0.0.1:{}", port);
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port))
+    info!("Listening on {}", bind_addr);
+    let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
         .context("Failed to bind TCP listener")?;
     axum::serve(

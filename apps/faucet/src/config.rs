@@ -13,6 +13,7 @@ pub struct Config {
     pub toncenter_retry_base_delay_ms: u64,
     pub worker_max_retries: u32,
     pub worker_retry_base_delay_ms: u64,
+    pub host: String,
     pub port: u16,
     pub faucet_amount: u64,
     pub pow_difficulty: u32,
@@ -53,6 +54,7 @@ impl Config {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(1_000),
+            host: std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
             port: std::env::var("PORT")
                 .ok()
                 .and_then(|p| p.parse().ok())
