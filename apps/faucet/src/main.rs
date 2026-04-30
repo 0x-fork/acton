@@ -41,6 +41,7 @@ mod wallet;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
     let config = Config::from_env().context("Failed to load config")?;
 

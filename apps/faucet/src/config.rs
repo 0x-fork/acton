@@ -50,8 +50,6 @@ pub struct PowConfig {
 
 impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
-        dotenvy::dotenv().ok();
-
         let config = Config {
             database: DatabaseConfig {
                 url: std::env::var("DATABASE_URL")
@@ -96,7 +94,7 @@ impl Config {
                     .unwrap_or(1_000),
             },
             faucet: FaucetConfig {
-                mnemonic: std::env::var("MNEMONIC").context("MNEMONIC must be set")?,
+                mnemonic: std::env::var("FAUCET_MNEMONIC").context("FAUCET_MNEMONIC must be set")?,
                 amount: std::env::var("FAUCET_AMOUNT")
                     .ok()
                     .and_then(|a| a.parse().ok())
