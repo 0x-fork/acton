@@ -94,7 +94,8 @@ impl Config {
                     .unwrap_or(1_000),
             },
             faucet: FaucetConfig {
-                mnemonic: std::env::var("FAUCET_MNEMONIC").context("FAUCET_MNEMONIC must be set")?,
+                mnemonic: std::env::var("FAUCET_MNEMONIC")
+                    .context("FAUCET_MNEMONIC must be set")?,
                 amount: std::env::var("FAUCET_AMOUNT")
                     .ok()
                     .and_then(|a| a.parse().ok())
