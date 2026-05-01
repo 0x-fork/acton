@@ -52,7 +52,8 @@ jobs:
           COMPONENT: ${{ inputs.component }}
         with:
           script: |
-            core.setOutput('tag', process.env.REF_NAME);
+            const tag = process.env.REF_NAME === 'master' ? 'main' : process.env.REF_NAME;
+            core.setOutput('tag', tag);
             core.setOutput('component', process.env.COMPONENT);
             let repository = process.env.GITHUB_REPOSITORY.toLowerCase();
             if (process.env.COMPONENT) {
