@@ -51,6 +51,7 @@ jobs:
         env:
           COMPONENT: ${{ inputs.component }}
         with:
+          # language=JavaScript
           script: |
             const tag = process.env.REF_NAME === 'master' ? 'main' : process.env.REF_NAME;
             core.setOutput('tag', tag);

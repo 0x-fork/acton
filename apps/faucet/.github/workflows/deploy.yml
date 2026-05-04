@@ -1,10 +1,6 @@
 name: Deploy build
 
 on:
-  push:
-    branches:
-      - master
-
   workflow_dispatch:
     inputs:
       ref_name:

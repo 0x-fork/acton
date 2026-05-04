@@ -39,6 +39,8 @@ mod client;
 mod config;
 mod wallet;
 
+pub const LONG_VERSION: &str = env!("ACTON_LONG_VERSION");
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
@@ -104,6 +106,10 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/", get(root))
+        .route("/ready", get(ok))
+        .route("/health", get(ok))
+        .route("/metrics", get(ok))
+        .route("/version", get(version))
         .route("/challenge", get(get_challenge))
         .route("/claim", post(create_claim))
         .layer(
@@ -284,6 +290,14 @@ fn build_message(wallet: &Wallet, amount: u64, dest: TonAddress) -> anyhow::Resu
 
 async fn root() -> &'static str {
     "TON Faucet is running!"
+}
+
+async fn ok() -> StatusCode {
+    StatusCode::OK
+}
+
+async fn version() -> &'static str {
+    LONG_VERSION
 }
 
 async fn get_challenge(State(state): State<AppState>) -> Json<Value> {
