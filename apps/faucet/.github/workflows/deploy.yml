@@ -1,4 +1,4 @@
-name: Deploy build
+name: Deploy
 
 on:
   workflow_dispatch:
@@ -14,15 +14,40 @@ on:
         required: true
         type: string
 
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
 jobs:
   build:
-    uses: ./.github/workflows/docker.yml
-    secrets: inherit
+    runs-on: ubuntu-latest
+
     permissions:
       packages: write
       contents: read
-    with:
-      ref_name: ${{ inputs.ref_name || github.ref_name }}
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Build Rust Binaries
+        uses: ./.github/actions/build-rust
+
+      - name: Copy Faucet Backend
+        run: |
+          mkdir -p dist/docker
+          cp target/release/faucet-backend dist/docker/faucet-backend
+
+      - name: Build Docker Image
+        uses: ./.github/actions/build-docker
+        with:
+          ref_name: ${{ github.head_ref || github.ref_name }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
   deploy:
     needs: build

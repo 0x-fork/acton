@@ -1,7 +1,9 @@
-FROM nginx:1.27-alpine
+FROM ubuntu:noble
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY dist/docker/faucet-backend /usr/local/bin/faucet-backend
 
-EXPOSE 3000
+RUN chmod +x /usr/local/bin/faucet-backend
+
+ENTRYPOINT ["/usr/local/bin/faucet-backend"]
 
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:3000/health || exit 1

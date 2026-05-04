@@ -4,6 +4,9 @@ build:
 build-dev:
     cargo build
 
+build-ci:
+    cargo build --release --locked --bin faucet-backend
+
 fmt-check:
     cargo fmt --all --check
 
