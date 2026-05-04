@@ -28,7 +28,7 @@ concurrency:
 permissions: { }
 
 jobs:
-  build:
+  build-linux:
     runs-on: ubuntu-latest
 
     permissions:
@@ -117,7 +117,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   deploy:
-    needs: build
+    needs: build-linux
     runs-on: ubuntu-latest
     steps:
       - name: Run deployment wf
