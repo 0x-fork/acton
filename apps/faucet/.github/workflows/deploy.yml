@@ -7,16 +7,22 @@ on:
         description: "Branch or tag"
         required: true
         type: string
+      component:
+        description: "Image repository component"
+        required: false
+        type: string
 
   workflow_call:
     inputs:
       ref_name:
         required: true
         type: string
-
+      component:
+        required: false
+        type: string
 
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: deploy-${{ inputs.ref_name || github.ref }}-${{ inputs.component || '-' }}
   cancel-in-progress: true
 
 permissions: { }
@@ -29,11 +35,25 @@ jobs:
       packages: write
       contents: read
 
+    env:
+      REF_NAME: ${{ inputs.ref_name || github.ref_name }}
+      COMPONENT: ${{ inputs.component }}
+
+    outputs:
+      image_repo: ${{ steps.params.outputs.image_repo }}
+      image_tag: ${{ steps.params.outputs.tag }}
+      image_digest: ${{ steps.build_image.outputs.digest }}
+      image_revision: ${{ steps.revision.outputs.revision }}
+      component: ${{ steps.params.outputs.component }}
+
     steps:
       - name: Fetch Sources
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          fetch-depth: 0
           persist-credentials: false
+          ref: ${{ env.REF_NAME }}
+          submodules: recursive
 
       - name: Build Rust Binaries
         uses: ./.github/actions/build-rust
@@ -43,11 +63,58 @@ jobs:
           mkdir -p dist/docker
           cp target/release/faucet-backend dist/docker/faucet-backend
 
-      - name: Build Docker Image
-        uses: ./.github/actions/build-docker
+      - name: Compute params
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        id: params
+        env:
+          REF_NAME: ${{ env.REF_NAME }}
+          COMPONENT: ${{ env.COMPONENT }}
         with:
-          ref_name: ${{ github.head_ref || github.ref_name }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # language=JavaScript
+          script: |
+            const tag = process.env.REF_NAME === 'master' ? 'main' : process.env.REF_NAME;
+            core.setOutput('tag', tag);
+            core.setOutput('component', process.env.COMPONENT);
+            let repository = process.env.GITHUB_REPOSITORY.toLowerCase();
+            if (process.env.COMPONENT) {
+              repository += '/' + process.env.COMPONENT
+            }
+            core.setOutput('repository', repository);
+            core.setOutput('image_repo', `ghcr.io/${repository}`);
+
+      - name: Resolve revision
+        id: revision
+        run: |
+          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@8e5442c4ef9f78752691e2d8f8d19755c6f78e81 # v5.5.1
+        with:
+          images: ${{ steps.params.outputs.image_repo }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          context: 'git'
+          tags: |
+            type=sha
+            type=sha,format=long
+            type=raw,value=${{ steps.params.outputs.tag }}
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
+        id: build_image
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
   deploy:
     needs: build
