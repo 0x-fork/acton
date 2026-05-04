@@ -122,7 +122,7 @@ jobs:
     steps:
       - name: Run deployment wf
         env:
-          RUN_NAME: ${{ format('Deploy {0} / {1} / {2}', vars.APP_NAME, needs.build.outputs.component || '-', needs.build.outputs.image_tag) }}
+          RUN_NAME: ${{ format('Deploy {0} / {1} / {2}', vars.APP_NAME, needs.build-linux.outputs.component || '-', needs.build-linux.outputs.image_tag) }}
         uses: the-actions-org/workflow-dispatch@v4
         with:
           run-name: ${{ env.RUN_NAME }}
@@ -133,8 +133,8 @@ jobs:
           inputs: |
             {
               "app_name": "${{ vars.APP_NAME }}",
-              "image_tag": "${{ needs.build.outputs.image_tag }}",
-              "image_digest": "${{ needs.build.outputs.image_digest }}",
-              "image_revision": "${{ needs.build.outputs.image_revision || github.sha }}",
+              "image_tag": "${{ needs.build-linux.outputs.image_tag }}",
+              "image_digest": "${{ needs.build-linux.outputs.image_digest }}",
+              "image_revision": "${{ needs.build-linux.outputs.image_revision || github.sha }}",
               "run_name": "${{ env.RUN_NAME }}"
             }
