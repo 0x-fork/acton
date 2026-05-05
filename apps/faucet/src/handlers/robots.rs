@@ -1,6 +1,6 @@
 use axum::{http::header::CONTENT_TYPE, response::IntoResponse};
 
-pub async fn robots_txt() -> impl IntoResponse {
+pub(super) async fn robots_txt() -> impl IntoResponse {
     let robots_txt = r#"User-agent: *
 Disallow: /
 "#;

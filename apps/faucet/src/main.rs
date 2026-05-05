@@ -1,26 +1,16 @@
 use anyhow::Context;
 use apalis::layers::WorkerBuilderExt;
 use apalis::prelude::json::JsonCodec;
-use apalis::prelude::{Data, TaskSink, WorkerBuilder};
+use apalis::prelude::{Data, WorkerBuilder};
 use apalis_sqlite::{CompactType, Config as SqliteConfig, HookCallbackListener, SqliteStorage};
-use axum::extract::State;
-use axum::{
-    Json, Router,
-    http::StatusCode,
-    routing::{get, post},
-};
 use axum_governor::GovernorLayer;
 use client::ToncenterClient;
 use config::Config;
-use handlers::robots;
+use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::sync::Cache;
 use num_bigint::BigUint;
-use rand::RngCore;
 use real::RealIpLayer;
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -107,15 +97,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let app = Router::new()
-        .route("/", get(root))
-        .route("/robots.txt", get(robots::robots_txt))
-        .route("/ready", get(ok))
-        .route("/health", get(ok))
-        .route("/metrics", get(ok))
-        .route("/version", get(version))
-        .route("/challenge", get(get_challenge))
-        .route("/claim", post(create_claim))
+    let app = handlers::router()
         .layer(
             ServiceBuilder::new()
                 .layer(RealIpLayer::default())
@@ -171,12 +153,12 @@ async fn shutdown_signal() {
 }
 
 #[derive(Clone)]
-struct AppState {
-    storage: SqliteStorage<CreateClaim, JsonCodec<CompactType>, HookCallbackListener>,
+pub(crate) struct AppState {
+    pub(crate) storage: SqliteStorage<CreateClaim, JsonCodec<CompactType>, HookCallbackListener>,
     wallet: Arc<Wallet>,
     client: Arc<ToncenterClient>,
-    config: Arc<Config>,
-    pow_cache: Cache<String, ()>,
+    pub(crate) config: Arc<Config>,
+    pub(crate) pow_cache: Cache<String, ()>,
 }
 
 async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<()> {
@@ -290,106 +272,4 @@ fn build_message(wallet: &Wallet, amount: u64, dest: TonAddress) -> anyhow::Resu
 
     let message_cell = message.to_cell()?;
     Ok(message_cell)
-}
-
-async fn root() -> &'static str {
-    "TON Faucet is running!"
-}
-
-async fn ok() -> StatusCode {
-    StatusCode::OK
-}
-
-async fn version() -> &'static str {
-    LONG_VERSION
-}
-
-async fn get_challenge(State(state): State<AppState>) -> Json<Value> {
-    let mut bytes = [0u8; 32];
-    rand::rng().fill_bytes(&mut bytes);
-    let challenge = hex::encode(bytes);
-
-    state.pow_cache.insert(challenge.clone(), ());
-
-    Json(json!({
-        "challenge": challenge,
-        "difficulty": state.config.pow.difficulty
-    }))
-}
-
-fn verify_pow(challenge: &str, nonce: u64, difficulty: u32) -> bool {
-    let mut hasher = Sha256::new();
-    hasher.update(challenge.as_bytes());
-    hasher.update(nonce.to_be_bytes());
-    let result = hasher.finalize();
-
-    let mut zero_bits = 0;
-    for &byte in result.iter() {
-        let leading_zeros = byte.leading_zeros();
-        zero_bits += leading_zeros;
-        if leading_zeros < 8 {
-            break;
-        }
-    }
-    zero_bits >= difficulty
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct CreateClaim {
-    address: String,
-    challenge: String,
-    nonce: u64,
-}
-
-//noinspection RsLiveness
-#[axum::debug_handler]
-async fn create_claim(
-    State(mut state): State<AppState>,
-    Json(payload): Json<CreateClaim>,
-) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
-    if TonAddress::from_str(&payload.address).is_err() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Invalid TON address" })),
-        ));
-    }
-
-    // Verify PoW
-    if state.pow_cache.get(&payload.challenge).is_none() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Invalid or expired challenge" })),
-        ));
-    }
-
-    if !verify_pow(
-        &payload.challenge,
-        payload.nonce,
-        state.config.pow.difficulty,
-    ) {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Invalid PoW solution" })),
-        ));
-    }
-
-    // Atomically consume challenge to prevent reuse in concurrent requests.
-    if state.pow_cache.remove(&payload.challenge).is_none() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Invalid or expired challenge" })),
-        ));
-    }
-
-    state.storage.push(payload).await.map_err(|_| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": "Failed to queue claim" })),
-        )
-    })?;
-
-    Ok((
-        StatusCode::OK,
-        Json(json!({ "message": "Your claim has been queued. It will be processed soon." })),
-    ))
 }
