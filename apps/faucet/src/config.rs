@@ -42,6 +42,7 @@ pub struct WorkerConfig {
 pub struct FaucetConfig {
     pub mnemonic: String,
     pub amount: u64,
+    pub message: String,
 }
 
 #[derive(Clone, Debug)]
@@ -77,6 +78,8 @@ impl Config {
                 mnemonic: std::env::var("FAUCET_MNEMONIC")
                     .context("FAUCET_MNEMONIC must be set")?,
                 amount: parse_env_number("FAUCET_AMOUNT", 1_000_000), // 0.5 TON default
+                message: std::env::var("FAUCET_MESSAGE")
+                    .unwrap_or_else(|_| "Testnet faucet".to_string()),
             },
             pow: PowConfig {
                 difficulty: parse_env_number("POW_DIFFICULTY", 21),

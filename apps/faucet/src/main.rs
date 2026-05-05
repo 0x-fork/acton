@@ -168,7 +168,16 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
     let max_retries = state.config.worker.max_retries;
 
     for attempt in 0..=max_retries {
-        match process_send_tokens(wallet, client, &task.address, state.config.faucet.amount).await {
+        let status = process_send_tokens(
+            wallet,
+            client,
+            &task.address,
+            state.config.faucet.amount,
+            &state.config.faucet.message,
+        )
+        .await;
+
+        match status {
             Ok(_) => {
                 info!("Successfully sent claim to {}", task.address);
                 return Ok(());
@@ -213,10 +222,11 @@ async fn process_send_tokens(
     client: &ToncenterClient,
     dest: &str,
     amount: u64,
+    message: &str,
 ) -> anyhow::Result<()> {
     let dest = TonAddress::from_str(dest)?;
 
-    let message_cell = build_message(wallet, amount, dest)?;
+    let message_cell = build_message(wallet, amount, dest, message)?;
 
     let seqno = client
         .get_wallet_seqno(&wallet.wallet.address.to_base64(false, true, true))
@@ -242,7 +252,12 @@ async fn process_send_tokens(
     Ok(())
 }
 
-fn build_message(wallet: &Wallet, amount: u64, dest: TonAddress) -> anyhow::Result<TonCell> {
+fn build_message(
+    wallet: &Wallet,
+    amount: u64,
+    dest: TonAddress,
+    message: &str,
+) -> anyhow::Result<TonCell> {
     let message_info = CommonMsgInfoInt {
         ihr_disabled: true,
         bounce: false,
@@ -258,7 +273,7 @@ fn build_message(wallet: &Wallet, amount: u64, dest: TonAddress) -> anyhow::Resu
 
     let mut message_body_builder = TonCell::builder();
     message_body_builder.write_num(&0u32, 32)?;
-    message_body_builder.write_bits("Testnet faucet".as_bytes(), "Testnet faucet".len() * 8)?;
+    message_body_builder.write_bits(message.as_bytes(), message.len() * 8)?;
     let message_body = message_body_builder.build()?;
 
     let message = Msg::new(CommonMsgInfo::Int(message_info), message_body);
