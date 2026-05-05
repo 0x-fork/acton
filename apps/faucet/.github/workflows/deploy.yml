@@ -6,6 +6,7 @@ on:
       ref_name:
         description: "Branch or tag"
         required: true
+        default: "master"
         type: string
       component:
         description: "Image repository component"
@@ -111,7 +112,7 @@ jobs:
         id: build_image
         with:
           context: .
-          file: ./Dockerfile
+          file: ./deploy/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

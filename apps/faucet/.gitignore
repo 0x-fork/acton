@@ -26,6 +26,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+!deploy/.env.production
 db.sqlite
 db.sqlite-*
 test*.sh
