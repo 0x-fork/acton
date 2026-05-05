@@ -12,6 +12,7 @@ use axum::{
 use axum_governor::GovernorLayer;
 use client::ToncenterClient;
 use config::Config;
+use handlers::robots;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::sync::Cache;
 use num_bigint::BigUint;
@@ -37,6 +38,7 @@ use wallet::Wallet;
 
 mod client;
 mod config;
+mod handlers;
 mod logger;
 mod wallet;
 
@@ -107,6 +109,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/", get(root))
+        .route("/robots.txt", get(robots::robots_txt))
         .route("/ready", get(ok))
         .route("/health", get(ok))
         .route("/metrics", get(ok))
