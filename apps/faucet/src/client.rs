@@ -6,6 +6,14 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::warn;
 
+const USER_AGENT: &str = concat!(
+    "faucet/",
+    env!("CARGO_PKG_VERSION"),
+    " (",
+    env!("GIT_HASH"),
+    ")"
+);
+
 pub struct ToncenterClient {
     client: reqwest::Client,
     base_url: String,
@@ -26,6 +34,7 @@ impl ToncenterClient {
             .connect_timeout(Duration::from_secs(
                 config.toncenter.connect_timeout_seconds,
             ))
+            .user_agent(USER_AGENT)
             .build()
             .context("Failed to build Toncenter HTTP client")?;
 
