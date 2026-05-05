@@ -5,7 +5,9 @@ COPY dist/docker/faucet-backend /usr/local/bin/faucet-backend
 RUN chmod +x /usr/local/bin/faucet-backend
 
 ENV PORT=3000 \
-    HOST=0.0.0.0
+    HOST=0.0.0.0 \
+    LOG_LEVEL=info \
+    LOG_FORMAT=json
 
 ENTRYPOINT ["/usr/local/bin/faucet-backend"]
 

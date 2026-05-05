@@ -37,6 +37,7 @@ use wallet::Wallet;
 
 mod client;
 mod config;
+mod logger;
 mod wallet;
 
 pub const LONG_VERSION: &str = env!("ACTON_LONG_VERSION");
@@ -44,7 +45,7 @@ pub const LONG_VERSION: &str = env!("ACTON_LONG_VERSION");
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
-    tracing_subscriber::fmt::init();
+    logger::init_tracing();
     let config = Config::from_env().context("Failed to load config")?;
 
     let bind_addr = format!("{}:{}", config.server.host, config.server.port);
