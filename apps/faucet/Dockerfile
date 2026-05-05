@@ -1,5 +1,10 @@
 FROM ubuntu:noble
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates wget \
+    && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY dist/docker/faucet-backend /usr/local/bin/faucet-backend
 
 RUN chmod +x /usr/local/bin/faucet-backend
