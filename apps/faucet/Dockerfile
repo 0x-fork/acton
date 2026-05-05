@@ -12,7 +12,9 @@ RUN chmod +x /usr/local/bin/faucet-backend
 ENV PORT=3000 \
     HOST=0.0.0.0 \
     LOG_LEVEL=info \
-    LOG_FORMAT=json
+    LOG_FORMAT=json \
+    FAUCET_AMOUNT=500_000_000 \
+    POW_DIFFICULTY=20
 
 ENTRYPOINT ["/usr/local/bin/faucet-backend"]
 
