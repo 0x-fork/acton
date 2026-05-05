@@ -20,6 +20,6 @@ check-deny:
     cargo deny check
 
 test:
-    true
+    cargo test --locked
 
 check: fmt-check check-deps clippy check-deny test

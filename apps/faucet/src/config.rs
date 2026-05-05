@@ -1,4 +1,5 @@
 use anyhow::Context;
+use std::str::FromStr;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -57,58 +58,65 @@ impl Config {
             },
             server: ServerConfig {
                 host: std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
-                port: std::env::var("PORT")
-                    .ok()
-                    .and_then(|p| p.parse().ok())
-                    .unwrap_or(3001),
+                port: parse_env_number("PORT", 3001),
             },
             toncenter: ToncenterConfig {
                 api_key: std::env::var("TONCENTER_API_KEY").ok(),
                 url: std::env::var("TONCENTER_URL")
                     .unwrap_or_else(|_| "https://testnet.toncenter.com".to_string()),
-                timeout_seconds: std::env::var("TONCENTER_TIMEOUT_SECONDS")
-                    .ok()
-                    .and_then(|v| v.parse().ok())
-                    .unwrap_or(10),
-                connect_timeout_seconds: std::env::var("TONCENTER_CONNECT_TIMEOUT_SECONDS")
-                    .ok()
-                    .and_then(|v| v.parse().ok())
-                    .unwrap_or(5),
-                max_retries: std::env::var("TONCENTER_MAX_RETRIES")
-                    .ok()
-                    .and_then(|v| v.parse().ok())
-                    .unwrap_or(3),
-                retry_base_delay_ms: std::env::var("TONCENTER_RETRY_BASE_DELAY_MS")
-                    .ok()
-                    .and_then(|v| v.parse().ok())
-                    .unwrap_or(500),
+                timeout_seconds: parse_env_number("TONCENTER_TIMEOUT_SECONDS", 10),
+                connect_timeout_seconds: parse_env_number("TONCENTER_CONNECT_TIMEOUT_SECONDS", 5),
+                max_retries: parse_env_number("TONCENTER_MAX_RETRIES", 3),
+                retry_base_delay_ms: parse_env_number("TONCENTER_RETRY_BASE_DELAY_MS", 500),
             },
             worker: WorkerConfig {
-                max_retries: std::env::var("WORKER_MAX_RETRIES")
-                    .ok()
-                    .and_then(|v| v.parse().ok())
-                    .unwrap_or(2),
-                retry_base_delay_ms: std::env::var("WORKER_RETRY_BASE_DELAY_MS")
-                    .ok()
-                    .and_then(|v| v.parse().ok())
-                    .unwrap_or(1_000),
+                max_retries: parse_env_number("WORKER_MAX_RETRIES", 2),
+                retry_base_delay_ms: parse_env_number("WORKER_RETRY_BASE_DELAY_MS", 1_000),
             },
             faucet: FaucetConfig {
                 mnemonic: std::env::var("FAUCET_MNEMONIC")
                     .context("FAUCET_MNEMONIC must be set")?,
-                amount: std::env::var("FAUCET_AMOUNT")
-                    .ok()
-                    .and_then(|a| a.parse().ok())
-                    .unwrap_or(1_000_000), // 0.001 TON default
+                amount: parse_env_number("FAUCET_AMOUNT", 1_000_000), // 0.5 TON default
             },
             pow: PowConfig {
-                difficulty: std::env::var("POW_DIFFICULTY")
-                    .ok()
-                    .and_then(|d| d.parse().ok())
-                    .unwrap_or(21),
+                difficulty: parse_env_number("POW_DIFFICULTY", 21),
             },
         };
 
         Ok(config)
+    }
+}
+
+fn parse_env_number<T>(name: &str, default: T) -> T
+where
+    T: FromStr,
+{
+    std::env::var(name)
+        .ok()
+        .and_then(|value| parse_number(&value))
+        .unwrap_or(default)
+}
+
+fn parse_number<T>(value: &str) -> Option<T>
+where
+    T: FromStr,
+{
+    value.replace('_', "").parse().ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_number;
+
+    #[test]
+    fn parses_numbers_with_underscores() {
+        assert_eq!(parse_number::<u64>("500_000_000"), Some(500_000_000));
+        assert_eq!(parse_number::<u32>("1_000"), Some(1_000));
+        assert_eq!(parse_number::<u16>("3001"), Some(3001));
+    }
+
+    #[test]
+    fn rejects_invalid_numbers() {
+        assert_eq!(parse_number::<u64>("500 TON"), None);
     }
 }
