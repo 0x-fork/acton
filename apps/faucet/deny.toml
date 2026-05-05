@@ -14,9 +14,7 @@ allow = [
   "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.8
-exceptions = [
-  { crate = "nacl", allow = ["LGPL-3.0-or-later"] }
-]
+exceptions = []
 unused-allowed-license = "deny"
 unused-license-exception = "deny"
 
@@ -24,7 +22,9 @@ unused-license-exception = "deny"
 ignore = true
 
 [advisories]
-ignore = []
+ignore = [
+  "RUSTSEC-2024-0388", # derivative via ton_liteapi -> ton
+]
 
 [bans]
 multiple-versions = "allow"

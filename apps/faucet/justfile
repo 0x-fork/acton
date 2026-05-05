@@ -7,6 +7,9 @@ build-dev:
 build-ci:
     cargo build --release --locked --bin faucet-backend
 
+fmt:
+    cargo fmt --all
+
 fmt-check:
     cargo fmt --all --check
 

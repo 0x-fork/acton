@@ -9,19 +9,17 @@ use config::Config;
 use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::sync::Cache;
-use num_bigint::BigUint;
 use real::RealIpLayer;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
-use tonlib_core::TonAddress;
-use tonlib_core::cell::{Cell, CellBuilder};
-use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
-use tonlib_core::tlb_types::block::message::{CommonMsgInfo, IntMsgInfo, Message};
-use tonlib_core::tlb_types::primitives::either::EitherRef;
-use tonlib_core::tlb_types::tlb::TLB;
+use ton::block_tlb::{CommonMsgInfo, CommonMsgInfoInt, CurrencyCollection, Msg};
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
+use ton::ton_core::types::TonAddress;
+use ton::ton_core::types::tlb_core::TLBCoins;
 use tower::ServiceBuilder;
 use tracing::{error, info, warn};
 use wallet::Wallet;
@@ -221,7 +219,7 @@ async fn process_send_tokens(
     let message_cell = build_message(wallet, amount, dest)?;
 
     let seqno = client
-        .get_wallet_seqno(&wallet.wallet.address.to_base64_url())
+        .get_wallet_seqno(&wallet.wallet.address.to_base64(false, true, true))
         .await?;
 
     let expire_at = (std::time::SystemTime::now()
@@ -229,12 +227,11 @@ async fn process_send_tokens(
         .as_secs()
         + 600) as u32;
 
-    let external =
-        wallet
-            .wallet
-            .create_external_msg(expire_at, seqno, false, vec![message_cell.to_arc()])?;
+    let external = wallet
+        .wallet
+        .create_ext_in_msg(vec![message_cell], seqno, expire_at, false)?;
 
-    let response = client.send_boc(&external.to_boc_b64(false)?).await?;
+    let response = client.send_boc(&external.to_boc_base64()?).await?;
 
     if let Some(ok) = response.get("ok").and_then(|v| v.as_bool())
         && !ok
@@ -245,31 +242,26 @@ async fn process_send_tokens(
     Ok(())
 }
 
-fn build_message(wallet: &Wallet, amount: u64, dest: TonAddress) -> anyhow::Result<Cell> {
-    let message_info = IntMsgInfo {
+fn build_message(wallet: &Wallet, amount: u64, dest: TonAddress) -> anyhow::Result<TonCell> {
+    let message_info = CommonMsgInfoInt {
         ihr_disabled: true,
         bounce: false,
         bounced: false,
         src: wallet.wallet.address.to_msg_address(),
-        dest: dest.to_msg_address(),
-        value: CurrencyCollection::new(BigUint::from(amount)),
-        ihr_fee: Grams::new(BigUint::from(0u64)),
-        fwd_fee: Grams::new(BigUint::from(0u64)),
+        dst: dest.to_msg_address(),
+        value: CurrencyCollection::new(TLBCoins::from_num(&amount)?),
+        ihr_fee: TLBCoins::ZERO,
+        fwd_fee: TLBCoins::ZERO,
         created_at: 0,
         created_lt: 0,
     };
 
-    let mut message_body_builder = CellBuilder::new();
-    message_body_builder.store_u32(32, 0)?;
-    message_body_builder.store_string("Testnet faucet")?;
+    let mut message_body_builder = TonCell::builder();
+    message_body_builder.write_num(&0u32, 32)?;
+    message_body_builder.write_bits("Testnet faucet".as_bytes(), "Testnet faucet".len() * 8)?;
     let message_body = message_body_builder.build()?;
 
-    let message = Message {
-        info: CommonMsgInfo::Int(message_info),
-        init: None, // Some(EitherRef::new(state_init)),
-        body: EitherRef::new(message_body.to_arc()),
-    };
+    let message = Msg::new(CommonMsgInfo::Int(message_info), message_body);
 
-    let message_cell = message.to_cell()?;
-    Ok(message_cell)
+    Ok(message.to_cell()?)
 }

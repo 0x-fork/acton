@@ -1,12 +1,11 @@
+use crate::AppState;
 use apalis::prelude::TaskSink;
 use axum::{Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::str::FromStr;
-use tonlib_core::TonAddress;
-
-use crate::AppState;
+use ton::ton_core::types::TonAddress;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct CreateClaim {
