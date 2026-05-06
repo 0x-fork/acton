@@ -23,6 +23,6 @@ check-deny:
     cargo deny check
 
 test:
-    cargo test --locked
+    cargo test --workspace --locked
 
 check: fmt-check check-deps clippy check-deny test

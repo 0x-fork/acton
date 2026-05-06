@@ -1,5 +1,5 @@
-use crate::config::Config;
 use anyhow::{Context, anyhow};
+use faucet_config::Config;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::time::Duration;

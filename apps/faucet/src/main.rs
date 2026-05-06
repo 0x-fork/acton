@@ -5,7 +5,7 @@ use apalis::prelude::{Data, WorkerBuilder};
 use apalis_sqlite::{CompactType, Config as SqliteConfig, HookCallbackListener, SqliteStorage};
 use axum_governor::GovernorLayer;
 use client::ToncenterClient;
-use config::Config;
+use faucet_config::Config;
 use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::sync::Cache;
@@ -25,7 +25,6 @@ use tracing::{error, info, warn};
 use wallet::Wallet;
 
 mod client;
-mod config;
 mod handlers;
 mod logger;
 mod wallet;

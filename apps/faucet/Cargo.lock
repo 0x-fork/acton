@@ -1035,6 +1035,7 @@ dependencies = [
  "axum-governor",
  "chrono",
  "dotenvy",
+ "faucet-config",
  "hex",
  "lazy-limit",
  "moka",
@@ -1050,6 +1051,13 @@ dependencies = [
  "tower 0.5.2",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "faucet-config"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
 ]
 
 [[package]]
