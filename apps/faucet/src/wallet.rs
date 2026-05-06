@@ -18,4 +18,8 @@ impl Wallet {
 
         Ok(Self { wallet })
     }
+
+    pub fn get_address(&self) -> String {
+        self.wallet.address.to_base64(false, true, true)
+    }
 }

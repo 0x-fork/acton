@@ -40,6 +40,15 @@ async fn main() -> anyhow::Result<()> {
 
     let bind_addr = format!("{}:{}", config.server.host, config.server.port);
 
+    info!(
+        version = LONG_VERSION,
+        bind_addr = %bind_addr,
+        database_url = %config.database.url,
+        toncenter_url = %config.toncenter.url,
+        "Loaded startup config"
+    );
+
+    info!(database_url = %config.database.url, "Connecting to database");
     let opts = SqliteConnectOptions::from_str(&config.database.url)
         .context("Invalid database URL")?
         .create_if_missing(true);
@@ -49,6 +58,7 @@ async fn main() -> anyhow::Result<()> {
         .connect_with(opts)
         .await
         .context("Failed to connect to database")?;
+    info!("Connected to database");
 
     init_rate_limiter!(
         default: RuleConfig::new(Duration::seconds(1), 5),
@@ -58,16 +68,24 @@ async fn main() -> anyhow::Result<()> {
         ]
     )
     .await;
+    info!("Initialized rate limiter");
 
     SqliteStorage::setup(&pool)
         .await
         .context("Failed to setup storage")?;
     let storage_config = SqliteConfig::new(std::any::type_name::<CreateClaim>());
     let storage = SqliteStorage::new_with_callback(&config.database.url, &storage_config);
+    info!("Initialized claim storage");
 
     let wallet = Wallet::new(&config.faucet.mnemonic).context("Failed to create faucet wallet")?;
+    info!(
+        faucet_address = %wallet.get_address(),
+        "Created faucet wallet"
+    );
+
     let client =
         Arc::new(ToncenterClient::new(&config).context("Failed to create Toncenter client")?);
+    info!("Created Toncenter client");
 
     let shared_state = AppState {
         storage: storage.clone(),
@@ -228,9 +246,7 @@ async fn process_send_tokens(
 
     let message_cell = build_message(wallet, amount, dest, message)?;
 
-    let seqno = client
-        .get_wallet_seqno(&wallet.wallet.address.to_base64(false, true, true))
-        .await?;
+    let seqno = client.get_wallet_seqno(&wallet.get_address()).await?;
 
     let expire_at = (std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
