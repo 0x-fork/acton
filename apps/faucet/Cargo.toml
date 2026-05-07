@@ -57,3 +57,6 @@ opt-level = 3
 
 [lints.clippy]
 collapsible_if = "allow"
+
+[lib]
+doctest = false
