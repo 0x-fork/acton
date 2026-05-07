@@ -2,7 +2,7 @@ use axum::{
     Router, middleware,
     routing::{get, post},
 };
-use faucet_backend::middlewares::require_acton_user_agent;
+use faucet_backend::middlewares::require_airdrop_headers;
 
 use crate::AppState;
 
@@ -17,7 +17,7 @@ pub(crate) fn router() -> Router<AppState> {
     let airdrop_routes = Router::new()
         .route("/challenge", get(challenge::get_challenge))
         .route("/claim", post(claim::create_claim))
-        .route_layer(middleware::from_fn(require_acton_user_agent));
+        .route_layer(middleware::from_fn(require_airdrop_headers));
 
     Router::new()
         .route("/", get(health::root))

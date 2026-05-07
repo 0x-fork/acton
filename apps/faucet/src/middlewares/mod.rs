@@ -1,3 +1,3 @@
-mod user_agent;
+mod request_headers;
 
-pub use user_agent::require_acton_user_agent;
+pub use request_headers::require_airdrop_headers;
