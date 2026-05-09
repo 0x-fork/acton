@@ -2,8 +2,6 @@ use crate::AppState;
 use apalis::prelude::TaskSink;
 use axum::{Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use std::str::FromStr;
 use ton::ton_core::types::TonAddress;
 
@@ -14,71 +12,59 @@ pub(crate) struct CreateClaim {
     pub(crate) nonce: u64,
 }
 
+#[derive(Serialize)]
+pub(super) struct ClaimResponse {
+    message: &'static str,
+}
+
+#[derive(Serialize)]
+pub(super) struct ErrorResponse {
+    error: &'static str,
+}
+
+type ClaimResult = Result<(StatusCode, Json<ClaimResponse>), (StatusCode, Json<ErrorResponse>)>;
+
 //noinspection RsLiveness
 #[axum::debug_handler]
 pub(super) async fn create_claim(
     State(mut state): State<AppState>,
     Json(payload): Json<CreateClaim>,
-) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+) -> ClaimResult {
     if TonAddress::from_str(&payload.address).is_err() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Invalid TON address" })),
-        ));
+        return Err(bad_request("Invalid TON address"));
     }
 
-    if state.pow_cache.get(&payload.challenge).is_none() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Invalid or expired challenge" })),
-        ));
+    state
+        .pow_challenges
+        .get(&payload.challenge)
+        .ok_or_else(|| bad_request("Invalid or expired challenge"))?;
+
+    if !state.pow.verify(&payload.challenge, payload.nonce) {
+        return Err(bad_request("Invalid PoW solution"));
     }
 
-    if !verify_pow(
-        &payload.challenge,
-        payload.nonce,
-        state.config.pow.difficulty,
-    ) {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Invalid PoW solution" })),
-        ));
+    if state.pow_challenges.remove(&payload.challenge).is_none() {
+        return Err(bad_request("Invalid or expired challenge"));
     }
 
-    // Atomically consume challenge to prevent reuse in concurrent requests.
-    if state.pow_cache.remove(&payload.challenge).is_none() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Invalid or expired challenge" })),
-        ));
-    }
-
-    state.storage.push(payload).await.map_err(|_| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": "Failed to queue claim" })),
-        )
-    })?;
+    state
+        .storage
+        .push(payload)
+        .await
+        .map_err(|_| response_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to queue claim"))?;
 
     Ok((
         StatusCode::OK,
-        Json(json!({ "message": "Your claim has been queued. It will be processed soon." })),
+        Json(ClaimResponse {
+            message: "Your claim has been queued. It will be processed soon.",
+        }),
     ))
 }
 
-fn verify_pow(challenge: &str, nonce: u64, difficulty: u32) -> bool {
-    let mut hasher = Sha256::new();
-    hasher.update(challenge.as_bytes());
-    hasher.update(nonce.to_be_bytes());
-    let result = hasher.finalize();
+fn bad_request(error: &'static str) -> (StatusCode, Json<ErrorResponse>) {
+    response_error(StatusCode::BAD_REQUEST, error)
+}
 
-    let mut zero_bits = 0;
-    for &byte in result.iter() {
-        let leading_zeros = byte.leading_zeros();
-        zero_bits += leading_zeros;
-        if leading_zeros < 8 {
-            break;
-        }
-    }
-    zero_bits >= difficulty
+fn response_error(status: StatusCode, error: &'static str) -> (StatusCode, Json<ErrorResponse>) {
+    (status, Json(ErrorResponse { error }))
 }

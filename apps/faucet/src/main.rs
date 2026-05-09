@@ -6,6 +6,7 @@ use apalis_sqlite::{CompactType, Config as SqliteConfig, HookCallbackListener, S
 use axum_governor::GovernorLayer;
 use client::ToncenterClient;
 use faucet_config::Config;
+use faucet_pow::Pow;
 use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::sync::Cache;
@@ -90,11 +91,12 @@ async fn main() -> anyhow::Result<()> {
         storage: storage.clone(),
         wallet: Arc::new(wallet),
         client: client.clone(),
-        config: Arc::new(config),
-        pow_cache: Cache::builder()
-            .time_to_live(StdDuration::from_secs(300)) // 5 minutes
-            .max_capacity(10000)
+        pow: Pow::new(config.pow.difficulty),
+        pow_challenges: Cache::builder()
+            .time_to_live(StdDuration::from_secs(config.pow.challenge_ttl_seconds))
+            .max_capacity(config.pow.max_challenges)
             .build(),
+        config: Arc::new(config),
     };
 
     let worker_state = shared_state.clone();
@@ -172,8 +174,9 @@ pub(crate) struct AppState {
     pub(crate) storage: SqliteStorage<CreateClaim, JsonCodec<CompactType>, HookCallbackListener>,
     wallet: Arc<Wallet>,
     client: Arc<ToncenterClient>,
+    pub(crate) pow: Pow,
+    pub(crate) pow_challenges: Cache<String, ()>,
     pub(crate) config: Arc<Config>,
-    pub(crate) pow_cache: Cache<String, ()>,
 }
 
 async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<()> {

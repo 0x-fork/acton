@@ -1,18 +1,21 @@
 use axum::{Json, extract::State};
-use rand::RngCore;
-use serde_json::{Value, json};
+use serde::Serialize;
 
 use crate::AppState;
 
-pub(super) async fn get_challenge(State(state): State<AppState>) -> Json<Value> {
-    let mut bytes = [0u8; 32];
-    rand::rng().fill_bytes(&mut bytes);
-    let challenge = hex::encode(bytes);
+#[derive(Serialize)]
+pub(super) struct ChallengeResponse {
+    challenge: String,
+    difficulty: u32,
+}
 
-    state.pow_cache.insert(challenge.clone(), ());
+pub(super) async fn get_challenge(State(state): State<AppState>) -> Json<ChallengeResponse> {
+    let challenge = state.pow.create();
 
-    Json(json!({
-        "challenge": challenge,
-        "difficulty": state.config.pow.difficulty
-    }))
+    state.pow_challenges.insert(challenge.clone(), ());
+
+    Json(ChallengeResponse {
+        challenge,
+        difficulty: state.pow.difficulty(),
+    })
 }

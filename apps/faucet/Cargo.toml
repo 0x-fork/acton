@@ -20,6 +20,9 @@ repository = "https://github.com/i582/faucet"
 
 [workspace.dependencies]
 anyhow = "1.0.100"
+hex = "0.4.3"
+rand = "0.9.2"
+sha2 = "0.10.9"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
 
 [dependencies]
@@ -38,12 +41,10 @@ apalis = { version = "1.0.0-beta.2" }
 apalis-sqlite = "1.0.0-beta.4"
 anyhow = { workspace = true }
 faucet-config = { path = "crates/config" }
+faucet-pow = { path = "crates/pow" }
 reqwest = { version = "0.12.28", features = ["json"] }
 dotenvy = "0.15.7"
 ton = "0.1.4"
-sha2 = "0.10.9"
-hex = "0.4.3"
-rand = "0.9.2"
 moka = { version = "0.12.12", features = ["sync"] }
 
 [dev-dependencies]

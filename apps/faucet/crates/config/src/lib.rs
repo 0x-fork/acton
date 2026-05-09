@@ -48,6 +48,8 @@ pub struct FaucetConfig {
 #[derive(Clone, Debug)]
 pub struct PowConfig {
     pub difficulty: u32,
+    pub challenge_ttl_seconds: u64,
+    pub max_challenges: u64,
 }
 
 impl Config {
@@ -83,6 +85,8 @@ impl Config {
             },
             pow: PowConfig {
                 difficulty: parse_env_number("POW_DIFFICULTY", 21),
+                challenge_ttl_seconds: parse_env_number("POW_CHALLENGE_TTL_SECONDS", 300),
+                max_challenges: parse_env_number("POW_MAX_CHALLENGES", 10_000),
             },
         };
 
