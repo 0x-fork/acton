@@ -1,6 +1,8 @@
 use rand::RngCore;
 use sha2::{Digest, Sha256};
 
+pub const CHALLENGE_VERSION: [u32; 1] = [1];
+
 #[derive(Clone, Copy, Debug)]
 pub struct Pow {
     difficulty: u32,
@@ -13,6 +15,14 @@ impl Pow {
 
     pub fn difficulty(&self) -> u32 {
         self.difficulty
+    }
+
+    pub fn version(&self) -> u32 {
+        CHALLENGE_VERSION[CHALLENGE_VERSION.len() - 1]
+    }
+
+    pub fn can_process_version(&self, version: u32) -> bool {
+        CHALLENGE_VERSION.contains(&version)
     }
 
     pub fn create(&self) -> String {
@@ -42,7 +52,7 @@ impl Pow {
 
 #[cfg(test)]
 mod tests {
-    use super::Pow;
+    use super::{CHALLENGE_VERSION, Pow};
     use std::collections::HashSet;
 
     #[test]
@@ -50,6 +60,29 @@ mod tests {
         for difficulty in [0, 1, 8, 21, 256, u32::MAX] {
             assert_eq!(Pow::new(difficulty).difficulty(), difficulty);
         }
+    }
+
+    #[test]
+    fn stores_challenge_versions() {
+        assert_eq!(CHALLENGE_VERSION, [1]);
+    }
+
+    #[test]
+    fn returns_current_challenge_version() {
+        assert_eq!(Pow::new(21).version(), 1);
+    }
+
+    #[test]
+    fn accepts_current_challenge_version() {
+        assert!(Pow::new(21).can_process_version(1));
+    }
+
+    #[test]
+    fn rejects_unknown_challenge_versions() {
+        let pow = Pow::new(21);
+
+        assert!(!pow.can_process_version(0));
+        assert!(!pow.can_process_version(pow.version() + 1));
     }
 
     #[test]

@@ -173,7 +173,7 @@ pub(crate) struct AppState {
     wallet: Arc<Wallet>,
     client: Arc<ToncenterClient>,
     pub(crate) pow: Pow,
-    pub(crate) pow_challenges: Cache<String, ()>,
+    pub(crate) pow_challenges: Cache<String, u32>,
     pub(crate) config: Arc<Config>,
 }
 
