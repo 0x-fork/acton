@@ -1,8 +1,9 @@
 use axum::{
-    Router, middleware,
+    Router,
+    middleware::{self, from_fn_with_state},
     routing::{get, post},
 };
-use faucet_backend::middlewares::require_airdrop_headers;
+use faucet_backend::middlewares::{require_airdrop_headers, require_pow_enabled};
 
 use crate::AppState;
 
@@ -13,10 +14,14 @@ mod robots;
 
 pub(crate) use claim::CreateClaim;
 
-pub(crate) fn router() -> Router<AppState> {
+pub(crate) fn router(state: AppState) -> Router {
     let airdrop_routes = Router::new()
         .route("/challenge", get(challenge::get_challenge))
         .route("/claim", post(claim::create_claim))
+        .route_layer(from_fn_with_state(
+            state.config.clone(),
+            require_pow_enabled,
+        ))
         .route_layer(middleware::from_fn(require_airdrop_headers));
 
     Router::new()
@@ -27,4 +32,5 @@ pub(crate) fn router() -> Router<AppState> {
         .route("/metrics", get(health::ok))
         .route("/version", get(health::version))
         .merge(airdrop_routes)
+        .with_state(state)
 }

@@ -47,6 +47,7 @@ pub struct FaucetConfig {
 
 #[derive(Clone, Debug)]
 pub struct PowConfig {
+    pub enabled: bool,
     pub difficulty: u32,
     pub challenge_ttl_seconds: u64,
     pub max_challenges: u64,
@@ -84,6 +85,7 @@ impl Config {
                     .unwrap_or_else(|_| "Testnet faucet".to_string()),
             },
             pow: PowConfig {
+                enabled: parse_env_bool("POW_ENABLED", true),
                 difficulty: parse_env_number("POW_DIFFICULTY", 21),
                 challenge_ttl_seconds: parse_env_number("POW_CHALLENGE_TTL_SECONDS", 300),
                 max_challenges: parse_env_number("POW_MAX_CHALLENGES", 10_000),
@@ -111,9 +113,24 @@ where
     value.replace('_', "").parse().ok()
 }
 
+fn parse_env_bool(name: &str, default: bool) -> bool {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| parse_bool(&value))
+        .unwrap_or(default)
+}
+
+fn parse_bool(value: &str) -> Option<bool> {
+    match value.trim_end().to_ascii_lowercase().as_str() {
+        "true" | "yes" | "on" => Some(true),
+        "false" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::parse_number;
+    use super::{parse_bool, parse_number};
 
     #[test]
     fn parses_numbers_with_underscores() {
@@ -125,5 +142,26 @@ mod tests {
     #[test]
     fn rejects_invalid_numbers() {
         assert_eq!(parse_number::<u64>("500 TON"), None);
+    }
+
+    #[test]
+    fn parses_bool_values() {
+        for value in ["true", "TRUE", "yes", "on", "on "] {
+            assert_eq!(parse_bool(value), Some(true));
+        }
+
+        for value in ["false", "FALSE", "no", "off", "off "] {
+            assert_eq!(parse_bool(value), Some(false));
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_bool_values() {
+        assert_eq!(parse_bool(""), None);
+        assert_eq!(parse_bool("1"), None);
+        assert_eq!(parse_bool("0"), None);
+        assert_eq!(parse_bool(" on"), None);
+        assert_eq!(parse_bool(" off"), None);
+        assert_eq!(parse_bool("maybe"), None);
     }
 }

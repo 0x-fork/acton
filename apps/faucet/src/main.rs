@@ -114,13 +114,11 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let app = handlers::router()
-        .layer(
-            ServiceBuilder::new()
-                .layer(RealIpLayer::default())
-                .layer(GovernorLayer::default()),
-        )
-        .with_state(shared_state);
+    let app = handlers::router(shared_state).layer(
+        ServiceBuilder::new()
+            .layer(RealIpLayer::default())
+            .layer(GovernorLayer::default()),
+    );
 
     info!("Listening on {}", bind_addr);
     let listener = tokio::net::TcpListener::bind(&bind_addr)
