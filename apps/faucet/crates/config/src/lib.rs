@@ -10,6 +10,7 @@ pub struct Config {
     pub faucet: FaucetConfig,
     pub pow: PowConfig,
     pub valkey: ValkeyConfig,
+    pub antifraud: AntifraudConfig,
 }
 
 #[derive(Clone, Debug)]
@@ -59,6 +60,18 @@ pub struct ValkeyConfig {
     pub uri: String,
 }
 
+#[derive(Clone, Debug)]
+pub struct AntifraudConfig {
+    pub enabled: bool,
+    pub wallet_balance: WalletBalanceCheckConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct WalletBalanceCheckConfig {
+    pub enabled: bool,
+    pub max_wallet_balance: u64,
+}
+
 impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
         let config = Config {
@@ -99,6 +112,16 @@ impl Config {
             valkey: ValkeyConfig {
                 uri: std::env::var("VALKEY_URI")
                     .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string()),
+            },
+            antifraud: AntifraudConfig {
+                enabled: parse_env_bool("ANTIFRAUD_ENABLED", true),
+                wallet_balance: WalletBalanceCheckConfig {
+                    enabled: parse_env_bool("ANTIFRAUD_WALLET_BALANCE_ENABLED", true),
+                    max_wallet_balance: parse_env_number(
+                        "ANTIFRAUD_WALLET_BALANCE_MAX_NANOTONS",
+                        25_000_000_000,
+                    ),
+                },
             },
         };
 

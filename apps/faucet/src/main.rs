@@ -5,6 +5,7 @@ use apalis::prelude::{Data, WorkerBuilder};
 use apalis_sqlite::{CompactType, Config as SqliteConfig, HookCallbackListener, SqliteStorage};
 use axum_governor::GovernorLayer;
 use client::ToncenterClient;
+use faucet_antifraud::Antifraud;
 use faucet_config::Config;
 use faucet_pow::Pow;
 use faucet_valkey::ValkeyStore;
@@ -91,6 +92,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("Failed to create Valkey store")?;
     info!("Connected to Valkey");
+    let antifraud = Antifraud::new(&config.antifraud);
 
     let shared_state = AppState {
         storage: storage.clone(),
@@ -102,6 +104,7 @@ async fn main() -> anyhow::Result<()> {
             .max_capacity(config.pow.max_challenges)
             .build(),
         valkey,
+        antifraud,
         config: Arc::new(config),
     };
 
@@ -181,6 +184,7 @@ pub(crate) struct AppState {
     pub(crate) pow: Pow,
     pub(crate) pow_challenges: Cache<String, u32>,
     pub(crate) valkey: ValkeyStore,
+    pub(crate) antifraud: Antifraud,
     pub(crate) config: Arc<Config>,
 }
 

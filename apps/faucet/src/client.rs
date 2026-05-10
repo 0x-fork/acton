@@ -117,6 +117,24 @@ impl ToncenterClient {
         self.post_jsonrpc_with_retry(&json, "sendBoc").await
     }
 
+    pub async fn get_address_balance(&self, address: &str) -> anyhow::Result<u64> {
+        let json = json!({
+            "id": "1",
+            "jsonrpc": "2.0",
+            "method": "getAddressBalance",
+            "params": {
+                "address": address
+            }
+        });
+
+        let response = self
+            .post_jsonrpc_with_retry(&json, "getAddressBalance")
+            .await?;
+        let result = response.get("result").unwrap_or(&response);
+
+        parse_balance(result).context("Failed to parse getAddressBalance response payload")
+    }
+
     fn jsonrpc_url(&self) -> String {
         format!("{}/api/v2/jsonRPC", self.base_url)
     }
@@ -238,5 +256,43 @@ impl ToncenterClient {
             "Exceeded retry budget for Toncenter operation: {}",
             operation
         ))
+    }
+}
+
+fn parse_balance(value: &Value) -> Option<u64> {
+    if let Some(balance) = value.as_u64() {
+        return Some(balance);
+    }
+
+    if let Some(balance) = value.as_i64() {
+        return u64::try_from(balance).ok();
+    }
+
+    if let Some(balance) = value.as_str() {
+        return balance.parse().ok();
+    }
+
+    value.get("balance").and_then(parse_balance)
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::parse_balance;
+
+    #[test]
+    fn parses_balance_payloads() {
+        assert_eq!(parse_balance(&json!("25000000000")), Some(25_000_000_000));
+        assert_eq!(
+            parse_balance(&json!(25_000_000_000u64)),
+            Some(25_000_000_000)
+        );
+        assert_eq!(
+            parse_balance(&json!({ "balance": "25000000000" })),
+            Some(25_000_000_000)
+        );
+        assert_eq!(parse_balance(&json!(-1)), None);
+        assert_eq!(parse_balance(&json!("not-number")), None);
     }
 }

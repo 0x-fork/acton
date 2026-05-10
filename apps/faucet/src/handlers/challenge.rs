@@ -39,6 +39,26 @@ pub(super) async fn create_challenge(
         return Err(bad_request("Invalid challenge type"));
     }
 
+    if state.antifraud.wallet_balance_enabled() {
+        let balance = state
+            .client
+            .get_address_balance(&payload.address)
+            .await
+            .map_err(|_| {
+                response_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Failed to check wallet balance",
+                )
+            })?;
+
+        if state.antifraud.check_wallet_balance(balance).is_err() {
+            return Err(response_error(
+                StatusCode::FORBIDDEN,
+                "Wallet balance exceeds limit",
+            ));
+        }
+    }
+
     let challenge = state.pow.create();
     let version = state.pow.version();
 
@@ -55,7 +75,11 @@ pub(super) async fn create_challenge(
 }
 
 fn bad_request(error: &'static str) -> (StatusCode, Json<ErrorResponse>) {
-    (StatusCode::BAD_REQUEST, Json(ErrorResponse { error }))
+    response_error(StatusCode::BAD_REQUEST, error)
+}
+
+fn response_error(status: StatusCode, error: &'static str) -> (StatusCode, Json<ErrorResponse>) {
+    (status, Json(ErrorResponse { error }))
 }
 
 #[cfg(test)]

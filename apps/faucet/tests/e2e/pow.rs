@@ -7,8 +7,8 @@ use axum::{
 };
 use faucet_backend::middlewares::require_pow_enabled;
 use faucet_config::{
-    Config, DatabaseConfig, FaucetConfig, PowConfig, ServerConfig, ToncenterConfig, ValkeyConfig,
-    WorkerConfig,
+    AntifraudConfig, Config, DatabaseConfig, FaucetConfig, PowConfig, ServerConfig,
+    ToncenterConfig, ValkeyConfig, WalletBalanceCheckConfig, WorkerConfig,
 };
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -94,6 +94,13 @@ fn config(pow_enabled: bool) -> Config {
         },
         valkey: ValkeyConfig {
             uri: "redis://127.0.0.1:6379".to_string(),
+        },
+        antifraud: AntifraudConfig {
+            enabled: true,
+            wallet_balance: WalletBalanceCheckConfig {
+                enabled: true,
+                max_wallet_balance: 25_000_000_000,
+            },
         },
     }
 }

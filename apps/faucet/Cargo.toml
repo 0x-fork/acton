@@ -41,6 +41,7 @@ real = { version = "0.1", features = ["axum"] }
 apalis = { version = "1.0.0-beta.2" }
 apalis-sqlite = "1.0.0-beta.4"
 anyhow = { workspace = true }
+faucet-antifraud = { path = "crates/antifraud" }
 faucet-config = { workspace = true }
 faucet-pow = { path = "crates/pow" }
 faucet-valkey = { path = "crates/valkey" }

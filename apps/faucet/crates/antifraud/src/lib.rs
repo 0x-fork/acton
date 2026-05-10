@@ -1,0 +1,121 @@
+#![forbid(unsafe_code)]
+
+use faucet_config::AntifraudConfig;
+
+#[derive(Clone, Copy, Debug)]
+pub struct Antifraud {
+    enabled: bool,
+    wallet_balance_enabled: bool,
+    max_wallet_balance: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CheckError {
+    WalletBalanceTooHigh { balance: u64, max: u64 },
+}
+
+impl Antifraud {
+    pub fn new(config: &AntifraudConfig) -> Self {
+        Self {
+            enabled: config.enabled,
+            wallet_balance_enabled: config.wallet_balance.enabled,
+            max_wallet_balance: config.wallet_balance.max_wallet_balance,
+        }
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn wallet_balance_enabled(&self) -> bool {
+        self.enabled && self.wallet_balance_enabled
+    }
+
+    pub fn check_wallet_balance(&self, balance: u64) -> Result<(), CheckError> {
+        if !self.wallet_balance_enabled() {
+            return Ok(());
+        }
+
+        if balance > self.max_wallet_balance {
+            return Err(CheckError::WalletBalanceTooHigh {
+                balance,
+                max: self.max_wallet_balance,
+            });
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Antifraud, CheckError};
+    use faucet_config::{AntifraudConfig, WalletBalanceCheckConfig};
+
+    fn config(max_wallet_balance: u64) -> AntifraudConfig {
+        AntifraudConfig {
+            enabled: true,
+            wallet_balance: WalletBalanceCheckConfig {
+                enabled: true,
+                max_wallet_balance,
+            },
+        }
+    }
+
+    fn config_with_flags(
+        enabled: bool,
+        wallet_balance_enabled: bool,
+        max_wallet_balance: u64,
+    ) -> AntifraudConfig {
+        AntifraudConfig {
+            enabled,
+            wallet_balance: WalletBalanceCheckConfig {
+                enabled: wallet_balance_enabled,
+                max_wallet_balance,
+            },
+        }
+    }
+
+    #[test]
+    fn allows_balance_at_or_below_limit() {
+        let config = config(25_000_000_000);
+        let antifraud = Antifraud::new(&config);
+
+        assert_eq!(antifraud.check_wallet_balance(0), Ok(()));
+        assert_eq!(antifraud.check_wallet_balance(25_000_000_000), Ok(()));
+    }
+
+    #[test]
+    fn rejects_balance_above_limit() {
+        let config = config(25_000_000_000);
+        let antifraud = Antifraud::new(&config);
+
+        assert_eq!(
+            antifraud.check_wallet_balance(25_000_000_001),
+            Err(CheckError::WalletBalanceTooHigh {
+                balance: 25_000_000_001,
+                max: 25_000_000_000,
+            })
+        );
+    }
+
+    #[test]
+    fn allows_any_balance_when_disabled() {
+        let config = config_with_flags(false, true, 25_000_000_000);
+        let antifraud = Antifraud::new(&config);
+
+        assert!(!antifraud.enabled());
+        assert!(!antifraud.wallet_balance_enabled());
+        assert_eq!(antifraud.check_wallet_balance(25_000_000_001), Ok(()));
+    }
+
+    #[test]
+    fn allows_any_balance_when_wallet_balance_check_disabled() {
+        let config = config_with_flags(true, false, 25_000_000_000);
+        let antifraud = Antifraud::new(&config);
+
+        assert!(antifraud.enabled());
+        assert!(!antifraud.wallet_balance_enabled());
+        assert_eq!(antifraud.check_wallet_balance(25_000_000_001), Ok(()));
+    }
+}
