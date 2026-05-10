@@ -1,9 +1,9 @@
 use axum::{
     Router,
     body::{Body, to_bytes},
-    http::{Request, StatusCode, header::USER_AGENT},
+    http::{Method, Request, StatusCode, header::USER_AGENT},
     middleware,
-    routing::get,
+    routing::post,
 };
 use faucet_backend::middlewares::require_airdrop_headers;
 use tower::ServiceExt;
@@ -66,10 +66,10 @@ async fn request_with_headers(
     device_uid: Option<&str>,
 ) -> axum::response::Response {
     let app = Router::new()
-        .route("/challenge", get(|| async { "ok" }))
+        .route("/challenge", post(|| async { "ok" }))
         .route_layer(middleware::from_fn(require_airdrop_headers));
 
-    let mut request = Request::builder().uri("/challenge");
+    let mut request = Request::builder().method(Method::POST).uri("/challenge");
 
     if let Some(user_agent) = user_agent {
         request = request.header(USER_AGENT, user_agent);

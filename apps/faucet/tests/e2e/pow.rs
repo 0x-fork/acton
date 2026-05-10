@@ -3,7 +3,7 @@ use axum::{
     body::{Body, to_bytes},
     http::{Method, Request, StatusCode},
     middleware::from_fn_with_state,
-    routing::{get, post},
+    routing::post,
 };
 use faucet_backend::middlewares::require_pow_enabled;
 use faucet_config::{
@@ -15,7 +15,7 @@ use tower::ServiceExt;
 
 #[tokio::test]
 async fn pow_enabled_allows_protected_routes() {
-    for (method, path) in [(Method::GET, "/challenge"), (Method::POST, "/claim")] {
+    for (method, path) in [(Method::POST, "/challenge"), (Method::POST, "/claim")] {
         let response = request_with_pow(method, path, true).await;
 
         assert_eq!(response.status(), StatusCode::OK);
@@ -25,7 +25,7 @@ async fn pow_enabled_allows_protected_routes() {
 
 #[tokio::test]
 async fn pow_disabled_rejects_protected_routes() {
-    for (method, path) in [(Method::GET, "/challenge"), (Method::POST, "/claim")] {
+    for (method, path) in [(Method::POST, "/challenge"), (Method::POST, "/claim")] {
         let response = request_with_pow(method, path, false).await;
 
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
@@ -42,7 +42,7 @@ async fn request_with_pow(
     pow_enabled: bool,
 ) -> axum::response::Response {
     let app = Router::new()
-        .route("/challenge", get(|| async { "ok" }))
+        .route("/challenge", post(|| async { "ok" }))
         .route("/claim", post(|| async { "ok" }))
         .route_layer(from_fn_with_state(
             Arc::new(config(pow_enabled)),

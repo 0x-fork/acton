@@ -16,7 +16,7 @@ pub(crate) use claim::CreateClaim;
 
 pub(crate) fn router(state: AppState) -> Router {
     let airdrop_routes = Router::new()
-        .route("/challenge", get(challenge::get_challenge))
+        .route("/challenge", post(challenge::create_challenge))
         .route("/claim", post(claim::create_claim))
         .route_layer(from_fn_with_state(
             state.config.clone(),
