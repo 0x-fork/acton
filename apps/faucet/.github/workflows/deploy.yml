@@ -24,7 +24,7 @@ on:
 
 concurrency:
   group: deploy-${{ inputs.ref_name || github.ref }}-${{ inputs.component || '-' }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions: { }
 
@@ -51,7 +51,6 @@ jobs:
       - name: Fetch Sources
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 0
           persist-credentials: false
           ref: ${{ env.REF_NAME }}
           submodules: recursive

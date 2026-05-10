@@ -7,7 +7,8 @@ use axum::{
 };
 use faucet_backend::middlewares::require_pow_enabled;
 use faucet_config::{
-    Config, DatabaseConfig, FaucetConfig, PowConfig, ServerConfig, ToncenterConfig, WorkerConfig,
+    Config, DatabaseConfig, FaucetConfig, PowConfig, ServerConfig, ToncenterConfig, ValkeyConfig,
+    WorkerConfig,
 };
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -90,6 +91,9 @@ fn config(pow_enabled: bool) -> Config {
             difficulty: 21,
             challenge_ttl_seconds: 300,
             max_challenges: 10_000,
+        },
+        valkey: ValkeyConfig {
+            uri: "redis://127.0.0.1:6379".to_string(),
         },
     }
 }

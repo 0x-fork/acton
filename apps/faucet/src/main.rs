@@ -7,6 +7,7 @@ use axum_governor::GovernorLayer;
 use client::ToncenterClient;
 use faucet_config::Config;
 use faucet_pow::Pow;
+use faucet_valkey::ValkeyStore;
 use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::sync::Cache;
@@ -86,6 +87,10 @@ async fn main() -> anyhow::Result<()> {
     let client =
         Arc::new(ToncenterClient::new(&config).context("Failed to create Toncenter client")?);
     info!("Created Toncenter client");
+    let valkey = ValkeyStore::new(&config.valkey)
+        .await
+        .context("Failed to create Valkey store")?;
+    info!("Connected to Valkey");
 
     let shared_state = AppState {
         storage: storage.clone(),
@@ -96,6 +101,7 @@ async fn main() -> anyhow::Result<()> {
             .time_to_live(StdDuration::from_secs(config.pow.challenge_ttl_seconds))
             .max_capacity(config.pow.max_challenges)
             .build(),
+        valkey,
         config: Arc::new(config),
     };
 
@@ -174,6 +180,7 @@ pub(crate) struct AppState {
     client: Arc<ToncenterClient>,
     pub(crate) pow: Pow,
     pub(crate) pow_challenges: Cache<String, u32>,
+    pub(crate) valkey: ValkeyStore,
     pub(crate) config: Arc<Config>,
 }
 
@@ -197,6 +204,28 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
 
         match status {
             Ok(_) => {
+                match state
+                    .valkey
+                    .add_sent_amount(state.config.faucet.amount)
+                    .await
+                {
+                    Ok(total_sent_nanotons) => {
+                        info!(
+                            address = %task.address,
+                            amount = state.config.faucet.amount,
+                            total_sent_nanotons,
+                            "Recorded sent amount in Valkey"
+                        );
+                    }
+                    Err(err) => {
+                        warn!(
+                            address = %task.address,
+                            amount = state.config.faucet.amount,
+                            error = %err,
+                            "Failed to record sent amount in Valkey"
+                        );
+                    }
+                }
                 info!("Successfully sent claim to {}", task.address);
                 return Ok(());
             }

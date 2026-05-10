@@ -9,6 +9,7 @@ pub struct Config {
     pub worker: WorkerConfig,
     pub faucet: FaucetConfig,
     pub pow: PowConfig,
+    pub valkey: ValkeyConfig,
 }
 
 #[derive(Clone, Debug)]
@@ -53,6 +54,11 @@ pub struct PowConfig {
     pub max_challenges: u64,
 }
 
+#[derive(Clone, Debug)]
+pub struct ValkeyConfig {
+    pub uri: String,
+}
+
 impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
         let config = Config {
@@ -89,6 +95,10 @@ impl Config {
                 difficulty: parse_env_number("POW_DIFFICULTY", 21),
                 challenge_ttl_seconds: parse_env_number("POW_CHALLENGE_TTL_SECONDS", 300),
                 max_challenges: parse_env_number("POW_MAX_CHALLENGES", 10_000),
+            },
+            valkey: ValkeyConfig {
+                uri: std::env::var("VALKEY_URI")
+                    .unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string()),
             },
         };
 
