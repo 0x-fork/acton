@@ -7,11 +7,21 @@ pub struct Antifraud {
     enabled: bool,
     wallet_balance_enabled: bool,
     max_wallet_balance: u64,
+    sent_amount_window_enabled: bool,
+    sent_amount_window_max_amount: u64,
+    sent_amount_window_seconds: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SentAmountWindow {
+    pub max_amount: u64,
+    pub window_seconds: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CheckError {
     WalletBalanceTooHigh { balance: u64, max: u64 },
+    SentAmountWindowTransferTooLarge { amount: u64, max: u64 },
 }
 
 impl Antifraud {
@@ -20,6 +30,9 @@ impl Antifraud {
             enabled: config.enabled,
             wallet_balance_enabled: config.wallet_balance.enabled,
             max_wallet_balance: config.wallet_balance.max_wallet_balance,
+            sent_amount_window_enabled: config.sent_amount_window.enabled,
+            sent_amount_window_max_amount: config.sent_amount_window.max_amount,
+            sent_amount_window_seconds: config.sent_amount_window.window_seconds,
         }
     }
 
@@ -29,6 +42,17 @@ impl Antifraud {
 
     pub fn wallet_balance_enabled(&self) -> bool {
         self.enabled && self.wallet_balance_enabled
+    }
+
+    pub fn sent_amount_window(&self) -> Option<SentAmountWindow> {
+        if !self.enabled || !self.sent_amount_window_enabled {
+            return None;
+        }
+
+        Some(SentAmountWindow {
+            max_amount: self.sent_amount_window_max_amount,
+            window_seconds: self.sent_amount_window_seconds,
+        })
     }
 
     pub fn check_wallet_balance(&self, balance: u64) -> Result<(), CheckError> {
@@ -45,12 +69,27 @@ impl Antifraud {
 
         Ok(())
     }
+
+    pub fn check_sent_amount_window_transfer(&self, amount: u64) -> Result<(), CheckError> {
+        let Some(window) = self.sent_amount_window() else {
+            return Ok(());
+        };
+
+        if amount > window.max_amount {
+            return Err(CheckError::SentAmountWindowTransferTooLarge {
+                amount,
+                max: window.max_amount,
+            });
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{Antifraud, CheckError};
-    use faucet_config::{AntifraudConfig, WalletBalanceCheckConfig};
+    use faucet_config::{AntifraudConfig, SentAmountWindowCheckConfig, WalletBalanceCheckConfig};
 
     fn config(max_wallet_balance: u64) -> AntifraudConfig {
         AntifraudConfig {
@@ -59,12 +98,18 @@ mod tests {
                 enabled: true,
                 max_wallet_balance,
             },
+            sent_amount_window: SentAmountWindowCheckConfig {
+                enabled: true,
+                max_amount: 10_000_000_000,
+                window_seconds: 60,
+            },
         }
     }
 
     fn config_with_flags(
         enabled: bool,
         wallet_balance_enabled: bool,
+        sent_amount_window_enabled: bool,
         max_wallet_balance: u64,
     ) -> AntifraudConfig {
         AntifraudConfig {
@@ -72,6 +117,11 @@ mod tests {
             wallet_balance: WalletBalanceCheckConfig {
                 enabled: wallet_balance_enabled,
                 max_wallet_balance,
+            },
+            sent_amount_window: SentAmountWindowCheckConfig {
+                enabled: sent_amount_window_enabled,
+                max_amount: 10_000_000_000,
+                window_seconds: 60,
             },
         }
     }
@@ -101,21 +151,48 @@ mod tests {
 
     #[test]
     fn allows_any_balance_when_disabled() {
-        let config = config_with_flags(false, true, 25_000_000_000);
+        let config = config_with_flags(false, true, true, 25_000_000_000);
         let antifraud = Antifraud::new(&config);
 
         assert!(!antifraud.enabled());
         assert!(!antifraud.wallet_balance_enabled());
+        assert_eq!(antifraud.sent_amount_window(), None);
         assert_eq!(antifraud.check_wallet_balance(25_000_000_001), Ok(()));
     }
 
     #[test]
     fn allows_any_balance_when_wallet_balance_check_disabled() {
-        let config = config_with_flags(true, false, 25_000_000_000);
+        let config = config_with_flags(true, false, true, 25_000_000_000);
         let antifraud = Antifraud::new(&config);
 
         assert!(antifraud.enabled());
         assert!(!antifraud.wallet_balance_enabled());
         assert_eq!(antifraud.check_wallet_balance(25_000_000_001), Ok(()));
+    }
+
+    #[test]
+    fn rejects_transfer_larger_than_sent_amount_window_limit() {
+        let config = config(25_000_000_000);
+        let antifraud = Antifraud::new(&config);
+
+        assert_eq!(
+            antifraud.check_sent_amount_window_transfer(10_000_000_001),
+            Err(CheckError::SentAmountWindowTransferTooLarge {
+                amount: 10_000_000_001,
+                max: 10_000_000_000,
+            })
+        );
+    }
+
+    #[test]
+    fn allows_transfer_when_sent_amount_window_disabled() {
+        let config = config_with_flags(true, true, false, 25_000_000_000);
+        let antifraud = Antifraud::new(&config);
+
+        assert_eq!(antifraud.sent_amount_window(), None);
+        assert_eq!(
+            antifraud.check_sent_amount_window_transfer(10_000_000_001),
+            Ok(())
+        );
     }
 }

@@ -64,12 +64,20 @@ pub struct ValkeyConfig {
 pub struct AntifraudConfig {
     pub enabled: bool,
     pub wallet_balance: WalletBalanceCheckConfig,
+    pub sent_amount_window: SentAmountWindowCheckConfig,
 }
 
 #[derive(Clone, Debug)]
 pub struct WalletBalanceCheckConfig {
     pub enabled: bool,
     pub max_wallet_balance: u64,
+}
+
+#[derive(Clone, Debug)]
+pub struct SentAmountWindowCheckConfig {
+    pub enabled: bool,
+    pub max_amount: u64,
+    pub window_seconds: u64,
 }
 
 impl Config {
@@ -121,6 +129,14 @@ impl Config {
                         "ANTIFRAUD_WALLET_BALANCE_MAX_NANOTONS",
                         25_000_000_000,
                     ),
+                },
+                sent_amount_window: SentAmountWindowCheckConfig {
+                    enabled: parse_env_bool("ANTIFRAUD_SENT_AMOUNT_WINDOW_ENABLED", true),
+                    max_amount: parse_env_number(
+                        "ANTIFRAUD_SENT_AMOUNT_WINDOW_MAX_NANOTONS",
+                        10_000_000_000,
+                    ),
+                    window_seconds: parse_env_number("ANTIFRAUD_SENT_AMOUNT_WINDOW_SECONDS", 60),
                 },
             },
         };

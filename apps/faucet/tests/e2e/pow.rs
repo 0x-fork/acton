@@ -7,8 +7,8 @@ use axum::{
 };
 use faucet_backend::middlewares::require_pow_enabled;
 use faucet_config::{
-    AntifraudConfig, Config, DatabaseConfig, FaucetConfig, PowConfig, ServerConfig,
-    ToncenterConfig, ValkeyConfig, WalletBalanceCheckConfig, WorkerConfig,
+    AntifraudConfig, Config, DatabaseConfig, FaucetConfig, PowConfig, SentAmountWindowCheckConfig,
+    ServerConfig, ToncenterConfig, ValkeyConfig, WalletBalanceCheckConfig, WorkerConfig,
 };
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -100,6 +100,11 @@ fn config(pow_enabled: bool) -> Config {
             wallet_balance: WalletBalanceCheckConfig {
                 enabled: true,
                 max_wallet_balance: 25_000_000_000,
+            },
+            sent_amount_window: SentAmountWindowCheckConfig {
+                enabled: true,
+                max_amount: 10_000_000_000,
+                window_seconds: 60,
             },
         },
     }

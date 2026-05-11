@@ -8,7 +8,7 @@ use client::ToncenterClient;
 use faucet_antifraud::Antifraud;
 use faucet_config::Config;
 use faucet_pow::Pow;
-use faucet_valkey::ValkeyStore;
+use faucet_valkey::{SentAmountWindowDecision, ValkeyStore};
 use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::sync::Cache;
@@ -191,8 +191,11 @@ pub(crate) struct AppState {
 async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<()> {
     let wallet = state.wallet.as_ref();
     let client = state.client.as_ref();
+    let amount = state.config.faucet.amount;
 
     info!("Processing claim for address: {}", task.address);
+
+    wait_for_sent_amount_window(&state, &task.address, amount).await?;
 
     let max_retries = state.config.worker.max_retries;
 
@@ -201,22 +204,18 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
             wallet,
             client,
             &task.address,
-            state.config.faucet.amount,
+            amount,
             &state.config.faucet.message,
         )
         .await;
 
         match status {
             Ok(_) => {
-                match state
-                    .valkey
-                    .add_sent_amount(state.config.faucet.amount)
-                    .await
-                {
+                match state.valkey.add_sent_amount(amount).await {
                     Ok(total_sent_nanotons) => {
                         info!(
                             address = %task.address,
-                            amount = state.config.faucet.amount,
+                            amount,
                             total_sent_nanotons,
                             "Recorded sent amount in Valkey"
                         );
@@ -224,7 +223,7 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
                     Err(err) => {
                         warn!(
                             address = %task.address,
-                            amount = state.config.faucet.amount,
+                            amount,
                             error = %err,
                             "Failed to record sent amount in Valkey"
                         );
@@ -261,6 +260,65 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
     }
 
     unreachable!("send_claim loop should always return");
+}
+
+async fn wait_for_sent_amount_window(
+    state: &AppState,
+    address: &str,
+    amount: u64,
+) -> anyhow::Result<()> {
+    let Some(window) = state.antifraud.sent_amount_window() else {
+        return Ok(());
+    };
+
+    if let Err(err) = state.antifraud.check_sent_amount_window_transfer(amount) {
+        error!(
+            address = %address,
+            amount,
+            max_amount = window.max_amount,
+            error = ?err,
+            "Claim amount exceeds sent amount window limit"
+        );
+        anyhow::bail!("Claim amount exceeds sent amount window limit: {err:?}");
+    }
+
+    loop {
+        match state
+            .valkey
+            .reserve_sent_amount_window(amount, window.max_amount, window.window_seconds)
+            .await?
+        {
+            SentAmountWindowDecision::Reserved(reservation) => {
+                info!(
+                    address = %address,
+                    amount,
+                    reserved_total_nanotons = reservation.total,
+                    max_amount = reservation.max,
+                    window_seconds = reservation.window_seconds,
+                    "Reserved sent amount sliding window"
+                );
+                return Ok(());
+            }
+            SentAmountWindowDecision::Limited {
+                current,
+                attempted,
+                max,
+                window_seconds,
+                retry_after_ms,
+            } => {
+                warn!(
+                    address = %address,
+                    current_sent_nanotons = current,
+                    attempted_amount = attempted,
+                    max_amount = max,
+                    window_seconds,
+                    retry_after_ms,
+                    "Sent amount sliding window limit reached, waiting"
+                );
+                tokio::time::sleep(StdDuration::from_millis(retry_after_ms.max(1))).await;
+            }
+        }
+    }
 }
 
 fn exponential_backoff(base_delay_ms: u64, attempt: u32) -> StdDuration {
