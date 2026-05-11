@@ -7,6 +7,7 @@ const NANOTONS_PER_TON: u64 = 1_000_000_000;
 pub struct Config {
     pub database: DatabaseConfig,
     pub server: ServerConfig,
+    pub rate_limit: RateLimitConfig,
     pub toncenter: ToncenterConfig,
     pub worker: WorkerConfig,
     pub faucet: FaucetConfig,
@@ -24,6 +25,24 @@ pub struct DatabaseConfig {
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
+}
+
+#[derive(Clone, Debug)]
+pub struct RateLimitConfig {
+    pub default: DefaultRateLimitConfig,
+    pub claim: ClaimRateLimitConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct DefaultRateLimitConfig {
+    pub window_seconds: u64,
+    pub max_requests: u32,
+}
+
+#[derive(Clone, Debug)]
+pub struct ClaimRateLimitConfig {
+    pub window_seconds: u64,
+    pub max_requests: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -92,6 +111,16 @@ impl Config {
             server: ServerConfig {
                 host: std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
                 port: parse_env_number("PORT", 3001),
+            },
+            rate_limit: RateLimitConfig {
+                default: DefaultRateLimitConfig {
+                    window_seconds: parse_env_number("RATE_LIMIT_DEFAULT_WINDOW_SECONDS", 1),
+                    max_requests: parse_env_number("RATE_LIMIT_DEFAULT_MAX_REQUESTS", 5),
+                },
+                claim: ClaimRateLimitConfig {
+                    window_seconds: parse_env_number("RATE_LIMIT_CLAIM_WINDOW_SECONDS", 86_400),
+                    max_requests: parse_env_number("RATE_LIMIT_CLAIM_MAX_REQUESTS", 100),
+                },
             },
             toncenter: ToncenterConfig {
                 api_key: std::env::var("TONCENTER_API_KEY").ok(),

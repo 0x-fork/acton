@@ -5,7 +5,7 @@ use apalis::prelude::{Data, WorkerBuilder};
 use apalis_sqlite::{CompactType, Config as SqliteConfig, HookCallbackListener, SqliteStorage};
 use axum_governor::GovernorLayer;
 use faucet_antifraud::Antifraud;
-use faucet_config::Config;
+use faucet_config::{ClaimRateLimitConfig, Config, DefaultRateLimitConfig};
 use faucet_pow::Pow;
 use faucet_valkey::{SentAmountWindowDecision, ValkeyStore};
 use handlers::CreateClaim;
@@ -61,11 +61,13 @@ async fn main() -> anyhow::Result<()> {
         .context("Failed to connect to database")?;
     info!("Connected to database");
 
+    let default_rate_limit = default_rate_limit_rule(&config.rate_limit.default);
+    let claim_rate_limit = claim_rate_limit_rule(&config.rate_limit.claim);
     init_rate_limiter!(
-        default: RuleConfig::new(Duration::seconds(1), 5),
+        default: default_rate_limit,
         max_memory: Some(64 * 1024 * 1024),
         routes: [
-            ("/claim", RuleConfig::new(Duration::hours(24), 100)), // 2 req/24h
+            ("/claim", claim_rate_limit),
         ]
     )
     .await;
@@ -142,6 +144,20 @@ async fn main() -> anyhow::Result<()> {
     .context("HTTP server exited with error")?;
 
     Ok(())
+}
+
+fn default_rate_limit_rule(config: &DefaultRateLimitConfig) -> RuleConfig {
+    RuleConfig::new(
+        Duration::seconds(config.window_seconds),
+        config.max_requests,
+    )
+}
+
+fn claim_rate_limit_rule(config: &ClaimRateLimitConfig) -> RuleConfig {
+    RuleConfig::new(
+        Duration::seconds(config.window_seconds),
+        config.max_requests,
+    )
 }
 
 async fn shutdown_signal() {
