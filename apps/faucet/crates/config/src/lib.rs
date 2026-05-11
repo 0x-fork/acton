@@ -1,6 +1,8 @@
 use anyhow::Context;
 use std::str::FromStr;
 
+const NANOTONS_PER_TON: u64 = 1_000_000_000;
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub database: DatabaseConfig,
@@ -107,7 +109,7 @@ impl Config {
             faucet: FaucetConfig {
                 mnemonic: std::env::var("FAUCET_MNEMONIC")
                     .context("FAUCET_MNEMONIC must be set")?,
-                amount: parse_env_number("FAUCET_AMOUNT", 1_000_000), // 0.5 TON default
+                amount: parse_env_nanotons("FAUCET_AMOUNT_NANOTONS", 1_000_000),
                 message: std::env::var("FAUCET_MESSAGE")
                     .unwrap_or_else(|_| "Testnet faucet".to_string()),
             },
@@ -125,14 +127,14 @@ impl Config {
                 enabled: parse_env_bool("ANTIFRAUD_ENABLED", true),
                 wallet_balance: WalletBalanceCheckConfig {
                     enabled: parse_env_bool("ANTIFRAUD_WALLET_BALANCE_ENABLED", true),
-                    max_wallet_balance: parse_env_number(
+                    max_wallet_balance: parse_env_nanotons(
                         "ANTIFRAUD_WALLET_BALANCE_MAX_NANOTONS",
                         25_000_000_000,
                     ),
                 },
                 sent_amount_window: SentAmountWindowCheckConfig {
                     enabled: parse_env_bool("ANTIFRAUD_SENT_AMOUNT_WINDOW_ENABLED", true),
-                    max_amount: parse_env_number(
+                    max_amount: parse_env_nanotons(
                         "ANTIFRAUD_SENT_AMOUNT_WINDOW_MAX_NANOTONS",
                         10_000_000_000,
                     ),
@@ -162,6 +164,39 @@ where
     value.replace('_', "").parse().ok()
 }
 
+fn parse_env_nanotons(name: &str, default: u64) -> u64 {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| parse_nanotons(&value))
+        .unwrap_or(default)
+}
+
+fn parse_nanotons(value: &str) -> Option<u64> {
+    let value = value.trim();
+    let normalized = value.to_ascii_lowercase();
+
+    if let Some(ton_amount) = normalized.strip_suffix("ton") {
+        parse_ton_amount(ton_amount)
+    } else {
+        parse_number(value)
+    }
+}
+
+fn parse_ton_amount(value: &str) -> Option<u64> {
+    let tons = value.trim().replace('_', "").parse::<f64>().ok()?;
+    if !tons.is_finite() || tons < 0.0 {
+        return None;
+    }
+
+    let nanotons = tons * NANOTONS_PER_TON as f64;
+    let rounded = nanotons.round();
+    if (nanotons - rounded).abs() > 0.000_001 || rounded > u64::MAX as f64 {
+        return None;
+    }
+
+    Some(rounded as u64)
+}
+
 fn parse_env_bool(name: &str, default: bool) -> bool {
     std::env::var(name)
         .ok()
@@ -179,7 +214,7 @@ fn parse_bool(value: &str) -> Option<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_bool, parse_number};
+    use super::{NANOTONS_PER_TON, parse_bool, parse_nanotons, parse_number};
 
     #[test]
     fn parses_numbers_with_underscores() {
@@ -191,6 +226,25 @@ mod tests {
     #[test]
     fn rejects_invalid_numbers() {
         assert_eq!(parse_number::<u64>("500 TON"), None);
+    }
+
+    #[test]
+    fn parses_nanotons() {
+        assert_eq!(parse_nanotons("500_000_000"), Some(500_000_000));
+        assert_eq!(parse_nanotons("1TON"), Some(NANOTONS_PER_TON));
+        assert_eq!(parse_nanotons("1ton"), Some(NANOTONS_PER_TON));
+        assert_eq!(parse_nanotons("0.5TON"), Some(500_000_000));
+        assert_eq!(parse_nanotons(".25ton"), Some(250_000_000));
+        assert_eq!(parse_nanotons("1e-9TON"), Some(1));
+        assert_eq!(parse_nanotons("1.000000001TON"), Some(1_000_000_001));
+    }
+
+    #[test]
+    fn rejects_invalid_nanoton_values() {
+        assert_eq!(parse_nanotons(""), None);
+        assert_eq!(parse_nanotons("TON"), None);
+        assert_eq!(parse_nanotons("1.0000000001TON"), None);
+        assert_eq!(parse_nanotons("oneTON"), None);
     }
 
     #[test]
