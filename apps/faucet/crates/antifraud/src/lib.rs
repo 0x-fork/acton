@@ -10,11 +10,20 @@ pub struct Antifraud {
     sent_amount_window_enabled: bool,
     sent_amount_window_max_amount: u64,
     sent_amount_window_seconds: u64,
+    successful_claim_window_enabled: bool,
+    successful_claim_window_max_requests: u32,
+    successful_claim_window_seconds: u64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SentAmountWindow {
     pub max_amount: u64,
+    pub window_seconds: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SuccessfulClaimWindow {
+    pub max_requests: u32,
     pub window_seconds: u64,
 }
 
@@ -33,6 +42,9 @@ impl Antifraud {
             sent_amount_window_enabled: config.sent_amount_window.enabled,
             sent_amount_window_max_amount: config.sent_amount_window.max_amount,
             sent_amount_window_seconds: config.sent_amount_window.window_seconds,
+            successful_claim_window_enabled: config.successful_claim_window.enabled,
+            successful_claim_window_max_requests: config.successful_claim_window.max_requests,
+            successful_claim_window_seconds: config.successful_claim_window.window_seconds,
         }
     }
 
@@ -52,6 +64,17 @@ impl Antifraud {
         Some(SentAmountWindow {
             max_amount: self.sent_amount_window_max_amount,
             window_seconds: self.sent_amount_window_seconds,
+        })
+    }
+
+    pub fn successful_claim_window(&self) -> Option<SuccessfulClaimWindow> {
+        if !self.enabled || !self.successful_claim_window_enabled {
+            return None;
+        }
+
+        Some(SuccessfulClaimWindow {
+            max_requests: self.successful_claim_window_max_requests,
+            window_seconds: self.successful_claim_window_seconds,
         })
     }
 
@@ -89,7 +112,10 @@ impl Antifraud {
 #[cfg(test)]
 mod tests {
     use super::{Antifraud, CheckError};
-    use faucet_config::{AntifraudConfig, SentAmountWindowCheckConfig, WalletBalanceCheckConfig};
+    use faucet_config::{
+        AntifraudConfig, SentAmountWindowCheckConfig, SuccessfulClaimWindowCheckConfig,
+        WalletBalanceCheckConfig,
+    };
 
     fn config(max_wallet_balance: u64) -> AntifraudConfig {
         AntifraudConfig {
@@ -102,6 +128,11 @@ mod tests {
                 enabled: true,
                 max_amount: 10_000_000_000,
                 window_seconds: 60,
+            },
+            successful_claim_window: SuccessfulClaimWindowCheckConfig {
+                enabled: true,
+                max_requests: 2,
+                window_seconds: 86_400,
             },
         }
     }
@@ -122,6 +153,11 @@ mod tests {
                 enabled: sent_amount_window_enabled,
                 max_amount: 10_000_000_000,
                 window_seconds: 60,
+            },
+            successful_claim_window: SuccessfulClaimWindowCheckConfig {
+                enabled: true,
+                max_requests: 2,
+                window_seconds: 86_400,
             },
         }
     }
@@ -157,6 +193,7 @@ mod tests {
         assert!(!antifraud.enabled());
         assert!(!antifraud.wallet_balance_enabled());
         assert_eq!(antifraud.sent_amount_window(), None);
+        assert_eq!(antifraud.successful_claim_window(), None);
         assert_eq!(antifraud.check_wallet_balance(25_000_000_001), Ok(()));
     }
 
@@ -193,6 +230,20 @@ mod tests {
         assert_eq!(
             antifraud.check_sent_amount_window_transfer(10_000_000_001),
             Ok(())
+        );
+    }
+
+    #[test]
+    fn returns_successful_claim_window_when_enabled() {
+        let config = config(25_000_000_000);
+        let antifraud = Antifraud::new(&config);
+
+        assert_eq!(
+            antifraud.successful_claim_window(),
+            Some(super::SuccessfulClaimWindow {
+                max_requests: 2,
+                window_seconds: 86_400,
+            })
         );
     }
 }

@@ -9,7 +9,8 @@ use faucet_backend::middlewares::require_pow_enabled;
 use faucet_config::{
     AntifraudConfig, ClaimRateLimitConfig, Config, DatabaseConfig, DefaultRateLimitConfig,
     FaucetConfig, PowConfig, RateLimitConfig, SentAmountWindowCheckConfig, ServerConfig,
-    ToncenterConfig, ValkeyConfig, WalletBalanceCheckConfig, WorkerConfig,
+    SuccessfulClaimWindowCheckConfig, ToncenterConfig, ValkeyConfig, WalletBalanceCheckConfig,
+    WorkerConfig,
 };
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -116,6 +117,11 @@ fn config(pow_enabled: bool) -> Config {
                 enabled: true,
                 max_amount: 10_000_000_000,
                 window_seconds: 60,
+            },
+            successful_claim_window: SuccessfulClaimWindowCheckConfig {
+                enabled: true,
+                max_requests: 2,
+                window_seconds: 86_400,
             },
         },
     }

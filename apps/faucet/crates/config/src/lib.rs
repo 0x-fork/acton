@@ -86,6 +86,7 @@ pub struct AntifraudConfig {
     pub enabled: bool,
     pub wallet_balance: WalletBalanceCheckConfig,
     pub sent_amount_window: SentAmountWindowCheckConfig,
+    pub successful_claim_window: SuccessfulClaimWindowCheckConfig,
 }
 
 #[derive(Clone, Debug)]
@@ -98,6 +99,13 @@ pub struct WalletBalanceCheckConfig {
 pub struct SentAmountWindowCheckConfig {
     pub enabled: bool,
     pub max_amount: u64,
+    pub window_seconds: u64,
+}
+
+#[derive(Clone, Debug)]
+pub struct SuccessfulClaimWindowCheckConfig {
+    pub enabled: bool,
+    pub max_requests: u32,
     pub window_seconds: u64,
 }
 
@@ -168,6 +176,17 @@ impl Config {
                         10_000_000_000,
                     ),
                     window_seconds: parse_env_number("ANTIFRAUD_SENT_AMOUNT_WINDOW_SECONDS", 60),
+                },
+                successful_claim_window: SuccessfulClaimWindowCheckConfig {
+                    enabled: parse_env_bool("ANTIFRAUD_SUCCESSFUL_CLAIM_WINDOW_ENABLED", true),
+                    max_requests: parse_env_number(
+                        "ANTIFRAUD_SUCCESSFUL_CLAIM_WINDOW_MAX_REQUESTS",
+                        2,
+                    ),
+                    window_seconds: parse_env_number(
+                        "ANTIFRAUD_SUCCESSFUL_CLAIM_WINDOW_SECONDS",
+                        86_400,
+                    ),
                 },
             },
         };

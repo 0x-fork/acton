@@ -5,6 +5,12 @@ const SENT_AMOUNT_WINDOW_KEY: &str = "faucet:antifraud:sent-amount-window";
 const SENT_AMOUNT_WINDOW_SEQ_KEY: &str = "faucet:antifraud:sent-amount-window:seq";
 const SENT_AMOUNT_WINDOW_SCRIPT: &str = include_str!("../scripts/reserve_sliding_window.lua");
 
+const SUCCESSFUL_CLAIM_WINDOW_KEY_PREFIX: &str = "faucet:antifraud:successful-claim-window";
+const SUCCESSFUL_CLAIM_WINDOW_SEQ_KEY_PREFIX: &str = "faucet:antifraud:successful-claim-window:seq";
+const CHECK_SUCCESSFUL_CLAIM_WINDOW_SCRIPT: &str =
+    include_str!("../scripts/check_successful_claim_window.lua");
+const RECORD_SUCCESSFUL_CLAIM_SCRIPT: &str = include_str!("../scripts/record_successful_claim.lua");
+
 const TOTAL_SENT_NANOTONS_KEY: &str = "faucet:stats:sent-nanotons";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -22,6 +28,21 @@ pub enum SentAmountWindowDecision {
         current: u64,
         attempted: u64,
         max: u64,
+        window_seconds: u64,
+        retry_after_ms: u64,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SuccessfulClaimWindowDecision {
+    Allowed {
+        current: u32,
+        max: u32,
+        window_seconds: u64,
+    },
+    Limited {
+        current: u32,
+        max: u32,
         window_seconds: u64,
         retry_after_ms: u64,
     },
@@ -98,13 +119,97 @@ impl ValkeyStore {
             value => anyhow::bail!("Unexpected sent amount window decision: {value}"),
         }
     }
+
+    pub async fn check_successful_claim_window(
+        &self,
+        address: &str,
+        max_requests: u32,
+        window_seconds: u64,
+    ) -> anyhow::Result<SuccessfulClaimWindowDecision> {
+        anyhow::ensure!(
+            window_seconds > 0,
+            "Successful claim window must be positive"
+        );
+
+        let ttl_seconds = window_seconds.saturating_mul(2).max(1);
+        let mut connection = self.connection.clone();
+        let response: (u64, u32, u64) = redis::Script::new(CHECK_SUCCESSFUL_CLAIM_WINDOW_SCRIPT)
+            .key(successful_claim_window_key(address))
+            .arg(max_requests)
+            .arg(window_seconds)
+            .arg(ttl_seconds)
+            .invoke_async(&mut connection)
+            .await
+            .context("Failed to check successful claim window")?;
+
+        match response.0 {
+            1 => Ok(SuccessfulClaimWindowDecision::Allowed {
+                current: response.1,
+                max: max_requests,
+                window_seconds,
+            }),
+            0 => Ok(SuccessfulClaimWindowDecision::Limited {
+                current: response.1,
+                max: max_requests,
+                window_seconds,
+                retry_after_ms: response.2,
+            }),
+            value => anyhow::bail!("Unexpected successful claim window decision: {value}"),
+        }
+    }
+
+    pub async fn record_successful_claim(
+        &self,
+        address: &str,
+        window_seconds: u64,
+    ) -> anyhow::Result<u32> {
+        anyhow::ensure!(
+            window_seconds > 0,
+            "Successful claim window must be positive"
+        );
+
+        let ttl_seconds = window_seconds.saturating_mul(2).max(1);
+        let mut connection = self.connection.clone();
+        redis::Script::new(RECORD_SUCCESSFUL_CLAIM_SCRIPT)
+            .key(successful_claim_window_key(address))
+            .key(successful_claim_window_seq_key(address))
+            .arg(window_seconds)
+            .arg(ttl_seconds)
+            .invoke_async(&mut connection)
+            .await
+            .context("Failed to record successful claim")
+    }
+}
+
+fn successful_claim_window_key(address: &str) -> String {
+    format!("{SUCCESSFUL_CLAIM_WINDOW_KEY_PREFIX}:{address}")
+}
+
+fn successful_claim_window_seq_key(address: &str) -> String {
+    format!("{SUCCESSFUL_CLAIM_WINDOW_SEQ_KEY_PREFIX}:{address}")
 }
 
 #[cfg(test)]
 mod tests {
+    use super::{successful_claim_window_key, successful_claim_window_seq_key};
+
     #[test]
     fn accepts_plain_and_tls_valkey_uris() {
         redis::Client::open("redis://127.0.0.1:6379/0").unwrap();
         redis::Client::open("rediss://user:password@hostname").unwrap();
+    }
+
+    #[test]
+    fn builds_successful_claim_window_keys_from_canonical_address() {
+        let address = "0:e4d954ef9f4e1250a26b5bbad76a1cdd17cfd08babad6f4c23e372270aef6f76";
+
+        assert_eq!(
+            successful_claim_window_key(address),
+            "faucet:antifraud:successful-claim-window:0:e4d954ef9f4e1250a26b5bbad76a1cdd17cfd08babad6f4c23e372270aef6f76"
+        );
+        assert_eq!(
+            successful_claim_window_seq_key(address),
+            "faucet:antifraud:successful-claim-window:seq:0:e4d954ef9f4e1250a26b5bbad76a1cdd17cfd08babad6f4c23e372270aef6f76"
+        );
     }
 }

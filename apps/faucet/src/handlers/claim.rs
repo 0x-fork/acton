@@ -1,9 +1,11 @@
 use crate::AppState;
 use apalis::prelude::TaskSink;
 use axum::{Json, extract::State, http::StatusCode};
+use faucet_valkey::SuccessfulClaimWindowDecision;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use ton::ton_core::types::TonAddress;
+use tracing::{error, info, warn};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct CreateClaim {
@@ -31,6 +33,7 @@ pub(super) struct ErrorResponse {
 }
 
 type ClaimResult = Result<(StatusCode, Json<ClaimResponse>), (StatusCode, Json<ErrorResponse>)>;
+type ClaimLimitResult = Result<(), (StatusCode, Json<ErrorResponse>)>;
 
 //noinspection RsLiveness
 #[axum::debug_handler]
@@ -38,9 +41,9 @@ pub(super) async fn create_claim(
     State(mut state): State<AppState>,
     Json(payload): Json<CreateClaimRequest>,
 ) -> ClaimResult {
-    if TonAddress::from_str(&payload.address).is_err() {
-        return Err(bad_request("Invalid TON address"));
-    }
+    let address = TonAddress::from_str(&payload.address)
+        .map(|address| address.to_hex())
+        .map_err(|_| bad_request("Invalid TON address"))?;
 
     if !state.pow.can_process_version(payload.version) {
         return Err(bad_request("Unsupported challenge version"));
@@ -59,6 +62,8 @@ pub(super) async fn create_claim(
         return Err(bad_request("Invalid PoW solution"));
     }
 
+    check_successful_claim_window(&state, &address).await?;
+
     if state.pow_challenges.remove(&payload.challenge).is_none() {
         return Err(bad_request("Invalid or expired challenge"));
     }
@@ -66,7 +71,7 @@ pub(super) async fn create_claim(
     state
         .storage
         .push(CreateClaim {
-            address: payload.address,
+            address,
             challenge: payload.challenge,
             nonce: payload.nonce,
         })
@@ -79,6 +84,64 @@ pub(super) async fn create_claim(
             message: "Your claim has been queued. It will be processed soon.",
         }),
     ))
+}
+
+// TODO: сделать по другому
+async fn check_successful_claim_window(state: &AppState, address: &str) -> ClaimLimitResult {
+    let Some(window) = state.antifraud.successful_claim_window() else {
+        return Ok(());
+    };
+
+    match state
+        .valkey
+        .check_successful_claim_window(address, window.max_requests, window.window_seconds)
+        .await
+    {
+        Ok(SuccessfulClaimWindowDecision::Allowed {
+            current,
+            max,
+            window_seconds,
+        }) => {
+            info!(
+                address = %address,
+                successful_claims = current,
+                max_requests = max,
+                window_seconds,
+                "Successful claim window checked"
+            );
+            Ok(())
+        }
+        Ok(SuccessfulClaimWindowDecision::Limited {
+            current,
+            max,
+            window_seconds,
+            retry_after_ms,
+        }) => {
+            warn!(
+                address = %address,
+                successful_claims = current,
+                max_requests = max,
+                window_seconds,
+                retry_after_ms,
+                "Successful claim window limit reached"
+            );
+            Err(response_error(
+                StatusCode::TOO_MANY_REQUESTS,
+                "Successful claim limit exceeded",
+            ))
+        }
+        Err(err) => {
+            error!(
+                address = %address,
+                error = %err,
+                "Failed to check successful claim window"
+            );
+            Err(response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to check claim limit",
+            ))
+        }
+    }
 }
 
 fn bad_request(error: &'static str) -> (StatusCode, Json<ErrorResponse>) {

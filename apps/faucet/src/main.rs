@@ -7,7 +7,7 @@ use axum_governor::GovernorLayer;
 use faucet_antifraud::Antifraud;
 use faucet_config::{ClaimRateLimitConfig, Config, DefaultRateLimitConfig};
 use faucet_pow::Pow;
-use faucet_valkey::{SentAmountWindowDecision, ValkeyStore};
+use faucet_valkey::{SentAmountWindowDecision, SuccessfulClaimWindowDecision, ValkeyStore};
 use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::sync::Cache;
@@ -211,6 +211,10 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
 
     info!("Processing claim for address: {}", task.address);
 
+    if !can_process_successful_claim_window(&state, &task.address).await? {
+        return Ok(());
+    }
+
     wait_for_sent_amount_window(&state, &task.address, amount).await?;
 
     let max_retries = state.config.worker.max_retries;
@@ -227,6 +231,7 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
 
         match status {
             Ok(_) => {
+                record_successful_claim(&state, &task.address).await;
                 match state.valkey.add_sent_amount(amount).await {
                     Ok(total_sent_nanotons) => {
                         info!(
@@ -276,6 +281,99 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
     }
 
     unreachable!("send_claim loop should always return");
+}
+
+// TODO: вынести куда-то
+async fn can_process_successful_claim_window(
+    state: &AppState,
+    address: &str,
+) -> anyhow::Result<bool> {
+    let Some(window) = state.antifraud.successful_claim_window() else {
+        return Ok(true);
+    };
+
+    let address_key = normalized_address_key(address)?;
+
+    match state
+        .valkey
+        .check_successful_claim_window(&address_key, window.max_requests, window.window_seconds)
+        .await?
+    {
+        SuccessfulClaimWindowDecision::Allowed {
+            current,
+            max,
+            window_seconds,
+        } => {
+            info!(
+                address = %address,
+                successful_claims = current,
+                max_requests = max,
+                window_seconds,
+                "Successful claim window allows send"
+            );
+            Ok(true)
+        }
+        SuccessfulClaimWindowDecision::Limited {
+            current,
+            max,
+            window_seconds,
+            retry_after_ms,
+        } => {
+            warn!(
+                address = %address,
+                successful_claims = current,
+                max_requests = max,
+                window_seconds,
+                retry_after_ms,
+                "Successful claim window limit reached, skipping queued claim"
+            );
+            Ok(false)
+        }
+    }
+}
+
+async fn record_successful_claim(state: &AppState, address: &str) {
+    let Some(window) = state.antifraud.successful_claim_window() else {
+        return;
+    };
+
+    let address_key = match normalized_address_key(address) {
+        Ok(address_key) => address_key,
+        Err(err) => {
+            warn!(
+                address = %address,
+                error = %err,
+                "Failed to normalize successful claim address"
+            );
+            return;
+        }
+    };
+
+    match state
+        .valkey
+        .record_successful_claim(&address_key, window.window_seconds)
+        .await
+    {
+        Ok(successful_claims) => {
+            info!(
+                address = %address,
+                successful_claims,
+                window_seconds = window.window_seconds,
+                "Recorded successful claim in Valkey"
+            );
+        }
+        Err(err) => {
+            warn!(
+                address = %address,
+                error = %err,
+                "Failed to record successful claim in Valkey"
+            );
+        }
+    }
+}
+
+fn normalized_address_key(address: &str) -> anyhow::Result<String> {
+    Ok(TonAddress::from_str(address)?.to_hex())
 }
 
 async fn wait_for_sent_amount_window(
