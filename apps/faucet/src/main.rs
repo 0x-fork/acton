@@ -4,7 +4,6 @@ use apalis::prelude::json::JsonCodec;
 use apalis::prelude::{Data, WorkerBuilder};
 use apalis_sqlite::{CompactType, Config as SqliteConfig, HookCallbackListener, SqliteStorage};
 use axum_governor::GovernorLayer;
-use client::ToncenterClient;
 use faucet_antifraud::Antifraud;
 use faucet_config::Config;
 use faucet_pow::Pow;
@@ -23,11 +22,11 @@ use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton::ton_core::types::TonAddress;
 use ton::ton_core::types::tlb_core::TLBCoins;
+use toncenter::ToncenterClient;
 use tower::ServiceBuilder;
 use tracing::{error, info, warn};
 use wallet::Wallet;
 
-mod client;
 mod handlers;
 mod logger;
 mod wallet;
@@ -85,8 +84,9 @@ async fn main() -> anyhow::Result<()> {
         "Created faucet wallet"
     );
 
-    let client =
-        Arc::new(ToncenterClient::new(&config).context("Failed to create Toncenter client")?);
+    let client = Arc::new(
+        ToncenterClient::new(&config.toncenter).context("Failed to create Toncenter client")?,
+    );
     info!("Created Toncenter client");
     let valkey = ValkeyStore::new(&config.valkey)
         .await

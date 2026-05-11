@@ -1079,12 +1079,12 @@ dependencies = [
  "lazy-limit",
  "moka",
  "real",
- "reqwest",
  "serde",
  "serde_json",
  "sqlx",
  "tokio",
  "ton",
+ "toncenter",
  "tower 0.5.2",
  "tracing",
  "tracing-subscriber",
@@ -3777,6 +3777,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.111",
+]
+
+[[package]]
+name = "toncenter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "faucet-config",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

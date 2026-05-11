@@ -1,23 +1,15 @@
 use anyhow::{Context, anyhow};
-use faucet_config::Config;
+use faucet_config::ToncenterConfig;
+use reqwest::header;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::warn;
 
-const USER_AGENT: &str = concat!(
-    "faucet/",
-    env!("CARGO_PKG_VERSION"),
-    " (",
-    env!("GIT_HASH"),
-    ")"
-);
-
 pub struct ToncenterClient {
     client: reqwest::Client,
     base_url: String,
-    api_key: Option<String>,
     max_retries: u32,
     retry_base_delay: Duration,
 }
@@ -28,58 +20,58 @@ pub struct GetMethodResult {
 }
 
 impl ToncenterClient {
-    pub fn new(config: &Config) -> anyhow::Result<Self> {
+    pub fn new(config: &ToncenterConfig) -> anyhow::Result<Self> {
+        let mut default_headers = header::HeaderMap::new();
+
+        if let Some(api_key) = config.api_key.as_deref() {
+            let api_key = header::HeaderValue::from_str(api_key)
+                .context("Invalid Toncenter API key header value")?;
+
+            default_headers.insert(header::HeaderName::from_static("x-api-key"), api_key);
+        }
+
         let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(config.toncenter.timeout_seconds))
-            .connect_timeout(Duration::from_secs(
-                config.toncenter.connect_timeout_seconds,
-            ))
-            .user_agent(USER_AGENT)
+            .timeout(Duration::from_secs(config.timeout_seconds))
+            .connect_timeout(Duration::from_secs(config.connect_timeout_seconds))
+            .default_headers(default_headers)
+            .user_agent(user_agent())
             .build()
             .context("Failed to build Toncenter HTTP client")?;
 
         Ok(Self {
             client,
-            base_url: config.toncenter.url.clone(),
-            api_key: config.toncenter.api_key.clone(),
-            max_retries: config.toncenter.max_retries,
-            retry_base_delay: Duration::from_millis(config.toncenter.retry_base_delay_ms),
+            base_url: config.url.clone(),
+            max_retries: config.max_retries,
+            retry_base_delay: Duration::from_millis(config.retry_base_delay_ms),
         })
-    }
-
-    fn apply_auth(&self, mut request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-        if let Some(ref key) = self.api_key {
-            request = request.header("X-API-Key", key);
-        }
-        request
     }
 
     pub async fn get_wallet_seqno(&self, address: &str) -> anyhow::Result<u32> {
         let result = self.run_get_method(address, "seqno").await?;
 
         for first in result.stack {
-            if let Some(val) = first.as_array() {
-                if val.len() == 2 {
-                    if let (Some(type_str), Some(value_str)) = (val[0].as_str(), val[1].as_str()) {
-                        if type_str == "num" {
-                            let seqno = u32::from_str_radix(value_str.trim_start_matches("0x"), 16)
-                                .unwrap_or(0);
-                            return Ok(seqno);
-                        }
-                    }
-                }
-            } else if let Some(type_str) = first.get("type").and_then(|t| t.as_str()) {
-                if type_str == "num" {
-                    if let Some(value_str) = first.get("value").and_then(|v| v.as_str()) {
-                        let seqno = u32::from_str_radix(value_str.trim_start_matches("0x"), 16)
-                            .unwrap_or(0);
-                        return Ok(seqno);
-                    }
-                }
+            if let Some(value_str) = Self::stack_num_value(&first) {
+                return Ok(Self::parse_seqno(value_str));
             }
         }
 
         Ok(0)
+    }
+
+    fn stack_num_value(value: &Value) -> Option<&str> {
+        value
+            .as_array()
+            .filter(|items| items.len() == 2 && items[0].as_str() == Some("num"))
+            .and_then(|items| items[1].as_str())
+            .or_else(|| {
+                (value.get("type").and_then(Value::as_str) == Some("num"))
+                    .then(|| value.get("value").and_then(Value::as_str))
+                    .flatten()
+            })
+    }
+
+    fn parse_seqno(value: &str) -> u32 {
+        u32::from_str_radix(value.trim_start_matches("0x"), 16).unwrap_or(0)
     }
 
     pub async fn run_get_method(
@@ -178,7 +170,7 @@ impl ToncenterClient {
         let url = self.jsonrpc_url();
 
         for attempt in 0..=self.max_retries {
-            let request = self.apply_auth(self.client.post(&url).json(payload));
+            let request = self.client.post(&url).json(payload);
 
             let response = match request.send().await {
                 Ok(response) => response,
@@ -257,6 +249,11 @@ impl ToncenterClient {
             operation
         ))
     }
+}
+
+fn user_agent() -> String {
+    let git_hash = option_env!("GIT_HASH").unwrap_or("unknown");
+    format!("faucet/{} ({git_hash})", env!("CARGO_PKG_VERSION"))
 }
 
 fn parse_balance(value: &Value) -> Option<u64> {
