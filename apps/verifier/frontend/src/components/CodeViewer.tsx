@@ -1,5 +1,5 @@
 import {FileCode2, Folder} from "lucide-react"
-import {useEffect, useMemo, useState, type CSSProperties} from "react"
+import {useCallback, useEffect, useMemo, useState, type CSSProperties} from "react"
 
 import type {SourceFile} from "../lib/api"
 import {highlightCodeToHtml, type HighlightLanguage} from "../lib/syntax-highlighter"
@@ -8,6 +8,8 @@ interface CodeViewerProps {
   readonly files: readonly SourceFile[]
   readonly entrypoint?: string
 }
+
+const FILE_QUERY_PARAM = "file"
 
 function escapeHtml(value: string): string {
   return value
@@ -61,26 +63,56 @@ function normalizeFilePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/^\.?\//, "")
 }
 
+function findFileByPath(
+  files: readonly SourceFile[],
+  path: string | undefined,
+): SourceFile | undefined {
+  if (!path) {
+    return undefined
+  }
+
+  const normalizedPath = normalizeFilePath(path)
+  return (
+    files.find(file => file.path === path) ??
+    files.find(file => normalizeFilePath(file.path) === normalizedPath)
+  )
+}
+
 function findEntrypointFile(
   files: readonly SourceFile[],
   entrypoint: string | undefined,
 ): SourceFile | undefined {
-  if (!entrypoint) {
-    return undefined
-  }
-
-  const normalizedEntrypoint = normalizeFilePath(entrypoint)
-  const exactMatch =
-    files.find(file => file.path === entrypoint) ??
-    files.find(file => normalizeFilePath(file.path) === normalizedEntrypoint)
+  const exactMatch = findFileByPath(files, entrypoint)
 
   if (exactMatch) {
     return exactMatch
   }
 
+  if (!entrypoint) {
+    return undefined
+  }
+
+  const normalizedEntrypoint = normalizeFilePath(entrypoint)
   const suffix = `/${normalizedEntrypoint}`
   const suffixMatches = files.filter(file => normalizeFilePath(file.path).endsWith(suffix))
   return suffixMatches.length === 1 ? suffixMatches[0] : undefined
+}
+
+function selectedFilePathFromUrl(files: readonly SourceFile[]): string | undefined {
+  return findFileByPath(
+    files,
+    new URLSearchParams(window.location.search).get(FILE_QUERY_PARAM) ?? undefined,
+  )?.path
+}
+
+function setSelectedFilePathInUrl(path: string): void {
+  const url = new URL(window.location.href)
+  if (url.searchParams.get(FILE_QUERY_PARAM) === path) {
+    return
+  }
+
+  url.searchParams.set(FILE_QUERY_PARAM, path)
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`)
 }
 
 interface FileTreeNode {
@@ -210,14 +242,20 @@ function FileTreeRows({
 }
 
 export function CodeViewer({files, entrypoint}: CodeViewerProps) {
+  const urlSelectedPath = useMemo(() => selectedFilePathFromUrl(files), [files])
   const entrypointPath = useMemo(
     () => findEntrypointFile(files, entrypoint)?.path,
     [entrypoint, files],
   )
-  const initialActivePath = entrypointPath ?? files[0]?.path ?? ""
-  const [activePath, setActivePath] = useState(initialActivePath)
+  const defaultActivePath = urlSelectedPath ?? entrypointPath ?? files[0]?.path ?? ""
+  const [activePath, setActivePath] = useState(defaultActivePath)
   const [html, setHtml] = useState("")
   const [themeRevision, setThemeRevision] = useState(0)
+
+  const selectFile = useCallback((path: string) => {
+    setActivePath(path)
+    setSelectedFilePathInUrl(path)
+  }, [])
 
   const activeFile = useMemo(
     () =>
@@ -231,8 +269,8 @@ export function CodeViewer({files, entrypoint}: CodeViewerProps) {
   const isDark = document.documentElement.classList.contains("dark-theme")
 
   useEffect(() => {
-    setActivePath(initialActivePath)
-  }, [files, initialActivePath])
+    setActivePath(defaultActivePath)
+  }, [defaultActivePath])
 
   useEffect(() => {
     if (!activeFile) {
@@ -277,7 +315,7 @@ export function CodeViewer({files, entrypoint}: CodeViewerProps) {
             nodes={tree}
             activePath={activeFile.path}
             entrypoint={entrypointPath}
-            onSelect={setActivePath}
+            onSelect={selectFile}
           />
         </div>
       </aside>
