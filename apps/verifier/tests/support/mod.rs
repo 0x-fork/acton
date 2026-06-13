@@ -1,5 +1,7 @@
-use std::sync::Arc;
+#![allow(dead_code)]
+
 use std::sync::Mutex;
+use std::{borrow::Cow, sync::Arc};
 
 use axum::{
     body::{Body, to_bytes},
@@ -8,10 +10,17 @@ use axum::{
 };
 use serde::de::DeserializeOwned;
 use tower::ServiceExt;
-use verifier::{app, compilers::CompileRequest, state::AppState};
+use verifier::{
+    app,
+    blockchain::ToncenterClient,
+    compilers::CompileRequest,
+    registry::{RegisterBundleRequest, SharedRegistryClient},
+    state::AppState,
+};
 
 mod mock_blockchain;
 mod mock_compiler;
+mod mock_registry;
 
 const MULTIPART_BOUNDARY: &str = "verifier-test-boundary";
 
@@ -20,6 +29,29 @@ pub fn app_state(code_hashes: &[(&str, &str)], compiled_code_hash: &str) -> AppS
     AppState::new(
         Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
         Arc::new(compiler_service),
+        Arc::new(mock_registry::MockRegistryClient::confirmed()),
+    )
+}
+
+pub fn toncenter_app_state(base_url: &str, compiled_code_hash: &str) -> AppState {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+    AppState::new(
+        Arc::new(ToncenterClient::new(base_url.to_owned(), None)),
+        Arc::new(compiler_service),
+        Arc::new(mock_registry::MockRegistryClient::confirmed()),
+    )
+}
+
+pub fn toncenter_app_state_with_registry(
+    base_url: &str,
+    compiled_code_hash: &str,
+    registry_client: SharedRegistryClient,
+) -> AppState {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+    AppState::new(
+        Arc::new(ToncenterClient::new(base_url.to_owned(), None)),
+        Arc::new(compiler_service),
+        registry_client,
     )
 }
 
@@ -34,8 +66,42 @@ pub fn recording_app_state(
         AppState::new(
             Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
             Arc::new(compiler_service),
+            Arc::new(mock_registry::MockRegistryClient::confirmed()),
         ),
         recorded_requests,
+    )
+}
+
+pub fn recording_registry_app_state(
+    code_hashes: &[(&str, &str)],
+    compiled_code_hash: &str,
+) -> (AppState, Arc<Mutex<Vec<RegisterBundleRequest>>>) {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+    let registry_client = mock_registry::MockRegistryClient::confirmed();
+    let recorded_requests = registry_client.recorded_requests();
+
+    (
+        AppState::new(
+            Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
+            Arc::new(compiler_service),
+            Arc::new(registry_client),
+        ),
+        recorded_requests,
+    )
+}
+
+pub fn failing_registry_app_state(
+    code_hashes: &[(&str, &str)],
+    compiled_code_hash: &str,
+) -> AppState {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+
+    AppState::new(
+        Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
+        Arc::new(compiler_service),
+        Arc::new(mock_registry::MockRegistryClient::failing(
+            "registry sender failed",
+        )),
     )
 }
 
@@ -81,7 +147,17 @@ where
 }
 
 pub const fn text_part(name: &'static str, value: &'static str) -> MultipartPart {
-    MultipartPart::Text { name, value }
+    MultipartPart::Text {
+        name,
+        value: Cow::Borrowed(value),
+    }
+}
+
+pub fn owned_text_part(name: &'static str, value: impl Into<String>) -> MultipartPart {
+    MultipartPart::Text {
+        name,
+        value: Cow::Owned(value.into()),
+    }
 }
 
 pub const fn file_part(
@@ -92,9 +168,9 @@ pub const fn file_part(
 ) -> MultipartPart {
     MultipartPart::File {
         name,
-        file_name,
+        file_name: Cow::Borrowed(file_name),
         content_type,
-        content,
+        content: Cow::Borrowed(content),
     }
 }
 
@@ -138,12 +214,12 @@ fn multipart_body(parts: Vec<MultipartPart>) -> Vec<u8> {
 pub enum MultipartPart {
     Text {
         name: &'static str,
-        value: &'static str,
+        value: Cow<'static, str>,
     },
     File {
         name: &'static str,
-        file_name: &'static str,
+        file_name: Cow<'static, str>,
         content_type: &'static str,
-        content: &'static str,
+        content: Cow<'static, str>,
     },
 }

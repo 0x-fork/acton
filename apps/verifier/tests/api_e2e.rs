@@ -5,12 +5,14 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use support::{
-    app_state, file_part, get, post_verify, recording_app_state, response_json, text_part,
+    app_state, failing_registry_app_state, file_part, get, post_verify, recording_app_state,
+    recording_registry_app_state, response_json, text_part,
 };
 
 const ADDRESS_ONE: &str = "EQD0000000000000000000000000000000000000000000000";
 const ADDRESS_TWO: &str = "EQD1111111111111111111111111111111111111111111111";
 const CODE_HASH_ONE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const CODE_HASH_ONE_BASE64: &str = "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=";
 const CODE_HASH_TWO: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const COMPILE_PARAMS_TOLK: &str = r#"{"compiler_version":"1.4.1"}"#;
 const SOURCES_MAIN: &str = r#"[{"path":"main.tolk","is_entrypoint":true}]"#;
@@ -50,6 +52,13 @@ async fn verify_resolves_code_hash_from_address_with_mock_blockchain() {
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert_eq!(body.compiled_code_hash, CODE_HASH_ONE);
     assert_eq!(body.verification_result, "match");
+    assert!(body.source_bundle_hash.is_some());
+    assert_eq!(
+        body.onchain_registration
+            .as_ref()
+            .map(|registration| registration.status.as_str()),
+        Some("confirmed")
+    );
     assert_eq!(body.language, "tolk");
     assert_eq!(body.compile_params, json!({"compiler_version": "1.4.1"}));
     assert_eq!(body.files.len(), 1);
@@ -191,6 +200,30 @@ async fn verify_accepts_address_and_code_hash_together() {
 }
 
 #[tokio::test]
+async fn verify_normalizes_base64_code_hash_input() {
+    let response = post_verify(
+        app_state(&[(ADDRESS_ONE, CODE_HASH_ONE)], CODE_HASH_ONE),
+        vec![
+            text_part("address", ADDRESS_ONE),
+            text_part("code_hash", CODE_HASH_ONE_BASE64),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response_json::<VerifyResponse>(response).await;
+    assert_eq!(body.address.as_deref(), Some(ADDRESS_ONE));
+    assert_eq!(body.code_hash, CODE_HASH_ONE);
+    assert_eq!(body.compiled_code_hash, CODE_HASH_ONE);
+    assert_eq!(body.verification_result, "match");
+}
+
+#[tokio::test]
 async fn verify_returns_mismatch_when_compiled_hash_differs_from_target() {
     let response = post_verify(
         app_state(&[], CODE_HASH_TWO),
@@ -210,6 +243,120 @@ async fn verify_returns_mismatch_when_compiled_hash_differs_from_target() {
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert_eq!(body.compiled_code_hash, CODE_HASH_TWO);
     assert_eq!(body.verification_result, "mismatch");
+    assert_eq!(body.source_bundle_hash, None);
+    assert!(body.onchain_registration.is_none());
+}
+
+#[tokio::test]
+async fn verify_registers_source_bundle_on_hash_match() {
+    let (state, recorded_requests) = recording_registry_app_state(&[], CODE_HASH_ONE);
+    let response = post_verify(
+        state,
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response_json::<VerifyResponse>(response).await;
+    let source_bundle_hash = body
+        .source_bundle_hash
+        .as_deref()
+        .expect("matched verification should return source bundle hash");
+    assert_eq!(source_bundle_hash.len(), 64);
+    assert!(
+        source_bundle_hash
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    );
+    assert_eq!(
+        body.onchain_registration
+            .as_ref()
+            .map(|registration| registration.verification_record_address.as_str()),
+        Some("mock-record")
+    );
+    assert_eq!(
+        body.onchain_registration
+            .as_ref()
+            .map(|registration| registration.master_address.as_str()),
+        Some("mock-master")
+    );
+
+    let recorded_snapshot = {
+        let recorded_requests = recorded_requests
+            .lock()
+            .expect("recorded registry requests mutex should not be poisoned");
+        let snapshot = recorded_requests
+            .iter()
+            .map(|request| {
+                (
+                    request.code_hash.clone(),
+                    request.source_bundle_hash.clone(),
+                )
+            })
+            .collect::<Vec<_>>();
+        drop(recorded_requests);
+        snapshot
+    };
+    assert_eq!(recorded_snapshot.len(), 1);
+    assert_eq!(recorded_snapshot[0].0, CODE_HASH_ONE);
+    assert_eq!(recorded_snapshot[0].1, source_bundle_hash);
+}
+
+#[tokio::test]
+async fn verify_does_not_register_source_bundle_on_hash_mismatch() {
+    let (state, recorded_requests) = recording_registry_app_state(&[], CODE_HASH_TWO);
+    let response = post_verify(
+        state,
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response_json::<VerifyResponse>(response).await;
+    assert_eq!(body.verification_result, "mismatch");
+    assert!(body.onchain_registration.is_none());
+
+    let recorded_requests_is_empty = {
+        let recorded_requests = recorded_requests
+            .lock()
+            .expect("recorded registry requests mutex should not be poisoned");
+        let is_empty = recorded_requests.is_empty();
+        drop(recorded_requests);
+        is_empty
+    };
+    assert!(recorded_requests_is_empty);
+}
+
+#[tokio::test]
+async fn verify_returns_bad_gateway_when_registry_registration_fails() {
+    let response = post_verify(
+        failing_registry_app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    assert_error_contains(response, "registry sender failed").await;
 }
 
 #[tokio::test]
@@ -510,9 +657,18 @@ struct VerifyResponse {
     code_hash: String,
     compiled_code_hash: String,
     verification_result: String,
+    source_bundle_hash: Option<String>,
+    onchain_registration: Option<OnchainRegistration>,
     language: String,
     compile_params: Value,
     files: Vec<FileSummary>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OnchainRegistration {
+    status: String,
+    master_address: String,
+    verification_record_address: String,
 }
 
 #[derive(Debug, Deserialize)]

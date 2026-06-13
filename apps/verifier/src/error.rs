@@ -5,7 +5,10 @@ use axum::{
 };
 use serde::Serialize;
 
-use crate::{compilers::CompilerError, verification::VerificationError};
+use crate::{
+    compilers::CompilerError, registry::RegistryError, source_bundle::SourceBundleError,
+    verification::VerificationError,
+};
 
 #[derive(Debug)]
 pub struct ApiError {
@@ -46,6 +49,18 @@ impl From<CompilerError> for ApiError {
             CompilerError::CompileFailed(message) => Self::bad_request(message),
             err => Self::bad_gateway(err.to_string()),
         }
+    }
+}
+
+impl From<RegistryError> for ApiError {
+    fn from(err: RegistryError) -> Self {
+        Self::bad_gateway(err.to_string())
+    }
+}
+
+impl From<SourceBundleError> for ApiError {
+    fn from(err: SourceBundleError) -> Self {
+        Self::bad_request(err.to_string())
     }
 }
 

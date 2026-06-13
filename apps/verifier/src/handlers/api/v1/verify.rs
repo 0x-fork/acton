@@ -16,8 +16,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::{
+    blockchain::normalize_code_hash,
     compilers::{CompileRequest, CompileSource},
     error::ApiError,
+    registry::{RegisterBundleRequest, RegistrationReceipt},
+    source_bundle::{
+        SourceBundleFile, SourceBundleInput, SourceBundleSource, compute_source_bundle_hash,
+    },
     state::AppState,
     verification::{ResolvedVerificationTarget, VerificationTarget},
 };
@@ -115,7 +120,7 @@ async fn handle_multipart(
         ));
     }
 
-    let compile_input = prepare_compile_input(language, compile_params.clone(), sources, files)?;
+    let compile_input = prepare_compile_input(language, &compile_params, sources, files)?;
     let resolved_target = state.verification_service().resolve_target(target).await?;
     let compiled = state
         .compiler_service()
@@ -126,9 +131,24 @@ async fn handle_multipart(
             sources: compile_input.compile_sources,
         })
         .await?;
-    let compiled_code_hash = compiled.code_hash.to_ascii_lowercase();
+    let compiled_code_hash = normalize_code_hash(&compiled.code_hash);
     let verification_result =
         VerificationResult::from_hashes(&resolved_target.code_hash, &compiled_code_hash);
+    let (source_bundle_hash, onchain_registration) = match verification_result {
+        VerificationResult::Match => {
+            let source_bundle_hash = compile_input.source_bundle_hash.clone();
+            let registration = state
+                .registry_client()
+                .register_bundle(RegisterBundleRequest {
+                    code_hash: resolved_target.code_hash.clone(),
+                    source_bundle_hash: source_bundle_hash.clone(),
+                })
+                .await?;
+
+            (Some(source_bundle_hash), Some(registration.into()))
+        }
+        VerificationResult::Mismatch => (None, None),
+    };
 
     print_verify_request(
         &resolved_target,
@@ -136,6 +156,7 @@ async fn handle_multipart(
         &compile_params,
         &compile_input.sources,
         &compiled_code_hash,
+        source_bundle_hash.as_deref(),
         verification_result,
     );
 
@@ -144,6 +165,8 @@ async fn handle_multipart(
         code_hash: resolved_target.code_hash,
         compiled_code_hash,
         verification_result,
+        source_bundle_hash,
+        onchain_registration,
         language: compile_input.language,
         compile_params,
         files: compile_input
@@ -170,7 +193,7 @@ async fn read_file_part(field: Field<'_>) -> Result<ReceivedFile, ApiError> {
 
 fn prepare_compile_input(
     language: String,
-    compile_params: Value,
+    compile_params: &Value,
     sources: Option<Vec<SourceMetadata>>,
     files: Vec<ReceivedFile>,
 ) -> Result<CompileInput, ApiError> {
@@ -180,26 +203,48 @@ fn prepare_compile_input(
         )));
     }
 
-    let compile_params = serde_json::from_value::<TolkCompileParams>(compile_params)
-        .map_err(|err| ApiError::bad_request(format!("invalid Tolk compile_params: {err}")))?;
-    if compile_params.compiler_version != SUPPORTED_TOLK_VERSION {
+    let tolk_compile_params =
+        serde_json::from_value::<TolkCompileParams>(compile_params.clone())
+            .map_err(|err| ApiError::bad_request(format!("invalid Tolk compile_params: {err}")))?;
+    if tolk_compile_params.compiler_version != SUPPORTED_TOLK_VERSION {
         return Err(ApiError::bad_request(format!(
             "unsupported Tolk compiler_version: {}",
-            compile_params.compiler_version
+            tolk_compile_params.compiler_version
         )));
     }
     let sources = sources
         .ok_or_else(|| ApiError::bad_request("missing required field: sources".to_owned()))?;
     let entrypoint = validate_sources(&sources)?;
     let files = match_files_to_sources(&sources, files)?;
+    let source_bundle_hash = compute_source_bundle_hash(SourceBundleInput {
+        language: &language,
+        compiler_version: &tolk_compile_params.compiler_version,
+        entrypoint: &entrypoint,
+        compile_params,
+        sources: sources
+            .iter()
+            .map(|source| SourceBundleSource {
+                path: &source.path,
+                is_entrypoint: source.is_entrypoint,
+            })
+            .collect(),
+        files: files
+            .iter()
+            .map(|(path, file)| SourceBundleFile {
+                path,
+                bytes: file.content.as_ref(),
+            })
+            .collect(),
+    })?;
     let compile_sources = build_compile_sources(&sources, files)?;
 
     Ok(CompileInput {
         language,
-        compiler_version: compile_params.compiler_version,
+        compiler_version: tolk_compile_params.compiler_version,
         entrypoint,
         compile_sources,
         sources,
+        source_bundle_hash,
     })
 }
 
@@ -336,12 +381,17 @@ fn print_verify_request(
     compile_params: &Value,
     sources: &[SourceMetadata],
     compiled_code_hash: &str,
+    source_bundle_hash: Option<&str>,
     verification_result: VerificationResult,
 ) {
     println!("verification request");
     println!("address: {}", target.address.as_deref().unwrap_or("<none>"));
     println!("code_hash: {}", target.code_hash);
     println!("compiled_code_hash: {compiled_code_hash}");
+    println!(
+        "source_bundle_hash: {}",
+        source_bundle_hash.unwrap_or("<none>")
+    );
     println!("verification_result: {verification_result}");
     println!("language: {language}");
     println!("compile_params: {compile_params}");
@@ -360,6 +410,7 @@ struct CompileInput {
     entrypoint: String,
     compile_sources: Vec<CompileSource>,
     sources: Vec<SourceMetadata>,
+    source_bundle_hash: String,
 }
 
 #[derive(Debug)]
@@ -385,9 +436,34 @@ struct VerifyResponse {
     code_hash: String,
     compiled_code_hash: String,
     verification_result: VerificationResult,
+    source_bundle_hash: Option<String>,
+    onchain_registration: Option<OnchainRegistration>,
     language: String,
     compile_params: Value,
     files: Vec<FileSummary>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct OnchainRegistration {
+    status: OnchainRegistrationStatus,
+    master_address: String,
+    verification_record_address: String,
+}
+
+impl From<RegistrationReceipt> for OnchainRegistration {
+    fn from(receipt: RegistrationReceipt) -> Self {
+        Self {
+            status: OnchainRegistrationStatus::Confirmed,
+            master_address: receipt.master_address,
+            verification_record_address: receipt.verification_record_address,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum OnchainRegistrationStatus {
+    Confirmed,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -398,8 +474,8 @@ enum VerificationResult {
 }
 
 impl VerificationResult {
-    const fn from_hashes(target: &str, compiled: &str) -> Self {
-        if target.eq_ignore_ascii_case(compiled) {
+    fn from_hashes(target: &str, compiled: &str) -> Self {
+        if target == compiled {
             Self::Match
         } else {
             Self::Mismatch

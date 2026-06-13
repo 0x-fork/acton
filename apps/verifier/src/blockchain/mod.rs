@@ -1,4 +1,8 @@
 use async_trait::async_trait;
+use base64::{
+    Engine as _,
+    engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD},
+};
 use reqwest::{Client, StatusCode};
 use serde::Deserialize;
 use thiserror::Error;
@@ -6,6 +10,7 @@ use thiserror::Error;
 use crate::config::Config;
 
 const TONCENTER_API_KEY_HEADER: &str = "X-API-Key";
+const CODE_HASH_BYTES: usize = 32;
 
 #[async_trait]
 pub trait BlockchainClient: Send + Sync + 'static {
@@ -76,7 +81,48 @@ impl BlockchainClient for ToncenterClient {
 }
 
 fn non_empty_text(value: Option<String>) -> Option<String> {
-    value.filter(|value| !value.trim().is_empty())
+    let value = value?;
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+
+    Some(normalize_code_hash(value))
+}
+
+pub(crate) fn normalize_code_hash(value: &str) -> String {
+    if is_hex_code_hash(value) {
+        return value.to_ascii_lowercase();
+    }
+
+    decode_base64_code_hash(value)
+        .map_or_else(|| value.to_owned(), |bytes| bytes_to_lower_hex(&bytes))
+}
+
+fn is_hex_code_hash(value: &str) -> bool {
+    value.len() == CODE_HASH_BYTES * 2 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn decode_base64_code_hash(value: &str) -> Option<Vec<u8>> {
+    [STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD]
+        .into_iter()
+        .find_map(|engine| {
+            engine
+                .decode(value)
+                .ok()
+                .filter(|bytes| bytes.len() == CODE_HASH_BYTES)
+        })
+}
+
+fn bytes_to_lower_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+
+    let mut encoded = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    encoded
 }
 
 #[derive(Debug, Error)]
@@ -103,4 +149,25 @@ struct AccountStatesResponse {
 #[derive(Debug, Deserialize)]
 struct AccountState {
     code_hash: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_code_hash;
+
+    #[test]
+    fn normalize_code_hash_keeps_hex_as_lowercase() {
+        assert_eq!(
+            normalize_code_hash("AF8F72E22D3DD6EEC1F312693C026E4D1751E2DFEC9B3F6577E8C8B3A668947C"),
+            "af8f72e22d3dd6eec1f312693c026e4d1751e2dfec9b3f6577e8c8b3a668947c"
+        );
+    }
+
+    #[test]
+    fn normalize_code_hash_decodes_base64_to_hex() {
+        assert_eq!(
+            normalize_code_hash("r49y4i091u7B8xJpPAJuTRdR4t/smz9ld+jIs6ZolHw="),
+            "af8f72e22d3dd6eec1f312693c026e4d1751e2dfec9b3f6577e8c8b3a668947c"
+        );
+    }
 }

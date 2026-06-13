@@ -4,12 +4,14 @@ use crate::{
     blockchain::{BlockchainClient, ToncenterClient},
     compilers::{CompilerService, NodeCompilerService},
     config::Config,
+    registry::{RegistryClient, TonRegistryClient},
     verification::VerificationService,
 };
 
 #[derive(Clone)]
 pub struct AppState {
     compiler_service: Arc<dyn CompilerService>,
+    registry_client: Arc<dyn RegistryClient>,
     verification_service: VerificationService,
 }
 
@@ -19,6 +21,7 @@ impl AppState {
         Self::new(
             Arc::new(ToncenterClient::from_config(config)),
             Arc::new(NodeCompilerService::from_config(config)),
+            Arc::new(TonRegistryClient::from_config(config)),
         )
     }
 
@@ -26,9 +29,11 @@ impl AppState {
     pub fn new(
         blockchain_client: Arc<dyn BlockchainClient>,
         compiler_service: Arc<dyn CompilerService>,
+        registry_client: Arc<dyn RegistryClient>,
     ) -> Self {
         Self {
             compiler_service,
+            registry_client,
             verification_service: VerificationService::new(blockchain_client),
         }
     }
@@ -36,6 +41,11 @@ impl AppState {
     #[must_use]
     pub fn compiler_service(&self) -> &dyn CompilerService {
         self.compiler_service.as_ref()
+    }
+
+    #[must_use]
+    pub fn registry_client(&self) -> &dyn RegistryClient {
+        self.registry_client.as_ref()
     }
 
     #[must_use]

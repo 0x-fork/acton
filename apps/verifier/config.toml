@@ -6,6 +6,15 @@ name = "mainnet"
 
 [toncenter]
 
+[registry]
+register_value_nano = 500000000
+confirmation_attempts = 20
+confirmation_delay_ms = 1000
+
+[wallet]
+kind = "v5r1"
+workchain = 0
+
 [compiler]
 node_bin = "node"
 worker_path = "compiler-worker/compile-tolk.mjs"

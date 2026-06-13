@@ -12,9 +12,15 @@ const DEFAULT_CONFIG_PATH: &str = "config.toml";
 const CONFIG_PATH_ENV: &str = "VERIFIER_CONFIG";
 const MAINNET_TONCENTER_BASE_URL: &str = "https://toncenter.com";
 const TESTNET_TONCENTER_BASE_URL: &str = "https://testnet.toncenter.com";
+const LOCALNET_TONCENTER_BASE_URL: &str = "http://127.0.0.1:5411";
 const DEFAULT_COMPILER_NODE_BIN: &str = "node";
 const DEFAULT_COMPILER_WORKER_PATH: &str = "compiler-worker/compile-tolk.mjs";
 const DEFAULT_COMPILER_TIMEOUT_MS: u64 = 5_000;
+const DEFAULT_REGISTRY_REGISTER_VALUE_NANO: u64 = 500_000_000;
+const DEFAULT_REGISTRY_CONFIRMATION_ATTEMPTS: usize = 20;
+const DEFAULT_REGISTRY_CONFIRMATION_DELAY_MS: u64 = 1_000;
+const DEFAULT_WALLET_KIND: &str = "v5r1";
+const DEFAULT_WALLET_WORKCHAIN: i32 = 0;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -22,6 +28,15 @@ pub struct Config {
     network: TonNetwork,
     toncenter_base_url: Option<String>,
     toncenter_api_key: Option<String>,
+    registry_master_address: Option<String>,
+    registry_register_value_nano: u64,
+    registry_confirmation_attempts: usize,
+    registry_confirmation_delay: Duration,
+    wallet_kind: String,
+    wallet_workchain: i32,
+    wallet_mnemonic_env: Option<String>,
+    wallet_mnemonic_file: Option<PathBuf>,
+    wallet_mnemonic: Option<String>,
     compiler_node_bin: String,
     compiler_worker_path: PathBuf,
     compiler_timeout: Duration,
@@ -83,6 +98,51 @@ impl Config {
     }
 
     #[must_use]
+    pub fn registry_master_address(&self) -> Option<&str> {
+        self.registry_master_address.as_deref()
+    }
+
+    #[must_use]
+    pub const fn registry_register_value_nano(&self) -> u64 {
+        self.registry_register_value_nano
+    }
+
+    #[must_use]
+    pub const fn registry_confirmation_attempts(&self) -> usize {
+        self.registry_confirmation_attempts
+    }
+
+    #[must_use]
+    pub const fn registry_confirmation_delay(&self) -> Duration {
+        self.registry_confirmation_delay
+    }
+
+    #[must_use]
+    pub fn wallet_kind(&self) -> &str {
+        &self.wallet_kind
+    }
+
+    #[must_use]
+    pub const fn wallet_workchain(&self) -> i32 {
+        self.wallet_workchain
+    }
+
+    #[must_use]
+    pub fn wallet_mnemonic_env(&self) -> Option<&str> {
+        self.wallet_mnemonic_env.as_deref()
+    }
+
+    #[must_use]
+    pub fn wallet_mnemonic_file(&self) -> Option<&Path> {
+        self.wallet_mnemonic_file.as_deref()
+    }
+
+    #[must_use]
+    pub fn wallet_mnemonic(&self) -> Option<&str> {
+        self.wallet_mnemonic.as_deref()
+    }
+
+    #[must_use]
     pub fn compiler_node_bin(&self) -> &str {
         &self.compiler_node_bin
     }
@@ -105,6 +165,17 @@ impl Default for Config {
             network: TonNetwork::Mainnet,
             toncenter_base_url: None,
             toncenter_api_key: None,
+            registry_master_address: None,
+            registry_register_value_nano: DEFAULT_REGISTRY_REGISTER_VALUE_NANO,
+            registry_confirmation_attempts: DEFAULT_REGISTRY_CONFIRMATION_ATTEMPTS,
+            registry_confirmation_delay: Duration::from_millis(
+                DEFAULT_REGISTRY_CONFIRMATION_DELAY_MS,
+            ),
+            wallet_kind: DEFAULT_WALLET_KIND.to_owned(),
+            wallet_workchain: DEFAULT_WALLET_WORKCHAIN,
+            wallet_mnemonic_env: None,
+            wallet_mnemonic_file: None,
+            wallet_mnemonic: None,
             compiler_node_bin: DEFAULT_COMPILER_NODE_BIN.to_owned(),
             compiler_worker_path: PathBuf::from(DEFAULT_COMPILER_WORKER_PATH),
             compiler_timeout: Duration::from_millis(DEFAULT_COMPILER_TIMEOUT_MS),
@@ -117,13 +188,20 @@ impl Default for Config {
 pub enum TonNetwork {
     Mainnet,
     Testnet,
+    Localnet,
 }
 
 impl TonNetwork {
+    #[must_use]
+    pub const fn uses_testnet_address_format(self) -> bool {
+        matches!(self, Self::Testnet | Self::Localnet)
+    }
+
     const fn default_toncenter_base_url(self) -> &'static str {
         match self {
             Self::Mainnet => MAINNET_TONCENTER_BASE_URL,
             Self::Testnet => TESTNET_TONCENTER_BASE_URL,
+            Self::Localnet => LOCALNET_TONCENTER_BASE_URL,
         }
     }
 }
@@ -133,6 +211,7 @@ impl fmt::Display for TonNetwork {
         match self {
             Self::Mainnet => formatter.write_str("mainnet"),
             Self::Testnet => formatter.write_str("testnet"),
+            Self::Localnet => formatter.write_str("localnet"),
         }
     }
 }
@@ -157,6 +236,10 @@ struct ConfigFile {
     #[serde(default)]
     toncenter: ToncenterConfig,
     #[serde(default)]
+    registry: RegistryConfig,
+    #[serde(default)]
+    wallet: WalletConfig,
+    #[serde(default)]
     compiler: CompilerConfig,
 }
 
@@ -167,6 +250,28 @@ impl ConfigFile {
             network: self.network.name.unwrap_or(TonNetwork::Mainnet),
             toncenter_base_url: self.toncenter.base_url,
             toncenter_api_key: self.toncenter.api_key,
+            registry_master_address: self.registry.master_address,
+            registry_register_value_nano: self
+                .registry
+                .register_value_nano
+                .unwrap_or(DEFAULT_REGISTRY_REGISTER_VALUE_NANO),
+            registry_confirmation_attempts: self
+                .registry
+                .confirmation_attempts
+                .unwrap_or(DEFAULT_REGISTRY_CONFIRMATION_ATTEMPTS),
+            registry_confirmation_delay: Duration::from_millis(
+                self.registry
+                    .confirmation_delay_ms
+                    .unwrap_or(DEFAULT_REGISTRY_CONFIRMATION_DELAY_MS),
+            ),
+            wallet_kind: self
+                .wallet
+                .kind
+                .unwrap_or_else(|| DEFAULT_WALLET_KIND.to_owned()),
+            wallet_workchain: self.wallet.workchain.unwrap_or(DEFAULT_WALLET_WORKCHAIN),
+            wallet_mnemonic_env: self.wallet.mnemonic_env,
+            wallet_mnemonic_file: self.wallet.mnemonic_file,
+            wallet_mnemonic: self.wallet.mnemonic,
             compiler_node_bin: self
                 .compiler
                 .node_bin
@@ -198,6 +303,23 @@ struct NetworkConfig {
 struct ToncenterConfig {
     base_url: Option<String>,
     api_key: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct RegistryConfig {
+    master_address: Option<String>,
+    register_value_nano: Option<u64>,
+    confirmation_attempts: Option<usize>,
+    confirmation_delay_ms: Option<u64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct WalletConfig {
+    kind: Option<String>,
+    workchain: Option<i32>,
+    mnemonic_env: Option<String>,
+    mnemonic_file: Option<PathBuf>,
+    mnemonic: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]

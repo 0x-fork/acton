@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::blockchain::{BlockchainClient, BlockchainError};
+use crate::blockchain::{BlockchainClient, BlockchainError, normalize_code_hash};
 use thiserror::Error;
 
 #[derive(Clone)]
@@ -22,7 +22,7 @@ impl VerificationService {
             (None, None) => Err(VerificationError::MissingTarget),
             (None, Some(code_hash)) => Ok(ResolvedVerificationTarget {
                 address: None,
-                code_hash,
+                code_hash: normalize_code_hash(&code_hash),
             }),
             (Some(address), None) => {
                 let fetched_code_hash = self.fetch_code_hash(&address).await?;
@@ -32,6 +32,7 @@ impl VerificationService {
                 })
             }
             (Some(address), Some(provided_code_hash)) => {
+                let provided_code_hash = normalize_code_hash(&provided_code_hash);
                 let fetched_code_hash = self.fetch_code_hash(&address).await?;
 
                 if fetched_code_hash != provided_code_hash {
