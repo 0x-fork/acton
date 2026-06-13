@@ -5,9 +5,10 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use support::{
-    app_state, failing_registry_app_state, failing_source_storage_recording_registry_app_state,
-    file_part, get, post_verify, recording_app_state, recording_registry_app_state,
-    recording_source_storage_app_state, response_json, text_part, unverified_registry_app_state,
+    app_state, failing_compiler_app_state, failing_registry_app_state,
+    failing_source_storage_recording_registry_app_state, file_part, get, post_verify,
+    recording_app_state, recording_registry_app_state, recording_source_storage_app_state,
+    response_json, text_part, unverified_registry_app_state,
 };
 
 const ADDRESS_ONE: &str = "EQD0000000000000000000000000000000000000000000000";
@@ -553,6 +554,29 @@ async fn verify_returns_bad_gateway_when_registry_registration_fails() {
 
     assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
     assert_error_contains(response, "registry sender failed").await;
+}
+
+#[tokio::test]
+async fn verify_returns_bad_request_when_compilation_fails() {
+    let response = post_verify(
+        failing_compiler_app_state(&[], "Tolk syntax error at main.tolk:1:5"),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun broken("),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = response_json::<Value>(response).await;
+    let error = body["error"].as_str().unwrap_or_default();
+    assert!(
+        error.contains("Tolk syntax error at main.tolk:1:5"),
+        "expected error to contain compiler details, got {body}"
+    );
 }
 
 #[tokio::test]

@@ -180,6 +180,17 @@ pub fn failing_source_storage_app_state(
     )
 }
 
+pub fn failing_compiler_app_state(code_hashes: &[(&str, &str)], error: &str) -> AppState {
+    let compiler_service = mock_compiler::MockCompilerService::failing(error);
+
+    AppState::new(
+        Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
+        Arc::new(compiler_service),
+        Arc::new(mock_registry::MockRegistryClient::confirmed()),
+        Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+    )
+}
+
 pub fn failing_source_storage_recording_registry_app_state(
     code_hashes: &[(&str, &str)],
     compiled_code_hash: &str,

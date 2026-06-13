@@ -4,14 +4,25 @@ use async_trait::async_trait;
 use verifier::compilers::{CompileOutput, CompileRequest, CompilerError, CompilerService};
 
 pub struct MockCompilerService {
-    code_hash: String,
+    result: MockCompilerResult,
     recorded_requests: Arc<Mutex<Vec<CompileRequest>>>,
 }
 
 impl MockCompilerService {
     pub fn new(code_hash: &str) -> Self {
         Self {
-            code_hash: code_hash.to_owned(),
+            result: MockCompilerResult::Ok {
+                code_hash: code_hash.to_owned(),
+            },
+            recorded_requests: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    pub fn failing(error: &str) -> Self {
+        Self {
+            result: MockCompilerResult::CompileFailed {
+                error: error.to_owned(),
+            },
             recorded_requests: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -19,6 +30,11 @@ impl MockCompilerService {
     pub fn recorded_requests(&self) -> Arc<Mutex<Vec<CompileRequest>>> {
         Arc::clone(&self.recorded_requests)
     }
+}
+
+enum MockCompilerResult {
+    Ok { code_hash: String },
+    CompileFailed { error: String },
 }
 
 #[async_trait]
@@ -32,8 +48,13 @@ impl CompilerService for MockCompilerService {
             recorded_requests.push(request);
         }
 
-        Ok(CompileOutput {
-            code_hash: self.code_hash.clone(),
-        })
+        match &self.result {
+            MockCompilerResult::Ok { code_hash } => Ok(CompileOutput {
+                code_hash: code_hash.clone(),
+            }),
+            MockCompilerResult::CompileFailed { error } => {
+                Err(CompilerError::CompileFailed(error.clone()))
+            }
+        }
     }
 }
