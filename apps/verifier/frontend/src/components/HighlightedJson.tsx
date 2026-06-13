@@ -1,6 +1,6 @@
 import {useEffect, useState} from "react"
 
-import {highlightJsonToHtml} from "../lib/tolk-highlighter"
+import {highlightJsonToHtml} from "../lib/syntax-highlighter"
 
 interface HighlightedJsonProps {
   readonly value: unknown

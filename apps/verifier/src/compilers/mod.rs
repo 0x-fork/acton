@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, path::PathBuf, process::ExitStatus};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use thiserror::Error;
 use tokio::{
     io::AsyncWriteExt,
@@ -71,7 +72,13 @@ impl CompilerService for NodeCompilerService {
             .map_err(CompilerError::DeserializeOutput)?;
 
         match output {
-            WorkerOutput::Ok { code_hash } => Ok(CompileOutput { code_hash }),
+            WorkerOutput::Ok {
+                code_hash,
+                generated_sources,
+            } => Ok(CompileOutput {
+                code_hash,
+                generated_sources,
+            }),
             WorkerOutput::CompileError { error } => Err(CompilerError::CompileFailed(error)),
         }
     }
@@ -83,6 +90,7 @@ pub struct CompileRequest {
     pub compiler_version: String,
     pub entrypoint: String,
     pub import_mappings: BTreeMap<String, String>,
+    pub compile_params: Value,
     pub sources: Vec<CompileSource>,
 }
 
@@ -90,17 +98,34 @@ pub struct CompileRequest {
 pub struct CompileSource {
     pub path: String,
     pub content: String,
+    pub is_entrypoint: bool,
+    pub include_in_command: Option<bool>,
+    pub is_stdlib: Option<bool>,
+    pub has_include_directives: Option<bool>,
 }
 
 pub struct CompileOutput {
     pub code_hash: String,
+    pub generated_sources: Vec<CompileGeneratedSource>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct CompileGeneratedSource {
+    pub path: String,
+    pub content: String,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 enum WorkerOutput {
-    Ok { code_hash: String },
-    CompileError { error: String },
+    Ok {
+        code_hash: String,
+        #[serde(default)]
+        generated_sources: Vec<CompileGeneratedSource>,
+    },
+    CompileError {
+        error: String,
+    },
 }
 
 #[derive(Debug, Error)]

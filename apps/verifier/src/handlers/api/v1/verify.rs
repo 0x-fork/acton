@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     path::{Component, Path},
 };
 
@@ -17,7 +17,7 @@ use serde_json::{Value, json};
 
 use crate::{
     blockchain::normalize_code_hash,
-    compilers::{CompileRequest, CompileSource},
+    compilers::{CompileGeneratedSource, CompileRequest, CompileSource},
     error::ApiError,
     registry::{RegisterBundleRequest, RegistrationReceipt},
     source_bundle::{
@@ -31,8 +31,7 @@ use crate::{
     verification::{ResolvedVerificationTarget, VerificationTarget},
 };
 
-const TOLK_LANGUAGE: &str = "tolk";
-const SUPPORTED_TOLK_VERSION: &str = "1.4.1";
+mod languages;
 
 pub async fn handler(
     State(state): State<AppState>,
@@ -124,7 +123,7 @@ async fn handle_multipart(
         ));
     }
 
-    let compile_input = prepare_compile_input(language, &compile_params, sources, files)?;
+    let compile_input = prepare_compile_input(&language, &compile_params, sources, files)?;
     let resolved_target = state.verification_service().resolve_target(target).await?;
     let compiled = state
         .compiler_service()
@@ -133,6 +132,7 @@ async fn handle_multipart(
             compiler_version: compile_input.compiler_version.clone(),
             entrypoint: compile_input.entrypoint.clone(),
             import_mappings: compile_input.import_mappings.clone(),
+            compile_params: compile_params.clone(),
             sources: compile_input.compile_sources,
         })
         .await?;
@@ -141,7 +141,30 @@ async fn handle_multipart(
         VerificationResult::from_hashes(&resolved_target.code_hash, &compiled_code_hash);
     let (source_bundle_hash, source_storage, onchain_registration) = match verification_result {
         VerificationResult::Match => {
-            let source_bundle_hash = compile_input.source_bundle_hash.clone();
+            let mut stored_sources = compile_input.sources.clone();
+            let mut storage_files = compile_input.storage_files.clone();
+            merge_generated_sources(
+                &mut stored_sources,
+                &mut storage_files,
+                compiled.generated_sources,
+            )?;
+            let source_bundle_hash = compute_source_bundle_hash(SourceBundleInput {
+                language: &compile_input.language,
+                compiler_version: &compile_input.compiler_version,
+                entrypoint: &compile_input.entrypoint,
+                compile_params: &compile_params,
+                sources: stored_sources
+                    .iter()
+                    .map(SourceBundleSource::from_source_metadata)
+                    .collect(),
+                files: storage_files
+                    .iter()
+                    .map(|file| SourceBundleFile {
+                        path: &file.path,
+                        bytes: &file.content,
+                    })
+                    .collect(),
+            })?;
             let source_storage = state
                 .source_storage()
                 .store_bundle(StoreSourceBundleRequest {
@@ -152,15 +175,11 @@ async fn handle_multipart(
                     compiler_version: compile_input.compiler_version.clone(),
                     entrypoint: compile_input.entrypoint.clone(),
                     compile_params: compile_params.clone(),
-                    sources: compile_input
-                        .sources
+                    sources: stored_sources
                         .iter()
-                        .map(|source| SourceStorageSource {
-                            path: source.path.clone(),
-                            is_entrypoint: source.is_entrypoint,
-                        })
+                        .map(SourceStorageSource::from_source_metadata)
                         .collect(),
-                    files: compile_input.storage_files.clone(),
+                    files: storage_files,
                 })
                 .await?;
             let registration = state
@@ -223,51 +242,20 @@ async fn read_file_part(field: Field<'_>) -> Result<ReceivedFile, ApiError> {
 }
 
 fn prepare_compile_input(
-    language: String,
+    language: &str,
     compile_params: &Value,
     sources: Option<Vec<SourceMetadata>>,
     files: Vec<ReceivedFile>,
 ) -> Result<CompileInput, ApiError> {
-    if language != TOLK_LANGUAGE {
-        return Err(ApiError::bad_request(format!(
-            "unsupported language: {language}"
-        )));
-    }
-
-    let tolk_compile_params =
-        serde_json::from_value::<TolkCompileParams>(compile_params.clone())
-            .map_err(|err| ApiError::bad_request(format!("invalid Tolk compile_params: {err}")))?;
-    if tolk_compile_params.compiler_version != SUPPORTED_TOLK_VERSION {
-        return Err(ApiError::bad_request(format!(
-            "unsupported Tolk compiler_version: {}",
-            tolk_compile_params.compiler_version
-        )));
-    }
-    validate_import_mappings(&tolk_compile_params.import_mappings)?;
     let sources = sources
         .ok_or_else(|| ApiError::bad_request("missing required field: sources".to_owned()))?;
-    let entrypoint = validate_sources(&sources)?;
     let files = match_files_to_sources(&sources, files)?;
-    let source_bundle_hash = compute_source_bundle_hash(SourceBundleInput {
-        language: &language,
-        compiler_version: &tolk_compile_params.compiler_version,
-        entrypoint: &entrypoint,
-        compile_params,
-        sources: sources
-            .iter()
-            .map(|source| SourceBundleSource {
-                path: &source.path,
-                is_entrypoint: source.is_entrypoint,
-            })
-            .collect(),
-        files: files
-            .iter()
-            .map(|(path, file)| SourceBundleFile {
-                path,
-                bytes: file.content.as_ref(),
-            })
-            .collect(),
-    })?;
+    let language_input = languages::prepare(language, compile_params, &sources, &files)?;
+    let language = language_input.language;
+    let entrypoint = language_input.entrypoint;
+    let compiler_version = language_input.compiler_version;
+    let import_mappings = language_input.import_mappings;
+    validate_import_mappings(&import_mappings)?;
     let storage_files = files
         .iter()
         .map(|(path, file)| SourceStorageFile {
@@ -279,45 +267,13 @@ fn prepare_compile_input(
 
     Ok(CompileInput {
         language,
-        compiler_version: tolk_compile_params.compiler_version,
-        import_mappings: tolk_compile_params.import_mappings,
+        compiler_version,
+        import_mappings,
         entrypoint,
         compile_sources,
         sources,
-        source_bundle_hash,
         storage_files,
     })
-}
-
-fn validate_sources(sources: &[SourceMetadata]) -> Result<String, ApiError> {
-    if sources.is_empty() {
-        return Err(ApiError::bad_request(
-            "sources must contain at least one source".to_owned(),
-        ));
-    }
-
-    let mut seen_paths = BTreeSet::new();
-    let mut entrypoint = None;
-
-    for source in sources {
-        validate_source_path(&source.path)?;
-        if !seen_paths.insert(source.path.clone()) {
-            return Err(ApiError::bad_request(format!(
-                "duplicate source path: {}",
-                source.path
-            )));
-        }
-        if source.is_entrypoint {
-            if entrypoint.is_some() {
-                return Err(ApiError::bad_request(
-                    "multiple entrypoint sources were provided".to_owned(),
-                ));
-            }
-            entrypoint = Some(source.path.clone());
-        }
-    }
-
-    entrypoint.ok_or_else(|| ApiError::bad_request("missing entrypoint source".to_owned()))
 }
 
 fn validate_source_path(path: &str) -> Result<(), ApiError> {
@@ -451,10 +407,77 @@ fn build_compile_sources(
         compile_sources.push(CompileSource {
             path: source.path.clone(),
             content,
+            is_entrypoint: source.is_entrypoint,
+            include_in_command: source.include_in_command,
+            is_stdlib: source.is_stdlib,
+            has_include_directives: source.has_include_directives,
         });
     }
 
     Ok(compile_sources)
+}
+
+fn merge_generated_sources(
+    sources: &mut Vec<SourceMetadata>,
+    files: &mut Vec<SourceStorageFile>,
+    generated_sources: Vec<CompileGeneratedSource>,
+) -> Result<(), ApiError> {
+    for generated in generated_sources {
+        validate_source_path(&generated.path)?;
+        let content = generated.content.into_bytes();
+        match files.iter().find(|file| file.path == generated.path) {
+            Some(existing) if existing.content == content => {}
+            Some(_) => {
+                return Err(ApiError::bad_request(format!(
+                    "generated source conflicts with uploaded file: {}",
+                    generated.path
+                )));
+            }
+            None => files.push(SourceStorageFile {
+                path: generated.path.clone(),
+                content,
+            }),
+        }
+
+        if !sources.iter().any(|source| source.path == generated.path) {
+            sources.push(SourceMetadata {
+                path: generated.path,
+                is_entrypoint: false,
+                include_in_command: None,
+                is_stdlib: None,
+                has_include_directives: None,
+            });
+        }
+    }
+
+    sources.sort_by(|left, right| left.path.cmp(&right.path));
+    files.sort_by(|left, right| left.path.cmp(&right.path));
+
+    Ok(())
+}
+
+impl<'a> SourceBundleSource<'a> {
+    fn from_source_metadata(source: &'a SourceMetadata) -> Self {
+        Self {
+            path: &source.path,
+            is_entrypoint: source.is_entrypoint,
+            include_in_command: source.include_in_command,
+            is_stdlib: source.is_stdlib,
+            has_include_directives: source.has_include_directives,
+        }
+    }
+}
+
+impl SourceStorageSource {
+    fn from_source_metadata(source: &SourceMetadata) -> Self {
+        Self {
+            path: source.path.clone(),
+            is_entrypoint: source.is_entrypoint,
+            include_in_command: source.include_in_command,
+            is_stdlib: source.is_stdlib,
+            has_include_directives: source.has_include_directives,
+        }
+    }
 }
 
 fn print_verify_request(
@@ -493,7 +516,6 @@ struct CompileInput {
     entrypoint: String,
     compile_sources: Vec<CompileSource>,
     sources: Vec<SourceMetadata>,
-    source_bundle_hash: String,
     storage_files: Vec<SourceStorageFile>,
 }
 
@@ -507,13 +529,12 @@ struct ReceivedFile {
 struct SourceMetadata {
     path: String,
     is_entrypoint: bool,
-}
-
-#[derive(Debug, Deserialize)]
-struct TolkCompileParams {
-    compiler_version: String,
     #[serde(default)]
-    import_mappings: BTreeMap<String, String>,
+    include_in_command: Option<bool>,
+    #[serde(default)]
+    is_stdlib: Option<bool>,
+    #[serde(default)]
+    has_include_directives: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

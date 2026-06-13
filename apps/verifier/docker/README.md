@@ -54,6 +54,6 @@ The image contains:
 
 - `verifier` Rust backend
 - Node.js runtime
-- `compiler-worker/compile-tolk.mjs`
-- NPM dependencies, including `@ton/tolk-js@1.4.1`
+- `compiler-worker/compile.mjs`
+- Static NPM compiler packages for supported FunC, Tact, and Tolk versions
 - Git and OpenSSH client for source storage commit/push

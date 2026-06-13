@@ -1,7 +1,9 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use verifier::compilers::{CompileOutput, CompileRequest, CompilerError, CompilerService};
+use verifier::compilers::{
+    CompileGeneratedSource, CompileOutput, CompileRequest, CompilerError, CompilerService,
+};
 
 pub struct MockCompilerService {
     result: MockCompilerResult,
@@ -13,6 +15,20 @@ impl MockCompilerService {
         Self {
             result: MockCompilerResult::Ok {
                 code_hash: code_hash.to_owned(),
+                generated_sources: Vec::new(),
+            },
+            recorded_requests: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    pub fn with_generated_sources(
+        code_hash: &str,
+        generated_sources: Vec<CompileGeneratedSource>,
+    ) -> Self {
+        Self {
+            result: MockCompilerResult::Ok {
+                code_hash: code_hash.to_owned(),
+                generated_sources,
             },
             recorded_requests: Arc::new(Mutex::new(Vec::new())),
         }
@@ -33,8 +49,13 @@ impl MockCompilerService {
 }
 
 enum MockCompilerResult {
-    Ok { code_hash: String },
-    CompileFailed { error: String },
+    Ok {
+        code_hash: String,
+        generated_sources: Vec<CompileGeneratedSource>,
+    },
+    CompileFailed {
+        error: String,
+    },
 }
 
 #[async_trait]
@@ -49,8 +70,12 @@ impl CompilerService for MockCompilerService {
         }
 
         match &self.result {
-            MockCompilerResult::Ok { code_hash } => Ok(CompileOutput {
+            MockCompilerResult::Ok {
+                code_hash,
+                generated_sources,
+            } => Ok(CompileOutput {
                 code_hash: code_hash.clone(),
+                generated_sources: generated_sources.clone(),
             }),
             MockCompilerResult::CompileFailed { error } => {
                 Err(CompilerError::CompileFailed(error.clone()))

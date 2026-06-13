@@ -13,7 +13,8 @@ use tower::ServiceExt;
 use verifier::{
     app,
     blockchain::ToncenterClient,
-    compilers::CompileRequest,
+    compilers::{CompileGeneratedSource, CompileRequest, NodeCompilerService},
+    config::Config,
     registry::{RegisterBundleRequest, SharedRegistryClient},
     source_storage::SharedSourceStorage,
     state::AppState,
@@ -31,6 +32,15 @@ pub fn app_state(code_hashes: &[(&str, &str)], compiled_code_hash: &str) -> AppS
     AppState::new(
         Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
         Arc::new(compiler_service),
+        Arc::new(mock_registry::MockRegistryClient::confirmed()),
+        Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+    )
+}
+
+pub fn real_compiler_app_state(code_hashes: &[(&str, &str)]) -> AppState {
+    AppState::new(
+        Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
+        Arc::new(NodeCompilerService::from_config(&Config::default())),
         Arc::new(mock_registry::MockRegistryClient::confirmed()),
         Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
     )
@@ -120,6 +130,32 @@ pub fn recording_source_storage_app_state(
     Arc<Mutex<Vec<mock_source_storage::RecordedSourceStorageRequest>>>,
 ) {
     let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+    let source_storage = mock_source_storage::MockSourceStorage::confirmed();
+    let recorded_requests = source_storage.recorded_requests();
+
+    (
+        AppState::new(
+            Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
+            Arc::new(compiler_service),
+            Arc::new(mock_registry::MockRegistryClient::confirmed()),
+            Arc::new(source_storage),
+        ),
+        recorded_requests,
+    )
+}
+
+pub fn recording_source_storage_app_state_with_generated_sources(
+    code_hashes: &[(&str, &str)],
+    compiled_code_hash: &str,
+    generated_sources: Vec<CompileGeneratedSource>,
+) -> (
+    AppState,
+    Arc<Mutex<Vec<mock_source_storage::RecordedSourceStorageRequest>>>,
+) {
+    let compiler_service = mock_compiler::MockCompilerService::with_generated_sources(
+        compiled_code_hash,
+        generated_sources,
+    );
     let source_storage = mock_source_storage::MockSourceStorage::confirmed();
     let recorded_requests = source_storage.recorded_requests();
 
@@ -278,6 +314,20 @@ pub const fn file_part(
         file_name: Cow::Borrowed(file_name),
         content_type,
         content: Cow::Borrowed(content),
+    }
+}
+
+pub fn owned_file_part(
+    name: &'static str,
+    file_name: impl Into<String>,
+    content_type: &'static str,
+    content: impl Into<String>,
+) -> MultipartPart {
+    MultipartPart::File {
+        name,
+        file_name: Cow::Owned(file_name.into()),
+        content_type,
+        content: Cow::Owned(content.into()),
     }
 }
 

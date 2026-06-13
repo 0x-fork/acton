@@ -19,6 +19,9 @@ pub struct SourceBundleInput<'a> {
 pub struct SourceBundleSource<'a> {
     pub path: &'a str,
     pub is_entrypoint: bool,
+    pub include_in_command: Option<bool>,
+    pub is_stdlib: Option<bool>,
+    pub has_include_directives: Option<bool>,
 }
 
 pub struct SourceBundleFile<'a> {
@@ -59,6 +62,9 @@ impl CanonicalBundle {
             .map(|source| CanonicalSource {
                 path: source.path.to_owned(),
                 is_entrypoint: source.is_entrypoint,
+                include_in_command: source.include_in_command,
+                is_stdlib: source.is_stdlib,
+                has_include_directives: source.has_include_directives,
             })
             .collect::<Vec<_>>();
         sources.sort_by(|left, right| left.path.cmp(&right.path));
@@ -89,6 +95,12 @@ impl CanonicalBundle {
 struct CanonicalSource {
     path: String,
     is_entrypoint: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    include_in_command: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    is_stdlib: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    has_include_directives: Option<bool>,
 }
 
 #[derive(Serialize)]

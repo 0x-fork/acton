@@ -31,7 +31,8 @@ WORKDIR /compiler-worker
 COPY compiler-worker/package.json compiler-worker/package-lock.json ./
 RUN npm ci --omit=dev
 
-COPY compiler-worker/compile-tolk.mjs ./compile-tolk.mjs
+COPY compiler-worker/compile.mjs ./compile.mjs
+COPY compiler-worker/languages ./languages
 COPY compiler-worker/fixtures ./fixtures
 
 FROM node:22-bookworm-slim AS runtime
@@ -66,7 +67,7 @@ ENV VERIFIER_CONFIG=/etc/verifier/config.toml \
     SOURCE_REPOSITORY_AUTHOR_NAME=ton-verifier \
     SOURCE_REPOSITORY_AUTHOR_EMAIL=ton-verifier@example.invalid \
     VERIFIER_COMPILER_NODE_BIN=node \
-    VERIFIER_COMPILER_WORKER_PATH=/app/compiler-worker/compile-tolk.mjs \
+    VERIFIER_COMPILER_WORKER_PATH=/app/compiler-worker/compile.mjs \
     VERIFIER_COMPILER_TIMEOUT_MS=5000
 
 EXPOSE 3000

@@ -46,6 +46,9 @@ pub struct StoreSourceBundleRequest {
 pub struct SourceStorageSource {
     pub path: String,
     pub is_entrypoint: bool,
+    pub include_in_command: Option<bool>,
+    pub is_stdlib: Option<bool>,
+    pub has_include_directives: Option<bool>,
 }
 
 #[derive(Clone)]
@@ -372,6 +375,9 @@ async fn write_manifest(
         .map(|source| SourceBundleManifestSource {
             path: source.path.clone(),
             is_entrypoint: source.is_entrypoint,
+            include_in_command: source.include_in_command,
+            is_stdlib: source.is_stdlib,
+            has_include_directives: source.has_include_directives,
         })
         .collect::<Vec<_>>();
     sources.sort_by(|left, right| left.path.cmp(&right.path));
@@ -641,6 +647,12 @@ pub struct SourceBundleManifest {
 pub struct SourceBundleManifestSource {
     pub path: String,
     pub is_entrypoint: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_in_command: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_stdlib: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub has_include_directives: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

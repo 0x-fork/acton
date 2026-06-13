@@ -2,7 +2,7 @@ import {FileCode2, Folder} from "lucide-react"
 import {useEffect, useMemo, useState, type CSSProperties} from "react"
 
 import type {SourceFile} from "../lib/api"
-import {highlightTolkToHtml} from "../lib/tolk-highlighter"
+import {highlightCodeToHtml, type HighlightLanguage} from "../lib/syntax-highlighter"
 
 interface CodeViewerProps {
   readonly files: readonly SourceFile[]
@@ -22,8 +22,25 @@ function fileContent(file: SourceFile): string {
   return content.endsWith("\n") ? content.slice(0, -1) : content
 }
 
-function isTolkFile(path: string): boolean {
-  return path.toLowerCase().endsWith(".tolk")
+function languageForPath(path: string): HighlightLanguage | undefined {
+  const normalizedPath = path.toLowerCase()
+  if (normalizedPath.endsWith(".tolk")) {
+    return "tolk"
+  }
+  if (normalizedPath.endsWith(".fc") || normalizedPath.endsWith(".func")) {
+    return "func"
+  }
+  if (normalizedPath.endsWith(".tact")) {
+    return "tact"
+  }
+  if (
+    normalizedPath.endsWith(".json") ||
+    normalizedPath.endsWith(".abi") ||
+    normalizedPath.endsWith(".pkg")
+  ) {
+    return "json"
+  }
+  return undefined
 }
 
 function lineCount(code: string): number {
@@ -225,9 +242,10 @@ export function CodeViewer({files, entrypoint}: CodeViewerProps) {
 
     let cancelled = false
     const render = async () => {
-      const highlighted = isTolkFile(activeFile.path)
-        ? await highlightTolkToHtml(code, isDark)
-        : plainCodeToHtml(code)
+      const language = languageForPath(activeFile.path)
+      const highlighted = await (language
+        ? highlightCodeToHtml(code, language, isDark).catch(() => plainCodeToHtml(code))
+        : Promise.resolve(plainCodeToHtml(code)))
       if (!cancelled) {
         setHtml(highlighted)
       }

@@ -105,7 +105,7 @@ write_generated_config() {
 
         printf '[compiler]\n'
         write_optional_string node_bin "${VERIFIER_COMPILER_NODE_BIN:-node}"
-        write_optional_string worker_path "${VERIFIER_COMPILER_WORKER_PATH:-/app/compiler-worker/compile-tolk.mjs}"
+        write_optional_string worker_path "${VERIFIER_COMPILER_WORKER_PATH:-/app/compiler-worker/compile.mjs}"
         write_optional_int timeout_ms "${VERIFIER_COMPILER_TIMEOUT_MS:-5000}"
     } > "$config_path"
 }

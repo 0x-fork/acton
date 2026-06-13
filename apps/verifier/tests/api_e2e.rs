@@ -3,12 +3,14 @@ mod support;
 use axum::http::StatusCode;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use verifier::compilers::CompileGeneratedSource;
 
 use support::{
     app_state, failing_compiler_app_state, failing_registry_app_state,
     failing_source_storage_recording_registry_app_state, file_part, get, post_verify,
     recording_app_state, recording_registry_app_state, recording_source_storage_app_state,
-    response_json, text_part, unverified_registry_app_state,
+    recording_source_storage_app_state_with_generated_sources, response_json, text_part,
+    unverified_registry_app_state,
 };
 
 const ADDRESS_ONE: &str = "EQD0000000000000000000000000000000000000000000000";
@@ -19,7 +21,13 @@ const CODE_HASH_TWO: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 const COMPILE_PARAMS_TOLK: &str = r#"{"compiler_version":"1.4.1"}"#;
 const COMPILE_PARAMS_TOLK_WITH_IMPORT_MAPPINGS: &str =
     r#"{"compiler_version":"1.4.1","import_mappings":{"@contracts":"contracts"}}"#;
+const COMPILE_PARAMS_FUNC: &str = r#"{"compiler_version":"0.4.6"}"#;
+const EMPTY_COMPILE_PARAMS: &str = "{}";
 const SOURCES_MAIN: &str = r#"[{"path":"main.tolk","is_entrypoint":true}]"#;
+const SOURCES_FUNC_MAIN: &str =
+    r#"[{"path":"main.fc","is_entrypoint":true,"include_in_command":true}]"#;
+const SOURCES_TACT_PKG: &str = r#"[{"path":"contract.pkg","is_entrypoint":true}]"#;
+const TACT_PKG_1_6_13: &str = r#"{"compiler":{"version":"1.6.13"}}"#;
 const SOURCES_TWO_FILES: &str = r#"[
   {"path":"main.tolk","is_entrypoint":true},
   {"path":"imports/lib.tolk","is_entrypoint":false}
@@ -314,6 +322,84 @@ async fn verify_passes_import_mappings_to_compiler() {
 }
 
 #[tokio::test]
+async fn verify_accepts_func_and_passes_compile_metadata_to_compiler() {
+    let (state, recorded_requests) = recording_app_state(&[], CODE_HASH_ONE);
+    let response = post_verify(
+        state,
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "func"),
+            text_part("compile_params", COMPILE_PARAMS_FUNC),
+            text_part("sources", SOURCES_FUNC_MAIN),
+            file_part("files", "main.fc", "text/plain", "() main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let snapshot = {
+        let recorded_requests = recorded_requests
+            .lock()
+            .expect("recorded compiler requests mutex should not be poisoned");
+        assert_eq!(recorded_requests.len(), 1);
+
+        let request = &recorded_requests[0];
+        let snapshot = (
+            request.language.clone(),
+            request.compiler_version.clone(),
+            request.entrypoint.clone(),
+            request.sources[0].path.clone(),
+            request.sources[0].include_in_command,
+        );
+        drop(recorded_requests);
+        snapshot
+    };
+    assert_eq!(snapshot.0, "func");
+    assert_eq!(snapshot.1, "0.4.6");
+    assert_eq!(snapshot.2, "main.fc");
+    assert_eq!(snapshot.3, "main.fc");
+    assert_eq!(snapshot.4, Some(true));
+}
+
+#[tokio::test]
+async fn verify_accepts_tact_and_reads_compiler_version_from_pkg() {
+    let (state, recorded_requests) = recording_app_state(&[], CODE_HASH_ONE);
+    let response = post_verify(
+        state,
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tact"),
+            text_part("compile_params", EMPTY_COMPILE_PARAMS),
+            text_part("sources", SOURCES_TACT_PKG),
+            file_part("files", "contract.pkg", "application/json", TACT_PKG_1_6_13),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let snapshot = {
+        let recorded_requests = recorded_requests
+            .lock()
+            .expect("recorded compiler requests mutex should not be poisoned");
+        assert_eq!(recorded_requests.len(), 1);
+
+        let request = &recorded_requests[0];
+        let snapshot = (
+            request.language.clone(),
+            request.compiler_version.clone(),
+            request.entrypoint.clone(),
+        );
+        drop(recorded_requests);
+        snapshot
+    };
+    assert_eq!(snapshot.0, "tact");
+    assert_eq!(snapshot.1, "1.6.13");
+    assert_eq!(snapshot.2, "contract.pkg");
+}
+
+#[tokio::test]
 async fn verify_accepts_code_hash_without_address() {
     let response = post_verify(
         app_state(&[], CODE_HASH_ONE),
@@ -458,6 +544,45 @@ async fn verify_stores_source_bundle_on_hash_match() {
     assert_eq!(recorded_snapshot[0].files.len(), 1);
     assert_eq!(recorded_snapshot[0].files[0].0, "main.tolk");
     assert_eq!(recorded_snapshot[0].files[0].1, b"fun main() {}");
+}
+
+#[tokio::test]
+async fn verify_stores_generated_sources_on_hash_match() {
+    let (state, recorded_requests) = recording_source_storage_app_state_with_generated_sources(
+        &[],
+        CODE_HASH_ONE,
+        vec![CompileGeneratedSource {
+            path: "contract.abi".to_owned(),
+            content: r#"{"name":"Contract"}"#.to_owned(),
+        }],
+    );
+    let response = post_verify(
+        state,
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tact"),
+            text_part("compile_params", EMPTY_COMPILE_PARAMS),
+            text_part("sources", SOURCES_TACT_PKG),
+            file_part("files", "contract.pkg", "application/json", TACT_PKG_1_6_13),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let recorded_snapshot = {
+        let recorded_requests = recorded_requests
+            .lock()
+            .expect("recorded source storage requests mutex should not be poisoned");
+        let snapshot = recorded_requests.clone();
+        drop(recorded_requests);
+        snapshot
+    };
+    assert_eq!(recorded_snapshot.len(), 1);
+    assert_eq!(recorded_snapshot[0].files.len(), 2);
+    assert_eq!(recorded_snapshot[0].files[0].0, "contract.abi");
+    assert_eq!(recorded_snapshot[0].files[0].1, br#"{"name":"Contract"}"#);
+    assert_eq!(recorded_snapshot[0].files[1].0, "contract.pkg");
 }
 
 #[tokio::test]
@@ -878,7 +1003,7 @@ async fn verify_rejects_unsupported_language() {
         app_state(&[], CODE_HASH_ONE),
         vec![
             text_part("code_hash", CODE_HASH_ONE),
-            text_part("language", "func"),
+            text_part("language", "fift"),
             text_part("compile_params", COMPILE_PARAMS_TOLK),
             text_part("sources", SOURCES_MAIN),
             file_part("files", "main.tolk", "text/plain", "fun main() {}"),
@@ -891,13 +1016,13 @@ async fn verify_rejects_unsupported_language() {
 }
 
 #[tokio::test]
-async fn verify_rejects_unsupported_tolk_version() {
+async fn verify_rejects_missing_tolk_version() {
     let response = post_verify(
         app_state(&[], CODE_HASH_ONE),
         vec![
             text_part("code_hash", CODE_HASH_ONE),
             text_part("language", "tolk"),
-            text_part("compile_params", r#"{"compiler_version":"1.4.0"}"#),
+            text_part("compile_params", EMPTY_COMPILE_PARAMS),
             text_part("sources", SOURCES_MAIN),
             file_part("files", "main.tolk", "text/plain", "fun main() {}"),
         ],
@@ -905,7 +1030,7 @@ async fn verify_rejects_unsupported_tolk_version() {
     .await;
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    assert_error_contains(response, "unsupported Tolk compiler_version").await;
+    assert_error_contains(response, "missing compiler version for tolk").await;
 }
 
 async fn assert_error_contains(response: axum::response::Response, expected: &str) {

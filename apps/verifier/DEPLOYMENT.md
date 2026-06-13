@@ -2,7 +2,7 @@
 
 This document describes how to deploy the verifier backend as a Docker service on a server.
 
-The Docker image contains the verifier backend, Node.js, the Tolk compiler worker, `@ton/tolk-js@1.4.1`, Git, and OpenSSH. It does not run a TON node by itself. The verifier needs a TonCenter-compatible API endpoint, which can be mainnet, testnet, or a localnet/lightnode endpoint.
+The Docker image contains the verifier backend, Node.js, the static compiler worker packages, Git, and OpenSSH. It does not run a TON node by itself. The verifier needs a TonCenter-compatible API endpoint, which can be mainnet, testnet, or a localnet/lightnode endpoint.
 
 ## Architecture
 
@@ -395,7 +395,7 @@ docker compose exec verifier node -e "fetch(process.env.VERIFIER_TONCENTER_BASE_
 Check that the worker exists:
 
 ```bash
-docker compose exec verifier test -f /app/compiler-worker/compile-tolk.mjs
+docker compose exec verifier test -f /app/compiler-worker/compile.mjs
 ```
 
 Check Node:
@@ -404,7 +404,8 @@ Check Node:
 docker compose exec verifier node --version
 ```
 
-Only Tolk compiler version `1.4.1` is currently supported.
+Supported Tolk compiler versions are the statically bundled `@ton/tolk-js` versions from the
+compiler worker package.
 
 ### Container starts but `/healthz` is not reachable
 

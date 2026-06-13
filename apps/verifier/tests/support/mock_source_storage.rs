@@ -145,6 +145,9 @@ fn stored_bundle_from_request(
         .map(|source| SourceBundleManifestSource {
             path: source.path.clone(),
             is_entrypoint: source.is_entrypoint,
+            include_in_command: source.include_in_command,
+            is_stdlib: source.is_stdlib,
+            has_include_directives: source.has_include_directives,
         })
         .collect::<Vec<_>>();
     sources.sort_by(|left, right| left.path.cmp(&right.path));

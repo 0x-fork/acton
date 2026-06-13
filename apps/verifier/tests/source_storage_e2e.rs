@@ -39,10 +39,16 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
                 SourceStorageSource {
                     path: "main.tolk".to_owned(),
                     is_entrypoint: true,
+                    include_in_command: None,
+                    is_stdlib: None,
+                    has_include_directives: None,
                 },
                 SourceStorageSource {
                     path: "imports/lib.tolk".to_owned(),
                     is_entrypoint: false,
+                    include_in_command: None,
+                    is_stdlib: None,
+                    has_include_directives: None,
                 },
             ],
             files: vec![

@@ -37,7 +37,7 @@ fn repository_config_toml_loads() {
     assert_eq!(config.compiler_node_bin(), "node");
     assert_eq!(
         config.compiler_worker_path().to_string_lossy(),
-        "compiler-worker/compile-tolk.mjs"
+        "compiler-worker/compile.mjs"
     );
     assert_eq!(config.compiler_timeout(), Duration::from_secs(5));
 }
