@@ -10,5 +10,6 @@ pub fn router_with_state(state: AppState) -> Router {
     Router::<AppState>::new()
         .route("/healthz", get(handlers::health::handler))
         .nest("/api/v1", handlers::api::v1::router())
+        .fallback(handlers::frontend::handler)
         .with_state(state)
 }
