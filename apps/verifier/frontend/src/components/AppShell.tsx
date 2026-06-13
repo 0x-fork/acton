@@ -1,6 +1,7 @@
 import type {ReactNode} from "react"
 import {Github} from "lucide-react"
 
+import tonVerifierIcon from "../assets/ton-verifier-icons/icon.svg"
 import {ThemeToggle} from "./ThemeToggle"
 
 interface AppShellProps {
@@ -13,18 +14,28 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
     <div className="app-shell">
       <header className="topbar">
         <a className="brand" href="/" aria-label="Acton Verifier home">
-          <span className="brand-mark" aria-hidden="true" />
+          <img className="brand-mark" src={tonVerifierIcon} alt="" aria-hidden="true" />
           <span className="brand-text">Acton Verifier</span>
         </a>
         <div className="topbar-actions">
           {headerAccessory}
           <ThemeToggle />
+          <a
+            className="topbar-github"
+            href="https://github.com/ton-blockchain/acton"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Open GitHub"
+            title="GitHub"
+          >
+            <Github size={18} strokeWidth={2} aria-hidden="true" />
+          </a>
         </div>
       </header>
       {children}
       <footer className="app-footer">
         <div className="footer-brand">
-          <span className="brand-mark" aria-hidden="true" />
+          <img className="brand-mark" src={tonVerifierIcon} alt="" aria-hidden="true" />
           <span>Acton Verifier</span>
         </div>
         <div className="footer-meta">

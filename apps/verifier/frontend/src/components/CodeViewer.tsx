@@ -1,4 +1,4 @@
-import {FileCode2, Folder} from "lucide-react"
+import {FileCode2, Folder, Menu} from "lucide-react"
 import {useCallback, useEffect, useMemo, useState, type CSSProperties} from "react"
 
 import type {SourceFile} from "../lib/api"
@@ -249,12 +249,14 @@ export function CodeViewer({files, entrypoint}: CodeViewerProps) {
   )
   const defaultActivePath = urlSelectedPath ?? entrypointPath ?? files[0]?.path ?? ""
   const [activePath, setActivePath] = useState(defaultActivePath)
+  const [isFileTreeOpen, setFileTreeOpen] = useState(false)
   const [html, setHtml] = useState("")
   const [themeRevision, setThemeRevision] = useState(0)
 
   const selectFile = useCallback((path: string) => {
     setActivePath(path)
     setSelectedFilePathInUrl(path)
+    setFileTreeOpen(false)
   }, [])
 
   const activeFile = useMemo(
@@ -270,6 +272,7 @@ export function CodeViewer({files, entrypoint}: CodeViewerProps) {
 
   useEffect(() => {
     setActivePath(defaultActivePath)
+    setFileTreeOpen(false)
   }, [defaultActivePath])
 
   useEffect(() => {
@@ -309,7 +312,10 @@ export function CodeViewer({files, entrypoint}: CodeViewerProps) {
 
   return (
     <section className="code-workspace" aria-label="Source code">
-      <aside className="file-tree" aria-label="Source files">
+      <aside
+        className="file-tree file-tree-desktop"
+        aria-label="Source files"
+      >
         <div className="file-tree-list">
           <FileTreeRows
             nodes={tree}
@@ -321,8 +327,32 @@ export function CodeViewer({files, entrypoint}: CodeViewerProps) {
       </aside>
       <div className="code-pane">
         <div className="code-pane-header">
+          <button
+            type="button"
+            className={`mobile-file-tree-toggle ${isFileTreeOpen ? "mobile-file-tree-toggle-open" : ""}`}
+            aria-label="Toggle source files"
+            aria-expanded={isFileTreeOpen}
+            aria-controls="source-file-tree-mobile"
+            onClick={() => setFileTreeOpen(current => !current)}
+          >
+            <Menu size={16} aria-hidden="true" />
+          </button>
           <span title={activeFile.path}>{activeFile.path}</span>
         </div>
+        <aside
+          id="source-file-tree-mobile"
+          className={`file-tree file-tree-mobile ${isFileTreeOpen ? "file-tree-open" : ""}`}
+          aria-label="Source files"
+        >
+          <div className="file-tree-list">
+            <FileTreeRows
+              nodes={tree}
+              activePath={activeFile.path}
+              entrypoint={entrypointPath}
+              onSelect={selectFile}
+            />
+          </div>
+        </aside>
         <div className="code-frame">
           <div className="line-numbers" aria-hidden="true">
             {Array.from({length: lineCount(code)}, (_, index) => (
