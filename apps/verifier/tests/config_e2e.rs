@@ -26,6 +26,14 @@ fn repository_config_toml_loads() {
     assert_eq!(config.wallet_mnemonic_env(), None);
     assert_eq!(config.wallet_mnemonic_file(), None);
     assert_eq!(config.wallet_mnemonic(), None);
+    assert_eq!(config.source_repository_path(), None);
+    assert_eq!(config.source_repository_remote(), "origin");
+    assert_eq!(config.source_repository_branch(), None);
+    assert_eq!(config.source_repository_author_name(), "ton-verifier");
+    assert_eq!(
+        config.source_repository_author_email(),
+        "ton-verifier@example.invalid"
+    );
     assert_eq!(config.compiler_node_bin(), "node");
     assert_eq!(
         config.compiler_worker_path().to_string_lossy(),
@@ -80,6 +88,13 @@ confirmation_delay_ms = 25
 kind = "v5r1"
 workchain = 0
 mnemonic_env = "VERIFIER_TEST_MNEMONIC"
+
+[source_repository]
+path = "/tmp/verifier-sources"
+remote = "github"
+branch = "verified-sources"
+author_name = "Verifier Bot"
+author_email = "verifier@example.com"
 "#
     )
     .expect("temporary config should be writable");
@@ -105,4 +120,17 @@ mnemonic_env = "VERIFIER_TEST_MNEMONIC"
     assert_eq!(config.wallet_kind(), "v5r1");
     assert_eq!(config.wallet_workchain(), 0);
     assert_eq!(config.wallet_mnemonic_env(), Some("VERIFIER_TEST_MNEMONIC"));
+    assert_eq!(
+        config
+            .source_repository_path()
+            .map(|path| path.to_string_lossy()),
+        Some("/tmp/verifier-sources".into())
+    );
+    assert_eq!(config.source_repository_remote(), "github");
+    assert_eq!(config.source_repository_branch(), Some("verified-sources"));
+    assert_eq!(config.source_repository_author_name(), "Verifier Bot");
+    assert_eq!(
+        config.source_repository_author_email(),
+        "verifier@example.com"
+    );
 }

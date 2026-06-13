@@ -5,6 +5,7 @@ use crate::{
     compilers::{CompilerService, NodeCompilerService},
     config::Config,
     registry::{RegistryClient, TonRegistryClient},
+    source_storage::{GitSourceStorage, SourceStorage},
     verification::VerificationService,
 };
 
@@ -12,6 +13,7 @@ use crate::{
 pub struct AppState {
     compiler_service: Arc<dyn CompilerService>,
     registry_client: Arc<dyn RegistryClient>,
+    source_storage: Arc<dyn SourceStorage>,
     verification_service: VerificationService,
 }
 
@@ -22,6 +24,7 @@ impl AppState {
             Arc::new(ToncenterClient::from_config(config)),
             Arc::new(NodeCompilerService::from_config(config)),
             Arc::new(TonRegistryClient::from_config(config)),
+            Arc::new(GitSourceStorage::from_config(config)),
         )
     }
 
@@ -30,10 +33,12 @@ impl AppState {
         blockchain_client: Arc<dyn BlockchainClient>,
         compiler_service: Arc<dyn CompilerService>,
         registry_client: Arc<dyn RegistryClient>,
+        source_storage: Arc<dyn SourceStorage>,
     ) -> Self {
         Self {
             compiler_service,
             registry_client,
+            source_storage,
             verification_service: VerificationService::new(blockchain_client),
         }
     }
@@ -46,6 +51,11 @@ impl AppState {
     #[must_use]
     pub fn registry_client(&self) -> &dyn RegistryClient {
         self.registry_client.as_ref()
+    }
+
+    #[must_use]
+    pub fn source_storage(&self) -> &dyn SourceStorage {
+        self.source_storage.as_ref()
     }
 
     #[must_use]

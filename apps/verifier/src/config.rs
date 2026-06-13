@@ -21,6 +21,9 @@ const DEFAULT_REGISTRY_CONFIRMATION_ATTEMPTS: usize = 20;
 const DEFAULT_REGISTRY_CONFIRMATION_DELAY_MS: u64 = 1_000;
 const DEFAULT_WALLET_KIND: &str = "v5r1";
 const DEFAULT_WALLET_WORKCHAIN: i32 = 0;
+const DEFAULT_SOURCE_REPOSITORY_REMOTE: &str = "origin";
+const DEFAULT_SOURCE_REPOSITORY_AUTHOR_NAME: &str = "ton-verifier";
+const DEFAULT_SOURCE_REPOSITORY_AUTHOR_EMAIL: &str = "ton-verifier@example.invalid";
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -37,6 +40,11 @@ pub struct Config {
     wallet_mnemonic_env: Option<String>,
     wallet_mnemonic_file: Option<PathBuf>,
     wallet_mnemonic: Option<String>,
+    source_repository_path: Option<PathBuf>,
+    source_repository_remote: String,
+    source_repository_branch: Option<String>,
+    source_repository_author_name: String,
+    source_repository_author_email: String,
     compiler_node_bin: String,
     compiler_worker_path: PathBuf,
     compiler_timeout: Duration,
@@ -143,6 +151,31 @@ impl Config {
     }
 
     #[must_use]
+    pub fn source_repository_path(&self) -> Option<&Path> {
+        self.source_repository_path.as_deref()
+    }
+
+    #[must_use]
+    pub fn source_repository_remote(&self) -> &str {
+        &self.source_repository_remote
+    }
+
+    #[must_use]
+    pub fn source_repository_branch(&self) -> Option<&str> {
+        self.source_repository_branch.as_deref()
+    }
+
+    #[must_use]
+    pub fn source_repository_author_name(&self) -> &str {
+        &self.source_repository_author_name
+    }
+
+    #[must_use]
+    pub fn source_repository_author_email(&self) -> &str {
+        &self.source_repository_author_email
+    }
+
+    #[must_use]
     pub fn compiler_node_bin(&self) -> &str {
         &self.compiler_node_bin
     }
@@ -176,6 +209,11 @@ impl Default for Config {
             wallet_mnemonic_env: None,
             wallet_mnemonic_file: None,
             wallet_mnemonic: None,
+            source_repository_path: None,
+            source_repository_remote: DEFAULT_SOURCE_REPOSITORY_REMOTE.to_owned(),
+            source_repository_branch: None,
+            source_repository_author_name: DEFAULT_SOURCE_REPOSITORY_AUTHOR_NAME.to_owned(),
+            source_repository_author_email: DEFAULT_SOURCE_REPOSITORY_AUTHOR_EMAIL.to_owned(),
             compiler_node_bin: DEFAULT_COMPILER_NODE_BIN.to_owned(),
             compiler_worker_path: PathBuf::from(DEFAULT_COMPILER_WORKER_PATH),
             compiler_timeout: Duration::from_millis(DEFAULT_COMPILER_TIMEOUT_MS),
@@ -240,6 +278,8 @@ struct ConfigFile {
     #[serde(default)]
     wallet: WalletConfig,
     #[serde(default)]
+    source_repository: SourceRepositoryConfig,
+    #[serde(default)]
     compiler: CompilerConfig,
 }
 
@@ -272,6 +312,20 @@ impl ConfigFile {
             wallet_mnemonic_env: self.wallet.mnemonic_env,
             wallet_mnemonic_file: self.wallet.mnemonic_file,
             wallet_mnemonic: self.wallet.mnemonic,
+            source_repository_path: self.source_repository.path,
+            source_repository_remote: self
+                .source_repository
+                .remote
+                .unwrap_or_else(|| DEFAULT_SOURCE_REPOSITORY_REMOTE.to_owned()),
+            source_repository_branch: self.source_repository.branch,
+            source_repository_author_name: self
+                .source_repository
+                .author_name
+                .unwrap_or_else(|| DEFAULT_SOURCE_REPOSITORY_AUTHOR_NAME.to_owned()),
+            source_repository_author_email: self
+                .source_repository
+                .author_email
+                .unwrap_or_else(|| DEFAULT_SOURCE_REPOSITORY_AUTHOR_EMAIL.to_owned()),
             compiler_node_bin: self
                 .compiler
                 .node_bin
@@ -320,6 +374,15 @@ struct WalletConfig {
     mnemonic_env: Option<String>,
     mnemonic_file: Option<PathBuf>,
     mnemonic: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SourceRepositoryConfig {
+    path: Option<PathBuf>,
+    remote: Option<String>,
+    branch: Option<String>,
+    author_name: Option<String>,
+    author_email: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]

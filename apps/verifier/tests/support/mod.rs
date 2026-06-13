@@ -15,12 +15,14 @@ use verifier::{
     blockchain::ToncenterClient,
     compilers::CompileRequest,
     registry::{RegisterBundleRequest, SharedRegistryClient},
+    source_storage::SharedSourceStorage,
     state::AppState,
 };
 
 mod mock_blockchain;
 mod mock_compiler;
 mod mock_registry;
+mod mock_source_storage;
 
 const MULTIPART_BOUNDARY: &str = "verifier-test-boundary";
 
@@ -30,6 +32,7 @@ pub fn app_state(code_hashes: &[(&str, &str)], compiled_code_hash: &str) -> AppS
         Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
         Arc::new(compiler_service),
         Arc::new(mock_registry::MockRegistryClient::confirmed()),
+        Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
     )
 }
 
@@ -39,6 +42,7 @@ pub fn toncenter_app_state(base_url: &str, compiled_code_hash: &str) -> AppState
         Arc::new(ToncenterClient::new(base_url.to_owned(), None)),
         Arc::new(compiler_service),
         Arc::new(mock_registry::MockRegistryClient::confirmed()),
+        Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
     )
 }
 
@@ -52,6 +56,22 @@ pub fn toncenter_app_state_with_registry(
         Arc::new(ToncenterClient::new(base_url.to_owned(), None)),
         Arc::new(compiler_service),
         registry_client,
+        Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+    )
+}
+
+pub fn toncenter_app_state_with_registry_and_source_storage(
+    base_url: &str,
+    compiled_code_hash: &str,
+    registry_client: SharedRegistryClient,
+    source_storage: SharedSourceStorage,
+) -> AppState {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+    AppState::new(
+        Arc::new(ToncenterClient::new(base_url.to_owned(), None)),
+        Arc::new(compiler_service),
+        registry_client,
+        source_storage,
     )
 }
 
@@ -67,6 +87,7 @@ pub fn recording_app_state(
             Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
             Arc::new(compiler_service),
             Arc::new(mock_registry::MockRegistryClient::confirmed()),
+            Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
         ),
         recorded_requests,
     )
@@ -85,6 +106,29 @@ pub fn recording_registry_app_state(
             Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
             Arc::new(compiler_service),
             Arc::new(registry_client),
+            Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+        ),
+        recorded_requests,
+    )
+}
+
+pub fn recording_source_storage_app_state(
+    code_hashes: &[(&str, &str)],
+    compiled_code_hash: &str,
+) -> (
+    AppState,
+    Arc<Mutex<Vec<mock_source_storage::RecordedSourceStorageRequest>>>,
+) {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+    let source_storage = mock_source_storage::MockSourceStorage::confirmed();
+    let recorded_requests = source_storage.recorded_requests();
+
+    (
+        AppState::new(
+            Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
+            Arc::new(compiler_service),
+            Arc::new(mock_registry::MockRegistryClient::confirmed()),
+            Arc::new(source_storage),
         ),
         recorded_requests,
     )
@@ -102,6 +146,58 @@ pub fn failing_registry_app_state(
         Arc::new(mock_registry::MockRegistryClient::failing(
             "registry sender failed",
         )),
+        Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+    )
+}
+
+pub fn unverified_registry_app_state(
+    code_hashes: &[(&str, &str)],
+    compiled_code_hash: &str,
+) -> AppState {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+
+    AppState::new(
+        Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
+        Arc::new(compiler_service),
+        Arc::new(mock_registry::MockRegistryClient::unverified()),
+        Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+    )
+}
+
+pub fn failing_source_storage_app_state(
+    code_hashes: &[(&str, &str)],
+    compiled_code_hash: &str,
+) -> AppState {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+
+    AppState::new(
+        Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
+        Arc::new(compiler_service),
+        Arc::new(mock_registry::MockRegistryClient::confirmed()),
+        Arc::new(mock_source_storage::MockSourceStorage::failing(
+            "source storage failed",
+        )),
+    )
+}
+
+pub fn failing_source_storage_recording_registry_app_state(
+    code_hashes: &[(&str, &str)],
+    compiled_code_hash: &str,
+) -> (AppState, Arc<Mutex<Vec<RegisterBundleRequest>>>) {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+    let registry_client = mock_registry::MockRegistryClient::confirmed();
+    let recorded_requests = registry_client.recorded_requests();
+
+    (
+        AppState::new(
+            Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
+            Arc::new(compiler_service),
+            Arc::new(registry_client),
+            Arc::new(mock_source_storage::MockSourceStorage::failing(
+                "source storage failed",
+            )),
+        ),
+        recorded_requests,
     )
 }
 

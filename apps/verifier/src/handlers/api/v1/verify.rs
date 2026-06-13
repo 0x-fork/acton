@@ -23,6 +23,10 @@ use crate::{
     source_bundle::{
         SourceBundleFile, SourceBundleInput, SourceBundleSource, compute_source_bundle_hash,
     },
+    source_storage::{
+        SourceStorageFile, SourceStorageProvider, SourceStorageReceipt, SourceStorageSource,
+        StoreSourceBundleRequest,
+    },
     state::AppState,
     verification::{ResolvedVerificationTarget, VerificationTarget},
 };
@@ -126,17 +130,38 @@ async fn handle_multipart(
         .compiler_service()
         .compile(CompileRequest {
             language: compile_input.language.clone(),
-            compiler_version: compile_input.compiler_version,
-            entrypoint: compile_input.entrypoint,
+            compiler_version: compile_input.compiler_version.clone(),
+            entrypoint: compile_input.entrypoint.clone(),
             sources: compile_input.compile_sources,
         })
         .await?;
     let compiled_code_hash = normalize_code_hash(&compiled.code_hash);
     let verification_result =
         VerificationResult::from_hashes(&resolved_target.code_hash, &compiled_code_hash);
-    let (source_bundle_hash, onchain_registration) = match verification_result {
+    let (source_bundle_hash, source_storage, onchain_registration) = match verification_result {
         VerificationResult::Match => {
             let source_bundle_hash = compile_input.source_bundle_hash.clone();
+            let source_storage = state
+                .source_storage()
+                .store_bundle(StoreSourceBundleRequest {
+                    address: resolved_target.address.clone(),
+                    code_hash: resolved_target.code_hash.clone(),
+                    source_bundle_hash: source_bundle_hash.clone(),
+                    language: compile_input.language.clone(),
+                    compiler_version: compile_input.compiler_version.clone(),
+                    entrypoint: compile_input.entrypoint.clone(),
+                    compile_params: compile_params.clone(),
+                    sources: compile_input
+                        .sources
+                        .iter()
+                        .map(|source| SourceStorageSource {
+                            path: source.path.clone(),
+                            is_entrypoint: source.is_entrypoint,
+                        })
+                        .collect(),
+                    files: compile_input.storage_files.clone(),
+                })
+                .await?;
             let registration = state
                 .registry_client()
                 .register_bundle(RegisterBundleRequest {
@@ -145,9 +170,13 @@ async fn handle_multipart(
                 })
                 .await?;
 
-            (Some(source_bundle_hash), Some(registration.into()))
+            (
+                Some(source_bundle_hash),
+                Some(source_storage.into()),
+                Some(registration.into()),
+            )
         }
-        VerificationResult::Mismatch => (None, None),
+        VerificationResult::Mismatch => (None, None, None),
     };
 
     print_verify_request(
@@ -166,6 +195,7 @@ async fn handle_multipart(
         compiled_code_hash,
         verification_result,
         source_bundle_hash,
+        source_storage,
         onchain_registration,
         language: compile_input.language,
         compile_params,
@@ -236,6 +266,13 @@ fn prepare_compile_input(
             })
             .collect(),
     })?;
+    let storage_files = files
+        .iter()
+        .map(|(path, file)| SourceStorageFile {
+            path: path.clone(),
+            content: file.content.to_vec(),
+        })
+        .collect();
     let compile_sources = build_compile_sources(&sources, files)?;
 
     Ok(CompileInput {
@@ -245,6 +282,7 @@ fn prepare_compile_input(
         compile_sources,
         sources,
         source_bundle_hash,
+        storage_files,
     })
 }
 
@@ -411,6 +449,7 @@ struct CompileInput {
     compile_sources: Vec<CompileSource>,
     sources: Vec<SourceMetadata>,
     source_bundle_hash: String,
+    storage_files: Vec<SourceStorageFile>,
 }
 
 #[derive(Debug)]
@@ -437,10 +476,28 @@ struct VerifyResponse {
     compiled_code_hash: String,
     verification_result: VerificationResult,
     source_bundle_hash: Option<String>,
+    source_storage: Option<SourceStorageResponse>,
     onchain_registration: Option<OnchainRegistration>,
     language: String,
     compile_params: Value,
     files: Vec<FileSummary>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SourceStorageResponse {
+    provider: SourceStorageProvider,
+    commit: String,
+    bundle_path: String,
+}
+
+impl From<SourceStorageReceipt> for SourceStorageResponse {
+    fn from(receipt: SourceStorageReceipt) -> Self {
+        Self {
+            provider: receipt.provider,
+            commit: receipt.commit,
+            bundle_path: receipt.bundle_path,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

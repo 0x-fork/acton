@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use crate::{
     compilers::CompilerError, registry::RegistryError, source_bundle::SourceBundleError,
-    verification::VerificationError,
+    source_storage::SourceStorageError, verification::VerificationError,
 };
 
 #[derive(Debug)]
@@ -61,6 +61,12 @@ impl From<RegistryError> for ApiError {
 impl From<SourceBundleError> for ApiError {
     fn from(err: SourceBundleError) -> Self {
         Self::bad_request(err.to_string())
+    }
+}
+
+impl From<SourceStorageError> for ApiError {
+    fn from(err: SourceStorageError) -> Self {
+        Self::bad_gateway(err.to_string())
     }
 }
 

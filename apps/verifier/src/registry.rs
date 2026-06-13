@@ -44,6 +44,16 @@ pub trait RegistryClient: Send + Sync + 'static {
         &self,
         request: RegisterBundleRequest,
     ) -> Result<RegistrationReceipt, RegistryError>;
+
+    async fn verification_status(
+        &self,
+        request: VerificationStatusRequest,
+    ) -> Result<VerificationStatusReceipt, RegistryError>;
+
+    async fn source_bundle_status(
+        &self,
+        request: SourceBundleStatusRequest,
+    ) -> Result<SourceBundleStatusReceipt, RegistryError>;
 }
 
 pub type SharedRegistryClient = Arc<dyn RegistryClient>;
@@ -54,10 +64,33 @@ pub struct RegisterBundleRequest {
     pub source_bundle_hash: String,
 }
 
+#[derive(Clone, Debug)]
+pub struct VerificationStatusRequest {
+    pub code_hash: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct SourceBundleStatusRequest {
+    pub code_hash: String,
+    pub source_bundle_hash: String,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RegistrationReceipt {
     pub master_address: String,
     pub verification_record_address: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct VerificationStatusReceipt {
+    pub master_address: String,
+    pub verification_record_address: String,
+    pub verified: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SourceBundleStatusReceipt {
+    pub verified: bool,
 }
 
 #[derive(Clone, Default)]
@@ -69,6 +102,20 @@ impl RegistryClient for DisabledRegistryClient {
         &self,
         _request: RegisterBundleRequest,
     ) -> Result<RegistrationReceipt, RegistryError> {
+        Err(RegistryError::MissingConfig("registry.master_address"))
+    }
+
+    async fn verification_status(
+        &self,
+        _request: VerificationStatusRequest,
+    ) -> Result<VerificationStatusReceipt, RegistryError> {
+        Err(RegistryError::MissingConfig("registry.master_address"))
+    }
+
+    async fn source_bundle_status(
+        &self,
+        _request: SourceBundleStatusRequest,
+    ) -> Result<SourceBundleStatusReceipt, RegistryError> {
         Err(RegistryError::MissingConfig("registry.master_address"))
     }
 }
@@ -318,13 +365,18 @@ impl TonRegistryClient {
         record_address: &TonAddress,
         source_bundle_hash: &str,
     ) -> Result<bool, RegistryError> {
-        let result = self
+        let result = match self
             .run_get_method(
                 &format_ton_address(record_address, self.network, true),
                 "hasBundle",
                 vec![stack_num_u256(source_bundle_hash)],
             )
-            .await?;
+            .await
+        {
+            Ok(result) => result,
+            Err(error) if is_account_not_found_api_error(&error) => return Ok(false),
+            Err(error) => return Err(error),
+        };
 
         if result.exit_code == -13 {
             return Ok(false);
@@ -338,6 +390,34 @@ impl TonRegistryClient {
         }
 
         parse_stack_bool(result.stack.first(), "hasBundle")
+    }
+
+    async fn is_verified(&self, record_address: &TonAddress) -> Result<bool, RegistryError> {
+        let result = match self
+            .run_get_method(
+                &format_ton_address(record_address, self.network, true),
+                "isVerified",
+                Vec::new(),
+            )
+            .await
+        {
+            Ok(result) => result,
+            Err(error) if is_account_not_found_api_error(&error) => return Ok(false),
+            Err(error) => return Err(error),
+        };
+
+        if result.exit_code == -13 {
+            return Ok(false);
+        }
+
+        if result.exit_code != 0 {
+            return Err(RegistryError::GetMethodExit {
+                method: "isVerified",
+                exit_code: result.exit_code,
+            });
+        }
+
+        parse_stack_bool(result.stack.first(), "isVerified")
     }
 
     async fn wait_for_confirmation(
@@ -441,6 +521,38 @@ impl RegistryClient for TonRegistryClient {
             master_address: format_ton_address(&master_address, self.network, true),
             verification_record_address: format_ton_address(&record_address, self.network, true),
         })
+    }
+
+    async fn verification_status(
+        &self,
+        request: VerificationStatusRequest,
+    ) -> Result<VerificationStatusReceipt, RegistryError> {
+        let master_address = self.master_address()?;
+        let record_address = self
+            .verification_record_address(&master_address, &request.code_hash)
+            .await?;
+        let verified = self.is_verified(&record_address).await?;
+
+        Ok(VerificationStatusReceipt {
+            master_address: format_ton_address(&master_address, self.network, true),
+            verification_record_address: format_ton_address(&record_address, self.network, true),
+            verified,
+        })
+    }
+
+    async fn source_bundle_status(
+        &self,
+        request: SourceBundleStatusRequest,
+    ) -> Result<SourceBundleStatusReceipt, RegistryError> {
+        let master_address = self.master_address()?;
+        let record_address = self
+            .verification_record_address(&master_address, &request.code_hash)
+            .await?;
+        let verified = self
+            .has_bundle(&record_address, &request.source_bundle_hash)
+            .await?;
+
+        Ok(SourceBundleStatusReceipt { verified })
     }
 }
 
@@ -603,6 +715,14 @@ fn parse_stack_bool(entry: Option<&Value>, method: &'static str) -> Result<bool,
     Ok(parse_stack_num(entry, method)? != 0)
 }
 
+fn is_account_not_found_api_error(error: &RegistryError) -> bool {
+    let RegistryError::Api { body, .. } = error else {
+        return false;
+    };
+
+    body.contains("Account ") && body.contains(" not found")
+}
+
 fn parse_stack_num(entry: Option<&Value>, method: &'static str) -> Result<i128, RegistryError> {
     let (_, value) = stack_type_value(entry, method)?;
     let raw = value
@@ -728,4 +848,31 @@ fn parse_int_literal(value: &str) -> Result<i128, String> {
 
 fn cell_error(error: impl std::fmt::Display) -> RegistryError {
     RegistryError::Cell(error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::http::StatusCode;
+
+    use super::{RegistryError, is_account_not_found_api_error};
+
+    #[test]
+    fn account_not_found_api_error_is_transient_for_confirmation() {
+        let error = RegistryError::Api {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            body: r#"{"error":"Account 0:abc not found"}"#.to_owned(),
+        };
+
+        assert!(is_account_not_found_api_error(&error));
+    }
+
+    #[test]
+    fn unrelated_api_error_is_not_account_not_found() {
+        let error = RegistryError::Api {
+            status: StatusCode::BAD_GATEWAY,
+            body: "upstream failed".to_owned(),
+        };
+
+        assert!(!is_account_not_found_api_error(&error));
+    }
 }

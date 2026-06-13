@@ -3,6 +3,7 @@ pub mod blockchain;
 pub mod compilers;
 pub mod config;
 pub mod registry;
+pub mod source_storage;
 pub mod state;
 
 mod error;
