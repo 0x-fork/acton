@@ -413,6 +413,7 @@ a {
 .lookup-submit:focus-visible,
 .topbar-github:focus-visible,
 .mobile-file-tree-toggle:focus-visible,
+.download-sources-button:focus-visible,
 .file-tree-file:focus-visible,
 .bundle-tab:focus-visible {
   outline: none;
@@ -977,6 +978,13 @@ a {
   font-weight: var(--font-weight-medium);
 }
 
+.section-actions {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .bundle-tabs {
   display: flex;
   gap: 4px;
@@ -1010,6 +1018,31 @@ a {
   background: var(--tonscan-card-bg);
   color: var(--litenode-text);
   box-shadow: var(--litenode-shadow-sm);
+}
+
+.download-sources-button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--litenode-border-control);
+  border-radius: 10px;
+  background: var(--tonscan-card-bg);
+  color: var(--litenode-text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.download-sources-button:hover {
+  border-color: var(--litenode-border-strong);
+  background: var(--litenode-surface-hover);
 }
 
 .code-workspace {
@@ -1381,6 +1414,16 @@ a {
 
   .section-header {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .section-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .download-sources-button {
+    margin-left: auto;
   }
 
   .code-workspace {

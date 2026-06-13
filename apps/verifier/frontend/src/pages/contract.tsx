@@ -1,5 +1,6 @@
 import {useEffect, useMemo, useState} from "react"
 import {createRoot} from "react-dom/client"
+import {Download} from "lucide-react"
 
 import {AppShell} from "../components/AppShell"
 import {CodeViewer} from "../components/CodeViewer"
@@ -16,6 +17,7 @@ import verificationBombIcon from "../assets/ton-verifier-icons/verification-bomb
 import verificationPaperIcon from "../assets/ton-verifier-icons/verification-paper.svg"
 import verifiedSourceIcon from "../assets/ton-verifier-icons/verified-light.svg"
 import {fetchVerificationSource, type SourceBundle, type VerificationSourceResponse} from "../lib/api"
+import {downloadSourceArchive} from "../lib/source-archive"
 import {getPathLookupValue, parseLookupTarget, shortenMiddle} from "../lib/target"
 import "../styles.css"
 
@@ -214,11 +216,21 @@ function VerifiedContract({data}: {readonly data: VerificationSourceResponse}) {
                 <span>{bundle.files.length} files</span>
               </div>
             </div>
-            <BundleSelector
-              bundles={data.bundles}
-              activeBundle={bundle}
-              onSelect={next => setSelectedBundleHash(next.source_bundle_hash)}
-            />
+            <div className="section-actions">
+              <BundleSelector
+                bundles={data.bundles}
+                activeBundle={bundle}
+                onSelect={next => setSelectedBundleHash(next.source_bundle_hash)}
+              />
+              <button
+                type="button"
+                className="download-sources-button"
+                onClick={() => downloadSourceArchive(bundle)}
+              >
+                <Download size={15} aria-hidden="true" />
+                <span>Download sources</span>
+              </button>
+            </div>
           </div>
           <CodeViewer files={bundle.files} entrypoint={bundle.entrypoint} />
         </section>
