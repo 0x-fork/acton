@@ -44,12 +44,12 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY --from=rust-builder /build/target/release/verifier /usr/local/bin/verifier
-COPY --from=compiler-worker /compiler-worker /app/compiler-worker
+COPY --chown=node:node --from=compiler-worker /compiler-worker /app/compiler-worker
 COPY docker/entrypoint.sh /usr/local/bin/verifier-entrypoint
 
 RUN chmod +x /usr/local/bin/verifier-entrypoint \
     && mkdir -p /etc/verifier /var/lib/verifier/source-repo \
-    && chown -R node:node /etc/verifier /var/lib/verifier /app/compiler-worker
+    && chown -R node:node /etc/verifier /var/lib/verifier
 
 USER node
 
