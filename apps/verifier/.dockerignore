@@ -1,0 +1,11 @@
+.git
+.idea
+target
+build
+gen
+node_modules
+compiler-worker/node_modules
+wallets.toml
+*.log
+.DS_Store
+docker-compose.override.yml

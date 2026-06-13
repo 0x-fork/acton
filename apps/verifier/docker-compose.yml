@@ -1,0 +1,29 @@
+services:
+  verifier:
+    build:
+      context: .
+    image: ton-verifier:local
+    ports:
+      - "3000:3000"
+    environment:
+      VERIFIER_NETWORK: localnet
+      VERIFIER_TONCENTER_BASE_URL: http://host.docker.internal:5412
+      VERIFIER_REGISTRY_MASTER_ADDRESS: ${VERIFIER_REGISTRY_MASTER_ADDRESS:?set registry master address}
+      WALLET_MNEMONIC: ${WALLET_MNEMONIC:?set wallet mnemonic}
+      SOURCE_REPOSITORY_URL: ${SOURCE_REPOSITORY_URL:?set source repository URL}
+      SOURCE_REPOSITORY_BRANCH: ${SOURCE_REPOSITORY_BRANCH:-main}
+      SOURCE_REPOSITORY_AUTHOR_NAME: ${SOURCE_REPOSITORY_AUTHOR_NAME:-ton-verifier}
+      SOURCE_REPOSITORY_AUTHOR_EMAIL: ${SOURCE_REPOSITORY_AUTHOR_EMAIL:-ton-verifier@example.invalid}
+    volumes:
+      - source-repo:/var/lib/verifier/source-repo
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+
+volumes:
+  source-repo:
