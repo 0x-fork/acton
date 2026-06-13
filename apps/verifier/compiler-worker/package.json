@@ -1,0 +1,13 @@
+{
+  "name": "verifier-compiler-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke": "node compile-tolk.mjs < fixtures/valid-minimal.json",
+    "smoke:compile-error": "node compile-tolk.mjs < fixtures/invalid-entrypoint.json"
+  },
+  "dependencies": {
+    "@ton/tolk-js": "1.4.1"
+  }
+}

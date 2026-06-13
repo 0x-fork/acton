@@ -1,0 +1,12 @@
+[server]
+bind_addr = "127.0.0.1:3000"
+
+[network]
+name = "mainnet"
+
+[toncenter]
+
+[compiler]
+node_bin = "node"
+worker_path = "compiler-worker/compile-tolk.mjs"
+timeout_ms = 5000

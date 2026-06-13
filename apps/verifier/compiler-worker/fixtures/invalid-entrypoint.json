@@ -1,0 +1,11 @@
+{
+  "language": "tolk",
+  "compiler_version": "1.4.1",
+  "root_dir": ".",
+  "entrypoint": "missing.tolk",
+  "sources": [
+    {
+      "path": "missing.tolk"
+    }
+  ]
+}

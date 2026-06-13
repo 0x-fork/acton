@@ -1,0 +1,67 @@
+use axum::{
+    Json,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+use serde::Serialize;
+
+use crate::{compilers::CompilerError, verification::VerificationError};
+
+#[derive(Debug)]
+pub struct ApiError {
+    status: StatusCode,
+    message: String,
+}
+
+impl ApiError {
+    pub const fn bad_request(message: String) -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            message,
+        }
+    }
+
+    pub const fn bad_gateway(message: String) -> Self {
+        Self {
+            status: StatusCode::BAD_GATEWAY,
+            message,
+        }
+    }
+}
+
+impl From<VerificationError> for ApiError {
+    fn from(err: VerificationError) -> Self {
+        match err {
+            VerificationError::Blockchain(blockchain_err) => {
+                Self::bad_gateway(blockchain_err.to_string())
+            }
+            err => Self::bad_request(err.to_string()),
+        }
+    }
+}
+
+impl From<CompilerError> for ApiError {
+    fn from(err: CompilerError) -> Self {
+        match err {
+            CompilerError::CompileFailed(message) => Self::bad_request(message),
+            err => Self::bad_gateway(err.to_string()),
+        }
+    }
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        (
+            self.status,
+            Json(ErrorResponse {
+                error: self.message,
+            }),
+        )
+            .into_response()
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct ErrorResponse {
+    error: String,
+}
