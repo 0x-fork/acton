@@ -11,13 +11,17 @@ try {
   validateInput(input);
 
   const sources = buildSourceMap(input.sources);
+  const importMappings = buildImportMappings(input.import_mappings);
   const entrypointFileName = normalizeSourcePath(input.entrypoint);
 
   const result = await runTolkCompiler({
     entrypointFileName,
+    pathMappings: Object.fromEntries(
+      importMappings.map((mapping) => [mapping.prefix, mapping.target]),
+    ),
     fsReadCallback: (requestedPath) => {
-      const sourcePath = normalizeSourcePath(requestedPath);
-      const content = sources.get(sourcePath);
+      const resolvedPath = resolveSourcePath(requestedPath, sources, importMappings);
+      const content = sources.get(resolvedPath);
       if (content === undefined) {
         throw new Error(`source was not provided: ${requestedPath}`);
       }
@@ -65,6 +69,9 @@ function validateInput(input) {
   if (!Array.isArray(input.sources) || input.sources.length === 0) {
     throw new Error("sources are required");
   }
+  if (input.import_mappings !== undefined && !isPlainObject(input.import_mappings)) {
+    throw new Error("import_mappings must be an object");
+  }
 }
 
 function buildSourceMap(inputSources) {
@@ -85,6 +92,70 @@ function buildSourceMap(inputSources) {
   }
 
   return sources;
+}
+
+function buildImportMappings(inputMappings) {
+  if (inputMappings === undefined) {
+    return [];
+  }
+
+  return Object.entries(inputMappings)
+    .map(([prefix, target]) => ({
+      prefix: normalizeSourcePath(prefix),
+      target: normalizeSourcePath(target),
+    }))
+    .sort((left, right) => right.prefix.length - left.prefix.length);
+}
+
+function resolveSourcePath(requestedPath, sources, importMappings) {
+  const sourcePath = normalizeSourcePath(requestedPath);
+  const candidates = [sourcePath];
+
+  for (const mapping of importMappings) {
+    const suffix = mappedSuffix(sourcePath, mapping.prefix);
+    if (suffix === undefined) {
+      continue;
+    }
+
+    candidates.push(joinMappingTarget(mapping.target, suffix));
+  }
+
+  for (const candidate of candidates) {
+    const normalizedCandidate = normalizeSourcePath(candidate);
+    if (sources.has(normalizedCandidate)) {
+      return normalizedCandidate;
+    }
+
+    if (!path.posix.extname(normalizedCandidate)) {
+      const tolkCandidate = `${normalizedCandidate}.tolk`;
+      if (sources.has(tolkCandidate)) {
+        return tolkCandidate;
+      }
+    }
+  }
+
+  return sourcePath;
+}
+
+function mappedSuffix(sourcePath, prefix) {
+  if (sourcePath === prefix) {
+    return "";
+  }
+
+  const prefixWithSlash = `${prefix}/`;
+  if (sourcePath.startsWith(prefixWithSlash)) {
+    return sourcePath.slice(prefixWithSlash.length);
+  }
+
+  return undefined;
+}
+
+function joinMappingTarget(target, suffix) {
+  if (suffix.length === 0) {
+    return target;
+  }
+
+  return path.posix.join(target, suffix);
 }
 
 function normalizeSourcePath(sourcePath) {
@@ -109,4 +180,8 @@ function normalizeSourcePath(sourcePath) {
   }
 
   return normalized;
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
