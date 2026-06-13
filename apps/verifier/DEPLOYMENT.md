@@ -41,7 +41,40 @@ Recommended server setup:
 - Firewall allowing inbound traffic only to the reverse proxy or to port `3000` if exposing directly
 - Secrets managed through environment files, Docker secrets, or your orchestrator
 
-## Build The Image
+## CI-Published Image
+
+GitHub Actions builds the same Dockerfile used locally:
+
+- Pull requests build `ton-verifier:ci` and smoke-test `/healthz`.
+- Pushes to `master` or `main` publish a multi-arch image to GHCR.
+- Tags matching `v*.*.*` publish release tags.
+
+For this repository the published image is:
+
+```bash
+ghcr.io/i582/verifier
+```
+
+Common tags:
+
+- `latest` for the default branch
+- `master` or `main` for branch builds
+- `sha-<short-sha>` for immutable commit builds
+- `v1.2.3`, `1.2.3`, and `1.2` for release tags
+
+Pull the CI-built image on the server:
+
+```bash
+docker pull ghcr.io/i582/verifier:latest
+```
+
+If the package is private, authenticate first with a token that has `read:packages`:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
+```
+
+## Build The Image Locally
 
 From the repository root:
 
@@ -49,14 +82,14 @@ From the repository root:
 docker build -t ton-verifier:local .
 ```
 
-For production, tag and push the image to your registry:
+Manual registry publishing is still possible:
 
 ```bash
 docker tag ton-verifier:local registry.example.com/ton-verifier:0.1.0
 docker push registry.example.com/ton-verifier:0.1.0
 ```
 
-On the server, either build locally from the checked-out repository or pull the published image:
+If you use a manually published image instead of the GHCR image, pull it on the server:
 
 ```bash
 docker pull registry.example.com/ton-verifier:0.1.0
@@ -132,7 +165,7 @@ Create `/opt/ton-verifier/docker-compose.yml`:
 ```yaml
 services:
   verifier:
-    image: ton-verifier:local
+    image: ghcr.io/i582/verifier:latest
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -158,6 +191,7 @@ Start the service:
 
 ```bash
 cd /opt/ton-verifier
+docker compose pull
 docker compose up -d
 ```
 
@@ -274,12 +308,14 @@ Fetch verified source:
 curl -sS 'http://127.0.0.1:3000/api/v1/verification/source?code_hash=<code_hash>'
 ```
 
+This does not build Rust, Node.js packages, or compilers on the server. The server only pulls the CI-built image and starts it.
+
 ## Updating
 
-Build or pull the new image:
+Pull the new image:
 
 ```bash
-docker pull registry.example.com/ton-verifier:0.1.1
+docker pull ghcr.io/i582/verifier:latest
 ```
 
 Update the image tag in `/opt/ton-verifier/docker-compose.yml`, then restart:

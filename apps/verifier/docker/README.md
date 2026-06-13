@@ -1,9 +1,21 @@
 # Docker Deployment
 
-Build the image:
+Production deployments should pull the CI-built image:
+
+```bash
+docker pull ghcr.io/i582/verifier:latest
+```
+
+Local development can build the image:
 
 ```bash
 docker build -t ton-verifier:local .
+```
+
+Or use the local build override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 ```
 
 Run with generated config:
@@ -17,7 +29,7 @@ docker run --rm -p 3000:3000 \
   -e SOURCE_REPOSITORY_URL=https://github.com/i582/test-verify-repo \
   -e SOURCE_REPOSITORY_BRANCH=main \
   -v verifier-source-repo:/var/lib/verifier/source-repo \
-  ton-verifier:local
+  ghcr.io/i582/verifier:latest
 ```
 
 Or mount a full TOML config:
@@ -27,7 +39,7 @@ docker run --rm -p 3000:3000 \
   -e VERIFIER_CONFIG=/etc/verifier/config.toml \
   -v ./config.toml:/etc/verifier/config.toml:ro \
   -v verifier-source-repo:/var/lib/verifier/source-repo \
-  ton-verifier:local
+  ghcr.io/i582/verifier:latest
 ```
 
 For SSH Git remotes, mount a deploy key and pass:
