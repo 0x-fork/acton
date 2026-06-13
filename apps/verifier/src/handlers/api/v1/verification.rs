@@ -145,6 +145,7 @@ impl From<VerificationStatusReceipt> for OnchainVerification {
 #[derive(Debug, Serialize, Deserialize)]
 struct SourceBundleResponse {
     source_bundle_hash: String,
+    verified_at: u64,
     commit: Option<String>,
     bundle_path: String,
     language: String,
@@ -160,6 +161,7 @@ impl From<StoredSourceBundle> for SourceBundleResponse {
         let manifest = bundle.manifest;
         Self {
             source_bundle_hash: manifest.source_bundle_hash,
+            verified_at: manifest.verified_at,
             commit: bundle.commit,
             bundle_path: manifest.bundle_path,
             language: manifest.language,

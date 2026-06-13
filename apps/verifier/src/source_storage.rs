@@ -1,6 +1,7 @@
 use std::{
     path::{Component, Path, PathBuf},
     sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use async_trait::async_trait;
@@ -359,6 +360,11 @@ async fn write_manifest(
     bundle_path: &str,
     request: &StoreSourceBundleRequest,
 ) -> Result<(), SourceStorageError> {
+    let verified_at = match read_existing_verified_at(bundle_dir).await? {
+        Some(verified_at) => verified_at,
+        None => current_unix_timestamp()?,
+    };
+
     let mut files = request
         .files
         .iter()
@@ -387,6 +393,7 @@ async fn write_manifest(
         address: request.address.clone(),
         code_hash: request.code_hash.clone(),
         source_bundle_hash: request.source_bundle_hash.clone(),
+        verified_at,
         language: request.language.clone(),
         compiler_version: request.compiler_version.clone(),
         entrypoint: request.entrypoint.clone(),
@@ -401,6 +408,37 @@ async fn write_manifest(
     fs::write(&path, bytes)
         .await
         .map_err(|source| SourceStorageError::WriteFile { path, source })
+}
+
+async fn read_existing_verified_at(bundle_dir: &Path) -> Result<Option<u64>, SourceStorageError> {
+    let manifest_path = bundle_dir.join("manifest.json");
+    let manifest_bytes = match fs::read(&manifest_path).await {
+        Ok(bytes) => bytes,
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(source) => {
+            return Err(SourceStorageError::ReadFile {
+                path: manifest_path,
+                source,
+            });
+        }
+    };
+
+    let manifest =
+        serde_json::from_slice::<SourceBundleManifest>(&manifest_bytes).map_err(|source| {
+            SourceStorageError::DeserializeManifest {
+                path: manifest_path,
+                source,
+            }
+        })?;
+
+    Ok(Some(manifest.verified_at))
+}
+
+fn current_unix_timestamp() -> Result<u64, SourceStorageError> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|source| SourceStorageError::Operation(source.to_string()))
+        .map(|duration| duration.as_secs())
 }
 
 async fn read_bundle(
@@ -634,6 +672,8 @@ pub struct SourceBundleManifest {
     pub address: Option<String>,
     pub code_hash: String,
     pub source_bundle_hash: String,
+    #[serde(default)]
+    pub verified_at: u64,
     pub language: String,
     pub compiler_version: String,
     pub entrypoint: String,

@@ -9,6 +9,8 @@ use verifier::source_storage::{
     StoredSourceBundle, StoredSourceFile,
 };
 
+const MOCK_VERIFIED_AT: u64 = 1_700_000_000;
+
 pub struct MockSourceStorage {
     outcome: MockSourceStorageOutcome,
     recorded_requests: Arc<Mutex<Vec<RecordedSourceStorageRequest>>>,
@@ -159,6 +161,7 @@ fn stored_bundle_from_request(
             address: request.address.clone(),
             code_hash: request.code_hash.clone(),
             source_bundle_hash: request.source_bundle_hash.clone(),
+            verified_at: MOCK_VERIFIED_AT,
             language: request.language.clone(),
             compiler_version: request.compiler_version.clone(),
             entrypoint: request.entrypoint.clone(),

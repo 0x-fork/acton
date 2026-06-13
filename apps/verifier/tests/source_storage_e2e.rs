@@ -4,6 +4,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::{Command, Output},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use serde_json::json;
@@ -26,6 +27,7 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
     let config = Config::load_from_path(config_path)?;
     let storage = GitSourceStorage::from_config(&config);
 
+    let started_at = unix_timestamp()?;
     let receipt = storage
         .store_bundle(StoreSourceBundleRequest {
             address: Some("EQD0000000000000000000000000000000000000000000000".to_owned()),
@@ -91,14 +93,23 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
     assert_eq!(fs::read_to_string(stored_lib)?, "fun helper() {}");
 
     let manifest = serde_json::from_slice::<serde_json::Value>(&fs::read(manifest)?)?;
+    assert_eq!(manifest["schema_version"], 1);
     assert_eq!(manifest["code_hash"], CODE_HASH);
     assert_eq!(manifest["source_bundle_hash"], SOURCE_BUNDLE_HASH);
     assert_eq!(manifest["entrypoint"], "main.tolk");
     assert_eq!(manifest["files"].as_array().map(Vec::len), Some(2));
+    let verified_at = manifest["verified_at"]
+        .as_u64()
+        .expect("manifest should include verification timestamp");
+    assert!(
+        (started_at..=unix_timestamp()?).contains(&verified_at),
+        "verification timestamp should be recorded when the bundle is stored"
+    );
 
     let stored_bundles = storage.list_bundles(CODE_HASH).await?;
     assert_eq!(stored_bundles.len(), 1);
     assert_eq!(stored_bundles[0].manifest.code_hash, CODE_HASH);
+    assert_eq!(stored_bundles[0].manifest.verified_at, verified_at);
     assert_eq!(
         stored_bundles[0].manifest.source_bundle_hash,
         SOURCE_BUNDLE_HASH
@@ -134,6 +145,10 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
     assert_eq!(remote_head, receipt.commit);
 
     Ok(())
+}
+
+fn unix_timestamp() -> Result<u64, Box<dyn Error>> {
+    Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
 }
 
 struct GitFixture {

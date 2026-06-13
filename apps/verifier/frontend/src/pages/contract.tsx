@@ -33,6 +33,17 @@ function DetailRow({label, value}: {readonly label: string; readonly value: stri
   )
 }
 
+function formatVerifiedAt(timestamp: number): string | undefined {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return undefined
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(new Date(timestamp * 1000))
+}
+
 function PanelHeading({
   icon,
   label,
@@ -148,6 +159,8 @@ function VerifiedContract({data}: {readonly data: VerificationSourceResponse}) {
     )
   }
 
+  const verifiedAt = formatVerifiedAt(bundle.verified_at)
+
   return (
     <>
       <section className="contract-summary">
@@ -191,6 +204,7 @@ function VerifiedContract({data}: {readonly data: VerificationSourceResponse}) {
           </summary>
           <dl>
             {data.address && <DetailRow label="Address" value={data.address} />}
+            {verifiedAt && <DetailRow label="Verified at" value={verifiedAt} />}
             <DetailRow label="Code hash" value={data.code_hash} />
             <DetailRow label="Record" value={data.onchain.verification_record_address} />
             <DetailRow label="Master" value={data.onchain.master_address} />

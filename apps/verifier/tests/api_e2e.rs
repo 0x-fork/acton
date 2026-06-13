@@ -138,6 +138,7 @@ async fn verification_source_returns_verified_bundle_files() {
     assert!(body.verified);
     assert_eq!(body.bundles.len(), 1);
     assert_eq!(body.bundles[0].source_bundle_hash, source_bundle_hash);
+    assert_eq!(body.bundles[0].verified_at, 1_700_000_000);
     assert_eq!(body.bundles[0].language, "tolk");
     assert_eq!(body.bundles[0].compiler_version, "1.4.1");
     assert_eq!(body.bundles[0].entrypoint, "main.tolk");
@@ -1102,6 +1103,7 @@ struct VerificationOnchain {
 #[derive(Debug, Deserialize)]
 struct VerifiedSourceBundle {
     source_bundle_hash: String,
+    verified_at: u64,
     language: String,
     compiler_version: String,
     entrypoint: String,

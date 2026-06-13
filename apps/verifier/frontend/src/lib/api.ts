@@ -15,6 +15,7 @@ export interface OnchainVerification {
 
 export interface SourceBundle {
   readonly source_bundle_hash: string
+  readonly verified_at: number
   readonly commit: string | null
   readonly bundle_path: string
   readonly language: string
