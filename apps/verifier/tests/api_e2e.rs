@@ -17,10 +17,16 @@ const CODE_HASH_ONE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 const CODE_HASH_ONE_BASE64: &str = "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=";
 const CODE_HASH_TWO: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const COMPILE_PARAMS_TOLK: &str = r#"{"compiler_version":"1.4.1"}"#;
+const COMPILE_PARAMS_TOLK_WITH_IMPORT_MAPPINGS: &str =
+    r#"{"compiler_version":"1.4.1","import_mappings":{"@contracts":"contracts"}}"#;
 const SOURCES_MAIN: &str = r#"[{"path":"main.tolk","is_entrypoint":true}]"#;
 const SOURCES_TWO_FILES: &str = r#"[
   {"path":"main.tolk","is_entrypoint":true},
   {"path":"imports/lib.tolk","is_entrypoint":false}
+]"#;
+const SOURCES_ALIASED_FILES: &str = r#"[
+  {"path":"main.tolk","is_entrypoint":true},
+  {"path":"contracts/lib.tolk","is_entrypoint":false}
 ]"#;
 
 #[tokio::test]
@@ -263,6 +269,48 @@ async fn verify_passes_uploaded_file_contents_to_compiler() {
     assert_eq!(sources[0].1, "import \"imports/lib.tolk\";");
     assert_eq!(sources[1].0, "imports/lib.tolk");
     assert_eq!(sources[1].1, "fun helper() {}");
+}
+
+#[tokio::test]
+async fn verify_passes_import_mappings_to_compiler() {
+    let (state, recorded_requests) = recording_app_state(&[], CODE_HASH_ONE);
+    let response = post_verify(
+        state,
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK_WITH_IMPORT_MAPPINGS),
+            text_part("sources", SOURCES_ALIASED_FILES),
+            file_part(
+                "files",
+                "main.tolk",
+                "text/plain",
+                "import \"@contracts/lib\";",
+            ),
+            file_part(
+                "files",
+                "contracts/lib.tolk",
+                "text/plain",
+                "fun helper() {}",
+            ),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let contracts_mapping = {
+        let recorded_requests = recorded_requests
+            .lock()
+            .expect("recorded compiler requests mutex should not be poisoned");
+        assert_eq!(recorded_requests.len(), 1);
+
+        recorded_requests[0]
+            .import_mappings
+            .get("@contracts")
+            .cloned()
+    };
+    assert_eq!(contracts_mapping.as_deref(), Some("contracts"));
 }
 
 #[tokio::test]

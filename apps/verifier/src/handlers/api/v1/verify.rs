@@ -132,6 +132,7 @@ async fn handle_multipart(
             language: compile_input.language.clone(),
             compiler_version: compile_input.compiler_version.clone(),
             entrypoint: compile_input.entrypoint.clone(),
+            import_mappings: compile_input.import_mappings.clone(),
             sources: compile_input.compile_sources,
         })
         .await?;
@@ -242,6 +243,7 @@ fn prepare_compile_input(
             tolk_compile_params.compiler_version
         )));
     }
+    validate_import_mappings(&tolk_compile_params.import_mappings)?;
     let sources = sources
         .ok_or_else(|| ApiError::bad_request("missing required field: sources".to_owned()))?;
     let entrypoint = validate_sources(&sources)?;
@@ -278,6 +280,7 @@ fn prepare_compile_input(
     Ok(CompileInput {
         language,
         compiler_version: tolk_compile_params.compiler_version,
+        import_mappings: tolk_compile_params.import_mappings,
         entrypoint,
         compile_sources,
         sources,
@@ -344,6 +347,47 @@ fn validate_source_path(path: &str) -> Result<(), ApiError> {
                 return Err(ApiError::bad_request(
                     "source path contains an invalid component".to_owned(),
                 ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_import_mappings(import_mappings: &BTreeMap<String, String>) -> Result<(), ApiError> {
+    for (prefix, target) in import_mappings {
+        validate_import_mapping_component("import mapping prefix", prefix)?;
+        validate_import_mapping_component("import mapping target", target)?;
+    }
+
+    Ok(())
+}
+
+fn validate_import_mapping_component(name: &str, value: &str) -> Result<(), ApiError> {
+    if value.trim().is_empty() {
+        return Err(ApiError::bad_request(format!("{name} is empty")));
+    }
+    if value.contains('\\') {
+        return Err(ApiError::bad_request(format!(
+            "{name} must use '/' separators"
+        )));
+    }
+
+    let path = Path::new(value);
+    if path.is_absolute() {
+        return Err(ApiError::bad_request(format!("{name} must be relative")));
+    }
+
+    for component in path.components() {
+        match component {
+            Component::Normal(_) => {}
+            Component::CurDir
+            | Component::ParentDir
+            | Component::RootDir
+            | Component::Prefix(_) => {
+                return Err(ApiError::bad_request(format!(
+                    "{name} contains an invalid component"
+                )));
             }
         }
     }
@@ -445,6 +489,7 @@ fn print_verify_request(
 struct CompileInput {
     language: String,
     compiler_version: String,
+    import_mappings: BTreeMap<String, String>,
     entrypoint: String,
     compile_sources: Vec<CompileSource>,
     sources: Vec<SourceMetadata>,
@@ -467,6 +512,8 @@ struct SourceMetadata {
 #[derive(Debug, Deserialize)]
 struct TolkCompileParams {
     compiler_version: String,
+    #[serde(default)]
+    import_mappings: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

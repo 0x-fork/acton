@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::ExitStatus};
+use std::{collections::BTreeMap, path::PathBuf, process::ExitStatus};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -82,6 +82,7 @@ pub struct CompileRequest {
     pub language: String,
     pub compiler_version: String,
     pub entrypoint: String,
+    pub import_mappings: BTreeMap<String, String>,
     pub sources: Vec<CompileSource>,
 }
 
