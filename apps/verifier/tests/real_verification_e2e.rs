@@ -21,11 +21,36 @@ const ALL_TOLK_VERSIONS: &[&str] = &[
 ];
 
 #[tokio::test]
-async fn verify_tolk_with_real_compiler() {
+async fn verify_tolk_with_real_compiler_and_stores_generated_abi() {
     let state = real_compiler_app_state(&[]);
-    let response = verify_fixture(state, TOLK_CODE_HASH, fixture("valid-minimal.json")).await;
+    let response =
+        verify_fixture(state.clone(), TOLK_CODE_HASH, fixture("valid-minimal.json")).await;
 
     assert_verified(response, "tolk", TOLK_CODE_HASH).await;
+
+    let response = get(
+        state,
+        &format!("/api/v1/verification/source?code_hash={TOLK_CODE_HASH}"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response_json::<VerificationSourceResponse>(response).await;
+    assert!(body.verified);
+    assert_eq!(body.bundles.len(), 1);
+    let files = &body.bundles[0].files;
+    let abi = files
+        .iter()
+        .find(|file| file.path == "output/main.abi.json")
+        .expect("expected stored Tolk bundle to include generated ABI JSON");
+    let abi = abi
+        .content_text
+        .as_deref()
+        .expect("generated Tolk ABI JSON should be UTF-8");
+    let abi = serde_json::from_str::<Value>(abi).expect("generated Tolk ABI should be JSON");
+    assert_eq!(abi["abi_schema_version"], "1.0");
+    assert_eq!(abi["compiler_name"], "tolk");
+    assert_eq!(abi["compiler_version"], "1.4.1");
 }
 
 #[tokio::test]
@@ -265,4 +290,5 @@ struct VerifiedSourceBundle {
 #[derive(Debug, Deserialize)]
 struct VerifiedSourceFile {
     path: String,
+    content_text: Option<String>,
 }

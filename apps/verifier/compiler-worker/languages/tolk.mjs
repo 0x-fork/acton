@@ -31,7 +31,27 @@ export async function compileTolk(input) {
   return {
     status: "ok",
     code_hash: String(result.codeHashHex).toLowerCase(),
+    generated_sources: generatedSources(entrypointFileName, result),
   };
+}
+
+function generatedSources(entrypointFileName, result) {
+  if (result.abiJson === undefined || result.abiJson === null) {
+    return [];
+  }
+
+  return [
+    {
+      path: generatedAbiPath(entrypointFileName),
+      content: `${JSON.stringify(result.abiJson, null, 2)}\n`,
+    },
+  ];
+}
+
+function generatedAbiPath(entrypointFileName) {
+  const parsed = path.posix.parse(normalizeSourcePath(entrypointFileName));
+  const name = parsed.name || "contract";
+  return path.posix.join("output", `${name}.abi.json`);
 }
 
 function buildImportMappings(inputMappings) {
