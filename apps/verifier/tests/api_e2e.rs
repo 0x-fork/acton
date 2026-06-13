@@ -4,7 +4,9 @@ use axum::http::StatusCode;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use support::{app_state, file_part, get, post_verify, response_json, text_part};
+use support::{
+    app_state, file_part, get, post_verify, recording_app_state, response_json, text_part,
+};
 
 const ADDRESS_ONE: &str = "EQD0000000000000000000000000000000000000000000000";
 const ADDRESS_TWO: &str = "EQD1111111111111111111111111111111111111111111111";
@@ -85,6 +87,60 @@ async fn verify_accepts_valid_multipart_request_with_multiple_files() {
     assert_eq!(body.files.len(), 2);
     assert_eq!(body.files[0].path, "main.tolk");
     assert_eq!(body.files[1].path, "imports/lib.tolk");
+}
+
+#[tokio::test]
+async fn verify_passes_uploaded_file_contents_to_compiler() {
+    let (state, recorded_requests) = recording_app_state(&[], CODE_HASH_ONE);
+    let response = post_verify(
+        state,
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_TWO_FILES),
+            file_part(
+                "files",
+                "main.tolk",
+                "text/plain",
+                "import \"imports/lib.tolk\";",
+            ),
+            file_part("files", "imports/lib.tolk", "text/plain", "fun helper() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let (language, compiler_version, entrypoint, sources) = {
+        let recorded_requests = recorded_requests
+            .lock()
+            .expect("recorded compiler requests mutex should not be poisoned");
+        assert_eq!(recorded_requests.len(), 1);
+
+        let request = &recorded_requests[0];
+        let snapshot = (
+            request.language.clone(),
+            request.compiler_version.clone(),
+            request.entrypoint.clone(),
+            request
+                .sources
+                .iter()
+                .map(|source| (source.path.clone(), source.content.clone()))
+                .collect::<Vec<_>>(),
+        );
+        drop(recorded_requests);
+        snapshot
+    };
+
+    assert_eq!(language, "tolk");
+    assert_eq!(compiler_version, "1.4.1");
+    assert_eq!(entrypoint, "main.tolk");
+    assert_eq!(sources.len(), 2);
+    assert_eq!(sources[0].0, "main.tolk");
+    assert_eq!(sources[0].1, "import \"imports/lib.tolk\";");
+    assert_eq!(sources[1].0, "imports/lib.tolk");
+    assert_eq!(sources[1].1, "fun helper() {}");
 }
 
 #[tokio::test]
@@ -378,6 +434,27 @@ async fn verify_rejects_invalid_source_path() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     assert_error_contains(response, "invalid component").await;
+}
+
+#[tokio::test]
+async fn verify_rejects_backslash_source_path() {
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part(
+                "sources",
+                r#"[{"path":"imports\\lib.tolk","is_entrypoint":true}]"#,
+            ),
+            file_part("files", "imports\\lib.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_contains(response, "separators").await;
 }
 
 #[tokio::test]

@@ -81,7 +81,6 @@ impl CompilerService for NodeCompilerService {
 pub struct CompileRequest {
     pub language: String,
     pub compiler_version: String,
-    pub root_dir: PathBuf,
     pub entrypoint: String,
     pub sources: Vec<CompileSource>,
 }
@@ -89,6 +88,7 @@ pub struct CompileRequest {
 #[derive(Debug, Serialize)]
 pub struct CompileSource {
     pub path: String,
+    pub content: String,
 }
 
 pub struct CompileOutput {

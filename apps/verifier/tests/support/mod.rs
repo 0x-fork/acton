@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use axum::{
     body::{Body, to_bytes},
@@ -7,7 +8,7 @@ use axum::{
 };
 use serde::de::DeserializeOwned;
 use tower::ServiceExt;
-use verifier::{app, state::AppState};
+use verifier::{app, compilers::CompileRequest, state::AppState};
 
 mod mock_blockchain;
 mod mock_compiler;
@@ -15,9 +16,26 @@ mod mock_compiler;
 const MULTIPART_BOUNDARY: &str = "verifier-test-boundary";
 
 pub fn app_state(code_hashes: &[(&str, &str)], compiled_code_hash: &str) -> AppState {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
     AppState::new(
         Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
-        Arc::new(mock_compiler::MockCompilerService::new(compiled_code_hash)),
+        Arc::new(compiler_service),
+    )
+}
+
+pub fn recording_app_state(
+    code_hashes: &[(&str, &str)],
+    compiled_code_hash: &str,
+) -> (AppState, Arc<Mutex<Vec<CompileRequest>>>) {
+    let compiler_service = mock_compiler::MockCompilerService::new(compiled_code_hash);
+    let recorded_requests = compiler_service.recorded_requests();
+
+    (
+        AppState::new(
+            Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
+            Arc::new(compiler_service),
+        ),
+        recorded_requests,
     )
 }
 

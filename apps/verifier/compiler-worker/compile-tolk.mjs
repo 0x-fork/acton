@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
@@ -11,14 +10,18 @@ try {
   const input = JSON.parse(await readStdin());
   validateInput(input);
 
-  const rootDir = fs.realpathSync(input.root_dir);
-  const entrypointFileName = resolveInsideRoot(rootDir, input.entrypoint);
+  const sources = buildSourceMap(input.sources);
+  const entrypointFileName = normalizeSourcePath(input.entrypoint);
 
   const result = await runTolkCompiler({
     entrypointFileName,
     fsReadCallback: (requestedPath) => {
-      const sourcePath = resolveInsideRoot(rootDir, requestedPath);
-      return fs.readFileSync(sourcePath, "utf8");
+      const sourcePath = normalizeSourcePath(requestedPath);
+      const content = sources.get(sourcePath);
+      if (content === undefined) {
+        throw new Error(`source was not provided: ${requestedPath}`);
+      }
+      return content;
     },
   });
 
@@ -56,23 +59,54 @@ function validateInput(input) {
   if (input.compiler_version !== SUPPORTED_TOLK_VERSION) {
     throw new Error(`unsupported Tolk compiler_version: ${input.compiler_version}`);
   }
-  if (typeof input.root_dir !== "string" || input.root_dir.length === 0) {
-    throw new Error("root_dir is required");
-  }
   if (typeof input.entrypoint !== "string" || input.entrypoint.length === 0) {
     throw new Error("entrypoint is required");
   }
+  if (!Array.isArray(input.sources) || input.sources.length === 0) {
+    throw new Error("sources are required");
+  }
 }
 
-function resolveInsideRoot(rootDir, requestedPath) {
-  const candidate = path.isAbsolute(requestedPath)
-    ? path.resolve(requestedPath)
-    : path.resolve(rootDir, requestedPath);
-  const relative = path.relative(rootDir, candidate);
+function buildSourceMap(inputSources) {
+  const sources = new Map();
+  for (const source of inputSources) {
+    if (typeof source?.path !== "string" || source.path.length === 0) {
+      throw new Error("source path is required");
+    }
+    if (typeof source.content !== "string") {
+      throw new Error(`source content is required: ${source.path}`);
+    }
 
-  if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error(`invalid source path: ${requestedPath}`);
+    const sourcePath = normalizeSourcePath(source.path);
+    if (sources.has(sourcePath)) {
+      throw new Error(`duplicate source path: ${source.path}`);
+    }
+    sources.set(sourcePath, source.content);
   }
 
-  return candidate;
+  return sources;
+}
+
+function normalizeSourcePath(sourcePath) {
+  if (typeof sourcePath !== "string" || sourcePath.length === 0) {
+    throw new Error("source path is required");
+  }
+  if (sourcePath.includes("\\")) {
+    throw new Error(`source path must use '/' separators: ${sourcePath}`);
+  }
+  if (path.posix.isAbsolute(sourcePath) || sourcePath.split("/").includes("..")) {
+    throw new Error(`invalid source path: ${sourcePath}`);
+  }
+
+  const normalized = path.posix.normalize(sourcePath);
+  if (
+    normalized === "." ||
+    normalized === ".." ||
+    normalized.startsWith("../") ||
+    path.posix.isAbsolute(normalized)
+  ) {
+    throw new Error(`invalid source path: ${sourcePath}`);
+  }
+
+  return normalized;
 }

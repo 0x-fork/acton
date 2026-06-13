@@ -14,8 +14,6 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use tempfile::TempDir;
-use tokio::fs;
 
 use crate::{
     compilers::{CompileRequest, CompileSource},
@@ -119,21 +117,13 @@ async fn handle_multipart(
 
     let compile_input = prepare_compile_input(language, compile_params.clone(), sources, files)?;
     let resolved_target = state.verification_service().resolve_target(target).await?;
-    let temp_dir = write_compile_sources(&compile_input.sources, compile_input.files).await?;
     let compiled = state
         .compiler_service()
         .compile(CompileRequest {
             language: compile_input.language.clone(),
             compiler_version: compile_input.compiler_version,
-            root_dir: temp_dir.path().to_path_buf(),
             entrypoint: compile_input.entrypoint,
-            sources: compile_input
-                .sources
-                .iter()
-                .map(|source| CompileSource {
-                    path: source.path.clone(),
-                })
-                .collect(),
+            sources: compile_input.compile_sources,
         })
         .await?;
     let compiled_code_hash = compiled.code_hash.to_ascii_lowercase();
@@ -202,13 +192,14 @@ fn prepare_compile_input(
         .ok_or_else(|| ApiError::bad_request("missing required field: sources".to_owned()))?;
     let entrypoint = validate_sources(&sources)?;
     let files = match_files_to_sources(&sources, files)?;
+    let compile_sources = build_compile_sources(&sources, files)?;
 
     Ok(CompileInput {
         language,
         compiler_version: compile_params.compiler_version,
         entrypoint,
+        compile_sources,
         sources,
-        files,
     })
 }
 
@@ -246,6 +237,11 @@ fn validate_sources(sources: &[SourceMetadata]) -> Result<String, ApiError> {
 fn validate_source_path(path: &str) -> Result<(), ApiError> {
     if path.trim().is_empty() {
         return Err(ApiError::bad_request("source path is empty".to_owned()));
+    }
+    if path.contains('\\') {
+        return Err(ApiError::bad_request(
+            "source path must use '/' separators".to_owned(),
+        ));
     }
 
     let path = Path::new(path);
@@ -310,13 +306,11 @@ fn match_files_to_sources(
     Ok(files_by_path)
 }
 
-async fn write_compile_sources(
+fn build_compile_sources(
     sources: &[SourceMetadata],
     mut files: BTreeMap<String, ReceivedFile>,
-) -> Result<TempDir, ApiError> {
-    let temp_dir = tempfile::tempdir()
-        .map_err(|err| ApiError::bad_gateway(format!("failed to create temp dir: {err}")))?;
-
+) -> Result<Vec<CompileSource>, ApiError> {
+    let mut compile_sources = Vec::with_capacity(sources.len());
     for source in sources {
         let file = files.remove(&source.path).ok_or_else(|| {
             ApiError::bad_request(format!(
@@ -324,18 +318,16 @@ async fn write_compile_sources(
                 source.path
             ))
         })?;
-        let output_path = temp_dir.path().join(&source.path);
-        if let Some(parent) = output_path.parent() {
-            fs::create_dir_all(parent).await.map_err(|err| {
-                ApiError::bad_gateway(format!("failed to create source dir: {err}"))
-            })?;
-        }
-        fs::write(output_path, file.content)
-            .await
-            .map_err(|err| ApiError::bad_gateway(format!("failed to write source file: {err}")))?;
+        let content = String::from_utf8(file.content.to_vec()).map_err(|err| {
+            ApiError::bad_request(format!("source is not valid UTF-8: {}: {err}", source.path))
+        })?;
+        compile_sources.push(CompileSource {
+            path: source.path.clone(),
+            content,
+        });
     }
 
-    Ok(temp_dir)
+    Ok(compile_sources)
 }
 
 fn print_verify_request(
@@ -366,8 +358,8 @@ struct CompileInput {
     language: String,
     compiler_version: String,
     entrypoint: String,
+    compile_sources: Vec<CompileSource>,
     sources: Vec<SourceMetadata>,
-    files: BTreeMap<String, ReceivedFile>,
 }
 
 #[derive(Debug)]
