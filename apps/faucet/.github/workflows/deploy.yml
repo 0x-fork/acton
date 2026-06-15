@@ -1,35 +1,24 @@
-name: Deploy
+name: Build Docker Image
+
+run-name: Build Docker Image from ${{ inputs.ref_name || github.head_ref || 'master' }}
 
 on:
   workflow_dispatch:
     inputs:
       ref_name:
-        description: "Branch or tag"
-        required: true
+        description: "Branch to build"
+        required: false
         default: "master"
-        type: string
-      component:
-        description: "Image repository component"
-        required: false
-        type: string
-
-  workflow_call:
-    inputs:
-      ref_name:
-        required: true
-        type: string
-      component:
-        required: false
         type: string
 
 concurrency:
-  group: deploy-${{ inputs.ref_name || github.ref }}-${{ inputs.component || '-' }}
+  group: docker-image-${{ inputs.ref_name || github.head_ref || 'master' }}
   cancel-in-progress: false
 
 permissions: { }
 
 jobs:
-  build-linux:
+  build-docker-image:
     runs-on: ubuntu-latest
 
     permissions:
@@ -37,15 +26,7 @@ jobs:
       contents: read
 
     env:
-      REF_NAME: ${{ inputs.ref_name || github.ref_name }}
-      COMPONENT: ${{ inputs.component }}
-
-    outputs:
-      image_repo: ${{ steps.params.outputs.image_repo }}
-      image_tag: ${{ steps.params.outputs.tag }}
-      image_digest: ${{ steps.build_image.outputs.digest }}
-      image_revision: ${{ steps.revision.outputs.revision }}
-      component: ${{ steps.params.outputs.component }}
+      REF_NAME: ${{ inputs.ref_name || github.head_ref || 'master' }}
 
     steps:
       - name: Fetch Sources
@@ -63,29 +44,43 @@ jobs:
           mkdir -p dist/docker
           cp target/release/faucet-backend dist/docker/faucet-backend
 
-      - name: Compute params
+      - name: Compute Docker image tags
+        id: image
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
-        id: params
         env:
           REF_NAME: ${{ env.REF_NAME }}
-          COMPONENT: ${{ env.COMPONENT }}
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
         with:
           # language=JavaScript
           script: |
-            const tag = process.env.REF_NAME === 'master' ? 'main' : process.env.REF_NAME;
-            core.setOutput('tag', tag);
-            core.setOutput('component', process.env.COMPONENT);
-            let repository = process.env.GITHUB_REPOSITORY.toLowerCase();
-            if (process.env.COMPONENT) {
-              repository += '/' + process.env.COMPONENT
-            }
-            core.setOutput('repository', repository);
-            core.setOutput('image_repo', `ghcr.io/${repository}`);
+            const sha = process.env.SHA;
+            const shortSha = sha.slice(0, 7);
+            const repository = process.env.REPOSITORY.toLowerCase();
 
-      - name: Resolve revision
-        id: revision
-        run: |
-          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            const fullShaTag = `sha-${sha}`;
+            const shortShaTag = `sha-${shortSha}`;
+            const branchTag = process.env.REF_NAME
+              .toLowerCase()
+              .replace(/[^a-z0-9_.-]+/g, '-')
+              .slice(0, 128)
+              .replace(/^[.-]+/, '')
+              .replace(/[.-]+$/, '') || 'master';
+
+            const imageRepo = `ghcr.io/${repository}`;
+            const tags = [
+              `${imageRepo}:${fullShaTag}`,
+              `${imageRepo}:${shortShaTag}`,
+              `${imageRepo}:${branchTag}`,
+            ].join('\n');
+
+            core.setOutput('repo', imageRepo);
+            core.setOutput('sha', sha);
+            core.setOutput('short_sha', shortSha);
+            core.setOutput('full_sha_tag', fullShaTag);
+            core.setOutput('short_sha_tag', shortShaTag);
+            core.setOutput('branch_tag', branchTag);
+            core.setOutput('tags', tags);
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
@@ -94,18 +89,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@8e5442c4ef9f78752691e2d8f8d19755c6f78e81 # v5.5.1
-        with:
-          images: ${{ steps.params.outputs.image_repo }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          context: 'git'
-          tags: |
-            type=sha
-            type=sha,format=long
-            type=raw,value=${{ steps.params.outputs.tag }}
-
       - name: Build Docker Image
         uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
         id: build_image
@@ -113,28 +96,27 @@ jobs:
           context: .
           file: ./deploy/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.image.outputs.tags }}
 
-  deploy:
-    needs: build-linux
-    runs-on: ubuntu-latest
-    steps:
-      - name: Run deployment wf
+      - name: Write build summary
         env:
-          RUN_NAME: ${{ format('Deploy {0} / {1} / {2}', vars.APP_NAME, needs.build-linux.outputs.component || '-', needs.build-linux.outputs.image_tag) }}
-        uses: the-actions-org/workflow-dispatch@v4
-        with:
-          run-name: ${{ env.RUN_NAME }}
-          workflow: deploy-v2.yml
-          ref: main
-          repo: ${{ vars.DEPLOY_REPO }}
-          token: ${{ secrets.DEPLOY_REPO_TOKEN }}
-          inputs: |
-            {
-              "app_name": "${{ vars.APP_NAME }}",
-              "image_tag": "${{ needs.build-linux.outputs.image_tag }}",
-              "image_digest": "${{ needs.build-linux.outputs.image_digest }}",
-              "image_revision": "${{ needs.build-linux.outputs.image_revision || github.sha }}",
-              "run_name": "${{ env.RUN_NAME }}"
-            }
+          IMAGE_REPO: ${{ steps.image.outputs.repo }}
+          IMAGE_TAGS: ${{ steps.image.outputs.tags }}
+          SOURCE_REF: ${{ env.REF_NAME }}
+          FULL_SHA_TAG: ${{ steps.image.outputs.full_sha_tag }}
+          SHORT_SHA_TAG: ${{ steps.image.outputs.short_sha_tag }}
+          BRANCH_TAG: ${{ steps.image.outputs.branch_tag }}
+        run: |
+          {
+            echo "### Docker image"
+            echo ""
+            echo "- Source branch: \`${SOURCE_REF}\`"
+            echo "- Image repo: \`${IMAGE_REPO}\`"
+            echo "- Full SHA tag: \`${FULL_SHA_TAG}\`"
+            echo "- Short SHA tag: \`${SHORT_SHA_TAG}\`"
+            echo "- Branch tag: \`${BRANCH_TAG}\`"
+            echo ""
+            echo '```'
+            echo "$IMAGE_TAGS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
