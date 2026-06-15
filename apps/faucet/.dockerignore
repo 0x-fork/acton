@@ -1,7 +1,7 @@
 *
-!deploy/
-!deploy/Dockerfile
-!deploy/.env.production
+!build/
+!build/Dockerfile
+!build/.env.production
 !dist/
 !dist/docker/
 !dist/docker/faucet-backend

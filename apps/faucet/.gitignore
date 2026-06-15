@@ -8,7 +8,8 @@ target/
 Acton.toml
 .acton/
 gen/
-build/
+build/*
+!build/Dockerfile
 lcov.info
 libraries.toml
 global.libraries.toml
@@ -26,7 +27,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
-!deploy/.env.production
+!build/.env.production
 db.sqlite
 db.sqlite-*
 test*.sh

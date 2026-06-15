@@ -6,7 +6,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY dist/docker/faucet-backend /usr/local/bin/faucet-backend
-COPY deploy/.env.production /usr/local/bin/.env
+COPY build/.env.production /usr/local/bin/.env
 
 RUN chmod +x /usr/local/bin/faucet-backend
 

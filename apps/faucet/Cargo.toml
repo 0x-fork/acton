@@ -16,7 +16,7 @@ publish = false
 authors = ["TON Core"]
 edition = "2024"
 rust-version = "1.94.1"
-repository = "https://github.com/i582/faucet"
+repository = "https://github.com/ton-blockchain/faucet"
 
 [workspace.dependencies]
 anyhow = "1.0.100"
