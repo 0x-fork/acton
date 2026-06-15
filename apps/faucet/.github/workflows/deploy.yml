@@ -1,18 +1,12 @@
 name: Build Docker Image
 
-run-name: Build Docker Image from ${{ inputs.ref_name || github.head_ref || 'master' }}
+run-name: Build Docker Image from ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
-    inputs:
-      ref_name:
-        description: "Branch to build"
-        required: false
-        default: "master"
-        type: string
 
 concurrency:
-  group: docker-image-${{ inputs.ref_name || github.head_ref || 'master' }}
+  group: docker-image-${{ github.ref_name }}
   cancel-in-progress: false
 
 permissions: { }
@@ -26,7 +20,7 @@ jobs:
       contents: read
 
     env:
-      REF_NAME: ${{ inputs.ref_name || github.head_ref || 'master' }}
+      REF_NAME: ${{ github.ref_name }}
 
     steps:
       - name: Fetch Sources
