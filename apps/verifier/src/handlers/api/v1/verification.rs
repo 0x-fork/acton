@@ -52,7 +52,6 @@ pub async fn status_handler(
         .await?;
 
     Ok(Json(VerificationStatusResponse::new(
-        resolved_target.address,
         resolved_target.code_hash,
         &status,
     )))
@@ -208,20 +207,14 @@ fn page_limit(limit: Option<usize>) -> usize {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub(super) struct VerificationStatusResponse {
-    address: Option<String>,
     code_hash: String,
     verified: bool,
     bundle_count: usize,
 }
 
 impl VerificationStatusResponse {
-    const fn new(
-        address: Option<String>,
-        code_hash: String,
-        status: &VerificationStatusReceipt,
-    ) -> Self {
+    const fn new(code_hash: String, status: &VerificationStatusReceipt) -> Self {
         Self {
-            address,
             code_hash,
             verified: status.verified,
             bundle_count: status.bundle_count,
@@ -241,6 +234,7 @@ pub(super) struct SourceBundleResponse {
     source_bundle_hash: String,
     verified_at: u64,
     storage_revision: String,
+    entrypoint: String,
     compiler: CompilerResponse,
     files: Vec<SourceFileResponse>,
 }
@@ -252,6 +246,7 @@ impl From<StoredSourceBundle> for SourceBundleResponse {
             source_bundle_hash: manifest.source_bundle_hash,
             verified_at: manifest.verified_at,
             storage_revision: bundle.storage_revision,
+            entrypoint: manifest.compiler.entrypoint.clone(),
             compiler: CompilerResponse::from(manifest.compiler),
             files: bundle
                 .files
@@ -266,7 +261,6 @@ impl From<StoredSourceBundle> for SourceBundleResponse {
 pub(super) struct CompilerResponse {
     language: String,
     version: String,
-    entrypoint: String,
     #[schema(value_type = Object)]
     params: Value,
 }
@@ -276,7 +270,6 @@ impl From<CompilerMetadata> for CompilerResponse {
         Self {
             language: compiler.language,
             version: compiler.version,
-            entrypoint: compiler.entrypoint,
             params: compiler.params,
         }
     }

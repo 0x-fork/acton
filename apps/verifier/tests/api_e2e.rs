@@ -163,7 +163,6 @@ async fn verification_status_reports_unverified_code_hash_without_stored_bundle(
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = response_json::<VerificationStatusResponse>(response).await;
-    assert_eq!(body.address, None);
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(!body.verified);
     assert_eq!(body.bundle_count, 0);
@@ -194,7 +193,6 @@ async fn verification_status_reports_verified_after_successful_verify() {
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = response_json::<VerificationStatusResponse>(response).await;
-    assert_eq!(body.address, None);
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(body.verified);
     assert_eq!(body.bundle_count, 1);
@@ -225,7 +223,6 @@ async fn verification_status_resolves_code_hash_from_address() {
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = response_json::<VerificationStatusResponse>(response).await;
-    assert_eq!(body.address.as_deref(), Some(ADDRESS_ONE));
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(body.verified);
 }
@@ -290,7 +287,7 @@ async fn verification_source_returns_verified_bundle_files() {
     assert_eq!(body.bundles[0].verified_at, 1_700_000_000);
     assert_eq!(body.bundles[0].compiler.language, "tolk");
     assert_eq!(body.bundles[0].compiler.version, "1.4.1");
-    assert_eq!(body.bundles[0].compiler.entrypoint, "main.tolk");
+    assert_eq!(body.bundles[0].entrypoint, "main.tolk");
     assert_eq!(body.bundles[0].files.len(), 1);
     assert_eq!(body.bundles[0].files[0].path, "main.tolk");
     assert_eq!(body.bundles[0].files[0].content, "fun main() {}");
@@ -313,7 +310,6 @@ async fn verify_resolves_code_hash_from_address_with_mock_blockchain() {
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = response_json::<VerifyResponse>(response).await;
-    assert_eq!(body.address.as_deref(), Some(ADDRESS_ONE));
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert_eq!(body.compiled_code_hash, CODE_HASH_ONE);
     assert_eq!(body.verification_result, "match");
@@ -344,7 +340,6 @@ async fn verify_accepts_valid_multipart_request_with_multiple_files() {
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = response_json::<VerifyResponse>(response).await;
-    assert_eq!(body.address.as_deref(), Some(ADDRESS_TWO));
     assert_eq!(body.code_hash, CODE_HASH_TWO);
     assert_eq!(body.compiled_code_hash, CODE_HASH_TWO);
     assert_eq!(body.verification_result, "match");
@@ -543,7 +538,6 @@ async fn verify_accepts_code_hash_without_address() {
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = response_json::<VerifyResponse>(response).await;
-    assert_eq!(body.address, None);
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert_eq!(body.compiled_code_hash, CODE_HASH_ONE);
     assert_eq!(body.verification_result, "match");
@@ -567,7 +561,6 @@ async fn verify_accepts_address_and_code_hash_together() {
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = response_json::<VerifyResponse>(response).await;
-    assert_eq!(body.address.as_deref(), Some(ADDRESS_ONE));
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert_eq!(body.compiled_code_hash, CODE_HASH_ONE);
     assert_eq!(body.verification_result, "match");
@@ -591,7 +584,6 @@ async fn verify_normalizes_base64_code_hash_input() {
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = response_json::<VerifyResponse>(response).await;
-    assert_eq!(body.address.as_deref(), Some(ADDRESS_ONE));
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert_eq!(body.compiled_code_hash, CODE_HASH_ONE);
     assert_eq!(body.verification_result, "match");
@@ -1086,7 +1078,6 @@ async fn assert_error_contains(response: axum::response::Response, expected: &st
 
 #[derive(Debug, Deserialize)]
 struct VerifyResponse {
-    address: Option<String>,
     code_hash: String,
     compiled_code_hash: String,
     verification_result: String,
@@ -1096,7 +1087,6 @@ struct VerifyResponse {
 
 #[derive(Debug, Deserialize)]
 struct VerificationStatusResponse {
-    address: Option<String>,
     code_hash: String,
     verified: bool,
     bundle_count: usize,
@@ -1113,6 +1103,7 @@ struct VerificationSourceResponse {
 struct VerifiedSourceBundle {
     source_bundle_hash: String,
     verified_at: u64,
+    entrypoint: String,
     compiler: VerifiedCompiler,
     files: Vec<VerifiedSourceFile>,
 }
@@ -1121,7 +1112,6 @@ struct VerifiedSourceBundle {
 struct VerifiedCompiler {
     language: String,
     version: String,
-    entrypoint: String,
 }
 
 #[derive(Debug, Deserialize)]

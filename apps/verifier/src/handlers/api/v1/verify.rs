@@ -211,7 +211,6 @@ async fn handle_multipart(
     );
 
     Ok(Json(VerifyResponse {
-        address: resolved_target.address,
         code_hash: resolved_target.code_hash,
         compiled_code_hash,
         verification_result,
@@ -555,7 +554,6 @@ pub(super) struct VerifyMultipartRequest {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub(super) struct VerifyResponse {
-    address: Option<String>,
     code_hash: String,
     compiled_code_hash: String,
     verification_result: VerificationResult,

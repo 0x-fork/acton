@@ -204,7 +204,6 @@ GET /api/v1/abi?code_hash=...
 
 Status responses include:
 
-- `address`
 - `code_hash`
 - `verified`
 - `bundle_count`
@@ -216,7 +215,8 @@ Source responses include:
 - `bundles`
 
 Each source bundle includes `source_bundle_hash`, `verified_at`,
-`storage_revision`, a grouped `compiler` object, and source `files`.
+`storage_revision`, `entrypoint`, a grouped `compiler` object, and source
+`files`.
 
 Last verified and ABI requests accept `limit` and `offset`, but responses only
 include `items`. Last verified items are ordered by recent verification time;

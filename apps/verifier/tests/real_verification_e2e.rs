@@ -40,7 +40,7 @@ async fn verify_tolk_with_real_compiler_and_stores_generated_abi() {
     assert_eq!(body.bundles.len(), 1);
     assert_eq!(body.bundles[0].compiler.language, "tolk");
     assert_eq!(body.bundles[0].compiler.version, "1.4.1");
-    assert_eq!(body.bundles[0].compiler.entrypoint, "main.tolk");
+    assert_eq!(body.bundles[0].entrypoint, "main.tolk");
     let files = &body.bundles[0].files;
     let abi = files
         .iter()
@@ -103,7 +103,7 @@ async fn verify_tact_with_real_compiler_and_stores_generated_sources() {
     assert_eq!(body.bundles.len(), 1);
     assert_eq!(body.bundles[0].compiler.language, "tact");
     assert_eq!(body.bundles[0].compiler.version, "1.6.13");
-    assert_eq!(body.bundles[0].compiler.entrypoint, "contract.pkg");
+    assert_eq!(body.bundles[0].entrypoint, "contract.pkg");
     let files = &body.bundles[0].files;
     assert!(files.iter().any(|file| file.path == "contract.pkg"));
     assert!(
@@ -273,6 +273,7 @@ struct VerificationSourceResponse {
 
 #[derive(Debug, Deserialize)]
 struct VerifiedSourceBundle {
+    entrypoint: String,
     compiler: VerifiedCompiler,
     files: Vec<VerifiedSourceFile>,
 }
@@ -281,7 +282,6 @@ struct VerifiedSourceBundle {
 struct VerifiedCompiler {
     language: String,
     version: String,
-    entrypoint: String,
 }
 
 #[derive(Debug, Deserialize)]

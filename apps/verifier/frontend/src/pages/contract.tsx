@@ -232,7 +232,7 @@ function VerifiedContract({
             )}
             <DetailRow label="Language" value={bundle.compiler.language} />
             <DetailRow label="Compiler" value={bundle.compiler.version} />
-            <DetailRow label="Entrypoint" value={bundle.compiler.entrypoint} />
+            <DetailRow label="Entrypoint" value={bundle.entrypoint} />
           </dl>
           <div className="metadata-json">
             <div className="metadata-json-title">Compile params</div>
@@ -265,7 +265,7 @@ function VerifiedContract({
               </button>
             </div>
           </div>
-          <CodeViewer files={bundle.files} entrypoint={bundle.compiler.entrypoint} />
+          <CodeViewer files={bundle.files} entrypoint={bundle.entrypoint} />
         </section>
       </div>
     </>

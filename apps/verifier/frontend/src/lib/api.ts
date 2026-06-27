@@ -10,6 +10,7 @@ export interface SourceBundle {
   readonly source_bundle_hash: string
   readonly verified_at: number
   readonly storage_revision: string
+  readonly entrypoint: string
   readonly compiler: CompilerMetadata
   readonly files: readonly SourceFile[]
 }
@@ -17,7 +18,6 @@ export interface SourceBundle {
 export interface CompilerMetadata {
   readonly language: string
   readonly version: string
-  readonly entrypoint: string
   readonly params: unknown
 }
 

@@ -6,7 +6,7 @@ import {highlightCodeToHtml, type HighlightLanguage} from "../lib/syntax-highlig
 
 interface CodeViewerProps {
   readonly files: readonly SourceFile[]
-  readonly entrypoint?: string
+  readonly entrypoint: string
 }
 
 const FILE_QUERY_PARAM = "file"
@@ -79,16 +79,12 @@ function findFileByPath(
 
 function findEntrypointFile(
   files: readonly SourceFile[],
-  entrypoint: string | undefined,
+  entrypoint: string,
 ): SourceFile | undefined {
   const exactMatch = findFileByPath(files, entrypoint)
 
   if (exactMatch) {
     return exactMatch
-  }
-
-  if (!entrypoint) {
-    return undefined
   }
 
   const normalizedEntrypoint = normalizeFilePath(entrypoint)
@@ -192,7 +188,7 @@ function FileTreeRows({
 }: {
   readonly nodes: readonly FileTreeNode[]
   readonly activePath: string
-  readonly entrypoint?: string
+  readonly entrypoint: string
   readonly depth?: number
   readonly onSelect: (path: string) => void
 }) {
@@ -267,6 +263,7 @@ export function CodeViewer({files, entrypoint}: CodeViewerProps) {
   )
   const code = activeFile ? fileContent(activeFile) : ""
   const tree = useMemo(() => buildFileTree(files), [files])
+  const treeEntrypoint = entrypointPath ?? entrypoint
   const isDark = document.documentElement.classList.contains("dark-theme")
 
   useEffect(() => {
@@ -319,7 +316,7 @@ export function CodeViewer({files, entrypoint}: CodeViewerProps) {
           <FileTreeRows
             nodes={tree}
             activePath={activeFile.path}
-            entrypoint={entrypointPath}
+            entrypoint={treeEntrypoint}
             onSelect={selectFile}
           />
         </div>
@@ -347,7 +344,7 @@ export function CodeViewer({files, entrypoint}: CodeViewerProps) {
             <FileTreeRows
               nodes={tree}
               activePath={activeFile.path}
-              entrypoint={entrypointPath}
+              entrypoint={treeEntrypoint}
               onSelect={selectFile}
             />
           </div>
