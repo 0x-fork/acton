@@ -9,11 +9,18 @@ use utoipa::ToSchema;
 
 use crate::{
     error::ApiError,
-    registry::{VerificationStatusReceipt, VerificationStatusRequest, VerifiedBundlesRequest},
+    registry::{
+        AbiContractsRequest, LastVerifiedRequest, VerificationStatusReceipt,
+        VerificationStatusRequest, VerifiedBundlesRequest,
+    },
+    registry_index::{IndexedAbiContract, IndexedVerifiedBundleSummary},
     source_storage::{CompilerMetadata, StoredSourceBundle, StoredSourceFile},
     state::AppState,
     verification::VerificationTarget,
 };
+
+const DEFAULT_PAGE_LIMIT: usize = 50;
+const MAX_PAGE_LIMIT: usize = 100;
 
 #[utoipa::path(
     get,
@@ -93,10 +100,93 @@ pub async fn source_handler(
     }))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/last_verified",
+    params(
+        ("limit" = Option<usize>, Query, description = "Maximum number of records to return. Defaults to 50 and is capped at 100."),
+        ("offset" = Option<usize>, Query, description = "Number of records to skip for pagination.")
+    ),
+    responses(
+        (status = 200, description = "Latest verified source bundles", body = LastVerifiedResponse),
+        (status = 502, description = "Registry lookup failure", body = crate::error::ErrorResponse)
+    ),
+    tag = "verification"
+)]
+pub async fn last_verified_handler(
+    State(state): State<AppState>,
+    Query(query): Query<PaginationQuery>,
+) -> Result<impl IntoResponse, ApiError> {
+    let receipt = state
+        .verification_registry()
+        .last_verified(LastVerifiedRequest {
+            limit: page_limit(query.limit),
+            offset: query.offset.unwrap_or(0),
+        })
+        .await?;
+
+    Ok(Json(LastVerifiedResponse {
+        items: receipt
+            .items
+            .into_iter()
+            .map(LastVerifiedItemResponse::from)
+            .collect(),
+    }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/abi",
+    params(
+        ("code_hash" = Option<String>, Query, description = "Optional code hash filter."),
+        ("limit" = Option<usize>, Query, description = "Maximum number of records to return. Defaults to 50 and is capped at 100."),
+        ("offset" = Option<usize>, Query, description = "Number of records to skip for pagination.")
+    ),
+    responses(
+        (status = 200, description = "Tolk ABI records indexed from verified contracts", body = AbiContractsResponse),
+        (status = 502, description = "Registry lookup failure", body = crate::error::ErrorResponse)
+    ),
+    tag = "verification"
+)]
+pub async fn abi_handler(
+    State(state): State<AppState>,
+    Query(query): Query<AbiQuery>,
+) -> Result<impl IntoResponse, ApiError> {
+    let receipt = state
+        .verification_registry()
+        .abi_contracts(AbiContractsRequest {
+            code_hash: non_empty_text(query.code_hash),
+            limit: page_limit(query.limit),
+            offset: query.offset.unwrap_or(0),
+        })
+        .await?;
+
+    Ok(Json(AbiContractsResponse {
+        items: receipt
+            .items
+            .into_iter()
+            .map(AbiContractResponse::from)
+            .collect(),
+    }))
+}
+
 #[derive(Debug, Deserialize)]
 pub(super) struct VerificationQuery {
     address: Option<String>,
     code_hash: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct PaginationQuery {
+    limit: Option<usize>,
+    offset: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct AbiQuery {
+    code_hash: Option<String>,
+    limit: Option<usize>,
+    offset: Option<usize>,
 }
 
 impl VerificationQuery {
@@ -110,6 +200,10 @@ impl VerificationQuery {
 
 fn non_empty_text(value: Option<String>) -> Option<String> {
     value.filter(|value| !value.trim().is_empty())
+}
+
+fn page_limit(limit: Option<usize>) -> usize {
+    limit.unwrap_or(DEFAULT_PAGE_LIMIT).clamp(1, MAX_PAGE_LIMIT)
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -207,6 +301,57 @@ impl From<StoredSourceFile> for SourceFileResponse {
             is_stdlib: file.is_stdlib,
             has_include_directives: file.has_include_directives,
             content: file.content,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct LastVerifiedResponse {
+    items: Vec<LastVerifiedItemResponse>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct LastVerifiedItemResponse {
+    code_hash: String,
+    source_bundle_hash: String,
+    verified_at: u64,
+    storage_revision: String,
+    compiler: CompilerResponse,
+    file_count: usize,
+    has_tolk_abi: bool,
+}
+
+impl From<IndexedVerifiedBundleSummary> for LastVerifiedItemResponse {
+    fn from(item: IndexedVerifiedBundleSummary) -> Self {
+        Self {
+            code_hash: item.code_hash,
+            source_bundle_hash: item.source_bundle_hash,
+            verified_at: item.verified_at,
+            storage_revision: item.storage_revision,
+            compiler: CompilerResponse::from(item.compiler),
+            file_count: item.file_count,
+            has_tolk_abi: item.has_tolk_abi,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct AbiContractsResponse {
+    items: Vec<AbiContractResponse>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct AbiContractResponse {
+    code_hash: String,
+    #[schema(value_type = Object)]
+    abi: Value,
+}
+
+impl From<IndexedAbiContract> for AbiContractResponse {
+    fn from(item: IndexedAbiContract) -> Self {
+        Self {
+            code_hash: item.code_hash,
+            abi: item.abi,
         }
     }
 }

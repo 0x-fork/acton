@@ -30,6 +30,20 @@ export interface SourceFile {
   readonly content: string
 }
 
+export interface LastVerifiedResponse {
+  readonly items: readonly LastVerifiedItem[]
+}
+
+export interface LastVerifiedItem {
+  readonly code_hash: string
+  readonly source_bundle_hash: string
+  readonly verified_at: number
+  readonly storage_revision: string
+  readonly compiler: CompilerMetadata
+  readonly file_count: number
+  readonly has_tolk_abi: boolean
+}
+
 export class ApiRequestError extends Error {
   readonly status: number
 
@@ -38,6 +52,25 @@ export class ApiRequestError extends Error {
     this.name = "ApiRequestError"
     this.status = status
   }
+}
+
+export async function fetchLastVerified(limit = 12, offset = 0): Promise<LastVerifiedResponse> {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  })
+  const response = await fetch(`/api/v1/last_verified?${params.toString()}`, {
+    headers: {
+      accept: "application/json",
+    },
+  })
+
+  const body = (await response.json().catch(() => undefined)) as {error?: string} | undefined
+  if (!response.ok) {
+    throw new ApiRequestError(response.status, body?.error || `Request failed: ${response.status}`)
+  }
+
+  return body as LastVerifiedResponse
 }
 
 export async function fetchVerificationSource(

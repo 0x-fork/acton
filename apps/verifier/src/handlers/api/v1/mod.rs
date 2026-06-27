@@ -12,6 +12,8 @@ mod verify;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/openapi.json", get(openapi_handler))
+        .route("/last_verified", get(verification::last_verified_handler))
+        .route("/abi", get(verification::abi_handler))
         .route("/verify", post(verify::handler))
         .route("/verification/status", get(verification::status_handler))
         .route("/verification/source", get(verification::source_handler))
@@ -34,6 +36,8 @@ fn openapi() -> utoipa::openapi::OpenApi {
     ),
     paths(
         verify::handler,
+        verification::last_verified_handler,
+        verification::abi_handler,
         verification::status_handler,
         verification::source_handler
     ),
@@ -47,7 +51,11 @@ fn openapi() -> utoipa::openapi::OpenApi {
         verification::VerificationSourceResponse,
         verification::SourceBundleResponse,
         verification::CompilerResponse,
-        verification::SourceFileResponse
+        verification::SourceFileResponse,
+        verification::LastVerifiedResponse,
+        verification::LastVerifiedItemResponse,
+        verification::AbiContractsResponse,
+        verification::AbiContractResponse
     )),
     tags(
         (name = "verification", description = "Source verification and lookup endpoints")

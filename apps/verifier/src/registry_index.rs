@@ -7,6 +7,7 @@ use std::{
 
 use async_trait::async_trait;
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
+use serde_json::Value;
 use thiserror::Error;
 
 use crate::{
@@ -17,7 +18,7 @@ use crate::{
     },
 };
 
-const INDEX_SCHEMA_VERSION: i64 = 5;
+const INDEX_SCHEMA_VERSION: i64 = 7;
 const UNKNOWN_REVISION: &str = "unknown";
 
 #[async_trait]
@@ -42,6 +43,17 @@ pub trait VerificationIndex: Send + Sync + 'static {
         &self,
         code_hash: &str,
     ) -> Result<Vec<StoredSourceBundle>, VerificationIndexError>;
+
+    async fn last_verified(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> Result<IndexedLastVerifiedPage, VerificationIndexError>;
+
+    async fn abi_contracts(
+        &self,
+        query: IndexedAbiContractsQuery,
+    ) -> Result<IndexedAbiContractsPage, VerificationIndexError>;
 }
 
 pub type SharedVerificationIndex = Arc<dyn VerificationIndex>;
@@ -50,6 +62,40 @@ pub type SharedVerificationIndex = Arc<dyn VerificationIndex>;
 pub struct IndexedVerificationStatus {
     pub verified: bool,
     pub bundle_count: usize,
+}
+
+#[derive(Clone, Debug)]
+pub struct IndexedLastVerifiedPage {
+    pub items: Vec<IndexedVerifiedBundleSummary>,
+}
+
+#[derive(Clone, Debug)]
+pub struct IndexedVerifiedBundleSummary {
+    pub code_hash: String,
+    pub source_bundle_hash: String,
+    pub verified_at: u64,
+    pub storage_revision: String,
+    pub compiler: CompilerMetadata,
+    pub file_count: usize,
+    pub has_tolk_abi: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct IndexedAbiContractsQuery {
+    pub code_hash: Option<String>,
+    pub limit: usize,
+    pub offset: usize,
+}
+
+#[derive(Clone, Debug)]
+pub struct IndexedAbiContractsPage {
+    pub items: Vec<IndexedAbiContract>,
+}
+
+#[derive(Clone, Debug)]
+pub struct IndexedAbiContract {
+    pub code_hash: String,
+    pub abi: Value,
 }
 
 pub struct SqliteVerificationIndex {
@@ -122,6 +168,7 @@ impl SqliteVerificationIndex {
             let mut connection = self.connection()?;
             let transaction = connection.transaction()?;
 
+            transaction.execute("delete from bundle_abis", [])?;
             transaction.execute("delete from bundle_files", [])?;
             transaction.execute("delete from verified_bundles", [])?;
             transaction.execute("delete from registry_index_state", [])?;
@@ -253,6 +300,107 @@ impl VerificationIndex for SqliteVerificationIndex {
             Ok(bundles)
         }
     }
+
+    async fn last_verified(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> Result<IndexedLastVerifiedPage, VerificationIndexError> {
+        let limit_i64 = usize_to_i64("limit", limit)?;
+        let offset_i64 = usize_to_i64("offset", offset)?;
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            r"
+            select
+              verified_bundles.code_hash,
+              verified_bundles.source_bundle_hash,
+              verified_bundles.verified_at,
+              verified_bundles.compiler_json,
+              verified_bundles.storage_revision,
+              count(bundle_files.path) as file_count,
+              exists (
+                select 1
+                from bundle_abis
+                where bundle_abis.code_hash = verified_bundles.code_hash
+                  and bundle_abis.source_bundle_hash = verified_bundles.source_bundle_hash
+              ) as has_tolk_abi
+            from verified_bundles
+            left join bundle_files
+              on bundle_files.code_hash = verified_bundles.code_hash
+             and bundle_files.source_bundle_hash = verified_bundles.source_bundle_hash
+            group by
+              verified_bundles.code_hash,
+              verified_bundles.source_bundle_hash,
+              verified_bundles.verified_at,
+              verified_bundles.compiler_json,
+              verified_bundles.storage_revision
+            order by verified_bundles.verified_at desc, verified_bundles.source_bundle_hash desc
+            limit ?1 offset ?2
+            ",
+        )?;
+        let rows = statement.query_map(params![limit_i64, offset_i64], |row| {
+            Ok(IndexedVerifiedBundleSummaryRow {
+                code_hash: row.get(0)?,
+                source_bundle_hash: row.get(1)?,
+                verified_at: row.get(2)?,
+                compiler_json: row.get(3)?,
+                storage_revision: row.get(4)?,
+                file_count: row.get(5)?,
+                has_tolk_abi: row.get::<_, i64>(6)? != 0,
+            })
+        })?;
+
+        let mut items = Vec::new();
+        for row in rows {
+            items.push(summary_from_row(row?)?);
+        }
+        drop(statement);
+        drop(connection);
+
+        Ok(IndexedLastVerifiedPage { items })
+    }
+
+    async fn abi_contracts(
+        &self,
+        query: IndexedAbiContractsQuery,
+    ) -> Result<IndexedAbiContractsPage, VerificationIndexError> {
+        let limit_i64 = usize_to_i64("limit", query.limit)?;
+        let offset_i64 = usize_to_i64("offset", query.offset)?;
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            r"
+            select
+              bundle_abis.code_hash,
+              bundle_abis.abi_json
+            from bundle_abis
+            join verified_bundles
+              on verified_bundles.code_hash = bundle_abis.code_hash
+             and verified_bundles.source_bundle_hash = bundle_abis.source_bundle_hash
+            where (?1 is null or bundle_abis.code_hash = ?1)
+            group by bundle_abis.code_hash, bundle_abis.abi_json
+            order by max(verified_bundles.verified_at) desc, bundle_abis.code_hash desc
+            limit ?2 offset ?3
+            ",
+        )?;
+        let rows = statement.query_map(
+            params![query.code_hash.as_deref(), limit_i64, offset_i64],
+            |row| {
+                Ok(IndexedAbiContractRow {
+                    code_hash: row.get(0)?,
+                    abi_json: row.get(1)?,
+                })
+            },
+        )?;
+
+        let mut items = Vec::new();
+        for row in rows {
+            items.push(abi_contract_from_row(row?)?);
+        }
+        drop(statement);
+        drop(connection);
+
+        Ok(IndexedAbiContractsPage { items })
+    }
 }
 
 #[derive(Debug, Error)]
@@ -274,6 +422,8 @@ pub enum VerificationIndexError {
     TimestampOutOfRange(u64),
     #[error("registry index integer field {field} has invalid value: {value}")]
     InvalidInteger { field: &'static str, value: i64 },
+    #[error("registry index pagination field {field} is too large: {value}")]
+    PaginationOutOfRange { field: &'static str, value: usize },
     #[error(transparent)]
     SourceStorage(#[from] SourceStorageError),
     #[error(transparent)]
@@ -287,12 +437,28 @@ struct IndexedBundleRow {
     storage_revision: String,
 }
 
+struct IndexedVerifiedBundleSummaryRow {
+    code_hash: String,
+    source_bundle_hash: String,
+    verified_at: i64,
+    compiler_json: String,
+    storage_revision: String,
+    file_count: i64,
+    has_tolk_abi: bool,
+}
+
+struct IndexedAbiContractRow {
+    code_hash: String,
+    abi_json: String,
+}
+
 fn initialize_schema(connection: &Connection) -> Result<(), VerificationIndexError> {
     let user_version =
         connection.query_row("pragma user_version", [], |row| row.get::<_, i64>(0))?;
     if user_version != INDEX_SCHEMA_VERSION {
         connection.execute_batch(
             r"
+            drop table if exists bundle_abis;
             drop table if exists bundle_sources;
             drop table if exists bundle_files;
             drop table if exists verified_code_hashes;
@@ -334,11 +500,24 @@ fn initialize_schema(connection: &Connection) -> Result<(), VerificationIndexErr
           primary key (code_hash, source_bundle_hash, path)
         );
 
+        create table if not exists bundle_abis (
+          code_hash text not null,
+          source_bundle_hash text not null,
+          path text not null,
+          content_hash text not null,
+          abi_json text not null,
+          indexed_at integer not null,
+          primary key (code_hash, source_bundle_hash, path)
+        );
+
         create index if not exists verified_bundles_by_code_hash
           on verified_bundles (code_hash);
 
         create index if not exists bundle_files_by_bundle
           on bundle_files (code_hash, source_bundle_hash);
+
+        create index if not exists bundle_abis_by_code_hash
+          on bundle_abis (code_hash);
         ",
     )?;
     connection.pragma_update(None, "user_version", INDEX_SCHEMA_VERSION)?;
@@ -405,6 +584,29 @@ fn insert_bundle(
                 option_bool_to_i64(file.has_include_directives),
             ],
         )?;
+
+        if let Some(abi_json) = tolk_abi_json(manifest, file) {
+            transaction.execute(
+                r"
+                insert into bundle_abis (
+                  code_hash,
+                  source_bundle_hash,
+                  path,
+                  content_hash,
+                  abi_json,
+                  indexed_at
+                ) values (?1, ?2, ?3, ?4, ?5, ?6)
+                ",
+                params![
+                    &manifest.code_hash,
+                    &manifest.source_bundle_hash,
+                    &file.path,
+                    &file.content_hash,
+                    abi_json.to_string(),
+                    indexed_at,
+                ],
+            )?;
+        }
     }
 
     Ok(())
@@ -415,6 +617,10 @@ fn delete_bundle_rows(
     code_hash: &str,
     source_bundle_hash: &str,
 ) -> Result<(), VerificationIndexError> {
+    transaction.execute(
+        "delete from bundle_abis where code_hash = ?1 and source_bundle_hash = ?2",
+        params![code_hash, source_bundle_hash],
+    )?;
     transaction.execute(
         "delete from bundle_files where code_hash = ?1 and source_bundle_hash = ?2",
         params![code_hash, source_bundle_hash],
@@ -460,12 +666,7 @@ fn bundle_from_row(
         manifest: SourceBundleManifest {
             code_hash: code_hash.to_owned(),
             source_bundle_hash: row.source_bundle_hash,
-            verified_at: u64::try_from(row.verified_at).map_err(|_| {
-                VerificationIndexError::InvalidInteger {
-                    field: "verified_at",
-                    value: row.verified_at,
-                }
-            })?,
+            verified_at: i64_to_u64("verified_at", row.verified_at)?,
             compiler,
         },
         files,
@@ -506,9 +707,55 @@ fn bundle_files(
         .map_err(VerificationIndexError::Sqlite)
 }
 
+fn summary_from_row(
+    row: IndexedVerifiedBundleSummaryRow,
+) -> Result<IndexedVerifiedBundleSummary, VerificationIndexError> {
+    Ok(IndexedVerifiedBundleSummary {
+        code_hash: row.code_hash,
+        source_bundle_hash: row.source_bundle_hash,
+        verified_at: i64_to_u64("verified_at", row.verified_at)?,
+        storage_revision: row.storage_revision,
+        compiler: serde_json::from_str::<CompilerMetadata>(&row.compiler_json)?,
+        file_count: i64_to_usize("file_count", row.file_count)?,
+        has_tolk_abi: row.has_tolk_abi,
+    })
+}
+
+fn abi_contract_from_row(
+    row: IndexedAbiContractRow,
+) -> Result<IndexedAbiContract, VerificationIndexError> {
+    let abi = serde_json::from_str::<Value>(&row.abi_json)?;
+
+    Ok(IndexedAbiContract {
+        code_hash: row.code_hash,
+        abi,
+    })
+}
+
+fn tolk_abi_json(manifest: &SourceBundleManifest, file: &StoredSourceFile) -> Option<Value> {
+    if !manifest.compiler.language.eq_ignore_ascii_case("tolk") || !file.path.ends_with(".abi.json")
+    {
+        return None;
+    }
+
+    serde_json::from_str::<Value>(&file.content).ok()
+}
+
 fn now_unix_seconds() -> Result<i64, VerificationIndexError> {
     let seconds = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     i64::try_from(seconds).map_err(|_| VerificationIndexError::TimestampOutOfRange(seconds))
+}
+
+fn i64_to_u64(field: &'static str, value: i64) -> Result<u64, VerificationIndexError> {
+    u64::try_from(value).map_err(|_| VerificationIndexError::InvalidInteger { field, value })
+}
+
+fn i64_to_usize(field: &'static str, value: i64) -> Result<usize, VerificationIndexError> {
+    usize::try_from(value).map_err(|_| VerificationIndexError::InvalidInteger { field, value })
+}
+
+fn usize_to_i64(field: &'static str, value: usize) -> Result<i64, VerificationIndexError> {
+    i64::try_from(value).map_err(|_| VerificationIndexError::PaginationOutOfRange { field, value })
 }
 
 fn revision_or_unknown(revision: Option<String>) -> String {

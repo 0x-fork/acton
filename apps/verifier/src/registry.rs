@@ -5,7 +5,10 @@ use thiserror::Error;
 
 use crate::{
     bundle_validation::{StoredBundleValidationError, validate_stored_bundle},
-    registry_index::{SharedVerificationIndex, VerificationIndexError},
+    registry_index::{
+        IndexedAbiContract, IndexedAbiContractsQuery, IndexedVerifiedBundleSummary,
+        SharedVerificationIndex, VerificationIndexError,
+    },
     source_storage::{
         SharedSourceStorage, SourceStorageError, SourceStorageReceipt, StoreSourceBundleRequest,
         StoredSourceBundle,
@@ -30,6 +33,16 @@ pub trait VerificationRegistry: Send + Sync + 'static {
         &self,
         request: VerifiedBundlesRequest,
     ) -> Result<VerifiedBundlesReceipt, RegistryError>;
+
+    async fn last_verified(
+        &self,
+        request: LastVerifiedRequest,
+    ) -> Result<LastVerifiedReceipt, RegistryError>;
+
+    async fn abi_contracts(
+        &self,
+        request: AbiContractsRequest,
+    ) -> Result<AbiContractsReceipt, RegistryError>;
 }
 
 pub type SharedVerificationRegistry = Arc<dyn VerificationRegistry>;
@@ -50,6 +63,19 @@ pub struct VerifiedBundlesRequest {
 }
 
 #[derive(Clone, Debug)]
+pub struct LastVerifiedRequest {
+    pub limit: usize,
+    pub offset: usize,
+}
+
+#[derive(Clone, Debug)]
+pub struct AbiContractsRequest {
+    pub code_hash: Option<String>,
+    pub limit: usize,
+    pub offset: usize,
+}
+
+#[derive(Clone, Debug)]
 pub struct VerificationStatusReceipt {
     pub verified: bool,
     pub bundle_count: usize,
@@ -58,6 +84,16 @@ pub struct VerificationStatusReceipt {
 #[derive(Clone, Debug)]
 pub struct VerifiedBundlesReceipt {
     pub bundles: Vec<StoredSourceBundle>,
+}
+
+#[derive(Clone, Debug)]
+pub struct LastVerifiedReceipt {
+    pub items: Vec<IndexedVerifiedBundleSummary>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AbiContractsReceipt {
+    pub items: Vec<IndexedAbiContract>,
 }
 
 #[derive(Clone)]
@@ -146,6 +182,36 @@ impl VerificationRegistry for SourceVerificationRegistry {
         Ok(VerifiedBundlesReceipt {
             bundles: self.verification_index.bundles(&request.code_hash).await?,
         })
+    }
+
+    async fn last_verified(
+        &self,
+        request: LastVerifiedRequest,
+    ) -> Result<LastVerifiedReceipt, RegistryError> {
+        self.ensure_current().await?;
+        let page = self
+            .verification_index
+            .last_verified(request.limit, request.offset)
+            .await?;
+
+        Ok(LastVerifiedReceipt { items: page.items })
+    }
+
+    async fn abi_contracts(
+        &self,
+        request: AbiContractsRequest,
+    ) -> Result<AbiContractsReceipt, RegistryError> {
+        self.ensure_current().await?;
+        let page = self
+            .verification_index
+            .abi_contracts(IndexedAbiContractsQuery {
+                code_hash: request.code_hash,
+                limit: request.limit,
+                offset: request.offset,
+            })
+            .await?;
+
+        Ok(AbiContractsReceipt { items: page.items })
     }
 }
 

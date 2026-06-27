@@ -310,6 +310,18 @@ Fetch verified source:
 curl -sS 'http://127.0.0.1:3000/api/v1/verification/source?code_hash=<code_hash>'
 ```
 
+Fetch recent verified bundles:
+
+```bash
+curl -sS 'http://127.0.0.1:3000/api/v1/last_verified?limit=50&offset=0'
+```
+
+Fetch indexed Tolk ABI records:
+
+```bash
+curl -sS 'http://127.0.0.1:3000/api/v1/abi?code_hash=<code_hash>'
+```
+
 This does not build Rust, Node.js packages, or compilers on the server. The server only pulls the CI-built image and starts it.
 
 ## Updating

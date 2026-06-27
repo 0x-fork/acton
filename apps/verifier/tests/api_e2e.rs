@@ -55,11 +55,101 @@ async fn openapi_json_documents_verifier_api() {
     let body = response_json::<Value>(response).await;
     assert_eq!(body["openapi"], "3.1.0");
     assert!(body["paths"]["/api/v1/verify"].is_object());
+    assert!(body["paths"]["/api/v1/last_verified"].is_object());
+    assert!(body["paths"]["/api/v1/abi"].is_object());
     assert!(body["paths"]["/api/v1/verification/status"].is_object());
     assert!(body["paths"]["/api/v1/verification/source"].is_object());
     assert!(body["components"]["schemas"]["VerifyResponse"].is_object());
     assert!(body["components"]["schemas"]["VerificationSourceResponse"].is_object());
     assert!(body["components"]["schemas"]["SourceFileResponse"].is_object());
+}
+
+#[tokio::test]
+async fn last_verified_returns_latest_verified_bundles() {
+    let state = app_state(&[], CODE_HASH_ONE);
+    let verify_response = post_verify(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+    assert_eq!(verify_response.status(), StatusCode::OK);
+    let verified = response_json::<VerifyResponse>(verify_response).await;
+    let source_bundle_hash = verified
+        .source_bundle_hash
+        .as_deref()
+        .expect("verify response should include source bundle hash");
+
+    let response = get(state.clone(), "/api/v1/last_verified?limit=500&offset=0").await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response_json::<LastVerifiedResponse>(response).await;
+    assert_eq!(body.items.len(), 1);
+    assert_eq!(body.items[0].code_hash, CODE_HASH_ONE);
+    assert_eq!(body.items[0].source_bundle_hash, source_bundle_hash);
+    assert_eq!(body.items[0].compiler.language, "tolk");
+    assert_eq!(body.items[0].file_count, 1);
+    assert!(!body.items[0].has_tolk_abi);
+
+    let response = get(state, "/api/v1/last_verified?offset=500").await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json::<LastVerifiedResponse>(response).await;
+    assert!(body.items.is_empty());
+}
+
+#[tokio::test]
+async fn abi_returns_indexed_tolk_abi_records_with_code_hash() {
+    let state = recording_source_storage_app_state_with_generated_sources(
+        &[],
+        CODE_HASH_ONE,
+        vec![CompileGeneratedSource {
+            path: "output/main.abi.json".to_owned(),
+            content: r#"{"contract_name":"Smoke","abi_schema_version":"1.0"}"#.to_owned(),
+        }],
+    )
+    .0;
+    let verify_response = post_verify(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+    assert_eq!(verify_response.status(), StatusCode::OK);
+    let verified = response_json::<VerifyResponse>(verify_response).await;
+    assert!(verified.source_bundle_hash.is_some());
+
+    let response = get(state.clone(), "/api/v1/abi").await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json::<AbiContractsResponse>(response).await;
+    assert_eq!(body.items.len(), 1);
+    assert_eq!(body.items[0].code_hash, CODE_HASH_ONE);
+    assert_eq!(body.items[0].abi["contract_name"].as_str(), Some("Smoke"));
+
+    let response = get(
+        state.clone(),
+        &format!("/api/v1/abi?code_hash={CODE_HASH_ONE}"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json::<AbiContractsResponse>(response).await;
+    assert_eq!(body.items[0].code_hash, CODE_HASH_ONE);
+    assert_eq!(body.items[0].abi["contract_name"].as_str(), Some("Smoke"));
+
+    let response = get(state, "/api/v1/abi?offset=500").await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json::<AbiContractsResponse>(response).await;
+    assert!(body.items.is_empty());
 }
 
 #[tokio::test]
@@ -1038,4 +1128,29 @@ struct VerifiedCompiler {
 struct VerifiedSourceFile {
     path: String,
     content: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct LastVerifiedResponse {
+    items: Vec<LastVerifiedItem>,
+}
+
+#[derive(Debug, Deserialize)]
+struct LastVerifiedItem {
+    code_hash: String,
+    source_bundle_hash: String,
+    compiler: VerifiedCompiler,
+    file_count: usize,
+    has_tolk_abi: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct AbiContractsResponse {
+    items: Vec<AbiContract>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AbiContract {
+    code_hash: String,
+    abi: Value,
 }

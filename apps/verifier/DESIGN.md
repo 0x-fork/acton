@@ -198,6 +198,8 @@ GET /api/v1/verification/status?code_hash=...
 GET /api/v1/verification/status?address=...
 GET /api/v1/verification/source?code_hash=...
 GET /api/v1/verification/source?address=...
+GET /api/v1/last_verified?limit=50&offset=0
+GET /api/v1/abi?code_hash=...
 ```
 
 Status responses include:
@@ -215,6 +217,10 @@ Source responses include:
 
 Each source bundle includes `source_bundle_hash`, `verified_at`,
 `storage_revision`, a grouped `compiler` object, and source `files`.
+
+Last verified and ABI requests accept `limit` and `offset`, but responses only
+include `items`. Last verified items are ordered by recent verification time;
+ABI items contain the `code_hash` and parsed `abi` JSON.
 
 ## Failure Handling
 

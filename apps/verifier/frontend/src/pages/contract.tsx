@@ -21,9 +21,17 @@ import {downloadSourceArchive} from "../lib/source-archive"
 import {getPathLookupValue, parseLookupTarget, shortenMiddle, type LookupTarget} from "../lib/target"
 import "../styles.css"
 
-function DetailRow({label, value}: {readonly label: string; readonly value: string}) {
+function DetailRow({
+  label,
+  value,
+  monospace = false,
+}: {
+  readonly label: string
+  readonly value: string
+  readonly monospace?: boolean
+}) {
   return (
-    <div className="detail-row">
+    <div className={`detail-row ${monospace ? "detail-row-monospace" : ""}`}>
       <dt>{label}</dt>
       <dd>
         <span title={value}>{value}</span>
@@ -214,13 +222,13 @@ function VerifiedContract({
             <span>Verification metadata</span>
           </summary>
           <dl>
-            {address && <DetailRow label="Address" value={address} />}
+            {address && <DetailRow label="Address" value={address} monospace />}
             {verifiedAt && <DetailRow label="Verified at" value={verifiedAt} />}
-            <DetailRow label="Code hash" value={data.code_hash} />
+            <DetailRow label="Code hash" value={data.code_hash} monospace />
             <DetailRow label="Bundles" value={String(data.bundles.length)} />
-            <DetailRow label="Bundle hash" value={bundle.source_bundle_hash} />
+            <DetailRow label="Bundle hash" value={bundle.source_bundle_hash} monospace />
             {bundle.storage_revision && (
-              <DetailRow label="Storage revision" value={bundle.storage_revision} />
+              <DetailRow label="Storage revision" value={bundle.storage_revision} monospace />
             )}
             <DetailRow label="Language" value={bundle.compiler.language} />
             <DetailRow label="Compiler" value={bundle.compiler.version} />
@@ -283,7 +291,7 @@ function UnverifiedContract({
       </p>
       {address && (
         <dl className="summary-grid compact-grid">
-          <DetailRow label="Address" value={address} />
+          <DetailRow label="Address" value={address} monospace />
         </dl>
       )}
     </section>
