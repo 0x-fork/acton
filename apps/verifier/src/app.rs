@@ -1,4 +1,5 @@
-use axum::{Router, routing::get};
+use axum::{Router, http::Method, routing::get};
+use tower_http::cors::{Any, CorsLayer};
 
 use crate::{
     config::Config,
@@ -23,4 +24,10 @@ pub fn router_with_state(state: AppState) -> Router {
         .nest("/api/v1", handlers::api::v1::router())
         .fallback(handlers::frontend::handler)
         .with_state(state)
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+                .allow_headers(Any),
+        )
 }

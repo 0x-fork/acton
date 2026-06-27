@@ -1,8 +1,13 @@
 mod support;
 
-use axum::http::StatusCode;
+use axum::{
+    body::Body,
+    http::{Method, Request, StatusCode, header},
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
+use tower::ServiceExt;
+use verifier::app;
 use verifier::compilers::CompileGeneratedSource;
 
 use support::{
@@ -62,6 +67,53 @@ async fn openapi_json_documents_verifier_api() {
     assert!(body["components"]["schemas"]["VerifyResponse"].is_object());
     assert!(body["components"]["schemas"]["VerificationSourceResponse"].is_object());
     assert!(body["components"]["schemas"]["SourceFileResponse"].is_object());
+}
+
+#[tokio::test]
+async fn api_routes_allow_browser_cors() {
+    let state = app_state(&[], CODE_HASH_ONE);
+    let preflight_request = Request::builder()
+        .method(Method::OPTIONS)
+        .uri(format!("/api/v1/abi?code_hash={CODE_HASH_ONE}"))
+        .header(header::ORIGIN, "https://actonscan.com")
+        .header(header::ACCESS_CONTROL_REQUEST_METHOD, "GET")
+        .body(Body::empty())
+        .expect("preflight request should be valid");
+
+    let preflight_response = app::router_with_state(state.clone())
+        .oneshot(preflight_request)
+        .await
+        .expect("router should handle CORS preflight");
+
+    assert_eq!(preflight_response.status(), StatusCode::OK);
+    assert_eq!(
+        preflight_response
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+            .and_then(|value| value.to_str().ok()),
+        Some("*")
+    );
+
+    let get_request = Request::builder()
+        .method(Method::GET)
+        .uri(format!("/api/v1/abi?code_hash={CODE_HASH_ONE}"))
+        .header(header::ORIGIN, "https://actonscan.com")
+        .body(Body::empty())
+        .expect("GET request should be valid");
+
+    let get_response = app::router_with_state(state)
+        .oneshot(get_request)
+        .await
+        .expect("router should handle browser GET request");
+
+    assert_eq!(get_response.status(), StatusCode::OK);
+    assert_eq!(
+        get_response
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+            .and_then(|value| value.to_str().ok()),
+        Some("*")
+    );
 }
 
 #[tokio::test]
