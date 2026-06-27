@@ -18,7 +18,7 @@ import verificationPaperIcon from "../assets/ton-verifier-icons/verification-pap
 import verifiedSourceIcon from "../assets/ton-verifier-icons/verified-light.svg"
 import {fetchVerificationSource, type SourceBundle, type VerificationSourceResponse} from "../lib/api"
 import {downloadSourceArchive} from "../lib/source-archive"
-import {getPathLookupValue, parseLookupTarget, shortenMiddle} from "../lib/target"
+import {getPathLookupValue, parseLookupTarget, shortenMiddle, type LookupTarget} from "../lib/target"
 import "../styles.css"
 
 function DetailRow({label, value}: {readonly label: string; readonly value: string}) {
@@ -75,7 +75,7 @@ const verificationPoints = [
   },
   {
     icon: verificationPaperIcon,
-    text: "You can review verification proofs and perform your own client-side verification.",
+    text: "You can review the stored source bundle and perform your own client-side verification.",
   },
   {
     icon: verificationAlertIcon,
@@ -140,7 +140,18 @@ function BundleSelector({
   )
 }
 
-function VerifiedContract({data}: {readonly data: VerificationSourceResponse}) {
+function lookupAddress(lookupTarget: LookupTarget | undefined): string | undefined {
+  return lookupTarget?.kind === "address" ? lookupTarget.value : undefined
+}
+
+function VerifiedContract({
+  data,
+  lookupTarget,
+}: {
+  readonly data: VerificationSourceResponse
+  readonly lookupTarget: LookupTarget | undefined
+}) {
+  const address = lookupAddress(lookupTarget)
   const [selectedBundleHash, setSelectedBundleHash] = useState(
     data.bundles[0]?.source_bundle_hash ?? "",
   )
@@ -154,7 +165,7 @@ function VerifiedContract({data}: {readonly data: VerificationSourceResponse}) {
     return (
       <section className="empty-state">
         <StatusPill verified={false} />
-        <h2>Contract is registered, but no verified source bundle is available.</h2>
+        <h2>Contract is indexed, but no verified source bundle is available.</h2>
       </section>
     )
   }
@@ -168,7 +179,7 @@ function VerifiedContract({data}: {readonly data: VerificationSourceResponse}) {
           <PanelHeading
             icon={contractIcon}
             label="Contract"
-            title={data.address ? shortenMiddle(data.address, 18, 12) : "Verified code hash"}
+            title={address ? shortenMiddle(address, 18, 12) : "Verified code hash"}
             titleLevel="h1"
           />
           <div className="summary-status-row">
@@ -177,11 +188,11 @@ function VerifiedContract({data}: {readonly data: VerificationSourceResponse}) {
           <div className="summary-facts" aria-label="Source bundle summary">
             <div className="summary-fact">
               <span>Language</span>
-              <strong>{bundle.language}</strong>
+              <strong>{bundle.compiler.language}</strong>
             </div>
             <div className="summary-fact">
               <span>Compiler</span>
-              <strong>{bundle.compiler_version}</strong>
+              <strong>{bundle.compiler.version}</strong>
             </div>
             <div className="summary-fact">
               <span>Files</span>
@@ -203,21 +214,21 @@ function VerifiedContract({data}: {readonly data: VerificationSourceResponse}) {
             <span>Verification metadata</span>
           </summary>
           <dl>
-            {data.address && <DetailRow label="Address" value={data.address} />}
+            {address && <DetailRow label="Address" value={address} />}
             {verifiedAt && <DetailRow label="Verified at" value={verifiedAt} />}
             <DetailRow label="Code hash" value={data.code_hash} />
-            <DetailRow label="Record" value={data.onchain.verification_record_address} />
-            <DetailRow label="Master" value={data.onchain.master_address} />
+            <DetailRow label="Bundles" value={String(data.bundles.length)} />
             <DetailRow label="Bundle hash" value={bundle.source_bundle_hash} />
-            {bundle.commit && <DetailRow label="Git commit" value={bundle.commit} />}
-            <DetailRow label="Bundle path" value={bundle.bundle_path} />
-            <DetailRow label="Language" value={bundle.language} />
-            <DetailRow label="Compiler" value={bundle.compiler_version} />
-            <DetailRow label="Entrypoint" value={bundle.entrypoint} />
+            {bundle.storage_revision && (
+              <DetailRow label="Storage revision" value={bundle.storage_revision} />
+            )}
+            <DetailRow label="Language" value={bundle.compiler.language} />
+            <DetailRow label="Compiler" value={bundle.compiler.version} />
+            <DetailRow label="Entrypoint" value={bundle.compiler.entrypoint} />
           </dl>
           <div className="metadata-json">
             <div className="metadata-json-title">Compile params</div>
-            <HighlightedJson value={bundle.compile_params} />
+            <HighlightedJson value={bundle.compiler.params} />
           </div>
         </details>
 
@@ -246,25 +257,33 @@ function VerifiedContract({data}: {readonly data: VerificationSourceResponse}) {
               </button>
             </div>
           </div>
-          <CodeViewer files={bundle.files} entrypoint={bundle.entrypoint} />
+          <CodeViewer files={bundle.files} entrypoint={bundle.compiler.entrypoint} />
         </section>
       </div>
     </>
   )
 }
 
-function UnverifiedContract({data}: {readonly data: VerificationSourceResponse}) {
+function UnverifiedContract({
+  data,
+  lookupTarget,
+}: {
+  readonly data: VerificationSourceResponse
+  readonly lookupTarget: LookupTarget | undefined
+}) {
+  const address = lookupAddress(lookupTarget)
+
   return (
     <section className="empty-state">
       <StatusPill verified={false} />
       <h1>Contract is not verified</h1>
       <p>
         This target resolves to code hash <span className="mono-inline">{data.code_hash}</span>, but
-        there is no confirmed source registration for it.
+        there is no stored source bundle for it.
       </p>
-      {data.address && (
+      {address && (
         <dl className="summary-grid compact-grid">
-          <DetailRow label="Address" value={data.address} />
+          <DetailRow label="Address" value={address} />
         </dl>
       )}
     </section>
@@ -273,6 +292,13 @@ function UnverifiedContract({data}: {readonly data: VerificationSourceResponse})
 
 function ContractPage() {
   const rawLookup = getPathLookupValue()
+  const lookupTarget = useMemo(() => {
+    try {
+      return parseLookupTarget(rawLookup)
+    } catch {
+      return undefined
+    }
+  }, [rawLookup])
   const [data, setData] = useState<VerificationSourceResponse | undefined>()
   const [error, setError] = useState<string | undefined>()
   const [loading, setLoading] = useState(true)
@@ -317,9 +343,9 @@ function ContractPage() {
             <p>{error}</p>
           </section>
         ) : data?.verified ? (
-          <VerifiedContract data={data} />
+          <VerifiedContract data={data} lookupTarget={lookupTarget} />
         ) : data ? (
-          <UnverifiedContract data={data} />
+          <UnverifiedContract data={data} lookupTarget={lookupTarget} />
         ) : null}
       </main>
     </AppShell>

@@ -14,25 +14,38 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use utoipa::ToSchema;
 
 use crate::{
     blockchain::normalize_code_hash,
     compilers::{CompileGeneratedSource, CompileRequest, CompileSource},
     error::ApiError,
-    registry::{RegisterBundleRequest, RegistrationReceipt},
     source_bundle::{
-        SourceBundleFile, SourceBundleInput, SourceBundleSource, compute_source_bundle_hash,
+        SourceBundleCompiler, SourceBundleFile, SourceBundleInput, SourceBundleSource,
+        compute_source_bundle_hash,
     },
-    source_storage::{
-        SourceStorageFile, SourceStorageProvider, SourceStorageReceipt, SourceStorageSource,
-        StoreSourceBundleRequest,
-    },
+    source_storage::{CompilerMetadata, SourceStorageFile, StoreSourceBundleRequest},
     state::AppState,
     verification::{ResolvedVerificationTarget, VerificationTarget},
 };
 
 mod languages;
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/verify",
+    request_body(
+        content = VerifyMultipartRequest,
+        content_type = "multipart/form-data",
+        description = "Multipart verification request. The sources and compile_params parts contain JSON encoded as text."
+    ),
+    responses(
+        (status = 200, description = "Verification completed", body = VerifyResponse),
+        (status = 400, description = "Invalid verification request or compilation mismatch input", body = crate::error::ErrorResponse),
+        (status = 502, description = "Compiler, blockchain, or source storage failure", body = crate::error::ErrorResponse)
+    ),
+    tag = "verification"
+)]
 pub async fn handler(
     State(state): State<AppState>,
     multipart: MultipartExtractor,
@@ -139,7 +152,7 @@ async fn handle_multipart(
     let compiled_code_hash = normalize_code_hash(&compiled.code_hash);
     let verification_result =
         VerificationResult::from_hashes(&resolved_target.code_hash, &compiled_code_hash);
-    let (source_bundle_hash, source_storage, onchain_registration) = match verification_result {
+    let (source_bundle_hash, storage_revision) = match verification_result {
         VerificationResult::Match => {
             let mut stored_sources = compile_input.sources.clone();
             let mut storage_files = compile_input.storage_files.clone();
@@ -149,54 +162,42 @@ async fn handle_multipart(
                 compiled.generated_sources,
             )?;
             let source_bundle_hash = compute_source_bundle_hash(SourceBundleInput {
-                language: &compile_input.language,
-                compiler_version: &compile_input.compiler_version,
-                entrypoint: &compile_input.entrypoint,
-                compile_params: &compile_params,
-                sources: stored_sources
+                compiler: SourceBundleCompiler {
+                    language: &compile_input.language,
+                    version: &compile_input.compiler_version,
+                    entrypoint: &compile_input.entrypoint,
+                    params: &compile_params,
+                },
+                sources: storage_files
                     .iter()
-                    .map(SourceBundleSource::from_source_metadata)
+                    .map(SourceBundleSource::from_storage_file)
                     .collect(),
                 files: storage_files
                     .iter()
                     .map(|file| SourceBundleFile {
                         path: &file.path,
-                        bytes: &file.content,
+                        bytes: file.content.as_bytes(),
                     })
                     .collect(),
             })?;
-            let source_storage = state
-                .source_storage()
-                .store_bundle(StoreSourceBundleRequest {
-                    address: resolved_target.address.clone(),
+            let storage = state
+                .verification_registry()
+                .store_verified_bundle(StoreSourceBundleRequest {
                     code_hash: resolved_target.code_hash.clone(),
                     source_bundle_hash: source_bundle_hash.clone(),
-                    language: compile_input.language.clone(),
-                    compiler_version: compile_input.compiler_version.clone(),
-                    entrypoint: compile_input.entrypoint.clone(),
-                    compile_params: compile_params.clone(),
-                    sources: stored_sources
-                        .iter()
-                        .map(SourceStorageSource::from_source_metadata)
-                        .collect(),
+                    compiler: CompilerMetadata {
+                        language: compile_input.language.clone(),
+                        version: compile_input.compiler_version.clone(),
+                        entrypoint: compile_input.entrypoint.clone(),
+                        params: compile_params.clone(),
+                    },
                     files: storage_files,
                 })
-                .await?;
-            let registration = state
-                .registry_client()
-                .register_bundle(RegisterBundleRequest {
-                    code_hash: resolved_target.code_hash.clone(),
-                    source_bundle_hash: source_bundle_hash.clone(),
-                })
-                .await?;
-
-            (
-                Some(source_bundle_hash),
-                Some(source_storage.into()),
-                Some(registration.into()),
-            )
+                .await?
+                .storage;
+            (Some(source_bundle_hash), Some(storage.revision))
         }
-        VerificationResult::Mismatch => (None, None, None),
+        VerificationResult::Mismatch => (None, None),
     };
 
     print_verify_request(
@@ -215,15 +216,7 @@ async fn handle_multipart(
         compiled_code_hash,
         verification_result,
         source_bundle_hash,
-        source_storage,
-        onchain_registration,
-        language: compile_input.language,
-        compile_params,
-        files: compile_input
-            .sources
-            .into_iter()
-            .map(FileSummary::from_source_metadata)
-            .collect(),
+        storage_revision,
     }))
 }
 
@@ -256,14 +249,17 @@ fn prepare_compile_input(
     let compiler_version = language_input.compiler_version;
     let import_mappings = language_input.import_mappings;
     validate_import_mappings(&import_mappings)?;
-    let storage_files = files
+    let compile_sources = build_compile_sources(&sources, files)?;
+    let storage_files = compile_sources
         .iter()
-        .map(|(path, file)| SourceStorageFile {
-            path: path.clone(),
-            content: file.content.to_vec(),
+        .map(|source| SourceStorageFile {
+            path: source.path.clone(),
+            content: source.content.clone(),
+            include_in_command: source.include_in_command,
+            is_stdlib: source.is_stdlib,
+            has_include_directives: source.has_include_directives,
         })
         .collect();
-    let compile_sources = build_compile_sources(&sources, files)?;
 
     Ok(CompileInput {
         language,
@@ -424,7 +420,7 @@ fn merge_generated_sources(
 ) -> Result<(), ApiError> {
     for generated in generated_sources {
         validate_source_path(&generated.path)?;
-        let content = generated.content.into_bytes();
+        let content = generated.content;
         match files.iter().find(|file| file.path == generated.path) {
             Some(existing) if existing.content == content => {}
             Some(_) => {
@@ -436,6 +432,9 @@ fn merge_generated_sources(
             None => files.push(SourceStorageFile {
                 path: generated.path.clone(),
                 content,
+                include_in_command: None,
+                is_stdlib: None,
+                has_include_directives: None,
             }),
         }
 
@@ -457,25 +456,12 @@ fn merge_generated_sources(
 }
 
 impl<'a> SourceBundleSource<'a> {
-    fn from_source_metadata(source: &'a SourceMetadata) -> Self {
+    fn from_storage_file(file: &'a SourceStorageFile) -> Self {
         Self {
-            path: &source.path,
-            is_entrypoint: source.is_entrypoint,
-            include_in_command: source.include_in_command,
-            is_stdlib: source.is_stdlib,
-            has_include_directives: source.has_include_directives,
-        }
-    }
-}
-
-impl SourceStorageSource {
-    fn from_source_metadata(source: &SourceMetadata) -> Self {
-        Self {
-            path: source.path.clone(),
-            is_entrypoint: source.is_entrypoint,
-            include_in_command: source.include_in_command,
-            is_stdlib: source.is_stdlib,
-            has_include_directives: source.has_include_directives,
+            path: &file.path,
+            include_in_command: file.include_in_command,
+            is_stdlib: file.is_stdlib,
+            has_include_directives: file.has_include_directives,
         }
     }
 }
@@ -525,8 +511,8 @@ struct ReceivedFile {
     content: Bytes,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-struct SourceMetadata {
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub(super) struct SourceMetadata {
     path: String,
     is_entrypoint: bool,
     #[serde(default)]
@@ -537,63 +523,49 @@ struct SourceMetadata {
     has_include_directives: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct VerifyResponse {
+#[derive(Debug, ToSchema)]
+#[allow(dead_code)]
+pub(super) struct VerifyMultipartRequest {
+    #[schema(nullable = false, example = "EQD...")]
+    address: Option<String>,
+    #[schema(
+        nullable = false,
+        example = "a873d8c2d163f7fa10bbe38769706f0554505e8ea2dcea3f115288db8becf2ab"
+    )]
+    code_hash: Option<String>,
+    #[schema(example = "tolk")]
+    language: String,
+    #[schema(
+        content_media_type = "application/json",
+        example = r#"{"compiler_version":"1.4.1"}"#
+    )]
+    compile_params: String,
+    #[schema(
+        content_media_type = "application/json",
+        example = r#"[{"path":"main.tolk","is_entrypoint":true}]"#
+    )]
+    sources: String,
+    #[schema(
+        value_type = String,
+        format = Binary,
+        content_media_type = "application/octet-stream"
+    )]
+    files: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct VerifyResponse {
     address: Option<String>,
     code_hash: String,
     compiled_code_hash: String,
     verification_result: VerificationResult,
     source_bundle_hash: Option<String>,
-    source_storage: Option<SourceStorageResponse>,
-    onchain_registration: Option<OnchainRegistration>,
-    language: String,
-    compile_params: Value,
-    files: Vec<FileSummary>,
+    storage_revision: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct SourceStorageResponse {
-    provider: SourceStorageProvider,
-    commit: String,
-    bundle_path: String,
-}
-
-impl From<SourceStorageReceipt> for SourceStorageResponse {
-    fn from(receipt: SourceStorageReceipt) -> Self {
-        Self {
-            provider: receipt.provider,
-            commit: receipt.commit,
-            bundle_path: receipt.bundle_path,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct OnchainRegistration {
-    status: OnchainRegistrationStatus,
-    master_address: String,
-    verification_record_address: String,
-}
-
-impl From<RegistrationReceipt> for OnchainRegistration {
-    fn from(receipt: RegistrationReceipt) -> Self {
-        Self {
-            status: OnchainRegistrationStatus::Confirmed,
-            master_address: receipt.master_address,
-            verification_record_address: receipt.verification_record_address,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
-enum OnchainRegistrationStatus {
-    Confirmed,
-}
-
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum VerificationResult {
+pub(super) enum VerificationResult {
     Match,
     Mismatch,
 }
@@ -613,21 +585,6 @@ impl std::fmt::Display for VerificationResult {
         match self {
             Self::Match => formatter.write_str("match"),
             Self::Mismatch => formatter.write_str("mismatch"),
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct FileSummary {
-    path: String,
-    is_entrypoint: bool,
-}
-
-impl FileSummary {
-    fn from_source_metadata(source: SourceMetadata) -> Self {
-        Self {
-            path: source.path,
-            is_entrypoint: source.is_entrypoint,
         }
     }
 }

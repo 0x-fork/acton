@@ -6,11 +6,10 @@ use serde_json::{Value, json};
 use verifier::compilers::CompileGeneratedSource;
 
 use support::{
-    app_state, failing_compiler_app_state, failing_registry_app_state,
-    failing_source_storage_recording_registry_app_state, file_part, get, post_verify,
-    recording_app_state, recording_registry_app_state, recording_source_storage_app_state,
+    app_state, failing_compiler_app_state, failing_source_storage_app_state, file_part, get,
+    post_verify, recording_app_state, recording_source_storage_app_state,
     recording_source_storage_app_state_with_generated_sources, response_json, text_part,
-    unverified_registry_app_state,
+    unverified_app_state,
 };
 
 const ADDRESS_ONE: &str = "EQD0000000000000000000000000000000000000000000000";
@@ -48,7 +47,23 @@ async fn healthz_returns_ok() {
 }
 
 #[tokio::test]
-async fn verification_status_reports_verified_for_code_hash() {
+async fn openapi_json_documents_verifier_api() {
+    let response = get(app_state(&[], CODE_HASH_ONE), "/api/v1/openapi.json").await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response_json::<Value>(response).await;
+    assert_eq!(body["openapi"], "3.1.0");
+    assert!(body["paths"]["/api/v1/verify"].is_object());
+    assert!(body["paths"]["/api/v1/verification/status"].is_object());
+    assert!(body["paths"]["/api/v1/verification/source"].is_object());
+    assert!(body["components"]["schemas"]["VerifyResponse"].is_object());
+    assert!(body["components"]["schemas"]["VerificationSourceResponse"].is_object());
+    assert!(body["components"]["schemas"]["SourceFileResponse"].is_object());
+}
+
+#[tokio::test]
+async fn verification_status_reports_unverified_code_hash_without_stored_bundle() {
     let response = get(
         app_state(&[], CODE_HASH_ONE),
         &format!("/api/v1/verification/status?code_hash={CODE_HASH_ONE}"),
@@ -60,15 +75,59 @@ async fn verification_status_reports_verified_for_code_hash() {
     let body = response_json::<VerificationStatusResponse>(response).await;
     assert_eq!(body.address, None);
     assert_eq!(body.code_hash, CODE_HASH_ONE);
+    assert!(!body.verified);
+    assert_eq!(body.bundle_count, 0);
+}
+
+#[tokio::test]
+async fn verification_status_reports_verified_after_successful_verify() {
+    let state = app_state(&[], CODE_HASH_ONE);
+    let verify_response = post_verify(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+    assert_eq!(verify_response.status(), StatusCode::OK);
+
+    let response = get(
+        state,
+        &format!("/api/v1/verification/status?code_hash={CODE_HASH_ONE}"),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response_json::<VerificationStatusResponse>(response).await;
+    assert_eq!(body.address, None);
+    assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(body.verified);
-    assert_eq!(body.onchain.master_address, "mock-master");
-    assert_eq!(body.onchain.verification_record_address, "mock-record");
+    assert_eq!(body.bundle_count, 1);
 }
 
 #[tokio::test]
 async fn verification_status_resolves_code_hash_from_address() {
+    let state = app_state(&[(ADDRESS_ONE, CODE_HASH_ONE)], CODE_HASH_ONE);
+    let verify_response = post_verify(
+        state.clone(),
+        vec![
+            text_part("address", ADDRESS_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+    assert_eq!(verify_response.status(), StatusCode::OK);
+
     let response = get(
-        app_state(&[(ADDRESS_ONE, CODE_HASH_ONE)], CODE_HASH_ONE),
+        state,
         &format!("/api/v1/verification/status?address={ADDRESS_ONE}"),
     )
     .await;
@@ -84,7 +143,7 @@ async fn verification_status_resolves_code_hash_from_address() {
 #[tokio::test]
 async fn verification_status_reports_unverified_contract() {
     let response = get(
-        unverified_registry_app_state(&[], CODE_HASH_ONE),
+        unverified_app_state(&[], CODE_HASH_ONE),
         &format!("/api/v1/verification/status?code_hash={CODE_HASH_ONE}"),
     )
     .await;
@@ -139,18 +198,12 @@ async fn verification_source_returns_verified_bundle_files() {
     assert_eq!(body.bundles.len(), 1);
     assert_eq!(body.bundles[0].source_bundle_hash, source_bundle_hash);
     assert_eq!(body.bundles[0].verified_at, 1_700_000_000);
-    assert_eq!(body.bundles[0].language, "tolk");
-    assert_eq!(body.bundles[0].compiler_version, "1.4.1");
-    assert_eq!(body.bundles[0].entrypoint, "main.tolk");
-    assert_eq!(body.bundles[0].sources.len(), 1);
-    assert_eq!(body.bundles[0].sources[0].path, "main.tolk");
-    assert!(body.bundles[0].sources[0].is_entrypoint);
+    assert_eq!(body.bundles[0].compiler.language, "tolk");
+    assert_eq!(body.bundles[0].compiler.version, "1.4.1");
+    assert_eq!(body.bundles[0].compiler.entrypoint, "main.tolk");
     assert_eq!(body.bundles[0].files.len(), 1);
     assert_eq!(body.bundles[0].files[0].path, "main.tolk");
-    assert_eq!(
-        body.bundles[0].files[0].content_text.as_deref(),
-        Some("fun main() {}")
-    );
+    assert_eq!(body.bundles[0].files[0].content, "fun main() {}");
 }
 
 #[tokio::test]
@@ -175,23 +228,7 @@ async fn verify_resolves_code_hash_from_address_with_mock_blockchain() {
     assert_eq!(body.compiled_code_hash, CODE_HASH_ONE);
     assert_eq!(body.verification_result, "match");
     assert!(body.source_bundle_hash.is_some());
-    assert_eq!(
-        body.onchain_registration
-            .as_ref()
-            .map(|registration| registration.status.as_str()),
-        Some("confirmed")
-    );
-    assert_eq!(
-        body.source_storage
-            .as_ref()
-            .map(|storage| storage.provider.as_str()),
-        Some("mock")
-    );
-    assert_eq!(body.language, "tolk");
-    assert_eq!(body.compile_params, json!({"compiler_version": "1.4.1"}));
-    assert_eq!(body.files.len(), 1);
-    assert_eq!(body.files[0].path, "main.tolk");
-    assert!(body.files[0].is_entrypoint);
+    assert_eq!(body.storage_revision.as_deref(), Some("mock-revision"));
 }
 
 #[tokio::test]
@@ -221,9 +258,8 @@ async fn verify_accepts_valid_multipart_request_with_multiple_files() {
     assert_eq!(body.code_hash, CODE_HASH_TWO);
     assert_eq!(body.compiled_code_hash, CODE_HASH_TWO);
     assert_eq!(body.verification_result, "match");
-    assert_eq!(body.files.len(), 2);
-    assert_eq!(body.files[0].path, "main.tolk");
-    assert_eq!(body.files[1].path, "imports/lib.tolk");
+    assert!(body.source_bundle_hash.is_some());
+    assert_eq!(body.storage_revision.as_deref(), Some("mock-revision"));
 }
 
 #[tokio::test]
@@ -492,12 +528,11 @@ async fn verify_returns_mismatch_when_compiled_hash_differs_from_target() {
     assert_eq!(body.compiled_code_hash, CODE_HASH_TWO);
     assert_eq!(body.verification_result, "mismatch");
     assert_eq!(body.source_bundle_hash, None);
-    assert!(body.source_storage.is_none());
-    assert!(body.onchain_registration.is_none());
+    assert!(body.storage_revision.is_none());
 }
 
 #[tokio::test]
-async fn verify_stores_source_bundle_on_hash_match() {
+async fn verify_returns_source_bundle_hash_on_hash_match() {
     let (state, recorded_requests) = recording_source_storage_app_state(&[], CODE_HASH_ONE);
     let response = post_verify(
         state,
@@ -518,18 +553,7 @@ async fn verify_stores_source_bundle_on_hash_match() {
         .source_bundle_hash
         .as_deref()
         .expect("matched verification should return source bundle hash");
-    assert_eq!(
-        body.source_storage
-            .as_ref()
-            .map(|storage| storage.commit.as_str()),
-        Some("mock-commit")
-    );
-    assert_eq!(
-        body.source_storage
-            .as_ref()
-            .map(|storage| storage.bundle_path.as_str()),
-        Some("sources/mock-code-hash/mock-source-bundle-hash")
-    );
+    assert_eq!(body.storage_revision.as_deref(), Some("mock-revision"));
 
     let recorded_snapshot = {
         let recorded_requests = recorded_requests
@@ -544,7 +568,7 @@ async fn verify_stores_source_bundle_on_hash_match() {
     assert_eq!(recorded_snapshot[0].source_bundle_hash, source_bundle_hash);
     assert_eq!(recorded_snapshot[0].files.len(), 1);
     assert_eq!(recorded_snapshot[0].files[0].0, "main.tolk");
-    assert_eq!(recorded_snapshot[0].files[0].1, b"fun main() {}");
+    assert_eq!(recorded_snapshot[0].files[0].1, "fun main() {}");
 }
 
 #[tokio::test]
@@ -582,15 +606,14 @@ async fn verify_stores_generated_sources_on_hash_match() {
     assert_eq!(recorded_snapshot.len(), 1);
     assert_eq!(recorded_snapshot[0].files.len(), 2);
     assert_eq!(recorded_snapshot[0].files[0].0, "contract.abi");
-    assert_eq!(recorded_snapshot[0].files[0].1, br#"{"name":"Contract"}"#);
+    assert_eq!(recorded_snapshot[0].files[0].1, r#"{"name":"Contract"}"#);
     assert_eq!(recorded_snapshot[0].files[1].0, "contract.pkg");
 }
 
 #[tokio::test]
-async fn verify_registers_source_bundle_on_hash_match() {
-    let (state, recorded_requests) = recording_registry_app_state(&[], CODE_HASH_ONE);
+async fn verify_stores_source_bundle_on_hash_match() {
     let response = post_verify(
-        state,
+        app_state(&[], CODE_HASH_ONE),
         vec![
             text_part("code_hash", CODE_HASH_ONE),
             text_part("language", "tolk"),
@@ -614,45 +637,13 @@ async fn verify_registers_source_bundle_on_hash_match() {
             .bytes()
             .all(|byte| byte.is_ascii_hexdigit())
     );
-    assert_eq!(
-        body.onchain_registration
-            .as_ref()
-            .map(|registration| registration.verification_record_address.as_str()),
-        Some("mock-record")
-    );
-    assert_eq!(
-        body.onchain_registration
-            .as_ref()
-            .map(|registration| registration.master_address.as_str()),
-        Some("mock-master")
-    );
-
-    let recorded_snapshot = {
-        let recorded_requests = recorded_requests
-            .lock()
-            .expect("recorded registry requests mutex should not be poisoned");
-        let snapshot = recorded_requests
-            .iter()
-            .map(|request| {
-                (
-                    request.code_hash.clone(),
-                    request.source_bundle_hash.clone(),
-                )
-            })
-            .collect::<Vec<_>>();
-        drop(recorded_requests);
-        snapshot
-    };
-    assert_eq!(recorded_snapshot.len(), 1);
-    assert_eq!(recorded_snapshot[0].0, CODE_HASH_ONE);
-    assert_eq!(recorded_snapshot[0].1, source_bundle_hash);
+    assert_eq!(body.storage_revision.as_deref(), Some("mock-revision"));
 }
 
 #[tokio::test]
-async fn verify_does_not_register_source_bundle_on_hash_mismatch() {
-    let (state, recorded_requests) = recording_registry_app_state(&[], CODE_HASH_TWO);
+async fn verify_does_not_store_source_bundle_on_hash_mismatch() {
     let response = post_verify(
-        state,
+        app_state(&[], CODE_HASH_TWO),
         vec![
             text_part("code_hash", CODE_HASH_ONE),
             text_part("language", "tolk"),
@@ -667,27 +658,13 @@ async fn verify_does_not_register_source_bundle_on_hash_mismatch() {
 
     let body = response_json::<VerifyResponse>(response).await;
     assert_eq!(body.verification_result, "mismatch");
-    assert!(body.source_storage.is_none());
-    assert!(body.onchain_registration.is_none());
-
-    let recorded_requests_is_empty = {
-        let recorded_requests = recorded_requests
-            .lock()
-            .expect("recorded registry requests mutex should not be poisoned");
-        let is_empty = recorded_requests.is_empty();
-        drop(recorded_requests);
-        is_empty
-    };
-    assert!(recorded_requests_is_empty);
+    assert!(body.storage_revision.is_none());
 }
 
 #[tokio::test]
 async fn verify_returns_bad_gateway_when_source_storage_fails() {
-    let (state, recorded_registry_requests) =
-        failing_source_storage_recording_registry_app_state(&[], CODE_HASH_ONE);
-
     let response = post_verify(
-        state,
+        failing_source_storage_app_state(&[], CODE_HASH_ONE),
         vec![
             text_part("code_hash", CODE_HASH_ONE),
             text_part("language", "tolk"),
@@ -700,34 +677,6 @@ async fn verify_returns_bad_gateway_when_source_storage_fails() {
 
     assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
     assert_error_contains(response, "source storage failed").await;
-
-    let registry_requests_is_empty = {
-        let recorded_requests = recorded_registry_requests
-            .lock()
-            .expect("recorded registry requests mutex should not be poisoned");
-        let is_empty = recorded_requests.is_empty();
-        drop(recorded_requests);
-        is_empty
-    };
-    assert!(registry_requests_is_empty);
-}
-
-#[tokio::test]
-async fn verify_returns_bad_gateway_when_registry_registration_fails() {
-    let response = post_verify(
-        failing_registry_app_state(&[], CODE_HASH_ONE),
-        vec![
-            text_part("code_hash", CODE_HASH_ONE),
-            text_part("language", "tolk"),
-            text_part("compile_params", COMPILE_PARAMS_TOLK),
-            text_part("sources", SOURCES_MAIN),
-            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
-        ],
-    )
-    .await;
-
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
-    assert_error_contains(response, "registry sender failed").await;
 }
 
 #[tokio::test]
@@ -773,7 +722,7 @@ async fn verify_rejects_address_and_code_hash_mismatch() {
 }
 
 #[tokio::test]
-async fn verify_rejects_address_without_onchain_code_hash() {
+async fn verify_rejects_address_without_current_code_hash() {
     let response = post_verify(
         app_state(&[], CODE_HASH_ONE),
         vec![
@@ -1052,31 +1001,7 @@ struct VerifyResponse {
     compiled_code_hash: String,
     verification_result: String,
     source_bundle_hash: Option<String>,
-    source_storage: Option<SourceStorage>,
-    onchain_registration: Option<OnchainRegistration>,
-    language: String,
-    compile_params: Value,
-    files: Vec<FileSummary>,
-}
-
-#[derive(Debug, Deserialize)]
-struct SourceStorage {
-    provider: String,
-    commit: String,
-    bundle_path: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct OnchainRegistration {
-    status: String,
-    master_address: String,
-    verification_record_address: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct FileSummary {
-    path: String,
-    is_entrypoint: bool,
+    storage_revision: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1084,7 +1009,7 @@ struct VerificationStatusResponse {
     address: Option<String>,
     code_hash: String,
     verified: bool,
-    onchain: VerificationOnchain,
+    bundle_count: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1095,30 +1020,22 @@ struct VerificationSourceResponse {
 }
 
 #[derive(Debug, Deserialize)]
-struct VerificationOnchain {
-    master_address: String,
-    verification_record_address: String,
-}
-
-#[derive(Debug, Deserialize)]
 struct VerifiedSourceBundle {
     source_bundle_hash: String,
     verified_at: u64,
-    language: String,
-    compiler_version: String,
-    entrypoint: String,
-    sources: Vec<VerifiedSourceSummary>,
+    compiler: VerifiedCompiler,
     files: Vec<VerifiedSourceFile>,
 }
 
 #[derive(Debug, Deserialize)]
-struct VerifiedSourceSummary {
-    path: String,
-    is_entrypoint: bool,
+struct VerifiedCompiler {
+    language: String,
+    version: String,
+    entrypoint: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct VerifiedSourceFile {
     path: String,
-    content_text: Option<String>,
+    content: String,
 }

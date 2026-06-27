@@ -46,16 +46,7 @@ function writeUint32(buffer: Uint8Array, offset: number, value: number): void {
 }
 
 function sourceFileBytes(file: SourceFile): Uint8Array {
-  if (file.content_text !== null) {
-    return encoder.encode(file.content_text)
-  }
-
-  const decoded = atob(file.content_base64)
-  const bytes = new Uint8Array(decoded.length)
-  for (let index = 0; index < decoded.length; index += 1) {
-    bytes[index] = decoded.charCodeAt(index)
-  }
-  return bytes
+  return encoder.encode(file.content)
 }
 
 function archivePath(path: string, fallbackIndex: number): string {

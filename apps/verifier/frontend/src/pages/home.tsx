@@ -12,8 +12,8 @@ function HomePage() {
           <div className="home-kicker">TON source registry</div>
           <h1 id="home-title">Find verified contract sources</h1>
           <p className="home-copy">
-            Search by contract address or code hash. The verifier checks on-chain registration and
-            returns the stored source bundle when the contract is verified.
+            Search by contract address or code hash. The verifier checks the source registry and
+            returns the stored source bundle when the code hash is verified.
           </p>
           <SearchBox />
         </section>

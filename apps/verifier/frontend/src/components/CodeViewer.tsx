@@ -20,8 +20,7 @@ function escapeHtml(value: string): string {
 }
 
 function fileContent(file: SourceFile): string {
-  const content = file.content_text !== null ? file.content_text : atob(file.content_base64)
-  return content.endsWith("\n") ? content.slice(0, -1) : content
+  return file.content.endsWith("\n") ? file.content.slice(0, -1) : file.content
 }
 
 function languageForPath(path: string): HighlightLanguage | undefined {

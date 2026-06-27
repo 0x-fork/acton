@@ -76,31 +76,16 @@ write_generated_config() {
         write_optional_string api_key "${VERIFIER_TONCENTER_API_KEY:-}"
         printf '\n'
 
-        printf '[registry]\n'
-        write_optional_string master_address "${VERIFIER_REGISTRY_MASTER_ADDRESS:-}"
-        write_optional_int register_value_nano "${VERIFIER_REGISTRY_REGISTER_VALUE_NANO:-500000000}"
-        write_optional_int confirmation_attempts "${VERIFIER_REGISTRY_CONFIRMATION_ATTEMPTS:-20}"
-        write_optional_int confirmation_delay_ms "${VERIFIER_REGISTRY_CONFIRMATION_DELAY_MS:-1000}"
-        printf '\n'
-
-        printf '[wallet]\n'
-        write_optional_string kind "${VERIFIER_WALLET_KIND:-v5r1}"
-        write_optional_int workchain "${VERIFIER_WALLET_WORKCHAIN:-0}"
-        if [ -n "${VERIFIER_WALLET_MNEMONIC_FILE:-}" ]; then
-            write_optional_string mnemonic_file "$VERIFIER_WALLET_MNEMONIC_FILE"
-        elif [ -n "${VERIFIER_WALLET_MNEMONIC_ENV:-}" ]; then
-            write_optional_string mnemonic_env "$VERIFIER_WALLET_MNEMONIC_ENV"
-        elif [ -n "${WALLET_MNEMONIC:-}" ]; then
-            write_optional_string mnemonic_env WALLET_MNEMONIC
-        fi
-        printf '\n'
-
         printf '[source_repository]\n'
         write_optional_string path "${SOURCE_REPOSITORY_PATH:-/var/lib/verifier/source-repo}"
         write_optional_string remote "${SOURCE_REPOSITORY_REMOTE:-origin}"
         write_optional_string branch "${SOURCE_REPOSITORY_BRANCH:-main}"
         write_optional_string author_name "${SOURCE_REPOSITORY_AUTHOR_NAME:-ton-verifier}"
         write_optional_string author_email "${SOURCE_REPOSITORY_AUTHOR_EMAIL:-ton-verifier@example.invalid}"
+        printf '\n'
+
+        printf '[registry_index]\n'
+        write_optional_string path "${VERIFIER_REGISTRY_INDEX_PATH:-/var/lib/verifier/registry-index/registry-index.sqlite3}"
         printf '\n'
 
         printf '[compiler]\n'

@@ -17,11 +17,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "starting verifier backend"
     );
 
-    axum::serve(
-        listener,
-        app::router_with_state(AppState::from_config(&config)),
-    )
-    .await?;
+    let state = AppState::from_config(&config)?;
+    if config.source_repository_path().is_some() {
+        state.ensure_registry_current().await?;
+    }
+
+    axum::serve(listener, app::router_with_state(state)).await?;
 
     Ok(())
 }

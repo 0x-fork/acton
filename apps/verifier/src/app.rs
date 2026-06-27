@@ -1,9 +1,20 @@
 use axum::{Router, routing::get};
 
-use crate::{config::Config, handlers, state::AppState};
+use crate::{
+    config::Config,
+    handlers,
+    state::{AppState, StateError},
+};
 
-pub fn router() -> Router {
-    router_with_state(AppState::from_config(&Config::default()))
+/// Builds a router with default configuration.
+///
+/// # Errors
+///
+/// Returns an error when application state cannot be initialized.
+pub fn router() -> Result<Router, StateError> {
+    Ok(router_with_state(
+        AppState::from_config(&Config::default())?,
+    ))
 }
 
 pub fn router_with_state(state: AppState) -> Router {

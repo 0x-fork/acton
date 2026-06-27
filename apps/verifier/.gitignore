@@ -12,4 +12,7 @@
 /wallets.toml
 /libraries.toml
 /.env
+/verifier-index.sqlite3
+/verifier-index.sqlite3-*
 .playwright-mcp/
+/.codegraph/

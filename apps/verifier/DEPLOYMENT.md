@@ -2,17 +2,16 @@
 
 This document describes how to deploy the verifier backend as a Docker service on a server.
 
-The Docker image contains the verifier backend, Node.js, the static compiler worker packages, Git, and OpenSSH. It does not run a TON node by itself. The verifier needs a TonCenter-compatible API endpoint, which can be mainnet, testnet, or a localnet/lightnode endpoint.
+The Docker image contains the verifier backend, Node.js, the static compiler worker packages, Git, and OpenSSH. It does not run a TON node by itself. The verifier needs a TonCenter-compatible API endpoint only when resolving a contract address to its current code hash.
 
 ## Architecture
 
 At runtime the service needs:
 
 - Verifier HTTP backend exposed on port `3000`.
-- TonCenter-compatible API endpoint for code hash resolution and on-chain registry reads/writes.
-- Registry master contract address.
-- Wallet mnemonic for sending registration messages to the registry master.
+- TonCenter-compatible API endpoint for address-to-code-hash resolution.
 - Git source repository for verified source bundles.
+- SQLite registry index for fast reads, rebuilt from Git when stale or missing.
 - Git credentials that allow pushing to the source repository.
 
 The verifier stores verified source bundles in Git under:
@@ -38,6 +37,7 @@ Recommended server setup:
 
 - Linux VM with at least 2 CPU cores and 2 GB RAM
 - Persistent Docker volume for `/var/lib/verifier/source-repo`
+- Persistent Docker volume for `/var/lib/verifier/registry-index`
 - Firewall allowing inbound traffic only to the reverse proxy or to port `3000` if exposing directly
 - Secrets managed through environment files, Docker secrets, or your orchestrator
 
@@ -110,9 +110,6 @@ Example `/opt/ton-verifier/verifier.env`:
 VERIFIER_NETWORK=mainnet
 VERIFIER_TONCENTER_BASE_URL=https://toncenter.com
 VERIFIER_TONCENTER_API_KEY=
-VERIFIER_REGISTRY_MASTER_ADDRESS=<registry-master-address>
-
-WALLET_MNEMONIC=<24 words>
 
 SOURCE_REPOSITORY_URL=git@github.com:i582/test-verify-repo.git
 SOURCE_REPOSITORY_BRANCH=main
@@ -120,6 +117,8 @@ SOURCE_REPOSITORY_AUTHOR_NAME=ton-verifier
 SOURCE_REPOSITORY_AUTHOR_EMAIL=ton-verifier@example.invalid
 SOURCE_REPOSITORY_SSH_KEY_FILE=/run/secrets/source_repo_key
 SOURCE_REPOSITORY_SSH_STRICT_HOST_KEY_CHECKING=accept-new
+
+VERIFIER_REGISTRY_INDEX_PATH=/var/lib/verifier/registry-index/registry-index.sqlite3
 
 RUST_LOG=info
 ```
@@ -173,6 +172,7 @@ services:
       - /opt/ton-verifier/verifier.env
     volumes:
       - source-repo:/var/lib/verifier/source-repo
+      - registry-index:/var/lib/verifier/registry-index
       - /opt/ton-verifier/secrets/source_repo_key:/run/secrets/source_repo_key:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -185,6 +185,7 @@ services:
 
 volumes:
   source-repo:
+  registry-index:
 ```
 
 Start the service:
@@ -275,6 +276,12 @@ Check verification status for a known code hash:
 curl -sS 'http://127.0.0.1:3000/api/v1/verification/status?code_hash=<code_hash>'
 ```
 
+Fetch the OpenAPI schema:
+
+```bash
+curl -sS 'http://127.0.0.1:3000/api/v1/openapi.json'
+```
+
 Submit a verification request:
 
 ```bash
@@ -292,13 +299,8 @@ Successful response should contain:
 ```json
 {
   "verification_result": "match",
-  "source_storage": {
-    "provider": "git",
-    "commit": "..."
-  },
-  "onchain_registration": {
-    "status": "confirmed"
-  }
+  "source_bundle_hash": "...",
+  "storage_revision": "..."
 }
 ```
 
@@ -336,7 +338,10 @@ Back up:
 - `/opt/ton-verifier/verifier.env`
 - SSH deploy key or Git credentials
 - Docker Compose file
-- Any local wallet/secret files
+
+The SQLite registry index volume is useful for fast restarts, but it is not the
+source of truth. If the index volume is lost, the service rebuilds it from the
+Git source repository.
 
 The Docker `source-repo` volume is a local clone. The authoritative source storage should be the remote Git repository after every successful push.
 
@@ -374,15 +379,13 @@ Common causes:
 - Host key verification blocks the first connection.
 - The branch configured in `SOURCE_REPOSITORY_BRANCH` is protected.
 
-### On-chain registration fails
+### TonCenter lookup fails
 
 Check:
 
-- `VERIFIER_REGISTRY_MASTER_ADDRESS` is correct for the selected network.
-- `VERIFIER_NETWORK` matches the address format and wallet id.
+- `VERIFIER_NETWORK` matches the target network.
 - `VERIFIER_TONCENTER_BASE_URL` is reachable from inside the container.
-- Wallet mnemonic is configured and funded.
-- `VERIFIER_REGISTRY_REGISTER_VALUE_NANO` is enough for the registration transaction.
+- `VERIFIER_TONCENTER_API_KEY` is set if your endpoint requires it.
 
 Connectivity check:
 
@@ -430,7 +433,7 @@ Binding to `127.0.0.1:3000` inside the container will not expose the service cor
 
 - Keep only one verifier instance writing to the same Git checkout. The current Git storage lock is process-local.
 - Use a dedicated Git repository for source storage.
-- Do not bake mnemonics or deploy keys into the image.
+- Do not bake deploy keys into the image.
 - Prefer SSH deploy keys scoped to one repository.
 - Use a reverse proxy for TLS and request size limits.
 - Monitor logs for failed Git pushes, compiler errors, and TonCenter API errors.

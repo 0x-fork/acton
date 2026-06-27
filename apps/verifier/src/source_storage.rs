@@ -5,7 +5,6 @@ use std::{
 };
 
 use async_trait::async_trait;
-use base64::{Engine as _, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -27,49 +26,41 @@ pub trait SourceStorage: Send + Sync + 'static {
         &self,
         code_hash: &str,
     ) -> Result<Vec<StoredSourceBundle>, SourceStorageError>;
+
+    async fn list_code_hashes(&self) -> Result<Vec<String>, SourceStorageError>;
+
+    async fn current_revision(&self) -> Result<Option<String>, SourceStorageError>;
 }
 
 pub type SharedSourceStorage = Arc<dyn SourceStorage>;
 
 pub struct StoreSourceBundleRequest {
-    pub address: Option<String>,
     pub code_hash: String,
     pub source_bundle_hash: String,
-    pub language: String,
-    pub compiler_version: String,
-    pub entrypoint: String,
-    pub compile_params: Value,
-    pub sources: Vec<SourceStorageSource>,
+    pub compiler: CompilerMetadata,
     pub files: Vec<SourceStorageFile>,
 }
 
-#[derive(Clone)]
-pub struct SourceStorageSource {
-    pub path: String,
-    pub is_entrypoint: bool,
-    pub include_in_command: Option<bool>,
-    pub is_stdlib: Option<bool>,
-    pub has_include_directives: Option<bool>,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CompilerMetadata {
+    pub language: String,
+    pub version: String,
+    pub entrypoint: String,
+    pub params: Value,
 }
 
 #[derive(Clone)]
 pub struct SourceStorageFile {
     pub path: String,
-    pub content: Vec<u8>,
+    pub content: String,
+    pub include_in_command: Option<bool>,
+    pub is_stdlib: Option<bool>,
+    pub has_include_directives: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SourceStorageReceipt {
-    pub provider: SourceStorageProvider,
-    pub commit: String,
-    pub bundle_path: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SourceStorageProvider {
-    Git,
-    Mock,
+    pub revision: String,
 }
 
 #[derive(Clone, Default)]
@@ -88,6 +79,14 @@ impl SourceStorage for DisabledSourceStorage {
         &self,
         _code_hash: &str,
     ) -> Result<Vec<StoredSourceBundle>, SourceStorageError> {
+        Err(SourceStorageError::MissingConfig("source_repository.path"))
+    }
+
+    async fn list_code_hashes(&self) -> Result<Vec<String>, SourceStorageError> {
+        Err(SourceStorageError::MissingConfig("source_repository.path"))
+    }
+
+    async fn current_revision(&self) -> Result<Option<String>, SourceStorageError> {
         Err(SourceStorageError::MissingConfig("source_repository.path"))
     }
 }
@@ -136,7 +135,7 @@ impl GitSourceStorage {
             })?;
 
         write_bundle_files(&files_dir, &request.files).await?;
-        write_manifest(&bundle_dir, &bundle_path, &request).await?;
+        write_manifest(&bundle_dir, &request).await?;
 
         git(repo_path, &["add", "--", &bundle_path]).await?;
 
@@ -150,7 +149,7 @@ impl GitSourceStorage {
             )
             .await?;
         }
-        let commit = git_output(repo_path, &["rev-parse", "HEAD"]).await?;
+        let revision = git_output(repo_path, &["rev-parse", "HEAD"]).await?;
 
         let branch = match &self.branch {
             Some(branch) => branch.clone(),
@@ -159,11 +158,7 @@ impl GitSourceStorage {
         let refspec = format!("HEAD:{branch}");
         git(repo_path, &["push", &self.remote, &refspec]).await?;
 
-        Ok(SourceStorageReceipt {
-            provider: SourceStorageProvider::Git,
-            commit,
-            bundle_path,
-        })
+        Ok(SourceStorageReceipt { revision })
     }
 
     async fn list_bundles_locked(
@@ -228,6 +223,72 @@ impl GitSourceStorage {
         });
         Ok(bundles)
     }
+
+    async fn list_code_hashes_locked(&self) -> Result<Vec<String>, SourceStorageError> {
+        let repo_path = self
+            .repo_path
+            .as_deref()
+            .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
+        ensure_git_repo(repo_path).await?;
+
+        let storage_dir = repo_path.join(STORAGE_ROOT);
+        if !fs::try_exists(&storage_dir)
+            .await
+            .map_err(|source| SourceStorageError::ReadDir {
+                path: storage_dir.clone(),
+                source,
+            })?
+        {
+            return Ok(Vec::new());
+        }
+
+        let mut read_dir =
+            fs::read_dir(&storage_dir)
+                .await
+                .map_err(|source| SourceStorageError::ReadDir {
+                    path: storage_dir.clone(),
+                    source,
+                })?;
+        let mut code_hashes = Vec::new();
+        while let Some(entry) =
+            read_dir
+                .next_entry()
+                .await
+                .map_err(|source| SourceStorageError::ReadDir {
+                    path: storage_dir.clone(),
+                    source,
+                })?
+        {
+            let file_type =
+                entry
+                    .file_type()
+                    .await
+                    .map_err(|source| SourceStorageError::ReadDir {
+                        path: entry.path(),
+                        source,
+                    })?;
+            if file_type.is_dir() {
+                code_hashes.push(entry.file_name().to_string_lossy().into_owned());
+            }
+        }
+
+        code_hashes.sort();
+        Ok(code_hashes)
+    }
+
+    async fn current_revision_locked(&self) -> Result<Option<String>, SourceStorageError> {
+        let repo_path = self
+            .repo_path
+            .as_deref()
+            .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
+        ensure_git_repo(repo_path).await?;
+
+        match git_output(repo_path, &["rev-parse", "--verify", "HEAD"]).await {
+            Ok(revision) => Ok(Some(revision)),
+            Err(SourceStorageError::Git { .. }) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
 }
 
 #[async_trait]
@@ -246,6 +307,16 @@ impl SourceStorage for GitSourceStorage {
     ) -> Result<Vec<StoredSourceBundle>, SourceStorageError> {
         let _guard = self.lock.lock().await;
         self.list_bundles_locked(code_hash).await
+    }
+
+    async fn list_code_hashes(&self) -> Result<Vec<String>, SourceStorageError> {
+        let _guard = self.lock.lock().await;
+        self.list_code_hashes_locked().await
+    }
+
+    async fn current_revision(&self) -> Result<Option<String>, SourceStorageError> {
+        let _guard = self.lock.lock().await;
+        self.current_revision_locked().await
     }
 }
 
@@ -274,6 +345,11 @@ pub enum SourceStorageError {
     ReadFile {
         path: PathBuf,
         source: std::io::Error,
+    },
+    #[error("source file is not valid UTF-8: {path}: {source}", path = path.display())]
+    ReadFileUtf8 {
+        path: PathBuf,
+        source: std::string::FromUtf8Error,
     },
     #[error("failed to serialize source manifest: {0}")]
     SerializeManifest(serde_json::Error),
@@ -347,7 +423,7 @@ async fn write_bundle_files(
                     source,
                 })?;
         }
-        fs::write(&path, &file.content)
+        fs::write(&path, file.content.as_bytes())
             .await
             .map_err(|source| SourceStorageError::WriteFile { path, source })?;
     }
@@ -357,7 +433,6 @@ async fn write_bundle_files(
 
 async fn write_manifest(
     bundle_dir: &Path,
-    bundle_path: &str,
     request: &StoreSourceBundleRequest,
 ) -> Result<(), SourceStorageError> {
     let verified_at = match read_existing_verified_at(bundle_dir).await? {
@@ -368,38 +443,21 @@ async fn write_manifest(
     let mut files = request
         .files
         .iter()
-        .map(|file| SourceBundleManifestFile {
+        .map(|file| DiskManifestFile {
             path: file.path.clone(),
-            sha256: hex::encode(Sha256::digest(&file.content)),
+            content_hash: hex::encode(Sha256::digest(file.content.as_bytes())),
+            include_in_command: file.include_in_command,
+            is_stdlib: file.is_stdlib,
+            has_include_directives: file.has_include_directives,
         })
         .collect::<Vec<_>>();
     files.sort_by(|left, right| left.path.cmp(&right.path));
 
-    let mut sources = request
-        .sources
-        .iter()
-        .map(|source| SourceBundleManifestSource {
-            path: source.path.clone(),
-            is_entrypoint: source.is_entrypoint,
-            include_in_command: source.include_in_command,
-            is_stdlib: source.is_stdlib,
-            has_include_directives: source.has_include_directives,
-        })
-        .collect::<Vec<_>>();
-    sources.sort_by(|left, right| left.path.cmp(&right.path));
-
-    let manifest = SourceBundleManifest {
-        schema_version: 1,
-        address: request.address.clone(),
+    let manifest = DiskSourceBundleManifest {
         code_hash: request.code_hash.clone(),
         source_bundle_hash: request.source_bundle_hash.clone(),
         verified_at,
-        language: request.language.clone(),
-        compiler_version: request.compiler_version.clone(),
-        entrypoint: request.entrypoint.clone(),
-        compile_params: request.compile_params.clone(),
-        bundle_path: bundle_path.to_owned(),
-        sources,
+        compiler: request.compiler.clone(),
         files,
     };
     let bytes =
@@ -424,7 +482,7 @@ async fn read_existing_verified_at(bundle_dir: &Path) -> Result<Option<u64>, Sou
     };
 
     let manifest =
-        serde_json::from_slice::<SourceBundleManifest>(&manifest_bytes).map_err(|source| {
+        serde_json::from_slice::<DiskSourceBundleManifest>(&manifest_bytes).map_err(|source| {
             SourceStorageError::DeserializeManifest {
                 path: manifest_path,
                 source,
@@ -454,33 +512,39 @@ async fn read_bundle(
                 path: manifest_path.clone(),
                 source,
             })?;
-    let manifest =
-        serde_json::from_slice::<SourceBundleManifest>(&manifest_bytes).map_err(|source| {
-            SourceStorageError::DeserializeManifest {
-                path: manifest_path,
-                source,
-            }
+    let disk_manifest = serde_json::from_slice::<DiskSourceBundleManifest>(&manifest_bytes)
+        .map_err(|source| SourceStorageError::DeserializeManifest {
+            path: manifest_path,
+            source,
         })?;
     let files_dir = bundle_dir.join("files");
-    let files = read_bundle_files(&files_dir, &manifest.files).await?;
-    let commit = git_output(
+    let files = read_bundle_files(&files_dir, &disk_manifest.files).await?;
+    let storage_revision = git_output(
         repo_path,
         &["log", "-n", "1", "--format=%H", "--", bundle_path],
     )
-    .await
-    .ok()
-    .filter(|commit| !commit.is_empty());
+    .await?;
+    if storage_revision.is_empty() {
+        return Err(SourceStorageError::Operation(format!(
+            "stored bundle has no storage revision: {bundle_path}"
+        )));
+    }
 
     Ok(StoredSourceBundle {
-        commit,
-        manifest,
+        storage_revision,
+        manifest: SourceBundleManifest {
+            code_hash: disk_manifest.code_hash,
+            source_bundle_hash: disk_manifest.source_bundle_hash,
+            verified_at: disk_manifest.verified_at,
+            compiler: disk_manifest.compiler,
+        },
         files,
     })
 }
 
 async fn read_bundle_files(
     files_dir: &Path,
-    manifest_files: &[SourceBundleManifestFile],
+    manifest_files: &[DiskManifestFile],
 ) -> Result<Vec<StoredSourceFile>, SourceStorageError> {
     let mut files = Vec::with_capacity(manifest_files.len());
     for manifest_file in manifest_files {
@@ -491,21 +555,27 @@ async fn read_bundle_files(
                 path: path.clone(),
                 source,
             })?;
-        let actual_sha256 = hex::encode(Sha256::digest(&content));
-        if actual_sha256 != manifest_file.sha256 {
+        let actual_content_hash = hex::encode(Sha256::digest(&content));
+        if actual_content_hash != manifest_file.content_hash {
             return Err(SourceStorageError::FileHashMismatch {
                 path,
-                expected: manifest_file.sha256.clone(),
-                actual: actual_sha256,
+                expected: manifest_file.content_hash.clone(),
+                actual: actual_content_hash,
             });
         }
 
-        let content_text = String::from_utf8(content.clone()).ok();
+        let content =
+            String::from_utf8(content).map_err(|source| SourceStorageError::ReadFileUtf8 {
+                path: path.clone(),
+                source,
+            })?;
         files.push(StoredSourceFile {
             path: manifest_file.path.clone(),
-            sha256: manifest_file.sha256.clone(),
-            content_base64: STANDARD.encode(&content),
-            content_text,
+            content_hash: manifest_file.content_hash.clone(),
+            content,
+            include_in_command: manifest_file.include_in_command,
+            is_stdlib: manifest_file.is_stdlib,
+            has_include_directives: manifest_file.has_include_directives,
         });
     }
 
@@ -653,7 +723,7 @@ fn git_command_string(args: &[&str]) -> String {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct StoredSourceBundle {
-    pub commit: Option<String>,
+    pub storage_revision: String,
     pub manifest: SourceBundleManifest,
     pub files: Vec<StoredSourceFile>,
 }
@@ -661,42 +731,38 @@ pub struct StoredSourceBundle {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct StoredSourceFile {
     pub path: String,
-    pub sha256: String,
-    pub content_base64: String,
-    pub content_text: Option<String>,
+    pub content_hash: String,
+    pub content: String,
+    pub include_in_command: Option<bool>,
+    pub is_stdlib: Option<bool>,
+    pub has_include_directives: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SourceBundleManifest {
-    pub schema_version: u8,
-    pub address: Option<String>,
     pub code_hash: String,
     pub source_bundle_hash: String,
-    #[serde(default)]
     pub verified_at: u64,
-    pub language: String,
-    pub compiler_version: String,
-    pub entrypoint: String,
-    pub compile_params: Value,
-    pub bundle_path: String,
-    pub sources: Vec<SourceBundleManifestSource>,
-    pub files: Vec<SourceBundleManifestFile>,
+    pub compiler: CompilerMetadata,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SourceBundleManifestSource {
+struct DiskSourceBundleManifest {
+    code_hash: String,
+    source_bundle_hash: String,
+    verified_at: u64,
+    compiler: CompilerMetadata,
+    files: Vec<DiskManifestFile>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct DiskManifestFile {
     pub path: String,
-    pub is_entrypoint: bool,
+    pub content_hash: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_in_command: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_stdlib: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub has_include_directives: Option<bool>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct SourceBundleManifestFile {
-    pub path: String,
-    pub sha256: String,
 }

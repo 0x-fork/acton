@@ -4,6 +4,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use crate::{
     compilers::CompilerError, registry::RegistryError, source_bundle::SourceBundleError,
@@ -82,7 +83,7 @@ impl IntoResponse for ApiError {
     }
 }
 
-#[derive(Debug, Serialize)]
-struct ErrorResponse {
-    error: String,
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ErrorResponse {
+    pub error: String,
 }

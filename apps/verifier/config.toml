@@ -6,19 +6,13 @@ name = "mainnet"
 
 [toncenter]
 
-[registry]
-register_value_nano = 500000000
-confirmation_attempts = 20
-confirmation_delay_ms = 1000
-
-[wallet]
-kind = "v5r1"
-workchain = 0
-
 [source_repository]
 remote = "origin"
 author_name = "ton-verifier"
 author_email = "ton-verifier@example.invalid"
+
+[registry_index]
+path = "verifier-index.sqlite3"
 
 [compiler]
 node_bin = "node"

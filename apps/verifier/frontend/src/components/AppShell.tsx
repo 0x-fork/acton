@@ -13,16 +13,16 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="Acton Verifier home">
+        <a className="brand" href="/" aria-label="TON Verifier home">
           <img className="brand-mark" src={tonVerifierIcon} alt="" aria-hidden="true" />
-          <span className="brand-text">Acton Verifier</span>
+          <span className="brand-text">TON Verifier</span>
         </a>
         <div className="topbar-actions">
           {headerAccessory}
           <ThemeToggle />
           <a
             className="topbar-github"
-            href="https://github.com/ton-blockchain/acton"
+            href="https://github.com/i582/verifier"
             target="_blank"
             rel="noreferrer"
             aria-label="Open GitHub"
@@ -36,13 +36,13 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
       <footer className="app-footer">
         <div className="footer-brand">
           <img className="brand-mark" src={tonVerifierIcon} alt="" aria-hidden="true" />
-          <span>Acton Verifier</span>
+          <span>TON Verifier</span>
         </div>
         <div className="footer-meta">
           <span className="footer-year">2026</span>
           <a
             className="footer-github"
-            href="https://github.com/ton-blockchain/acton"
+            href="https://github.com/i582/verifier"
             target="_blank"
             rel="noreferrer"
             aria-label="Open GitHub"

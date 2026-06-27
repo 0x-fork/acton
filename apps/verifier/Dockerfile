@@ -48,7 +48,7 @@ COPY --chown=node:node --from=compiler-worker /compiler-worker /app/compiler-wor
 COPY docker/entrypoint.sh /usr/local/bin/verifier-entrypoint
 
 RUN chmod +x /usr/local/bin/verifier-entrypoint \
-    && mkdir -p /etc/verifier /var/lib/verifier/source-repo \
+    && mkdir -p /etc/verifier /var/lib/verifier/source-repo /var/lib/verifier/registry-index \
     && chown -R node:node /etc/verifier /var/lib/verifier
 
 USER node
@@ -56,16 +56,12 @@ USER node
 ENV VERIFIER_CONFIG=/etc/verifier/config.toml \
     VERIFIER_BIND_ADDR=0.0.0.0:3000 \
     VERIFIER_NETWORK=mainnet \
-    VERIFIER_REGISTRY_REGISTER_VALUE_NANO=500000000 \
-    VERIFIER_REGISTRY_CONFIRMATION_ATTEMPTS=20 \
-    VERIFIER_REGISTRY_CONFIRMATION_DELAY_MS=1000 \
-    VERIFIER_WALLET_KIND=v5r1 \
-    VERIFIER_WALLET_WORKCHAIN=0 \
     SOURCE_REPOSITORY_PATH=/var/lib/verifier/source-repo \
     SOURCE_REPOSITORY_REMOTE=origin \
     SOURCE_REPOSITORY_BRANCH=main \
     SOURCE_REPOSITORY_AUTHOR_NAME=ton-verifier \
     SOURCE_REPOSITORY_AUTHOR_EMAIL=ton-verifier@example.invalid \
+    VERIFIER_REGISTRY_INDEX_PATH=/var/lib/verifier/registry-index/registry-index.sqlite3 \
     VERIFIER_COMPILER_NODE_BIN=node \
     VERIFIER_COMPILER_WORKER_PATH=/app/compiler-worker/compile.mjs \
     VERIFIER_COMPILER_TIMEOUT_MS=5000

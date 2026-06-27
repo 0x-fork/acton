@@ -5,15 +5,30 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use utoipa::ToSchema;
 
 use crate::{
     error::ApiError,
-    registry::{SourceBundleStatusRequest, VerificationStatusReceipt, VerificationStatusRequest},
-    source_storage::{StoredSourceBundle, StoredSourceFile},
+    registry::{VerificationStatusReceipt, VerificationStatusRequest, VerifiedBundlesRequest},
+    source_storage::{CompilerMetadata, StoredSourceBundle, StoredSourceFile},
     state::AppState,
     verification::VerificationTarget,
 };
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/verification/status",
+    params(
+        ("address" = Option<String>, Query, description = "TON address to resolve to the current code hash"),
+        ("code_hash" = Option<String>, Query, description = "Code hash to check directly")
+    ),
+    responses(
+        (status = 200, description = "Verification status for the resolved code hash", body = VerificationStatusResponse),
+        (status = 400, description = "Invalid or missing verification target", body = crate::error::ErrorResponse),
+        (status = 502, description = "Blockchain or registry lookup failure", body = crate::error::ErrorResponse)
+    ),
+    tag = "verification"
+)]
 pub async fn status_handler(
     State(state): State<AppState>,
     Query(query): Query<VerificationQuery>,
@@ -23,8 +38,8 @@ pub async fn status_handler(
         .resolve_target(query.into_target())
         .await?;
     let status = state
-        .registry_client()
-        .verification_status(VerificationStatusRequest {
+        .verification_registry()
+        .status(VerificationStatusRequest {
             code_hash: resolved_target.code_hash.clone(),
         })
         .await?;
@@ -32,10 +47,24 @@ pub async fn status_handler(
     Ok(Json(VerificationStatusResponse::new(
         resolved_target.address,
         resolved_target.code_hash,
-        status,
+        &status,
     )))
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/verification/source",
+    params(
+        ("address" = Option<String>, Query, description = "TON address to resolve to the current code hash"),
+        ("code_hash" = Option<String>, Query, description = "Code hash to load verified source bundles for")
+    ),
+    responses(
+        (status = 200, description = "Verified source bundles for the resolved code hash", body = VerificationSourceResponse),
+        (status = 400, description = "Invalid or missing verification target", body = crate::error::ErrorResponse),
+        (status = 502, description = "Blockchain, registry, or source lookup failure", body = crate::error::ErrorResponse)
+    ),
+    tag = "verification"
+)]
 pub async fn source_handler(
     State(state): State<AppState>,
     Query(query): Query<VerificationQuery>,
@@ -44,38 +73,22 @@ pub async fn source_handler(
         .verification_service()
         .resolve_target(query.into_target())
         .await?;
-    let status = state
-        .registry_client()
-        .verification_status(VerificationStatusRequest {
+    let receipt = state
+        .verification_registry()
+        .verified_bundles(VerifiedBundlesRequest {
             code_hash: resolved_target.code_hash.clone(),
         })
         .await?;
-    let mut bundles = Vec::new();
-
-    if status.verified {
-        for bundle in state
-            .source_storage()
-            .list_bundles(&resolved_target.code_hash)
-            .await?
-        {
-            let bundle_status = state
-                .registry_client()
-                .source_bundle_status(SourceBundleStatusRequest {
-                    code_hash: resolved_target.code_hash.clone(),
-                    source_bundle_hash: bundle.manifest.source_bundle_hash.clone(),
-                })
-                .await?;
-            if bundle_status.verified {
-                bundles.push(SourceBundleResponse::from(bundle));
-            }
-        }
-    }
+    let verified = !receipt.bundles.is_empty();
+    let bundles = receipt
+        .bundles
+        .into_iter()
+        .map(SourceBundleResponse::from)
+        .collect();
 
     Ok(Json(VerificationSourceResponse {
-        address: resolved_target.address,
         code_hash: resolved_target.code_hash,
-        verified: status.verified,
-        onchain: OnchainVerification::from(status),
+        verified,
         bundles,
     }))
 }
@@ -99,60 +112,42 @@ fn non_empty_text(value: Option<String>) -> Option<String> {
     value.filter(|value| !value.trim().is_empty())
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct VerificationStatusResponse {
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct VerificationStatusResponse {
     address: Option<String>,
     code_hash: String,
     verified: bool,
-    onchain: OnchainVerification,
+    bundle_count: usize,
 }
 
 impl VerificationStatusResponse {
-    fn new(address: Option<String>, code_hash: String, status: VerificationStatusReceipt) -> Self {
+    const fn new(
+        address: Option<String>,
+        code_hash: String,
+        status: &VerificationStatusReceipt,
+    ) -> Self {
         Self {
             address,
             code_hash,
             verified: status.verified,
-            onchain: OnchainVerification::from(status),
+            bundle_count: status.bundle_count,
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct VerificationSourceResponse {
-    address: Option<String>,
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct VerificationSourceResponse {
     code_hash: String,
     verified: bool,
-    onchain: OnchainVerification,
     bundles: Vec<SourceBundleResponse>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct OnchainVerification {
-    master_address: String,
-    verification_record_address: String,
-}
-
-impl From<VerificationStatusReceipt> for OnchainVerification {
-    fn from(status: VerificationStatusReceipt) -> Self {
-        Self {
-            master_address: status.master_address,
-            verification_record_address: status.verification_record_address,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SourceBundleResponse {
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct SourceBundleResponse {
     source_bundle_hash: String,
     verified_at: u64,
-    commit: Option<String>,
-    bundle_path: String,
-    language: String,
-    compiler_version: String,
-    entrypoint: String,
-    compile_params: Value,
-    sources: Vec<SourceFileSummary>,
+    storage_revision: String,
+    compiler: CompilerResponse,
     files: Vec<SourceFileResponse>,
 }
 
@@ -162,20 +157,8 @@ impl From<StoredSourceBundle> for SourceBundleResponse {
         Self {
             source_bundle_hash: manifest.source_bundle_hash,
             verified_at: manifest.verified_at,
-            commit: bundle.commit,
-            bundle_path: manifest.bundle_path,
-            language: manifest.language,
-            compiler_version: manifest.compiler_version,
-            entrypoint: manifest.entrypoint,
-            compile_params: manifest.compile_params,
-            sources: manifest
-                .sources
-                .into_iter()
-                .map(|source| SourceFileSummary {
-                    path: source.path,
-                    is_entrypoint: source.is_entrypoint,
-                })
-                .collect(),
+            storage_revision: bundle.storage_revision,
+            compiler: CompilerResponse::from(manifest.compiler),
             files: bundle
                 .files
                 .into_iter()
@@ -185,27 +168,45 @@ impl From<StoredSourceBundle> for SourceBundleResponse {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct SourceFileSummary {
-    path: String,
-    is_entrypoint: bool,
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct CompilerResponse {
+    language: String,
+    version: String,
+    entrypoint: String,
+    #[schema(value_type = Object)]
+    params: Value,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct SourceFileResponse {
+impl From<CompilerMetadata> for CompilerResponse {
+    fn from(compiler: CompilerMetadata) -> Self {
+        Self {
+            language: compiler.language,
+            version: compiler.version,
+            entrypoint: compiler.entrypoint,
+            params: compiler.params,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct SourceFileResponse {
     path: String,
-    sha256: String,
-    content_base64: String,
-    content_text: Option<String>,
+    content_hash: String,
+    include_in_command: Option<bool>,
+    is_stdlib: Option<bool>,
+    has_include_directives: Option<bool>,
+    content: String,
 }
 
 impl From<StoredSourceFile> for SourceFileResponse {
     fn from(file: StoredSourceFile) -> Self {
         Self {
             path: file.path,
-            sha256: file.sha256,
-            content_base64: file.content_base64,
-            content_text: file.content_text,
+            content_hash: file.content_hash,
+            include_in_command: file.include_in_command,
+            is_stdlib: file.is_stdlib,
+            has_include_directives: file.has_include_directives,
+            content: file.content,
         }
     }
 }

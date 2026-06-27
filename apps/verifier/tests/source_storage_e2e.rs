@@ -12,8 +12,8 @@ use tempfile::TempDir;
 use verifier::{
     config::Config,
     source_storage::{
-        GitSourceStorage, SourceStorage, SourceStorageFile, SourceStorageProvider,
-        SourceStorageSource, StoreSourceBundleRequest,
+        CompilerMetadata, GitSourceStorage, SourceStorage, SourceStorageFile,
+        StoreSourceBundleRequest,
     },
 };
 
@@ -28,63 +28,44 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
     let storage = GitSourceStorage::from_config(&config);
 
     let started_at = unix_timestamp()?;
+    let bundle_path = format!("sources/{CODE_HASH}/{SOURCE_BUNDLE_HASH}");
     let receipt = storage
         .store_bundle(StoreSourceBundleRequest {
-            address: Some("EQD0000000000000000000000000000000000000000000000".to_owned()),
             code_hash: CODE_HASH.to_owned(),
             source_bundle_hash: SOURCE_BUNDLE_HASH.to_owned(),
-            language: "tolk".to_owned(),
-            compiler_version: "1.4.1".to_owned(),
-            entrypoint: "main.tolk".to_owned(),
-            compile_params: json!({"compiler_version": "1.4.1"}),
-            sources: vec![
-                SourceStorageSource {
-                    path: "main.tolk".to_owned(),
-                    is_entrypoint: true,
-                    include_in_command: None,
-                    is_stdlib: None,
-                    has_include_directives: None,
-                },
-                SourceStorageSource {
-                    path: "imports/lib.tolk".to_owned(),
-                    is_entrypoint: false,
-                    include_in_command: None,
-                    is_stdlib: None,
-                    has_include_directives: None,
-                },
-            ],
+            compiler: CompilerMetadata {
+                language: "tolk".to_owned(),
+                version: "1.4.1".to_owned(),
+                entrypoint: "main.tolk".to_owned(),
+                params: json!({"compiler_version": "1.4.1"}),
+            },
             files: vec![
                 SourceStorageFile {
                     path: "main.tolk".to_owned(),
-                    content: b"import \"imports/lib.tolk\";".to_vec(),
+                    content: "import \"imports/lib.tolk\";".to_owned(),
+                    include_in_command: None,
+                    is_stdlib: None,
+                    has_include_directives: None,
                 },
                 SourceStorageFile {
                     path: "imports/lib.tolk".to_owned(),
-                    content: b"fun helper() {}".to_vec(),
+                    content: "fun helper() {}".to_owned(),
+                    include_in_command: None,
+                    is_stdlib: None,
+                    has_include_directives: None,
                 },
             ],
         })
         .await?;
 
-    assert!(matches!(receipt.provider, SourceStorageProvider::Git));
-    assert_eq!(
-        receipt.bundle_path,
-        format!("sources/{CODE_HASH}/{SOURCE_BUNDLE_HASH}")
-    );
-    assert_eq!(receipt.commit.len(), 40);
+    assert_eq!(receipt.revision.len(), 40);
 
-    let stored_main = fixture
-        .repo_path
-        .join(&receipt.bundle_path)
-        .join("files/main.tolk");
+    let stored_main = fixture.repo_path.join(&bundle_path).join("files/main.tolk");
     let stored_lib = fixture
         .repo_path
-        .join(&receipt.bundle_path)
+        .join(&bundle_path)
         .join("files/imports/lib.tolk");
-    let manifest = fixture
-        .repo_path
-        .join(&receipt.bundle_path)
-        .join("manifest.json");
+    let manifest = fixture.repo_path.join(&bundle_path).join("manifest.json");
 
     assert_eq!(
         fs::read_to_string(stored_main)?,
@@ -93,11 +74,12 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
     assert_eq!(fs::read_to_string(stored_lib)?, "fun helper() {}");
 
     let manifest = serde_json::from_slice::<serde_json::Value>(&fs::read(manifest)?)?;
-    assert_eq!(manifest["schema_version"], 1);
     assert_eq!(manifest["code_hash"], CODE_HASH);
     assert_eq!(manifest["source_bundle_hash"], SOURCE_BUNDLE_HASH);
-    assert_eq!(manifest["entrypoint"], "main.tolk");
+    assert_eq!(manifest["compiler"]["entrypoint"], "main.tolk");
+    assert_eq!(manifest["compiler"]["version"], "1.4.1");
     assert_eq!(manifest["files"].as_array().map(Vec::len), Some(2));
+    assert_eq!(manifest["files"][1]["path"], "main.tolk");
     let verified_at = manifest["verified_at"]
         .as_u64()
         .expect("manifest should include verification timestamp");
@@ -114,20 +96,14 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
         stored_bundles[0].manifest.source_bundle_hash,
         SOURCE_BUNDLE_HASH
     );
-    assert_eq!(
-        stored_bundles[0].commit.as_deref(),
-        Some(receipt.commit.as_str())
-    );
+    assert_eq!(stored_bundles[0].storage_revision, receipt.revision);
     assert_eq!(stored_bundles[0].files.len(), 2);
     assert_eq!(stored_bundles[0].files[0].path, "imports/lib.tolk");
-    assert_eq!(
-        stored_bundles[0].files[0].content_text.as_deref(),
-        Some("fun helper() {}")
-    );
+    assert_eq!(stored_bundles[0].files[0].content, "fun helper() {}");
     assert_eq!(stored_bundles[0].files[1].path, "main.tolk");
     assert_eq!(
-        stored_bundles[0].files[1].content_text.as_deref(),
-        Some("import \"imports/lib.tolk\";")
+        stored_bundles[0].files[1].content,
+        "import \"imports/lib.tolk\";"
     );
 
     let remote_head = git_output(
@@ -142,7 +118,7 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
             "refs/heads/main",
         ],
     )?;
-    assert_eq!(remote_head, receipt.commit);
+    assert_eq!(remote_head, receipt.revision);
 
     Ok(())
 }

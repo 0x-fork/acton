@@ -1,12 +1,10 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use base64::{Engine as _, engine::general_purpose::STANDARD};
 use sha2::{Digest, Sha256};
 use verifier::source_storage::{
-    SourceBundleManifest, SourceBundleManifestFile, SourceBundleManifestSource, SourceStorage,
-    SourceStorageError, SourceStorageProvider, SourceStorageReceipt, StoreSourceBundleRequest,
-    StoredSourceBundle, StoredSourceFile,
+    SourceBundleManifest, SourceStorage, SourceStorageError, SourceStorageReceipt,
+    StoreSourceBundleRequest, StoredSourceBundle, StoredSourceFile,
 };
 
 const MOCK_VERIFIED_AT: u64 = 1_700_000_000;
@@ -21,9 +19,7 @@ impl MockSourceStorage {
     pub fn confirmed() -> Self {
         Self {
             outcome: MockSourceStorageOutcome::Confirmed(SourceStorageReceipt {
-                provider: SourceStorageProvider::Mock,
-                commit: "mock-commit".to_owned(),
-                bundle_path: "sources/mock-code-hash/mock-source-bundle-hash".to_owned(),
+                revision: "mock-revision".to_owned(),
             }),
             recorded_requests: Arc::new(Mutex::new(Vec::new())),
             stored_bundles: Arc::new(Mutex::new(Vec::new())),
@@ -85,13 +81,33 @@ impl SourceStorage for MockSourceStorage {
             .cloned()
             .collect())
     }
+
+    async fn list_code_hashes(&self) -> Result<Vec<String>, SourceStorageError> {
+        let mut code_hashes = {
+            let stored_bundles = self
+                .stored_bundles
+                .lock()
+                .expect("stored source bundles mutex should not be poisoned");
+            stored_bundles
+                .iter()
+                .map(|bundle| bundle.manifest.code_hash.clone())
+                .collect::<Vec<_>>()
+        };
+        code_hashes.sort();
+        code_hashes.dedup();
+        Ok(code_hashes)
+    }
+
+    async fn current_revision(&self) -> Result<Option<String>, SourceStorageError> {
+        Ok(Some("mock-revision".to_owned()))
+    }
 }
 
 #[derive(Clone)]
 pub struct RecordedSourceStorageRequest {
     pub code_hash: String,
     pub source_bundle_hash: String,
-    pub files: Vec<(String, Vec<u8>)>,
+    pub files: Vec<(String, String)>,
 }
 
 impl RecordedSourceStorageRequest {
@@ -121,54 +137,26 @@ fn stored_bundle_from_request(
         .files
         .iter()
         .map(|file| {
-            let sha256 = hex::encode(Sha256::digest(&file.content));
+            let content_hash = hex::encode(Sha256::digest(file.content.as_bytes()));
             StoredSourceFile {
                 path: file.path.clone(),
-                sha256,
-                content_base64: STANDARD.encode(&file.content),
-                content_text: String::from_utf8(file.content.clone()).ok(),
+                content_hash,
+                content: file.content.clone(),
+                include_in_command: file.include_in_command,
+                is_stdlib: file.is_stdlib,
+                has_include_directives: file.has_include_directives,
             }
         })
         .collect::<Vec<_>>();
     files.sort_by(|left, right| left.path.cmp(&right.path));
 
-    let mut manifest_files = files
-        .iter()
-        .map(|file| SourceBundleManifestFile {
-            path: file.path.clone(),
-            sha256: file.sha256.clone(),
-        })
-        .collect::<Vec<_>>();
-    manifest_files.sort_by(|left, right| left.path.cmp(&right.path));
-
-    let mut sources = request
-        .sources
-        .iter()
-        .map(|source| SourceBundleManifestSource {
-            path: source.path.clone(),
-            is_entrypoint: source.is_entrypoint,
-            include_in_command: source.include_in_command,
-            is_stdlib: source.is_stdlib,
-            has_include_directives: source.has_include_directives,
-        })
-        .collect::<Vec<_>>();
-    sources.sort_by(|left, right| left.path.cmp(&right.path));
-
     StoredSourceBundle {
-        commit: Some(receipt.commit.clone()),
+        storage_revision: receipt.revision.clone(),
         manifest: SourceBundleManifest {
-            schema_version: 1,
-            address: request.address.clone(),
             code_hash: request.code_hash.clone(),
             source_bundle_hash: request.source_bundle_hash.clone(),
             verified_at: MOCK_VERIFIED_AT,
-            language: request.language.clone(),
-            compiler_version: request.compiler_version.clone(),
-            entrypoint: request.entrypoint.clone(),
-            compile_params: request.compile_params.clone(),
-            bundle_path: receipt.bundle_path.clone(),
-            sources,
-            files: manifest_files,
+            compiler: request.compiler.clone(),
         },
         files,
     }

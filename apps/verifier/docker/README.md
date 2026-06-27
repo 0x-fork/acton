@@ -24,11 +24,10 @@ Run with generated config:
 docker run --rm -p 3000:3000 \
   -e VERIFIER_NETWORK=localnet \
   -e VERIFIER_TONCENTER_BASE_URL=http://host.docker.internal:5412 \
-  -e VERIFIER_REGISTRY_MASTER_ADDRESS=<registry-master-address> \
-  -e WALLET_MNEMONIC="<24 words>" \
   -e SOURCE_REPOSITORY_URL=https://github.com/i582/test-verify-repo \
   -e SOURCE_REPOSITORY_BRANCH=main \
   -v verifier-source-repo:/var/lib/verifier/source-repo \
+  -v verifier-registry-index:/var/lib/verifier/registry-index \
   ghcr.io/i582/verifier:latest
 ```
 
@@ -39,6 +38,7 @@ docker run --rm -p 3000:3000 \
   -e VERIFIER_CONFIG=/etc/verifier/config.toml \
   -v ./config.toml:/etc/verifier/config.toml:ro \
   -v verifier-source-repo:/var/lib/verifier/source-repo \
+  -v verifier-registry-index:/var/lib/verifier/registry-index \
   ghcr.io/i582/verifier:latest
 ```
 

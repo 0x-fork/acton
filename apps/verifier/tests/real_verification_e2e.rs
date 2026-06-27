@@ -38,16 +38,16 @@ async fn verify_tolk_with_real_compiler_and_stores_generated_abi() {
     let body = response_json::<VerificationSourceResponse>(response).await;
     assert!(body.verified);
     assert_eq!(body.bundles.len(), 1);
+    assert_eq!(body.bundles[0].compiler.language, "tolk");
+    assert_eq!(body.bundles[0].compiler.version, "1.4.1");
+    assert_eq!(body.bundles[0].compiler.entrypoint, "main.tolk");
     let files = &body.bundles[0].files;
     let abi = files
         .iter()
         .find(|file| file.path == "output/main.abi.json")
         .expect("expected stored Tolk bundle to include generated ABI JSON");
-    let abi = abi
-        .content_text
-        .as_deref()
-        .expect("generated Tolk ABI JSON should be UTF-8");
-    let abi = serde_json::from_str::<Value>(abi).expect("generated Tolk ABI should be JSON");
+    let abi =
+        serde_json::from_str::<Value>(&abi.content).expect("generated Tolk ABI should be JSON");
     assert_eq!(abi["abi_schema_version"], "1.0");
     assert_eq!(abi["compiler_name"], "tolk");
     assert_eq!(abi["compiler_version"], "1.4.1");
@@ -101,6 +101,9 @@ async fn verify_tact_with_real_compiler_and_stores_generated_sources() {
     let body = response_json::<VerificationSourceResponse>(response).await;
     assert!(body.verified);
     assert_eq!(body.bundles.len(), 1);
+    assert_eq!(body.bundles[0].compiler.language, "tact");
+    assert_eq!(body.bundles[0].compiler.version, "1.6.13");
+    assert_eq!(body.bundles[0].compiler.entrypoint, "contract.pkg");
     let files = &body.bundles[0].files;
     assert!(files.iter().any(|file| file.path == "contract.pkg"));
     assert!(
@@ -163,22 +166,15 @@ async fn verify_fixture(
     post_verify(state, parts).await
 }
 
-async fn assert_verified(response: axum::response::Response, language: &str, code_hash: &str) {
+async fn assert_verified(response: axum::response::Response, _language: &str, code_hash: &str) {
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = response_json::<VerifyResponse>(response).await;
     assert_eq!(body.code_hash, code_hash);
     assert_eq!(body.compiled_code_hash, code_hash);
     assert_eq!(body.verification_result, "match");
-    assert_eq!(body.language, language);
     assert!(body.source_bundle_hash.is_some());
-    assert!(body.source_storage.is_some());
-    assert_eq!(
-        body.onchain_registration
-            .as_ref()
-            .map(|registration| registration.status.as_str()),
-        Some("confirmed")
-    );
+    assert!(body.storage_revision.is_some());
 }
 
 fn fixture(name: &str) -> WorkerFixture {
@@ -266,14 +262,7 @@ struct VerifyResponse {
     compiled_code_hash: String,
     verification_result: String,
     source_bundle_hash: Option<String>,
-    source_storage: Option<Value>,
-    onchain_registration: Option<OnchainRegistration>,
-    language: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct OnchainRegistration {
-    status: String,
+    storage_revision: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -284,11 +273,19 @@ struct VerificationSourceResponse {
 
 #[derive(Debug, Deserialize)]
 struct VerifiedSourceBundle {
+    compiler: VerifiedCompiler,
     files: Vec<VerifiedSourceFile>,
+}
+
+#[derive(Debug, Deserialize)]
+struct VerifiedCompiler {
+    language: String,
+    version: String,
+    entrypoint: String,
 }
 
 #[derive(Debug, Deserialize)]
 struct VerifiedSourceFile {
     path: String,
-    content_text: Option<String>,
+    content: String,
 }

@@ -8,17 +8,20 @@ use thiserror::Error;
 const SOURCE_BUNDLE_SCHEMA_VERSION: u8 = 1;
 
 pub struct SourceBundleInput<'a> {
-    pub language: &'a str,
-    pub compiler_version: &'a str,
-    pub entrypoint: &'a str,
-    pub compile_params: &'a Value,
+    pub compiler: SourceBundleCompiler<'a>,
     pub sources: Vec<SourceBundleSource<'a>>,
     pub files: Vec<SourceBundleFile<'a>>,
 }
 
+pub struct SourceBundleCompiler<'a> {
+    pub language: &'a str,
+    pub version: &'a str,
+    pub entrypoint: &'a str,
+    pub params: &'a Value,
+}
+
 pub struct SourceBundleSource<'a> {
     pub path: &'a str,
-    pub is_entrypoint: bool,
     pub include_in_command: Option<bool>,
     pub is_stdlib: Option<bool>,
     pub has_include_directives: Option<bool>,
@@ -46,10 +49,7 @@ pub enum SourceBundleError {
 #[derive(Serialize)]
 struct CanonicalBundle {
     schema_version: u8,
-    language: String,
-    compiler_version: String,
-    entrypoint: String,
-    compile_params: CanonicalJson,
+    compiler: CanonicalCompiler,
     sources: Vec<CanonicalSource>,
     files: Vec<CanonicalFile>,
 }
@@ -61,7 +61,6 @@ impl CanonicalBundle {
             .into_iter()
             .map(|source| CanonicalSource {
                 path: source.path.to_owned(),
-                is_entrypoint: source.is_entrypoint,
                 include_in_command: source.include_in_command,
                 is_stdlib: source.is_stdlib,
                 has_include_directives: source.has_include_directives,
@@ -74,17 +73,19 @@ impl CanonicalBundle {
             .into_iter()
             .map(|file| CanonicalFile {
                 path: file.path.to_owned(),
-                sha256: hex::encode(Sha256::digest(file.bytes)),
+                content_hash: hex::encode(Sha256::digest(file.bytes)),
             })
             .collect::<Vec<_>>();
         files.sort_by(|left, right| left.path.cmp(&right.path));
 
         Self {
             schema_version: SOURCE_BUNDLE_SCHEMA_VERSION,
-            language: input.language.to_owned(),
-            compiler_version: input.compiler_version.to_owned(),
-            entrypoint: input.entrypoint.to_owned(),
-            compile_params: CanonicalJson::from(input.compile_params),
+            compiler: CanonicalCompiler {
+                language: input.compiler.language.to_owned(),
+                version: input.compiler.version.to_owned(),
+                entrypoint: input.compiler.entrypoint.to_owned(),
+                params: CanonicalJson::from(input.compiler.params),
+            },
             sources,
             files,
         }
@@ -92,9 +93,16 @@ impl CanonicalBundle {
 }
 
 #[derive(Serialize)]
+struct CanonicalCompiler {
+    language: String,
+    version: String,
+    entrypoint: String,
+    params: CanonicalJson,
+}
+
+#[derive(Serialize)]
 struct CanonicalSource {
     path: String,
-    is_entrypoint: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     include_in_command: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -106,7 +114,7 @@ struct CanonicalSource {
 #[derive(Serialize)]
 struct CanonicalFile {
     path: String,
-    sha256: String,
+    content_hash: String,
 }
 
 #[derive(Serialize)]
