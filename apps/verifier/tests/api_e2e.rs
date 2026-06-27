@@ -198,6 +198,16 @@ async fn abi_returns_indexed_tolk_abi_records_with_code_hash() {
     assert_eq!(body.items[0].code_hash, CODE_HASH_ONE);
     assert_eq!(body.items[0].abi["contract_name"].as_str(), Some("Smoke"));
 
+    let response = get(
+        state.clone(),
+        &format!("/api/v1/abi?code_hash={CODE_HASH_ONE_BASE64}"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json::<AbiContractsResponse>(response).await;
+    assert_eq!(body.items[0].code_hash, CODE_HASH_ONE);
+    assert_eq!(body.items[0].abi["contract_name"].as_str(), Some("Smoke"));
+
     let response = get(state, "/api/v1/abi?offset=500").await;
     assert_eq!(response.status(), StatusCode::OK);
     let body = response_json::<AbiContractsResponse>(response).await;

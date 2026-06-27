@@ -8,6 +8,7 @@ use serde_json::Value;
 use utoipa::ToSchema;
 
 use crate::{
+    blockchain::normalize_code_hash,
     error::ApiError,
     registry::{
         AbiContractsRequest, LastVerifiedRequest, VerificationStatusReceipt,
@@ -154,7 +155,7 @@ pub async fn abi_handler(
     let receipt = state
         .verification_registry()
         .abi_contracts(AbiContractsRequest {
-            code_hash: non_empty_text(query.code_hash),
+            code_hash: non_empty_code_hash(query.code_hash),
             limit: page_limit(query.limit),
             offset: query.offset.unwrap_or(0),
         })
@@ -199,6 +200,10 @@ impl VerificationQuery {
 
 fn non_empty_text(value: Option<String>) -> Option<String> {
     value.filter(|value| !value.trim().is_empty())
+}
+
+fn non_empty_code_hash(value: Option<String>) -> Option<String> {
+    non_empty_text(value).map(|value| normalize_code_hash(value.trim()))
 }
 
 fn page_limit(limit: Option<usize>) -> usize {
