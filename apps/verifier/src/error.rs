@@ -31,11 +31,19 @@ impl ApiError {
             message,
         }
     }
+
+    pub const fn not_found(message: String) -> Self {
+        Self {
+            status: StatusCode::NOT_FOUND,
+            message,
+        }
+    }
 }
 
 impl From<VerificationError> for ApiError {
     fn from(err: VerificationError) -> Self {
         match err {
+            VerificationError::CodeHashNotFound { .. } => Self::not_found(err.to_string()),
             VerificationError::Blockchain(blockchain_err) => {
                 Self::bad_gateway(blockchain_err.to_string())
             }

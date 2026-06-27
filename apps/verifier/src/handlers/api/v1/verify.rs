@@ -42,6 +42,7 @@ mod languages;
     responses(
         (status = 200, description = "Verification completed", body = VerifyResponse),
         (status = 400, description = "Invalid verification request or compilation mismatch input", body = crate::error::ErrorResponse),
+        (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
         (status = 502, description = "Compiler, blockchain, or source storage failure", body = crate::error::ErrorResponse)
     ),
     tag = "verification"
