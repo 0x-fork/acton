@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::{
     bundle_validation::{StoredBundleValidationError, validate_stored_bundle},
     source_storage::{
-        CompilerMetadata, SourceBundleManifest, SourceStorage, SourceStorageError,
+        CompilerMetadata, SourceBundleManifest, SourceMapData, SourceStorage, SourceStorageError,
         StoredSourceBundle, StoredSourceFile,
     },
 };
@@ -271,7 +271,8 @@ impl VerificationIndex for SqliteVerificationIndex {
                   source_bundle_hash,
                   verified_at,
                   compiler_json,
-                  storage_revision
+                  storage_revision,
+                  source_map_json
                 from verified_bundles
                 where code_hash = ?1
                 order by source_bundle_hash
@@ -284,6 +285,7 @@ impl VerificationIndex for SqliteVerificationIndex {
                     verified_at: row.get(1)?,
                     compiler_json: row.get(2)?,
                     storage_revision: row.get(3)?,
+                    source_map_json: row.get(4)?,
                 })
             })?;
 
@@ -435,6 +437,7 @@ struct IndexedBundleRow {
     verified_at: i64,
     compiler_json: String,
     storage_revision: String,
+    source_map_json: Option<String>,
 }
 
 struct IndexedVerifiedBundleSummaryRow {
@@ -484,6 +487,7 @@ fn initialize_schema(connection: &Connection) -> Result<(), VerificationIndexErr
           verified_at integer not null,
           compiler_json text not null,
           storage_revision text not null,
+          source_map_json text,
           indexed_at integer not null,
           primary key (code_hash, source_bundle_hash)
         );
@@ -539,12 +543,14 @@ fn insert_bundle(
           verified_at,
           compiler_json,
           storage_revision,
+          source_map_json,
           indexed_at
-        ) values (?1, ?2, ?3, ?4, ?5, ?6)
+        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7)
         on conflict (code_hash, source_bundle_hash) do update set
           verified_at = excluded.verified_at,
           compiler_json = excluded.compiler_json,
           storage_revision = excluded.storage_revision,
+          source_map_json = excluded.source_map_json,
           indexed_at = excluded.indexed_at
         ",
         params![
@@ -555,6 +561,11 @@ fn insert_bundle(
             })?,
             serde_json::to_string(&manifest.compiler)?,
             &bundle.storage_revision,
+            manifest
+                .source_map
+                .as_ref()
+                .map(serde_json::to_string)
+                .transpose()?,
             indexed_at,
         ],
     )?;
@@ -660,6 +671,11 @@ fn bundle_from_row(
 ) -> Result<StoredSourceBundle, VerificationIndexError> {
     let files = bundle_files(connection, code_hash, &row.source_bundle_hash)?;
     let compiler = serde_json::from_str::<CompilerMetadata>(&row.compiler_json)?;
+    let source_map = row
+        .source_map_json
+        .as_deref()
+        .map(serde_json::from_str::<SourceMapData>)
+        .transpose()?;
 
     Ok(StoredSourceBundle {
         storage_revision: row.storage_revision,
@@ -668,6 +684,7 @@ fn bundle_from_row(
             source_bundle_hash: row.source_bundle_hash,
             verified_at: i64_to_u64("verified_at", row.verified_at)?,
             compiler,
+            source_map,
         },
         files,
     })

@@ -50,6 +50,7 @@ fn openapi() -> utoipa::openapi::OpenApi {
         verification::VerificationStatusResponse,
         verification::VerificationSourceResponse,
         verification::SourceBundleResponse,
+        crate::source_storage::SourceMapData,
         verification::CompilerResponse,
         verification::SourceFileResponse,
         verification::LastVerifiedResponse,

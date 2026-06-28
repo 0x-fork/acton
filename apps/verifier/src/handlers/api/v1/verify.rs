@@ -151,6 +151,7 @@ async fn handle_multipart(
         })
         .await?;
     let compiled_code_hash = normalize_code_hash(&compiled.code_hash);
+    let compiled_source_map_data = compiled.source_map.clone();
     let verification_result =
         VerificationResult::from_hashes(&resolved_target.code_hash, &compiled_code_hash);
     let (source_bundle_hash, storage_revision) = match verification_result {
@@ -193,6 +194,7 @@ async fn handle_multipart(
                         params: compile_params.clone(),
                     },
                     files: storage_files,
+                    source_map: compiled_source_map_data,
                 })
                 .await?
                 .storage;

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use sha2::{Digest, Sha256};
 use verifier::source_storage::{
-    SourceBundleManifest, SourceStorage, SourceStorageError, SourceStorageReceipt,
+    SourceBundleManifest, SourceMapData, SourceStorage, SourceStorageError, SourceStorageReceipt,
     StoreSourceBundleRequest, StoredSourceBundle, StoredSourceFile,
 };
 
@@ -107,6 +107,7 @@ impl SourceStorage for MockSourceStorage {
 pub struct RecordedSourceStorageRequest {
     pub code_hash: String,
     pub source_bundle_hash: String,
+    pub source_map: Option<SourceMapData>,
     pub files: Vec<(String, String)>,
 }
 
@@ -115,6 +116,7 @@ impl RecordedSourceStorageRequest {
         Self {
             code_hash: request.code_hash.clone(),
             source_bundle_hash: request.source_bundle_hash.clone(),
+            source_map: request.source_map.clone(),
             files: request
                 .files
                 .iter()
@@ -157,6 +159,7 @@ fn stored_bundle_from_request(
             source_bundle_hash: request.source_bundle_hash.clone(),
             verified_at: MOCK_VERIFIED_AT,
             compiler: request.compiler.clone(),
+            source_map: request.source_map.clone(),
         },
         files,
     }

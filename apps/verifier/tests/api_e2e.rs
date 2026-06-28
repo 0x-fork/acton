@@ -9,11 +9,13 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 use verifier::app;
 use verifier::compilers::CompileGeneratedSource;
+use verifier::source_storage::SourceMapData;
 
 use support::{
     app_state, failing_compiler_app_state, failing_source_storage_app_state, file_part, get,
     post_verify, recording_app_state, recording_source_storage_app_state,
-    recording_source_storage_app_state_with_generated_sources, response_json, text_part,
+    recording_source_storage_app_state_with_generated_sources,
+    recording_source_storage_app_state_with_source_map_data, response_json, text_part,
     unverified_app_state,
 };
 
@@ -313,6 +315,18 @@ async fn verification_status_rejects_missing_target() {
 }
 
 #[tokio::test]
+async fn verification_status_returns_not_found_when_address_has_no_code_hash() {
+    let response = get(
+        app_state(&[], CODE_HASH_ONE),
+        &format!("/api/v1/verification/status?address={ADDRESS_ONE}"),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_error_contains(response, "code_hash was not found").await;
+}
+
+#[tokio::test]
 async fn verification_source_returns_verified_bundle_files() {
     let state = app_state(&[], CODE_HASH_ONE);
     let verify_response = post_verify(
@@ -353,6 +367,60 @@ async fn verification_source_returns_verified_bundle_files() {
     assert_eq!(body.bundles[0].files.len(), 1);
     assert_eq!(body.bundles[0].files[0].path, "main.tolk");
     assert_eq!(body.bundles[0].files[0].content, "fun main() {}");
+}
+
+#[tokio::test]
+async fn verification_source_returns_stored_source_map_data() {
+    let source_map = source_map_data_fixture();
+    let (state, recorded_requests) = recording_source_storage_app_state_with_source_map_data(
+        &[],
+        CODE_HASH_ONE,
+        source_map.clone(),
+    );
+    let verify_response = post_verify(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+    assert_eq!(verify_response.status(), StatusCode::OK);
+
+    let recorded_source_map_data = {
+        let recorded_requests = recorded_requests
+            .lock()
+            .expect("recorded source storage requests mutex should not be poisoned");
+        assert_eq!(recorded_requests.len(), 1);
+        recorded_requests[0].source_map.clone()
+    };
+    assert_eq!(recorded_source_map_data.as_ref(), Some(&source_map));
+
+    let response = get(
+        state,
+        &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response_json::<VerificationSourceResponse>(response).await;
+    assert_eq!(body.bundles.len(), 1);
+    assert_eq!(body.bundles[0].source_map.as_ref(), Some(&source_map));
+}
+
+#[tokio::test]
+async fn verification_source_returns_not_found_when_address_has_no_code_hash() {
+    let response = get(
+        app_state(&[], CODE_HASH_ONE),
+        &format!("/api/v1/verification/source?address={ADDRESS_ONE}"),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_error_contains(response, "code_hash was not found").await;
 }
 
 #[tokio::test]
@@ -879,7 +947,7 @@ async fn verify_rejects_address_without_current_code_hash() {
     )
     .await;
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
     assert_error_contains(response, "not found").await;
 }
 
@@ -1167,7 +1235,17 @@ struct VerifiedSourceBundle {
     verified_at: u64,
     entrypoint: String,
     compiler: VerifiedCompiler,
+    source_map: Option<SourceMapData>,
     files: Vec<VerifiedSourceFile>,
+}
+
+fn source_map_data_fixture() -> SourceMapData {
+    SourceMapData {
+        code_boc64: "te6cckEBAQEAAgAAAEysuc0=".to_owned(),
+        symbol_types_json: json!([{ "name": "main" }]),
+        debug_marks_json: json!([{ "offset": 0 }]),
+        debug_marks_base64: "te6cckEBAQEAAgAAAEysuc0=".to_owned(),
+    }
 }
 
 #[derive(Debug, Deserialize)]

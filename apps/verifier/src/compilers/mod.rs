@@ -10,7 +10,7 @@ use tokio::{
     time::{self, Duration},
 };
 
-use crate::config::Config;
+use crate::{config::Config, source_storage::SourceMapData};
 
 #[async_trait]
 pub trait CompilerService: Send + Sync + 'static {
@@ -75,9 +75,11 @@ impl CompilerService for NodeCompilerService {
             WorkerOutput::Ok {
                 code_hash,
                 generated_sources,
+                source_map,
             } => Ok(CompileOutput {
                 code_hash,
                 generated_sources,
+                source_map,
             }),
             WorkerOutput::CompileError { error } => Err(CompilerError::CompileFailed(error)),
         }
@@ -107,6 +109,7 @@ pub struct CompileSource {
 pub struct CompileOutput {
     pub code_hash: String,
     pub generated_sources: Vec<CompileGeneratedSource>,
+    pub source_map: Option<SourceMapData>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -122,6 +125,7 @@ enum WorkerOutput {
         code_hash: String,
         #[serde(default)]
         generated_sources: Vec<CompileGeneratedSource>,
+        source_map: Option<SourceMapData>,
     },
     CompileError {
         error: String,

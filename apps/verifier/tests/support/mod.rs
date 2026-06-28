@@ -17,7 +17,7 @@ use verifier::{
     config::Config,
     registry::SourceVerificationRegistry,
     registry_index::SqliteVerificationIndex,
-    source_storage::SharedSourceStorage,
+    source_storage::{SharedSourceStorage, SourceMapData},
     state::AppState,
 };
 
@@ -119,6 +119,29 @@ pub fn recording_source_storage_app_state_with_generated_sources(
         compiled_code_hash,
         generated_sources,
     );
+    let source_storage = mock_source_storage::MockSourceStorage::confirmed();
+    let recorded_requests = source_storage.recorded_requests();
+
+    (
+        app_state_from_parts(
+            Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
+            Arc::new(compiler_service),
+            Arc::new(source_storage),
+        ),
+        recorded_requests,
+    )
+}
+
+pub fn recording_source_storage_app_state_with_source_map_data(
+    code_hashes: &[(&str, &str)],
+    compiled_code_hash: &str,
+    source_map: SourceMapData,
+) -> (
+    AppState,
+    Arc<Mutex<Vec<mock_source_storage::RecordedSourceStorageRequest>>>,
+) {
+    let compiler_service =
+        mock_compiler::MockCompilerService::with_source_map_data(compiled_code_hash, source_map);
     let source_storage = mock_source_storage::MockSourceStorage::confirmed();
     let recorded_requests = source_storage.recorded_requests();
 

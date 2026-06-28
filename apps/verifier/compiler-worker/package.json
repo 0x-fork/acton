@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "postinstall": "node scripts/patch-tolk-source-map-data.mjs"
+  },
   "dependencies": {
     "@ton-community/func-js": "0.9.1",
     "@ton/core": "0.61.0",

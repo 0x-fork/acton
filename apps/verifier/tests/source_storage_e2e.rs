@@ -12,7 +12,7 @@ use tempfile::TempDir;
 use verifier::{
     config::Config,
     source_storage::{
-        CompilerMetadata, GitSourceStorage, SourceStorage, SourceStorageFile,
+        CompilerMetadata, GitSourceStorage, SourceMapData, SourceStorage, SourceStorageFile,
         StoreSourceBundleRequest,
     },
 };
@@ -39,6 +39,7 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
                 entrypoint: "main.tolk".to_owned(),
                 params: json!({"compiler_version": "1.4.1"}),
             },
+            source_map: Some(source_map_data_fixture()),
             files: vec![
                 SourceStorageFile {
                     path: "main.tolk".to_owned(),
@@ -78,6 +79,15 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
     assert_eq!(manifest["source_bundle_hash"], SOURCE_BUNDLE_HASH);
     assert_eq!(manifest["compiler"]["entrypoint"], "main.tolk");
     assert_eq!(manifest["compiler"]["version"], "1.4.1");
+    assert!(
+        manifest
+            .as_object()
+            .is_some_and(|value| value.contains_key("source_map"))
+    );
+    assert_eq!(
+        manifest["source_map"]["code_boc64"],
+        "te6cckEBAQEAAgAAAEysuc0="
+    );
     assert_eq!(manifest["files"].as_array().map(Vec::len), Some(2));
     assert_eq!(manifest["files"][1]["path"], "main.tolk");
     let verified_at = manifest["verified_at"]
@@ -95,6 +105,14 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
     assert_eq!(
         stored_bundles[0].manifest.source_bundle_hash,
         SOURCE_BUNDLE_HASH
+    );
+    assert_eq!(
+        stored_bundles[0]
+            .manifest
+            .source_map
+            .as_ref()
+            .map(|data| data.debug_marks_base64.as_str()),
+        Some("te6cckEBAQEAAgAAAEysuc0=")
     );
     assert_eq!(stored_bundles[0].storage_revision, receipt.revision);
     assert_eq!(stored_bundles[0].files.len(), 2);
@@ -125,6 +143,15 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
 
 fn unix_timestamp() -> Result<u64, Box<dyn Error>> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
+}
+
+fn source_map_data_fixture() -> SourceMapData {
+    SourceMapData {
+        code_boc64: "te6cckEBAQEAAgAAAEysuc0=".to_owned(),
+        symbol_types_json: json!([]),
+        debug_marks_json: json!([]),
+        debug_marks_base64: "te6cckEBAQEAAgAAAEysuc0=".to_owned(),
+    }
 }
 
 struct GitFixture {

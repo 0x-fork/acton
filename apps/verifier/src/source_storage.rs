@@ -10,6 +10,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 use tokio::{fs, process::Command, sync::Mutex};
+use utoipa::ToSchema;
 
 use crate::config::Config;
 
@@ -39,6 +40,15 @@ pub struct StoreSourceBundleRequest {
     pub source_bundle_hash: String,
     pub compiler: CompilerMetadata,
     pub files: Vec<SourceStorageFile>,
+    pub source_map: Option<SourceMapData>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+pub struct SourceMapData {
+    pub code_boc64: String,
+    pub symbol_types_json: Value,
+    pub debug_marks_json: Value,
+    pub debug_marks_base64: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -458,6 +468,7 @@ async fn write_manifest(
         source_bundle_hash: request.source_bundle_hash.clone(),
         verified_at,
         compiler: request.compiler.clone(),
+        source_map: request.source_map.clone(),
         files,
     };
     let bytes =
@@ -537,6 +548,7 @@ async fn read_bundle(
             source_bundle_hash: disk_manifest.source_bundle_hash,
             verified_at: disk_manifest.verified_at,
             compiler: disk_manifest.compiler,
+            source_map: disk_manifest.source_map,
         },
         files,
     })
@@ -744,6 +756,7 @@ pub struct SourceBundleManifest {
     pub source_bundle_hash: String,
     pub verified_at: u64,
     pub compiler: CompilerMetadata,
+    pub source_map: Option<SourceMapData>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -752,6 +765,7 @@ struct DiskSourceBundleManifest {
     source_bundle_hash: String,
     verified_at: u64,
     compiler: CompilerMetadata,
+    source_map: Option<SourceMapData>,
     files: Vec<DiskManifestFile>,
 }
 

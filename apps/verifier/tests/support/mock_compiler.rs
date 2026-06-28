@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use verifier::compilers::{
     CompileGeneratedSource, CompileOutput, CompileRequest, CompilerError, CompilerService,
 };
+use verifier::source_storage::SourceMapData;
 
 pub struct MockCompilerService {
     result: MockCompilerResult,
@@ -16,6 +17,7 @@ impl MockCompilerService {
             result: MockCompilerResult::Ok {
                 code_hash: code_hash.to_owned(),
                 generated_sources: Vec::new(),
+                source_map: None,
             },
             recorded_requests: Arc::new(Mutex::new(Vec::new())),
         }
@@ -29,6 +31,18 @@ impl MockCompilerService {
             result: MockCompilerResult::Ok {
                 code_hash: code_hash.to_owned(),
                 generated_sources,
+                source_map: None,
+            },
+            recorded_requests: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    pub fn with_source_map_data(code_hash: &str, source_map: SourceMapData) -> Self {
+        Self {
+            result: MockCompilerResult::Ok {
+                code_hash: code_hash.to_owned(),
+                generated_sources: Vec::new(),
+                source_map: Some(source_map),
             },
             recorded_requests: Arc::new(Mutex::new(Vec::new())),
         }
@@ -52,6 +66,7 @@ enum MockCompilerResult {
     Ok {
         code_hash: String,
         generated_sources: Vec<CompileGeneratedSource>,
+        source_map: Option<SourceMapData>,
     },
     CompileFailed {
         error: String,
@@ -73,9 +88,11 @@ impl CompilerService for MockCompilerService {
             MockCompilerResult::Ok {
                 code_hash,
                 generated_sources,
+                source_map,
             } => Ok(CompileOutput {
                 code_hash: code_hash.clone(),
                 generated_sources: generated_sources.clone(),
+                source_map: source_map.clone(),
             }),
             MockCompilerResult::CompileFailed { error } => {
                 Err(CompilerError::CompileFailed(error.clone()))

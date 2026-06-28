@@ -15,7 +15,7 @@ use crate::{
         VerificationStatusRequest, VerifiedBundlesRequest,
     },
     registry_index::{IndexedAbiContract, IndexedVerifiedBundleSummary},
-    source_storage::{CompilerMetadata, StoredSourceBundle, StoredSourceFile},
+    source_storage::{CompilerMetadata, SourceMapData, StoredSourceBundle, StoredSourceFile},
     state::AppState,
     verification::VerificationTarget,
 };
@@ -243,6 +243,7 @@ pub(super) struct SourceBundleResponse {
     storage_revision: String,
     entrypoint: String,
     compiler: CompilerResponse,
+    source_map: Option<SourceMapData>,
     files: Vec<SourceFileResponse>,
 }
 
@@ -255,6 +256,7 @@ impl From<StoredSourceBundle> for SourceBundleResponse {
             storage_revision: bundle.storage_revision,
             entrypoint: manifest.compiler.entrypoint.clone(),
             compiler: CompilerResponse::from(manifest.compiler),
+            source_map: manifest.source_map,
             files: bundle
                 .files
                 .into_iter()
