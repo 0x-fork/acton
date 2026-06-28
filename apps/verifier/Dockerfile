@@ -29,6 +29,7 @@ FROM node:22-bookworm-slim AS compiler-worker
 WORKDIR /compiler-worker
 
 COPY compiler-worker/package.json compiler-worker/package-lock.json ./
+COPY compiler-worker/scripts ./scripts
 RUN npm ci --omit=dev
 
 COPY compiler-worker/compile.mjs ./compile.mjs
