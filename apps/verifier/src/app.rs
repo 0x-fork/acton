@@ -1,5 +1,8 @@
 use axum::{Router, http::Method, routing::get};
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::{
+    compression::CompressionLayer,
+    cors::{Any, CorsLayer},
+};
 
 use crate::{
     config::Config,
@@ -30,4 +33,5 @@ pub fn router_with_state(state: AppState) -> Router {
                 .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
                 .allow_headers(Any),
         )
+        .layer(CompressionLayer::new())
 }

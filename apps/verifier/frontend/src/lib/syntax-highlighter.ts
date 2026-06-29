@@ -1,5 +1,5 @@
 import {createHighlighterCore} from "shiki/core"
-import {createOnigurumaEngine} from "shiki/engine/oniguruma"
+import {createJavaScriptRegexEngine} from "shiki/engine/javascript"
 import jsonGrammar from "shiki/langs/json.mjs"
 
 import {funcGrammar} from "./func-grammar"
@@ -15,7 +15,7 @@ function getHighlighter() {
   highlighterPromise ??= createHighlighterCore({
     themes: [jetbrainsLightTheme, jetbrainsDarculaTheme],
     langs: [funcGrammar, tactGrammar, tolkGrammar, ...jsonGrammar],
-    engine: createOnigurumaEngine(() => import("shiki/wasm")),
+    engine: createJavaScriptRegexEngine(),
   })
 
   return highlighterPromise
