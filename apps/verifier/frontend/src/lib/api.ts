@@ -39,9 +39,11 @@ export interface LastVerifiedItem {
   readonly source_bundle_hash: string
   readonly verified_at: number
   readonly storage_revision: string
+  readonly entrypoint: string
   readonly compiler: CompilerMetadata
   readonly file_count: number
   readonly has_tolk_abi: boolean
+  readonly abi_name: string | null
 }
 
 export class ApiRequestError extends Error {

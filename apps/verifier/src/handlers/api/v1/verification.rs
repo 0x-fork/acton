@@ -318,9 +318,11 @@ pub(super) struct LastVerifiedItemResponse {
     source_bundle_hash: String,
     verified_at: u64,
     storage_revision: String,
+    entrypoint: String,
     compiler: CompilerResponse,
     file_count: usize,
     has_tolk_abi: bool,
+    abi_name: Option<String>,
 }
 
 impl From<IndexedVerifiedBundleSummary> for LastVerifiedItemResponse {
@@ -330,9 +332,11 @@ impl From<IndexedVerifiedBundleSummary> for LastVerifiedItemResponse {
             source_bundle_hash: item.source_bundle_hash,
             verified_at: item.verified_at,
             storage_revision: item.storage_revision,
+            entrypoint: item.entrypoint,
             compiler: CompilerResponse::from(item.compiler),
             file_count: item.file_count,
             has_tolk_abi: item.has_tolk_abi,
+            abi_name: item.abi_name,
         }
     }
 }

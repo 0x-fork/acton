@@ -2,7 +2,9 @@ import type {ReactNode} from "react"
 import {Github} from "lucide-react"
 
 import tonVerifierIcon from "../assets/ton-verifier-icons/icon.svg"
+import {SearchBox} from "./SearchBox"
 import {ThemeToggle} from "./ThemeToggle"
+import styles from "./AppShell.module.css"
 
 interface AppShellProps {
   readonly children: ReactNode
@@ -10,48 +12,51 @@ interface AppShellProps {
 }
 
 export function AppShell({children, headerAccessory}: AppShellProps) {
+  const pathname = window.location.pathname
+  const isHomePage = pathname === "/"
+  const headerClassName = isHomePage ? `${styles.header} ${styles.headerHome}` : styles.header
+
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="TON Verifier home">
-          <img className="brand-mark" src={tonVerifierIcon} alt="" aria-hidden="true" />
-          <span className="brand-text">TON Verifier</span>
-        </a>
-        <div className="topbar-actions">
-          {headerAccessory}
-          <ThemeToggle />
-          <a
-            className="topbar-github"
-            href="https://github.com/i582/verifier"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Open GitHub"
-            title="GitHub"
-          >
-            <Github size={18} strokeWidth={2} aria-hidden="true" />
-          </a>
+    <div className={styles.appShell}>
+      <header className={headerClassName}>
+        <div className={styles.headerInner}>
+          <div className={styles.headerPrimary}>
+            <a className={styles.brand} href="/" aria-label="TON Verifier home">
+              <img className={styles.brandIcon} src={tonVerifierIcon} alt="" aria-hidden="true" />
+              <span>TON Verifier</span>
+            </a>
+            <nav className={styles.nav} aria-label="TON Verifier navigation">
+              <a
+                className={`${styles.navLink} ${
+                  pathname === "/verified" ? styles.navLinkActive : ""
+                }`}
+                href="/verified"
+              >
+                Verified contracts
+              </a>
+            </nav>
+          </div>
+          {!isHomePage && (
+            <div className={styles.headerSearch}>
+              {headerAccessory ?? <SearchBox variant="header" />}
+            </div>
+          )}
+          <div className={styles.headerActions}>
+            <ThemeToggle />
+            <a
+              className={styles.githubButton}
+              href="https://github.com/i582/verifier"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open GitHub"
+              title="GitHub"
+            >
+              <Github size={18} strokeWidth={2} aria-hidden="true" />
+            </a>
+          </div>
         </div>
       </header>
-      {children}
-      <footer className="app-footer">
-        <div className="footer-brand">
-          <img className="brand-mark" src={tonVerifierIcon} alt="" aria-hidden="true" />
-          <span>TON Verifier</span>
-        </div>
-        <div className="footer-meta">
-          <span className="footer-year">2026</span>
-          <a
-            className="footer-github"
-            href="https://github.com/i582/verifier"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Open GitHub"
-            title="GitHub"
-          >
-            <Github size={18} strokeWidth={2} aria-hidden="true" />
-          </a>
-        </div>
-      </footer>
+      <main className={styles.main}>{children}</main>
     </div>
   )
 }

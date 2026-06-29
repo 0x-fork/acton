@@ -25,6 +25,7 @@
   --font-mono: "JetBrains Mono", "Fira Code", "Source Code Pro", Menlo, Consolas, monospace;
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
+  --font-size-md: 0.9375rem;
   --font-size-base: 1rem;
   --font-size-lg: 1.125rem;
   --font-size-xl: 1.25rem;
@@ -52,9 +53,11 @@
   --litenode-row-hover: #f0f0f1;
   --litenode-surface-raised: #fdfdfd;
   --litenode-border: rgba(24, 24, 27, 0.09);
+  --litenode-border-subtle: rgba(24, 24, 27, 0.08);
   --litenode-border-control: rgba(24, 24, 27, 0.12);
   --litenode-border-strong: rgba(24, 24, 27, 0.16);
   --litenode-text: #18181b;
+  --litenode-text-strong: #171717;
   --litenode-text-muted: #71717a;
   --litenode-text-subtle: #52525b;
   --litenode-text-faint: #8c8c92;
@@ -84,8 +87,9 @@
   --tonscan-border: var(--litenode-border);
   --tonscan-text-primary: var(--litenode-text);
   --tonscan-text-secondary: var(--litenode-text-muted);
-  --tonscan-accent: #0070f3;
+  --tonscan-accent: #4e96ff;
   --tonscan-link: var(--tonscan-accent);
+  --tonscan-row-hover: var(--litenode-row-hover);
   --acton-search-border: rgba(24, 24, 27, 0.1);
   --acton-search-bg: rgba(24, 24, 27, 0.03);
   --acton-search-bg-hover: rgba(24, 24, 27, 0.06);
@@ -125,9 +129,11 @@
   --litenode-row-hover: #18181b;
   --litenode-surface-raised: #18181b;
   --litenode-border: #27272a;
+  --litenode-border-subtle: #27272a;
   --litenode-border-control: #27272a;
   --litenode-border-strong: #3f3f46;
   --litenode-text: #fafafa;
+  --litenode-text-strong: #fafafa;
   --litenode-text-muted: #a1a1aa;
   --litenode-text-subtle: #d4d4d8;
   --litenode-text-faint: #a1a1aa;
@@ -154,7 +160,7 @@
 
   --tonscan-bg: var(--litenode-bg);
   --tonscan-card-bg: var(--litenode-surface-raised);
-  --tonscan-accent: #38bdf8;
+  --tonscan-accent: #4e96ff;
   --acton-search-border: rgba(255, 255, 255, 0.1);
   --acton-search-bg: rgba(255, 255, 255, 0.04);
   --acton-search-bg-hover: rgba(255, 255, 255, 0.07);
@@ -765,7 +771,6 @@ a {
 .panel-heading h2,
 .empty-state h1,
 .empty-state h2,
-.metadata-panel h2,
 .section-header h2 {
   margin: 0;
   color: var(--litenode-text);
@@ -1337,34 +1342,20 @@ a {
   overflow: hidden;
 }
 
-.metadata-panel summary {
+.metadata-panel-heading {
   padding: 12px 18px;
   color: var(--litenode-text);
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  list-style: none;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.metadata-panel summary::-webkit-details-marker {
-  display: none;
-}
-
-.metadata-panel summary::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(-45deg);
-  transition: transform 120ms ease;
-}
-
-.metadata-panel[open] summary::before {
-  transform: rotate(45deg) translate(-1px, -1px);
+.metadata-panel-heading h2 {
+  margin: 0;
+  color: var(--litenode-text);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
 }
 
 .metadata-panel dl {
@@ -1614,7 +1605,7 @@ a {
     max-height: 560px;
   }
 
-  .metadata-panel summary {
+  .metadata-panel-heading {
     padding: 14px 16px;
   }
 

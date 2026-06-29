@@ -147,9 +147,11 @@ async fn last_verified_returns_latest_verified_bundles() {
     assert_eq!(body.items.len(), 1);
     assert_eq!(body.items[0].code_hash, CODE_HASH_ONE);
     assert_eq!(body.items[0].source_bundle_hash, source_bundle_hash);
+    assert_eq!(body.items[0].entrypoint, "main.tolk");
     assert_eq!(body.items[0].compiler.language, "tolk");
     assert_eq!(body.items[0].file_count, 1);
     assert!(!body.items[0].has_tolk_abi);
+    assert_eq!(body.items[0].abi_name, None);
 
     let response = get(state, "/api/v1/last_verified?offset=500").await;
     assert_eq!(response.status(), StatusCode::OK);
@@ -209,6 +211,12 @@ async fn abi_returns_indexed_tolk_abi_records_with_code_hash() {
     let body = response_json::<AbiContractsResponse>(response).await;
     assert_eq!(body.items[0].code_hash, CODE_HASH_ONE);
     assert_eq!(body.items[0].abi["contract_name"].as_str(), Some("Smoke"));
+
+    let response = get(state.clone(), "/api/v1/last_verified").await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json::<LastVerifiedResponse>(response).await;
+    assert_eq!(body.items[0].entrypoint, "main.tolk");
+    assert_eq!(body.items[0].abi_name.as_deref(), Some("Smoke"));
 
     let response = get(state, "/api/v1/abi?offset=500").await;
     assert_eq!(response.status(), StatusCode::OK);
@@ -1269,9 +1277,11 @@ struct LastVerifiedResponse {
 struct LastVerifiedItem {
     code_hash: String,
     source_bundle_hash: String,
+    entrypoint: String,
     compiler: VerifiedCompiler,
     file_count: usize,
     has_tolk_abi: bool,
+    abi_name: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

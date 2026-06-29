@@ -37,8 +37,8 @@ export function getPathLookupValue(): string {
 }
 
 export function shortenMiddle(value: string, left = 10, right = 8): string {
-  if (value.length <= left + right + 3) {
+  if (value.length <= left + right + 1) {
     return value
   }
-  return `${value.slice(0, left)}...${value.slice(-right)}`
+  return `${value.slice(0, left)}…${value.slice(-right)}`
 }

@@ -216,11 +216,11 @@ function VerifiedContract({
       </section>
 
       <div className="contract-layout">
-        <details className="metadata-panel" open>
-          <summary>
+        <section className="metadata-panel" aria-labelledby="verification-metadata-title">
+          <div className="metadata-panel-heading">
             <img className="panel-heading-icon compact" src={compilerIcon} alt="" aria-hidden="true" />
-            <span>Verification metadata</span>
-          </summary>
+            <h2 id="verification-metadata-title">Verification metadata</h2>
+          </div>
           <dl>
             {address && <DetailRow label="Address" value={address} monospace />}
             {verifiedAt && <DetailRow label="Verified at" value={verifiedAt} />}
@@ -238,7 +238,7 @@ function VerifiedContract({
             <div className="metadata-json-title">Compile params</div>
             <HighlightedJson value={bundle.compiler.params} />
           </div>
-        </details>
+        </section>
 
         <section className="source-section">
           <div className="section-header">
@@ -342,7 +342,7 @@ function ContractPage() {
 
   return (
     <AppShell headerAccessory={<SearchBox initialValue={rawLookup} variant="header" />}>
-      <main className="contract-page">
+      <div className="contract-page">
         {loading ? (
           <section className="loading-state">Loading verification state...</section>
         ) : error ? (
@@ -355,7 +355,7 @@ function ContractPage() {
         ) : data ? (
           <UnverifiedContract data={data} lookupTarget={lookupTarget} />
         ) : null}
-      </main>
+      </div>
     </AppShell>
   )
 }

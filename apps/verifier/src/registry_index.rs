@@ -75,9 +75,11 @@ pub struct IndexedVerifiedBundleSummary {
     pub source_bundle_hash: String,
     pub verified_at: u64,
     pub storage_revision: String,
+    pub entrypoint: String,
     pub compiler: CompilerMetadata,
     pub file_count: usize,
     pub has_tolk_abi: bool,
+    pub abi_name: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -325,7 +327,15 @@ impl VerificationIndex for SqliteVerificationIndex {
                 from bundle_abis
                 where bundle_abis.code_hash = verified_bundles.code_hash
                   and bundle_abis.source_bundle_hash = verified_bundles.source_bundle_hash
-              ) as has_tolk_abi
+              ) as has_tolk_abi,
+              (
+                select bundle_abis.abi_json
+                from bundle_abis
+                where bundle_abis.code_hash = verified_bundles.code_hash
+                  and bundle_abis.source_bundle_hash = verified_bundles.source_bundle_hash
+                order by bundle_abis.path asc
+                limit 1
+              ) as abi_json
             from verified_bundles
             left join bundle_files
               on bundle_files.code_hash = verified_bundles.code_hash
@@ -349,6 +359,7 @@ impl VerificationIndex for SqliteVerificationIndex {
                 storage_revision: row.get(4)?,
                 file_count: row.get(5)?,
                 has_tolk_abi: row.get::<_, i64>(6)? != 0,
+                abi_json: row.get(7)?,
             })
         })?;
 
@@ -448,6 +459,7 @@ struct IndexedVerifiedBundleSummaryRow {
     storage_revision: String,
     file_count: i64,
     has_tolk_abi: bool,
+    abi_json: Option<String>,
 }
 
 struct IndexedAbiContractRow {
@@ -727,15 +739,35 @@ fn bundle_files(
 fn summary_from_row(
     row: IndexedVerifiedBundleSummaryRow,
 ) -> Result<IndexedVerifiedBundleSummary, VerificationIndexError> {
+    let compiler = serde_json::from_str::<CompilerMetadata>(&row.compiler_json)?;
+    let entrypoint = compiler.entrypoint.clone();
+    let abi_name = abi_contract_name(row.abi_json.as_deref())?;
+
     Ok(IndexedVerifiedBundleSummary {
         code_hash: row.code_hash,
         source_bundle_hash: row.source_bundle_hash,
         verified_at: i64_to_u64("verified_at", row.verified_at)?,
         storage_revision: row.storage_revision,
-        compiler: serde_json::from_str::<CompilerMetadata>(&row.compiler_json)?,
+        entrypoint,
+        compiler,
         file_count: i64_to_usize("file_count", row.file_count)?,
         has_tolk_abi: row.has_tolk_abi,
+        abi_name,
     })
+}
+
+fn abi_contract_name(abi_json: Option<&str>) -> Result<Option<String>, VerificationIndexError> {
+    let Some(abi_json) = abi_json else {
+        return Ok(None);
+    };
+    let abi = serde_json::from_str::<Value>(abi_json)?;
+
+    Ok(abi
+        .get("contract_name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_owned))
 }
 
 fn abi_contract_from_row(

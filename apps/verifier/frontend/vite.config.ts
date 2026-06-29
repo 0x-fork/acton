@@ -6,6 +6,15 @@ import {defineConfig} from "vite"
 
 const backendTarget = process.env.VITE_BACKEND_PROXY_TARGET || "http://127.0.0.1:3000"
 const contractHtml = resolve(import.meta.dirname, "contract.html")
+const verifiedHtml = resolve(import.meta.dirname, "verified.html")
+
+function routeHtmlPath(pathname: string, production = false) {
+  if (pathname === "/verified" || pathname === "/verified/") {
+    return production ? resolve(import.meta.dirname, "dist/verified.html") : verifiedHtml
+  }
+
+  return production ? resolve(import.meta.dirname, "dist/contract.html") : contractHtml
+}
 
 function contractRouteFallback() {
   return {
@@ -24,7 +33,7 @@ function contractRouteFallback() {
           !pathname.startsWith("/api/") &&
           !isAsset
         ) {
-          const html = await readFile(contractHtml, "utf8")
+          const html = await readFile(routeHtmlPath(pathname), "utf8")
           const transformedHtml = await server.transformIndexHtml(pathname, html)
           response.statusCode = 200
           response.setHeader("Content-Type", "text/html")
@@ -49,7 +58,7 @@ function contractRouteFallback() {
           !pathname.startsWith("/api/") &&
           !isAsset
         ) {
-          const html = await readFile(resolve(import.meta.dirname, "dist/contract.html"), "utf8")
+          const html = await readFile(routeHtmlPath(pathname, true), "utf8")
           response.statusCode = 200
           response.setHeader("Content-Type", "text/html")
           response.end(html)
@@ -71,6 +80,7 @@ export default defineConfig({
       input: {
         index: resolve(import.meta.dirname, "index.html"),
         contract: resolve(import.meta.dirname, "contract.html"),
+        verified: resolve(import.meta.dirname, "verified.html"),
       },
     },
   },

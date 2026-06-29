@@ -35,6 +35,8 @@ fn asset_path(request_path: &str) -> Option<String> {
     let path = request_path.trim_start_matches('/');
     let path = if path.is_empty() {
         "index.html"
+    } else if path == "verified" || path == "verified/" {
+        "verified.html"
     } else if asset_path_has_extension(path) {
         path
     } else {
