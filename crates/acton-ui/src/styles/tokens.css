@@ -39,6 +39,10 @@
   --acton-color-accent-hover: hsl(216 83% 41%);
   /* Text and icon color placed on accent backgrounds when needed. */
   --acton-color-accent-foreground: hsl(0 0% 100%);
+  /* Success status color for completed non-destructive feedback. */
+  --acton-color-success: hsl(142 64% 36%);
+  /* Success border color for feedback surfaces. */
+  --acton-color-success-border: hsl(142 44% 72%);
   /* Destructive action color. */
   --acton-color-danger: hsl(0 84% 60%);
   /* Hover state for destructive action color. */
@@ -53,6 +57,13 @@
   --acton-color-focus-ring: hsl(240 6% 10% / 0.18);
   /* Scrim behind temporary overlays such as mobile drawers. */
   --acton-color-backdrop: hsl(240 10% 4% / 0.42);
+  /* Floating overlay surface for popovers. */
+  --acton-color-popover-surface: hsl(0 0% 100%);
+  /* Floating overlay border for popovers. */
+  --acton-color-popover-border: hsl(240 6% 84%);
+  /* Floating overlay shadow used only by popovers. */
+  --acton-shadow-popover:
+    0 1rem 2.5rem hsl(240 10% 4% / 0.14), 0 0.25rem 0.75rem hsl(240 10% 4% / 0.08);
   /* Base fill for loading skeleton placeholders. */
   --acton-color-skeleton-base: hsl(240 6% 90%);
   /* Passing highlight used by loading skeleton shimmer. */
@@ -161,6 +172,10 @@
   --acton-color-accent-hover: hsl(214 100% 76%);
   /* Dark text and icon color placed on accent backgrounds when needed. */
   --acton-color-accent-foreground: hsl(215 63% 7%);
+  /* Dark success status color for completed non-destructive feedback. */
+  --acton-color-success: hsl(142 69% 58%);
+  /* Dark success border color for feedback surfaces. */
+  --acton-color-success-border: hsl(142 39% 30%);
   /* Dark destructive action color. */
   --acton-color-danger: hsl(0 63% 31%);
   /* Dark hover state for destructive action color. */
@@ -175,6 +190,13 @@
   --acton-color-focus-ring: hsl(0 0% 98% / 0.22);
   /* Dark scrim behind temporary overlays such as mobile drawers. */
   --acton-color-backdrop: hsl(240 10% 4% / 0.68);
+  /* Dark floating overlay surface for popovers. */
+  --acton-color-popover-surface: hsl(240 6% 10%);
+  /* Dark floating overlay border for popovers. */
+  --acton-color-popover-border: hsl(240 5% 26%);
+  /* Dark floating overlay shadow used only by popovers. */
+  --acton-shadow-popover:
+    0 1rem 2.5rem hsl(240 10% 2% / 0.52), 0 0.25rem 0.75rem hsl(240 10% 2% / 0.32);
   /* Dark base fill for loading skeleton placeholders. */
   --acton-color-skeleton-base: hsl(240 4% 16%);
   /* Dark passing highlight used by loading skeleton shimmer. */

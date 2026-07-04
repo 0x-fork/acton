@@ -526,6 +526,150 @@ syntax cases.
 - Treat sanitization as a caller boundary concern; do not pass arbitrary
   untrusted user-authored markdown without a policy.
 
+## Popover
+
+Status: ready
+
+Import:
+
+```tsx
+import { Popover } from "@acton/ui"
+```
+
+Use Popover for rich contextual overlays attached to inline values, status
+labels, compact actions, or info triggers. It is the shared primitive for help
+content that needs multiple lines, links, small actions, or structured detail.
+
+### Composition
+
+```tsx
+<Popover
+  ariaLabel="Send mode details"
+  content={<SendModeHelp />}
+  placement="top"
+>
+  <span>send mode 3</span>
+</Popover>
+```
+
+- `content`: the overlay body. Keep it compact and caller-owned.
+- `interaction`: `hover` by default, or `click` when users need to interact with
+  links/buttons inside the panel.
+- `placement`: preferred side: `top`, `right`, `bottom`, or `left`.
+- Positioning uses Base UI collision handling. The preferred side can flip or
+  shift to stay inside the viewport.
+- `open`, `defaultOpen`, and `onOpenChange`: controlled or uncontrolled state.
+- `openDelay` and `closeDelay`: tune hover timing when the host surface needs
+  it.
+- `contentClassName` and `triggerClassName`: local layout hooks; do not use them
+  to replace the shared panel frame.
+- `tabIndex`: defaults to `0` for text triggers. Pass `-1` when wrapping a
+  focusable child such as `InlineButton`.
+
+### States To Review Visually
+
+- Hover inline technical value
+- Click-triggered rich panel
+- Interactive content with links/actions
+- Preferred top/right/bottom/left placement
+- Auto placement near viewport edges
+- Keyboard focus and Escape close
+
+### Agent Guidance
+
+- Use Popover when contextual content must remain near the value or action it
+  explains.
+- Use hover for read-only inline help and click for interactive panels.
+- Keep docs links, product copy, and domain-specific actions outside the
+  component.
+- Let Popover handle portal rendering and viewport positioning instead of local
+  absolute-positioned panels.
+- Do not put large workflows, destructive confirmations, or long forms inside a
+  popover.
+- Do not reuse the popover shadow on other components.
+
+## Toast
+
+Status: ready
+
+Import:
+
+```tsx
+import { ToastProvider, useToast } from "@acton/ui"
+```
+
+Use Toast for temporary, non-blocking feedback after user actions and async
+workflow changes. It is built on Base UI Toast and keeps the Acton API small:
+wrap the app once, then call toast methods from action handlers.
+
+### Composition
+
+```tsx
+function AppRoot() {
+  return (
+    <ToastProvider theme={theme}>
+      <App />
+    </ToastProvider>
+  )
+}
+
+function RefreshButton() {
+  const { showToast, updateToast } = useToast()
+
+  async function refresh() {
+    const toastId = showToast({
+      title: "Refreshing wallets",
+      description: "Fetching sessions and balances.",
+      variant: "loading",
+    })
+
+    await refreshWallets()
+
+    updateToast(toastId, {
+      title: "Wallets refreshed",
+      description: "Sessions and balances are up to date.",
+      variant: "success",
+    })
+  }
+}
+```
+
+- `ToastProvider`: app-level provider and viewport. Render it once near the
+  root.
+- `showToast(options)`: creates a toast and returns its id.
+- `updateToast(id, options)`: updates a toast in place. Use this for loading to
+  success/error flows.
+- `dismissToast(id?)`: closes one toast, or all toasts when called without an
+  id.
+- `promiseToast(promise, states)`: binds loading, success, and error states to a
+  promise.
+- `variant`: `info`, `success`, `error`, or `loading`.
+- `durationMs`: custom auto-dismiss timeout. Base UI uses a non-auto-dismissed
+  loading toast for promise/loading flows when appropriate.
+
+### States To Review Visually
+
+- Info
+- Success
+- Error
+- Loading
+- Loading updated to success/error
+- Multiple stacked toasts
+- Mobile viewport
+- Keyboard focus and close button
+
+### Agent Guidance
+
+- Use Toast for copy, refresh, connection, approval, rejection, and recoverable
+  error feedback.
+- Use `updateToast` or `promiseToast` instead of stacking separate loading and
+  completion messages.
+- Keep text short and specific.
+- Variants are expressed through icon color, border color, and text content.
+  Do not add decorative side rails, status strips, or accent bars.
+- Do not use Toast for field validation, destructive confirmations, long logs,
+  forms, tables, or permanent page content.
+
 ## DataTable
 
 Status: ready

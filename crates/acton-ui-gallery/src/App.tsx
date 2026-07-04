@@ -1,4 +1,4 @@
-import {MarkdownText, ThemeSwitch, cx} from "@acton/ui"
+import {MarkdownText, ThemeSwitch, ToastProvider, cx} from "@acton/ui"
 import {PanelLeftOpen, X} from "lucide-react"
 import {useEffect, useState} from "react"
 
@@ -50,7 +50,8 @@ export function App() {
   }
 
   return (
-    <div className={styles.shell} data-theme={theme}>
+    <ToastProvider theme={theme}>
+      <div className={styles.shell} data-theme={theme}>
       <header className={styles.mobileToolbar}>
         <button
           type="button"
@@ -189,7 +190,8 @@ export function App() {
           ))}
         </div>
       </main>
-    </div>
+      </div>
+    </ToastProvider>
   )
 }
 

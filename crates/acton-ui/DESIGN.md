@@ -26,7 +26,12 @@ inventory.
   - Use `--acton-color-surface-hover`, not "gray hover".
   - Use `--acton-color-danger-text` for destructive inline text/icons.
 - Do not use shadows for controls, cards, focus, or elevation. Use borders,
-  surfaces, and outline focus treatment.
+  surfaces, and outline focus treatment. `Popover` is the current exception:
+  floating overlays may use `--acton-shadow-popover` so they separate from the
+  page.
+- Never use decorative side rails, status strips, or accent bars anywhere in
+  the system. State must be communicated through content, icons, semantic
+  border/fill tokens, or explicit structure instead.
 - Use existing spacing tokens where possible. Add a token only when the spacing
   value is expected to recur.
 
@@ -226,6 +231,46 @@ release notes, and agent-facing UI descriptions.
 - Do not use it for raw payloads, VM logs, base64, hex, disassembly, or code
   viewers. Use `RawDataBlock` for those.
 
+### Popover
+
+Use `Popover` for contextual overlays attached to inline values, status labels,
+and compact actions when the explanation needs rich content, links, or local
+interactive controls.
+
+- It owns portal rendering, outside click, Escape close, focus/hover behavior,
+  viewport positioning, and automatic side fallback through Base UI.
+- Use hover interaction for lightweight inline explanations.
+- Use click interaction when the panel contains links, buttons, or content users
+  need to inspect deliberately.
+- Keep domain copy, docs links, and action wiring in the caller.
+- Use `placement` as a preference; Base UI may shift or flip the panel to keep
+  it inside the viewport.
+- `Popover` is allowed to use `--acton-shadow-popover`. Do not copy that shadow
+  token into controls, cards, tables, or other framed surfaces.
+- Keep popover content compact. If the content becomes a workflow, use a page
+  region or modal-level component instead.
+
+### Toast
+
+Use `Toast` for short-lived, non-blocking feedback after user actions and async
+workflows.
+
+- Wrap app roots in `ToastProvider` once and call `useToast` from action
+  handlers.
+- Use `showToast` for immediate feedback such as copied values, refresh
+  completion, connection changes, and recoverable errors.
+- Use `updateToast` when a loading state resolves into success or failure.
+  Keep the same toast id instead of stacking separate loading and completion
+  messages.
+- Use `promiseToast` when the workflow already returns a promise and loading,
+  success, and error messages can live together.
+- Keep descriptions compact. Toasts may contain a short link or inline code, but
+  not logs, tables, forms, or large raw payloads.
+- Do not add decorative side rails, status strips, or accent bars. Variants are
+  expressed through icon color, border color, and text content only.
+- Do not use toast for destructive confirmations or field validation. Use a
+  dialog or inline form feedback for those.
+
 ### DataTable
 
 Use `DataTable` for standalone framed data tables in localnet, explorer, test
@@ -340,8 +385,10 @@ Use `ThemeSwitch` for global light/dark theme changes.
 - Shadows.
 - One-off component classes in application code when a primitive exists.
 - Rebuilding `Button`, `Breadcrumbs`, `InlineButton`, `InlineActions`,
-  `DisclosureToggle`, `ContentTabs`, `PillTabs`, `RawDataBlock`,
-  `MarkdownText`, `DataTable`, `Skeleton`, `Checkbox`, or `ThemeSwitch` with
-  ad hoc markup.
+  `DisclosureToggle`, `ContentTabs`, `PillTabs`, `Popover`, `RawDataBlock`,
+  `Toast`, `MarkdownText`, `DataTable`, `Skeleton`, `Checkbox`, or
+  `ThemeSwitch` with ad hoc markup.
+- Shadows outside the `Popover` floating overlay exception.
+- Decorative side rails, status strips, or accent bars anywhere in the system.
 - Adding variants because a single screen wants a custom look.
 - Mixing several high-emphasis actions in one compact group.

@@ -8,9 +8,11 @@ import {inlineActionsGallery} from "./inlineActionsGallery"
 import {inlineButtonGallery} from "./inlineButtonGallery"
 import {markdownTextGallery} from "./markdownTextGallery"
 import {pillTabsGallery} from "./pillTabsGallery"
+import {popoverGallery} from "./popoverGallery"
 import {rawDataBlockGallery} from "./rawDataBlockGallery"
 import {skeletonGallery} from "./skeletonGallery"
 import {themeSwitchGallery} from "./themeSwitchGallery"
+import {toastGallery} from "./toastGallery"
 import type {ComponentGallery} from "./types"
 
 export const galleries = [
@@ -22,6 +24,8 @@ export const galleries = [
   contentTabsGallery,
   pillTabsGallery,
   markdownTextGallery,
+  popoverGallery,
+  toastGallery,
   rawDataBlockGallery,
   dataTableGallery,
   skeletonGallery,
