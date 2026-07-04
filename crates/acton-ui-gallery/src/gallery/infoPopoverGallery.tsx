@@ -83,8 +83,7 @@ export const infoPopoverGallery = {
   id: "info-popover",
   title: "InfoPopover",
   status: "ready",
-  summary:
-    "InfoPopover renders the standard compact info icon trigger for rich contextual help.",
+  summary: "InfoPopover renders the standard compact info icon trigger for rich contextual help.",
   importStatement: 'import {InfoPopover} from "@acton/ui"',
   agentSummary:
     "Use InfoPopover for the standard inline info icon attached to labels or values. Use Popover directly when the trigger is custom text, a badge, or an action.",

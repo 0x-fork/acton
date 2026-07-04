@@ -29,11 +29,7 @@ function splitVisualNumberGroups(value: string): readonly string[] | undefined {
   return groups
 }
 
-export function VisuallyGroupedNumber({
-  value,
-  className,
-  ...props
-}: VisuallyGroupedNumberProps) {
+export function VisuallyGroupedNumber({value, className, ...props}: VisuallyGroupedNumberProps) {
   const normalizedValue = String(value)
   const groups = splitVisualNumberGroups(normalizedValue)
 

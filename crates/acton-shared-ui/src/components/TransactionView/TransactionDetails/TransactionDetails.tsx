@@ -10,12 +10,7 @@ import type {
   TransactionBlockRef,
   TransactionInfo,
 } from "@/types/transaction"
-import {
-  ContractSourcePanel,
-  DataBlock,
-  fmt,
-  type ContractVerifiedSource,
-} from "@/index"
+import {ContractSourcePanel, DataBlock, fmt, type ContractVerifiedSource} from "@/index"
 import {decodeMessageBody, decodeStateInitData, getShardAccountBalance} from "@/utils/messageBody"
 import {
   computeSendMode,
