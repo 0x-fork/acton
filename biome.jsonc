@@ -9,6 +9,8 @@
     "includes": [
       "crates/acton-explorer-ui/**",
       "crates/acton-localnet-ui/**",
+      "crates/acton-ui/**",
+      "crates/acton-ui-gallery/**",
       "crates/acton-shared-ui/**",
       "crates/acton-test-ui/**"
     ]
