@@ -2,7 +2,8 @@ import {type CSSProperties, useEffect, useState} from "react"
 import {X} from "lucide-react"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
-import {useToast, type ContractData} from "@acton/shared-ui"
+import {useToast} from "@acton/ui"
+import type {ContractData} from "@acton/shared-ui"
 
 import {useNetworkInfo} from "../../../../hooks/useNetworkInfo"
 import {useAvailableFlowMetrics} from "../../../../hooks/useAvailableFlowMetrics"

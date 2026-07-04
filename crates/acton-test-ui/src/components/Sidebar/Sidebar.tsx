@@ -9,7 +9,8 @@ import {
   FiMinus,
   FiX,
 } from "react-icons/fi"
-import {AppIcon, type TestReport, TestStatus, ThemeSwitch, type ThemeMode} from "@acton/shared-ui"
+import {ThemeSwitch, type ThemeMode} from "@acton/ui"
+import {AppIcon, type TestReport, TestStatus} from "@acton/shared-ui"
 
 import {Summary} from "../Summary/Summary"
 

@@ -1,4 +1,5 @@
-import {ThemeSwitch, ToastProvider, useToast} from "@acton/shared-ui"
+import {ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
+import type {ThemeMode} from "@acton/ui"
 import {Check, ChevronDown, Edit2, Github, Plus, Share2, Star, Trash2} from "lucide-react"
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
@@ -30,7 +31,7 @@ import {ExplorerSearch} from "../../acton-localnet-ui/src/explorer/components/Ex
 import {ExplorerIndexPage} from "../../acton-localnet-ui/src/explorer/pages/ExplorerIndexPage"
 import {FavoriteAccountsPage} from "../../acton-localnet-ui/src/explorer/pages/FavoriteAccountsPage"
 import {TransactionPage} from "../../acton-localnet-ui/src/explorer/pages/TransactionPage"
-import type {ThemeMode} from "@acton/shared-ui"
+import "@acton/ui/styles/tokens.css"
 import "@acton/shared-ui/styles/tokens.css"
 import "../../acton-localnet-ui/src/index.css"
 import actonScanLogo from "./assets/acton-scan-logo-dark.svg"
@@ -480,7 +481,7 @@ function NetworkDropdown({
       }
       closeDropdown()
       showToast({
-        description: networkFormMode.type === "edit" ? "Network updated." : "Network added.",
+        title: networkFormMode.type === "edit" ? "Network updated" : "Network added",
         variant: "success",
       })
     } catch (error) {
@@ -509,10 +510,11 @@ function NetworkDropdown({
       await navigator.clipboard.writeText(createNetworkShareUrl(selectedNetwork))
       closeDropdown()
       showToast({
+        title: "Network link copied",
         description:
           isCustomNetworkId(selectedNetwork.id) && selectedNetwork.api.toncenterApiKey
-            ? "Link with network copied without API key."
-            : "Link with network copied.",
+            ? "API key was not included in the shared link."
+            : undefined,
         variant: "success",
       })
     } catch {
@@ -610,7 +612,7 @@ function NetworkDropdown({
                       onClick={() => {
                         onDeleteNetwork(networkId)
                         showToast({
-                          description: "Network removed.",
+                          title: "Network removed",
                           variant: "success",
                         })
                       }}
@@ -898,7 +900,7 @@ export const ExplorerApp: FC = () => {
 
   return (
     <BrowserRouter>
-      <ToastProvider>
+      <ToastProvider theme={theme}>
         <StaticNetworkInfoProvider network={networkConfig}>
           <ExplorerRoutesProvider basePath="">
             <MetadataRegistryProvider registry={metadataRegistry}>

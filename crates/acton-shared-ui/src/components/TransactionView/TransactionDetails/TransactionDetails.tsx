@@ -1,6 +1,7 @@
 import * as React from "react"
 import {useEffect, useRef, useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
+import {InfoPopover} from "@acton/ui"
 
 import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {
@@ -12,7 +13,6 @@ import type {
 import {
   ContractSourcePanel,
   DataBlock,
-  InfoPopover,
   fmt,
   type ContractVerifiedSource,
 } from "@/index"

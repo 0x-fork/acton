@@ -1,5 +1,6 @@
 import {Check, Copy, KeyRound, Shield, X} from "lucide-react"
-import {Button, useToast} from "@acton/shared-ui"
+import {useToast} from "@acton/ui"
+import {Button} from "@acton/shared-ui"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {
@@ -246,7 +247,6 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           showToast({
             variant: "info",
             title: "Session disconnected",
-            description: "Session disconnected.",
           })
           void nextWalletKit.listSessions().then(setSessions)
         })
@@ -435,7 +435,6 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
       showToast({
         variant: "info",
         title: "Connection rejected",
-        description: "Connection request rejected.",
       })
     } catch (error) {
       if (isStaleTonConnectRequest(error)) {
@@ -469,7 +468,6 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
       showToast({
         variant: "success",
         title: "Transaction approved",
-        description: "Transaction request approved.",
       })
       await refreshWalletBalances()
     } catch (error) {
@@ -508,7 +506,6 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
       showToast({
         variant: "info",
         title: "Transaction rejected",
-        description: "Transaction request rejected.",
       })
     } catch (error) {
       if (isStaleTonConnectRequest(error)) {
@@ -542,7 +539,6 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
       showToast({
         variant: "success",
         title: "Sign request approved",
-        description: "Sign request approved.",
       })
     } catch (error) {
       if (isStaleTonConnectRequest(error)) {
@@ -579,7 +575,6 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
       showToast({
         variant: "info",
         title: "Sign request rejected",
-        description: "Sign request rejected.",
       })
     } catch (error) {
       if (isStaleTonConnectRequest(error)) {
@@ -614,7 +609,6 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
         showToast({
           variant: "info",
           title: "Session disconnected",
-          description: "Session disconnected.",
         })
       } catch (error) {
         showErrorToast("Disconnect failed", error, "Failed to disconnect session.")

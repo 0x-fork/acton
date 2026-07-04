@@ -190,6 +190,20 @@ selection, compact item filters, and selectors with a collapsible group summary.
 - Keep selected item state, group filtering, and domain labels in the caller.
 - Do not use it for connected panels; use `ContentTabs` instead.
 
+### VisuallyGroupedNumber
+
+Use `VisuallyGroupedNumber` for long decimal technical values where readability
+needs visual grouping but the text must stay exact for copying and inspection.
+
+- It visually separates decimal groups with CSS; it does not insert real
+  separators into the value.
+- It only groups plain decimal strings, including negative and fractional
+  values. Hex, hashes, addresses, base64, and short values render unchanged.
+- Keep typography, color, and table/cell layout in the caller.
+- Keep domain-specific formatting outside the component.
+- Do not use it for truncation. Use a dedicated truncation component or local
+  formatting for addresses and hashes.
+
 ### RawDataBlock
 
 Use `RawDataBlock` for large raw values and code-like payloads: base64, hex,
@@ -250,6 +264,19 @@ interactive controls.
 - Keep popover content compact. If the content becomes a workflow, use a page
   region or modal-level component instead.
 
+### InfoPopover
+
+Use `InfoPopover` for the standard compact info icon attached to labels or
+technical values.
+
+- Build it from `Popover`; do not duplicate portal, scroll, resize, or
+  positioning logic.
+- Use it when the trigger should be the shared info icon. Use `Popover`
+  directly for custom text, badges, buttons, or other triggers.
+- Keep the help content caller-owned and compact.
+- Use click interaction when the panel contains links or actions users need to
+  reach deliberately.
+
 ### Toast
 
 Use `Toast` for short-lived, non-blocking feedback after user actions and async
@@ -259,6 +286,8 @@ workflows.
   handlers.
 - Use `showToast` for immediate feedback such as copied values, refresh
   completion, connection changes, and recoverable errors.
+- Put the primary status in `title`. Use `description` only for supporting
+  detail, recovery context, links, or technical error text.
 - Use `updateToast` when a loading state resolves into success or failure.
   Keep the same toast id instead of stacking separate loading and completion
   messages.

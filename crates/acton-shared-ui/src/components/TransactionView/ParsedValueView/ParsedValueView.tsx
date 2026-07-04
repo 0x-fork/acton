@@ -1,6 +1,6 @@
 import type React from "react"
 
-import {VisuallyGroupedNumber} from "@/components/VisuallyGroupedNumber/VisuallyGroupedNumber"
+import {VisuallyGroupedNumber} from "@acton/ui"
 import type {ContractData, ParsedValue, ParsedValueMapEntry} from "@/types/transaction"
 
 import {ContractChip} from "../ContractChip/ContractChip"

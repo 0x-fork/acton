@@ -26,8 +26,8 @@ import {
 } from "lucide-react"
 import type {LucideIcon} from "lucide-react"
 import {useLocation, useNavigate} from "react-router-dom"
-import {ThemeSwitch} from "@acton/shared-ui"
-import type {ThemeMode} from "@acton/shared-ui"
+import {ThemeSwitch} from "@acton/ui"
+import type {ThemeMode} from "@acton/ui"
 
 import type {TonClient} from "../explorer/api/client"
 import {readExplorerLastPath, writeExplorerLastPath} from "../explorer/explorerResume"

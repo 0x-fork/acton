@@ -4,6 +4,7 @@ import {checkboxGallery} from "./checkboxGallery"
 import {contentTabsGallery} from "./contentTabsGallery"
 import {dataTableGallery} from "./dataTableGallery"
 import {disclosureToggleGallery} from "./disclosureToggleGallery"
+import {infoPopoverGallery} from "./infoPopoverGallery"
 import {inlineActionsGallery} from "./inlineActionsGallery"
 import {inlineButtonGallery} from "./inlineButtonGallery"
 import {markdownTextGallery} from "./markdownTextGallery"
@@ -13,6 +14,7 @@ import {rawDataBlockGallery} from "./rawDataBlockGallery"
 import {skeletonGallery} from "./skeletonGallery"
 import {themeSwitchGallery} from "./themeSwitchGallery"
 import {toastGallery} from "./toastGallery"
+import {visuallyGroupedNumberGallery} from "./visuallyGroupedNumberGallery"
 import type {ComponentGallery} from "./types"
 
 export const galleries = [
@@ -25,10 +27,12 @@ export const galleries = [
   pillTabsGallery,
   markdownTextGallery,
   popoverGallery,
+  infoPopoverGallery,
   toastGallery,
   rawDataBlockGallery,
   dataTableGallery,
   skeletonGallery,
+  visuallyGroupedNumberGallery,
   checkboxGallery,
   themeSwitchGallery,
 ] satisfies readonly ComponentGallery[]

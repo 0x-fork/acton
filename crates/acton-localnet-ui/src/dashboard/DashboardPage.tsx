@@ -1,5 +1,5 @@
 import {PanelLeftOpen} from "lucide-react"
-import type {ThemeMode} from "@acton/shared-ui"
+import type {ThemeMode} from "@acton/ui"
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 

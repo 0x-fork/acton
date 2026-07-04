@@ -3,7 +3,7 @@ import {Check, Copy, Edit2, QrCode, Star, X} from "lucide-react"
 import {QRCodeSVG} from "qrcode.react"
 import {useEffect, useId, useRef, useState} from "react"
 import type {FC} from "react"
-import {InfoPopover} from "@acton/shared-ui"
+import {InfoPopover} from "@acton/ui"
 
 import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {TonClient} from "../api/client"

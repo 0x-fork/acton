@@ -1,5 +1,6 @@
 import {ArrowUpRight, Check, ChevronDown, Coins, Loader2, X} from "lucide-react"
-import {Button, Input, useToast} from "@acton/shared-ui"
+import {useToast} from "@acton/ui"
+import {Button, Input} from "@acton/shared-ui"
 import type {Address} from "@ton/core"
 import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
@@ -48,7 +49,7 @@ interface FaucetOption {
 }
 
 export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
-  const {dismissToast, showToast} = useToast()
+  const {dismissToast, showToast, updateToast} = useToast()
   const addressFormat = useAddressFormat()
   const [mode, setMode] = useState<FaucetMode>("ton")
   const [address, setAddress] = useState("")
@@ -301,33 +302,40 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
         }
         await sendTons(normalized, tonAmountNano)
       }
-    } catch (submitError) {
-      showToast({
-        variant: "error",
-        title: isJettonMode ? "Mint failed" : "Transfer failed",
-        description:
-          submitError instanceof Error
-            ? submitError.message
-            : isJettonMode
-              ? "Failed to mint jettons."
-              : "Failed to send GRAM.",
-      })
     } finally {
       setIsSubmitting(false)
     }
   }
 
   async function sendTons(normalized: string, nanoAmount: number) {
-    const msgHash = await client.fundAccount(normalized, nanoAmount)
-    await showFaucetSuccessToast({
-      title: "Transfer sent",
-      description: (
-        <>
-          Sent {amount.trim()} GRAM to {formatAddress(normalized, true, addressFormat)}.
-        </>
-      ),
-      msgHash,
+    const recipient = formatAddress(normalized, true, addressFormat)
+    const toastId = showToast({
+      variant: "loading",
+      title: "Sending transfer",
+      description: `Sending ${amount.trim()} GRAM to ${recipient}.`,
+      durationMs: 60_000,
     })
+
+    try {
+      const msgHash = await client.fundAccount(normalized, nanoAmount)
+      await updateFaucetResultToast({
+        toastId,
+        title: "Transfer sent",
+        description: (
+          <>
+            Sent {amount.trim()} GRAM to {recipient}.
+          </>
+        ),
+        msgHash,
+      })
+    } catch (error) {
+      updateToast(toastId, {
+        variant: "error",
+        title: "Transfer failed",
+        description: error instanceof Error ? error.message : "Failed to send GRAM.",
+        durationMs: 8000,
+      })
+    }
   }
 
   async function mintJettons(recipientAddress: Address, normalized: string) {
@@ -342,78 +350,107 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
     }
 
     const normalizedMinter = parsedMinter.toString(addressFormat)
-    const [master] = await client.getJettonMasters([normalizedMinter])
-    if (!master) {
-      throw new Error(TOKEN_MINTER_NOT_FOUND_MESSAGE)
-    }
-    if (!master.mintable) {
-      throw new Error(TOKEN_MINTER_NOT_MINTABLE_MESSAGE)
-    }
-    if (!master.admin_address) {
-      throw new Error("This jetton master has no admin address, so faucet cannot mint it.")
-    }
+    const recipient = formatAddress(normalized, true, addressFormat)
+    const toastId = showToast({
+      variant: "loading",
+      title: "Sending mint",
+      description: `Preparing ${amount.trim()} ${selectedAssetSymbol} for ${recipient}.`,
+      durationMs: 60_000,
+    })
 
-    const adminAddress = parseAddress(master.admin_address)
-    if (!adminAddress) {
-      throw new Error("Jetton master admin address is invalid.")
-    }
+    try {
+      const [master] = await client.getJettonMasters([normalizedMinter])
+      if (!master) {
+        throw new Error(TOKEN_MINTER_NOT_FOUND_MESSAGE)
+      }
+      if (!master.mintable) {
+        throw new Error(TOKEN_MINTER_NOT_MINTABLE_MESSAGE)
+      }
+      if (!master.admin_address) {
+        throw new Error("This jetton master has no admin address, so faucet cannot mint it.")
+      }
 
-    const decimals = normalizeJettonDecimals(master.jetton_content.decimals)
-    const jettonAmount = parseJettonAmount(amount, decimals)
-    if (jettonAmount === undefined) {
-      showToast({
-        variant: "error",
-        title: "Invalid amount",
-        description: `Enter a valid amount with up to ${decimals} decimal places.`,
+      const adminAddress = parseAddress(master.admin_address)
+      if (!adminAddress) {
+        throw new Error("Jetton master admin address is invalid.")
+      }
+
+      const decimals = normalizeJettonDecimals(master.jetton_content.decimals)
+      const jettonAmount = parseJettonAmount(amount, decimals)
+      if (jettonAmount === undefined) {
+        updateToast(toastId, {
+          variant: "error",
+          title: "Invalid amount",
+          description: `Enter a valid amount with up to ${decimals} decimal places.`,
+          durationMs: 8000,
+        })
+        return
+      }
+
+      const boc = buildJettonMintInternalMessageBoc({
+        minter: parsedMinter,
+        admin: adminAddress,
+        recipient: recipientAddress,
+        jettonAmount,
       })
-      return
+      const symbol = jettonSymbol(master)
+      const msgHash = await client.sendInternalMessage(boc)
+      await updateFaucetResultToast({
+        toastId,
+        title: "Mint sent",
+        description: (
+          <>
+            Minted {amount.trim()} {symbol} to {recipient}.
+          </>
+        ),
+        msgHash,
+      })
+    } catch (error) {
+      updateToast(toastId, {
+        variant: "error",
+        title: "Mint failed",
+        description: error instanceof Error ? error.message : "Failed to mint jettons.",
+        durationMs: 8000,
+      })
     }
-
-    const boc = buildJettonMintInternalMessageBoc({
-      minter: parsedMinter,
-      admin: adminAddress,
-      recipient: recipientAddress,
-      jettonAmount,
-    })
-    const symbol = jettonSymbol(master)
-    const msgHash = await client.sendInternalMessage(boc)
-    await showFaucetSuccessToast({
-      title: "Mint sent",
-      description: (
-        <>
-          Minted {amount.trim()} {symbol} to {formatAddress(normalized, true, addressFormat)}.
-        </>
-      ),
-      msgHash,
-    })
   }
 
-  async function showFaucetSuccessToast({
+  async function updateFaucetResultToast({
+    toastId,
     title,
     description,
     msgHash,
   }: {
+    readonly toastId: string
     readonly title: string
     readonly description: ReactNode
     readonly msgHash: string
   }) {
+    updateToast(toastId, {
+      variant: "loading",
+      title: "Waiting for transaction",
+      description: "Message accepted. Resolving the trace link.",
+      durationMs: 60_000,
+    })
+
     const txHash = await waitForTraceTransactionHash(msgHash)
-    showToast({
+
+    updateToast(toastId, {
       variant: "success",
       title,
       description: (
         <span>
           {description}
-          {txHash && (
+          {txHash ? (
             <>
               <br />
               <br />
               <a href={`/explorer/tx/${encodeURIComponent(txHash)}`}>View transaction</a>
             </>
-          )}
+          ) : undefined}
         </span>
       ),
-      durationMs: txHash ? 8000 : undefined,
+      durationMs: 8000,
     })
   }
 

@@ -2,7 +2,8 @@ import type * as React from "react"
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import {FiWifiOff} from "react-icons/fi"
 
-import type {TestReport, ThemeMode, Trace} from "@acton/shared-ui"
+import type {ThemeMode} from "@acton/ui"
+import type {TestReport, Trace} from "@acton/shared-ui"
 
 import styles from "./App.module.css"
 import {Coverage} from "./components/Coverage/Coverage"

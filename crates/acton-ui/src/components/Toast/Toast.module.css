@@ -6,7 +6,20 @@
   top: auto;
   z-index: 1000;
   width: min(24rem, calc(100vw - var(--acton-space-4) * 2));
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-font-size-md);
+  line-height: 1.5;
   pointer-events: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+.viewport,
+.viewport *,
+.viewport *::before,
+.viewport *::after {
+  box-sizing: border-box;
 }
 
 .toast {
@@ -16,8 +29,10 @@
   --acton-toast-shrink: calc(1 - var(--acton-toast-scale));
   --acton-toast-height: var(--toast-frontmost-height, var(--toast-height));
   --acton-toast-offset-y: calc(
-    var(--toast-offset-y) * -1 + (var(--toast-index) * var(--acton-toast-gap) * -1) +
-      var(--toast-swipe-movement-y)
+    var(--toast-offset-y) *
+    -1 +
+    (var(--toast-index) * var(--acton-toast-gap) * -1) +
+    var(--toast-swipe-movement-y)
   );
 
   position: absolute;
@@ -36,8 +51,9 @@
   transform: translateX(var(--toast-swipe-movement-x))
     translateY(
       calc(
-        var(--toast-swipe-movement-y) - (var(--toast-index) * var(--acton-toast-peek)) -
-          (var(--acton-toast-shrink) * var(--acton-toast-height))
+        var(--toast-swipe-movement-y) -
+        (var(--toast-index) * var(--acton-toast-peek)) -
+        (var(--acton-toast-shrink) * var(--acton-toast-height))
       )
     )
     scale(var(--acton-toast-scale));
@@ -120,6 +136,15 @@
   transition: opacity var(--acton-duration-normal) var(--acton-ease-standard);
 }
 
+.content[data-layout="single"] {
+  display: grid;
+  grid-template-columns: 1.125rem minmax(0, 1fr) 1.75rem;
+  align-items: center;
+  min-height: 3.5rem;
+  padding: var(--acton-space-3);
+  padding-left: var(--acton-space-4);
+}
+
 .content[data-behind] {
   opacity: 0;
   pointer-events: none;
@@ -138,6 +163,10 @@
   margin-top: 0.0625rem;
   color: var(--acton-color-accent);
   place-items: center;
+}
+
+.content[data-layout="single"] .icon {
+  margin-top: 0;
 }
 
 .toast[data-variant="success"] .icon {
@@ -160,12 +189,20 @@
   gap: var(--acton-space-1);
 }
 
+.content[data-layout="single"] .body {
+  display: block;
+}
+
 .title {
   margin: 0;
   color: var(--acton-color-text);
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-semibold);
   line-height: 1.35;
+}
+
+.content[data-layout="single"] .title {
+  line-height: 1.25;
 }
 
 .description {
@@ -206,6 +243,11 @@
   color: var(--acton-color-text-subtle);
   cursor: pointer;
   place-items: center;
+}
+
+.content[data-layout="single"] .closeButton {
+  justify-self: end;
+  margin: 0;
 }
 
 .closeButton:hover {

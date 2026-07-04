@@ -14,6 +14,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@acton/shared-ui": "workspace:*",
+        "@acton/ui": "workspace:*",
         "@cloudflare/pages-plugin-vercel-og": "^0.1.2",
         "@monaco-editor/react": "^4.7.0",
         "@ton/core": "0.63.1",
@@ -52,6 +53,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@acton/shared-ui": "workspace:*",
+        "@acton/ui": "workspace:*",
         "@monaco-editor/react": "^4.7.0",
         "@scalar/api-reference-react": "^0.9.41",
         "@ton/core": "0.63.1",
@@ -90,6 +92,7 @@
       "name": "@acton/shared-ui",
       "version": "1.0.0",
       "dependencies": {
+        "@acton/ui": "workspace:*",
         "@ton/core": "0.63.1",
         "@ton/tasm": "^0.6.1",
         "@ton/tolk-abi-to-typescript": "^0.5.0",
@@ -113,6 +116,7 @@
       "version": "1.0.0",
       "dependencies": {
         "@acton/shared-ui": "workspace:*",
+        "@acton/ui": "workspace:*",
         "@ton/core": "0.63.1",
         "@ton/tolk-abi-to-typescript": "^0.5.0",
         "bignumber.js": "^9.3.1",

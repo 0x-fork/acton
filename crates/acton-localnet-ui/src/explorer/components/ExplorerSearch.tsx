@@ -1,4 +1,4 @@
-import {useToast} from "@acton/shared-ui"
+import {useToast} from "@acton/ui"
 import {FileCode2, History, Search, X} from "lucide-react"
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent} from "react"

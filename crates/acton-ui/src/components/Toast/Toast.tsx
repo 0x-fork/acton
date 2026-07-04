@@ -16,17 +16,32 @@ import styles from "./Toast.module.css"
 export type ToastVariant = "info" | "success" | "error" | "loading"
 export type ToastPriority = "low" | "high"
 
-export type ToastOptions = Readonly<{
+type ToastBaseOptions = Readonly<{
   readonly id?: string
-  readonly title?: ReactNode
-  readonly description?: ReactNode
   readonly variant?: ToastVariant
   readonly durationMs?: number
   readonly priority?: ToastPriority
 }>
 
+type ToastContentFields = Readonly<{
+  readonly title?: ReactNode
+  readonly description?: ReactNode
+}>
+
+type ToastRequiredContent =
+  | Readonly<{
+      readonly title: ReactNode
+      readonly description?: ReactNode
+    }>
+  | Readonly<{
+      readonly title?: ReactNode
+      readonly description: ReactNode
+    }>
+
+export type ToastOptions = ToastBaseOptions & ToastRequiredContent
+
 export type ToastUpdateOptions = Readonly<
-  Partial<Omit<ToastOptions, "id">> & {
+  Partial<Omit<ToastBaseOptions, "id"> & ToastContentFields> & {
     readonly id?: never
   }
 >
@@ -141,10 +156,7 @@ function ToastProviderBridge({
     <ToastContext.Provider value={contextValue}>
       {children}
       <ToastBase.Portal>
-        <ToastBase.Viewport
-          className={cx(styles.viewport, viewportClassName)}
-          data-theme={theme}
-        >
+        <ToastBase.Viewport className={cx(styles.viewport, viewportClassName)} data-theme={theme}>
           <ToastList />
         </ToastBase.Viewport>
       </ToastBase.Portal>
@@ -157,6 +169,7 @@ function ToastList() {
 
   return toasts.map(toast => {
     const variant = toast.data?.variant ?? normalizeToastVariant(toast.type)
+    const layout = toast.title && toast.description ? "rich" : "single"
 
     return (
       <ToastBase.Root
@@ -164,9 +177,10 @@ function ToastList() {
         toast={toast}
         className={styles.toast}
         data-variant={variant}
+        data-layout={layout}
         swipeDirection={["right", "down"]}
       >
-        <ToastBase.Content className={styles.content}>
+        <ToastBase.Content className={styles.content} data-layout={layout}>
           <span className={styles.icon} aria-hidden="true">
             <ToastIcon variant={variant} />
           </span>
@@ -207,19 +221,36 @@ function toBaseToastOptions(
   fallbackVariant: ToastVariant | undefined,
 ): ToastManagerUpdateOptions<ToastData> & {readonly id?: string} {
   const variant = options.variant ?? fallbackVariant
-  const timeout = options.durationMs
+  const baseOptions: ToastManagerUpdateOptions<ToastData> & {id?: string} = {}
 
-  return {
-    id: "id" in options ? options.id : undefined,
-    title: options.title,
-    description: options.description,
-    priority: options.priority ?? (variant === "error" ? "high" : "low"),
-    timeout,
-    type: variant,
-    data: {
-      variant,
-    },
+  if ("title" in options) {
+    baseOptions.title = options.title
   }
+
+  if ("description" in options) {
+    baseOptions.description = options.description
+  }
+
+  if (options.durationMs !== undefined) {
+    baseOptions.timeout = options.durationMs
+  }
+
+  if (options.priority !== undefined) {
+    baseOptions.priority = options.priority
+  } else if (variant === "error") {
+    baseOptions.priority = "high"
+  }
+
+  if (variant !== undefined) {
+    baseOptions.type = variant
+    baseOptions.data = {variant}
+  }
+
+  if ("id" in options && options.id !== undefined) {
+    baseOptions.id = options.id
+  }
+
+  return baseOptions
 }
 
 function resolvePromiseState<Value>(
@@ -230,7 +261,7 @@ function resolvePromiseState<Value>(
   const resolved = typeof state === "function" ? state(value as Value) : state
 
   if (typeof resolved === "string") {
-    return toBaseToastOptions({description: resolved, variant}, variant)
+    return toBaseToastOptions({title: resolved, variant}, variant)
   }
 
   return toBaseToastOptions({...resolved, variant: resolved.variant ?? variant}, variant)

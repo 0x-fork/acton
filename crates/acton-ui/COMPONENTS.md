@@ -407,6 +407,46 @@ It does not own a content panel.
 - Do not use PillTabToggle as the selected content tab; it controls group
   visibility.
 
+## VisuallyGroupedNumber
+
+Status: ready
+
+Import:
+
+```tsx
+import { VisuallyGroupedNumber } from "@acton/ui"
+```
+
+Use VisuallyGroupedNumber for long decimal technical values where visual
+readability matters but the underlying string must not gain real separators:
+parsed scalar values, storage diffs, balances, gas values, counters, and ids.
+
+### Composition
+
+```tsx
+<VisuallyGroupedNumber className={styles.value} value={displayValue} />
+```
+
+- `value`: already formatted display value. Plain decimal strings are visually
+  grouped; short values and non-decimal strings render unchanged.
+- `className`: caller-owned typography, color, truncation, and layout.
+
+### States To Review Visually
+
+- Short values
+- Large decimal values
+- Signed values
+- Decimal fractions
+- Hex/hash strings that should remain unchanged
+
+### Agent Guidance
+
+- Use it only when visual grouping should not alter copyable text.
+- Keep domain formatting outside the component.
+- Do not use it for addresses, hashes, base64, or values that need middle
+  truncation.
+- Do not insert literal spaces into technical numbers for readability.
+
 ## RawDataBlock
 
 Status: ready
@@ -588,6 +628,48 @@ content that needs multiple lines, links, small actions, or structured detail.
   popover.
 - Do not reuse the popover shadow on other components.
 
+## InfoPopover
+
+Status: ready
+
+Import:
+
+```tsx
+import { InfoPopover } from "@acton/ui"
+```
+
+Use InfoPopover for the standard compact info icon attached to labels or
+technical values. It composes Popover and only owns the trigger visual.
+
+### Composition
+
+```tsx
+<InfoPopover id={descriptionId} ariaLabel="Show contract description">
+  <ContractDescription />
+</InfoPopover>
+```
+
+- `children`: compact help content rendered inside the popover panel.
+- `id`: optional panel id for local aria relationships.
+- `ariaLabel`: trigger and panel label. Defaults to `Show information`.
+- `interaction`, `placement`, `open`, `defaultOpen`, `onOpenChange`,
+  `openDelay`, and `closeDelay`: forwarded to Popover.
+- Default placement is `right`.
+
+### States To Review Visually
+
+- Inline icon after a technical value
+- Top/right placement near dense rows
+- Interactive click content with a link or action
+- Keyboard focus and Escape close
+
+### Agent Guidance
+
+- Use InfoPopover when the trigger should be the shared info icon.
+- Use Popover directly when the trigger is custom text, a badge, or a button.
+- Keep domain copy, docs links, and local actions in the caller.
+- Do not rebuild icon help popovers with local portal or positioning code.
+
 ## Toast
 
 Status: ready
@@ -637,6 +719,8 @@ function RefreshButton() {
 - `ToastProvider`: app-level provider and viewport. Render it once near the
   root.
 - `showToast(options)`: creates a toast and returns its id.
+- Put the primary status text in `title`; reserve `description` for supporting
+  detail, links, or error context.
 - `updateToast(id, options)`: updates a toast in place. Use this for loading to
   success/error flows.
 - `dismissToast(id?)`: closes one toast, or all toasts when called without an

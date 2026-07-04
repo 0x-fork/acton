@@ -1,7 +1,7 @@
 import {BrowserRouter, Navigate, Route, Routes} from "react-router-dom"
 import {Check, KeyRound, ShieldCheck, X} from "lucide-react"
-import {ToastProvider} from "@acton/shared-ui"
-import type {ThemeMode} from "@acton/shared-ui"
+import {ToastProvider} from "@acton/ui"
+import type {ThemeMode} from "@acton/ui"
 import {
   Suspense,
   lazy,
@@ -37,6 +37,7 @@ import {NftsPage} from "./dashboard/pages/NftsPage"
 import {TokensPage} from "./dashboard/pages/TokensPage"
 import {WalletsPage} from "./dashboard/pages/WalletsPage"
 import {WalletRuntimeProvider} from "./wallet/WalletRuntimeProvider"
+import "@acton/ui/styles/tokens.css"
 import "@acton/shared-ui/styles/tokens.css"
 import "./index.css"
 import styles from "./App.module.css"
@@ -160,7 +161,7 @@ export const App: FC = () => {
 
   return (
     <BrowserRouter>
-      <ToastProvider>
+      <ToastProvider theme={theme}>
         <NetworkInfoProvider client={client} api={explorerApi}>
           <MetadataRegistryProvider registry={metadataRegistry}>
             <AddressBookProvider>

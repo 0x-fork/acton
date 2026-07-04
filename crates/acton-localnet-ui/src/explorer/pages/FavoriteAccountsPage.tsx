@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 import {Link} from "react-router-dom"
-import {useToast} from "@acton/shared-ui"
+import {useToast} from "@acton/ui"
 import {Star, Trash2} from "lucide-react"
 
 import type {TonClient} from "../api/client"
@@ -144,7 +144,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
   const handleRemove = (favorite: FavoriteAccount) => {
     setFavorite(favorite.address, false)
     showToast({
-      description: "Account removed from favorites",
+      title: "Account removed from favorites",
       variant: "success",
     })
   }

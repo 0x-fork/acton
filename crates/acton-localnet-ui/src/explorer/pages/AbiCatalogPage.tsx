@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-import {useToast} from "@acton/shared-ui"
+import {useToast} from "@acton/ui"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 import {Link, useParams} from "react-router-dom"
 
@@ -112,13 +112,14 @@ export const AbiCatalogPage: FC = () => {
       setAbiJson("")
       setAbiFormExpanded(false)
       showToast({
-        description: "ABI registered",
+        title: "ABI registered",
         variant: "success",
       })
       await loadRegisteredMetadata()
     } catch (error) {
       showToast({
-        description: error instanceof Error ? error.message : "Failed to register ABI",
+        title: "ABI not registered",
+        description: error instanceof Error ? error.message : "Failed to register ABI.",
         variant: "error",
       })
     }
@@ -128,13 +129,14 @@ export const AbiCatalogPage: FC = () => {
     try {
       await metadataRegistry.deleteCompilerAbi(codeHash)
       showToast({
-        description: "ABI deleted",
+        title: "ABI deleted",
         variant: "success",
       })
       await loadRegisteredMetadata()
     } catch (error) {
       showToast({
-        description: error instanceof Error ? error.message : "Failed to delete ABI",
+        title: "ABI not deleted",
+        description: error instanceof Error ? error.message : "Failed to delete ABI.",
         variant: "error",
       })
     }

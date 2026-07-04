@@ -52,144 +52,144 @@ export function App() {
   return (
     <ToastProvider theme={theme}>
       <div className={styles.shell} data-theme={theme}>
-      <header className={styles.mobileToolbar}>
-        <button
-          type="button"
-          className={styles.menuButton}
-          aria-label="Open component navigation"
-          aria-controls="gallery-navigation-panel"
-          aria-expanded={isNavigationOpen}
-          onClick={() => setIsNavigationOpen(true)}
-        >
-          <PanelLeftOpen size={18} aria-hidden="true" />
-        </button>
-        <div className={styles.mobileTitle}>
-          <span>Acton UI</span>
-          <strong>{activeGallery.title}</strong>
-        </div>
-        <ThemeSwitch
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
-        />
-      </header>
-
-      {isNavigationOpen ? (
-        <button
-          type="button"
-          className={styles.backdrop}
-          aria-label="Close component navigation"
-          onClick={() => setIsNavigationOpen(false)}
-        />
-      ) : undefined}
-
-      <aside
-        id="gallery-navigation-panel"
-        className={cx(styles.sidebar, isNavigationOpen && styles.sidebarOpen)}
-      >
-        <div className={styles.sidebarHeader}>
-          <div className={styles.sidebarHeaderText}>
-            <p className={styles.eyebrow}>Acton UI</p>
-            <h1 className={styles.title}>Component gallery</h1>
-            <p className={styles.sidebarText}>
-              Visual inventory for reusable Acton primitives, variants, states, and usage notes.
-            </p>
-          </div>
+        <header className={styles.mobileToolbar}>
           <button
             type="button"
-            className={styles.drawerClose}
-            aria-label="Close component navigation"
-            onClick={() => setIsNavigationOpen(false)}
+            className={styles.menuButton}
+            aria-label="Open component navigation"
+            aria-controls="gallery-navigation-panel"
+            aria-expanded={isNavigationOpen}
+            onClick={() => setIsNavigationOpen(true)}
           >
-            <X size={17} aria-hidden="true" />
+            <PanelLeftOpen size={18} aria-hidden="true" />
           </button>
-        </div>
-
-        <nav className={styles.navigation} aria-label="Components">
-          {galleries.map(gallery => (
-            <button
-              key={gallery.id}
-              type="button"
-              className={cx(
-                styles.navigationItem,
-                gallery.id === activeGallery.id && styles.navigationItemActive,
-              )}
-              onClick={() => selectGallery(gallery.id)}
-            >
-              <span>{gallery.title}</span>
-              <span className={styles.navigationStatus}>{gallery.status}</span>
-            </button>
-          ))}
-        </nav>
-
-        <div className={styles.sidebarFooter}>
+          <div className={styles.mobileTitle}>
+            <span>Acton UI</span>
+            <strong>{activeGallery.title}</strong>
+          </div>
           <ThemeSwitch
             theme={theme}
             onToggleTheme={toggleTheme}
             aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
           />
-        </div>
-      </aside>
-
-      <main className={styles.main}>
-        <header className={styles.componentHeader}>
-          <div className={styles.componentHeaderText}>
-            <p className={styles.eyebrow}>Component</p>
-            <h2 className={styles.componentTitle}>{activeGallery.title}</h2>
-            <p className={styles.componentSummary}>{activeGallery.summary}</p>
-          </div>
         </header>
 
-        <section className={styles.notesGrid} aria-label="Usage guidance">
-          <article className={styles.noteBlock}>
-            <h3>Use When</h3>
-            <ul>
-              {activeGallery.usage.map(item => (
-                <li key={item}>
-                  <MarkdownText className={styles.noteText} tone="muted">
-                    {item}
-                  </MarkdownText>
-                </li>
-              ))}
-            </ul>
-          </article>
-          <article className={styles.noteBlock}>
-            <h3>Avoid When</h3>
-            <ul>
-              {activeGallery.avoid.map(item => (
-                <li key={item}>
-                  <MarkdownText className={styles.noteText} tone="muted">
-                    {item}
-                  </MarkdownText>
-                </li>
-              ))}
-            </ul>
-          </article>
-          <article className={styles.agentBlock}>
-            <h3>Agent Note</h3>
-            <MarkdownText className={styles.agentText} tone="muted">
-              {activeGallery.agentSummary}
-            </MarkdownText>
-            <code>{activeGallery.importStatement}</code>
-          </article>
-        </section>
+        {isNavigationOpen ? (
+          <button
+            type="button"
+            className={styles.backdrop}
+            aria-label="Close component navigation"
+            onClick={() => setIsNavigationOpen(false)}
+          />
+        ) : undefined}
 
-        <div className={styles.sections}>
-          {activeGallery.sections.map(section => (
-            <section
-              key={section.id}
-              className={styles.gallerySection}
-              aria-labelledby={section.id}
+        <aside
+          id="gallery-navigation-panel"
+          className={cx(styles.sidebar, isNavigationOpen && styles.sidebarOpen)}
+        >
+          <div className={styles.sidebarHeader}>
+            <div className={styles.sidebarHeaderText}>
+              <p className={styles.eyebrow}>Acton UI</p>
+              <h1 className={styles.title}>Component gallery</h1>
+              <p className={styles.sidebarText}>
+                Visual inventory for reusable Acton primitives, variants, states, and usage notes.
+              </p>
+            </div>
+            <button
+              type="button"
+              className={styles.drawerClose}
+              aria-label="Close component navigation"
+              onClick={() => setIsNavigationOpen(false)}
             >
-              <div className={styles.sectionHeader}>
-                <h3 id={section.id}>{section.title}</h3>
-                <p>{section.description}</p>
-              </div>
-              {section.content}
-            </section>
-          ))}
-        </div>
-      </main>
+              <X size={17} aria-hidden="true" />
+            </button>
+          </div>
+
+          <nav className={styles.navigation} aria-label="Components">
+            {galleries.map(gallery => (
+              <button
+                key={gallery.id}
+                type="button"
+                className={cx(
+                  styles.navigationItem,
+                  gallery.id === activeGallery.id && styles.navigationItemActive,
+                )}
+                onClick={() => selectGallery(gallery.id)}
+              >
+                <span>{gallery.title}</span>
+                <span className={styles.navigationStatus}>{gallery.status}</span>
+              </button>
+            ))}
+          </nav>
+
+          <div className={styles.sidebarFooter}>
+            <ThemeSwitch
+              theme={theme}
+              onToggleTheme={toggleTheme}
+              aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
+            />
+          </div>
+        </aside>
+
+        <main className={styles.main}>
+          <header className={styles.componentHeader}>
+            <div className={styles.componentHeaderText}>
+              <p className={styles.eyebrow}>Component</p>
+              <h2 className={styles.componentTitle}>{activeGallery.title}</h2>
+              <p className={styles.componentSummary}>{activeGallery.summary}</p>
+            </div>
+          </header>
+
+          <section className={styles.notesGrid} aria-label="Usage guidance">
+            <article className={styles.noteBlock}>
+              <h3>Use When</h3>
+              <ul>
+                {activeGallery.usage.map(item => (
+                  <li key={item}>
+                    <MarkdownText className={styles.noteText} tone="muted">
+                      {item}
+                    </MarkdownText>
+                  </li>
+                ))}
+              </ul>
+            </article>
+            <article className={styles.noteBlock}>
+              <h3>Avoid When</h3>
+              <ul>
+                {activeGallery.avoid.map(item => (
+                  <li key={item}>
+                    <MarkdownText className={styles.noteText} tone="muted">
+                      {item}
+                    </MarkdownText>
+                  </li>
+                ))}
+              </ul>
+            </article>
+            <article className={styles.agentBlock}>
+              <h3>Agent Note</h3>
+              <MarkdownText className={styles.agentText} tone="muted">
+                {activeGallery.agentSummary}
+              </MarkdownText>
+              <code>{activeGallery.importStatement}</code>
+            </article>
+          </section>
+
+          <div className={styles.sections}>
+            {activeGallery.sections.map(section => (
+              <section
+                key={section.id}
+                className={styles.gallerySection}
+                aria-labelledby={section.id}
+              >
+                <div className={styles.sectionHeader}>
+                  <h3 id={section.id}>{section.title}</h3>
+                  <p>{section.description}</p>
+                </div>
+                {section.content}
+              </section>
+            ))}
+          </div>
+        </main>
       </div>
     </ToastProvider>
   )

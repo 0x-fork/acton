@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
-import {CopyValueButton, useToast} from "@acton/shared-ui"
+import {useToast} from "@acton/ui"
+import {CopyValueButton} from "@acton/shared-ui"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 
 import type {
@@ -84,13 +85,14 @@ export const SourceCatalogPage: FC = () => {
       setSourceJson("")
       setSourceFormExpanded(false)
       showToast({
-        description: "Source registered",
+        title: "Source registered",
         variant: "success",
       })
       await loadSources()
     } catch (error) {
       showToast({
-        description: error instanceof Error ? error.message : "Failed to register source",
+        title: "Source not registered",
+        description: error instanceof Error ? error.message : "Failed to register source.",
         variant: "error",
       })
     }
@@ -100,13 +102,14 @@ export const SourceCatalogPage: FC = () => {
     try {
       await metadataRegistry.deleteSource(codeHash)
       showToast({
-        description: "Source deleted",
+        title: "Source deleted",
         variant: "success",
       })
       await loadSources()
     } catch (error) {
       showToast({
-        description: error instanceof Error ? error.message : "Failed to delete source",
+        title: "Source not deleted",
+        description: error instanceof Error ? error.message : "Failed to delete source.",
         variant: "error",
       })
     }
