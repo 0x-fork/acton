@@ -112,3 +112,13 @@
   - changed-files:
       - any-glob-to-any-file:
           - "src/commands/hooks/**"
+
+"UI":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/acton-explorer-ui/**"
+          - "crates/acton-localnet-ui/**"
+          - "crates/acton-shared-ui/**"
+          - "crates/acton-test-ui/**"
+          - "crates/acton-ui/**"
+          - "crates/acton-ui-gallery/**"
