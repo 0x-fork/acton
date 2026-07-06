@@ -11,6 +11,7 @@ on:
       - "bun.lock"
       - "bunfig.toml"
       - "package.json"
+      - "crates/**-ui/package.json"
       - "crates/acton-**-ui/package.json"
   push:
     branches:
@@ -21,6 +22,7 @@ on:
       - "bun.lock"
       - "bunfig.toml"
       - "package.json"
+      - "crates/**-ui/package.json"
       - "crates/acton-**-ui/package.json"
   workflow_dispatch:
 
