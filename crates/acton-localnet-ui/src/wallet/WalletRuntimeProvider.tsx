@@ -1,6 +1,6 @@
 import {Check, Copy, KeyRound, Shield, X} from "lucide-react"
-import {useToast} from "@acton/ui"
 import {Button} from "@acton/shared-ui"
+import {useToast} from "@acton/ui"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {
@@ -19,6 +19,7 @@ import {formatAddress, normalizeAddress} from "../explorer/components/utils"
 import {useAddressFormat} from "../explorer/hooks/useNetworkInfo"
 
 import {addStartupWalletToKit, createWalletKit, getWalletNetworkLabel} from "./kit"
+import {SignRequestCellPreview} from "./SignRequestCellPreview"
 import type {RuntimeWallet, StartupWalletRecord} from "./types"
 import {isSupportedWalletVersion} from "./types"
 import {useTonConnectPasteHandler} from "./useTonConnectPasteHandler"
@@ -37,6 +38,10 @@ interface WalletRuntimeProviderProps {
   readonly host: string
   readonly localnetApiToken?: string
   readonly children: ReactNode
+}
+
+interface SignRequestPreviewProps {
+  readonly preview: SignDataRequestEvent["preview"]["data"]
 }
 
 export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
@@ -813,17 +818,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           subtitle={`${getDappName(pendingSignDataRequest.preview.dAppInfo?.name)} wants a signature.`}
           onDismiss={() => setPendingSignDataRequest(undefined)}
         >
-          <div className={styles.messageItem}>
-            <KeyRound size={16} />
-            <div>
-              <div className={styles.messageAddress}>
-                {pendingSignDataRequest.preview.data.type.toUpperCase()}
-              </div>
-              <div className={styles.permissionDescription}>
-                {describeSignPreview(pendingSignDataRequest.preview.data)}
-              </div>
-            </div>
-          </div>
+          <SignRequestPreview preview={pendingSignDataRequest.preview.data} />
 
           <div className={styles.modalActions}>
             <Button
@@ -910,6 +905,36 @@ const CopyableAddress: FC<CopyableAddressProps> = ({address, copiedAddress, onCo
   )
 }
 
+const SignRequestPreview: FC<SignRequestPreviewProps> = ({preview}) => {
+  if (preview.type === "cell") {
+    return <SignRequestCellPreview preview={preview} />
+  }
+
+  return (
+    <div className={styles.messageItem}>
+      <KeyRound size={16} />
+      <div>
+        <div className={styles.messageAddress}>{preview.type.toUpperCase()}</div>
+        <div className={styles.permissionDescription}>{describeSignPreview(preview)}</div>
+      </div>
+    </div>
+  )
+}
+
+function describeSignPreview(preview: SignDataRequestEvent["preview"]["data"]): string {
+  switch (preview.type) {
+    case "text": {
+      return preview.value.content
+    }
+    case "binary": {
+      return `${preview.value.content.length} base64 chars`
+    }
+    default: {
+      return "Unknown sign payload"
+    }
+  }
+}
+
 function shortenAddress(address: string, visibleChars: number): string {
   if (address.length <= visibleChars * 2) {
     return address
@@ -932,21 +957,4 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 function isStaleTonConnectRequest(error: unknown): boolean {
   return /session not found/i.test(getErrorMessage(error, ""))
-}
-
-function describeSignPreview(preview: SignDataRequestEvent["preview"]["data"]): string {
-  switch (preview.type) {
-    case "text": {
-      return preview.value.content
-    }
-    case "binary": {
-      return `${preview.value.content.length} base64 chars`
-    }
-    case "cell": {
-      return preview.value.schema || "TON Cell payload"
-    }
-    default: {
-      return "Unknown sign payload"
-    }
-  }
 }
