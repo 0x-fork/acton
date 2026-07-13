@@ -87,6 +87,14 @@ For the minimal local build/test flow, install:
 
 Optional CLI tools:
 
+Install the full set with:
+
+```bash
+just install-tools
+```
+
+Or install individual tools as needed:
+
 - `cargo-shear` (unused dependency linter for `just check-deps`, also needed by `just check` / `just check-ci`)
   ```bash
   cargo install cargo-shear --version 1.13.1 --locked
@@ -615,7 +623,8 @@ just check
 ```
 
 This command runs Rust formatting, docgen, dependency, dependency-policy, lint, schema, and test checks.
-Install `cargo-shear`, `cargo-deny`, and `typos-cli` if you want to run it locally.
+It needs `cargo-shear`, `cargo-deny`, `cargo-audit`, and `typos-cli` locally;
+`just install-tools` installs them together with the optional coverage and WASM tools.
 `typos` uses `_typos.toml` excludes for `docs/` and selected generated or imported trees.
 
 If your PR touches UI code (`crates/acton-test-ui`, `crates/acton-localnet-ui`,

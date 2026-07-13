@@ -16,6 +16,15 @@ build-source-trace-wasm:
 sync-artifacts:
     cargo xtask sync-artifacts
 
+install-tools:
+    cargo install cargo-shear --version 1.13.1 --locked
+    cargo install cargo-deny --version 0.19.8 --locked
+    cargo install cargo-audit --version 0.22.1 --locked
+    cargo install typos-cli --version 1.47.2 --locked
+    cargo install cargo-llvm-cov --locked
+    rustup component add llvm-tools-preview
+    cargo install wasm-pack --version 0.15.0 --locked
+
 test-unit:
     cargo nextest run --workspace --lib --bins {{ NEXTEST_PROFILE_ARGS }} {{ TEST_FEATURE_ARGS }}
     cargo test --workspace --doc
