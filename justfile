@@ -179,3 +179,8 @@ precommit: fmt fmt-ui build build-ui check check-ui
 clean:
     cargo clean
     rm -rf crates/acton-test-ui/dist
+
+generate-schema:
+    cargo run -p xtask -- schema --schema acton-toml
+    cargo run -p xtask -- schema --schema lint-report
+    cargo run -p xtask -- schema --schema mutation-rules
