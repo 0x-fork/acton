@@ -10,6 +10,7 @@ use thiserror::Error;
 
 const DEFAULT_CONFIG_PATH: &str = "config.toml";
 const CONFIG_PATH_ENV: &str = "VERIFIER_CONFIG";
+const DEFAULT_LOG_LEVEL: &str = "info";
 const MAINNET_TONCENTER_BASE_URL: &str = "https://toncenter.com";
 const TESTNET_TONCENTER_BASE_URL: &str = "https://testnet.toncenter.com";
 const LOCALNET_TONCENTER_BASE_URL: &str = "http://127.0.0.1:5411";
@@ -24,6 +25,7 @@ const DEFAULT_REGISTRY_INDEX_PATH: &str = "verifier-index.sqlite3";
 #[derive(Clone, Debug)]
 pub struct Config {
     bind_addr: SocketAddr,
+    logging_level: String,
     network: TonNetwork,
     toncenter_base_url: Option<String>,
     toncenter_api_key: Option<String>,
@@ -74,6 +76,11 @@ impl Config {
     #[must_use]
     pub const fn bind_addr(&self) -> SocketAddr {
         self.bind_addr
+    }
+
+    #[must_use]
+    pub fn logging_level(&self) -> &str {
+        &self.logging_level
     }
 
     #[must_use]
@@ -143,6 +150,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             bind_addr: default_bind_addr(),
+            logging_level: DEFAULT_LOG_LEVEL.to_owned(),
             network: TonNetwork::Mainnet,
             toncenter_base_url: None,
             toncenter_api_key: None,
@@ -208,6 +216,8 @@ struct ConfigFile {
     #[serde(default)]
     server: ServerConfig,
     #[serde(default)]
+    logging: LoggingConfig,
+    #[serde(default)]
     network: NetworkConfig,
     #[serde(default)]
     toncenter: ToncenterConfig,
@@ -223,6 +233,10 @@ impl ConfigFile {
     fn into_config(self) -> Config {
         Config {
             bind_addr: self.server.bind_addr.unwrap_or_else(default_bind_addr),
+            logging_level: self
+                .logging
+                .level
+                .unwrap_or_else(|| DEFAULT_LOG_LEVEL.to_owned()),
             network: self.network.name.unwrap_or(TonNetwork::Mainnet),
             toncenter_base_url: self.toncenter.base_url,
             toncenter_api_key: self.toncenter.api_key,
@@ -264,6 +278,11 @@ impl ConfigFile {
 #[derive(Debug, Default, Deserialize)]
 struct ServerConfig {
     bind_addr: Option<SocketAddr>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct LoggingConfig {
+    level: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]

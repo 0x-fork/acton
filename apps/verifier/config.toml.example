@@ -1,6 +1,10 @@
 [server]
 bind_addr = "127.0.0.1:3000"
 
+[logging]
+# Supported values: trace, debug, info, warn, error.
+level = "info"
+
 [network]
 # Supported values: mainnet, testnet, localnet.
 name = "mainnet"

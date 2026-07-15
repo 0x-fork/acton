@@ -6,8 +6,7 @@ use verifier::config::Config;
 
 #[test]
 fn example_config_toml_loads() {
-    let config =
-        Config::load_from_path("config.toml.example").expect("example config should load");
+    let config = Config::load_from_path("config.toml.example").expect("example config should load");
 
     assert_eq!(
         config.bind_addr(),
@@ -15,6 +14,7 @@ fn example_config_toml_loads() {
             .parse::<SocketAddr>()
             .expect("test bind address should be valid")
     );
+    assert_eq!(config.logging_level(), "info");
     assert_eq!(config.network().to_string(), "mainnet");
     assert_eq!(config.toncenter_base_url(), "https://toncenter.com");
     assert_eq!(config.toncenter_api_key(), None);
@@ -56,6 +56,7 @@ name = "localnet"
 
     let config = Config::load_from_path(config_file.path()).expect("localnet config should load");
 
+    assert_eq!(config.logging_level(), "info");
     assert_eq!(config.network().to_string(), "localnet");
     assert_eq!(config.toncenter_base_url(), "http://127.0.0.1:5411");
 }
@@ -67,6 +68,9 @@ fn source_repository_config_loads_from_toml() {
     writeln!(
         config_file,
         r#"
+[logging]
+level = "debug"
+
 [network]
 name = "testnet"
 
@@ -92,6 +96,7 @@ path = "/tmp/verifier-index.sqlite3"
 
     let config = Config::load_from_path(config_file.path()).expect("testnet config should load");
 
+    assert_eq!(config.logging_level(), "debug");
     assert_eq!(config.network().to_string(), "testnet");
     assert_eq!(config.toncenter_base_url(), "http://127.0.0.1:5412");
     assert_eq!(config.toncenter_api_key(), Some("test-key"));

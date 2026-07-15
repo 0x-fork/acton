@@ -108,6 +108,7 @@ Example `/opt/ton-verifier/verifier.env`:
 
 ```bash
 VERIFIER_NETWORK=mainnet
+VERIFIER_LOG_LEVEL=info
 VERIFIER_TONCENTER_BASE_URL=https://toncenter.com
 VERIFIER_TONCENTER_API_KEY=
 
@@ -119,8 +120,6 @@ SOURCE_REPOSITORY_SSH_KEY_FILE=/run/secrets/source_repo_key
 SOURCE_REPOSITORY_SSH_STRICT_HOST_KEY_CHECKING=accept-new
 
 VERIFIER_REGISTRY_INDEX_PATH=/var/lib/verifier/registry-index/registry-index.sqlite3
-
-RUST_LOG=info
 ```
 
 For testnet:
