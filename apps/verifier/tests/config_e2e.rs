@@ -5,8 +5,9 @@ use std::time::Duration;
 use verifier::config::Config;
 
 #[test]
-fn repository_config_toml_loads() {
-    let config = Config::load_from_path("config.toml").expect("repository config should load");
+fn example_config_toml_loads() {
+    let config =
+        Config::load_from_path("config.toml.example").expect("example config should load");
 
     assert_eq!(
         config.bind_addr(),
