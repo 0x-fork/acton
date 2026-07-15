@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "generate-registry": "node scripts/generate-registry.mjs",
     "postinstall": "node scripts/patch-tolk-source-map-data.mjs"
   },
   "dependencies": {
