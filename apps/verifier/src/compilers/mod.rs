@@ -49,6 +49,9 @@ impl CompilerService for NodeCompilerService {
             .ok_or_else(|| CompilerError::MissingWorkerDirectory(worker_path.clone()))?;
         let mut child = isolated_command(&self.node_bin)
             .arg("--permission")
+            .arg("--disallow-code-generation-from-strings")
+            .arg("--disable-proto=throw")
+            .arg("--no-experimental-sqlite")
             .arg(format!("--allow-fs-read={}", worker_directory.display()))
             .arg(&worker_path)
             .stdin(std::process::Stdio::piped())
@@ -270,5 +273,69 @@ mod tests {
             b"allowed:ERR_ACCESS_DENIED:ERR_ACCESS_DENIED"
         );
         assert!(!output_file.exists());
+    }
+
+    #[tokio::test]
+    async fn node_disallows_code_generation_from_strings() {
+        let output = isolated_command("node")
+            .arg("--disallow-code-generation-from-strings")
+            .arg("--eval")
+            .arg(
+                r#"
+                    try {
+                      eval("1");
+                    } catch (error) {
+                      process.stdout.write(error.name);
+                    }
+                "#,
+            )
+            .output()
+            .await
+            .expect("isolated Node command should run");
+
+        assert!(
+            output.status.success(),
+            "isolated Node command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(output.stdout, b"EvalError");
+    }
+
+    #[tokio::test]
+    async fn node_disables_proto_and_experimental_sqlite() {
+        let output = isolated_command("node")
+            .arg("--disable-proto=throw")
+            .arg("--no-experimental-sqlite")
+            .arg("--eval")
+            .arg(
+                r#"
+                    let protoError;
+                    try {
+                      ({}).__proto__;
+                    } catch (error) {
+                      protoError = error.code;
+                    }
+                    let sqliteError;
+                    try {
+                      require("node:sqlite");
+                    } catch (error) {
+                      sqliteError = error.code;
+                    }
+                    process.stdout.write(`${protoError}:${sqliteError}`);
+                "#,
+            )
+            .output()
+            .await
+            .expect("isolated Node command should run");
+
+        assert!(
+            output.status.success(),
+            "isolated Node command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            output.stdout,
+            b"ERR_PROTO_ACCESS:ERR_UNKNOWN_BUILTIN_MODULE"
+        );
     }
 }
