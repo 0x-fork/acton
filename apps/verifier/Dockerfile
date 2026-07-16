@@ -64,7 +64,7 @@ ENV VERIFIER_CONFIG=/etc/verifier/config.toml \
     SOURCE_REPOSITORY_AUTHOR_NAME=ton-verifier \
     SOURCE_REPOSITORY_AUTHOR_EMAIL=ton-verifier@example.invalid \
     VERIFIER_REGISTRY_INDEX_PATH=/var/lib/verifier/registry-index/registry-index.sqlite3 \
-    VERIFIER_COMPILER_NODE_BIN=node \
+    VERIFIER_COMPILER_NODE_BIN=/usr/local/bin/node \
     VERIFIER_COMPILER_WORKER_PATH=/app/compiler-worker/compile.mjs \
     VERIFIER_COMPILER_TIMEOUT_MS=5000
 

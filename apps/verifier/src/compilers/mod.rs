@@ -38,7 +38,7 @@ impl NodeCompilerService {
 impl CompilerService for NodeCompilerService {
     async fn compile(&self, request: CompileRequest) -> Result<CompileOutput, CompilerError> {
         let input = serde_json::to_vec(&request).map_err(CompilerError::SerializeInput)?;
-        let mut child = Command::new(&self.node_bin)
+        let mut child = isolated_command(&self.node_bin)
             .arg(&self.worker_path)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
@@ -84,6 +84,21 @@ impl CompilerService for NodeCompilerService {
             WorkerOutput::CompileError { error } => Err(CompilerError::CompileFailed(error)),
         }
     }
+}
+
+fn isolated_command(program: &str) -> Command {
+    let program = PathBuf::from(program);
+    let executable = std::env::var_os("PATH")
+        .filter(|_| program.components().count() == 1)
+        .and_then(|path| {
+            std::env::split_paths(&path)
+                .map(|directory| directory.join(&program))
+                .find(|candidate| candidate.is_file())
+        })
+        .unwrap_or(program);
+    let mut command = Command::new(executable);
+    command.env_clear();
+    command
 }
 
 #[derive(Debug, Serialize)]
@@ -152,4 +167,34 @@ pub enum CompilerError {
     DeserializeOutput(serde_json::Error),
     #[error("compile error: {0}")]
     CompileFailed(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn isolated_command_resolves_executable_and_clears_environment() {
+        let mut command = isolated_command("node");
+        let executable = PathBuf::from(command.as_std().get_program());
+        assert!(
+            executable.is_file(),
+            "resolved Node executable does not exist: {}",
+            executable.display()
+        );
+
+        let output = command
+            .arg("--eval")
+            .arg("process.stdout.write(String(process.env.PATH === undefined))")
+            .output()
+            .await
+            .expect("isolated Node command should run");
+
+        assert!(
+            output.status.success(),
+            "isolated Node command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(output.stdout, b"true");
+    }
 }
