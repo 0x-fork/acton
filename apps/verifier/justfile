@@ -20,7 +20,7 @@ build-ui: install-ui
 generate-registry:
     cd compiler-worker && npm run generate-registry
 
-test: build-ui install-compiler-worker
+test: install-compiler-worker
     cargo test --locked
 
 fmt:
