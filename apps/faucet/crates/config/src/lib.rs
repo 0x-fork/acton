@@ -74,6 +74,13 @@ pub struct PowConfig {
     pub difficulty: u32,
     pub challenge_ttl_seconds: u64,
     pub max_challenges: u64,
+    pub client: PowClientConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct PowClientConfig {
+    pub max_solve_ttl_seconds: u64,
+    pub max_nonce_attempts: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -155,6 +162,16 @@ impl Config {
                 difficulty: parse_env_number("POW_DIFFICULTY", 21),
                 challenge_ttl_seconds: parse_env_number("POW_CHALLENGE_TTL_SECONDS", 300),
                 max_challenges: parse_env_number("POW_MAX_CHALLENGES", 10_000),
+                client: PowClientConfig {
+                    max_solve_ttl_seconds: parse_env_number(
+                        "POW_CLIENT_MAX_SOLVE_TTL_SECONDS",
+                        300,
+                    ),
+                    max_nonce_attempts: parse_env_number(
+                        "POW_CLIENT_MAX_NONCE_ATTEMPTS",
+                        1_000_000_000,
+                    ),
+                },
             },
             valkey: ValkeyConfig {
                 uri: std::env::var("VALKEY_URI")

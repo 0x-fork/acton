@@ -17,6 +17,8 @@ pub(super) struct ChallengeResponse {
     version: u32,
     challenge: String,
     difficulty: u32,
+    max_solve_ttl_seconds: u64,
+    max_nonce_attempts: u64,
 }
 
 #[derive(Serialize)]
@@ -70,6 +72,8 @@ pub(super) async fn create_challenge(
             version,
             challenge,
             difficulty: state.pow.difficulty(),
+            max_solve_ttl_seconds: state.config.pow.client.max_solve_ttl_seconds,
+            max_nonce_attempts: state.config.pow.client.max_nonce_attempts,
         }),
     ))
 }
@@ -89,11 +93,13 @@ mod tests {
     use super::{ChallengeRequest, ChallengeResponse};
 
     #[test]
-    fn serializes_current_challenge_version() {
+    fn serializes_challenge_response() {
         let response = ChallengeResponse {
             version: 1,
             challenge: "challenge".to_string(),
             difficulty: 21,
+            max_solve_ttl_seconds: 300,
+            max_nonce_attempts: 1_000_000_000,
         };
 
         assert_eq!(
@@ -102,6 +108,8 @@ mod tests {
                 "version": 1,
                 "challenge": "challenge",
                 "difficulty": 21,
+                "max_solve_ttl_seconds": 300,
+                "max_nonce_attempts": 1_000_000_000_u64,
             })
         );
     }
