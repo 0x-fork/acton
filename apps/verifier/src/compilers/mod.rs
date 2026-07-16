@@ -38,8 +38,19 @@ impl NodeCompilerService {
 impl CompilerService for NodeCompilerService {
     async fn compile(&self, request: CompileRequest) -> Result<CompileOutput, CompilerError> {
         let input = serde_json::to_vec(&request).map_err(CompilerError::SerializeInput)?;
+        let worker_path = std::fs::canonicalize(&self.worker_path).map_err(|source| {
+            CompilerError::ResolveWorkerPath {
+                path: self.worker_path.clone(),
+                source,
+            }
+        })?;
+        let worker_directory = worker_path
+            .parent()
+            .ok_or_else(|| CompilerError::MissingWorkerDirectory(worker_path.clone()))?;
         let mut child = isolated_command(&self.node_bin)
-            .arg(&self.worker_path)
+            .arg("--permission")
+            .arg(format!("--allow-fs-read={}", worker_directory.display()))
+            .arg(&worker_path)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -151,6 +162,13 @@ enum WorkerOutput {
 pub enum CompilerError {
     #[error("failed to serialize compiler input: {0}")]
     SerializeInput(serde_json::Error),
+    #[error("failed to resolve compiler worker path {path}: {source}")]
+    ResolveWorkerPath {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+    #[error("compiler worker path has no parent directory: {0}")]
+    MissingWorkerDirectory(PathBuf),
     #[error("failed to spawn compiler worker: {0}")]
     Spawn(std::io::Error),
     #[error("compiler worker stdin was not available")]
@@ -196,5 +214,61 @@ mod tests {
             String::from_utf8_lossy(&output.stderr)
         );
         assert_eq!(output.stdout, b"true");
+    }
+
+    #[tokio::test]
+    async fn node_permissions_allow_selected_reads_and_deny_other_filesystem_access() {
+        let allowed_directory = tempfile::tempdir().expect("temporary directory should be created");
+        let denied_directory = tempfile::tempdir().expect("temporary directory should be created");
+        let allowed_file = allowed_directory.path().join("allowed.txt");
+        let denied_file = denied_directory.path().join("denied.txt");
+        let output_file = allowed_directory.path().join("output.txt");
+        std::fs::write(&allowed_file, "allowed").expect("allowed fixture should be written");
+        std::fs::write(&denied_file, "denied").expect("denied fixture should be written");
+
+        let output = isolated_command("node")
+            .arg("--permission")
+            .arg(format!(
+                "--allow-fs-read={}",
+                allowed_directory.path().display()
+            ))
+            .arg("--eval")
+            .arg(
+                r#"
+                    const fs = require("node:fs");
+                    const [allowedPath, deniedPath, outputPath] = process.argv.slice(1);
+                    const allowed = fs.readFileSync(allowedPath, "utf8");
+                    let denied;
+                    try {
+                      fs.readFileSync(deniedPath, "utf8");
+                    } catch (error) {
+                      denied = error.code;
+                    }
+                    let write;
+                    try {
+                      fs.writeFileSync(outputPath, "output");
+                    } catch (error) {
+                      write = error.code;
+                    }
+                    process.stdout.write(`${allowed}:${denied}:${write}`);
+                "#,
+            )
+            .arg(&allowed_file)
+            .arg(&denied_file)
+            .arg(&output_file)
+            .output()
+            .await
+            .expect("isolated Node command should run");
+
+        assert!(
+            output.status.success(),
+            "isolated Node command failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            output.stdout,
+            b"allowed:ERR_ACCESS_DENIED:ERR_ACCESS_DENIED"
+        );
+        assert!(!output_file.exists());
     }
 }

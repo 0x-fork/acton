@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "generate-registry": "node scripts/generate-registry.mjs",
-    "postinstall": "node scripts/patch-tolk-source-map-data.mjs"
+    "postinstall": "node scripts/postinstall.mjs"
   },
   "dependencies": {
     "@ton-community/func-js": "0.9.1",
