@@ -3,7 +3,7 @@ all: precommit
 build: build-ui
     cargo build --release --locked
 
-build-dev: build-ui
+build-dev:
     cargo build --locked
 
 install: install-ui install-compiler-worker
@@ -29,7 +29,7 @@ fmt:
 fmt-check:
     cargo fmt --all --check
 
-clippy: build-ui
+clippy:
     cargo clippy --all-targets --locked -- -D warnings
 
 check: fmt-check clippy test
