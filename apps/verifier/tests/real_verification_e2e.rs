@@ -1,6 +1,6 @@
 mod support;
 
-use std::path::Path;
+use std::{collections::BTreeSet, path::Path};
 
 use axum::http::StatusCode;
 use serde::Deserialize;
@@ -15,10 +15,80 @@ const SIMPLE_TOLK_CODE_HASH: &str =
     "63600fb71c1bfc85ed75dfbbd7b8e857ca98bc003fb2f758f07708fd1664edae";
 const FUNC_CODE_HASH: &str = "6ef6e4084167bca1464f9d2ddc8448bbd66df303c4014af50aeb5a109fdfb8cc";
 const TACT_CODE_HASH: &str = "f6b6d11538f0cb19c9f5b2812cb66d907b56c752c673d1bea205f07bce4c7f52";
+const ALL_FUNC_VERSIONS: &[&str] = &[
+    "0.2.0",
+    "0.3.0",
+    "0.4.0",
+    "0.4.1",
+    "0.4.2",
+    "0.4.3",
+    "0.4.4",
+    "0.4.4-newops",
+    "0.4.4-newops.1",
+    "0.4.5",
+    "0.4.6",
+    "0.4.6-wasmfix.0",
+];
 const ALL_TOLK_VERSIONS: &[&str] = &[
     "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.99.0", "1.0.0",
     "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.4.1", "1.4.2",
 ];
+const TACT_SOURCE_BASE64: &str = "Y29udHJhY3QgU21va2UgeyBpbml0KCkge30gcmVjZWl2ZSgpIHt9IH0=";
+const TACT_VERSION_GROUPS: &[TactVersionGroup] = &[
+    TactVersionGroup {
+        versions: &[
+            "1.6.5", "1.6.6", "1.6.7", "1.6.10", "1.6.11", "1.6.12", "1.6.13",
+        ],
+        code_boc: "te6ccgEBAQEAVwAAqv8AII5MMAHQctch0gDSAPpAIRA0UGZvBPhhAvhi7UTQ0gAwkW2RbeICkVvgcCHXSSDCH5UxAdMfMJEy4sAAAcEhsJkwyH8BygDJ7VTgMPLAguHyyAs=",
+        code_hash: TACT_CODE_HASH,
+    },
+    TactVersionGroup {
+        versions: &["1.6.3", "1.6.4"],
+        code_boc: "te6ccgEBAgEAWwABFP8A9KQT9LzyyAsBAJjTAdBy1yHSANIA+kAhEDRQZm8E+GEC+GLtRNDSADCRbZFt4gKRW+BwIddJIMIflTEB0x8wkTLiwAABwSGwmTDIfwHKAMntVOAw8sCC",
+        code_hash: "c9117b48e02d012aad1f5f6b573eb50f9e55d3d2513f595fb6d5d5d9a17dc3af",
+    },
+    TactVersionGroup {
+        versions: &["1.6.2"],
+        code_boc: "te6ccgEBAQEAXAAAtP8AII5MMAHQctch0gDSAPpAIRA0UGZvBPhhAvhi7UTQ0gAwkW2RbeICkVvgcCHXSSDCH5UxAdMfMJEy4sAAAcEhsJkwyH8BygDJ7VTgMPLAguFtgBP0vPLICw==",
+        code_hash: "54b93759513af3ff37fb587899e70af5a10efdfa7a85e8ffc15d52b00fffda51",
+    },
+    TactVersionGroup {
+        versions: &[
+            "1.4.1", "1.4.2", "1.4.3", "1.4.4", "1.5.0", "1.5.1", "1.5.2", "1.5.3", "1.5.4",
+        ],
+        code_boc: "te6ccgEBBwEAqgABFP8A9KQT9LzyyAsBAgFiAgMCktAB0NMDAXGwowH6QAEg10mBAQu68uCIINcLCiCBBP+68tCJgwm68uCIVFBTA28E+GEC+GLbPFnbPPLggjDI+EMBzH8BygDJ7VQEBQARoYV92omhpAADATTtRNDUAfhj0gAwkW3g+CjXCwqDCbry4InbPAYAPAGSMH/gcCHXScIflTAg1wsf3sAAAddJwSGwkX/gcAACbQ==",
+        code_hash: "437d33ce3e8b433319dcb7ea72e2b5cd9e8fde8c489ea24bf52aadd63805a172",
+    },
+    TactVersionGroup {
+        versions: &["1.3.1", "1.4.0"],
+        code_boc: "te6ccgECCwEAAT4AART/APSkE/S88sgLAQIBYgIDApLQAdDTAwFxsKMB+kABINdJgQELuvLgiCDXCwoggQT/uvLQiYMJuvLgiFRQUwNvBPhhAvhi2zxZ2zzy4IIwyPhDAcx/AcoAye1UBAUCAVgHCAE07UTQ1AH4Y9IAMJFt4Pgo1wsKgwm68uCJ2zwGADwBkjB/4HAh10nCH5UwINcLH97AAAHXScEhsJF/4HAAAm0Albu9GCcFzsPV0srnsehOw51kqFG2aCcJ3WNS0rZHyzItOvLf3xYjmCcCBVwBuAZ2OUzlg6rkclssOCcJ2XTlqzTstzOg6WbZRm6KSAIBSAkKABGwr7tRNDSAAGAAdbJu40NWlwZnM6Ly9RbVVncDdHSkVqRHlEQzNMbVJpa0xDS0E3Y2YxQ29kbmdTWm5UM0NyOWdHdlRmgg",
+        code_hash: "d3da9a6f003f842be5f37e274a3f1bf57ff26a80d460cd3683fcf6fd6ff55945",
+    },
+    TactVersionGroup {
+        versions: &[
+            "1.1.0", "1.1.1", "1.1.2", "1.1.3", "1.1.4", "1.1.5", "1.2.0", "1.3.0",
+        ],
+        code_boc: "te6ccgECCwEAAT4AART/APSkE/S88sgLAQIBYgIDApLQAdDTAwFxsKMB+kABINdJgQELuvLgiCDXCwoggQT/uvLQiYMJuvLgiFRQUwNvBPhhAvhi2zxZ2zzy4IIwyPhDAcx/AcoAye1UBAUCAVgHCAE07UTQ1AH4Y9IAMJFt4Pgo1wsKgwm68uCJ2zwGADwBkjB/4HAh10nCH5UwINcLH97AAAHXScEhsJF/4HAAAm0Albu9GCcFzsPV0srnsehOw51kqFG2aCcJ3WNS0rZHyzItOvLf3xYjmCcCBVwBuAZ2OUzlg6rkclssOCcJ2XTlqzTstzOg6WbZRm6KSAIBSAkKABGwr7tRNDSAAGAAdbJu40NWlwZnM6Ly9RbWRwQ3FXakdiNzQ3VWtQU3M1bVFDcFM4RjMzaWFhVnJTU0JIdUZtNGFkS21agg",
+        code_hash: "219f44acd833359da1fba55cf457f444a8cf1ef65649dcbc21a18ec61ccb45ff",
+    },
+    TactVersionGroup {
+        versions: &["1.0.0"],
+        code_boc: "te6ccgEBBgEA8wABFP8A9KQT9LzyyAsBAgFiAgMC2NAB0NMDAXGwwAGRf5Fw4gH6QAEg10mBAQu68uCIINcLCiCDCbohgQT/urHy4IiDCbry4IlUUFMDbwT4YQL4Yu1E0NQB+GPSADCRbY6N+CjXCwqDCbry4InbPOJZ2zwwMMj4QwHMfwHKAMntVAQFAJWhd6ME4LnYerpZXPY9CdhzrJUKNs0E4TusalpWyPlmRadeW/vixHME4ECrgDcAzscpnLB1XI5LZYcE4TsunLVmnZbmdB0s2yjN0UkAAm0APnAh10nCH5UwINcLH94Cklt/4AHAAAHXScEhsJF/4HA=",
+        code_hash: "a4a22ce9f054f2c9f3cae625098e15c3a9b77eae765047914b837135ce5777b9",
+    },
+];
+
+#[test]
+fn compiler_version_matrix_covers_all_npm_aliases() {
+    assert_eq!(npm_alias_versions("func"), version_set(ALL_FUNC_VERSIONS));
+    assert_eq!(npm_alias_versions("tolk"), version_set(ALL_TOLK_VERSIONS));
+
+    let tact_versions = TACT_VERSION_GROUPS
+        .iter()
+        .flat_map(|group| group.versions.iter().copied())
+        .collect::<Vec<_>>();
+    assert_eq!(npm_alias_versions("tact"), version_set(&tact_versions));
+}
 
 #[tokio::test]
 async fn verify_tolk_with_real_compiler_and_stores_generated_abi() {
@@ -86,6 +156,16 @@ async fn verify_func_with_real_compiler() {
 }
 
 #[tokio::test]
+async fn verify_all_func_npm_versions_with_real_compiler() {
+    for compiler_version in ALL_FUNC_VERSIONS {
+        let state = real_compiler_app_state(&[]);
+        let response = verify_fixture(state, FUNC_CODE_HASH, func_fixture(compiler_version)).await;
+
+        assert_verified(response, "func", FUNC_CODE_HASH).await;
+    }
+}
+
+#[tokio::test]
 async fn verify_tact_with_real_compiler_and_stores_generated_sources() {
     let state = real_compiler_app_state(&[]);
     let response = verify_fixture(state.clone(), TACT_CODE_HASH, fixture("valid-tact.json")).await;
@@ -114,6 +194,23 @@ async fn verify_tact_with_real_compiler_and_stores_generated_sources() {
         files.iter().any(|file| has_extension(&file.path, "tact")),
         "expected stored Tact bundle to include generated source"
     );
+}
+
+#[tokio::test]
+async fn verify_all_tact_npm_versions_with_real_compiler() {
+    for group in TACT_VERSION_GROUPS {
+        for compiler_version in group.versions {
+            let state = real_compiler_app_state(&[]);
+            let response = verify_fixture(
+                state,
+                group.code_hash,
+                tact_fixture(compiler_version, group.code_boc),
+            )
+            .await;
+
+            assert_verified(response, "tact", group.code_hash).await;
+        }
+    }
 }
 
 async fn verify_fixture(
@@ -185,6 +282,27 @@ fn fixture(name: &str) -> WorkerFixture {
         .unwrap_or_else(|err| panic!("fixture is not valid JSON {}: {err}", path.display()))
 }
 
+fn npm_alias_versions(language: &str) -> BTreeSet<String> {
+    let path = Path::new("compiler-worker").join("package.json");
+    let bytes = std::fs::read(&path)
+        .unwrap_or_else(|err| panic!("failed to read {}: {err}", path.display()));
+    let package = serde_json::from_slice::<Value>(&bytes)
+        .unwrap_or_else(|err| panic!("package is not valid JSON {}: {err}", path.display()));
+    let dependencies = package["dependencies"]
+        .as_object()
+        .expect("compiler-worker dependencies should be an object");
+    let prefix = format!("{language}-");
+
+    dependencies
+        .keys()
+        .filter_map(|name| name.strip_prefix(&prefix).map(str::to_owned))
+        .collect()
+}
+
+fn version_set(versions: &[&str]) -> BTreeSet<String> {
+    versions.iter().map(ToString::to_string).collect()
+}
+
 fn simple_tolk_fixture(compiler_version: &str) -> WorkerFixture {
     WorkerFixture {
         language: "tolk".to_owned(),
@@ -194,6 +312,47 @@ fn simple_tolk_fixture(compiler_version: &str) -> WorkerFixture {
         sources: vec![WorkerSource {
             path: "main.tolk".to_owned(),
             content: "fun main(): int {\n    return 0;\n}\n".to_owned(),
+            is_entrypoint: true,
+            include_in_command: None,
+            is_stdlib: None,
+            has_include_directives: None,
+        }],
+    }
+}
+
+fn func_fixture(compiler_version: &str) -> WorkerFixture {
+    let mut fixture = fixture("valid-func.json");
+    compiler_version.clone_into(&mut fixture.compiler_version);
+    fixture
+}
+
+fn tact_fixture(compiler_version: &str, code_boc: &str) -> WorkerFixture {
+    let package = json!({
+        "name": "Smoke",
+        "code": code_boc,
+        "abi": "{}",
+        "init": {
+            "kind": "direct",
+            "args": [],
+            "prefix": {"bits": 1, "value": 0},
+            "deployment": {"kind": "direct"}
+        },
+        "sources": {"contract.tact": TACT_SOURCE_BASE64},
+        "compiler": {
+            "name": "tact",
+            "version": compiler_version,
+            "parameters": r#"{"entrypoint":"contract.tact","options":{}}"#
+        }
+    });
+
+    WorkerFixture {
+        language: "tact".to_owned(),
+        compiler_version: compiler_version.to_owned(),
+        import_mappings: None,
+        entrypoint: "contract.pkg".to_owned(),
+        sources: vec![WorkerSource {
+            path: "contract.pkg".to_owned(),
+            content: package.to_string(),
             is_entrypoint: true,
             include_in_command: None,
             is_stdlib: None,
@@ -216,6 +375,12 @@ struct WorkerFixture {
     import_mappings: Option<Value>,
     entrypoint: String,
     sources: Vec<WorkerSource>,
+}
+
+struct TactVersionGroup {
+    versions: &'static [&'static str],
+    code_boc: &'static str,
+    code_hash: &'static str,
 }
 
 #[derive(Debug, Deserialize)]
