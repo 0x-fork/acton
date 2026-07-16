@@ -25,4 +25,6 @@ check-deny:
 test:
     cargo test --workspace --locked
 
-check: fmt-check check-deps clippy check-deny test
+check-ci: fmt-check check-deps clippy check-deny
+
+check: check-ci test

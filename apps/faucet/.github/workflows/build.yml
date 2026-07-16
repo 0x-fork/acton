@@ -57,6 +57,8 @@ jobs:
           tool: just@1.49.0,cargo-shear@1.11.2,cargo-deny@0.19.4
           fallback: none
 
+      - name: Run tests
+        run: just test
+
       - name: Run check
-        run: |
-          just check
+        run: just check-ci
