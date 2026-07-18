@@ -1,9 +1,9 @@
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-import {Check, Copy, Edit2, QrCode, Star, X} from "lucide-react"
+import {Check, Copy, Edit2, QrCode, Star} from "lucide-react"
 import {QRCodeSVG} from "qrcode.react"
 import {useEffect, useId, useRef, useState} from "react"
 import type {FC} from "react"
-import {InfoPopover, Input} from "@acton/ui"
+import {InfoPopover, Input, Popover} from "@acton/ui"
 
 import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {TonClient} from "../api/client"
@@ -71,7 +71,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const [customName, setCustomName] = useState<string | undefined>()
   const [editValue, setEditValue] = useState("")
   const [renameSaving, setRenameSaving] = useState(false)
-  const [qrOpen, setQrOpen] = useState(false)
   const editInputRef = useRef<HTMLInputElement>(null)
   const contractDescriptionId = useId()
   const {setAddressName} = useAddressBook()
@@ -152,10 +151,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
     editInputRef.current?.focus()
     editInputRef.current?.select()
   }, [isEditing])
-
-  useEffect(() => {
-    setQrOpen(false)
-  }, [rawAddress])
 
   const handleStartEdit = () => {
     setEditValue(customName || "")
@@ -622,38 +617,28 @@ export const AccountInfo: FC<AccountInfoProps> = ({
           </div>
         </div>
 
-        <button
-          type="button"
-          className={styles.qrToggle}
-          onClick={() => setQrOpen(value => !value)}
-          title="Show QR code"
-          aria-label="Show QR code"
-          aria-expanded={qrOpen}
+        <Popover
+          key={rawAddress}
+          ariaLabel="Address QR code"
+          content={qrCode}
+          interaction="click"
+          placement="bottom"
+          triggerAsChild
         >
-          <QrCode size={16} />
-        </button>
+          <button
+            type="button"
+            className={styles.qrToggle}
+            title="Show QR code"
+            aria-label="Show QR code"
+          >
+            <QrCode size={16} />
+          </button>
+        </Popover>
 
         <div className={styles.qrPanel} aria-label="Address QR code">
           {qrCode}
         </div>
       </div>
-
-      {qrOpen && (
-        <div className={styles.qrPopover}>
-          <div className={styles.qrPopoverHeader}>
-            <span>QR</span>
-            <button
-              type="button"
-              className={styles.iconButton}
-              onClick={() => setQrOpen(false)}
-              aria-label="Close QR code"
-            >
-              <X size={16} />
-            </button>
-          </div>
-          <div className={styles.qrPopoverBody}>{qrCode}</div>
-        </div>
-      )}
     </div>
   )
 }
