@@ -714,9 +714,11 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
 
       setHoldersLoading(true)
       try {
-        const masterHolders = await client.getJettonWallets(undefined, [formattedAddress])
+        const masterHolders = await client.getJettonWallets(undefined, [formattedAddress], {
+          sort: "desc",
+        })
         if (!isActive) return
-        setHolders(masterHolders)
+        setHolders(sortJettonWalletsByAmount(masterHolders))
       } catch (error) {
         console.error("Failed to fetch jetton holders", error)
       } finally {

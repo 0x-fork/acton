@@ -86,6 +86,10 @@ interface GetTracesOptions {
   readonly includeActions?: boolean
 }
 
+interface GetJettonWalletsOptions {
+  readonly sort?: "asc" | "desc"
+}
+
 type JettonWalletMetadata = Record<
   string,
   {
@@ -366,6 +370,7 @@ export class TonClient {
   async getJettonWallets(
     owner_address?: string[],
     jetton_address?: string[],
+    options: GetJettonWalletsOptions = {},
   ): Promise<JettonWallet[]> {
     if (
       (!owner_address || owner_address.length === 0) &&
@@ -376,7 +381,7 @@ export class TonClient {
     const addresses = owner_address || jetton_address || []
     const paramName = owner_address ? "owner_address" : "jetton_address"
 
-    return this.fetchJettonWallets(paramName, addresses)
+    return this.fetchJettonWallets(paramName, addresses, options)
   }
 
   async getJettonWalletsByAddress(address: string[]): Promise<JettonWallet[]> {
@@ -427,11 +432,15 @@ export class TonClient {
   private async fetchJettonWallets(
     paramName: "address" | "owner_address" | "jetton_address",
     addresses: string[],
+    options: GetJettonWalletsOptions = {},
   ): Promise<JettonWallet[]> {
     const results = await Promise.all(
       addresses.map(async addr => {
         const url = this.buildUrl(this.v3BaseUrl, "/jetton/wallets")
         url.searchParams.append(paramName, addr)
+        if (options.sort) {
+          url.searchParams.append("sort", options.sort)
+        }
         try {
           const response = await this.request<JettonWalletsResponse>(
             url,
