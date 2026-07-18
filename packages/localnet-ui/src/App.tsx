@@ -328,7 +328,7 @@ const AppContent: FC<AppContentProps> = ({
               path="/explorer"
               element={
                 <DashboardPage {...dashboardProps} embedded>
-                  <ExplorerIndexPage />
+                  <ExplorerIndexPage client={client} />
                 </DashboardPage>
               }
             />

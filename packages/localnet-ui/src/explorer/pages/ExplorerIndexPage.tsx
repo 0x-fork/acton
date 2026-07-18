@@ -1,14 +1,19 @@
 import type {FC} from "react"
 
+import type {TonClient} from "../api/client"
 import {ExplorerSearch} from "../components/ExplorerSearch"
 
 import styles from "./ExplorerIndexPage.module.css"
 
 interface ExplorerIndexPageProps {
+  readonly client: TonClient
   readonly fillAvailableHeight?: boolean
 }
 
-export const ExplorerIndexPage: FC<ExplorerIndexPageProps> = ({fillAvailableHeight = false}) => {
+export const ExplorerIndexPage: FC<ExplorerIndexPageProps> = ({
+  client,
+  fillAvailableHeight = false,
+}) => {
   const pageClassName = fillAvailableHeight
     ? `${styles.inputPage} ${styles.inputPageFillAvailableHeight}`
     : styles.inputPage
@@ -23,7 +28,7 @@ export const ExplorerIndexPage: FC<ExplorerIndexPageProps> = ({fillAvailableHeig
           </h1>
         </header>
 
-        <ExplorerSearch autoFocus />
+        <ExplorerSearch autoFocus client={client} />
       </div>
 
       <footer className={styles.footer}>

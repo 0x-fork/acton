@@ -53,6 +53,12 @@ interface SendInternalMessageResponse {
   readonly hash: string
 }
 
+interface DnsRecordsResponse {
+  readonly records: readonly {
+    readonly dns_wallet?: string | null
+  }[]
+}
+
 interface GetBlocksOptions {
   readonly workchain?: number
   readonly shard?: string
@@ -283,6 +289,13 @@ export class TonClient {
     url.searchParams.append("address", address)
     url.searchParams.append("include_boc", "true")
     return this.request(url, "Failed to fetch address information")
+  }
+
+  async resolveDnsWalletAddress(domain: string): Promise<string | undefined> {
+    const url = this.buildUrl(this.v3BaseUrl, "/dns/records")
+    url.searchParams.append("domain", domain)
+    const response = await this.request<DnsRecordsResponse>(url, "Failed to resolve TON DNS name")
+    return response.records.find(record => record.dns_wallet)?.dns_wallet ?? undefined
   }
 
   async getAccountStates(addresses: string[], includeBoc = true): Promise<AccountStatesResponse> {

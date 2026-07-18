@@ -6,6 +6,10 @@
   color: var(--acton-color-accent);
 }
 
+.breadcrumbs [aria-current="page"] .address > span {
+  color: var(--acton-color-text);
+}
+
 .breadcrumbs a:hover .address > span {
   text-decoration: underline;
 }

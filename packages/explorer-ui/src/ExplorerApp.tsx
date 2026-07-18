@@ -968,7 +968,11 @@ export const ExplorerApp: FC = () => {
                           </Link>
                         </nav>
                       </div>
-                      <ExplorerSearch className={styles.headerSearch} variant="header" />
+                      <ExplorerSearch
+                        className={styles.headerSearch}
+                        client={client}
+                        variant="header"
+                      />
                       <div className={styles.headerActions}>
                         <NetworkDropdown
                           networks={selectableNetworks}
@@ -1002,7 +1006,10 @@ export const ExplorerApp: FC = () => {
                   </ExplorerHeaderFrame>
                   <main className={styles.main}>
                     <Routes>
-                      <Route path="/" element={<ExplorerIndexPage fillAvailableHeight />} />
+                      <Route
+                        path="/"
+                        element={<ExplorerIndexPage client={client} fillAvailableHeight />}
+                      />
                       <Route path="/blocks" element={<BlocksPage client={client} />} />
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />

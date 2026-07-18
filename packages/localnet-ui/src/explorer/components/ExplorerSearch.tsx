@@ -1,7 +1,7 @@
 import {SearchInput, formatToncenterBlockId, useToast} from "@acton/ui"
 import type {SearchInputItem} from "@acton/ui"
 import {FileCode2, History, Search} from "lucide-react"
-import {useCallback, useEffect, useMemo, useState} from "react"
+import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC} from "react"
 import {useNavigate} from "react-router-dom"
 import type {NavigateFunction} from "react-router-dom"
@@ -10,6 +10,7 @@ import {
   getBundledCompilerAbiCatalog,
   type BundledCompilerAbiCatalogEntry,
 } from "../api/compilerAbiCatalog"
+import type {TonClient} from "../api/client"
 import {EXPLORER_HISTORY_STORAGE_KEY} from "../explorerResume"
 import {useAddressBook} from "../hooks/useAddressBook"
 import type {TonAssetsNameMatch} from "../hooks/useAddressBook"
@@ -26,6 +27,7 @@ type ExplorerSearchVariant = "hero" | "header"
 interface ExplorerSearchProps {
   readonly autoFocus?: boolean
   readonly className?: string
+  readonly client: TonClient
   readonly variant?: ExplorerSearchVariant
 }
 
@@ -52,13 +54,15 @@ const MAX_BLOCK_NUMBER = 2_147_483_647
 const MIN_WORKCHAIN = -2_147_483_648
 const MAX_WORKCHAIN = 2_147_483_647
 const TONCENTER_BLOCK_ID_PATTERN = /^\(\s*(-?\d+)\s*,\s*([\da-f]{16})\s*,\s*(\d+)\s*\)$/i
+const TON_DNS_DOMAIN_PATTERN = /^(?:[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?\.)+ton$/i
 const INVALID_SEARCH_DESCRIPTION =
-  "Paste a valid TON address, transaction hash, block ID, or ABI name."
+  "Paste a valid TON address, .ton name, transaction hash, block ID, or ABI name."
 const OPCODE_NOT_FOUND_DESCRIPTION = "No ABI declaration found for opcode"
 
 export const ExplorerSearch: FC<ExplorerSearchProps> = ({
   autoFocus = false,
   className,
+  client,
   variant = "hero",
 }) => {
   const {addressFormat, network} = useNetworkInfo()
@@ -71,6 +75,7 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
   const [history, setHistory] = useState<readonly string[]>([])
   const [abiSearchIndex, setAbiSearchIndex] = useState<readonly AbiSearchIndexEntry[]>([])
   const [isInvalid, setIsInvalid] = useState(false)
+  const searchRequestIdRef = useRef(0)
   const hasQuery = input.trim().length > 0
   const tonAssetsNameMatches = searchTonAssetsNames(input)
   const abiNameMatches = useMemo(
@@ -82,6 +87,12 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
   useEffect(() => {
     setHistory(readSearchHistory(historyStorageKey))
   }, [historyStorageKey])
+
+  useEffect(() => {
+    return () => {
+      searchRequestIdRef.current += 1
+    }
+  }, [client])
 
   useEffect(() => {
     let isActive = true
@@ -126,8 +137,46 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
 
   const handleSearch = useCallback(
     (value: string) => {
+      const requestId = ++searchRequestIdRef.current
       const target = resolveSearchTarget(value, addressFormat, routes)
       if (!target) {
+        const domain = parseTonDnsSearchQuery(value)
+        if (domain) {
+          setIsInvalid(false)
+          void client
+            .resolveDnsWalletAddress(domain)
+            .then(walletAddress => {
+              if (searchRequestIdRef.current !== requestId) return
+
+              const parsedAddress = walletAddress ? parseAddress(walletAddress) : undefined
+              if (!parsedAddress) {
+                setIsInvalid(true)
+                showToast({
+                  title: "TON DNS name not found",
+                  description: `No wallet address is configured for ${domain}`,
+                  variant: "error",
+                })
+                return
+              }
+
+              const displayAddress = parsedAddress.toString(addressFormat)
+              setInput("")
+              addToHistory(domain)
+              void navigate(routes.addressPath(displayAddress))
+            })
+            .catch(() => {
+              if (searchRequestIdRef.current !== requestId) return
+
+              setIsInvalid(true)
+              showToast({
+                title: "TON DNS lookup failed",
+                description: `Could not resolve ${domain} on ${network.label}`,
+                variant: "error",
+              })
+            })
+          return true
+        }
+
         const [nameMatch] = searchTonAssetsNames(value, 1)
         if (nameMatch) {
           openTonAssetsNameMatch({
@@ -184,7 +233,9 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
       abiSearchIndex,
       addToHistory,
       addressFormat,
+      client,
       navigate,
+      network.label,
       routes,
       searchTonAssetsNames,
       showToast,
@@ -240,16 +291,22 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
       items={dropdownItems}
       onSubmit={handleSearch}
       onValueChange={nextInput => {
+        searchRequestIdRef.current += 1
         setInput(nextInput)
         if (isInvalid) {
           setIsInvalid(false)
         }
       }}
-      placeholder="Search by address, hash, or block"
+      placeholder="Search by address, .ton name, hash, or block"
       size={variant === "header" ? "sm" : "lg"}
       value={input}
     />
   )
+}
+
+function parseTonDnsSearchQuery(value: string): string | undefined {
+  const domain = value.trim().toLowerCase()
+  return TON_DNS_DOMAIN_PATTERN.test(domain) ? domain : undefined
 }
 
 function resolveSearchTarget(

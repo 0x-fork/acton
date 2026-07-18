@@ -863,6 +863,11 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
               {
                 label: formattedAddress,
                 isAddress: true,
+                copy: {
+                  value: formattedAddress,
+                  label: "Copy account address",
+                  copiedLabel: "Account address copied",
+                },
               },
             ]}
           />
