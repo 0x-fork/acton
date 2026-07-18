@@ -1,7 +1,7 @@
 use crate::AppState;
 use apalis::prelude::TaskSink;
 use axum::{Json, extract::State, http::StatusCode};
-use faucet_valkey::SuccessfulClaimWindowDecision;
+use faucet_valkey::{AntifraudModule, SuccessfulClaimWindowDecision};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use ton::ton_core::types::TonAddress;
@@ -117,6 +117,9 @@ async fn check_successful_claim_window(state: &AppState, address: &str) -> Claim
             window_seconds,
             retry_after_ms,
         }) => {
+            state
+                .record_antifraud_trigger(AntifraudModule::SuccessfulClaimWindow)
+                .await;
             warn!(
                 address = %address,
                 successful_claims = current,

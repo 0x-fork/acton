@@ -12,6 +12,24 @@ const CHECK_SUCCESSFUL_CLAIM_WINDOW_SCRIPT: &str =
 const RECORD_SUCCESSFUL_CLAIM_SCRIPT: &str = include_str!("../scripts/record_successful_claim.lua");
 
 const TOTAL_SENT_NANOTONS_KEY: &str = "faucet:stats:sent-nanotons";
+const ANTIFRAUD_TRIGGER_COUNT_KEY_PREFIX: &str = "faucet:stats:antifraud";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AntifraudModule {
+    WalletBalance,
+    SentAmountWindow,
+    SuccessfulClaimWindow,
+}
+
+impl AntifraudModule {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::WalletBalance => "wallet-balance",
+            Self::SentAmountWindow => "sent-amount-window",
+            Self::SuccessfulClaimWindow => "successful-claim-window",
+        }
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SentAmountWindowReservation {
@@ -72,6 +90,18 @@ impl ValkeyStore {
             .query_async(&mut connection)
             .await
             .context("Failed to increment total sent amount")
+    }
+
+    pub async fn increment_antifraud_trigger_count(
+        &self,
+        module: AntifraudModule,
+    ) -> anyhow::Result<u64> {
+        let mut connection = self.connection.clone();
+        redis::cmd("INCR")
+            .arg(antifraud_trigger_count_key(module))
+            .query_async(&mut connection)
+            .await
+            .context("Failed to increment antifraud trigger count")
     }
 
     pub async fn reserve_sent_amount_window(
@@ -189,9 +219,16 @@ fn successful_claim_window_seq_key(address: &str) -> String {
     format!("{SUCCESSFUL_CLAIM_WINDOW_SEQ_KEY_PREFIX}:{address}")
 }
 
+fn antifraud_trigger_count_key(module: AntifraudModule) -> String {
+    format!("{ANTIFRAUD_TRIGGER_COUNT_KEY_PREFIX}:{}", module.name())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{successful_claim_window_key, successful_claim_window_seq_key};
+    use super::{
+        AntifraudModule, antifraud_trigger_count_key, successful_claim_window_key,
+        successful_claim_window_seq_key,
+    };
 
     #[test]
     fn accepts_plain_and_tls_valkey_uris() {
@@ -210,6 +247,22 @@ mod tests {
         assert_eq!(
             successful_claim_window_seq_key(address),
             "faucet:antifraud:successful-claim-window:seq:0:e4d954ef9f4e1250a26b5bbad76a1cdd17cfd08babad6f4c23e372270aef6f76"
+        );
+    }
+
+    #[test]
+    fn builds_antifraud_stat_key_for_each_module() {
+        assert_eq!(
+            antifraud_trigger_count_key(AntifraudModule::WalletBalance),
+            "faucet:stats:antifraud:wallet-balance"
+        );
+        assert_eq!(
+            antifraud_trigger_count_key(AntifraudModule::SentAmountWindow),
+            "faucet:stats:antifraud:sent-amount-window"
+        );
+        assert_eq!(
+            antifraud_trigger_count_key(AntifraudModule::SuccessfulClaimWindow),
+            "faucet:stats:antifraud:successful-claim-window"
         );
     }
 }

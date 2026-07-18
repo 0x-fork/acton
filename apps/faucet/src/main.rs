@@ -7,7 +7,9 @@ use axum_governor::GovernorLayer;
 use faucet_antifraud::Antifraud;
 use faucet_config::{ClaimRateLimitConfig, Config, DefaultRateLimitConfig};
 use faucet_pow::Pow;
-use faucet_valkey::{SentAmountWindowDecision, SuccessfulClaimWindowDecision, ValkeyStore};
+use faucet_valkey::{
+    AntifraudModule, SentAmountWindowDecision, SuccessfulClaimWindowDecision, ValkeyStore,
+};
 use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::sync::Cache;
@@ -204,6 +206,26 @@ pub(crate) struct AppState {
     pub(crate) config: Arc<Config>,
 }
 
+impl AppState {
+    pub(crate) async fn record_antifraud_trigger(&self, module: AntifraudModule) {
+        match self.valkey.increment_antifraud_trigger_count(module).await {
+            Ok(trigger_count) => {
+                info!(
+                    module = module.name(),
+                    trigger_count, "Recorded antifraud trigger in Valkey"
+                );
+            }
+            Err(err) => {
+                warn!(
+                    module = module.name(),
+                    error = %err,
+                    "Failed to record antifraud trigger in Valkey"
+                );
+            }
+        }
+    }
+}
+
 async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<()> {
     let wallet = state.wallet.as_ref();
     let client = state.client.as_ref();
@@ -319,6 +341,9 @@ async fn can_process_successful_claim_window(
             window_seconds,
             retry_after_ms,
         } => {
+            state
+                .record_antifraud_trigger(AntifraudModule::SuccessfulClaimWindow)
+                .await;
             warn!(
                 address = %address,
                 successful_claims = current,
@@ -386,6 +411,9 @@ async fn wait_for_sent_amount_window(
     };
 
     if let Err(err) = state.antifraud.check_sent_amount_window_transfer(amount) {
+        state
+            .record_antifraud_trigger(AntifraudModule::SentAmountWindow)
+            .await;
         error!(
             address = %address,
             amount,
@@ -396,6 +424,7 @@ async fn wait_for_sent_amount_window(
         anyhow::bail!("Claim amount exceeds sent amount window limit: {err:?}");
     }
 
+    let mut trigger_recorded = false;
     loop {
         match state
             .valkey
@@ -420,6 +449,12 @@ async fn wait_for_sent_amount_window(
                 window_seconds,
                 retry_after_ms,
             } => {
+                if !trigger_recorded {
+                    state
+                        .record_antifraud_trigger(AntifraudModule::SentAmountWindow)
+                        .await;
+                    trigger_recorded = true;
+                }
                 warn!(
                     address = %address,
                     current_sent_nanotons = current,

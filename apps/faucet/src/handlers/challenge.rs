@@ -1,4 +1,5 @@
 use axum::{Json, extract::State, http::StatusCode};
+use faucet_valkey::AntifraudModule;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use ton::ton_core::types::TonAddress;
@@ -54,6 +55,9 @@ pub(super) async fn create_challenge(
             })?;
 
         if state.antifraud.check_wallet_balance(balance).is_err() {
+            state
+                .record_antifraud_trigger(AntifraudModule::WalletBalance)
+                .await;
             return Err(response_error(
                 StatusCode::FORBIDDEN,
                 "Wallet balance exceeds limit",
