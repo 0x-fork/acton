@@ -1,5 +1,5 @@
 {
-  "name": "acton-explorer-ui",
+  "name": "@acton/explorer-ui",
   "version": "1.0.0",
   "private": true,
   "license": "MIT OR Apache-2.0",

@@ -1,6 +1,6 @@
 # Acton UI Component Catalog
 
-This catalog is a text companion to `acton-ui-gallery`. It is written for both
+This catalog is a text companion to `@acton/ui-gallery`. It is written for both
 humans and coding agents that need to build future Acton UI without guessing
 which primitives exist or when to use each visual variant.
 

@@ -15,5 +15,5 @@ bun dev:ui
 or directly:
 
 ```bash
-bun --filter acton-ui-gallery dev
+bun --filter @acton/ui-gallery dev
 ```

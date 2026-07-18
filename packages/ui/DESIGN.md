@@ -388,7 +388,7 @@ Use `ThemeSwitch` for global light/dark theme changes.
 ## Gallery Rules
 
 - Every component added to `@acton/ui` should also be added to
-  `acton-ui-gallery`.
+  `@acton/ui-gallery`.
 - The gallery should show practical visual states, not exhaustive prop docs.
 - Each gallery entry needs:
   - usage guidance

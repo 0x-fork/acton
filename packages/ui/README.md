@@ -39,5 +39,5 @@ import "@acton/ui/styles/tokens.css"
 ## Component Catalog
 
 Use [COMPONENTS.md](./COMPONENTS.md) as the text inventory for humans and coding
-agents. Use `acton-ui-gallery` for visual review of variants, states, and usage
+agents. Use `@acton/ui-gallery` for visual review of variants, states, and usage
 guidance.

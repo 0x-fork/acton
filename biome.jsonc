@@ -6,15 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": [
-      "packages/explorer-ui/**",
-      "packages/localnet-ui/**",
-      "packages/ui/**",
-      "packages/ui-gallery/**",
-      "packages/transaction-ui/**",
-      "packages/test-ui/**",
-      "packages/ui-e2e/**"
-    ]
+    "includes": ["packages/**"]
   },
   "formatter": {
     "enabled": true,

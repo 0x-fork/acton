@@ -8,7 +8,8 @@ use std::process::{Command, Stdio};
 const DEFAULT_REPOSITORY: &str = "https://github.com/i582/actonscan";
 const DEFAULT_BRANCH: &str = "pages";
 const DEFAULT_CHECKOUT_DIR: &str = "target/actonscan-pages";
-const EXPLORER_PACKAGE: &str = "acton-explorer-ui";
+const EXPLORER_PACKAGE: &str = "@acton/explorer-ui";
+const EXPLORER_PACKAGE_DIR: &str = "packages/explorer-ui";
 
 #[derive(Args)]
 pub(crate) struct DeployExplorerArgs {
@@ -31,10 +32,7 @@ pub(crate) struct DeployExplorerArgs {
 pub(crate) fn run(args: DeployExplorerArgs) -> Result<()> {
     let workspace_root = workspace_root()?;
     let checkout_dir = resolve_path(&workspace_root, &args.checkout);
-    let dist_dir = workspace_root
-        .join("crates")
-        .join(EXPLORER_PACKAGE)
-        .join("dist");
+    let dist_dir = workspace_root.join(EXPLORER_PACKAGE_DIR).join("dist");
 
     println!("Building `{EXPLORER_PACKAGE}`");
     run_inherited(
