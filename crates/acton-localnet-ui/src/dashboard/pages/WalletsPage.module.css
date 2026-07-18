@@ -30,10 +30,10 @@
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   box-sizing: border-box;
   border-radius: 12px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -62,9 +62,9 @@
   min-width: 720px;
   min-height: 52px;
   padding: 0 18px;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
-  background: var(--tonscan-card-bg, var(--litenode-surface));
-  color: var(--litenode-text);
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -82,7 +82,7 @@
 
 .walletTableTitleMeta {
   min-width: 0;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   overflow: hidden;
   text-align: right;
   text-overflow: ellipsis;
@@ -100,7 +100,7 @@
   border-radius: 7px;
   background: transparent;
   box-shadow: none;
-  color: var(--tonscan-accent);
+  color: var(--acton-color-accent);
   gap: 6px;
   font-size: 0.8125rem;
   font-weight: 500;
@@ -110,14 +110,14 @@
 .refreshButton.refreshButton:hover:not(:disabled),
 .tableActionButton.tableActionButton:hover:not(:disabled) {
   background: transparent;
-  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--tonscan-text-primary));
+  color: color-mix(in srgb, var(--acton-color-accent) 78%, var(--acton-color-text));
 }
 
 .refreshButton.refreshButton:focus-visible,
 .tableActionButton.tableActionButton:focus-visible {
   outline: none;
   background: transparent;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .refreshButton.refreshButton:disabled,
@@ -137,13 +137,13 @@
   min-width: 720px;
   border-collapse: collapse;
   table-layout: fixed;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
 }
 
 .walletTable th,
 .walletTable td {
   padding: 0 14px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   box-sizing: border-box;
   line-height: 1.35;
   text-align: left;
@@ -152,9 +152,9 @@
 
 .walletTable th {
   height: 36px;
-  color: var(--litenode-text-muted);
-  background: var(--tonscan-row-hover, var(--litenode-surface-subtle));
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-row);
+  border-bottom: 1px solid var(--acton-color-border);
   font-size: 0.7rem;
   font-weight: 650;
   letter-spacing: 0;
@@ -164,7 +164,7 @@
 
 .walletTable td {
   height: 46px;
-  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-top: 1px solid var(--acton-color-border);
   font-size: 0.82rem;
 }
 
@@ -173,12 +173,12 @@
 }
 
 .walletTableRow {
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   transition: background-color 120ms ease;
 }
 
 .walletTableRow:hover td {
-  background: var(--litenode-row-hover);
+  background: var(--acton-color-surface-row);
 }
 
 .walletNameHeader,
@@ -219,7 +219,7 @@
 .pickerTitle,
 .permissionTitle,
 .messageAddress {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-weight: 600;
 }
 
@@ -233,8 +233,8 @@
 
 .unsupportedItem {
   border-radius: 999px;
-  background: var(--litenode-surface);
-  color: var(--litenode-text-muted);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
   font-size: 0.72rem;
   font-weight: 600;
   line-height: 1;
@@ -244,7 +244,7 @@
 
 .walletVersion {
   display: block;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -259,7 +259,7 @@
 .metaLabel,
 .metaValue,
 .messageValue {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.82rem;
   line-height: 1.45;
 }
@@ -307,7 +307,7 @@
 }
 
 .sessionDappSeparator {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   flex: 0 0 auto;
   font-weight: 600;
 }
@@ -327,19 +327,19 @@
 
 .sessionWalletCell {
   width: 170px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-weight: 600;
 }
 
 .sessionWalletFallback {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-weight: 500;
 }
 
 .sessionActivityHeader,
 .sessionActivityCell {
   width: 230px;
-  color: var(--litenode-text-muted) !important;
+  color: var(--acton-color-text-muted) !important;
   white-space: nowrap;
 }
 
@@ -361,8 +361,8 @@
 }
 
 .connectFooterCell {
-  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle)) !important;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  border-top: 1px solid var(--acton-color-border) !important;
+  background: var(--acton-color-surface-raised);
 }
 
 .walletNameSkeleton,
@@ -392,7 +392,7 @@
 .unsupportedBlock {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid var(--litenode-border-subtle);
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .unsupportedTitle {
@@ -411,7 +411,7 @@
   min-height: 58px;
   padding: 11px 18px;
   box-sizing: border-box;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   display: grid;
   grid-template-columns: 128px minmax(0, 1fr) 148px;
   align-items: center;
@@ -419,7 +419,7 @@
 }
 
 .connectInlineLabel {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.7rem;
   font-weight: 650;
   letter-spacing: 0;
@@ -432,41 +432,11 @@
 }
 
 .connectInput {
-  width: 100%;
   height: 34px;
-  border: 1px solid var(--litenode-border-control);
   border-radius: 9px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
-  color: var(--litenode-text);
-  font: inherit;
+  background: var(--acton-color-surface-raised);
   font-size: 0.82rem;
   font-weight: 500;
-  line-height: 1;
-  padding: 0 11px;
-  box-sizing: border-box;
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease,
-    background-color 120ms ease;
-}
-
-.connectInput::placeholder {
-  color: var(--litenode-text-soft);
-}
-
-.connectInput:hover:not(:disabled) {
-  border-color: var(--litenode-border-strong);
-}
-
-.connectInput:focus-visible {
-  outline: none;
-  border-color: var(--litenode-border-strong);
-  box-shadow: 0 0 0 2px var(--litenode-focus);
-}
-
-.connectInput:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .copyableAddress {
@@ -479,7 +449,7 @@
 .copyableAddressText {
   min-width: 0;
   flex: 1 1 auto;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 0.82rem;
   overflow: hidden;
@@ -488,10 +458,10 @@
 }
 
 .addressCopyButton {
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 9px;
-  background: var(--litenode-surface);
-  color: var(--litenode-text-muted);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
 }
 
@@ -501,26 +471,26 @@
 }
 
 .addressCopyButton:hover {
-  border-color: var(--litenode-border-control);
-  background: var(--litenode-surface-hover);
-  color: var(--litenode-text);
+  border-color: var(--acton-color-border-control);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
 }
 
 .addressCopyButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .addressCopyButtonCopied {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .permissionItem,
 .messageItem,
 .requestSummary {
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   padding: 12px;
 }
 
@@ -537,7 +507,7 @@
 }
 
 .metaValue {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   text-align: right;
 }
 
@@ -549,7 +519,7 @@
   align-items: center;
   justify-content: center;
   padding: 18px;
-  background: var(--litenode-overlay);
+  background: var(--acton-color-overlay-surface);
   backdrop-filter: blur(2px);
 }
 
@@ -557,10 +527,10 @@
   width: min(520px, 100%);
   max-height: min(720px, calc(100vh - 36px));
   overflow: auto;
-  border: 1px solid var(--litenode-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 16px;
-  background: var(--litenode-surface);
-  box-shadow: var(--litenode-shadow-popover);
+  background: var(--acton-color-surface);
+  box-shadow: var(--acton-shadow-overlay);
 }
 
 .modalHeader {
@@ -577,7 +547,7 @@
 
 .modalTitle {
   margin: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 1.05rem;
   font-weight: 600;
 }
@@ -588,7 +558,7 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -597,18 +567,18 @@
 }
 
 .modalCloseButton:hover {
-  color: var(--litenode-text);
-  background: var(--litenode-surface-hover);
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
 }
 
 .modalCloseButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .modalSubtitle {
   margin: 8px 0 0;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.9rem;
   line-height: 1.45;
 }
@@ -628,7 +598,7 @@
 .permissionItem svg,
 .messageItem svg {
   margin-top: 2px;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   flex: 0 0 auto;
 }
 
@@ -640,9 +610,9 @@
 
 .pickerOption {
   width: 100%;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   color: inherit;
   cursor: pointer;
   display: flex;
@@ -654,18 +624,18 @@
 }
 
 .pickerOption:hover {
-  border-color: var(--litenode-border-control);
-  background: var(--litenode-surface-hover);
+  border-color: var(--acton-color-border-control);
+  background: var(--acton-color-surface-hover);
 }
 
 .pickerOption:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .pickerOptionActive {
-  border-color: var(--litenode-border-strong);
-  background: var(--litenode-surface-active);
+  border-color: var(--acton-color-border-strong);
+  background: var(--acton-color-surface-active);
 }
 
 .pickerTitle,
@@ -676,10 +646,10 @@
 .radio {
   width: 22px;
   height: 22px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 999px;
-  background: var(--litenode-surface);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
 }
 
 .requestSummary {
@@ -691,10 +661,10 @@
 .messageIndex {
   width: 28px;
   height: 28px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 9px;
-  background: var(--litenode-surface);
-  color: var(--litenode-text-muted);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
   font-size: 0.76rem;
   font-weight: 700;
 }
@@ -706,9 +676,9 @@
 .signPreviewPanel,
 .signPreviewDetails {
   min-width: 0;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
 }
 
 .signPreviewPanel {
@@ -718,8 +688,8 @@
 .signPreviewHeader {
   min-height: 38px;
   padding: 0 12px;
-  border-bottom: 1px solid var(--litenode-border-subtle);
-  color: var(--litenode-text);
+  border-bottom: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -740,8 +710,8 @@
 .signPreviewDetails summary::before {
   width: 7px;
   height: 7px;
-  border-right: 1.5px solid var(--litenode-text-muted);
-  border-bottom: 1.5px solid var(--litenode-text-muted);
+  border-right: 1.5px solid var(--acton-color-text-muted);
+  border-bottom: 1.5px solid var(--acton-color-text-muted);
   content: "";
   flex: 0 0 auto;
   transform: rotate(-45deg);
@@ -756,7 +726,7 @@
 .signPreviewHash {
   min-width: 0;
   margin-left: auto;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -767,14 +737,14 @@
 
 .signPreviewNotice {
   padding: 10px 12px;
-  border-bottom: 1px solid var(--litenode-border-subtle);
-  color: var(--litenode-text-muted);
+  border-bottom: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text-muted);
   font-size: 0.78rem;
   line-height: 1.4;
 }
 
 .signPreviewNoticeError {
-  color: var(--litenode-danger);
+  color: var(--acton-color-status-failed-text);
 }
 
 .signPreviewRows {
@@ -789,7 +759,7 @@
   min-width: 0;
   min-height: 34px;
   padding: 7px 12px 7px calc(12px + var(--sign-preview-depth) * 14px);
-  border-top: 1px solid var(--litenode-border-subtle);
+  border-top: 1px solid var(--acton-color-border);
   display: grid;
   grid-template-columns: minmax(92px, 0.42fr) minmax(0, 1fr);
   gap: 10px;
@@ -801,12 +771,12 @@
 }
 
 .signPreviewRowError .signPreviewValue {
-  color: var(--litenode-danger);
+  color: var(--acton-color-status-failed-text);
 }
 
 .signPreviewLabel {
   min-width: 0;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -817,7 +787,7 @@
 
 .signPreviewValue {
   min-width: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   overflow-wrap: anywhere;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 0.75rem;
@@ -831,7 +801,7 @@
 .signPreviewDetails summary {
   min-height: 38px;
   padding: 0 12px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -847,41 +817,14 @@
   display: none;
 }
 
-.signPreviewDetails pre,
-.tlbSchemaCode,
 .tlbHighlightedCode {
-  max-height: 240px;
+  --acton-highlighted-code-font-size: 0.74rem;
+  --acton-highlighted-code-line-height: 1.45;
+  --acton-highlighted-code-max-height: 240px;
+  --acton-highlighted-code-padding: 12px;
+
   margin: 0;
-  border-top: 1px solid var(--litenode-border-subtle);
-  overflow: auto;
-}
-
-.tlbSchemaCode {
-  padding: 12px;
-  color: var(--litenode-text-muted);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
-  font-size: 0.74rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
-}
-
-.tlbSchemaCode code {
-  font: inherit;
-}
-
-.tlbHighlightedCode :global(pre) {
-  margin: 0 !important;
-  padding: 12px !important;
-  background: transparent !important;
-  font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace !important;
-  font-size: 0.74rem !important;
-  line-height: 1.45 !important;
-  white-space: pre-wrap !important;
-}
-
-.tlbHighlightedCode :global(code) {
-  font: inherit !important;
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .spinning {

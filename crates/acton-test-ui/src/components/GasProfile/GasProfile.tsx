@@ -1,9 +1,11 @@
 import type React from "react"
+import {Checkbox} from "@acton/ui"
 import {useEffect, useMemo, useRef, useState} from "react"
 import flamegraph, {tooltip as flamegraphTooltip, type FlameGraphDatum} from "d3-flame-graph"
 import {select} from "d3-selection"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
 
+import {useGasProfileReport} from "../../hooks/useGasProfileReport"
 import styles from "./GasProfile.module.css"
 
 export interface GasProfileData {
@@ -40,6 +42,11 @@ interface GasProfileFrame {
 }
 
 interface GasProfileProps {
+  readonly profile?: GasProfileData
+  readonly projectRoot?: string
+}
+
+interface GasProfileContentProps {
   readonly profile: GasProfileData
   readonly projectRoot?: string
 }
@@ -499,6 +506,20 @@ const buildInstructionStats = (
 }
 
 export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) => {
+  const {profile: loadedProfile, error, loading} = useGasProfileReport(profile === undefined)
+
+  if (profile !== undefined)
+    return <GasProfileContent profile={profile} projectRoot={projectRoot} />
+  if (loading) return <div className={styles.emptyState}>Loading gas profile...</div>
+  if (error) return <div className={styles.emptyState}>Failed to load gas profile: {error}</div>
+  if (loadedProfile === undefined) {
+    return <div className={styles.emptyState}>Gas profile is not available</div>
+  }
+
+  return <GasProfileContent profile={loadedProfile} projectRoot={projectRoot} />
+}
+
+const GasProfileContent: React.FC<GasProfileContentProps> = ({profile, projectRoot}) => {
   const [selectedContractName, setSelectedContractName] = useState<string | undefined>(
     () => profile.contracts[0]?.name,
   )
@@ -755,7 +776,7 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
   }, [flameWidth, selectedNodeId])
 
   if (profile.contracts.length === 0 || profile.total_gas === 0) {
-    return <div className={styles.emptyState}>No gas profile samples were recorded.</div>
+    return <div className={styles.emptyState}>No gas profile samples were recorded</div>
   }
 
   return (
@@ -781,7 +802,7 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
       <div className={styles.workspace}>
         <section className={styles.viewer} ref={viewerRef}>
           {selectedContract === undefined || selectedTree === undefined ? (
-            <div className={styles.emptyState}>Select a contract to inspect its gas profile.</div>
+            <div className={styles.emptyState}>Select a contract to inspect its gas profile</div>
           ) : (
             <>
               <div className={styles.flameWrap} ref={flameContainerRef}>
@@ -896,16 +917,14 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
                                   )
                                 })}
                               </div>
-                              <label className={styles.instructionStackToggle}>
-                                <input
-                                  type="checkbox"
-                                  checked={showOnlyStackInstructions}
-                                  onChange={event =>
-                                    setShowOnlyStackInstructions(event.currentTarget.checked)
-                                  }
-                                />
-                                <span>Stack only</span>
-                              </label>
+                              <Checkbox
+                                className={styles.instructionStackToggle}
+                                label="Stack only"
+                                checked={showOnlyStackInstructions}
+                                onChange={event =>
+                                  setShowOnlyStackInstructions(event.currentTarget.checked)
+                                }
+                              />
                             </div>
                           )}
                         </div>

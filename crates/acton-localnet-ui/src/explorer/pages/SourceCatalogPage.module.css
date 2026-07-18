@@ -18,7 +18,7 @@
 
 .title {
   margin: 0;
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 32px;
   font-weight: 500;
   letter-spacing: 0;
@@ -29,9 +29,9 @@
   width: 100%;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   border-radius: 8px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   box-sizing: border-box;
 }
 
@@ -40,9 +40,9 @@
   display: flex;
   align-items: center;
   padding: 0 18px;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
-  background: var(--tonscan-card-bg, var(--litenode-surface));
-  color: var(--litenode-text);
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
   font-size: 0.86rem;
   font-weight: 750;
   letter-spacing: 0;
@@ -53,7 +53,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   border-radius: 8px;
   font: inherit;
   font-weight: 650;
@@ -67,9 +67,9 @@
   min-height: 38px;
   min-width: 160px;
   padding: 0 12px;
-  background: var(--litenode-text-strong);
-  color: var(--litenode-surface);
-  font-size: var(--font-size-sm);
+  background: var(--acton-color-text);
+  color: var(--acton-color-surface);
+  font-size: var(--acton-font-size-sm);
 }
 
 .primaryButton:hover:not(:disabled) {
@@ -87,8 +87,8 @@
   align-items: flex-start;
   gap: 7px;
   margin: -2px 0 0;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
   font-weight: 400;
   line-height: 1.45;
 }
@@ -109,14 +109,14 @@
   min-width: 860px;
   border-collapse: collapse;
   table-layout: fixed;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
 }
 
 .table th,
 .table td {
   box-sizing: border-box;
   padding: 0 14px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   line-height: 1.35;
   text-align: left;
   vertical-align: middle;
@@ -124,9 +124,9 @@
 
 .table th {
   height: 36px;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
-  background: var(--tonscan-row-hover, var(--litenode-surface-subtle));
-  color: var(--litenode-text-muted);
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-row);
+  color: var(--acton-color-text-muted);
   font-size: 0.7rem;
   font-weight: 650;
   letter-spacing: 0;
@@ -136,7 +136,7 @@
 
 .table td {
   height: 56px;
-  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-top: 1px solid var(--acton-color-border);
   font-size: 0.82rem;
 }
 
@@ -165,18 +165,22 @@
 }
 
 .tableRow {
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
 }
 
 .tableRow:hover td,
 .tableRow:focus-within td {
-  background: var(--litenode-row-hover);
+  background: var(--acton-color-surface-row);
 }
 
 .formButtonRow td {
   height: auto;
   padding: 0;
-  background: color-mix(in srgb, var(--litenode-focus) 5%, var(--tonscan-card-bg));
+  background: color-mix(
+    in srgb,
+    var(--acton-color-focus-ring) 5%,
+    var(--acton-color-surface-raised)
+  );
 }
 
 .registerSourceButton {
@@ -189,7 +193,7 @@
   padding: 0 14px;
   border: 0;
   background: transparent;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font: inherit;
   font-weight: 750;
   letter-spacing: 0;
@@ -205,18 +209,22 @@
 }
 
 .registerSourceButton:hover {
-  background: var(--litenode-row-hover);
+  background: var(--acton-color-surface-row);
 }
 
 .registerSourceButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .expandedFormRow td {
   height: auto;
   padding: 16px;
-  background: color-mix(in srgb, var(--litenode-focus) 4%, var(--tonscan-card-bg));
+  background: color-mix(
+    in srgb,
+    var(--acton-color-focus-ring) 4%,
+    var(--acton-color-surface-raised)
+  );
 }
 
 .sourceInlineForm {
@@ -262,35 +270,22 @@
 }
 
 .entrypointCell span {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-weight: 400;
 }
 
 .codeHash {
   display: inline-block;
-  color: var(--litenode-text);
-  font-family: var(--font-family-mono, monospace);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono, monospace);
   font-size: 0.78rem;
 }
 
 .hashCopyButton {
-  width: 20px;
-  height: 20px;
   flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--tonscan-text-secondary, var(--litenode-text-muted));
-  cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition:
-    color 120ms ease,
-    opacity 120ms ease;
+  transition: opacity 120ms ease;
 }
 
 .codeHashCell:hover .hashCopyButton,
@@ -299,24 +294,15 @@
   pointer-events: auto;
 }
 
-.hashCopyButton:hover {
-  color: var(--litenode-text);
-}
-
-.hashCopyButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
-}
-
 .empty {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 156px;
-  padding: var(--spacing-xl);
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  padding: var(--acton-space-8);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   text-align: center;
 }
 
@@ -341,9 +327,9 @@
   border-radius: 999px;
   background: linear-gradient(
     90deg,
-    var(--tonscan-row-hover) 0%,
-    color-mix(in srgb, var(--tonscan-text-secondary) 14%, var(--tonscan-row-hover)) 45%,
-    var(--tonscan-row-hover) 90%
+    var(--acton-color-surface-row) 0%,
+    color-mix(in srgb, var(--acton-color-text-muted) 14%, var(--acton-color-surface-row)) 45%,
+    var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;
   animation: skeletonPulse 1.2s ease-in-out infinite;
@@ -365,7 +351,7 @@
   }
 
   .title {
-    font-size: var(--font-size-xl);
+    font-size: var(--acton-font-size-2xl);
     line-height: 1.2;
   }
 

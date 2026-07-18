@@ -410,12 +410,15 @@ test.describe("Test UI", () => {
     await expect(page.getByTestId("summary-passed")).toContainText("Passed")
     await expect(page.getByRole("button", {name: /owner can send jettons/})).toBeVisible()
 
-    await page.getByPlaceholder("Filter tests...").fill("owner can send")
+    const filterInput = page.getByPlaceholder("Filter tests...")
+    await page.keyboard.press("Control+K")
+    await expect(filterInput).toBeFocused()
+    await filterInput.fill("owner can send")
     await expect(page.getByRole("button", {name: /owner can send jettons/})).toBeVisible()
     await expect(
       page.getByRole("button", {name: /deploy should create minter without bounce/}),
     ).toHaveCount(0)
-    await page.getByPlaceholder("Filter tests...").fill("")
+    await filterInput.fill("")
 
     await page.getByRole("button", {name: /owner can send jettons/}).click()
     await expect(page.getByTestId("test-details-title")).toContainText("wallet-behavior.test.tolk")
@@ -589,6 +592,20 @@ test.describe("Test UI", () => {
     await expect(storageDiff.getByText("7", {exact: true})).toBeVisible()
     await expect(storageDiff.getByText("42", {exact: true})).toBeVisible()
     await expect(storageDiff.getByText("true", {exact: true})).toBeVisible()
+  })
+
+  test("switches and persists the app theme", async ({actonUi, page}) => {
+    await page.goto(actonUi.baseUrl)
+
+    const root = page.locator("html")
+    await expect(root).toHaveAttribute("data-theme", "light")
+
+    await page.getByRole("button", {name: "Switch to dark theme"}).click()
+    await expect(root).toHaveAttribute("data-theme", "dark")
+
+    await page.reload()
+    await expect(root).toHaveAttribute("data-theme", "dark")
+    await expect(page.getByRole("button", {name: "Switch to light theme"})).toBeVisible()
   })
 
   test.describe("visual snapshots", () => {

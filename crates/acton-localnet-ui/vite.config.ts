@@ -9,6 +9,20 @@ import process from "node:process"
 const localnetTarget = process.env.VITE_LOCALNET_PROXY_TARGET || "http://127.0.0.1:3010"
 const require = createRequire(import.meta.url)
 const nodePolyfillsRoot = path.dirname(path.dirname(require.resolve("vite-plugin-node-polyfills")))
+const localnetProxy = {
+  "^/api(?:/|$)": {
+    target: localnetTarget,
+    changeOrigin: true,
+  },
+  "/acton_": {
+    target: localnetTarget,
+    changeOrigin: true,
+  },
+  "/emulate": {
+    target: localnetTarget,
+    changeOrigin: true,
+  },
+}
 
 export default defineConfig({
   plugins: [
@@ -22,8 +36,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@acton/shared-ui": path.resolve(import.meta.dirname, "../acton-shared-ui/src"),
-      "@": path.resolve(import.meta.dirname, "../acton-shared-ui/src"),
+      "@acton/transaction-ui": path.resolve(import.meta.dirname, "../acton-transaction-ui/src"),
       "@tasm-spec": path.resolve(import.meta.dirname, "../tasm-core/spec"),
       "vite-plugin-node-polyfills/shims/buffer": path.resolve(
         nodePolyfillsRoot,
@@ -37,19 +50,10 @@ export default defineConfig({
   },
   server: {
     port: 3006,
-    proxy: {
-      "^/api(?:/|$)": {
-        target: localnetTarget,
-        changeOrigin: true,
-      },
-      "/acton_": {
-        target: localnetTarget,
-        changeOrigin: true,
-      },
-      "/emulate": {
-        target: localnetTarget,
-        changeOrigin: true,
-      },
-    },
+    proxy: localnetProxy,
+  },
+  preview: {
+    port: 3006,
+    proxy: localnetProxy,
   },
 })

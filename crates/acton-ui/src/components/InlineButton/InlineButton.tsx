@@ -1,16 +1,10 @@
-import type {ComponentPropsWithRef, ReactNode} from "react"
+import {Check, Copy} from "lucide-react"
+import type {ComponentPropsWithRef, MouseEvent, ReactNode} from "react"
 
 import {cx} from "../../lib/cx"
+import {useCopyValue} from "../../lib/useCopyValue"
 import styles from "./InlineButton.module.css"
-
-export const ACTON_INLINE_BUTTON_VARIANTS = {
-  variant: {
-    default: "Neutral inline action",
-    utility: "Compact utility inline action",
-    accent: "Highlighted inline action",
-    danger: "Destructive inline action",
-  },
-} as const
+import type {ACTON_INLINE_BUTTON_VARIANTS} from "./constants"
 
 export type ActonInlineButtonVariant = keyof typeof ACTON_INLINE_BUTTON_VARIANTS.variant
 
@@ -19,6 +13,23 @@ export type InlineButtonProps = Readonly<
     readonly variant?: ActonInlineButtonVariant
     readonly leadingIcon?: ReactNode
     readonly trailingIcon?: ReactNode
+  }
+>
+
+export type CopyInlineButtonProps = Readonly<
+  Omit<
+    InlineButtonProps,
+    "aria-label" | "children" | "leadingIcon" | "onClick" | "title" | "type"
+  > & {
+    readonly children: ReactNode
+    readonly copiedChildren?: ReactNode
+    readonly copiedLabel?: string
+    readonly label?: string
+    readonly onCopy?: (value: string) => Promise<void> | void
+    readonly onCopyError?: (error: unknown) => void
+    readonly resetDelay?: number
+    readonly stopPropagation?: boolean
+    readonly value: string
   }
 >
 
@@ -62,5 +73,40 @@ export function InlineButton({
         ) : undefined}
       </span>
     </button>
+  )
+}
+
+export function CopyInlineButton({
+  children,
+  copiedChildren = "Copied",
+  copiedLabel = "Copied",
+  label = "Copy",
+  onCopy,
+  onCopyError,
+  resetDelay = 2000,
+  stopPropagation = true,
+  value,
+  variant = "utility",
+  ...props
+}: CopyInlineButtonProps) {
+  const {copy, isCopied} = useCopyValue({onCopy, onCopyError, resetDelay, value})
+  const currentLabel = isCopied ? copiedLabel : label
+
+  const handleClick = async (event: MouseEvent<HTMLButtonElement>) => {
+    if (stopPropagation) event.stopPropagation()
+    await copy()
+  }
+
+  return (
+    <InlineButton
+      {...props}
+      variant={variant}
+      aria-label={currentLabel}
+      title={currentLabel}
+      leadingIcon={isCopied ? <Check /> : <Copy />}
+      onClick={event => void handleClick(event)}
+    >
+      {isCopied ? copiedChildren : children}
+    </InlineButton>
   )
 }

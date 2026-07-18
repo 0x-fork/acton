@@ -27,21 +27,21 @@
 .editorTab {
   min-height: 34px;
   padding: 8px 18px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-left-width: 0;
   border-radius: 0;
-  background: var(--tonscan-row-hover);
-  color: var(--tonscan-text-secondary);
+  background: var(--acton-color-surface-row);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font: inherit;
   font-size: 13px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   white-space: nowrap;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .editorTab:first-child {
@@ -54,24 +54,24 @@
 }
 
 .editorTab:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .editorTabActive {
   position: relative;
   z-index: 1;
-  color: var(--tonscan-text-primary);
-  background: var(--tonscan-bg);
-  border-bottom-color: var(--tonscan-bg);
+  color: var(--acton-color-text);
+  background: var(--acton-color-canvas);
+  border-bottom-color: var(--acton-color-canvas);
 }
 
 .dataPanel {
   position: relative;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--tonscan-bg);
+  background: var(--acton-color-canvas);
 }
 
 .sourceDataBlock {
@@ -94,45 +94,15 @@
 .abiDeclaration summary:focus-visible,
 .abiDetails summary:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--litenode-focus);
-}
-
-.code {
-  margin: 0;
-  max-height: 600px;
-  min-height: 96px;
-  overflow: auto;
-  padding: var(--spacing-md);
-  color: var(--tonscan-text-primary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
-  white-space: pre;
-  word-break: normal;
-}
-
-.codeWrap {
-  white-space: pre-wrap;
-  word-break: break-word;
+  box-shadow: 0 0 0 3px var(--acton-color-focus-ring);
 }
 
 .highlightedCode {
-  max-height: 600px;
-  min-height: 96px;
-  overflow: auto;
-}
-
-.highlightedCode :global(pre) {
-  margin: 0 !important;
-  padding: var(--spacing-md) !important;
-  background: transparent !important;
-  font-family: var(--font-mono) !important;
-  font-size: var(--font-size-sm) !important;
-  line-height: 1.5 !important;
-}
-
-.highlightedCodeWrap :global(pre) {
-  white-space: pre-wrap !important;
+  --acton-highlighted-code-font-size: var(--acton-font-size-sm);
+  --acton-highlighted-code-line-height: 1.5;
+  --acton-highlighted-code-max-height: 600px;
+  --acton-highlighted-code-min-height: 96px;
+  --acton-highlighted-code-padding: var(--acton-space-4);
 }
 
 .abiPanel {
@@ -146,13 +116,12 @@
   max-height: 720px;
   overflow: auto;
   padding: 16px;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .sourceShellContent .abiView,
-.sourceShellContent .highlightedCode,
-.sourceShellContent .code {
-  max-height: none;
+.sourceShellContent .highlightedCode {
+  --acton-highlighted-code-max-height: none;
   overflow-y: visible;
 }
 
@@ -167,17 +136,17 @@
 }
 
 .abiStackLabel {
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.2;
 }
 
 .abiTitle {
   margin: 0;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-size: 18px;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.25;
 }
 
@@ -185,8 +154,8 @@
 .abiMethodDescription,
 .abiDeclarationDescription {
   margin: 6px 0 0;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.5;
 }
 
@@ -200,8 +169,8 @@
   gap: 4px 10px;
   min-width: 0;
   margin-top: 6px;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
   line-height: 1.35;
 }
 
@@ -210,8 +179,8 @@
 }
 
 .abiFacts strong {
-  color: var(--tonscan-text-primary);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .abiSection {
@@ -228,22 +197,22 @@
   gap: 12px;
   min-width: 0;
   padding-bottom: 7px;
-  border-bottom: 1px solid var(--tonscan-border);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .abiSectionHeader h4 {
   margin: 0;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-size: 13px;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.2;
 }
 
 .abiCount {
-  color: var(--tonscan-text-secondary);
-  font-family: var(--font-family);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
 }
 
@@ -258,7 +227,7 @@
 .abiMethod {
   min-width: 0;
   padding: 12px 0;
-  border-bottom: 1px solid var(--tonscan-border);
+  border-bottom: 1px solid var(--acton-color-border);
   scroll-margin-top: 96px;
 }
 
@@ -306,10 +275,10 @@
   flex: 0 0 auto;
   margin-top: 1px;
   margin-left: 6px;
-  color: var(--tonscan-text-secondary);
-  font-family: var(--font-family);
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-sans);
   font-size: 10px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1;
 }
 
@@ -321,23 +290,23 @@
   flex: 0 0 auto;
   min-height: 30px;
   padding: 0 10px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 8px;
-  background: var(--tonscan-bg);
-  color: var(--tonscan-text-primary);
+  background: var(--acton-color-canvas);
+  color: var(--acton-color-text);
   cursor: pointer;
   font: inherit;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .abiRunButton:hover:not(:disabled) {
-  background: var(--litenode-control-hover);
-  border-color: var(--litenode-border-control);
+  background: var(--acton-color-surface-hover);
+  border-color: var(--acton-color-border-control);
 }
 
 .abiRunButton:disabled {
@@ -361,8 +330,8 @@
 
 .abiMuted,
 .abiEmptyInline {
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.45;
 }
 
@@ -385,49 +354,32 @@
   min-width: 0;
   align-items: baseline;
   gap: 8px;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
   line-height: 1.25;
 }
 
 .abiArgLabel strong {
-  color: var(--tonscan-text-primary);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .abiArgLabel code {
   min-width: 0;
   overflow: hidden;
-  color: var(--tonscan-text-secondary);
-  font-family: var(--font-mono);
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
   font-size: 11px;
-  font-weight: var(--font-weight-normal);
+  font-weight: var(--acton-font-weight-normal);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .abiArgInput {
-  width: 100%;
-  min-height: 36px;
-  box-sizing: border-box;
   padding: 7px 9px;
-  border: 1px solid var(--tonscan-border);
-  border-radius: 8px;
-  outline: 0;
-  background: var(--tonscan-card-bg);
-  color: var(--tonscan-text-primary);
-  font-family: var(--font-mono);
+  background: var(--acton-color-surface-raised);
   font-size: 12px;
   line-height: 1.45;
-}
-
-.abiArgInput:focus-visible {
-  border-color: var(--tonscan-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tonscan-accent) 18%, transparent);
-}
-
-.abiArgInput::placeholder {
-  color: var(--tonscan-text-secondary);
 }
 
 .abiStackInput {
@@ -436,18 +388,18 @@
   box-sizing: border-box;
   padding: 9px 10px;
   resize: vertical;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 8px;
   outline: 0;
-  background: var(--tonscan-card-bg);
-  color: var(--tonscan-text-primary);
-  font-family: var(--font-mono);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
   font-size: 12px;
   line-height: 1.5;
 }
 
 .abiStackInput::placeholder {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .abiError,
@@ -457,8 +409,8 @@
 }
 
 .abiError {
-  color: var(--tonscan-error);
-  font-size: var(--font-size-sm);
+  color: var(--acton-color-status-failed);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.45;
 }
 
@@ -468,7 +420,7 @@
   gap: 5px;
   min-width: 0;
   padding-top: 10px;
-  border-top: 1px dashed var(--tonscan-border);
+  border-top: 1px dashed var(--acton-color-border);
 }
 
 .abiResultSkeleton {
@@ -478,7 +430,7 @@
   gap: 12px;
   min-height: 115px;
   padding-top: 10px;
-  border-top: 1px dashed var(--tonscan-border);
+  border-top: 1px dashed var(--acton-color-border);
 }
 
 .abiResultSkeleton span {
@@ -487,9 +439,9 @@
   border-radius: 999px;
   background: linear-gradient(
     90deg,
-    var(--tonscan-row-hover) 0%,
-    color-mix(in srgb, var(--tonscan-text-secondary) 16%, var(--tonscan-row-hover)) 45%,
-    var(--tonscan-row-hover) 90%
+    var(--acton-color-surface-row) 0%,
+    color-mix(in srgb, var(--acton-color-text-muted) 16%, var(--acton-color-surface-row)) 45%,
+    var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;
   animation: abiSkeletonPulse 1.2s ease-in-out infinite;
@@ -522,22 +474,22 @@
 }
 
 .abiResultStats span {
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
   line-height: 1.35;
 }
 
 .abiResultStats strong {
-  color: var(--tonscan-text-primary);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .abiDecodedResult span {
   min-width: 0;
   overflow-wrap: anywhere;
-  color: var(--tonscan-text-primary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
   line-height: 1.45;
   white-space: pre-wrap;
 }
@@ -551,9 +503,8 @@
   width: 100%;
 }
 
-.abiDecodedResult .abiTolkCode .code,
-.abiDecodedResult .abiTolkCode .highlightedCode :global(pre) {
-  font-size: var(--font-size-xs) !important;
+.abiDecodedResult .abiTolkCode .highlightedCode {
+  --acton-highlighted-code-font-size: var(--acton-font-size-xs);
 }
 
 .abiDetails {
@@ -569,9 +520,9 @@
   align-items: center;
   gap: 8px;
   width: fit-content;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.45;
   list-style: none;
   -webkit-appearance: none;
@@ -595,7 +546,7 @@
   background:
     linear-gradient(currentColor, currentColor) center / 8px 1.5px no-repeat,
     linear-gradient(currentColor, currentColor) center / 1.5px 8px no-repeat;
-  transition: opacity var(--transition-duration-fast);
+  transition: opacity var(--acton-duration-fast);
 }
 
 .abiDetails[open] summary::before {
@@ -607,11 +558,11 @@
   margin: 8px 0 0;
   overflow: auto;
   padding: 10px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 8px;
-  background: var(--tonscan-card-bg);
-  color: var(--tonscan-text-primary);
-  font-family: var(--font-mono);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -620,24 +571,16 @@
   max-height: 260px;
   margin: 8px 0 0;
   overflow: auto;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 8px;
-  background: var(--tonscan-card-bg);
+  background: var(--acton-color-surface-raised);
 }
 
 .abiDetailsCode .highlightedCode {
-  max-height: none;
-}
-
-.abiDetailsCode .highlightedCode :global(pre) {
-  padding: 10px !important;
-  font-size: 12px !important;
-  line-height: 1.5 !important;
-}
-
-.abiDetailsCode .code {
-  margin: 0;
-  padding: 10px;
+  --acton-highlighted-code-font-size: 12px;
+  --acton-highlighted-code-line-height: 1.5;
+  --acton-highlighted-code-max-height: none;
+  --acton-highlighted-code-padding: 10px;
   border: 0;
   background: transparent;
   font-size: 12px;
@@ -678,9 +621,9 @@
   gap: 8px;
   min-height: 26px;
   margin-bottom: 6px;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .abiMessageRow,
@@ -691,7 +634,7 @@
   gap: 6px;
   min-width: 0;
   padding: 8px 0;
-  border-top: 1px solid var(--tonscan-border);
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .abiMessageRow {
@@ -728,9 +671,9 @@
 .abiStorageName {
   min-width: 0;
   overflow: hidden;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -765,24 +708,24 @@
   min-height: 20px;
   padding: 0 6px;
   border-radius: 6px;
-  background: var(--tonscan-row-hover);
-  color: var(--tonscan-text-primary);
-  font-family: var(--font-family);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  background: var(--acton-color-surface-row);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.2;
 }
 
 .abiErrorName {
-  color: color-mix(in srgb, var(--tonscan-accent) 72%, var(--tonscan-text-primary));
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  color: color-mix(in srgb, var(--acton-color-accent) 72%, var(--acton-color-text));
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.45;
 }
 
 .abiDeclaration {
   min-width: 0;
-  border-top: 1px solid var(--tonscan-border);
+  border-top: 1px solid var(--acton-color-border);
   scroll-margin-top: 96px;
 }
 
@@ -796,7 +739,7 @@
   gap: 8px;
   min-width: 0;
   padding: 9px 0;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   cursor: pointer;
   list-style-position: inside;
 }
@@ -804,10 +747,10 @@
 .abiDeclarationName {
   min-width: 0;
   overflow: hidden;
-  color: var(--tonscan-text-primary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -821,43 +764,43 @@
   height: 18px;
   margin-top: 1px;
   border-radius: 5px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   text-decoration: none;
   opacity: 0.72;
   transition:
-    color var(--transition-duration-fast),
-    opacity var(--transition-duration-fast);
+    color var(--acton-duration-fast),
+    opacity var(--acton-duration-fast);
 }
 
 .abiSymbolAnchor:hover {
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
   opacity: 1;
 }
 
 .abiSymbolAnchor:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .abiDeclarationKind {
   flex: 0 0 auto;
   margin-top: -2px;
-  font-family: var(--font-family);
+  font-family: var(--acton-font-sans);
   font-size: 9px;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1;
 }
 
 .abiDeclarationKindStruct {
-  color: color-mix(in srgb, var(--tonscan-success) 76%, var(--tonscan-text-secondary));
+  color: color-mix(in srgb, var(--acton-color-status-passed) 76%, var(--acton-color-text-muted));
 }
 
 .abiDeclarationKindAlias {
-  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--tonscan-text-secondary));
+  color: color-mix(in srgb, var(--acton-color-accent) 78%, var(--acton-color-text-muted));
 }
 
 .abiDeclarationKindEnum {
-  color: color-mix(in srgb, #f59e0b 76%, var(--tonscan-text-secondary));
+  color: color-mix(in srgb, #f59e0b 76%, var(--acton-color-text-muted));
 }
 
 .abiDeclarationBody {
@@ -868,24 +811,12 @@
   min-width: 0;
 }
 
-.abiTolkCode .code {
-  max-height: none;
-  padding: 0;
-  overflow-x: auto;
-  font-size: 12px;
-  line-height: 1.55;
-}
-
 .abiTolkCode .highlightedCode {
-  max-height: none;
-  min-height: auto;
-  overflow: auto;
-}
-
-.abiTolkCode .highlightedCode :global(pre) {
-  padding: 0 !important;
-  font-size: 12px !important;
-  line-height: 1.55 !important;
+  --acton-highlighted-code-font-size: 12px;
+  --acton-highlighted-code-line-height: 1.55;
+  --acton-highlighted-code-max-height: none;
+  --acton-highlighted-code-min-height: 0;
+  --acton-highlighted-code-padding: 0;
 }
 
 .abiTolkCode .highlightedCode :global(code) {

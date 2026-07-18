@@ -1,8 +1,9 @@
 import path from "node:path"
 
 import {Address} from "@ton/core"
+import {PanelLeft} from "lucide-react"
 import type React from "react"
-import {useEffect, useMemo, useRef, useState} from "react"
+import {useEffect, useMemo, useState} from "react"
 import {
   FiArrowUpRight,
   FiCheck,
@@ -12,42 +13,42 @@ import {
   FiMinus,
   FiX,
 } from "react-icons/fi"
-import {SiIntellijidea, SiRust, SiWebstorm} from "react-icons/si"
-import {VscCode} from "react-icons/vsc"
-
 import {
-  type TestReport,
-  type TestExecutionLogs,
-  type SourceLocation,
-  TestStatus,
-  type Trace,
-  type ContractData,
-  type FailedMessage,
-  type TransactionInfo,
-} from "@acton/shared-ui"
+  ContractChip,
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableEmpty,
+  DataTableGroupRow,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableSkeletonRows,
+  DataTableTable,
+  getIdeUrl,
+  IdeSelector,
+  RawDataBlock,
+  useIdePreference,
+} from "@acton/ui"
+
+import type {ContractData, SourceLocation, TransactionInfo} from "@acton/transaction-ui"
 import {
   applyParsedBodies,
   buildValueFlowItems,
   fmt,
   getTransactionOpcode,
   processTransactions,
-  CodeSnippet,
-  DataBlock,
   TransactionTree,
-  ContractChip,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   resolveAbiOpcodeName,
   ValueFlowTable,
-} from "@acton/shared-ui"
+} from "@acton/transaction-ui"
 
 import {useContracts} from "../../hooks/useContracts"
-import {GasProfile, type GasProfileData} from "../GasProfile/GasProfile"
-import {DocsSidebarIcon} from "../Sidebar/DocsSidebarIcon"
+import {useGasProfileReport} from "../../hooks/useGasProfileReport"
+import {useTestExecutionLogs} from "../../hooks/useTestExecutionLogs"
+import {type FailedMessage, type TestReport, TestStatus, type Trace} from "../../types/test"
+import {CodeSnippet} from "../CodeSnippet/CodeSnippet"
+import {GasProfile} from "../GasProfile/GasProfile"
 
 import styles from "./TestDetails.module.css"
 
@@ -59,16 +60,10 @@ interface TestDetailsProps {
   readonly traceError?: string
   readonly isTraceLoading?: boolean
   readonly projectRoot?: string
-  readonly gasProfile?: GasProfileData
-  readonly gasProfileLoaded?: boolean
+  readonly gasProfileAvailable: boolean
+  readonly gasProfileAvailabilityLoaded: boolean
   readonly isSidebarCollapsed?: boolean
   readonly onExpandSidebar?: () => void
-}
-
-interface IDEConfig {
-  readonly name: string
-  readonly icon: React.ReactNode
-  readonly getUrl: (test: TestReport) => string
 }
 
 interface TraceFeeSummary {
@@ -122,14 +117,15 @@ const isExternalMessageNotAcceptedError = (error: string): boolean => {
 }
 
 const MISSING_VM_LOG_HINT = [
-  "No VM logs were collected for this trace.",
+  "No VM logs were collected for this trace",
   "Re-run with --verbose flag",
 ].join("\n")
 const VALUE_FLOW_EXPANDED_STORAGE_KEY = "valueFlowExpanded"
 
-const toIdeSourcePosition = (location: SourceLocation): Pick<TestReport, "row" | "column"> => ({
-  row: Math.max(0, location.line - 1),
-  column: Math.max(0, location.column - 2),
+const toIdeSourceLocation = (location: SourceLocation) => ({
+  filePath: location.file,
+  line: Math.max(1, location.line),
+  column: Math.max(1, location.column - 1),
 })
 
 const hasNonEmptyLog = (value: string | undefined): boolean => (value ?? "").trim().length > 0
@@ -149,14 +145,21 @@ const getStatusDescription = (test: TestReport): string | undefined => {
 const stringifyError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
+const formatDuration = (duration: {secs: number; nanos: number}): string => {
+  const ms = duration.secs * 1000 + duration.nanos / 1_000_000
+  if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`
+  if (ms < 1000) return `${ms.toFixed(1)}ms`
+  return `${(ms / 1000).toFixed(2)}s`
+}
+
 export const TestDetails: React.FC<TestDetailsProps> = ({
   test,
   trace,
   traceError,
   isTraceLoading = false,
   projectRoot,
-  gasProfile,
-  gasProfileLoaded = true,
+  gasProfileAvailable,
+  gasProfileAvailabilityLoaded,
   isSidebarCollapsed = false,
   onExpandSidebar,
 }) => {
@@ -175,15 +178,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     return localStorage.getItem(VALUE_FLOW_EXPANDED_STORAGE_KEY) === "true"
   })
   const [isTreasuryDeployTracesExpanded, setIsTreasuryDeployTracesExpanded] = useState(false)
-  const [selectedIdeName, setSelectedIdeName] = useState<string | null>(() => {
-    return localStorage.getItem("selectedIde")
-  })
-  const [executionLogs, setExecutionLogs] = useState<TestExecutionLogs | undefined>()
-  const [isLoadingExecutionLogs, setIsLoadingExecutionLogs] = useState(false)
-  const [isHeaderIDESelectorOpen, setIsHeaderIDESelectorOpen] = useState(false)
-  const [isGridIDESelectorOpen, setIsGridIDESelectorOpen] = useState(false)
-  const headerDropdownRef = useRef<HTMLDivElement | null>(null)
-  const gridDropdownRef = useRef<HTMLDivElement | null>(null)
+  const [selectedIde, selectIde] = useIdePreference()
 
   const contractNames = useMemo(() => {
     const names = new Set<string>(trace?.contracts ?? [])
@@ -205,59 +200,14 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     return [...names]
   }, [trace, test.failed_transactions])
   const {contracts: backendContracts} = useContracts(contractNames)
-
-  const ides: IDEConfig[] = useMemo(
-    () => [
-      {
-        name: "Cursor",
-        icon: <VscCode />,
-        getUrl: t => `cursor://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
-      },
-      {
-        name: "Windsurf",
-        icon: <VscCode />,
-        getUrl: t => `windsurf://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
-      },
-      {
-        name: "VS Code",
-        icon: <VscCode />,
-        getUrl: t => `vscode://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
-      },
-      {
-        name: "VSCodium",
-        icon: <VscCode />,
-        getUrl: t => `vscodium://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
-      },
-      {
-        name: "WebStorm",
-        icon: <SiWebstorm />,
-        getUrl: t => `webstorm://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
-      },
-      {
-        name: "RustRover",
-        icon: <SiRust />,
-        getUrl: t =>
-          `rustrover://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
-      },
-      {
-        name: "IntelliJ",
-        icon: <SiIntellijidea />,
-        getUrl: t => `idea://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
-      },
-    ],
-    [],
-  )
-
-  const selectedIde = useMemo(() => {
-    return ides.find(i => i.name === selectedIdeName) || ides[0]
-  }, [ides, selectedIdeName])
-
-  const handleSelectIde = (ide: IDEConfig) => {
-    setSelectedIdeName(ide.name)
-    localStorage.setItem("selectedIde", ide.name)
-    setIsHeaderIDESelectorOpen(false)
-    setIsGridIDESelectorOpen(false)
-  }
+  const {executionLogs, isLoadingExecutionLogs} = useTestExecutionLogs(test)
+  const {
+    profile: gasProfileReport,
+    error: gasProfileError,
+    loading: isGasProfileLoading,
+    loaded: gasProfileLoaded,
+  } = useGasProfileReport(gasProfileAvailable && activeTab === "profile")
+  const gasProfile = gasProfileReport?.tests?.find(profile => profile.name === test.name)
 
   const errorLocation = useMemo(() => {
     if (test.status !== TestStatus.Failed || !test.details) {
@@ -280,83 +230,6 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     return {filePath: test.file_path, row: test.row, column: test.column}
   }, [test, projectRoot])
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        document.activeElement instanceof HTMLInputElement ||
-        document.activeElement instanceof HTMLTextAreaElement
-      ) {
-        return
-      }
-
-      if (e.key === ".") {
-        globalThis.location.href = selectedIde.getUrl({
-          ...test,
-          file_path: errorLocation.filePath,
-          row: errorLocation.row,
-          column: errorLocation.column,
-        })
-      }
-
-      if (e.key === "Escape") {
-        setIsHeaderIDESelectorOpen(false)
-        setIsGridIDESelectorOpen(false)
-      }
-    }
-
-    globalThis.addEventListener("keydown", handleKeyDown)
-    return () => globalThis.removeEventListener("keydown", handleKeyDown)
-  }, [test, selectedIde, errorLocation])
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (headerDropdownRef.current && !headerDropdownRef.current.contains(event.target as Node)) {
-        setIsHeaderIDESelectorOpen(false)
-      }
-      if (gridDropdownRef.current && !gridDropdownRef.current.contains(event.target as Node)) {
-        setIsGridIDESelectorOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    const params = new URLSearchParams({
-      file_path: test.file_path,
-      name: test.name,
-      row: test.row.toString(),
-      column: test.column.toString(),
-    })
-
-    setIsLoadingExecutionLogs(true)
-    setExecutionLogs(undefined)
-
-    void fetch(`/api/test-logs?${params.toString()}`, {signal: controller.signal})
-      .then(async res => {
-        if (!res.ok) {
-          throw new Error(`Failed to fetch test logs: ${res.status}`)
-        }
-        return (await res.json()) as TestExecutionLogs
-      })
-      .then(data => {
-        setExecutionLogs(data)
-        setIsLoadingExecutionLogs(false)
-      })
-      .catch(error => {
-        if (error instanceof Error && error.name === "AbortError") {
-          return
-        }
-
-        console.error("Failed to fetch test logs", error)
-        setExecutionLogs({})
-        setIsLoadingExecutionLogs(false)
-      })
-
-    return () => controller.abort()
-  }, [test.file_path, test.name, test.row, test.column])
-
   const getRelativePath = (path: string) => {
     if (projectRoot && path.startsWith(projectRoot)) {
       const rel = path.slice(projectRoot.length)
@@ -371,29 +244,16 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
 
   const renderSourceLocation = (location: SourceLocation) => {
     const label = `${getRelativePath(location.file)}:${location.line}:${location.column}`
-    const idePosition = toIdeSourcePosition(location)
 
     return (
       <a
-        href={selectedIde.getUrl({
-          ...test,
-          file_path: location.file,
-          row: idePosition.row,
-          column: idePosition.column,
-        })}
+        href={getIdeUrl(selectedIde, toIdeSourceLocation(location))}
         className={styles.sourceLocationLink}
-        title={`Open ${label} in ${selectedIde.name}`}
+        title={`Open ${label} in ${selectedIde}`}
       >
         {label}
       </a>
     )
-  }
-
-  const formatDuration = (duration: {secs: number; nanos: number}) => {
-    const ms = duration.secs * 1000 + duration.nanos / 1_000_000
-    if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`
-    if (ms < 1000) return `${ms.toFixed(1)}ms`
-    return `${(ms / 1000).toFixed(2)}s`
   }
 
   const transactionCount = useMemo(() => {
@@ -409,7 +269,10 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   const skippedTracesCount = trace?.skipped_traces_count ?? 0
   const skippedTraceLabel = formatSkippedTraceCount(skippedTracesCount)
   const traceEntries = useMemo(() => {
-    return (trace?.traces ?? []).map((traceItem, index) => ({traceItem, index}))
+    return (trace?.traces ?? []).map((traceItem, index) => ({
+      traceItem,
+      index,
+    }))
   }, [trace])
   const treasuryDeployTraceEntries = useMemo(
     () => traceEntries.filter(({traceItem}) => traceItem.is_treasury_deploy === true),
@@ -697,11 +560,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   }
 
   useEffect(() => {
-    if (gasProfileLoaded && activeTab === "profile" && !hasGasProfile) {
+    if (gasProfileAvailabilityLoaded && !gasProfileAvailable && activeTab === "profile") {
       setActiveTab("info")
       localStorage.setItem("activeTab", "info")
     }
-  }, [activeTab, gasProfileLoaded, hasGasProfile])
+  }, [activeTab, gasProfileAvailabilityLoaded, gasProfileAvailable])
 
   const handleTabChange = (tab: TestDetailsTab) => {
     setActiveTab(tab)
@@ -755,24 +618,44 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
             </div>
           )}
           <div className={styles.logSection}>
-            <div className={styles.logSectionTitle}>Error</div>
-            <DataBlock data={failedMessage.error} />
+            <RawDataBlock
+              collapsible
+              copyLabel="Error"
+              defaultExpanded={false}
+              title="Error"
+              value={failedMessage.error}
+            />
           </div>
           {failedMessage.vm_exit_code !== undefined && (
             <div className={styles.logSection}>
-              <div className={styles.logSectionTitle}>VM Exit Code</div>
-              <DataBlock data={failedMessage.vm_exit_code.toString()} />
+              <RawDataBlock
+                collapsible
+                copyLabel="VM exit code"
+                defaultExpanded={false}
+                title="VM Exit Code"
+                value={failedMessage.vm_exit_code.toString()}
+              />
             </div>
           )}
           {hasExecutorLog && (
             <div className={styles.logSection}>
-              <div className={styles.logSectionTitle}>Executor Log</div>
-              <DataBlock data={failedMessage.executor_logs ?? ""} />
+              <RawDataBlock
+                collapsible
+                copyLabel="Executor log"
+                defaultExpanded={false}
+                title="Executor Log"
+                value={failedMessage.executor_logs ?? ""}
+              />
             </div>
           )}
           <div className={styles.logSection}>
-            <div className={styles.logSectionTitle}>VM Log</div>
-            <DataBlock data={hasVmLog ? (failedMessage.vm_log_diff ?? "") : MISSING_VM_LOG_HINT} />
+            <RawDataBlock
+              collapsible
+              copyLabel="VM log"
+              defaultExpanded={false}
+              title="VM Log"
+              value={hasVmLog ? (failedMessage.vm_log_diff ?? "") : MISSING_VM_LOG_HINT}
+            />
           </div>
         </div>
       )
@@ -780,52 +663,44 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   }
 
   const renderTestExecutionLogs = () => {
-    const hasStdout = hasNonEmptyLog(executionLogs?.stdout)
-    const hasStderr = hasNonEmptyLog(executionLogs?.stderr)
-    const hasVmLog = hasNonEmptyLog(executionLogs?.vm_log)
-
-    const summaryKinds = [
-      hasStdout ? "stdout" : undefined,
-      hasStderr ? "stderr" : undefined,
-    ].filter(Boolean)
-    const hasAnyLogs = hasStdout || hasStderr || hasVmLog
-
-    if (!hasAnyLogs && !isLoadingExecutionLogs) {
-      return
-    }
+    const sections = [
+      {
+        copyLabel: "Test stdout",
+        emptyContent: "No test output was produced",
+        title: "Test Output",
+        value: executionLogs?.stdout ?? "",
+      },
+      {
+        copyLabel: "Test stderr",
+        emptyContent: "No test error output was produced",
+        title: "Test Error Output",
+        value: executionLogs?.stderr ?? "",
+      },
+      {
+        copyLabel: "Test VM log",
+        emptyContent: "No test VM log was collected",
+        title: "Test VM Log",
+        value: executionLogs?.vm_log ?? "",
+      },
+    ]
 
     return (
-      <details className={styles.infoLogsSection}>
-        <summary className={styles.infoLogsSummary}>
-          <span className={styles.infoLogsTitle}>Test Logs</span>
-          {(isLoadingExecutionLogs || summaryKinds.length > 0) && (
-            <span className={styles.infoLogsMeta}>
-              {isLoadingExecutionLogs ? "loading..." : summaryKinds.join(" · ")}
-            </span>
-          )}
-        </summary>
-        {!isLoadingExecutionLogs && (
-          <div className={styles.infoLogsContent}>
-            {hasStdout && (
-              <div className={styles.logSection}>
-                <div className={styles.logSectionTitle}>Stdout</div>
-                <DataBlock data={executionLogs?.stdout ?? ""} />
-              </div>
-            )}
-            {hasStderr && (
-              <div className={styles.logSection}>
-                <div className={styles.logSectionTitle}>Stderr</div>
-                <DataBlock data={executionLogs?.stderr ?? ""} />
-              </div>
-            )}
-            {hasVmLog && (
-              <div className={styles.logSection}>
-                <DataBlock data={executionLogs?.vm_log ?? ""} />
-              </div>
-            )}
-          </div>
-        )}
-      </details>
+      <div className={styles.infoLogsSection}>
+        {sections.map(section => (
+          <RawDataBlock
+            key={section.title}
+            collapsible
+            copyLabel={section.copyLabel}
+            defaultExpanded={false}
+            empty={!isLoadingExecutionLogs && !hasNonEmptyLog(section.value)}
+            emptyContent={section.emptyContent}
+            loading={isLoadingExecutionLogs}
+            loadingLabel={`Loading ${section.title}`}
+            title={section.title}
+            value={section.value}
+          />
+        ))}
+      </div>
     )
   }
 
@@ -833,11 +708,12 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     const isTreasuryDeploy = trace?.traces[summary.traceIndex]?.is_treasury_deploy === true
 
     return (
-      <TableRow
+      <DataTableRow
         key={`${test.suite_name}:${test.name}:trace-fee:${summary.traceIndex}`}
-        className={isTreasuryDeploy ? styles.treasuryDeployTraceFeeRow : undefined}
+        groupChild={isTreasuryDeploy}
+        hover
       >
-        <TableCell>
+        <DataTableCell truncate>
           <button
             type="button"
             className={styles.traceLinkButton}
@@ -853,19 +729,13 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
             </span>
             <FiArrowUpRight className={styles.traceLinkIcon} aria-hidden="true" />
           </button>
-        </TableCell>
-        <TableCell className={styles.numericCell}>{summary.transactionCount.toString()}</TableCell>
-        <TableCell className={styles.numericCell}>{summary.totalGasUsed.toString()}</TableCell>
-        <TableCell className={styles.numericCell}>
-          {fmt.formatCurrency(summary.totalGasFees)}
-        </TableCell>
-        <TableCell className={styles.numericCell}>
-          {fmt.formatCurrency(summary.totalForwardFees)}
-        </TableCell>
-        <TableCell className={styles.numericCell}>
-          {fmt.formatCurrency(summary.totalFees)}
-        </TableCell>
-      </TableRow>
+        </DataTableCell>
+        <DataTableCell align="center">{summary.transactionCount.toString()}</DataTableCell>
+        <DataTableCell>{summary.totalGasUsed.toString()}</DataTableCell>
+        <DataTableCell>{fmt.formatCurrency(summary.totalGasFees)}</DataTableCell>
+        <DataTableCell>{fmt.formatCurrency(summary.totalForwardFees)}</DataTableCell>
+        <DataTableCell>{fmt.formatCurrency(summary.totalFees)}</DataTableCell>
+      </DataTableRow>
     )
   }
 
@@ -936,8 +806,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           {test.status === TestStatus.Failed && (
             <div className={styles.errorSection}>
               <div className={styles.errorTitle}>Error Message</div>
-              <DataBlock
-                data={
+              <RawDataBlock
+                value={
                   test.failed_transaction_context
                     ? (test.message ?? "expect(actual).toHaveTx(expected)")
                     : (test.detailed_message ?? test.message ?? "No error message available")
@@ -1003,95 +873,70 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                 line={errorLocation.row + 1}
                 projectRoot={projectRoot}
                 ideOpener={
-                  <div className={styles.gridIdeSelector} ref={gridDropdownRef}>
-                    <a
-                      href={selectedIde.getUrl({
-                        ...test,
-                        file_path: errorLocation.filePath,
-                        row: errorLocation.row,
-                        column: errorLocation.column,
-                      })}
-                      className={styles.gridIdeQuickLink}
-                      title={`Open in ${selectedIde.name} (or press \`.\`)`}
-                    >
-                      {selectedIde.icon}
-                    </a>
-                    <button
-                      type="button"
-                      className={`${styles.gridIdeTrigger} ${isGridIDESelectorOpen ? styles.active : ""}`}
-                      onClick={() => setIsGridIDESelectorOpen(!isGridIDESelectorOpen)}
-                      title="Change IDE"
-                    >
-                      <FiChevronDown />
-                    </button>
-                    {isGridIDESelectorOpen && (
-                      <div className={styles.gridIdeDropdown}>
-                        {ides.map(ide => (
-                          <button
-                            key={ide.name}
-                            type="button"
-                            className={`${styles.ideItem} ${selectedIdeName === ide.name ? styles.selectedIde : ""}`}
-                            onClick={() => handleSelectIde(ide)}
-                          >
-                            <span className={styles.ideIcon}>{ide.icon}</span>
-                            <span className={styles.ideName}>{ide.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <IdeSelector
+                    value={selectedIde}
+                    onValueChange={selectIde}
+                    size="compact"
+                    location={{
+                      filePath: errorLocation.filePath,
+                      line: errorLocation.row + 1,
+                      column: errorLocation.column + 1,
+                    }}
+                  />
                 }
               />
             </div>
           )}
 
-          {traceFeeSummaries.length > 0 && (
-            <div className={styles.traceFeesSection}>
-              <div className={styles.traceFeesTitle}>Fee Summary</div>
-              <div className={styles.traceFeesTableWrapper}>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Trace</TableHead>
-                      <TableHead>Tx Count</TableHead>
-                      <TableHead>Gas Used</TableHead>
-                      <TableHead>Gas Fee</TableHead>
-                      <TableHead>Forward Fee</TableHead>
-                      <TableHead>Total Fee</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {treasuryDeployTraceFeeSummaries.length > 0 && (
-                      <TableRow className={styles.treasuryDeploySummaryRow}>
-                        <TableCell colSpan={6}>
-                          <button
-                            type="button"
-                            className={styles.treasuryDeploySummaryToggle}
-                            onClick={handleToggleTreasuryDeployTraces}
-                            aria-expanded={shouldShowTreasuryDeployTraces}
-                          >
-                            {shouldShowTreasuryDeployTraces ? (
-                              <FiChevronUp aria-hidden="true" />
-                            ) : (
-                              <FiChevronDown aria-hidden="true" />
-                            )}
-                            <span>{treasuryDeployTraceLabel}</span>
-                          </button>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    {shouldShowTreasuryDeployTraces &&
-                      treasuryDeployTraceFeeSummaries.map(traceFeeSummary =>
+          <div className={styles.traceFeesSection}>
+            <div className={styles.traceFeesTitle}>Fee Summary</div>
+            <DataTable aria-busy={isTraceLoading} minWidth="62rem">
+              <DataTableTable aria-label="Trace fee summary">
+                <DataTableHead>
+                  <DataTableRow>
+                    <DataTableHeaderCell columnWidth="16rem">Trace</DataTableHeaderCell>
+                    <DataTableHeaderCell align="center" columnWidth="8rem">
+                      Tx Count
+                    </DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="8rem">Gas Used</DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="12rem">Gas Fee</DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="13rem">Forward Fee</DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="13rem">Total Fee</DataTableHeaderCell>
+                  </DataTableRow>
+                </DataTableHead>
+                <DataTableBody>
+                  {isTraceLoading ? (
+                    <DataTableSkeletonRows
+                      alignments={["left", "center", "left", "left", "left", "left"]}
+                      columns={6}
+                      rowKeyPrefix="trace-fee-summary"
+                    />
+                  ) : traceFeeSummaries.length === 0 ? (
+                    <DataTableEmpty colSpan={6}>No transactions were recorded</DataTableEmpty>
+                  ) : (
+                    <>
+                      {treasuryDeployTraceFeeSummaries.length > 0 && (
+                        <DataTableGroupRow
+                          colSpan={6}
+                          expanded={shouldShowTreasuryDeployTraces}
+                          onToggle={handleToggleTreasuryDeployTraces}
+                        >
+                          {treasuryDeployTraceLabel}
+                        </DataTableGroupRow>
+                      )}
+                      {shouldShowTreasuryDeployTraces &&
+                        treasuryDeployTraceFeeSummaries.map(traceFeeSummary =>
+                          renderTraceFeeSummaryRow(traceFeeSummary),
+                        )}
+                      {regularTraceFeeSummaries.map(traceFeeSummary =>
                         renderTraceFeeSummaryRow(traceFeeSummary),
                       )}
-                    {regularTraceFeeSummaries.map(traceFeeSummary =>
-                      renderTraceFeeSummaryRow(traceFeeSummary),
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          )}
+                    </>
+                  )}
+                </DataTableBody>
+              </DataTableTable>
+            </DataTable>
+          </div>
 
           {renderTestExecutionLogs()}
         </div>
@@ -1099,6 +944,14 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     }
 
     if (activeTab === "profile") {
+      if (isGasProfileLoading) {
+        return <div className={styles.empty}>Loading gas profile...</div>
+      }
+
+      if (gasProfileError) {
+        return <div className={styles.empty}>Failed to load gas profile: {gasProfileError}</div>
+      }
+
       if (hasGasProfile) {
         return (
           <div className={styles.profileTab}>
@@ -1137,20 +990,26 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                 </div>
                 {hasExecutorLog && (
                   <div className={styles.logSection}>
-                    <div className={styles.logSectionTitle}>Executor Log</div>
-                    <DataBlock
-                      data={tx.executor_logs}
-                      visualDynamic="executor-log"
-                      visualPlaceholder="<executor log>"
+                    <RawDataBlock
+                      collapsible
+                      copyLabel="Executor log"
+                      defaultExpanded={false}
+                      title="Executor Log"
+                      value={tx.executor_logs}
+                      data-visual-dynamic="executor-log"
+                      data-visual-placeholder="<executor log>"
                     />
                   </div>
                 )}
                 <div className={styles.logSection}>
-                  <div className={styles.logSectionTitle}>VM Log</div>
-                  <DataBlock
-                    data={hasVmLog ? tx.vm_log_diff : MISSING_VM_LOG_HINT}
-                    visualDynamic="vm-log"
-                    visualPlaceholder="<vm log>"
+                  <RawDataBlock
+                    collapsible
+                    copyLabel="VM log"
+                    defaultExpanded={false}
+                    title="VM Log"
+                    value={hasVmLog ? tx.vm_log_diff : MISSING_VM_LOG_HINT}
+                    data-visual-dynamic="vm-log"
+                    data-visual-placeholder="<vm log>"
                   />
                 </div>
               </div>
@@ -1166,11 +1025,14 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
         return (
           <div className={styles.txLogs}>
             <div className={styles.logSection}>
-              <div className={styles.logSectionTitle}>VM Log</div>
-              <DataBlock
-                data={MISSING_VM_LOG_HINT}
-                visualDynamic="vm-log"
-                visualPlaceholder="<vm log>"
+              <RawDataBlock
+                collapsible
+                copyLabel="VM log"
+                defaultExpanded={false}
+                title="VM Log"
+                value={MISSING_VM_LOG_HINT}
+                data-visual-dynamic="vm-log"
+                data-visual-placeholder="<vm log>"
               />
             </div>
           </div>
@@ -1259,46 +1121,19 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
               title="Expand sidebar"
               aria-label="Expand sidebar"
             >
-              <DocsSidebarIcon />
+              <PanelLeft aria-hidden="true" />
             </button>
           )}
           <span className={styles.statusIcon}>{getStatusIcon(test.status)}</span>
           <span className={styles.suiteName}>{test.suite_name} / </span>
           <span className={styles.testName}>{test.name}</span>
 
-          <div className={styles.ideSelectorContainer} ref={headerDropdownRef}>
-            <a
-              href={selectedIde.getUrl(test)}
-              className={styles.ideQuickLink}
-              title={`Open in ${selectedIde.name} (or press \`.\`)`}
-            >
-              {selectedIde.icon}
-            </a>
-            <button
-              type="button"
-              className={`${styles.ideTrigger} ${isHeaderIDESelectorOpen ? styles.active : ""}`}
-              onClick={() => setIsHeaderIDESelectorOpen(!isHeaderIDESelectorOpen)}
-              title="Change IDE"
-            >
-              <FiChevronDown />
-            </button>
-
-            {isHeaderIDESelectorOpen && (
-              <div className={styles.ideDropdown}>
-                {ides.map(ide => (
-                  <button
-                    key={ide.name}
-                    type="button"
-                    className={`${styles.ideItem} ${selectedIdeName === ide.name ? styles.selectedIde : ""}`}
-                    onClick={() => handleSelectIde(ide)}
-                  >
-                    <span className={styles.ideIcon}>{ide.icon}</span>
-                    <span className={styles.ideName}>{ide.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <IdeSelector
+            value={selectedIde}
+            onValueChange={selectIde}
+            shortcut
+            location={{filePath: test.file_path, line: test.row + 1, column: test.column + 1}}
+          />
         </div>
       </div>
 
@@ -1331,7 +1166,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           >
             Logs
           </button>
-          {hasGasProfile && (
+          {gasProfileAvailable && (
             <button
               type="button"
               role="tab"

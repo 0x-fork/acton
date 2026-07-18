@@ -2,16 +2,20 @@ import type React from "react"
 import {useEffect, useMemo, useRef, useState} from "react"
 import {FiSearch} from "react-icons/fi"
 
-import type {HighlightedToken} from "@acton/shared-ui"
-import {highlightTolkToTokens} from "@acton/shared-ui"
+import {highlightCodeToTokens, type HighlightedCodeToken, useTheme} from "@acton/ui"
 
+import {useCoverageReport} from "../../hooks/useCoverageReport"
+import {useFileContent} from "../../hooks/useFileContent"
 import {parseLcov, type CoverageFile} from "../../utils/lcov"
 
 import styles from "./Coverage.module.css"
 
 interface CoverageProps {
-  readonly lcov: string
   readonly projectRoot?: string
+}
+
+interface CoverageContentProps extends CoverageProps {
+  readonly lcov: string
 }
 
 const getRelativePath = (filePath: string, projectRoot?: string) => {
@@ -61,7 +65,7 @@ const BOLD_FONT_STYLE = 2
 const UNDERLINE_FONT_STYLE = 4
 const STRIKETHROUGH_FONT_STYLE = 8
 
-const tokenStyle = (token: HighlightedToken): React.CSSProperties | undefined => {
+const tokenStyle = (token: HighlightedCodeToken): React.CSSProperties | undefined => {
   const style: React.CSSProperties = {}
 
   if (token.htmlStyle) {
@@ -94,17 +98,25 @@ const tokenStyle = (token: HighlightedToken): React.CSSProperties | undefined =>
   return Object.keys(style).length > 0 ? style : undefined
 }
 
-export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
+export const Coverage: React.FC<CoverageProps> = ({projectRoot}) => {
+  const {lcov, error, loading} = useCoverageReport()
+
+  if (loading) return <div className={styles.emptyState}>Loading coverage report...</div>
+  if (error) return <div className={styles.emptyState}>Failed to load coverage: {error}</div>
+  if (lcov === undefined) return <div className={styles.emptyState}>Coverage is not available</div>
+
+  return <CoverageContent lcov={lcov} projectRoot={projectRoot} />
+}
+
+const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) => {
+  const {theme} = useTheme()
   const coverage = useMemo(() => parseLcov(lcov), [lcov])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedFilePath, setSelectedFilePath] = useState<string | undefined>(() => {
     return coverage.files[0]?.filePath
   })
-  const [sourceContent, setSourceContent] = useState("")
-  const [sourceError, setSourceError] = useState<string | undefined>()
-  const [isLoadingSource, setIsLoadingSource] = useState(false)
   const [highlightedLines, setHighlightedLines] = useState<
-    readonly (readonly HighlightedToken[])[] | undefined
+    readonly (readonly HighlightedCodeToken[])[] | undefined
   >()
   const codePaneRef = useRef<HTMLDivElement | null>(null)
 
@@ -136,49 +148,12 @@ export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
 
     return coverage.files.find(file => file.filePath === selectedFilePath) ?? filteredFiles[0]
   }, [coverage.files, filteredFiles, selectedFilePath])
-
-  useEffect(() => {
-    if (selectedFile === undefined) {
-      setSourceContent("")
-      setSourceError(undefined)
-      setIsLoadingSource(false)
-      setHighlightedLines(undefined)
-      return
-    }
-
-    const controller = new AbortController()
-
-    setIsLoadingSource(true)
-    setSourceError(undefined)
-    setSourceContent("")
-    setHighlightedLines(undefined)
-
-    void fetch(`/api/file?path=${encodeURIComponent(selectedFile.filePath)}`, {
-      signal: controller.signal,
-    })
-      .then(async response => {
-        if (!response.ok) {
-          throw new Error(`Failed to fetch source file: ${response.status}`)
-        }
-
-        return response.text()
-      })
-      .then(content => {
-        setSourceContent(content)
-        setIsLoadingSource(false)
-      })
-      .catch(error => {
-        if (error instanceof Error && error.name === "AbortError") {
-          return
-        }
-
-        console.error("Failed to fetch coverage source file", error)
-        setSourceError(error instanceof Error ? error.message : "Unknown error")
-        setIsLoadingSource(false)
-      })
-
-    return () => controller.abort()
-  }, [selectedFile])
+  const {
+    content: loadedSourceContent,
+    error: sourceError,
+    loading: isLoadingSource,
+  } = useFileContent(selectedFile?.filePath)
+  const sourceContent = loadedSourceContent ?? ""
 
   useEffect(() => {
     if (!sourceContent) {
@@ -190,8 +165,7 @@ export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
 
     const renderHighlightedLines = async () => {
       try {
-        const isDark = document.documentElement.classList.contains("dark-theme")
-        const tokens = await highlightTolkToTokens(sourceContent, isDark)
+        const tokens = await highlightCodeToTokens(sourceContent, "tolk", theme)
         if (!isDisposed) {
           setHighlightedLines(tokens)
         }
@@ -205,21 +179,10 @@ export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
 
     void renderHighlightedLines()
 
-    const observer = new MutationObserver(mutations => {
-      for (const mutation of mutations) {
-        if (mutation.type === "attributes" && mutation.attributeName === "class") {
-          void renderHighlightedLines()
-        }
-      }
-    })
-
-    observer.observe(document.documentElement, {attributes: true})
-
     return () => {
       isDisposed = true
-      observer.disconnect()
     }
-  }, [sourceContent])
+  }, [sourceContent, theme])
 
   const focusLine = selectedFile?.firstUncoveredLine ?? selectedFile?.firstPartialLine
 
@@ -243,7 +206,7 @@ export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
   }, [sourceContent])
 
   if (coverage.files.length === 0) {
-    return <div className={styles.emptyState}>No coverage records found in the LCOV report.</div>
+    return <div className={styles.emptyState}>No coverage records found in the LCOV report</div>
   }
 
   return (
@@ -336,14 +299,14 @@ export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
             })}
 
             {filteredFiles.length === 0 && (
-              <div className={styles.emptyList}>No files matched the current filter.</div>
+              <div className={styles.emptyList}>No files matched the current filter</div>
             )}
           </div>
         </aside>
 
         <section className={styles.viewer} aria-label="Coverage source">
           {selectedFile === undefined ? (
-            <div className={styles.emptyState}>Select a file to inspect its coverage.</div>
+            <div className={styles.emptyState}>Select a file to inspect its coverage</div>
           ) : (
             <>
               <div className={styles.viewerHeader}>

@@ -10,8 +10,9 @@
     "crates/acton-localnet-ui",
     "crates/acton-ui",
     "crates/acton-ui-gallery",
-    "crates/acton-shared-ui",
-    "crates/acton-test-ui"
+    "crates/acton-transaction-ui",
+    "crates/acton-test-ui",
+    "ui-e2e"
   ],
   "scripts": {
     "build": "bun --filter '*' build",
@@ -22,7 +23,9 @@
     "fmt:check": "bun --filter '*' fmt:check",
     "lint": "bun --filter '*' lint",
     "lint:fix": "bun --filter '*' lint:fix",
-    "test:e2e:test-ui": "playwright test --config crates/acton-test-ui/playwright.config.ts"
+    "test:e2e:ui": "playwright test --config ui-e2e/playwright.config.ts",
+    "test:e2e:test-ui": "playwright test --config crates/acton-test-ui/playwright.config.ts",
+    "doctor": "npx react-doctor@latest"
   },
   "overrides": {
     "postcss": ">=8.5.10",
@@ -33,7 +36,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.0",
-    "@playwright/test": "1.59.0"
+    "@playwright/test": "1.59.0",
+    "react-doctor": "^0.7.2"
   },
   "packageManager": "bun@1.3.5"
 }

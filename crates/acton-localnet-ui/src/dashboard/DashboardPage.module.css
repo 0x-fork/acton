@@ -1,8 +1,8 @@
 .page {
   height: 100%;
   display: flex;
-  background: var(--litenode-bg);
-  color: var(--litenode-text);
+  background: var(--acton-color-canvas);
+  color: var(--acton-color-text);
   overflow: hidden;
   position: relative;
 }
@@ -68,9 +68,9 @@
 .sidebarSlotPinning .floatingSidebar {
   height: calc(100vh - 16px);
   margin: 8px 0;
-  border: 1px solid var(--litenode-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 14px;
-  box-shadow: var(--litenode-shadow-popover);
+  box-shadow: var(--acton-shadow-overlay);
 }
 
 .sidebarExpandButton {
@@ -81,15 +81,15 @@
   width: 36px;
   height: 36px;
   padding: 0;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 10px;
-  background: var(--litenode-surface);
-  color: var(--litenode-text-subtle);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--litenode-shadow-sm);
+  box-shadow: var(--acton-shadow-surface);
   transition:
     background-color 120ms ease,
     border-color 120ms ease,
@@ -97,14 +97,14 @@
 }
 
 .sidebarExpandButton:hover {
-  border-color: var(--litenode-border-strong);
-  background: var(--litenode-surface-hover);
-  color: var(--litenode-text);
+  border-color: var(--acton-color-border-strong);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
 }
 
 .sidebarExpandButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .sidebar {
@@ -113,8 +113,8 @@
   flex-direction: column;
   gap: 8px;
   padding: 10px 8px 8px;
-  border-right: 1px solid var(--litenode-border);
-  background: var(--litenode-surface);
+  border-right: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface);
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -134,7 +134,7 @@
   width: 100%;
   min-height: 40px;
   padding: 0 8px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -145,10 +145,10 @@
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   background:
     radial-gradient(circle at 50% 50%, var(--litenode-workspace-dot) 0 1px, transparent 1px 100%),
-    linear-gradient(135deg, var(--litenode-workspace-from), var(--litenode-workspace-to));
+    linear-gradient(135deg, var(--acton-color-primary), var(--litenode-workspace-to));
   background-size:
     4px 4px,
     auto;
@@ -172,7 +172,7 @@
 
 .workspaceName {
   min-width: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.92rem;
   font-weight: 600;
   overflow: hidden;
@@ -184,10 +184,10 @@
   max-width: 116px;
   height: 18px;
   padding: 0 7px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 999px;
-  color: var(--litenode-text-muted);
-  background: var(--litenode-surface-raised);
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-raised);
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -202,7 +202,7 @@
 }
 
 .workspaceMeta {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.76rem;
   font-weight: 500;
   line-height: 1;
@@ -228,12 +228,12 @@
   padding: 0 10px;
   box-sizing: border-box;
   border-radius: 12px;
-  border: 1px solid var(--litenode-border-control);
-  background: var(--litenode-surface);
+  border: 1px solid var(--acton-color-border-control);
+  background: var(--acton-color-surface);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: var(--litenode-text-faint);
+  color: var(--acton-color-text-muted);
   font-family: inherit;
   box-shadow: var(--litenode-inset-highlight);
 }
@@ -254,11 +254,11 @@
   width: 22px;
   height: 22px;
   border-radius: 8px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-size: 0.82rem;
   font-weight: 500;
 }
@@ -278,7 +278,7 @@
   position: absolute;
   inset: 0;
   border: none;
-  background: var(--litenode-overlay);
+  background: var(--acton-color-overlay-surface);
   backdrop-filter: blur(2px);
   opacity: 0;
   transition: opacity 180ms ease;
@@ -295,9 +295,9 @@
   width: var(--search-origin-width, min(386px, calc(100vw - 8px)));
   max-height: var(--search-origin-height, 40px);
   box-sizing: border-box;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 12px;
-  background: var(--litenode-surface);
+  background: var(--acton-color-surface);
   box-shadow: var(--litenode-inset-highlight);
   display: flex;
   flex-direction: column;
@@ -317,7 +317,7 @@
   width: min(386px, calc(100vw - 8px));
   max-height: min(620px, calc(100vh - 92px));
   border-radius: 14px;
-  box-shadow: var(--litenode-shadow-popover);
+  box-shadow: var(--acton-shadow-overlay);
 }
 
 .searchInputRow {
@@ -336,7 +336,7 @@
 .searchOverlayOpen .searchInputRow {
   min-height: 49px;
   padding: 0 13px 0 17px;
-  border-bottom-color: var(--litenode-border-subtle);
+  border-bottom-color: var(--acton-color-border);
   gap: 11px;
 }
 
@@ -344,7 +344,7 @@
   width: 16px;
   height: 16px;
   margin-top: -2px;
-  color: var(--litenode-text-faint);
+  color: var(--acton-color-text-muted);
   flex: 0 0 auto;
   transition:
     width 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -355,7 +355,7 @@
   width: 17px;
   height: 17px;
   margin-top: 0;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
 }
 
 .searchInput {
@@ -366,7 +366,7 @@
   margin: 0;
   outline: none;
   background: transparent;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-family: inherit;
   font-weight: 400;
   font-size: 0.88rem;
@@ -381,7 +381,7 @@
 }
 
 .searchInput::placeholder {
-  color: var(--litenode-text-faint);
+  color: var(--acton-color-text-muted);
 }
 
 .searchEscButton {
@@ -391,10 +391,10 @@
   padding: 0;
   box-sizing: content-box;
   margin-top: -1px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 8px;
-  background: var(--litenode-surface);
-  color: var(--litenode-text-subtle);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
   font-family: inherit;
   font-size: 0.82rem;
   font-weight: 500;
@@ -416,7 +416,7 @@
   height: 31px;
   padding: 0 9px;
   margin-top: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.78rem;
 }
 
@@ -445,7 +445,7 @@
 }
 
 .searchEscButton:hover {
-  background: var(--litenode-surface-hover);
+  background: var(--acton-color-surface-hover);
 }
 
 .searchResultBody {
@@ -473,7 +473,7 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   display: flex;
   align-items: center;
   gap: 11px;
@@ -485,23 +485,23 @@
 }
 
 .searchResultItem:first-child {
-  background: var(--litenode-surface-hover);
+  background: var(--acton-color-surface-hover);
 }
 
 .searchResultItem:hover {
-  background: var(--litenode-surface-hover);
+  background: var(--acton-color-surface-hover);
 }
 
 .searchResultItem:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .searchResultIcon {
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -512,7 +512,7 @@
 .searchResultIcon img {
   width: 25px;
   height: 25px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 999px;
   object-fit: cover;
 }
@@ -521,10 +521,10 @@
   width: 25px;
   height: 25px;
   border-radius: 999px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   background:
     radial-gradient(circle at 50% 50%, var(--litenode-workspace-dot) 0 1px, transparent 1px 100%),
-    linear-gradient(135deg, var(--litenode-workspace-from), var(--litenode-workspace-to));
+    linear-gradient(135deg, var(--acton-color-primary), var(--litenode-workspace-to));
   background-size:
     4px 4px,
     auto;
@@ -539,7 +539,7 @@
 }
 
 .searchResultTitle {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.8rem;
   font-weight: 600;
   overflow: hidden;
@@ -548,7 +548,7 @@
 }
 
 .searchResultDescription {
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-size: 0.78rem;
   line-height: 1.25;
   overflow: hidden;
@@ -560,12 +560,12 @@
 .searchIndexState,
 .searchIndexError {
   padding: 14px 10px;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.88rem;
 }
 
 .searchIndexError {
-  color: var(--litenode-danger);
+  color: var(--acton-color-status-failed-text);
 }
 
 .navScroll {
@@ -574,7 +574,7 @@
   overflow-y: auto;
   padding-right: 2px;
   padding-bottom: 4px;
-  background: var(--litenode-surface);
+  background: var(--acton-color-surface);
 }
 
 .nav {
@@ -592,7 +592,7 @@
 
 .navDivider {
   height: 1px;
-  background: var(--litenode-border-subtle);
+  background: var(--acton-color-border);
 }
 
 .navFooter {
@@ -617,7 +617,7 @@
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -629,13 +629,13 @@
 }
 
 .sidebarToggleButton:hover {
-  background: var(--litenode-surface-hover);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
 }
 
 .sidebarToggleButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .sidebarUtilityButton {
@@ -647,7 +647,7 @@
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -659,17 +659,17 @@
 }
 
 .sidebarUtilityButton:hover {
-  background: var(--litenode-surface-hover);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
 }
 
 .sidebarUtilityButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .sidebarUtilityButtonActive {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .utilityStatusIcon {
@@ -680,8 +680,8 @@
   height: 12px;
   padding: 1px;
   border-radius: 999px;
-  background: var(--litenode-primary);
-  color: var(--litenode-primary-foreground);
+  background: var(--acton-color-primary);
+  color: var(--acton-color-primary-foreground);
 }
 
 .navItem {
@@ -694,7 +694,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   text-align: left;
   text-decoration: none;
   transition:
@@ -704,8 +704,8 @@
 }
 
 .navItem:hover {
-  background: var(--litenode-surface-hover);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
   text-decoration: none;
 }
 
@@ -715,7 +715,7 @@
 
 .navItem:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .navItemMain {
@@ -740,8 +740,8 @@
 }
 
 .navItemActive {
-  background: var(--litenode-surface-active);
-  color: var(--litenode-text-strong);
+  background: var(--acton-color-surface-active);
+  color: var(--acton-color-text);
 }
 
 .contentArea {
@@ -813,26 +813,27 @@
   grid-column: 1 / -1;
 }
 
-.dashboardCard.dashboardCard {
+.dashboardCard {
   border-radius: 18px;
-  border: 1px solid var(--litenode-border);
-  background: var(--litenode-surface);
-  box-shadow: var(--litenode-shadow-sm);
+  border: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
+  box-shadow: var(--acton-shadow-surface);
 }
 
-.homeCard.homeCard {
+.homeCard {
   overflow: hidden;
-  border-color: var(--tonscan-border, var(--litenode-border-subtle));
+  border-color: var(--acton-color-border);
   border-radius: 12px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   box-shadow: none;
 }
 
-.dashboardCardHeader.dashboardCardHeader {
+.dashboardCardHeader {
   padding: 24px 24px 0;
 }
 
-.dashboardCardContent.dashboardCardContent {
+.dashboardCardContent {
   padding: 0 24px 24px;
 }
 
@@ -840,10 +841,10 @@
   margin-bottom: 10px;
 }
 
-.homeCard .dashboardCardHeader.dashboardCardHeader {
+.homeCard .dashboardCardHeader {
   min-height: 52px;
   padding: 0 18px;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-bottom: 1px solid var(--acton-color-border);
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -851,11 +852,11 @@
   text-align: left;
 }
 
-.homeCard .dashboardCardContent.dashboardCardContent {
+.homeCard .dashboardCardContent {
   padding: 0;
 }
 
-.homeCard .dashboardCardTitle.dashboardCardTitle {
+.homeCard .dashboardCardTitle {
   margin: 0;
   font-size: 0.86rem;
   font-weight: 750;
@@ -863,164 +864,77 @@
   text-align: left;
 }
 
-.dashboardCardTitle.dashboardCardTitle {
+.dashboardCardTitle {
   margin: 1px 0 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 1rem;
   font-weight: 600;
 }
 
-.dashboardCardDescription.dashboardCardDescription {
-  margin: 6px 0 0;
-  color: var(--litenode-text-muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-.resourceGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 320px));
-  gap: 18px;
-  align-items: start;
-  justify-content: start;
-}
-
-.assetCard {
-  cursor: pointer;
-  outline: none;
+.resourceTableLayout {
   width: 100%;
-  max-width: 320px;
+  min-width: 0;
 }
 
-.assetCard:hover {
-  border-color: var(--litenode-border-strong);
-  background: var(--litenode-surface-raised);
+.assetTableIdentity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
 }
 
-.assetCard:focus-visible {
-  box-shadow: 0 0 0 2px var(--litenode-focus-strong);
-}
-
-.assetImage {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  border: 1px solid var(--litenode-border-subtle);
-  background: var(--litenode-surface-subtle);
-  object-fit: cover;
+.assetTableImage {
+  width: 28px;
+  height: 28px;
   flex: 0 0 auto;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 8px;
+  background: var(--acton-color-surface-raised);
+  object-fit: cover;
 }
 
-.assetMetaGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+.assetTableText {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
 }
 
-.assetMetaLabel,
-.assetMetaValue {
-  display: block;
-}
-
-.assetMetaLabel {
-  color: var(--litenode-text-muted);
-  font-size: 0.78rem;
-}
-
-.assetMetaValue {
-  margin-top: 4px;
-  color: var(--litenode-text);
-  font-size: 0.88rem;
-  font-weight: 500;
+.assetTableName,
+.assetTableSecondary {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.assetSkeletonCard {
-  box-sizing: border-box;
-  cursor: default;
-  pointer-events: none;
+.assetTableName {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
 }
 
-.assetImageSkeleton {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  flex: 0 0 auto;
+.assetTableSecondary {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
 }
 
-.assetSkeletonTitleGroup {
-  min-width: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.assetTableSecondary::before {
+  content: "·";
+  margin-right: 8px;
 }
 
-.assetSkeletonTitle {
-  width: min(190px, 82%);
-  height: 16px;
+.assetTableStatusPositive,
+.assetTableStatusMuted {
+  font-weight: var(--acton-font-weight-medium);
 }
 
-.assetSkeletonSubtitle {
-  width: 64px;
-  height: 22px;
+.assetTableStatusPositive {
+  color: var(--acton-color-success);
 }
 
-.assetSkeletonMetaLabel,
-.assetSkeletonMetaValue {
-  display: block;
-}
-
-.assetSkeletonMetaLabel {
-  width: 72px;
-  height: 14.5px;
-}
-
-.assetSkeletonMetaValue {
-  width: min(132px, 86%);
-  height: 16.5px;
-  margin-top: 4px;
-}
-
-.nftSkeletonTitle {
-  width: 86px;
-  height: 16px;
-}
-
-.nftSkeletonIndex {
-  width: 36px;
-  height: 22px;
-}
-
-.nftSkeletonCollectionLabel,
-.nftSkeletonSaleLabel,
-.nftSkeletonCollectionValue,
-.nftSkeletonSaleValue {
-  display: block;
-}
-
-.nftSkeletonCollectionLabel {
-  width: 76px;
-  height: 14.5px;
-}
-
-.nftSkeletonSaleLabel {
-  width: 38px;
-  height: 14.5px;
-}
-
-.nftSkeletonCollectionValue {
-  width: min(128px, 86%);
-  height: 16.5px;
-  margin-top: 4px;
-}
-
-.nftSkeletonSaleValue {
-  width: 86px;
-  height: 16.5px;
-  margin-top: 4px;
+.assetTableStatusMuted {
+  color: var(--acton-color-text-muted);
 }
 
 .endpointList,
@@ -1044,7 +958,7 @@
 .nodeInfoRow {
   min-height: 46px;
   padding: 0 18px;
-  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-top: 1px solid var(--acton-color-border);
   display: grid;
   grid-template-columns: minmax(112px, auto) minmax(0, 1fr);
   align-items: center;
@@ -1061,7 +975,7 @@
 }
 
 .homeCard .nodeInfoRow:nth-child(2n) {
-  border-left: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-left: 1px solid var(--acton-color-border);
 }
 
 .nodeInfoTimeRow {
@@ -1075,7 +989,7 @@
 
 .nodeInfoLabel {
   min-width: 0;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.7rem;
   font-weight: 650;
   letter-spacing: 0;
@@ -1085,7 +999,7 @@
 
 .nodeInfoValue {
   min-width: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   display: flex;
   align-items: baseline;
   justify-content: flex-end;
@@ -1105,7 +1019,7 @@
 
 .nodeInfoValueMeta {
   flex: 0 0 auto;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.78rem;
   font-weight: 500;
   white-space: nowrap;
@@ -1126,7 +1040,7 @@
   align-items: baseline;
   justify-content: flex-end;
   gap: 6px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.82rem;
   font-weight: 500;
   line-height: 1.25;
@@ -1141,7 +1055,7 @@
   border-radius: 7px;
   background: transparent;
   box-shadow: none;
-  color: var(--tonscan-link, var(--litenode-accent));
+  color: var(--acton-color-accent);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -1159,13 +1073,13 @@
 
 .nodeInfoTimeButton:hover {
   background: transparent;
-  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--tonscan-text-primary));
+  color: color-mix(in srgb, var(--acton-color-accent) 78%, var(--acton-color-text));
 }
 
 .nodeInfoTimeButton:focus-visible {
   outline: none;
   background: transparent;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .nodeInfoTimeButton svg {
@@ -1174,7 +1088,7 @@
 
 .nodeInfoValueLink {
   min-width: 0;
-  color: var(--tonscan-link, var(--litenode-accent));
+  color: var(--acton-color-accent);
   font-size: 0.82rem;
   font-weight: 600;
   line-height: 1.35;
@@ -1192,7 +1106,7 @@
 
 .nodeInfoValueLink:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus-strong);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .nodeInfoValueSkeleton {
@@ -1208,9 +1122,9 @@
   gap: 16px;
   min-width: 0;
   padding: 11px 12px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 8px;
-  background: var(--litenode-surface);
+  background: var(--acton-color-surface);
   color: inherit;
 }
 
@@ -1222,7 +1136,7 @@
   min-height: 46px;
   padding: 0 18px;
   border: 0;
-  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-top: 1px solid var(--acton-color-border);
   border-radius: 0;
   background: transparent;
   box-sizing: border-box;
@@ -1234,7 +1148,7 @@
 
 .endpointLabel,
 .rowSecondary {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.8rem;
 }
 
@@ -1249,7 +1163,7 @@
 
 .endpointValue {
   min-width: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.82rem;
   line-height: 1.35;
   overflow: hidden;
@@ -1292,30 +1206,30 @@
   padding: 0;
   border: 0;
   border-radius: 6px;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   background: transparent;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .endpointButton:hover {
-  color: var(--litenode-text);
-  background: var(--litenode-surface-hover);
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
 }
 
 .endpointButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus-strong);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .endpointButtonCopied {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   background: transparent;
 }
 
@@ -1333,9 +1247,9 @@
   gap: 14px;
   text-align: left;
   cursor: pointer;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   padding: 12px 14px;
   transition:
     background-color 120ms ease,
@@ -1345,18 +1259,18 @@
 
 .listRowButton:hover,
 .accountItem:hover {
-  border-color: var(--litenode-focus);
-  background: var(--litenode-surface-hover);
+  border-color: var(--acton-color-focus-ring);
+  background: var(--acton-color-surface-hover);
 }
 
 .listRowButton:focus-visible,
 .accountItem:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .rowPrimary {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.9rem;
   font-weight: 500;
 }
@@ -1381,16 +1295,16 @@
 }
 
 .addressDisplayName {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .addressDisplayAddress {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-weight: 500;
 }
 
 .addressDisplaySeparator {
-  color: var(--litenode-text-soft);
+  color: var(--acton-color-text-subtle);
   flex: 0 0 auto;
 }
 
@@ -1430,12 +1344,12 @@
 }
 
 .statusError {
-  background: var(--litenode-danger-bg);
-  color: var(--litenode-danger);
+  background: var(--acton-color-status-failed-surface);
+  color: var(--acton-color-status-failed-text);
 }
 
 .rowSecondaryDetail {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.8rem;
   line-height: 1.2;
 }
@@ -1451,7 +1365,7 @@
 }
 
 .emptyState {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.9rem;
 }
 
@@ -1464,9 +1378,9 @@
 .skeletonRow {
   min-height: 64px;
   padding: 12px 14px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1482,22 +1396,20 @@
   gap: 9px;
 }
 
-.skeletonLine,
-.skeletonAvatar {
+.skeletonLine {
   position: relative;
   overflow: hidden;
-  background: color-mix(in srgb, var(--litenode-text) 8%, var(--litenode-surface-subtle));
+  background: color-mix(in srgb, var(--acton-color-text) 8%, var(--acton-color-surface-raised));
 }
 
-.skeletonLine::after,
-.skeletonAvatar::after {
+.skeletonLine::after {
   content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--litenode-text) 8%, transparent),
+    color-mix(in srgb, var(--acton-color-text) 8%, transparent),
     transparent
   );
   transform: translateX(-100%);
@@ -1523,42 +1435,6 @@
   flex: 0 0 auto;
 }
 
-.skeletonAvatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  flex: 0 0 auto;
-}
-
-.skeletonAvatar.assetImageSkeleton {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-}
-
-.skeletonLine.assetSkeletonTitle,
-.skeletonLine.nftSkeletonTitle {
-  height: 16px;
-}
-
-.skeletonLine.assetSkeletonSubtitle,
-.skeletonLine.nftSkeletonIndex {
-  height: 22px;
-}
-
-.skeletonLine.assetSkeletonMetaLabel,
-.skeletonLine.nftSkeletonCollectionLabel,
-.skeletonLine.nftSkeletonSaleLabel {
-  height: 14.5px;
-}
-
-.skeletonLine.assetSkeletonMetaValue,
-.skeletonLine.nftSkeletonCollectionValue,
-.skeletonLine.nftSkeletonSaleValue {
-  height: 16.5px;
-  margin-top: 4px;
-}
-
 @keyframes skeletonShimmer {
   to {
     transform: translateX(100%);
@@ -1573,9 +1449,9 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  border: 1px solid var(--litenode-border-subtle);
-  background: var(--litenode-surface);
-  color: var(--litenode-text-subtle);
+  border: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1591,7 +1467,7 @@
 }
 
 .accountName {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.9rem;
   font-weight: 500;
   overflow: hidden;
@@ -1600,13 +1476,13 @@
 }
 
 .accountBalance {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.78rem;
 }
 
 .accountArrow {
   margin-left: auto;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   flex: 0 0 auto;
 }
 
@@ -1619,7 +1495,7 @@
 
 .title {
   margin: 0;
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 32px;
   font-weight: 500;
   letter-spacing: -0.79px;
@@ -1629,7 +1505,7 @@
 .subtitle {
   max-width: 620px;
   margin: 14px 0 0;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 1rem;
   line-height: 1.6;
 }
@@ -1642,19 +1518,18 @@
   max-width: 44rem;
 }
 
-.formCard,
-.dashboardCard {
+.formCard {
   border-radius: 18px;
-  border: 1px solid var(--litenode-border);
-  background: var(--litenode-surface);
-  box-shadow: var(--litenode-shadow-sm);
+  border: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface);
+  box-shadow: var(--acton-shadow-surface);
 }
 
 .formCard {
   padding: 24px;
   border-radius: 12px;
-  border-color: var(--tonscan-border, var(--litenode-border-subtle));
-  background: var(--litenode-surface);
+  border-color: var(--acton-color-border);
+  background: var(--acton-color-surface);
   box-shadow: none;
 }
 
@@ -1669,9 +1544,9 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  border: 1px solid var(--litenode-border-subtle);
-  background: var(--litenode-surface-subtle);
-  color: var(--litenode-text-subtle);
+  border: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1686,7 +1561,7 @@
 }
 
 .label {
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-size: 0.88rem;
   font-weight: 600;
 }
@@ -1715,10 +1590,10 @@
   max-width: 202px;
   height: 50px;
   padding: 0 11px 0 9px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 9px;
-  background: var(--litenode-surface-subtle);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1732,14 +1607,14 @@
 }
 
 .assetSelectorButton:hover {
-  border-color: var(--litenode-border-strong);
-  background: var(--litenode-surface-hover);
-  color: var(--litenode-text-strong);
+  border-color: var(--acton-color-border-strong);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
 }
 
 .assetSelectorButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .assetSelectorIcon {
@@ -1747,7 +1622,7 @@
   height: 32px;
   border-radius: 0;
   background: transparent;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1778,14 +1653,14 @@
 }
 
 .assetSelectorSymbol {
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 0.92rem;
   font-weight: 500;
   line-height: 1;
 }
 
 .assetSelectorName {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.72rem;
   font-weight: 560;
   line-height: 1;
@@ -1811,10 +1686,10 @@
   max-width: 154px;
   height: 34px;
   padding: 0 8px 0 10px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 9px;
-  background: var(--litenode-surface-subtle);
-  color: var(--litenode-text-muted);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1831,14 +1706,14 @@
 
 .faucetDropdownTrigger:hover,
 .faucetDropdownTriggerOpen {
-  border-color: var(--litenode-border-strong);
-  background: var(--litenode-surface-hover);
-  color: var(--litenode-text);
+  border-color: var(--acton-color-border-strong);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
 }
 
 .faucetDropdownTrigger:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .faucetDropdownTriggerLabel {
@@ -1876,10 +1751,10 @@
   z-index: 30;
   max-height: 286px;
   padding: 6px;
-  border: 1px solid var(--litenode-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 16px;
-  background: var(--litenode-surface);
-  box-shadow: var(--litenode-shadow-popover);
+  background: var(--acton-color-surface);
+  box-shadow: var(--acton-shadow-popover);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1888,7 +1763,7 @@
 
 .faucetDropdownState {
   padding: 18px 14px;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.88rem;
   line-height: 1.4;
 }
@@ -1900,7 +1775,7 @@
   border: 0;
   border-radius: 12px;
   background: transparent;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1913,36 +1788,36 @@
 }
 
 .faucetDropdownOption:hover {
-  background: var(--litenode-surface-hover);
-  color: var(--litenode-text-strong);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
 }
 
 .faucetDropdownOption:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2px var(--litenode-focus);
+  box-shadow: inset 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .faucetDropdownOptionSelected {
-  background: var(--litenode-surface-active);
+  background: var(--acton-color-surface-active);
 }
 
 .faucetDropdownOptionImage,
 .faucetDropdownOptionAvatar {
   width: 32px;
   height: 32px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 10px;
   flex: 0 0 auto;
 }
 
 .faucetDropdownOptionImage {
   object-fit: cover;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
 }
 
 .faucetDropdownOptionAvatar {
-  background: var(--litenode-surface-subtle);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1967,20 +1842,20 @@
 }
 
 .faucetDropdownOptionTitle {
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 0.9rem;
   font-weight: 650;
 }
 
 .faucetDropdownOptionSubtitle {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.78rem;
 }
 
 .faucetDropdownBadge {
   max-width: 90px;
   padding: 0;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
   overflow: hidden;
@@ -1991,7 +1866,7 @@
 .faucetDropdownCheck {
   flex: 0 0 auto;
   margin-right: 6px;
-  color: var(--litenode-accent);
+  color: var(--acton-color-accent);
 }
 
 .amountRow {
@@ -2000,7 +1875,7 @@
 
 .hint {
   margin: 0;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.82rem;
   line-height: 1.5;
 }
@@ -2024,7 +1899,7 @@
   align-items: center;
   justify-content: center;
   padding: 18px;
-  background: var(--litenode-overlay);
+  background: var(--acton-color-overlay-surface);
   backdrop-filter: blur(2px);
 }
 
@@ -2032,10 +1907,10 @@
 .timeModal {
   max-height: min(760px, calc(100vh - 36px));
   overflow: auto;
-  border: 1px solid var(--litenode-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 18px;
-  background: var(--litenode-surface);
-  box-shadow: var(--litenode-shadow-popover);
+  background: var(--acton-color-surface);
+  box-shadow: var(--acton-shadow-overlay);
 }
 
 .assetModal {
@@ -2058,7 +1933,7 @@
 .assetModalTitle,
 .timeModalTitle {
   margin: 0;
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 1.05rem;
   font-weight: 650;
   line-height: 1;
@@ -2072,7 +1947,7 @@
   border: 0;
   border-radius: 9px;
   background: transparent;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -2086,14 +1961,14 @@
 
 .assetModalCloseButton:hover,
 .timeModalCloseButton:hover:not(:disabled) {
-  background: var(--litenode-surface-hover);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
 }
 
 .assetModalCloseButton:focus-visible,
 .timeModalCloseButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .timeModalCloseButton:disabled {
@@ -2133,10 +2008,10 @@
 .timeAdvancePresetButton {
   height: 34px;
   padding: 0 10px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 9px;
-  background: var(--litenode-surface);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text);
   font: inherit;
   font-size: 0.82rem;
   font-weight: 600;
@@ -2150,13 +2025,13 @@
 }
 
 .timeAdvancePresetButton:hover:not(:disabled) {
-  border-color: var(--litenode-border-strong);
-  background: var(--litenode-surface-hover);
+  border-color: var(--acton-color-border-strong);
+  background: var(--acton-color-surface-hover);
 }
 
 .timeAdvancePresetButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .timeAdvancePresetButton:disabled {
@@ -2166,9 +2041,9 @@
 
 .timeAdvancePreview {
   margin-bottom: 8px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   overflow: hidden;
 }
 
@@ -2179,7 +2054,7 @@
   grid-template-columns: 72px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  border-top: 1px solid var(--litenode-border-subtle);
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .timeAdvancePreviewRow:first-child {
@@ -2187,7 +2062,7 @@
 }
 
 .timeAdvancePreviewRow span {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.74rem;
   font-weight: 650;
   letter-spacing: 0;
@@ -2196,7 +2071,7 @@
 
 .timeAdvancePreviewRow strong {
   min-width: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.84rem;
   font-weight: 600;
   text-align: right;
@@ -2206,7 +2081,7 @@
 }
 
 .timeAdvanceError {
-  color: var(--litenode-danger, #ff6b6b);
+  color: var(--acton-color-status-failed-text);
   font-size: 0.82rem;
   line-height: 1.35;
 }
@@ -2231,10 +2106,10 @@
   width: 100%;
   min-height: 62px;
   padding: 10px 12px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 14px;
-  background: var(--litenode-surface-subtle);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2249,32 +2124,32 @@
 }
 
 .assetChoiceButton:hover {
-  border-color: var(--litenode-border-strong);
-  background: var(--litenode-surface-hover);
+  border-color: var(--acton-color-border-strong);
+  background: var(--acton-color-surface-hover);
 }
 
 .assetChoiceButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .assetChoiceButtonSelected {
-  border-color: var(--litenode-border-strong);
-  background: var(--litenode-surface-active);
+  border-color: var(--acton-color-border-strong);
+  background: var(--acton-color-surface-active);
 }
 
 .assetChoiceIcon,
 .assetChoiceImage {
   width: 36px;
   height: 36px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
   flex: 0 0 auto;
 }
 
 .assetChoiceIcon {
-  background: var(--litenode-surface);
-  color: var(--litenode-text-subtle);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2304,19 +2179,19 @@
 }
 
 .assetChoiceTitle {
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 0.92rem;
   font-weight: 500;
 }
 
 .assetChoiceSubtitle {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.78rem;
 }
 
 .assetChoiceBadge {
   max-width: 96px;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-size: 0.74rem;
   font-weight: 760;
   overflow: hidden;
@@ -2325,7 +2200,7 @@
 }
 
 .assetChoiceCheck {
-  color: var(--litenode-accent);
+  color: var(--acton-color-accent);
   flex: 0 0 auto;
 }
 
@@ -2336,7 +2211,7 @@
 }
 
 .assetLookupStatus {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -2354,7 +2229,7 @@
 
 .formHint {
   max-width: 360px;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.82rem;
   line-height: 1.5;
 }
@@ -2386,159 +2261,32 @@
   gap: 20px;
 }
 
-.rpcCallsFilter {
-  position: relative;
-  min-height: 24px;
-  color: var(--litenode-text-muted);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  user-select: none;
-}
-
-.rpcCallsFilter input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.rpcCallsFilter:has(input:checked) {
-  color: var(--litenode-text);
-}
-
-.rpcCallsFilter:has(input:focus-visible) .rpcFilterCheckbox {
-  outline: 2px solid var(--litenode-primary);
-  outline-offset: 2px;
-}
-
-.rpcFilterCount {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: var(--litenode-control-hover);
-  color: var(--litenode-text);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.rpcFilterCheckbox {
-  width: 16px;
-  height: 16px;
-  border: 1px solid var(--litenode-border-strong);
-  border-radius: 4px;
-  background: transparent;
-  color: transparent;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
-}
-
-.rpcCallsFilter:has(input:checked) .rpcFilterCheckbox {
-  border-color: var(--litenode-primary);
-  background: var(--litenode-primary);
-  color: var(--litenode-primary-foreground);
-}
-
 .rpcStatusIcon {
   width: 22px;
   height: 22px;
-  margin-left: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.rpcCallsTableFrame {
-  border: 1px solid var(--litenode-border-subtle);
-  border-radius: 8px;
-  background: var(--litenode-surface);
-  overflow: hidden;
-}
-
 .rpcCallsTable {
-  min-width: 680px;
-  background: var(--litenode-surface);
-}
-
-.rpcCallsTable th,
-.rpcCallsTable td {
-  border-color: var(--litenode-border-subtle);
-}
-
-.rpcCallsTable th {
-  background: var(--litenode-surface-subtle);
-  color: var(--litenode-text-muted);
-  font-size: 0.78rem;
-  font-weight: 400;
-}
-
-.rpcCallsTable td {
-  background: var(--litenode-surface);
-  color: var(--litenode-text);
-  font-size: 0.84rem;
-}
-
-.rpcStatusCell {
-  vertical-align: middle;
-}
-
-.rpcCallsTable tbody tr:hover td {
-  background: var(--litenode-surface-hover);
-}
-
-.rpcCallsTable thead tr:hover {
-  background: var(--litenode-surface-subtle);
-}
-
-.rpcDurationCell {
-  color: var(--litenode-text-muted);
-  white-space: nowrap;
+  --acton-color-surface-row: var(--acton-color-surface-hover);
 }
 
 .rpcStatusSuccess {
-  color: var(--tonscan-success);
+  color: var(--acton-color-status-passed);
 }
 
 .rpcStatusFailed {
-  color: var(--litenode-danger);
+  color: var(--acton-color-status-failed-text);
 }
 
 .rpcTypeCell {
-  color: var(--litenode-text-muted);
   text-transform: lowercase;
 }
 
-.rpcMethodCell {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rpcCodeCell {
-  color: var(--litenode-text-subtle);
-}
-
+.rpcDurationCell,
 .rpcTimestampCell {
-  color: var(--litenode-text-muted);
   white-space: nowrap;
 }
 
@@ -2611,9 +2359,9 @@
     height: 100dvh;
     margin: 0;
     border: none;
-    border-right: 1px solid var(--litenode-border);
+    border-right: 1px solid var(--acton-color-border);
     border-radius: 0;
-    box-shadow: var(--litenode-shadow-popover);
+    box-shadow: var(--acton-shadow-overlay);
   }
 
   .mobileTopbar {
@@ -2626,8 +2374,8 @@
     gap: 10px;
     min-height: 56px;
     padding: 8px;
-    border-bottom: 1px solid var(--litenode-border-subtle);
-    background: var(--litenode-surface);
+    border-bottom: 1px solid var(--acton-color-border);
+    background: var(--acton-color-surface);
     box-sizing: border-box;
   }
 
@@ -2645,14 +2393,14 @@
     border: 0;
     border-radius: 12px;
     background: transparent;
-    color: var(--litenode-text);
+    color: var(--acton-color-text);
     cursor: pointer;
     align-items: center;
     justify-content: center;
     transition:
-      background-color var(--transition-duration-fast),
-      border-color var(--transition-duration-fast),
-      color var(--transition-duration-fast);
+      background-color var(--acton-duration-fast),
+      border-color var(--acton-duration-fast),
+      color var(--acton-duration-fast);
   }
 
   .mobileMenuButton {
@@ -2665,14 +2413,14 @@
 
   .mobileMenuButton:hover,
   .mobileCloseButton:hover {
-    color: var(--litenode-text-strong);
+    color: var(--acton-color-text);
   }
 
   .mobileMenuButton:focus-visible,
   .mobileCloseButton:focus-visible,
   .mobileBackdrop:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--litenode-focus);
+    box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
   }
 
   .mobileBackdrop {
@@ -2682,7 +2430,7 @@
     display: block;
     padding: 0;
     border: 0;
-    background: var(--litenode-overlay);
+    background: var(--acton-color-overlay-surface);
     opacity: 0;
     pointer-events: none;
     transition: opacity 160ms ease;
@@ -2704,9 +2452,9 @@
     height: 100dvh;
     gap: 10px;
     padding: 10px 8px 8px;
-    border-right: 1px solid var(--litenode-border);
+    border-right: 1px solid var(--acton-color-border);
     border-bottom: none;
-    box-shadow: var(--litenode-shadow-popover);
+    box-shadow: var(--acton-shadow-overlay);
     transform: translateX(-100%);
     visibility: hidden;
     overflow: hidden;
@@ -2768,7 +2516,7 @@
     padding: 0 2px 4px 0;
     overflow-x: hidden;
     overflow-y: auto;
-    background: var(--litenode-surface);
+    background: var(--acton-color-surface);
     -webkit-overflow-scrolling: touch;
   }
 
@@ -2852,14 +2600,6 @@
     gap: 0;
   }
 
-  .resourceGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .assetCard {
-    max-width: none;
-  }
-
   .hero,
   .formFooter,
   .rpcCallsToolbar {
@@ -2921,11 +2661,11 @@
     font-size: 0.94rem;
   }
 
-  .dashboardCardHeader.dashboardCardHeader {
+  .dashboardCardHeader {
     padding: 18px 18px 0;
   }
 
-  .dashboardCardContent.dashboardCardContent {
+  .dashboardCardContent {
     padding: 0 18px 18px;
   }
 
@@ -3016,7 +2756,7 @@
   }
 
   .homeCard .nodeInfoRow:nth-child(-n + 2) {
-    border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+    border-top: 1px solid var(--acton-color-border);
   }
 
   .homeCard .nodeInfoRow:first-child {

@@ -24,7 +24,8 @@ import {
   SkipForward,
 } from "lucide-react"
 
-import {CopyValueButton, Tooltip, type ContractData} from "@acton/shared-ui"
+import type {ContractData} from "@acton/transaction-ui"
+import {CopyInlineAction, InlineLoader} from "@acton/ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {
@@ -37,7 +38,8 @@ import type {
 } from "../../../../api/types"
 import {normalizeAddress} from "../../../../components/utils"
 import {useAddressFormat} from "../../../../hooks/useNetworkInfo"
-import {useLineExecutionData, useTraceStepper} from "../../hooks"
+import {useLineExecutionData} from "../../hooks/useLineExecutionData"
+import {useTraceStepper} from "../../hooks/useTraceStepper"
 import {findAddressContract, isTonAddress} from "../../lib/addressContracts"
 import {formatExitCode} from "../../lib/exitCodeFormatting"
 import type {ExitCode, RetraceResultAndCode} from "../../lib/types"
@@ -55,7 +57,6 @@ import {
   setStoredTraceViewMode,
   type TraceViewMode,
 } from "../../lib/traceViewModel"
-import InlineLoader from "../InlineLoader"
 import StatusBadge from "../StatusBadge"
 import TraceSidePanel from "../TraceSidePanel"
 import TraceStepsChainView from "../TraceStepsChainView"
@@ -493,7 +494,13 @@ function SourceVariableValue({value, label}: {readonly value: string; readonly l
   return (
     <span className={styles.sourceVariableValueWrap}>
       <span className={styles.sourceVariableValue}>{value}</span>
-      <CopyValueButton className={styles.sourceVariableCopyButton} value={value} label={label} />
+      <CopyInlineAction
+        className={styles.sourceVariableCopyButton}
+        value={value}
+        label={`Copy ${label}`}
+        copiedLabel={`Copied ${label}`}
+        size="compact"
+      />
     </span>
   )
 }
@@ -1271,7 +1278,7 @@ function SourceFilesEditor({
           <Suspense
             fallback={
               <div className={styles.editorLoader}>
-                <InlineLoader message="Loading editor" loading={true} />
+                <InlineLoader message="Loading editor" />
               </div>
             }
           >
@@ -1283,10 +1290,8 @@ function SourceFilesEditor({
               highlightGroups={frameHighlightGroups}
               shouldCenter={shouldCenterSourceStep && centerSourceLine !== undefined}
               centerLine={centerSourceLine}
-              needBorderRadius={false}
               needFloatingTip={false}
               showInstructionDocs={false}
-              compactGutter
               sourceDebugVariables={currentSourceStep?.locals ?? []}
               codeLensAnnotation={sourceExceptionAnnotation}
               compilerAbi={contractAbi}
@@ -1463,14 +1468,11 @@ function RetraceWorkspaceFc({
 
           {stateUpdateHashOk === false && (
             <div className={styles.statusContainer} role="status" aria-live="polite">
-              <Tooltip
-                content={
-                  "Because the transaction runs in a local sandbox, we can't always reproduce it exactly. Sandbox replay was incomplete, and some values may differ from those on the real blockchain."
-                }
-                placement="bottom"
-              >
-                <StatusBadge type="warning" text="Trace Incomplete" />
-              </Tooltip>
+              <StatusBadge
+                type="warning"
+                text="Trace Incomplete"
+                popoverContent="Because the transaction runs in a local sandbox, we can't always reproduce it exactly. Sandbox replay was incomplete, and some values may differ from those on the real blockchain."
+              />
             </div>
           )}
         </div>
@@ -1506,7 +1508,7 @@ function RetraceWorkspaceFc({
               <Suspense
                 fallback={
                   <div className={styles.editorLoader}>
-                    <InlineLoader message="Loading editor" loading={true} />
+                    <InlineLoader message="Loading editor" />
                   </div>
                 }
               >
@@ -1523,8 +1525,6 @@ function RetraceWorkspaceFc({
                   shouldCenter={transitionType === "button"}
                   exitCode={result.exitCode}
                   compilerAbi={contractAbi}
-                  needBorderRadius={false}
-                  compactGutter
                 />
               </Suspense>
             ) : (

@@ -2,9 +2,9 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: var(--spacing-md);
-  background-color: var(--tonscan-card-bg);
-  border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
+  padding: var(--acton-space-4);
+  background-color: var(--acton-color-surface-raised);
+  border-radius: 0 0 var(--acton-radius-control-sm) var(--acton-radius-control-sm);
 }
 
 .tabs {
@@ -29,13 +29,13 @@
   padding: 8px 18px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-left-width: 0;
   border-radius: 0;
-  transition: color var(--transition-duration-fast);
-  background: var(--tonscan-row-hover);
+  transition: color var(--acton-duration-fast);
+  background: var(--acton-color-surface-row);
 }
 
 .tab:first-child {
@@ -48,12 +48,12 @@
 }
 
 .tab:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .tabActive {
-  color: var(--tonscan-text-primary);
-  background: var(--tonscan-bg);
+  color: var(--acton-color-text);
+  background: var(--acton-color-canvas);
 }
 
 .content {
@@ -89,21 +89,21 @@
 .editorTab {
   min-height: 34px;
   padding: 8px 18px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-left-width: 0;
   border-radius: 0;
-  background: var(--tonscan-row-hover);
-  color: var(--tonscan-text-secondary);
+  background: var(--acton-color-surface-row);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font: inherit;
   font-size: 13px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   white-space: nowrap;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .editorTab:first-child {
@@ -116,24 +116,24 @@
 }
 
 .editorTab:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .editorTabActive {
   position: relative;
   z-index: 1;
-  color: var(--tonscan-text-primary);
-  background: var(--tonscan-bg);
-  border-bottom-color: var(--tonscan-bg);
+  color: var(--acton-color-text);
+  background: var(--acton-color-canvas);
+  border-bottom-color: var(--acton-color-canvas);
 }
 
 .dataPanel {
   position: relative;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 0 8px 8px;
-  background: var(--tonscan-bg);
+  background: var(--acton-color-canvas);
 }
 
 .sourceDataBlock {
@@ -147,17 +147,17 @@
 .tab:focus-visible,
 .editorTab:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--litenode-focus);
+  box-shadow: 0 0 0 3px var(--acton-color-focus-ring);
 }
 
 .code {
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
   font-size: 13px;
   line-height: 1.6;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   white-space: pre;
   word-break: normal;
-  padding: var(--spacing-md) 54px var(--spacing-md) var(--spacing-md);
+  padding: var(--acton-space-4) 54px var(--acton-space-4) var(--acton-space-4);
   margin: 0;
   overflow-x: auto;
   max-height: 600px;
@@ -175,9 +175,9 @@
   max-height: 600px;
   min-height: 96px;
   overflow: auto;
-  padding: var(--spacing-md);
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
+  padding: var(--acton-space-4);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.5;
 }
 
@@ -186,16 +186,16 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: var(--spacing-xl);
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  padding: var(--acton-space-8);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .panelEmpty {
-  background-color: var(--tonscan-bg);
-  border: 1px solid var(--tonscan-border);
-  border-radius: var(--border-radius-md);
+  background-color: var(--acton-color-canvas);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
 }
 
 .sourceShell > .panelEmpty {
@@ -203,7 +203,7 @@
 }
 
 .emptyError {
-  color: var(--tonscan-error);
+  color: var(--acton-color-status-failed);
 }
 
 .abiResultSkeleton {
@@ -213,9 +213,9 @@
   gap: 12px;
   min-height: 160px;
   padding: 18px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 0 8px 8px;
-  background: var(--tonscan-bg);
+  background: var(--acton-color-canvas);
 }
 
 .abiResultSkeleton span {
@@ -224,9 +224,9 @@
   border-radius: 999px;
   background: linear-gradient(
     90deg,
-    var(--tonscan-row-hover) 0%,
-    color-mix(in srgb, var(--tonscan-text-secondary) 16%, var(--tonscan-row-hover)) 45%,
-    var(--tonscan-row-hover) 90%
+    var(--acton-color-surface-row) 0%,
+    color-mix(in srgb, var(--acton-color-text-muted) 16%, var(--acton-color-surface-row)) 45%,
+    var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;
   animation: abiSkeletonPulse 1.2s ease-in-out infinite;

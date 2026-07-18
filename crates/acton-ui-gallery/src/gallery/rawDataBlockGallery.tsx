@@ -1,4 +1,10 @@
-import {ContentTabs, DisclosureToggle, RawDataBlock, type ContentTab} from "@acton/ui"
+import {
+  ContentTabs,
+  DisclosureToggle,
+  HighlightedCode,
+  RawDataBlock,
+  type ContentTab,
+} from "@acton/ui"
 import {useState} from "react"
 
 import styles from "./rawDataBlockGallery.module.css"
@@ -91,9 +97,12 @@ function EmbeddedTabsSample() {
             value={value}
             copyLabel={activeTab}
             wrap={activeTab !== "disasm"}
-          >
-            {activeTab === "disasm" ? <DisasmPreview /> : undefined}
-          </RawDataBlock>
+            customContent={
+              activeTab === "disasm" ? (
+                <HighlightedCode className={styles.highlightedCode} value={value} language="tasm" />
+              ) : undefined
+            }
+          />
         </ContentTabs>
       )}
     </div>
@@ -177,53 +186,6 @@ function EmptySamples() {
   )
 }
 
-function DisasmPreview() {
-  return (
-    <>
-      <span className={styles.keyword}>SETCP</span> <span className={styles.number}>0</span>
-      {"\n"}
-      <span className={styles.keyword}>DICTPUSHCONST</span>{" "}
-      <span className={styles.number}>19</span> [ {"\n"}
-      {"    "}
-      <span className={styles.number}>0</span> =&gt; {"{\n"}
-      {"        "}
-      <span className={styles.keyword}>DUP</span>
-      {"\n"}
-      {"        "}
-      <span className={styles.keyword}>SBITS</span>
-      {"\n"}
-      {"        "}
-      <span className={styles.keyword}>LESSINT</span> <span className={styles.number}>32</span>
-      {"\n"}
-      {"        "}
-      <span className={styles.keyword}>PUSHCONT_SHORT</span> {"{\n"}
-      {"            "}
-      <span className={styles.keyword}>DROP2</span>
-      {"\n"}
-      {"        }"}
-      {"\n"}
-      {"        "}
-      <span className={styles.keyword}>PUSHCONT</span> {"{\n"}
-      {"            "}
-      <span className={styles.keyword}>DUP</span>
-      {"\n"}
-      {"            "}
-      <span className={styles.keyword}>PLDU</span> <span className={styles.number}>32</span>
-      {"\n"}
-      {"            "}
-      <span className={styles.keyword}>PUSHINT_LONG</span>{" "}
-      <span className={styles.number}>1702392942</span>
-      {"\n"}
-      {"            "}
-      <span className={styles.keyword}>NEQ</span>
-      {"\n"}
-      {"        }"}
-      {"\n"}
-      {"    }"}
-    </>
-  )
-}
-
 export const rawDataBlockGallery = {
   id: "raw-data-block",
   title: "RawDataBlock",
@@ -238,8 +200,10 @@ export const rawDataBlockGallery = {
     'Use variant="embedded" inside ContentTabs so there is only one visible panel frame.',
     "Use wrap={false} for disassembly, logs, and aligned preformatted output.",
     "Use title with collapsible when a raw payload needs a compact reveal header.",
+    "Use loading instead of rendering loading text as raw or empty content.",
     "Use empty with emptyContent when a raw payload was expected but no data exists.",
     "Pass copyLabel so the copy button has a useful accessible label.",
+    "Compose HighlightedCode through customContent when the raw value is source code.",
   ],
   avoid: [
     "Do not use for parsed key-value data or tables.",
@@ -272,6 +236,25 @@ export const rawDataBlockGallery = {
       title: "Empty Data",
       description: "A missing raw payload gets a quiet empty state instead of fake raw text.",
       content: <EmptySamples />,
+    },
+    {
+      id: "raw-data-block-loading",
+      title: "Loading",
+      description:
+        "Standalone content uses a skeleton; a collapsible header uses its action slot for progress.",
+      content: (
+        <div className={styles.sampleRow}>
+          <RawDataBlock loading value="" />
+          <RawDataBlock
+            collapsible
+            defaultExpanded={false}
+            loading
+            loadingLabel="Loading raw message body"
+            title="Raw message body"
+            value=""
+          />
+        </div>
+      ),
     },
   ],
 } satisfies ComponentGallery

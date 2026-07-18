@@ -1,7 +1,6 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
-import {useToast} from "@acton/ui"
-import {CopyValueButton} from "@acton/shared-ui"
+import {CopyInlineAction, InlineAction, InlineActions, useToast} from "@acton/ui"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 
 import type {
@@ -10,8 +9,7 @@ import type {
   SourceFile,
   VerificationSourceResponse,
 } from "../api/types"
-import {Breadcrumbs} from "../components/Breadcrumbs"
-import {InlineActionButton, InlineActionGroup} from "../components/InlineActionButton"
+import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {JsonUploadField} from "../components/JsonUploadField"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import {normalizeCodeHash} from "../metadata/codeHash"
@@ -121,7 +119,7 @@ export const SourceCatalogPage: FC = () => {
 
   return (
     <section className={styles.container}>
-      <Breadcrumbs items={[{label: "Sources"}]} />
+      <ExplorerBreadcrumbs items={[{label: "Sources"}]} />
       <div className={styles.hero}>
         <h1 className={styles.title}>Sources</h1>
       </div>
@@ -194,40 +192,45 @@ export const SourceCatalogPage: FC = () => {
                   tableEntries.map(entry => (
                     <tr key={entry.codeHash} className={styles.tableRow}>
                       <td>
-                        <InlineActionGroup className={styles.nameCell} spacing="loose">
-                          <div className={styles.entrypointCell}>
+                        <InlineActions
+                          className={styles.nameCell}
+                          visibility="always"
+                          actions={
+                            metadataRegistry.canWriteSources ? (
+                              <InlineAction
+                                label="Delete source"
+                                icon={<Trash2 />}
+                                onClick={() => {
+                                  void handleDeleteSource(entry.codeHash)
+                                }}
+                              />
+                            ) : undefined
+                          }
+                        >
+                          <span className={styles.entrypointCell}>
                             <span>{entry.entrypoint}</span>
-                          </div>
-                          {metadataRegistry.canWriteSources && (
-                            <InlineActionButton
-                              type="button"
-                              onClick={() => {
-                                void handleDeleteSource(entry.codeHash)
-                              }}
-                              variant="danger"
-                              aria-label="Delete source"
-                              title="Delete source"
-                            >
-                              <Trash2 size={13} />
-                            </InlineActionButton>
-                          )}
-                        </InlineActionGroup>
+                          </span>
+                        </InlineActions>
                       </td>
                       <td>
                         <div className={styles.codeHashCell}>
                           <span className={styles.codeHash} title={entry.codeHash}>
                             {shortCodeHash(entry.codeHash)}
                           </span>
-                          <CopyValueButton
+                          <CopyInlineAction
                             className={styles.hashCopyButton}
                             value={entry.codeHash}
-                            label="code hash"
+                            label="Copy code hash"
+                            copiedLabel="Copied code hash"
+                            size="compact"
                           />
                         </div>
                       </td>
                       <td>{entry.compiler}</td>
                       <td>{entry.files}</td>
-                      <td>{formatSavedAt(entry.savedAt)}</td>
+                      <td data-visual-dynamic="time" data-visual-placeholder="<time>">
+                        {formatSavedAt(entry.savedAt)}
+                      </td>
                     </tr>
                   ))
                 )}

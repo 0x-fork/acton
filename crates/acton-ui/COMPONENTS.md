@@ -134,7 +134,7 @@ Status: ready
 Import:
 
 ```tsx
-import { InlineButton } from "@acton/ui"
+import { CopyInlineButton, InlineButton } from "@acton/ui"
 ```
 
 Use InlineButton for embedded command actions inside rows, cards, details
@@ -157,12 +157,30 @@ draw a boxed control surface.
 - Accent
 - Danger
 - Embedded row context
+- Copy feedback (`CopyInlineButton`)
+
+### Copy Actions
+
+Use `CopyInlineButton` for a text-and-icon copy command. It composes
+`InlineButton` with the `utility` variant, copies `value`, switches to a check
+icon and `Copied` text, and resets after 2000ms by default.
+
+```tsx
+<CopyInlineButton
+  value={rawMessage}
+  label="Copy raw message"
+  copiedLabel="Copied raw message"
+>
+  Copy raw message
+</CopyInlineButton>
+```
 
 ### Agent Guidance
 
 - Prefer `InlineButton` for Debug-style actions inside existing content.
 - Use `utility` for compact text+icon commands such as `Copy raw body` or
   `Copy raw state init`.
+- Use `CopyInlineButton` instead of wiring clipboard and copied state by hand.
 - Keep `utility` visually smaller than the default/accent variants; it should
   feel like an inline caption action, not a regular button.
 - Pair `accent` with a small lucide icon when the action benefits from quick
@@ -212,8 +230,12 @@ row item.
 - `visibility="always"`: actions are always visible.
 - `InlineAction` uses a 20px control with a 13px icon to match existing inline
   copy actions in localnet/shared UI.
+- `size="compact"` uses a 16px control with an 11px icon for tight chips and
+  metadata values.
 - `CopyInlineAction` copies `value`, switches to `copiedIcon`, updates the
   accessible label/title, and resets after 2000ms by default.
+- `CopyInlineAction` uses copy/check icons by default; pass `icon` and
+  `copiedIcon` only when the surrounding domain needs different symbols.
 
 ### Visibility Rules
 
@@ -232,9 +254,439 @@ row item.
   should change to a check mark after copying.
 - Keep `InlineAction` visually neutral; handle destructive intent through label,
   placement, confirmation, or surrounding context.
+- Use `size="compact"` only when the surrounding value is itself compact; keep
+  the default size for standalone inline actions.
 - Use `InlineButton` instead when the action needs a visible text label like
   `Debug`.
 - Do not hide remove actions behind hover-only visibility.
+
+## Input
+
+Status: ready
+
+Import:
+
+```tsx
+import { Input } from "@acton/ui"
+```
+
+Use Input for standalone single-line form values, filters, editable names,
+amounts, endpoints, addresses, and code hashes. It keeps native input behavior
+and forwards native attributes and refs.
+
+### Composition
+
+```tsx
+<Input
+  label="Code hash"
+  description="Hex or base64 contract code hash."
+  mono
+  spellCheck={false}
+/>
+```
+
+- `size`: `sm`, `md`, or `lg`; `md` is the default.
+- `label`: optional accessible field label. Omit it when the caller already
+  renders a linked label.
+- `description`: optional neutral helper text linked with
+  `aria-describedby`.
+- `invalid`: applies validation styling and `aria-invalid` without owning an
+  error message.
+- `leadingIcon`: optional decorative icon for standard search, token, or
+  credential fields. The icon is hidden from assistive technology.
+- `shortcut`: optional global modifier shortcut key, such as `"K"`. Input
+  renders the platform modifier and focuses and selects itself when the
+  shortcut is pressed.
+- `mono`: uses the shared monospace stack for hashes, addresses, and other
+  technical values.
+- `fieldClassName`: layout hook for the optional label/description wrapper;
+  `className` always targets the native input.
+
+### States To Review Visually
+
+- Empty and populated
+- Hover and keyboard focus
+- Read-only and disabled
+- Invalid
+- Required label
+- Small, medium, and large
+- Search, password, number, and monospace values
+
+### Agent Guidance
+
+- Use Input for a single-line native input value.
+- Prefer the built-in label and description when no surrounding form field
+  owns them.
+- Use `invalid` or `aria-invalid` to expose validation state, then report the
+  actual validation or request failure through Toast.
+- Input defaults `autoComplete`, `autoCorrect`, and `autoCapitalize` to `off`,
+  and `spellCheck` to `false`, because most Acton values are technical. Override
+  them explicitly for credential, email, name, or prose-like fields.
+- Keep file inputs native and use Checkbox for boolean values.
+- Do not add leading icons, shortcuts, unit suffixes, or embedded buttons
+  through absolute positioning outside Input. Use `leadingIcon` for decorative
+  icons and `shortcut` for a focus shortcut; unit suffixes and interactive
+  actions belong in a dedicated InputGroup.
+- Do not add an inline error-message API to Input.
+
+## SearchInput
+
+Status: ready
+
+Import:
+
+```tsx
+import { SearchInput } from "@acton/ui"
+```
+
+Use SearchInput for a search field that reveals recent queries or resolved
+matches. It owns the field, floating list, focus transitions, removable rows,
+and one-line or two-line item layout. The caller continues to own lookup,
+history persistence, validation messages, and navigation.
+
+### Composition
+
+```tsx
+<SearchInput
+  ariaLabel="Explorer search"
+  value={query}
+  items={matches.map(match => ({
+    id: match.address,
+    label: match.name,
+    description: match.address,
+    onSelect: () => openAddress(match.address),
+  }))}
+  onValueChange={setQuery}
+  onSubmit={search}
+/>
+```
+
+- `size`: `sm` for headers and dense toolbars, or `lg` for primary page search.
+- `items`: resolved rows with a stable `id`, label, optional description and
+  icon, and an `onSelect` callback.
+- `onRemove`: optional history-row command. SearchInput supplies the remove
+  button, accessible label, and focus behavior.
+- `onSubmit`: handles Enter; return `false` when validation fails and the
+  control should stay open.
+- `open` and `onOpenChange`: optional controlled visibility for previews or
+  coordinated layouts. Normal product usage can leave visibility uncontrolled.
+
+### States To Review Visually
+
+- Empty query with removable history
+- Query with one-line matches
+- Query with two-line matches
+- Small and large sizes
+- Invalid control
+- Empty result list
+- Keyboard focus moving from the input into a result or remove button
+
+### Agent Guidance
+
+- Keep domain lookup, `localStorage`, router calls, and toasts outside the base
+  component.
+- Pass already formatted labels and descriptions; SearchInput does not know
+  about TON addresses or ABI declarations.
+- Use `description` only for secondary identity such as an address, kind, or
+  opcode.
+- Let SearchInput own open/close and blur behavior instead of adding delayed
+  timers in feature code.
+- Use Input for a search field without a dropdown, and use a command palette
+  for global application commands.
+
+## AddressChip
+
+Status: ready
+
+Import:
+
+```tsx
+import { AddressChip } from "@acton/ui"
+```
+
+Use AddressChip for a compact technical address that may need copying,
+navigation, caller-resolved naming, or coordinated highlighting. The component
+owns shortening, copy feedback, focus behavior, and the compact chip visual.
+
+### Composition
+
+```tsx
+<AddressChip
+  address={address}
+  formatAddress={formatFriendlyAddress}
+  label={resolvedName ? <span>{resolvedName}</span> : undefined}
+  onAddressClick={openAccount}
+/>
+```
+
+- `address`: raw or already formatted string; missing values render `fallback`.
+- `formatAddress`: optional caller-owned conversion to a friendly/network form.
+- `label`: optional resolved display content that replaces the shortened address.
+- `copyable`: hides the copy action when another surrounding action owns the row.
+- `copyPlacement`: places the copy action on the left or right without changing
+  click semantics.
+- `shorten`: controls compact middle truncation; full values wrap safely.
+- `highlighted`: coordinates the chip with another hovered address or trace node.
+- `variant="plain"`: uses the standard text color, removes address hover styling,
+  and keeps the copy action visible.
+- `copied`: optional external copied state; the component also owns local feedback.
+- `onCopyAddress`: optional application copy handler. Native clipboard copying is
+  used when omitted.
+
+### States To Review Visually
+
+- Missing address and custom fallback
+- Shortened and full address
+- Caller-resolved label
+- Clickable and read-only
+- Copy action on the left and right
+- Highlighted address
+- Keyboard focus and copied feedback
+
+### Agent Guidance
+
+- Keep TON parsing, network selection, and address-book lookup outside AddressChip.
+- Pass a formatter callback instead of adding `@ton/core` to `@acton/ui`.
+- Pass resolved names through `label`; do not add address-book state to the component.
+- Let AddressChip own shortening and copy feedback.
+- Use ContractChip when known contract metadata should show a letter, name, and
+  address together.
+- Do not wrap AddressChip in another copy control or clickable element.
+
+## BlockChip
+
+Status: ready
+
+Import:
+
+```tsx
+import { BlockChip } from "@acton/ui"
+```
+
+Use BlockChip for a compact block seqno link or read-only value. It has one
+accent visual treatment shared with AddressChip and an optional coordinated
+highlight state.
+
+### Composition
+
+```tsx
+<BlockChip
+  workchain={block.workchain}
+  shard={block.shard}
+  seqno={block.seqno}
+  href={blockPath(block)}
+/>
+```
+
+- `workchain`, `shard`, and `seqno`: identify the block; only seqno is displayed.
+- `href`: renders a native link; without it the chip is read-only.
+- `label`: optional display content when the caller needs more context than the
+  raw seqno.
+- `highlighted`: applies the coordinated accent highlight used by AddressChip.
+- `onClick`: optional router integration while preserving a real `href`.
+- The copy action writes the Toncenter block id form `(workchain,shard,seqno)`.
+
+### States To Review Visually
+
+- Read-only block
+- Linked block and hover highlight
+- Coordinated highlighted state
+- Keyboard focus
+
+### Agent Guidance
+
+- Keep workchain, shard, route construction, and data fetching in the caller.
+- Preserve `href` when integrating a client router so modifier-click remains useful.
+- Do not add variants; BlockChip intentionally has one visual treatment.
+
+## ContractChip
+
+Status: ready
+
+Import:
+
+```tsx
+import { ContractChip } from "@acton/ui"
+```
+
+Use ContractChip for TON addresses that may have a known contract identity. It
+renders minimal metadata (`letter` and `displayName`), falls back to the
+address, and composes copying from `CopyInlineAction`.
+
+### States To Review Visually
+
+- Missing address
+- Unknown contract with shortened address
+- Known contract
+- Caller-formatted address
+- Clickable contract plus independent copy action
+
+### Agent Guidance
+
+- Pass a `ReadonlyMap<string, ContractChipData>`; richer domain contract records
+  are structurally compatible, but ContractChip does not consume their ABI.
+- Pass `formatAddress` when network-specific friendly formatting is required.
+- Keep TON parsing libraries outside `@acton/ui`; the formatter callback owns
+  that policy.
+- Use `onContractClick` for navigation and let the component keep the copy
+  action as a sibling rather than nesting interactive elements.
+- Do not wrap ContractChip in another copy control.
+
+## ParsedValueView
+
+Status: ready
+
+Import:
+
+```tsx
+import { ParsedValueView, type ParsedValue } from "@acton/ui"
+```
+
+Use ParsedValueView after domain code has decoded an ABI, message body, or
+storage cell into the minimal exported `ParsedValue` union. It renders scalar,
+address, boolean, null, void, array, object, and map nodes recursively.
+
+### States To Review Visually
+
+- Null and void
+- True and false
+- Decimal, hexadecimal, coin, and raw-copy scalars
+- Code/cell fields with an optional domain-provided inspector action
+- Known and unknown addresses
+- Empty and populated arrays
+- Empty and populated objects
+- Empty and populated maps
+- Nested structures on narrow screens
+
+### Agent Guidance
+
+- Keep ABI lookup, symbol tables, cells, tuple readers, and parsing outside the
+  component.
+- Depend only on the minimal `ParsedValue` shape; richer parser output can be
+  structurally compatible.
+- Pass `fieldName` for isolated scalars when field-sensitive hex or coin display
+  rules should apply.
+- Pass `rawValue` on a scalar to enable the shared compact copy action.
+- For a scalar with `typeName: "Cell"`, `rawValue`, and a field name containing
+  `code` or `cell`, pass `renderCodeCellDetails` to add the shared code-inspector
+  action. Keep BoC decoding, source lookup, and disassembly in domain code.
+- Reuse ContractChip metadata and `formatAddress` for address nodes.
+- Do not duplicate the recursive array, object, or map layout in callers.
+
+## ParsedValueDiffView
+
+Status: ready
+
+Import:
+
+```tsx
+import { buildStorageDiff, ParsedValueDiffView } from "@acton/ui"
+```
+
+Use `buildStorageDiff` to compare two minimal named `ParsedValue` roots and
+render the result with ParsedValueDiffView. The builder and renderer depend only
+on presentation models; ABI lookup, cell decoding, and parser policy stay in
+domain code.
+
+### States To Review Visually
+
+- Unchanged leaf
+- Changed leaf
+- Added and removed leaves
+- Address changes with known contract metadata
+- Serialized cell-like values with raw copy actions
+- Nested object and array changes
+- Nested map additions, removals, and changed values
+- Empty containers
+
+### Agent Guidance
+
+- Pass `{ name, value }` as `ParsedStorageValue`; richer decoded storage records
+  are structurally compatible.
+- Build the diff once outside render when the before/after values are stable.
+- Pass ContractChip metadata and `formatAddress` for address leaves.
+- Provide a `ParsedValueDiff` directly only when comparison already belongs to
+  domain code.
+- Do not pass ABI objects, cells, dictionaries, or parser contexts.
+- Do not duplicate ParsedValueView leaf formatting inside diff consumers.
+
+## ParsedBodySection
+
+Status: ready
+
+Import:
+
+```tsx
+import { ParsedBodySection } from "@acton/ui"
+```
+
+Use ParsedBodySection for an accessible disclosure around a decoded body. It
+accepts only `{ name, value }`, delegates the tree to ParsedValueView, and does
+not know how the ABI was selected or parsed.
+
+### States To Review Visually
+
+- Collapsed
+- Expanded
+- Custom title
+- Nested body wider than its container
+- Missing body, which intentionally renders nothing
+
+### Agent Guidance
+
+- Pass an already decoded `ParsedTransactionBody`.
+- Use `defaultExpanded` only when decoded data should be immediately visible.
+- Use `title` for another body-like decoded structure such as storage.
+- Do not add another disclosure control around ParsedBodySection.
+- Do not perform decoding or ABI fallback inside the component.
+
+## OpcodeChip
+
+Status: ready
+
+Import:
+
+```tsx
+import { OpcodeChip } from "@acton/ui"
+```
+
+Use OpcodeChip for TON message opcodes that may have a domain-resolved ABI name.
+It owns hexadecimal formatting and composes its copy interaction from
+`InlineActions` and `CopyInlineAction`.
+
+### Composition
+
+```tsx
+<OpcodeChip
+  opcode={opcode}
+  abiName={resolvedOpcodeName}
+  showOpcode
+/>
+```
+
+- `opcode`: numeric opcode. Zero is valid and renders as `0x0`; `undefined`
+  renders `Empty` without a copy action.
+- `abiName`: optional symbolic name resolved by domain code.
+- `showOpcode`: keeps the hexadecimal value visible beside `abiName`.
+- The copy action appears on hover or keyboard focus and is always visible on
+  coarse pointer devices.
+
+### States To Review Visually
+
+- Missing opcode
+- Zero opcode
+- Numeric opcode without an ABI name
+- ABI name with hexadecimal secondary text
+- ABI name without secondary text
+- Copy hover/focus and copied state
+
+### Agent Guidance
+
+- Pass a number and let OpcodeChip format the hexadecimal value.
+- Resolve ABI names outside `@acton/ui` and pass the prepared string.
+- Do not wrap OpcodeChip in another copy control.
+- Do not duplicate copy state, timers, clipboard calls, or copy/check icons in
+  consumers.
 
 ## DisclosureToggle
 
@@ -288,6 +740,108 @@ loading state, and `aria-expanded`.
   to the component; local layouts own that content.
 - Do not use DisclosureToggle for full-width collapsible headers, large
   accordions, or register-form buttons.
+
+## ExitCodeChip
+
+Status: ready
+
+Import:
+
+```tsx
+import {ExitCodeChip} from "@acton/ui"
+```
+
+Use ExitCodeChip for TVM compute-phase exit codes and transaction action result
+codes. It owns success classification, standard TVM descriptions, contract ABI
+error lookup, and the contextual popover.
+
+### Minimal ABI Shape
+
+The `abi` prop is structural and intentionally limited to the data the chip
+reads:
+
+```tsx
+interface ExitCodeAbi {
+  readonly thrown_errors?: readonly {
+    readonly err_code: number
+    readonly name?: string
+    readonly description?: string
+  }[]
+}
+```
+
+A full compiler ABI is assignable to this shape, but `@acton/ui` does not import
+or depend on compiler ABI types.
+
+### States To Review Visually
+
+- Missing code: yellow `Unknown` chip
+- Compute success: 0 and 1
+- Action success: 0
+- Standard TVM compute error
+- Standard action error
+- Contract-defined ABI error
+- Unknown custom error
+
+### Agent Guidance
+
+- Set `phase="action"` for action result codes; compute is the default.
+- Pass `abi` only when contract-defined thrown errors are available.
+- Pass `undefined` while the result is unavailable; the component renders an
+  `Unknown` warning chip.
+- Import the component directly from `@acton/ui`; do not recreate standard exit
+  code descriptions in application code.
+- Do not add a full ABI package dependency to consumers that only need the chip.
+
+## ModeViewer
+
+Status: ready
+
+Import:
+
+```tsx
+import {
+  ChangeLibraryModeViewer,
+  ModeViewer,
+  ReserveModeViewer,
+  SendModeViewer,
+} from "@acton/ui"
+```
+
+Use the three domain wrappers for TON action modes. They share the same inline
+layout, separators, empty state, and explanatory popovers, while each wrapper
+keeps its bit parsing in a separate parser module.
+
+### Wrappers
+
+- `ReserveModeViewer`: reserve base mode and optional reserve flags.
+- `SendModeViewer`: independent message send flags and regular mode `0`.
+- `ChangeLibraryModeViewer`: library visibility, bounce behavior, and unknown
+  bits.
+
+All wrappers accept `mode: number | undefined`. An unavailable value renders
+`No mode`.
+
+### Base Component
+
+`ModeViewer` accepts `mode` and a `parseMode` function returning entries with
+`name`, `value`, `description`, and an optional `docsUrl`. Use it directly only
+when adding another mode family; callers rendering the three known TON modes
+should use a wrapper.
+
+Descriptions may be plain strings or composed parts. Use `{name, value}` parts
+for inline mode constants and `{code}` parts for Tolk functions, types, and
+other code references.
+
+### Agent Guidance
+
+- Keep every mode family's constants and bit rules in its own folder and parser
+  file.
+- Reuse `ModeViewer` for presentation instead of rebuilding separators and
+  popovers.
+- Do not add reserve, send, or library-specific branches to `ModeViewer`.
+- Do not use one domain wrapper for a different mode family even when bit values
+  overlap.
 
 ## ContentTabs
 
@@ -447,6 +1001,121 @@ parsed scalar values, storage diffs, balances, gas values, counters, and ids.
   truncation.
 - Do not insert literal spaces into technical numbers for readability.
 
+## CodeViewer
+
+Status: ready
+
+Import:
+
+```tsx
+import { CodeViewer } from "@acton/ui"
+```
+
+Use CodeViewer for read-only multi-file source bundles. It owns the collapsible
+file tree, active-file selection, entrypoint marker, line numbers, syntax
+highlighting, copy action, optional external action, and responsive file picker.
+
+### Composition
+
+```tsx
+<CodeViewer
+  files={sourceFiles}
+  entrypoint="contracts/main.tolk"
+  externalActionUrl={verificationUrl}
+  externalActionLabel="View verification"
+/>
+```
+
+- `files`: minimal `{path, content}` records; domain-specific source metadata
+  stays in the caller.
+- `entrypoint`: optional path selected initially and marked as `main`.
+- `externalActionUrl` and `externalActionLabel`: optional navigation to a
+  verifier, repository, artifact, or other source context.
+- `compact`: limits the source height for dense details panels.
+- `defaultFileTreeVisible`: controls whether the desktop file tree is visible
+  on first render; users can still show or hide it from the code header.
+- `attachedToTabs`: removes the leading top corner radius when the viewer sits
+  directly below a tab bar.
+- `emptyMessage`: caller-provided text for an empty source bundle.
+
+### States To Review Visually
+
+- Nested expanded folders
+- Independently collapsed folders
+- Active and hovered files
+- Entrypoint marker
+- Compact layout
+- Initially hidden desktop file tree
+- Mobile file picker
+- Empty source bundle
+
+### Agent Guidance
+
+- Use it for verified contracts, generated source bundles, and other read-only
+  multi-file code.
+- Keep loading, verification, compilation, decompilation, and source-domain
+  types outside the component.
+- Let CodeViewer own file selection, tree disclosure, copying, line numbers,
+  highlighting, and responsive behavior.
+- Use HighlightedCode directly for a single source value without a file tree.
+- Use CodeEditor for editable code, debugger navigation, or completions.
+
+## HighlightedCode
+
+Status: ready
+
+Import:
+
+```tsx
+import { HighlightedCode } from "@acton/ui"
+```
+
+Use HighlightedCode for read-only syntax-highlighted source code. It owns the
+shared Shiki instance, JetBrains light/dark themes, loading fallback, scrolling,
+and wrapping behavior.
+
+### Languages
+
+- tolk: Tolk source and generated declarations.
+- func: legacy FunC source.
+- tasm: TVM assembly and decompiled code.
+- tlb: TL-B schemas.
+- json: ABI, stack, metadata, and other JSON.
+- Omit language for plain preformatted text with the same code geometry.
+
+### Composition
+
+```tsx
+<RawDataBlock
+  title="Disassembly"
+  value={disassembly}
+  customContent={
+    <HighlightedCode value={disassembly} language="tasm" />
+  }
+/>
+```
+
+- value: complete source text to render.
+- language: optional supported grammar.
+- wrap: enables preformatted wrapping; disabled by default.
+- maxHeight and minHeight: constrain the component-owned scroll area.
+- className: allows a surface to override the documented
+  --acton-highlighted-code-* sizing variables without creating another
+  highlighter.
+
+### Agent Guidance
+
+- Keep fetching, decompilation, parsing, tabs, copy actions, and line annotations
+  in caller-owned domain components.
+- Compose HighlightedCode through RawDataBlock.customContent when code also
+  needs a frame, title, copy button, or disclosure behavior.
+- Use the Monaco-based CodeEditor for editable code, CodeLens, decorations,
+  folding, trace navigation, or completion.
+- A coverage viewer may use highlightCodeToTokens because it renders hit counts
+  and status per line; do not flatten that viewer into a static block.
+- Do not create local Shiki instances, theme observers, or hand-written token
+  coloring.
+
 ## RawDataBlock
 
 Status: ready
@@ -492,8 +1161,15 @@ renders the scrollable `pre/code` area and owns copy button state.
   plain text.
 - `empty`: renders a quiet empty state instead of `pre/code`; copy is hidden.
 - `emptyContent`: text or React content explaining why raw data is unavailable.
-- `children`: optional highlighted code content; `value` remains the copy
-  source.
+- `loading`: disables copy and renders a skeleton instead of ordinary content. A
+  collapsible block hides its content and shows progress in the header action
+  slot instead.
+- `loadingLabel`: accessible name for the loading status.
+- `children`: optional highlighted code fragments rendered inside the built-in
+  `pre/code`; `value` remains the copy source.
+- `customContent`: a complete pre-rendered code viewer that replaces the
+  built-in `pre/code`. Use it when a highlighter already returns its own
+  `<pre>` or structured HTML.
 
 ### States To Review Visually
 
@@ -502,6 +1178,7 @@ renders the scrollable `pre/code` area and owns copy button state.
 - Wrapped payload
 - No-wrap preformatted output
 - Collapsible title open and closed states
+- Loading skeleton and collapsible header progress
 - Empty data text and custom React content
 - Copy hover/focus and copied state
 
@@ -513,6 +1190,8 @@ renders the scrollable `pre/code` area and owns copy button state.
   one-off disclosure header.
 - Use `empty` for missing VM logs, executor logs, state init, raw bodies, or
   other expected payloads. Do not display missing-data explanations as raw text.
+- Use `loading` while raw data is being fetched. Do not render loading text as
+  raw or empty content.
 - Keep decoding, formatting, and syntax highlighting setup outside RawDataBlock.
 - Do not use RawDataBlock for parsed key-value data, tables, or prose content.
 
@@ -596,6 +1275,10 @@ content that needs multiple lines, links, small actions, or structured detail.
 - `interaction`: `hover` by default, or `click` when users need to interact with
   links/buttons inside the panel.
 - `placement`: preferred side: `top`, `right`, `bottom`, or `left`.
+- `maxWidth`: opt into a wider panel for rich inspection content; the default
+  remains `22rem`.
+- `triggerAsChild`: use a single button child as the Base UI trigger instead of
+  wrapping that button in another interactive element.
 - Positioning uses Base UI collision handling. The preferred side can flip or
   shift to stay inside the viewport.
 - `open`, `defaultOpen`, and `onOpenChange`: controlled or uncontrolled state.
@@ -603,8 +1286,8 @@ content that needs multiple lines, links, small actions, or structured detail.
   it.
 - `contentClassName` and `triggerClassName`: local layout hooks; do not use them
   to replace the shared panel frame.
-- `tabIndex`: defaults to `0` for text triggers. Pass `-1` when wrapping a
-  focusable child such as `InlineButton`.
+- `tabIndex`: defaults to `0` for text triggers. Prefer `triggerAsChild` for a
+  focusable button child.
 
 ### States To Review Visually
 
@@ -891,6 +1574,56 @@ behavior, and basic placeholder shapes.
   when the loading state needs to be announced.
 - Do not use Skeleton for empty states, error states, or hidden final content.
 
+## InlineLoader
+
+Status: ready
+
+Import:
+
+```tsx
+import { InlineLoader } from "@acton/ui"
+```
+
+Use InlineLoader for an indeterminate operation when the destination layout is
+not yet available, such as a lazily loaded editor or a transaction trace. The
+component owns the accessible status, spinner, optional detail, animated dots,
+and reduced-motion behavior; the caller owns when it is mounted and how much
+space surrounds it.
+
+### Composition
+
+```tsx
+<InlineLoader message="Loading editor" />
+
+<InlineLoader
+  message="Tracing transaction"
+  subtext="This may take a few moments"
+/>
+```
+
+- `message`: operation label; defaults to `Loading`.
+- `subtext`: optional expectation-setting detail with animated trailing dots.
+- Standard `div` props, `className`, and `ref` are forwarded.
+- The component is announced as a polite status by default.
+
+### States To Review Visually
+
+- Default loading message
+- Message with subtext and animated dots
+- Light and dark themes
+- Reduced-motion mode
+- Constrained centered container
+
+### Agent Guidance
+
+- Mount InlineLoader only while the operation is in progress; it does not need
+  a separate `loading` boolean.
+- Use Skeleton when the final layout is known and preserving it will reduce
+  visual movement.
+- Keep page, panel, and editor sizing in the caller rather than adding layout
+  variants to InlineLoader.
+- Use a progress component instead when completion can be measured.
+
 ## Checkbox
 
 Status: ready
@@ -933,6 +1666,89 @@ same 16px checked-box pattern as localnet-style filter controls.
   controls.
 - Do not use Checkbox as a command button.
 
+## IdeSelector
+
+Status: ready
+
+Import:
+
+```tsx
+import { IdeSelector, useIdePreference } from "@acton/ui"
+```
+
+Use IdeSelector for source locations that can be opened in a desktop IDE. The
+primary icon opens the current IDE directly; the adjacent Base UI menu changes
+the preferred IDE with keyboard navigation, focus management, Escape handling,
+and outside-click dismissal built in.
+
+```tsx
+const [ide, setIde] = useIdePreference()
+
+<IdeSelector
+  value={ide}
+  onValueChange={setIde}
+  location={{ filePath, line, column }}
+  shortcut
+/>
+```
+
+- `location` uses one-based line and column values.
+- `size="compact"` fits dense code and file headers.
+- `shortcut` enables the `.` key for the current source location. Enable it on
+  only one mounted selector per screen.
+- `useIdePreference` validates and persists the selected IDE while keeping the
+  component controlled.
+- `getIdeUrl` builds editor links for source-location links that do not need the
+  selector UI.
+
+### Agent Guidance
+
+- Use IdeSelector instead of local split buttons and absolute-positioned menus.
+- Keep the IDE preference shared across all selectors on a screen.
+- Keep source-path formatting in the caller; pass the full path to `location`.
+- Do not add document-level Escape or outside-click listeners around the menu.
+
+## ThemeProvider and useTheme
+
+Status: ready
+
+Import:
+
+```tsx
+import { ThemeProvider, useTheme } from "@acton/ui"
+```
+
+Wrap each UI root once. ThemeProvider resolves the saved preference, falls back
+to the system preference, persists changes, and synchronizes the theme markers
+used by Acton tokens and legacy app styles. Theme toggles use the browser View
+Transition API when available and fall back to an immediate switch elsewhere.
+
+```tsx
+<ThemeProvider storageKey="theme">
+  <App />
+</ThemeProvider>
+```
+
+Theme-aware components read the shared state instead of receiving theme props:
+
+```tsx
+const { theme, setTheme, toggleTheme } = useTheme()
+```
+
+- `storageKey`: local-storage key; defaults to `theme`.
+- `defaultTheme`: `"light"`, `"dark"`, or `"system"`; defaults to `"system"`.
+- `theme`: resolved `"light"` or `"dark"` theme.
+- `setTheme`: sets an explicit resolved theme.
+- `toggleTheme`: switches between light and dark.
+
+### Agent Guidance
+
+- Use one ThemeProvider at the application root.
+- Read theme state with `useTheme`; do not inspect DOM classes or local storage
+  from feature components.
+- Do not pass theme through app, page, sidebar, toast, or syntax-highlighting
+  props.
+
 ## ThemeSwitch
 
 Status: ready
@@ -940,7 +1756,7 @@ Status: ready
 Import:
 
 ```tsx
-import { ThemeSwitch } from "@acton/ui"
+import { ThemeProvider, ThemeSwitch } from "@acton/ui"
 ```
 
 Use ThemeSwitch for app-level light/dark mode toggles in app chrome, sidebars,
@@ -951,15 +1767,14 @@ and focus treatment.
 ### Composition
 
 ```tsx
-<ThemeSwitch
-  theme={theme}
-  onToggleTheme={toggleTheme}
-  aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
-/>
+<ThemeProvider>
+  <ThemeSwitch />
+</ThemeProvider>
 ```
 
-- `theme`: current app theme, either `light` or `dark`.
-- `onToggleTheme`: called when the switch is clicked.
+- ThemeSwitch reads the current theme and toggle action from ThemeProvider.
+- `theme` and `onToggleTheme` remain available only for controlled visual-state
+  previews, such as the component gallery.
 - `data-theme-toggle`: emitted for compatibility with existing app chrome CSS.
 
 ### States To Review Visually
@@ -973,6 +1788,7 @@ and focus treatment.
 
 - Use ThemeSwitch for global app theme changes.
 - Keep the Sun/Moon segmented pill appearance; do not rebuild it with Button.
-- Use a contextual `aria-label` when the current theme is known.
+- Its default accessible label describes the target theme; override it only
+  when surrounding context requires different wording.
 - Do not use ThemeSwitch for local display modes such as source/trace view;
   use a segmented control for those.

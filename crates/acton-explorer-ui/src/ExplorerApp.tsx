@@ -1,5 +1,4 @@
-import {ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
-import type {ThemeMode} from "@acton/ui"
+import {Checkbox, Input, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
 import {Check, ChevronDown, Edit2, Github, Plus, Share2, Star, Trash2} from "lucide-react"
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
@@ -32,9 +31,11 @@ import {ExplorerIndexPage} from "../../acton-localnet-ui/src/explorer/pages/Expl
 import {FavoriteAccountsPage} from "../../acton-localnet-ui/src/explorer/pages/FavoriteAccountsPage"
 import {TransactionPage} from "../../acton-localnet-ui/src/explorer/pages/TransactionPage"
 import "@acton/ui/styles/tokens.css"
-import "@acton/shared-ui/styles/tokens.css"
 import "../../acton-localnet-ui/src/index.css"
+import actonScanCustomLogo from "./assets/acton-scan-custom-logo-dark.svg"
 import actonScanLogo from "./assets/acton-scan-logo-dark.svg"
+import actonScanTestnetLogo from "./assets/acton-scan-testnet-logo-dark.svg"
+import {DeveloperExplorerBanner} from "./components/DeveloperExplorerBanner"
 import styles from "./ExplorerApp.module.css"
 
 type BuiltinSelectableExplorerNetworkId = "mainnet" | "testnet"
@@ -42,6 +43,13 @@ type SelectableExplorerNetworkId = BuiltinSelectableExplorerNetworkId | CustomEx
 type SelectableExplorerNetwork = ExplorerNetworkInfo & {
   readonly id: SelectableExplorerNetworkId
   readonly api: ExplorerApiConfig
+}
+type ExplorerNetworkKind = BuiltinSelectableExplorerNetworkId | "custom"
+
+const EXPLORER_NETWORK_LOGOS: Record<ExplorerNetworkKind, string> = {
+  mainnet: actonScanLogo,
+  testnet: actonScanTestnetLogo,
+  custom: actonScanCustomLogo,
 }
 
 type NetworkFormMode =
@@ -383,15 +391,6 @@ function apiHostname(network: SelectableExplorerNetwork): string {
   }
 }
 
-const readInitialTheme = (): ThemeMode => {
-  const storedTheme = localStorage.getItem("explorerTheme")
-  if (storedTheme === "dark" || storedTheme === "light") {
-    return storedTheme
-  }
-
-  return globalThis.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-}
-
 function NetworkDropdown({
   networks,
   value,
@@ -683,9 +682,11 @@ function NetworkDropdown({
                 }}
               >
                 <div className={styles.networkFormTitle}>{networkFormTitle}</div>
-                <label className={styles.networkField}>
+                <label className={styles.networkField} htmlFor="custom-network-name">
                   <span className={styles.networkFieldLabel}>Name</span>
-                  <input
+                  <Input
+                    id="custom-network-name"
+                    size="sm"
                     className={styles.networkInput}
                     value={customName}
                     onChange={event => setCustomName(event.target.value)}
@@ -693,9 +694,11 @@ function NetworkDropdown({
                     disabled={!isNetworkFormOpen}
                   />
                 </label>
-                <label className={styles.networkField}>
+                <label className={styles.networkField} htmlFor="custom-network-v2-endpoint">
                   <span className={styles.networkFieldLabel}>V2 endpoint</span>
-                  <input
+                  <Input
+                    id="custom-network-v2-endpoint"
+                    size="sm"
                     className={styles.networkInput}
                     value={customV2Url}
                     onChange={event => setCustomV2Url(event.target.value)}
@@ -704,9 +707,11 @@ function NetworkDropdown({
                     required
                   />
                 </label>
-                <label className={styles.networkField}>
+                <label className={styles.networkField} htmlFor="custom-network-v3-endpoint">
                   <span className={styles.networkFieldLabel}>V3 endpoint</span>
-                  <input
+                  <Input
+                    id="custom-network-v3-endpoint"
+                    size="sm"
                     className={styles.networkInput}
                     value={customV3Url}
                     onChange={event => setCustomV3Url(event.target.value)}
@@ -715,9 +720,11 @@ function NetworkDropdown({
                     required
                   />
                 </label>
-                <label className={styles.networkField}>
+                <label className={styles.networkField} htmlFor="custom-network-api-key">
                   <span className={styles.networkFieldLabel}>API key</span>
-                  <input
+                  <Input
+                    id="custom-network-api-key"
+                    size="sm"
                     type="password"
                     className={styles.networkInput}
                     value={customApiKey}
@@ -727,34 +734,22 @@ function NetworkDropdown({
                     disabled={!isNetworkFormOpen}
                   />
                 </label>
-                <label className={styles.networkCheckboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={customTestOnly}
-                    disabled={!isNetworkFormOpen}
-                    onChange={event => setCustomTestOnly(event.target.checked)}
-                  />
-                  <span className={styles.networkCheckboxText}>
-                    <span className={styles.networkCheckboxLabel}>Testnet addresses</span>
-                    <span className={styles.networkCheckboxDescription}>
-                      Copy addresses and open links as testnet addresses.
-                    </span>
-                  </span>
-                </label>
-                <label className={styles.networkCheckboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={customSupportsActions}
-                    disabled={!isNetworkFormOpen}
-                    onChange={event => setCustomSupportsActions(event.target.checked)}
-                  />
-                  <span className={styles.networkCheckboxText}>
-                    <span className={styles.networkCheckboxLabel}>Support actions</span>
-                    <span className={styles.networkCheckboxDescription}>
-                      Enable Toncenter /actions history for this network.
-                    </span>
-                  </span>
-                </label>
+                <Checkbox
+                  className={styles.networkCheckbox}
+                  label="Testnet addresses"
+                  description="Copy addresses and open links as testnet addresses."
+                  checked={customTestOnly}
+                  disabled={!isNetworkFormOpen}
+                  onChange={event => setCustomTestOnly(event.currentTarget.checked)}
+                />
+                <Checkbox
+                  className={styles.networkCheckbox}
+                  label="Support actions"
+                  description="Enable Toncenter /actions history for this network."
+                  checked={customSupportsActions}
+                  disabled={!isNetworkFormOpen}
+                  onChange={event => setCustomSupportsActions(event.currentTarget.checked)}
+                />
                 <div className={styles.networkFormActions}>
                   <button
                     type="button"
@@ -794,7 +789,6 @@ const ExplorerHeaderFrame: FC<{readonly children: ReactNode}> = ({children}) => 
 }
 
 export const ExplorerApp: FC = () => {
-  const [theme, setTheme] = useState<ThemeMode>(readInitialTheme)
   const [networkState, setNetworkState] = useState<ExplorerNetworkState>(
     readInitialExplorerNetworkState,
   )
@@ -805,6 +799,8 @@ export const ExplorerApp: FC = () => {
   const networkId = networkState.selectedNetworkId
   const networkConfig =
     selectableNetworks.find(network => network.id === networkId) ?? EXPLORER_API_CONFIGS.mainnet
+  const networkKind: ExplorerNetworkKind = isCustomNetworkId(networkId) ? "custom" : networkId
+  const brandLogo = EXPLORER_NETWORK_LOGOS[networkKind]
   const client = useMemo(
     () =>
       new TonClient({
@@ -873,11 +869,8 @@ export const ExplorerApp: FC = () => {
   }, [])
 
   useLayoutEffect(() => {
-    document.documentElement.classList.toggle("dark-theme", theme === "dark")
-    document.body.classList.toggle("dark-mode", theme === "dark")
-    document.body.classList.toggle("light-mode", theme !== "dark")
-    localStorage.setItem("explorerTheme", theme)
-  }, [theme])
+    document.querySelector<HTMLLinkElement>('link[rel="icon"]')?.setAttribute("href", brandLogo)
+  }, [brandLogo])
 
   useEffect(() => {
     localStorage.setItem(EXPLORER_NETWORK_STORAGE_KEY, networkId)
@@ -896,23 +889,22 @@ export const ExplorerApp: FC = () => {
     }
   }, [])
 
-  const toggleTheme = () => setTheme(current => (current === "dark" ? "light" : "dark"))
-
   return (
     <BrowserRouter>
-      <ToastProvider theme={theme}>
+      <ToastProvider>
         <StaticNetworkInfoProvider network={networkConfig}>
           <ExplorerRoutesProvider basePath="">
             <MetadataRegistryProvider registry={metadataRegistry}>
               <AddressBookProvider>
-                <div className={styles.appShell}>
+                <div className={styles.appShell} data-network-kind={networkKind}>
+                  <DeveloperExplorerBanner />
                   <ExplorerHeaderFrame>
                     <div className={styles.headerInner}>
                       <div className={styles.headerPrimary}>
                         <Link className={styles.brand} to="/">
                           <img
                             className={styles.brandIcon}
-                            src={actonScanLogo}
+                            src={brandLogo}
                             alt=""
                             aria-hidden="true"
                           />
@@ -948,11 +940,7 @@ export const ExplorerApp: FC = () => {
                         >
                           <Star size={18} />
                         </Link>
-                        <ThemeSwitch
-                          theme={theme}
-                          onToggleTheme={toggleTheme}
-                          aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
-                        />
+                        <ThemeSwitch />
                         <a
                           className={styles.headerIconButton}
                           href="https://github.com/ton-blockchain/acton"
@@ -968,7 +956,7 @@ export const ExplorerApp: FC = () => {
                   </ExplorerHeaderFrame>
                   <main className={styles.main}>
                     <Routes>
-                      <Route path="/" element={<ExplorerIndexPage />} />
+                      <Route path="/" element={<ExplorerIndexPage fillAvailableHeight />} />
                       <Route path="/blocks" element={<BlocksPage client={client} />} />
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />

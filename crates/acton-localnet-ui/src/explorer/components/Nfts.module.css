@@ -9,22 +9,22 @@
   box-sizing: border-box;
   border: 1px solid transparent;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--tonscan-bg-secondary) 96%, var(--tonscan-text-primary));
-  color: var(--tonscan-text-secondary);
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 96%, var(--acton-color-text));
+  color: var(--acton-color-text-muted);
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 16px;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    box-shadow var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    box-shadow var(--acton-duration-fast);
 }
 
 .searchBox:focus-within {
-  border-color: var(--litenode-border-control);
-  background: var(--tonscan-card-bg);
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  border-color: var(--acton-color-border-control);
+  background: var(--acton-color-surface-raised);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .searchBox input {
@@ -33,14 +33,14 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font: inherit;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.4;
 }
 
 .searchBox input::placeholder {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .list {
@@ -54,7 +54,7 @@
   overflow: hidden;
   border: 0;
   border-radius: 10px;
-  background: var(--tonscan-bg-secondary);
+  background: var(--acton-color-surface-raised);
   color: inherit;
   cursor: pointer;
   display: flex;
@@ -68,7 +68,7 @@
 
 .nftItem:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .imageFrame {
@@ -77,7 +77,7 @@
   aspect-ratio: 1;
   background:
     linear-gradient(135deg, rgb(228 232 238 / 85%), rgb(244 246 248 / 88%)),
-    var(--tonscan-bg-secondary);
+    var(--acton-color-surface-raised);
   overflow: hidden;
 }
 
@@ -86,7 +86,7 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  background-color: var(--tonscan-bg-secondary);
+  background-color: var(--acton-color-surface-raised);
   transition: transform 180ms ease;
 }
 
@@ -96,14 +96,14 @@
   flex-direction: column;
   gap: 3px;
   padding: 10px 12px 11px;
-  background: var(--tonscan-bg-secondary);
+  background: var(--acton-color-surface-raised);
 }
 
 .collectionName,
 .nftMetaLine {
   min-width: 0;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
   font-weight: 500;
   line-height: 1.25;
 }
@@ -117,8 +117,8 @@
 }
 
 .nftName {
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
   font-weight: 650;
   line-height: 1.25;
 }
@@ -136,8 +136,8 @@
 .empty {
   padding: 32px 16px;
   text-align: center;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
 }
 
 @media (max-width: 720px) {

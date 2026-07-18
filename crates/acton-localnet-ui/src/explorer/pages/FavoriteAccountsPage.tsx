@@ -1,15 +1,14 @@
 import {useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 import {Link} from "react-router-dom"
-import {useToast} from "@acton/ui"
+import {InlineAction, InlineActions, useToast} from "@acton/ui"
 import {Star, Trash2} from "lucide-react"
 
 import type {TonClient} from "../api/client"
 import {loadJettonWalletsWithMasters, sortJettonWalletsByAmount} from "../api/jettonWallets"
 import type {JettonWallet} from "../api/types"
-import {AddressChip} from "../components/AddressChip"
-import {Breadcrumbs} from "../components/Breadcrumbs"
-import {InlineActionButton, InlineActionGroup} from "../components/InlineActionButton"
+import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
+import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {WalletAccountSummary, type AccountBalanceState} from "../components/WalletAccountSummary"
 import {normalizeAddress, toRawAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
@@ -151,7 +150,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
 
   return (
     <section className={styles.container}>
-      <Breadcrumbs items={[{label: "Favorite accounts"}]} />
+      <ExplorerBreadcrumbs items={[{label: "Favorite accounts"}]} />
       <header className={styles.hero}>
         <div>
           <h1 className={styles.title}>Favorite accounts</h1>
@@ -185,8 +184,17 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                 {favorites.map(favorite => (
                   <tr key={favorite.address} className={styles.tableRow}>
                     <td className={styles.accountCell}>
-                      <InlineActionGroup>
-                        <AddressChip
+                      <InlineActions
+                        visibility="always"
+                        actions={
+                          <InlineAction
+                            label="Remove from favorites"
+                            icon={<Trash2 />}
+                            onClick={() => handleRemove(favorite)}
+                          />
+                        }
+                      >
+                        <ExplorerAddressChip
                           address={favorite.address}
                           fallback="Account"
                           copyable={false}
@@ -194,16 +202,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                             openPath(routes.addressPath(address), event)
                           }
                         />
-                        <InlineActionButton
-                          type="button"
-                          variant="danger"
-                          onClick={() => handleRemove(favorite)}
-                          aria-label="Remove from favorites"
-                          title="Remove from favorites"
-                        >
-                          <Trash2 size={13} />
-                        </InlineActionButton>
-                      </InlineActionGroup>
+                      </InlineActions>
                     </td>
                     <td className={styles.balanceCell}>
                       <WalletAccountSummary
@@ -216,7 +215,13 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                         }
                       />
                     </td>
-                    <td className={styles.savedAtCell}>{formatSavedAt(favorite.savedAt)}</td>
+                    <td
+                      className={styles.savedAtCell}
+                      data-visual-dynamic="time"
+                      data-visual-placeholder="<time>"
+                    >
+                      {formatSavedAt(favorite.savedAt)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

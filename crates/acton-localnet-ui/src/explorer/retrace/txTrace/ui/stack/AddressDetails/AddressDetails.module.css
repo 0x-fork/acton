@@ -2,7 +2,7 @@
   display: grid;
   gap: 10px;
   min-width: 0;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--acton-space-4);
 }
 
 .contractLine {
@@ -29,7 +29,7 @@
 }
 
 .addressLabel {
-  color: var(--color-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0;
@@ -43,6 +43,6 @@
   min-width: 0;
   max-width: 100%;
   padding: 0;
-  color: var(--color-text-primary);
+  color: var(--acton-color-text);
   background: transparent;
 }

@@ -1,15 +1,16 @@
 import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"
-import type {CSSProperties, FC, JSX, MouseEvent} from "react"
+import type {CSSProperties, FC, JSX, KeyboardEvent as ReactKeyboardEvent, MouseEvent} from "react"
+import {fmt} from "@acton/transaction-ui"
 import {
-  Card,
-  CardContent,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@acton/shared-ui"
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableEmpty,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableTable,
+} from "@acton/ui"
 import {
   BadgeDollarSign,
   BadgeMinus,
@@ -57,7 +58,6 @@ import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {
   AddressInformation,
-  AccountStateTokenInfo,
   JettonMaster,
   JettonWallet,
   NftItem,
@@ -70,14 +70,18 @@ import type {
 import type {TonClient} from "../api/client"
 import {addressKey} from "../api/compilerAbi"
 import {
+  getMetadataTokenInfo,
+  metadataTokenDecimals,
+  metadataTokenString,
+} from "../api/tokenMetadata"
+import {
   collectTransactionListAddresses,
   useMessageNamesByAddress,
   type MessageNamesByAddress,
 } from "../hooks/useMessageNamesByAddress"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
-import {AddressChip} from "./AddressChip"
-import {AddressLabel} from "./AddressLabel"
+import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import {Nfts} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
@@ -546,7 +550,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     : undefined
 
   return (
-    <Card className={styles.tableCard}>
+    <section className={styles.tableCard}>
       <div className={styles.tabs}>
         <button
           type="button"
@@ -744,168 +748,186 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
       </div>
 
       {activeTab === "history" ? (
-        <CardContent className={styles.historyContent}>
-          <Table>
-            <TableHeader className={styles.historyHeaderGroup}>
-              <TableRow className={styles.historyHeaderRow}>
-                <TableHead className={`${styles.tableHeader} ${styles.timeColumn}`}>Time</TableHead>
-                <TableHead className={`${styles.tableHeader} ${styles.actionColumn}`}>
-                  Action
-                </TableHead>
-                <TableHead className={styles.tableHeader}>Address</TableHead>
-                <TableHead className={`${styles.tableHeader} ${styles.technicalColumn}`} />
-                <TableHead className={`${styles.tableHeader} ${styles.valueContainer}`}>
-                  Value
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {activeHistoryLoading ? (
-                Array.from({length: TRANSACTION_SKELETON_ROWS}, (_, index) => (
-                  <TableRow key={`transaction-skeleton-${index}`} className={styles.skeletonRow}>
-                    <TableCell className={`${styles.time} ${styles.timeColumn}`}>
-                      <div className={`${styles.skeleton} ${styles.historySkeletonTime}`} />
-                    </TableCell>
-                    <TableCell className={styles.actionColumn}>
-                      <div className={styles.action}>
-                        <div className={`${styles.skeleton} ${styles.historySkeletonIcon}`} />
-                        <div className={`${styles.skeleton} ${styles.historySkeletonAction}`} />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className={`${styles.skeleton} ${styles.historySkeletonAddress}`} />
-                    </TableCell>
-                    <TableCell className={styles.technicalColumn}>
-                      <div className={`${styles.skeleton} ${styles.historySkeletonTechnical}`} />
-                    </TableCell>
-                    <TableCell className={styles.valueContainer}>
-                      <div className={`${styles.skeleton} ${styles.historySkeletonValue}`} />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : activeHistoryError ? (
-                <TableRow className={styles.emptyRow}>
-                  <TableCell colSpan={5} className={styles.emptyCell}>
-                    <div className={`${styles.tableState} ${styles.tableStateError}`}>
-                      Failed to load {historySubject}: {activeHistoryError}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : displayedHistoryRowsLength === 0 ? (
-                <TableRow className={styles.emptyRow}>
-                  <TableCell colSpan={5} className={styles.emptyCell}>
-                    <div className={styles.tableState}>
-                      {activeHistorySourceCount > 0
-                        ? `No ${historySubject} match filters`
-                        : `No ${historySubject} found`}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : effectiveHistoryMode === "actions" ? (
-                <ActionHistoryRows
-                  rows={displayedActionRows}
-                  nowSeconds={nowSeconds}
-                  timeFormat={transactionFilters.timeFormat}
-                  highlightedTransactionHashSet={highlightedTransactionHashSet}
-                  onAddressClick={onAddressClick}
-                  onTransactionClick={onTransactionClick}
-                />
-              ) : (
-                displayedTransactionRows.map(({tx, info}) => {
-                  const transactionHash = tx.hash
-                  const valueStr = formatNano(info.displayValue.toString())
-                  const isEmptyValue = info.displayValue === 0n
-                  const valuePrefix = isEmptyValue ? "" : info.isIncoming ? "+ " : "- "
-                  const valueLabel = isEmptyValue
-                    ? "empty"
-                    : `${valuePrefix}${Number.parseFloat(valueStr).toLocaleString()} GRAM`
-                  const formattedTime = formatTransactionTime(
-                    tx.now,
-                    nowSeconds,
-                    transactionFilters.timeFormat,
-                  )
-                  const isAddressHovered =
-                    hoveredAddress && info.address
-                      ? isSameAddress(info.address, hoveredAddress)
-                      : false
-                  const isHighlighted = highlightedTransactionHashSet.has(transactionHash)
-
-                  return (
-                    <TableRow
-                      key={transactionHash ?? `${tx.account}:${tx.lt}:${tx.now}`}
-                      className={`${styles.row} ${styles.clickableRow} ${
-                        isHighlighted ? styles.newTransactionRow : ""
-                      }`}
-                      onClick={event => {
-                        const txHash = hashToHex(transactionHash)
-                        if (!txHash) return
-                        onTransactionClick?.(txHash, event)
-                      }}
-                    >
-                      <TableCell className={`${styles.time} ${styles.timeColumn}`}>
-                        <span title={formattedTime.title}>{formattedTime.label}</span>
-                      </TableCell>
-                      <TableCell className={styles.actionColumn}>
+        <div className={styles.historyContent}>
+          <div className={styles.tableWrapper}>
+            <table className={styles.table}>
+              <thead className={styles.historyHeaderGroup}>
+                <tr className={styles.historyHeaderRow}>
+                  <th className={`${styles.tableHeader} ${styles.timeColumn}`}>Time</th>
+                  <th className={`${styles.tableHeader} ${styles.actionColumn}`}>Action</th>
+                  <th className={styles.tableHeader}>Address</th>
+                  <th className={`${styles.tableHeader} ${styles.technicalColumn}`} />
+                  <th className={`${styles.tableHeader} ${styles.valueContainer}`}>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeHistoryLoading ? (
+                  Array.from({length: TRANSACTION_SKELETON_ROWS}, (_, index) => (
+                    <tr key={`transaction-skeleton-${index}`} className={styles.skeletonRow}>
+                      <td className={`${styles.time} ${styles.timeColumn}`}>
+                        <div className={`${styles.skeleton} ${styles.historySkeletonTime}`} />
+                      </td>
+                      <td className={styles.actionColumn}>
                         <div className={styles.action}>
-                          {info.isIncoming ? (
-                            <MoveDownLeft
-                              className={`${styles.actionIcon} ${styles.statusSuccess}`}
-                              aria-hidden="true"
-                            />
-                          ) : (
-                            <MoveUpRight
-                              className={`${styles.actionIcon} ${styles.statusFailed}`}
-                              aria-hidden="true"
-                            />
-                          )}
-                          {info.actionLabel ? (
-                            <span className={`${styles.actionText} ${styles.opcode}`}>
-                              {info.actionLabel}
-                            </span>
-                          ) : (
-                            <span className={styles.actionText}>Transaction</span>
-                          )}
+                          <div className={`${styles.skeleton} ${styles.historySkeletonIcon}`} />
+                          <div className={`${styles.skeleton} ${styles.historySkeletonAction}`} />
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className={styles.addressWrapper}>
-                          {info.address ? (
-                            <AddressChip
-                              address={info.address}
-                              fallback={info.displayAddressFallback}
-                              highlighted={isAddressHovered}
-                              onAddressClick={onAddressClick}
-                              onHoverAddressChange={setHoveredAddress}
-                            />
-                          ) : (
-                            <span className={styles.addressFallback}>
-                              {info.displayAddressFallback}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className={styles.technicalColumn}>
-                        <HistoryTechnicalCell technicalLabel={info.technicalLabel} />
-                      </TableCell>
-                      <TableCell className={styles.valueContainer}>
-                        <div
-                          className={`${
-                            isEmptyValue
-                              ? styles.valueEmpty
-                              : info.isIncoming
-                                ? styles.valuePositive
-                                : styles.valueNegative
-                          } ${styles.historyValue}`}
-                        >
-                          {valueLabel}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
-          </Table>
+                      </td>
+                      <td>
+                        <div className={`${styles.skeleton} ${styles.historySkeletonAddress}`} />
+                      </td>
+                      <td className={styles.technicalColumn}>
+                        <div className={`${styles.skeleton} ${styles.historySkeletonTechnical}`} />
+                      </td>
+                      <td className={styles.valueContainer}>
+                        <div className={`${styles.skeleton} ${styles.historySkeletonValue}`} />
+                      </td>
+                    </tr>
+                  ))
+                ) : activeHistoryError ? (
+                  <tr className={styles.emptyRow}>
+                    <td colSpan={5} className={styles.emptyCell}>
+                      <div className={`${styles.tableState} ${styles.tableStateError}`}>
+                        Failed to load {historySubject}: {activeHistoryError}
+                      </div>
+                    </td>
+                  </tr>
+                ) : displayedHistoryRowsLength === 0 ? (
+                  <tr className={styles.emptyRow}>
+                    <td colSpan={5} className={styles.emptyCell}>
+                      <div className={styles.tableState}>
+                        {activeHistorySourceCount > 0
+                          ? `No ${historySubject} match filters`
+                          : `No ${historySubject} found`}
+                      </div>
+                    </td>
+                  </tr>
+                ) : effectiveHistoryMode === "actions" ? (
+                  <ActionHistoryRows
+                    rows={displayedActionRows}
+                    nowSeconds={nowSeconds}
+                    timeFormat={transactionFilters.timeFormat}
+                    highlightedTransactionHashSet={highlightedTransactionHashSet}
+                    onAddressClick={onAddressClick}
+                    onTransactionClick={onTransactionClick}
+                  />
+                ) : (
+                  displayedTransactionRows.map(({tx, info}) => {
+                    const transactionHash = tx.hash
+                    const valueStr = formatNano(info.displayValue.toString())
+                    const isEmptyValue = info.displayValue === 0n
+                    const valuePrefix = isEmptyValue ? "" : info.isIncoming ? "+ " : "- "
+                    const valueLabel = isEmptyValue
+                      ? "empty"
+                      : `${valuePrefix}${Number.parseFloat(valueStr).toLocaleString()} GRAM`
+                    const formattedTime = formatTransactionTime(
+                      tx.now,
+                      nowSeconds,
+                      transactionFilters.timeFormat,
+                    )
+                    const isAddressHovered =
+                      hoveredAddress && info.address
+                        ? isSameAddress(info.address, hoveredAddress)
+                        : false
+                    const isHighlighted = highlightedTransactionHashSet.has(transactionHash)
+                    const transactionHashHex = hashToHex(transactionHash)
+                    const canOpenTransaction =
+                      transactionHashHex !== undefined && onTransactionClick !== undefined
+
+                    return (
+                      <tr
+                        key={transactionHash ?? `${tx.account}:${tx.lt}:${tx.now}`}
+                        className={`${styles.row} ${
+                          canOpenTransaction ? styles.clickableRow : ""
+                        } ${isHighlighted ? styles.newTransactionRow : ""}`}
+                        tabIndex={canOpenTransaction ? 0 : undefined}
+                        onClick={
+                          canOpenTransaction
+                            ? event => onTransactionClick(transactionHashHex, event)
+                            : undefined
+                        }
+                        onKeyDown={
+                          canOpenTransaction
+                            ? event => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault()
+                                  event.currentTarget.click()
+                                }
+                              }
+                            : undefined
+                        }
+                      >
+                        <td className={`${styles.time} ${styles.timeColumn}`}>
+                          <span
+                            title={formattedTime.title}
+                            data-visual-dynamic="time"
+                            data-visual-placeholder="<time>"
+                          >
+                            {formattedTime.label}
+                          </span>
+                        </td>
+                        <td className={styles.actionColumn}>
+                          <div className={styles.action}>
+                            {info.isIncoming ? (
+                              <MoveDownLeft
+                                className={`${styles.actionIcon} ${styles.statusSuccess}`}
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <MoveUpRight
+                                className={`${styles.actionIcon} ${styles.statusFailed}`}
+                                aria-hidden="true"
+                              />
+                            )}
+                            {info.actionLabel ? (
+                              <span className={`${styles.actionText} ${styles.opcode}`}>
+                                {info.actionLabel}
+                              </span>
+                            ) : (
+                              <span className={styles.actionText}>Transaction</span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <div className={styles.addressWrapper}>
+                            {info.address ? (
+                              <ExplorerAddressChip
+                                address={info.address}
+                                fallback={info.displayAddressFallback}
+                                highlighted={isAddressHovered}
+                                onAddressClick={onAddressClick}
+                                onHoverAddressChange={setHoveredAddress}
+                              />
+                            ) : (
+                              <span className={styles.addressFallback}>
+                                {info.displayAddressFallback}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className={styles.technicalColumn}>
+                          <HistoryTechnicalCell technicalLabel={info.technicalLabel} />
+                        </td>
+                        <td className={styles.valueContainer}>
+                          <div
+                            className={`${
+                              isEmptyValue
+                                ? styles.valueEmpty
+                                : info.isIncoming
+                                  ? styles.valuePositive
+                                  : styles.valueNegative
+                            } ${styles.historyValue}`}
+                          >
+                            {valueLabel}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
 
           {activeHistoryLoading ? (
             <div className={styles.pagination}>
@@ -987,92 +1009,92 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
               </div>
             </div>
           )}
-        </CardContent>
+        </div>
       ) : activeTab === "tokens" ? (
-        <CardContent className={styles.tokensContent}>
+        <div className={styles.tokensContent}>
           {tokensLoading ? (
             <TokensSkeleton />
           ) : (
             <Tokens wallets={jettonWallets} client={client} onAddressClick={onAddressClick} />
           )}
-        </CardContent>
+        </div>
       ) : activeTab === "nfts" && showNftsTab ? (
-        <CardContent className={styles.tokensContent}>
+        <div className={styles.tokensContent}>
           <Nfts items={nftItems} onAddressClick={onAddressClick} />
-        </CardContent>
+        </div>
       ) : activeTab === "holders" ? (
-        <CardContent className={styles.historyContent}>
+        <div className={styles.historyContent}>
           {holdersLoading ? (
             <HoldersSkeleton />
           ) : (
-            <Table>
-              <TableHeader className={styles.historyHeaderGroup}>
-                <TableRow className={styles.historyHeaderRow}>
-                  <TableHead className={styles.tableHeader}>Owner</TableHead>
-                  <TableHead className={styles.tableHeader}>Wallet</TableHead>
-                  <TableHead className={`${styles.tableHeader} ${styles.valueContainer}`}>
-                    Balance
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(holders || []).map(holder => {
-                  const decimals = Number(jettonMaster?.jetton_content?.decimals || 9)
-                  const balance = Number(holder.balance) / 10 ** decimals
-                  const symbol = jettonMaster?.jetton_content?.symbol || ""
+            <div className={styles.tableWrapper}>
+              <table className={styles.table}>
+                <thead className={styles.historyHeaderGroup}>
+                  <tr className={styles.historyHeaderRow}>
+                    <th className={styles.tableHeader}>Owner</th>
+                    <th className={styles.tableHeader}>Wallet</th>
+                    <th className={`${styles.tableHeader} ${styles.valueContainer}`}>Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(holders || []).map(holder => {
+                    const decimals = Number(jettonMaster?.jetton_content?.decimals || 9)
+                    const balance = Number(holder.balance) / 10 ** decimals
+                    const symbol = jettonMaster?.jetton_content?.symbol || ""
 
-                  return (
-                    <TableRow
-                      key={holder.address}
-                      className={`${styles.row} ${styles.clickableRow}`}
-                      onClick={event => onAddressClick?.(holder.owner, event)}
-                    >
-                      <TableCell>
-                        <button
-                          type="button"
-                          className={styles.address}
-                          onClick={e => {
-                            e.stopPropagation()
-                            onAddressClick?.(holder.owner, e)
-                          }}
-                        >
-                          <AddressLabel address={holder.owner} />
-                        </button>
-                      </TableCell>
-                      <TableCell>
-                        <button
-                          type="button"
-                          className={styles.address}
-                          onClick={e => {
-                            e.stopPropagation()
-                            onAddressClick?.(holder.address, e)
-                          }}
-                        >
-                          <AddressLabel address={holder.address} />
-                        </button>
-                      </TableCell>
-                      <TableCell className={styles.valueContainer}>
-                        <div className={styles.valuePositive}>
-                          {balance.toLocaleString(undefined, {maximumFractionDigits: decimals})}{" "}
-                          {symbol}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-                {(!holders || holders.length === 0) && (
-                  <TableRow className={styles.emptyRow}>
-                    <TableCell colSpan={3} className={styles.emptyCell}>
-                      <div className={styles.emptyState}>No holders found</div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                    return (
+                      <tr
+                        key={holder.address}
+                        className={`${styles.row} ${styles.clickableRow}`}
+                        tabIndex={onAddressClick ? 0 : undefined}
+                        onClick={event => onAddressClick?.(holder.owner, event)}
+                        onKeyDown={
+                          onAddressClick
+                            ? event => {
+                                if (event.target !== event.currentTarget) return
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault()
+                                  event.currentTarget.click()
+                                }
+                              }
+                            : undefined
+                        }
+                      >
+                        <td>
+                          <ExplorerAddressChip
+                            address={holder.owner}
+                            onAddressClick={onAddressClick}
+                          />
+                        </td>
+                        <td>
+                          <ExplorerAddressChip
+                            address={holder.address}
+                            onAddressClick={onAddressClick}
+                          />
+                        </td>
+                        <td className={styles.valueContainer}>
+                          <div className={styles.valuePositive}>
+                            {balance.toLocaleString(undefined, {maximumFractionDigits: decimals})}{" "}
+                            {symbol}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {(!holders || holders.length === 0) && (
+                    <tr className={styles.emptyRow}>
+                      <td colSpan={3} className={styles.emptyCell}>
+                        <div className={styles.emptyState}>No holders found</div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
-        </CardContent>
+        </div>
       ) : (
-        <CardContent className={styles.tokensContent}>
+        <div className={styles.tokensContent}>
           {accountLoading && !accountState ? (
             <ContractCodeSkeleton />
           ) : (
@@ -1091,40 +1113,40 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
               />
             </Suspense>
           )}
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </section>
   )
 }
 
 function HoldersSkeleton(): JSX.Element {
   return (
-    <Table aria-label="Loading holders">
-      <TableHeader className={styles.historyHeaderGroup}>
-        <TableRow className={styles.historyHeaderRow}>
-          <TableHead className={styles.tableHeader}>Owner</TableHead>
-          <TableHead className={styles.tableHeader}>Wallet</TableHead>
-          <TableHead className={`${styles.tableHeader} ${styles.valueContainer}`}>
-            Balance
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {Array.from({length: 4}, (_, index) => (
-          <TableRow key={`holders-skeleton-${index}`} className={styles.skeletonRow}>
-            <TableCell>
-              <div className={`${styles.skeleton} ${styles.historySkeletonAddress}`} />
-            </TableCell>
-            <TableCell>
-              <div className={`${styles.skeleton} ${styles.historySkeletonAddress}`} />
-            </TableCell>
-            <TableCell className={styles.valueContainer}>
-              <div className={`${styles.skeleton} ${styles.historySkeletonValue}`} />
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <div className={styles.tableWrapper}>
+      <table className={styles.table} aria-label="Loading holders">
+        <thead className={styles.historyHeaderGroup}>
+          <tr className={styles.historyHeaderRow}>
+            <th className={styles.tableHeader}>Owner</th>
+            <th className={styles.tableHeader}>Wallet</th>
+            <th className={`${styles.tableHeader} ${styles.valueContainer}`}>Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({length: 4}, (_, index) => (
+            <tr key={`holders-skeleton-${index}`} className={styles.skeletonRow}>
+              <td>
+                <div className={`${styles.skeleton} ${styles.historySkeletonAddress}`} />
+              </td>
+              <td>
+                <div className={`${styles.skeleton} ${styles.historySkeletonAddress}`} />
+              </td>
+              <td className={styles.valueContainer}>
+                <div className={`${styles.skeleton} ${styles.historySkeletonValue}`} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -1252,6 +1274,7 @@ interface ActionHistoryRowsProps {
   readonly highlightedTransactionHashSet?: ReadonlySet<string>
   readonly showTimeColumn?: boolean
   readonly interactiveRows?: boolean
+  readonly standardTable?: boolean
   readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
   readonly onActionHoverChange?: (action: V3Action | undefined) => void
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
@@ -1264,6 +1287,7 @@ export function ActionHistoryRows({
   highlightedTransactionHashSet,
   showTimeColumn = true,
   interactiveRows = true,
+  standardTable = false,
   onAddressClick,
   onActionHoverChange,
   onTransactionClick,
@@ -1286,33 +1310,23 @@ export function ActionHistoryRows({
         const ActionIcon = getHistoryActionIcon(action, info)
         const continuesTrace = isSameActionTrace(action, rows[index + 1]?.action)
         const continuesFromTrace = isSameActionTrace(rows[index - 1]?.action, action)
-
-        return (
-          <TableRow
-            key={info.rowKey}
-            className={`${styles.row} ${interactiveRows ? "" : styles.rowStatic} ${
-              canOpenTransaction ? styles.clickableRow : ""
-            } ${isHighlighted ? styles.newTransactionRow : ""} ${
-              continuesTrace ? styles.actionChainContinues : ""
-            } ${continuesFromTrace ? styles.actionChainContinuation : ""}`}
-            onClick={
-              canOpenTransaction
-                ? event => {
-                    if (info.transactionHash) onTransactionClick(info.transactionHash, event)
-                  }
-                : undefined
-            }
-            onMouseEnter={onActionHoverChange ? () => onActionHoverChange(action) : undefined}
-            onMouseLeave={onActionHoverChange ? () => onActionHoverChange(undefined) : undefined}
-          >
+        const Cell = standardTable ? DataTableCell : "td"
+        const rowContent = (
+          <>
             {showTimeColumn && (
-              <TableCell className={`${styles.time} ${styles.timeColumn}`}>
+              <Cell className={`${styles.time} ${styles.timeColumn}`}>
                 {!continuesFromTrace && formattedTime && (
-                  <span title={formattedTime.title}>{formattedTime.label}</span>
+                  <span
+                    title={formattedTime.title}
+                    data-visual-dynamic="time"
+                    data-visual-placeholder="<time>"
+                  >
+                    {formattedTime.label}
+                  </span>
                 )}
-              </TableCell>
+              </Cell>
             )}
-            <TableCell className={styles.actionColumn}>
+            <Cell className={styles.actionColumn}>
               <div className={styles.action}>
                 <ActionIcon className={styles.actionIcon} aria-hidden="true" />
                 <span
@@ -1322,14 +1336,14 @@ export function ActionHistoryRows({
                   {info.actionLabel}
                 </span>
               </div>
-            </TableCell>
-            <TableCell>
+            </Cell>
+            <Cell>
               <div className={styles.addressWrapper}>
                 {info.relationLabel && (
                   <span className={styles.addressRelation}>{info.relationLabel}</span>
                 )}
                 {info.address ? (
-                  <AddressChip
+                  <ExplorerAddressChip
                     address={info.address}
                     fallback={info.displayAddressFallback}
                     highlighted={isAddressHovered}
@@ -1340,18 +1354,55 @@ export function ActionHistoryRows({
                   <span className={styles.addressFallback}>{info.displayAddressFallback}</span>
                 )}
               </div>
-            </TableCell>
-            <TableCell className={styles.technicalColumn}>
+            </Cell>
+            <Cell className={styles.technicalColumn}>
               <HistoryTechnicalCell technicalLabel={info.technicalLabel} />
-            </TableCell>
-            <TableCell className={styles.valueContainer}>
+            </Cell>
+            <Cell className={styles.valueContainer}>
               <div className={styles.historyValueStack}>
                 {info.valueLines.map((line, lineIndex) => (
                   <HistoryValueCellLine key={`${info.rowKey}:value:${lineIndex}`} line={line} />
                 ))}
               </div>
-            </TableCell>
-          </TableRow>
+            </Cell>
+          </>
+        )
+
+        const rowClassName = standardTable
+          ? `${isHighlighted ? styles.newTransactionRow : ""}`
+          : `${styles.row} ${interactiveRows ? "" : styles.rowStatic} ${
+              canOpenTransaction ? styles.clickableRow : ""
+            } ${isHighlighted ? styles.newTransactionRow : ""} ${
+              continuesTrace ? styles.actionChainContinues : ""
+            } ${continuesFromTrace ? styles.actionChainContinuation : ""}`
+        const rowProps = {
+          className: rowClassName,
+          onClick: canOpenTransaction
+            ? (event: MouseEvent<HTMLTableRowElement>) => {
+                if (info.transactionHash) onTransactionClick(info.transactionHash, event)
+              }
+            : undefined,
+          tabIndex: canOpenTransaction ? 0 : undefined,
+          onKeyDown: canOpenTransaction
+            ? (event: ReactKeyboardEvent<HTMLTableRowElement>) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault()
+                  event.currentTarget.click()
+                }
+              }
+            : undefined,
+          onMouseEnter: onActionHoverChange ? () => onActionHoverChange(action) : undefined,
+          onMouseLeave: onActionHoverChange ? () => onActionHoverChange(undefined) : undefined,
+        }
+
+        return standardTable ? (
+          <DataTableRow key={info.rowKey} interactive={canOpenTransaction} {...rowProps}>
+            {rowContent}
+          </DataTableRow>
+        ) : (
+          <tr key={info.rowKey} {...rowProps}>
+            {rowContent}
+          </tr>
         )
       })}
     </>
@@ -1402,28 +1453,22 @@ export function ActionHistoryTable({
   )
 
   return (
-    <div className={`${styles.historyContent} ${className ?? ""}`}>
-      <Table>
-        <TableHeader className={styles.historyHeaderGroup}>
-          <TableRow className={styles.historyHeaderRow}>
-            {showTimeColumn && (
-              <TableHead className={`${styles.tableHeader} ${styles.timeColumn}`}>Time</TableHead>
-            )}
-            <TableHead className={`${styles.tableHeader} ${styles.actionColumn}`}>Action</TableHead>
-            <TableHead className={styles.tableHeader}>Address</TableHead>
-            <TableHead className={`${styles.tableHeader} ${styles.technicalColumn}`} />
-            <TableHead className={`${styles.tableHeader} ${styles.valueContainer}`}>
+    <DataTable className={className} minWidth={showTimeColumn ? "48rem" : "42rem"}>
+      <DataTableTable aria-label="Event overview" rowDividers={false}>
+        <DataTableHead>
+          <DataTableRow>
+            {showTimeColumn && <DataTableHeaderCell columnWidth="4rem">Time</DataTableHeaderCell>}
+            <DataTableHeaderCell columnWidth="11rem">Action</DataTableHeaderCell>
+            <DataTableHeaderCell>Address</DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth="9rem" aria-label="Details" />
+            <DataTableHeaderCell align="right" columnWidth="10rem">
               Value
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+            </DataTableHeaderCell>
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
           {rows.length === 0 ? (
-            <TableRow className={styles.emptyRow}>
-              <TableCell colSpan={showTimeColumn ? 5 : 4} className={styles.emptyCell}>
-                <div className={styles.tableState}>{emptyState}</div>
-              </TableCell>
-            </TableRow>
+            <DataTableEmpty colSpan={showTimeColumn ? 5 : 4}>{emptyState}</DataTableEmpty>
           ) : (
             <ActionHistoryRows
               rows={rows}
@@ -1431,14 +1476,15 @@ export function ActionHistoryTable({
               timeFormat={timeFormat}
               showTimeColumn={showTimeColumn}
               interactiveRows={interactiveRows}
+              standardTable
               onAddressClick={onAddressClick}
               onActionHoverChange={onActionHoverChange}
               onTransactionClick={onTransactionClick}
             />
           )}
-        </TableBody>
-      </Table>
-    </div>
+        </DataTableBody>
+      </DataTableTable>
+    </DataTable>
   )
 }
 
@@ -2769,7 +2815,7 @@ function assetValueLine(
   const symbol = metadataTokenString(tokenInfo, "symbol")
   const normalizedAmount = amount.trim().replace(/^[+-]/, "")
   const formattedAmount =
-    decimals === undefined ? normalizedAmount : formatDecimalAmount(normalizedAmount, decimals)
+    decimals === undefined ? normalizedAmount : fmt.formatDecimalAmount(normalizedAmount, decimals)
   const readableAmount = formatReadableNumber(formattedAmount, options.maximumFractionDigits)
   const displayTone = isZeroDisplayNumber(readableAmount) ? "neutral" : tone
   const sign = options.showSign === false ? "" : valueSign(displayTone)
@@ -2841,60 +2887,6 @@ function nftValueLine(
     return {kind: "text", label: "NFT", tone: "neutral"}
   }
   return undefined
-}
-
-function getMetadataTokenInfo(
-  metadata: V3Metadata,
-  address: string,
-  type: string,
-): AccountStateTokenInfo | undefined {
-  const entries = metadata[address]?.token_info ?? metadata[addressKey(address)]?.token_info ?? []
-  return entries.find(info => info.type === type)
-}
-
-function metadataTokenString(
-  tokenInfo: AccountStateTokenInfo | undefined,
-  key: string,
-): string | undefined {
-  const value = tokenInfo?.[key]
-  if (isNonEmptyString(value)) {
-    return value
-  }
-
-  const extra = isRecord(tokenInfo?.extra) ? tokenInfo.extra : undefined
-  const extraValue = extra?.[key]
-  return isNonEmptyString(extraValue) ? extraValue : undefined
-}
-
-function metadataTokenDecimals(tokenInfo: AccountStateTokenInfo | undefined): number | undefined {
-  const rawDecimals = metadataTokenString(tokenInfo, "decimals")
-  if (!rawDecimals) {
-    return undefined
-  }
-
-  const decimals = Number(rawDecimals)
-  return Number.isInteger(decimals) && decimals >= 0 && decimals <= 36 ? decimals : undefined
-}
-
-function formatDecimalAmount(value: string, decimals: number): string {
-  if (!/^[0-9]+$/.test(value)) {
-    return value
-  }
-
-  try {
-    const raw = BigInt(value)
-    const divisor = 10n ** BigInt(decimals)
-    const whole = raw / divisor
-    const fraction = raw % divisor
-    if (decimals === 0 || fraction === 0n) {
-      return whole.toString()
-    }
-
-    const fractionText = fraction.toString().padStart(decimals, "0").replace(/0+$/, "")
-    return `${whole}.${fractionText}`
-  } catch {
-    return value
-  }
 }
 
 function formatReadableNumber(value: string, maximumFractionDigits = 9): string {

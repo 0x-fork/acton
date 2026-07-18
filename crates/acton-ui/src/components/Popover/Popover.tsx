@@ -1,7 +1,16 @@
 import {Popover as PopoverBase} from "@base-ui/react/popover"
-import {type ComponentPropsWithRef, type ReactNode, type Ref, useCallback, useState} from "react"
+import {
+  type ComponentPropsWithRef,
+  type CSSProperties,
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+  useCallback,
+  useState,
+} from "react"
 
 import {cx} from "../../lib/cx"
+import {useTheme} from "../Theme/ThemeProvider"
 import styles from "./Popover.module.css"
 
 export type PopoverPlacement = "top" | "right" | "bottom" | "left"
@@ -19,8 +28,10 @@ export type PopoverProps = Readonly<
     readonly openDelay?: number
     readonly closeDelay?: number
     readonly offset?: number
+    readonly maxWidth?: string
     readonly contentClassName?: string
     readonly triggerClassName?: string
+    readonly triggerAsChild?: boolean
     readonly panelId?: string
     readonly ariaLabel?: string
   }
@@ -36,6 +47,7 @@ export function Popover({
   contentClassName,
   defaultOpen = false,
   interaction = "hover",
+  maxWidth,
   offset = defaultOffset,
   onOpenChange,
   open,
@@ -44,19 +56,18 @@ export function Popover({
   placement = "bottom",
   ref,
   tabIndex = 0,
+  triggerAsChild = false,
   triggerClassName,
   ariaLabel,
   ...props
 }: PopoverProps) {
+  const {theme} = useTheme()
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen)
-  const [triggerElement, setTriggerElement] = useState<HTMLSpanElement | null>(null)
   const isControlled = open !== undefined
   const isOpen = open ?? uncontrolledOpen
-  const portalTheme = isOpen ? getPortalTheme(triggerElement) : undefined
 
   const setTriggerRef = useCallback(
     (node: HTMLSpanElement | null) => {
-      setTriggerElement(node)
       assignRef(ref, node)
     },
     [ref],
@@ -72,30 +83,46 @@ export function Popover({
 
   return (
     <PopoverBase.Root open={isOpen} onOpenChange={handleOpenChange}>
-      <PopoverBase.Trigger
-        closeDelay={closeDelay}
-        delay={openDelay}
-        openOnHover={interaction === "hover"}
-        render={
-          <span
-            {...props}
-            ref={setTriggerRef}
-            tabIndex={tabIndex}
-            className={cx(styles.popover, className)}
-            data-interaction={interaction}
-          />
-        }
-      >
-        <span className={cx(styles.trigger, triggerClassName)}>{children}</span>
-      </PopoverBase.Trigger>
+      {triggerAsChild ? (
+        <PopoverBase.Trigger
+          closeDelay={closeDelay}
+          delay={openDelay}
+          openOnHover={interaction === "hover"}
+          render={children as ReactElement}
+          className={triggerClassName}
+        />
+      ) : (
+        <PopoverBase.Trigger
+          closeDelay={closeDelay}
+          delay={openDelay}
+          nativeButton={false}
+          openOnHover={interaction === "hover"}
+          render={
+            <span
+              {...props}
+              ref={setTriggerRef}
+              tabIndex={tabIndex}
+              className={cx(styles.popover, className)}
+              data-interaction={interaction}
+            />
+          }
+        >
+          <span className={cx(styles.trigger, triggerClassName)}>{children}</span>
+        </PopoverBase.Trigger>
+      )}
 
       <PopoverBase.Portal>
-        <PopoverBase.Positioner className={styles.positioner} side={placement} sideOffset={offset}>
+        <PopoverBase.Positioner
+          className={styles.positioner}
+          side={placement}
+          sideOffset={offset}
+          style={maxWidth ? ({"--acton-popover-max-width": maxWidth} as CSSProperties) : undefined}
+        >
           <PopoverBase.Popup
             id={panelId}
             aria-label={ariaLabel}
             className={cx(styles.panel, contentClassName)}
-            data-theme={portalTheme}
+            data-theme={theme}
           >
             <PopoverBase.Arrow className={styles.arrow}>
               <ArrowSvg />
@@ -119,33 +146,19 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
   ref.current = value
 }
 
-function getPortalTheme(trigger: HTMLElement | null) {
-  const themedElement = trigger?.closest<HTMLElement>("[data-theme]")
-  if (themedElement?.dataset.theme) return themedElement.dataset.theme
-
-  if (
-    typeof document !== "undefined" &&
-    document.documentElement.classList.contains("dark-theme")
-  ) {
-    return "dark"
-  }
-
-  return undefined
-}
-
 function ArrowSvg(props: ComponentPropsWithRef<"svg">) {
   return (
     <svg width="20" height="10" viewBox="0 0 20 10" fill="none" {...props}>
       <path
-        d="M9.66437 2.60207L4.80758 6.97318C4.07308 7.63423 3.11989 8 2.13172 8H0V10H20V8H18.5349C17.5468 8 16.5936 7.63423 15.8591 6.97318L11.0023 2.60207C10.622 2.2598 10.0447 2.25979 9.66437 2.60207Z"
+        d="M9.66 2.6L4.81 6.97C4.07 7.63 3.12 8 2.13 8H0V10H20V8H18.53C17.55 8 16.59 7.63 15.86 6.97L11 2.6C10.62 2.26 10.04 2.26 9.66 2.6Z"
         className={styles.arrowBody}
       />
       <path
-        d="M8.99542 1.85876C9.75604 1.17425 10.9106 1.17422 11.6713 1.85878L16.5281 6.22989C17.0789 6.72568 17.7938 7.00001 18.5349 7.00001L15.89 7L11.0023 2.60207C10.622 2.2598 10.0447 2.2598 9.66436 2.60207L4.77734 7L2.13171 7.00001C2.87284 7.00001 3.58774 6.72568 4.13861 6.22989L8.99542 1.85876Z"
+        d="M9 1.86C9.76 1.17 10.91 1.17 11.67 1.86L16.53 6.23C17.08 6.73 17.79 7 18.53 7L15.89 7L11 2.6C10.62 2.26 10.04 2.26 9.66 2.6L4.78 7L2.13 7C2.87 7 3.59 6.73 4.14 6.23L9 1.86Z"
         className={styles.arrowOuterStroke}
       />
       <path
-        d="M10.3333 3.34539L5.47654 7.71648C4.55842 8.54279 3.36693 9 2.13172 9H0V8H2.13172C3.11989 8 4.07308 7.63423 4.80758 6.97318L9.66437 2.60207C10.0447 2.25979 10.622 2.2598 11.0023 2.60207L15.8591 6.97318C16.5936 7.63423 17.5468 8 18.5349 8H20V9H18.5349C17.2998 9 16.1083 8.54278 15.1901 7.71648L10.3333 3.34539Z"
+        d="M10.33 3.35L5.48 7.72C4.56 8.54 3.37 9 2.13 9H0V8H2.13C3.12 8 4.07 7.63 4.81 6.97L9.66 2.6C10.04 2.26 10.62 2.26 11 2.6L15.86 6.97C16.59 7.63 17.55 8 18.53 8H20V9H18.53C17.3 9 16.11 8.54 15.19 7.72L10.33 3.35Z"
         className={styles.arrowInnerStroke}
       />
     </svg>

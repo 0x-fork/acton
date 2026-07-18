@@ -10,22 +10,57 @@
   border-bottom: 0 !important;
 }
 
-.historyContent {
-  padding: 0;
+.tableWrapper {
+  position: relative;
+  width: 100%;
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  caption-side: bottom;
+  font-size: var(--acton-font-size-sm);
+}
+
+.table thead {
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.table tbody tr:last-child {
+  border-bottom: 0;
+}
+
+.table tr {
+  border-bottom: 1px solid var(--acton-color-border);
+  transition: background-color var(--acton-duration-fast);
+}
+
+.table tr:hover {
+  background-color: var(--acton-color-surface-hover);
+}
+
+.table th {
+  height: 3rem;
+  padding: 0 var(--acton-space-4);
+  text-align: left;
+  vertical-align: middle;
+  font-weight: var(--acton-font-weight-utility);
+}
+
+.table td {
+  padding: var(--acton-space-4);
+  vertical-align: middle;
 }
 
 .historyContent tbody > tr {
-  border-top: 1px solid var(--tonscan-border) !important;
+  border-top: 1px solid var(--acton-color-border) !important;
   border-bottom: 0 !important;
 }
 
 .historyContent tbody > tr > td {
   padding-top: 12px !important;
   padding-bottom: 12px !important;
-}
-
-.tokensContent {
-  padding: 0;
 }
 
 .addressWrapper {
@@ -36,8 +71,8 @@
 }
 
 .addressRelation {
-  color: var(--litenode-text-muted);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
   font-weight: 400;
   white-space: nowrap;
 }
@@ -54,11 +89,13 @@
 }
 
 .tableCard {
-  --border-color: var(--tonscan-border);
+  --border-color: var(--acton-color-border);
 
-  background-color: var(--tonscan-card-bg) !important;
-  border: 1px solid var(--tonscan-border) !important;
-  border-radius: 16px !important;
+  overflow: hidden;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 16px;
+  background-color: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
 }
 
 .tabs {
@@ -66,15 +103,15 @@
   align-items: center;
   gap: 4px;
   padding: 8px;
-  border-bottom: 1px solid var(--tonscan-border);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .tab {
   min-height: 34px;
   padding: 0 10px;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   cursor: pointer;
   border: none;
   border-radius: 8px;
@@ -85,8 +122,8 @@
   letter-spacing: 0;
   background: transparent;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .tabIcon {
@@ -97,7 +134,7 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  transition: color var(--transition-duration-fast);
+  transition: color var(--acton-duration-fast);
 }
 
 .tabIcon svg {
@@ -105,17 +142,17 @@
 }
 
 .tab:hover {
-  background: var(--litenode-control-hover);
-  color: var(--tonscan-text-primary);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
 }
 
 .tab:hover .tabIcon {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .tabActive {
-  color: var(--tonscan-text-primary);
-  background: var(--litenode-surface-active);
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-active);
 }
 
 .filterPopoverRoot {
@@ -130,9 +167,9 @@
   box-sizing: border-box;
   width: min(430px, calc(100vw - 32px));
   padding: 18px 14px 14px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 16px;
-  background: color-mix(in srgb, var(--tonscan-card-bg) 95%, transparent);
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 95%, transparent);
   box-shadow:
     0 18px 50px rgb(0 0 0 / 22%),
     inset 0 1px 0 rgb(255 255 255 / 4%);
@@ -144,7 +181,7 @@
   flex-direction: column;
   gap: 10px;
   padding-top: 14px;
-  border-top: 1px solid var(--tonscan-border);
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .filterSection:first-child {
@@ -157,7 +194,7 @@
 }
 
 .filterSectionTitle {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: 0.78rem;
   font-weight: 750;
   line-height: 1.2;
@@ -178,38 +215,38 @@
   max-width: 100%;
   min-height: 34px;
   padding: 0 13px;
-  border: 2px solid var(--tonscan-border);
+  border: 2px solid var(--acton-color-border);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--tonscan-bg) 48%, transparent);
-  color: var(--tonscan-text-secondary);
+  background: color-mix(in srgb, var(--acton-color-canvas) 48%, transparent);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font: inherit;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   font-weight: 750;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .actionFilterChipSelected {
-  border-color: var(--tonscan-accent);
-  background: var(--litenode-surface-active);
-  color: color-mix(in srgb, var(--tonscan-text-primary) 82%, var(--tonscan-text-secondary));
+  border-color: var(--acton-color-accent);
+  background: var(--acton-color-surface-active);
+  color: color-mix(in srgb, var(--acton-color-text) 82%, var(--acton-color-text-muted));
 }
 
 .filterEmptyState {
   min-height: 34px;
   padding: 8px;
-  color: var(--tonscan-text-tertiary);
-  font-size: var(--font-size-sm);
+  color: var(--acton-color-text-subtle);
+  font-size: var(--acton-font-size-sm);
   font-weight: 500;
 }
 
@@ -218,8 +255,8 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 3px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--tonscan-bg) 72%, transparent);
-  border: 1px solid var(--tonscan-border);
+  background: color-mix(in srgb, var(--acton-color-canvas) 72%, transparent);
+  border: 1px solid var(--acton-color-border);
 }
 
 .segmentedOption {
@@ -227,23 +264,23 @@
   border: 0;
   border-radius: 9px;
   background: transparent;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font: inherit;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   font-weight: 700;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .segmentedOption:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .segmentedOptionActive {
-  background: var(--litenode-surface-active);
-  color: var(--tonscan-text-primary);
+  background: var(--acton-color-surface-active);
+  color: var(--acton-color-text);
 }
 
 .timeFormatGrid {
@@ -251,9 +288,9 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   overflow: hidden;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 14px;
-  background: color-mix(in srgb, var(--tonscan-bg) 72%, transparent);
+  background: color-mix(in srgb, var(--acton-color-canvas) 72%, transparent);
 }
 
 .timeFormatOption {
@@ -262,9 +299,9 @@
   min-height: 72px;
   padding: 9px 8px;
   border: 0;
-  border-left: 1px solid var(--tonscan-border);
+  border-left: 1px solid var(--acton-color-border);
   background: transparent;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -273,10 +310,10 @@
   gap: 5px;
   font: inherit;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    box-shadow var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    box-shadow var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .timeFormatOption:first-child {
@@ -284,12 +321,12 @@
 }
 
 .timeFormatOption:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .timeFormatOptionActive {
-  background: var(--litenode-surface-active);
-  color: var(--tonscan-text-primary);
+  background: var(--acton-color-surface-active);
+  color: var(--acton-color-text);
   z-index: 1;
   box-shadow: none;
 }
@@ -298,7 +335,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  border: 2px solid var(--tonscan-accent);
+  border: 2px solid var(--acton-color-accent);
   border-radius: 13px;
   pointer-events: none;
 }
@@ -312,7 +349,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   font-weight: 750;
   line-height: 1.2;
 }
@@ -322,21 +359,21 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--tonscan-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-subtle);
+  font-size: var(--acton-font-size-xs);
   font-weight: 650;
   line-height: 1.2;
 }
 
 .tableHeader {
-  color: var(--tonscan-text-secondary) !important;
+  color: var(--acton-color-text-muted) !important;
   text-transform: uppercase;
-  font-size: var(--font-size-xs) !important;
+  font-size: var(--acton-font-size-xs) !important;
   letter-spacing: 0.05em;
 }
 
 .row {
-  border-bottom: 1px solid var(--tonscan-border) !important;
+  border-bottom: 1px solid var(--acton-color-border) !important;
 }
 
 .row:last-child {
@@ -352,7 +389,7 @@
 }
 
 .row:hover {
-  background-color: var(--tonscan-row-hover) !important;
+  background-color: var(--acton-color-surface-row) !important;
 }
 
 .rowStatic:hover {
@@ -402,9 +439,9 @@
   align-items: center;
   justify-content: center;
   min-height: 56px;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .tableState {
@@ -412,22 +449,22 @@
   align-items: center;
   justify-content: center;
   min-height: 64px;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .tableStateError {
-  color: var(--tonscan-error);
+  color: var(--acton-color-status-failed);
 }
 
 .skeleton {
   display: block;
   background: linear-gradient(
     90deg,
-    var(--tonscan-row-hover) 0%,
-    var(--litenode-control-hover) 45%,
-    var(--tonscan-row-hover) 90%
+    var(--acton-color-surface-row) 0%,
+    var(--acton-color-surface-hover) 45%,
+    var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;
   animation: skeleton-shimmer 1.15s ease-in-out infinite;
@@ -477,21 +514,21 @@
 .contractSkeleton {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
+  gap: var(--acton-space-4);
+  padding: var(--acton-space-4);
 }
 
 .contractSkeletonTabs {
   width: 260px;
   max-width: 100%;
   height: 34px;
-  border-radius: var(--border-radius-md);
+  border-radius: var(--acton-radius-control-sm);
 }
 
 .contractSkeletonBlock {
   width: 100%;
   height: 260px;
-  border-radius: var(--border-radius-md);
+  border-radius: var(--acton-radius-control-sm);
 }
 
 @keyframes skeleton-shimmer {
@@ -514,13 +551,18 @@
   cursor: pointer;
 }
 
+.clickableRow:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--acton-color-focus-ring);
+}
+
 .txLinkCell {
   width: 40px;
   padding-right: 16px !important;
 }
 
 .txLink {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   opacity: 0;
   transition: opacity 0.2s;
   display: flex;
@@ -533,7 +575,7 @@
 }
 
 .time {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   white-space: nowrap;
 }
 
@@ -556,7 +598,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-weight: 400;
   min-width: 0;
   max-width: 100%;
@@ -577,8 +619,8 @@
 }
 
 .addressFallback {
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
   font-weight: 500;
 }
 
@@ -593,8 +635,8 @@
   display: block;
   max-width: 12rem;
   overflow: hidden;
-  color: var(--litenode-text-muted);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
   font-weight: 400;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -611,35 +653,36 @@
 
 th.valueContainer {
   display: table-cell;
+  text-align: right;
   vertical-align: middle;
 }
 
 .valuePositive {
-  color: var(--tonscan-success);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-status-passed);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .valueNegative {
-  color: var(--tonscan-text-primary);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .valueEmpty {
-  color: var(--tonscan-text-secondary);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-text-muted);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .valueNeutral {
-  color: var(--tonscan-text-secondary);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-text-muted);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .statusSuccess {
-  color: var(--tonscan-success);
+  color: var(--acton-color-status-passed);
 }
 
 .statusFailed {
-  color: var(--tonscan-error);
+  color: var(--acton-color-status-failed);
 }
 
 .historyValueStack {
@@ -651,7 +694,7 @@ th.valueContainer {
 }
 
 .historyValue {
-  font-size: var(--font-size-sm);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.35;
 }
 
@@ -675,13 +718,13 @@ th.valueContainer {
   width: 14px;
   height: 14px;
   flex: 0 0 auto;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   stroke-width: 2;
 }
 
 .tokenValue {
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
 }
 
 .pagination {
@@ -690,7 +733,7 @@ th.valueContainer {
   justify-content: center;
   gap: 12px;
   padding: 6px 12px;
-  border-top: 1px solid var(--tonscan-border);
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .paginationControls {
@@ -701,9 +744,9 @@ th.valueContainer {
 
 .paginationButton {
   min-height: 32px;
-  background: var(--tonscan-card-bg);
-  border: 1px solid var(--litenode-border-control);
-  color: var(--tonscan-text-primary);
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border-control);
+  color: var(--acton-color-text);
   padding: 0 10px;
   border-radius: 8px;
   cursor: pointer;
@@ -712,18 +755,18 @@ th.valueContainer {
   justify-content: center;
   gap: 6px;
   font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast),
-    opacity var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast),
+    opacity var(--acton-duration-fast);
 }
 
 .paginationButton:hover:not(:disabled) {
-  background-color: var(--litenode-control-hover);
-  border-color: var(--litenode-border-strong);
+  background-color: var(--acton-color-surface-hover);
+  border-color: var(--acton-color-border-strong);
 }
 
 .paginationButton:disabled {
@@ -737,26 +780,26 @@ th.valueContainer {
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .paginationPage:hover {
-  background: var(--litenode-control-hover);
-  color: var(--tonscan-text-primary);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
 }
 
 .paginationPageActive {
-  border-color: var(--litenode-border-control);
-  background: var(--litenode-surface-active);
-  color: var(--tonscan-text-primary);
+  border-color: var(--acton-color-border-control);
+  background: var(--acton-color-surface-active);
+  color: var(--acton-color-text);
 }
 
 .paginationEllipsis {
@@ -765,7 +808,7 @@ th.valueContainer {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--tonscan-text-tertiary);
+  color: var(--acton-color-text-subtle);
 }
 
 .paginationSkeletonButton {
@@ -826,7 +869,7 @@ th.valueContainer {
 
 @media (max-width: 520px) {
   .tableCard {
-    border-radius: 14px !important;
+    border-radius: 14px;
   }
 
   .tabs {
@@ -856,7 +899,7 @@ th.valueContainer {
   .timeFormatOption {
     min-height: 56px;
     border-left: 0;
-    border-top: 1px solid var(--tonscan-border);
+    border-top: 1px solid var(--acton-color-border);
   }
 
   .timeFormatOption:first-child {

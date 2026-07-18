@@ -1,4 +1,4 @@
-import {Check, ChevronDown, ChevronRight, Copy} from "lucide-react"
+import {Check, ChevronDown, ChevronRight, Copy, LoaderCircle} from "lucide-react"
 import {
   useEffect,
   useId,
@@ -10,6 +10,7 @@ import {
 } from "react"
 
 import {cx} from "../../lib/cx"
+import {SkeletonText} from "../Skeleton"
 import styles from "./RawDataBlock.module.css"
 
 export type RawDataBlockVariant = "embedded" | "standalone"
@@ -22,10 +23,14 @@ export type RawDataBlockProps = Readonly<
     readonly contentClassName?: string
     readonly copyLabel?: string
     readonly copyValue?: string
+    /** Fully rendered content that replaces the built-in pre/code presentation. */
+    readonly customContent?: ReactNode
     readonly defaultExpanded?: boolean
     readonly empty?: boolean
     readonly emptyContent?: ReactNode
     readonly expanded?: boolean
+    readonly loading?: boolean
+    readonly loadingLabel?: string
     readonly maxHeight?: CSSProperties["maxHeight"]
     readonly onCopy?: (value: string) => Promise<void> | void
     readonly onCopyError?: (error: unknown) => void
@@ -46,6 +51,7 @@ const variantClassNames = {
 } satisfies Record<RawDataBlockVariant, string>
 
 export function RawDataBlock({
+  "aria-busy": ariaBusy,
   children,
   className,
   codeClassName,
@@ -53,10 +59,13 @@ export function RawDataBlock({
   contentClassName,
   copyLabel = "raw data",
   copyValue,
+  customContent,
   defaultExpanded = true,
   empty = false,
   emptyContent = "No data available",
   expanded,
+  loading = false,
+  loadingLabel = "Loading raw data",
   maxHeight,
   onCopy,
   onCopyError,
@@ -80,7 +89,7 @@ export function RawDataBlock({
   const isExpanded = canCollapse ? (expanded ?? uncontrolledExpanded) : true
   const valueToCopy = copyValue ?? value
   const copyTitle = isCopied ? `Copied ${copyLabel}` : `Copy ${copyLabel}`
-  const canCopy = !empty && showCopy && valueToCopy.length > 0
+  const canCopy = !loading && !empty && showCopy && valueToCopy.length > 0
   const resolvedTitleLabel =
     titleLabel ?? (typeof title === "string" ? title : undefined) ?? copyLabel
   const contentId = `${generatedId}-content`
@@ -137,12 +146,20 @@ export function RawDataBlock({
     </button>
   ) : undefined
 
+  const loadingIndicator = loading && canCollapse && (
+    <span className={styles.loadingIndicator} role="status" aria-label={loadingLabel}>
+      <LoaderCircle size={14} aria-hidden="true" />
+    </span>
+  )
+
   return (
     <div
       {...props}
       ref={ref}
+      aria-busy={loading ? true : ariaBusy}
       data-expanded={hasTitle ? String(isExpanded) : undefined}
       data-has-title={hasTitle ? "true" : undefined}
+      data-loading={loading ? "true" : undefined}
       className={cx(styles.rawDataBlock, variantClassNames[variant], className)}
       style={getRawDataBlockStyle(style, maxHeight)}
     >
@@ -165,17 +182,29 @@ export function RawDataBlock({
           ) : (
             <div className={styles.headerTitle}>{title}</div>
           )}
-          {copyButton}
+          {loadingIndicator || copyButton}
         </div>
       )}
 
       {isExpanded && (
         <div
           id={hasTitle ? contentId : undefined}
-          className={cx(styles.content, empty && styles.emptyContent, contentClassName)}
+          hidden={loading && canCollapse}
+          className={cx(
+            styles.content,
+            empty && styles.emptyContent,
+            loading && !canCollapse && styles.loadingContent,
+            contentClassName,
+          )}
+          role={loading && !canCollapse ? "status" : undefined}
+          aria-label={loading && !canCollapse ? loadingLabel : undefined}
         >
-          {empty ? (
+          {loading && !canCollapse ? (
+            <SkeletonText lineCount={3} />
+          ) : empty ? (
             <div className={styles.empty}>{emptyContent}</div>
+          ) : customContent !== undefined && customContent !== null ? (
+            customContent
           ) : (
             <pre className={cx(styles.pre, wrap && styles.preWrap)}>
               <code className={codeClassName}>{children ?? value}</code>

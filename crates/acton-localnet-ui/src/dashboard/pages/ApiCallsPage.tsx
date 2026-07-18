@@ -1,15 +1,17 @@
 import {Check, CircleAlert, RefreshCw} from "lucide-react"
-import {useCallback, useEffect, useMemo, useState} from "react"
-import type {FC} from "react"
 import {
   Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@acton/shared-ui"
+  Checkbox,
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableTable,
+} from "@acton/ui"
+import {useCallback, useEffect, useMemo, useState} from "react"
+import type {FC} from "react"
 
 import type {TonClient} from "../../explorer/api/client"
 import type {ApiCallRecord, ApiCallStatus} from "../../explorer/api/types"
@@ -88,39 +90,27 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
       <section className={styles.rpcCallsLayout}>
         <div className={styles.rpcCallsToolbar}>
           <div className={styles.rpcCallsFilters}>
-            <label className={styles.rpcCallsFilter}>
-              <input
-                type="checkbox"
-                checked={statusFilter.success}
-                onChange={() => toggleStatusFilter("success")}
-              />
-              <span className={styles.rpcFilterCheckbox}>
-                <Check size={13} strokeWidth={2.5} />
-              </span>
-              <span>Success</span>
-              <span className={styles.rpcFilterCount}>{successCount}</span>
-            </label>
-            <label className={styles.rpcCallsFilter}>
-              <input
-                type="checkbox"
-                checked={statusFilter.failed}
-                onChange={() => toggleStatusFilter("failed")}
-              />
-              <span className={styles.rpcFilterCheckbox}>
-                <Check size={13} strokeWidth={2.5} />
-              </span>
-              <span>Failed</span>
-              <span className={styles.rpcFilterCount}>{failedCount}</span>
-            </label>
+            <Checkbox
+              label="Success"
+              count={successCount}
+              checked={statusFilter.success}
+              onChange={() => toggleStatusFilter("success")}
+            />
+            <Checkbox
+              label="Failed"
+              count={failedCount}
+              checked={statusFilter.failed}
+              onChange={() => toggleStatusFilter("failed")}
+            />
           </div>
           <Button
             type="button"
             variant="outline"
             size="sm"
+            leadingIcon={<RefreshCw size={14} className={isRefreshing ? styles.spinning : ""} />}
             disabled={isRefreshing}
             onClick={() => void loadCalls(true)}
           >
-            <RefreshCw size={14} className={isRefreshing ? styles.spinning : ""} />
             Refresh
           </Button>
         </div>
@@ -134,22 +124,24 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
         ) : filteredCalls.length === 0 ? (
           <div className={styles.emptyState}>No calls match the selected status filters.</div>
         ) : (
-          <div className={styles.rpcCallsTableFrame}>
-            <Table className={styles.rpcCallsTable}>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Status Code</TableHead>
-                  <TableHead>Call Type</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Timestamp</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+          <DataTable className={styles.rpcCallsTable} minWidth="42.5rem">
+            <DataTableTable aria-label="API calls" layout="fixed">
+              <DataTableHead>
+                <DataTableRow>
+                  <DataTableHeaderCell align="center" columnWidth="4rem">
+                    Status
+                  </DataTableHeaderCell>
+                  <DataTableHeaderCell columnWidth="7rem">Status Code</DataTableHeaderCell>
+                  <DataTableHeaderCell columnWidth="8rem">Call Type</DataTableHeaderCell>
+                  <DataTableHeaderCell>Method</DataTableHeaderCell>
+                  <DataTableHeaderCell columnWidth="7rem">Duration</DataTableHeaderCell>
+                  <DataTableHeaderCell columnWidth="12rem">Timestamp</DataTableHeaderCell>
+                </DataTableRow>
+              </DataTableHead>
+              <DataTableBody>
                 {[...filteredCalls].reverse().map(call => (
-                  <TableRow key={call.sequence}>
-                    <TableCell className={styles.rpcStatusCell}>
+                  <DataTableRow key={call.sequence} hover>
+                    <DataTableCell align="center">
                       <span
                         aria-label={call.status === "success" ? "Success" : "Failed"}
                         className={`${styles.rpcStatusIcon} ${
@@ -166,21 +158,30 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
                           <CircleAlert size={17} />
                         )}
                       </span>
-                    </TableCell>
-                    <TableCell className={styles.rpcCodeCell}>{call.status_code}</TableCell>
-                    <TableCell className={styles.rpcTypeCell}>{call.call_type}</TableCell>
-                    <TableCell className={styles.rpcMethodCell}>{call.method}</TableCell>
-                    <TableCell className={styles.rpcDurationCell}>
+                    </DataTableCell>
+                    <DataTableCell tone="subtle">{call.status_code}</DataTableCell>
+                    <DataTableCell className={styles.rpcTypeCell} tone="muted">
+                      {call.call_type}
+                    </DataTableCell>
+                    <DataTableCell mono truncate title={call.method}>
+                      {call.method}
+                    </DataTableCell>
+                    <DataTableCell className={styles.rpcDurationCell} tone="muted">
                       {formatApiCallDuration(call.duration_ns)}
-                    </TableCell>
-                    <TableCell className={styles.rpcTimestampCell}>
+                    </DataTableCell>
+                    <DataTableCell
+                      className={styles.rpcTimestampCell}
+                      tone="muted"
+                      data-visual-dynamic="time"
+                      data-visual-placeholder="<time>"
+                    >
                       {formatTimestamp(call.timestamp_ms)}
-                    </TableCell>
-                  </TableRow>
+                    </DataTableCell>
+                  </DataTableRow>
                 ))}
-              </TableBody>
-            </Table>
-          </div>
+              </DataTableBody>
+            </DataTableTable>
+          </DataTable>
         )}
       </section>
     </>

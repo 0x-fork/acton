@@ -1,7 +1,9 @@
-import {Check, Copy, X} from "lucide-react"
+import {Copy, X} from "lucide-react"
 import {useLocation, useNavigate, useParams} from "react-router-dom"
 import {useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
+
+import {HighlightedCode} from "@acton/ui"
 
 import type {TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
@@ -21,8 +23,8 @@ import type {
   VerificationSourceResponse,
 } from "../api/types"
 import {AccountInfo} from "../components/AccountInfo"
-import {AddressLabel} from "../components/AddressLabel"
-import {Breadcrumbs} from "../components/Breadcrumbs"
+import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
+import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {AccountDetails} from "../components/AccountDetails"
 import {
   NFT_COLLECTION_IMAGE_SOURCE_KEYS,
@@ -853,7 +855,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     <div className={styles.container}>
       {formattedAddress && (
         <>
-          <Breadcrumbs
+          <ExplorerBreadcrumbs
             items={[
               {
                 label: formattedAddress,
@@ -1118,8 +1120,8 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
                     <div className={styles.metadataSummary}>
                       <div className={styles.metadataRow}>
                         <span className={styles.metadataLabel}>Address</span>
-                        <span className={`${styles.metadataValue} ${styles.metadataLink}`}>
-                          <AddressLabel address={formattedAddress} />
+                        <span className={styles.metadataValue}>
+                          <ExplorerAddressChip address={formattedAddress} variant="plain" />
                         </span>
                       </div>
                       {jettonMaster && (
@@ -1127,18 +1129,12 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
                           <div className={styles.metadataRow}>
                             <span className={styles.metadataLabel}>Owner</span>
                             {jettonMasterAdminAddress ? (
-                              <span
-                                className={`${styles.metadataValue} ${styles.metadataLink}`}
-                                onClick={() => handleSearch(jettonMasterAdminAddress)}
-                                onKeyDown={event => {
-                                  if (event.key === "Enter" || event.key === " ") {
-                                    handleSearch(jettonMasterAdminAddress)
-                                  }
-                                }}
-                                role="button"
-                                tabIndex={0}
-                              >
-                                <AddressLabel address={jettonMasterAdminAddress} />
+                              <span className={styles.metadataValue}>
+                                <ExplorerAddressChip
+                                  address={jettonMasterAdminAddress}
+                                  onAddressClick={handleSearch}
+                                  variant="plain"
+                                />
                               </span>
                             ) : (
                               <span className={styles.metadataValue}>None</span>
@@ -1163,18 +1159,12 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
                           <div className={styles.metadataRow}>
                             <span className={styles.metadataLabel}>Owner</span>
                             {nftItemOwnerAddress ? (
-                              <span
-                                className={`${styles.metadataValue} ${styles.metadataLink}`}
-                                onClick={() => handleSearch(nftItemOwnerAddress)}
-                                onKeyDown={event => {
-                                  if (event.key === "Enter" || event.key === " ") {
-                                    handleSearch(nftItemOwnerAddress)
-                                  }
-                                }}
-                                role="button"
-                                tabIndex={0}
-                              >
-                                <AddressLabel address={nftItemOwnerAddress} />
+                              <span className={styles.metadataValue}>
+                                <ExplorerAddressChip
+                                  address={nftItemOwnerAddress}
+                                  onAddressClick={handleSearch}
+                                  variant="plain"
+                                />
                               </span>
                             ) : (
                               <span className={styles.metadataValue}>No owner</span>
@@ -1183,18 +1173,12 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
                           <div className={styles.metadataRow}>
                             <span className={styles.metadataLabel}>Collection</span>
                             {nftItemCollectionAddress ? (
-                              <span
-                                className={`${styles.metadataValue} ${styles.metadataLink}`}
-                                onClick={() => handleSearch(nftItemCollectionAddress)}
-                                onKeyDown={event => {
-                                  if (event.key === "Enter" || event.key === " ") {
-                                    handleSearch(nftItemCollectionAddress)
-                                  }
-                                }}
-                                role="button"
-                                tabIndex={0}
-                              >
-                                <AddressLabel address={nftItemCollectionAddress} />
+                              <span className={styles.metadataValue}>
+                                <ExplorerAddressChip
+                                  address={nftItemCollectionAddress}
+                                  onAddressClick={handleSearch}
+                                  variant="plain"
+                                />
                               </span>
                             ) : (
                               <span className={styles.metadataValue}>Standalone</span>
@@ -1239,9 +1223,11 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
                   >
                     <Copy size={18} />
                   </button>
-                  <pre className={styles.metadataJson}>
-                    <code>{renderJson(activeMetadataJson)}</code>
-                  </pre>
+                  <HighlightedCode
+                    className={styles.metadataJson}
+                    value={activeMetadataJson}
+                    language="json"
+                  />
                 </div>
               </section>
             </div>
@@ -1299,12 +1285,6 @@ function parseJettonDecimals(decimals: string | undefined): number {
   return Math.min(value, 36)
 }
 
-interface CopyAddressButtonProps {
-  readonly address: string
-  readonly className?: string
-  readonly title?: string
-}
-
 interface AccountIssueCardProps {
   readonly issue: AccountLoadIssue
 }
@@ -1322,41 +1302,6 @@ const AccountIssueCard: FC<AccountIssueCardProps> = ({issue}) => (
     </div>
   </section>
 )
-
-const CopyAddressButton: FC<CopyAddressButtonProps> = ({
-  address,
-  className,
-  title = "Copy address",
-}) => {
-  const [isCopied, setIsCopied] = useState(false)
-
-  useEffect(() => {
-    if (!isCopied) {
-      return
-    }
-
-    const timer = setTimeout(() => setIsCopied(false), 1600)
-    return () => clearTimeout(timer)
-  }, [isCopied])
-
-  return (
-    <button
-      type="button"
-      className={`${styles.addressCopyButton} ${isCopied ? styles.addressCopyButtonCopied : ""} ${
-        className ?? ""
-      }`}
-      onClick={event => {
-        event.stopPropagation()
-        void navigator.clipboard.writeText(address)
-        setIsCopied(true)
-      }}
-      aria-label={isCopied ? "Address copied" : title}
-      title={isCopied ? "Copied" : title}
-    >
-      {isCopied ? <Check size={14} /> : <Copy size={14} />}
-    </button>
-  )
-}
 
 interface AccountDetailRowsProps {
   readonly children: ReactNode
@@ -1395,74 +1340,13 @@ const AccountAddressDetailRow: FC<AccountAddressDetailRowProps> = ({
     <span className={styles.accountDetailLabel}>{label}</span>
     {address ? (
       <div className={styles.accountDetailAddressValue}>
-        <span
-          className={`${styles.accountDetailValue} ${styles.accountDetailLink}`}
-          onClick={() => onAddressClick(address)}
-          onKeyDown={event => {
-            if (event.key === "Enter" || event.key === " ") {
-              onAddressClick(address)
-            }
-          }}
-          role="button"
-          tabIndex={0}
-        >
-          <AddressLabel address={address} />
-        </span>
-        <CopyAddressButton address={address} />
+        <ExplorerAddressChip address={address} onAddressClick={onAddressClick} variant="plain" />
       </div>
     ) : (
       <span className={styles.accountDetailValue}>{fallback ?? "Unknown"}</span>
     )}
   </div>
 )
-
-const JSON_TOKEN_RE =
-  /("(?:\\.|[^"\\])*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)/g
-
-function renderJson(json: string): ReactNode[] {
-  const parts: ReactNode[] = []
-  let lastIndex = 0
-  let key = 0
-
-  for (const match of json.matchAll(JSON_TOKEN_RE)) {
-    if (match.index === undefined) continue
-
-    if (match.index > lastIndex) {
-      parts.push(json.slice(lastIndex, match.index))
-    }
-
-    const [token, stringToken, colon, literalToken] = match
-    if (stringToken) {
-      parts.push(
-        <span
-          key={`json-token-${key++}`}
-          className={colon ? styles.metadataJsonKey : styles.metadataJsonValue}
-        >
-          {stringToken}
-        </span>,
-      )
-      if (colon) {
-        parts.push(colon)
-      }
-    } else if (literalToken) {
-      parts.push(
-        <span key={`json-token-${key++}`} className={styles.metadataJsonValue}>
-          {literalToken}
-        </span>,
-      )
-    } else {
-      parts.push(token)
-    }
-
-    lastIndex = match.index + token.length
-  }
-
-  if (lastIndex < json.length) {
-    parts.push(json.slice(lastIndex))
-  }
-
-  return parts
-}
 
 function getAccountTokenInfo(
   stateV3: AccountStatesResponse | void,

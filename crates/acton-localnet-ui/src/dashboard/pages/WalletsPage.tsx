@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
 import {Link2, RefreshCw, Unplug} from "lucide-react"
-import {Button} from "@acton/shared-ui"
+import {Button, Input} from "@acton/ui"
 
 import type {TonClient} from "../../explorer/api/client"
 import {
@@ -9,7 +9,7 @@ import {
   sortJettonWalletsByAmount,
 } from "../../explorer/api/jettonWallets"
 import type {JettonWallet} from "../../explorer/api/types"
-import {AddressChip} from "../../explorer/components/AddressChip"
+import {ExplorerAddressChip} from "../../explorer/components/ExplorerAddressChip"
 import {WalletAccountSummary} from "../../explorer/components/WalletAccountSummary"
 import {
   normalizeAddress,
@@ -149,17 +149,20 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
               </h2>
               <Button
                 type="button"
+                variant="primary"
                 size="sm"
                 className={styles.refreshButton}
+                leadingIcon={
+                  <RefreshCw
+                    size={14}
+                    className={isRefreshingBalances || walletTokensLoading ? styles.spinning : ""}
+                  />
+                }
                 onClick={() => void handleRefreshWallets()}
                 disabled={
                   runtimeWallets.length === 0 || isRefreshingBalances || walletTokensLoading
                 }
               >
-                <RefreshCw
-                  size={14}
-                  className={isRefreshingBalances || walletTokensLoading ? styles.spinning : ""}
-                />
                 Refresh
               </Button>
             </div>
@@ -194,7 +197,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                           </span>
                         </td>
                         <td className={styles.walletAddressCell}>
-                          <AddressChip
+                          <ExplorerAddressChip
                             address={walletAddress}
                             fallback="Account"
                             copiedAddress={copiedAddress}
@@ -295,7 +298,11 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                           onCopyAddress={handleCopyAddress}
                         />
                       </td>
-                      <td className={styles.sessionActivityCell}>
+                      <td
+                        className={styles.sessionActivityCell}
+                        data-visual-dynamic="time"
+                        data-visual-placeholder="<time>"
+                      >
                         {formatDateTime(session.lastActivityAt)}
                       </td>
                       <td className={styles.sessionActionsCell}>
@@ -304,10 +311,10 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                           variant="outline"
                           size="sm"
                           className={styles.tableActionButton}
+                          leadingIcon={<Unplug size={14} />}
                           onClick={() => void handleDisconnectSession(session.sessionId)}
                           disabled={isSubmitting}
                         >
-                          <Unplug size={14} />
                           Disconnect
                         </Button>
                       </td>
@@ -325,7 +332,8 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                       <label className={styles.connectInlineLabel} htmlFor="ton-connect-url">
                         Connect URL
                       </label>
-                      <input
+                      <Input
+                        size="sm"
                         id="ton-connect-url"
                         className={styles.connectInput}
                         value={tonConnectUrl}
@@ -338,13 +346,13 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                         variant="outline"
                         size="sm"
                         className={styles.tableActionButton}
+                        leadingIcon={<Link2 size={14} />}
                         disabled={
                           runtimeWallets.length === 0 ||
                           tonConnectUrl.trim().length === 0 ||
                           isSubmitting
                         }
                       >
-                        <Link2 size={14} />
                         Handle request
                       </Button>
                     </form>
@@ -429,7 +437,7 @@ const SessionWalletCell: FC<SessionWalletCellProps> = ({
 
   const walletAddress = normalizeAddress(wallet.record.address, addressFormat)
   return (
-    <AddressChip
+    <ExplorerAddressChip
       address={walletAddress}
       copiedAddress={copiedAddress}
       nameFallback={wallet.record.name}

@@ -3,6 +3,7 @@ import "@scalar/api-reference-react/style.css"
 import {useLocation} from "react-router-dom"
 import {useCallback, useEffect, useMemo, useRef} from "react"
 import type {FC} from "react"
+import {useTheme} from "@acton/ui"
 
 import styles from "./ApiReferencePage.module.css"
 
@@ -12,7 +13,6 @@ interface ApiReferencePageProps {
   readonly apiBaseUrl: string
   readonly localnetApiToken?: string
   readonly onUnauthorized: () => void
-  readonly theme: string
   readonly toncenterApiKey?: string
   readonly version: ApiReferenceVersion
 }
@@ -46,10 +46,10 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
   apiBaseUrl,
   localnetApiToken,
   onUnauthorized,
-  theme,
   toncenterApiKey,
   version,
 }) => {
+  const {theme} = useTheme()
   const reference = apiReferences[version]
   const localnetOrigin = useMemo(() => apiOrigin(apiBaseUrl), [apiBaseUrl])
   const syncReferenceAnchor = useApiReferenceAnchorSync(reference.slug)
@@ -106,55 +106,55 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
         .scalar-app,
         .scalar-app .dark-mode,
         .scalar-app .light-mode {
-          --scalar-font: var(--font-family);
+          --scalar-font: var(--acton-font-sans);
           --scalar-font-code: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
           --scalar-radius: 4px;
           --scalar-radius-lg: 6px;
           --scalar-radius-xl: 8px;
-          --scalar-background-1: var(--litenode-bg);
-          --scalar-background-2: var(--litenode-surface);
-          --scalar-background-3: var(--litenode-surface-subtle);
-          --scalar-background-4: var(--litenode-control-hover);
-          --scalar-background-accent: var(--litenode-accent-bg);
-          --scalar-background-danger: var(--litenode-danger-bg);
-          --scalar-color-1: var(--litenode-text);
-          --scalar-color-2: var(--litenode-text-muted);
-          --scalar-color-3: var(--litenode-text-faint);
-          --scalar-color-accent: var(--tonscan-accent);
-          --scalar-color-danger: var(--litenode-danger);
-          --scalar-border-color: var(--litenode-border);
-          --scalar-button-1: var(--litenode-primary);
-          --scalar-button-1-color: var(--litenode-primary-foreground);
-          --scalar-button-1-hover: var(--litenode-primary-hover);
-          --scalar-link-color: var(--tonscan-link);
-          --scalar-link-color-hover: var(--tonscan-link);
-          --scalar-link-color-visited: var(--tonscan-link);
-          --scalar-sidebar-background-1: var(--litenode-surface);
-          --scalar-sidebar-border-color: var(--litenode-border);
-          --scalar-sidebar-color-1: var(--litenode-text);
-          --scalar-sidebar-color-2: var(--litenode-text-muted);
-          --scalar-sidebar-color-active: var(--litenode-text);
-          --scalar-sidebar-search-background: var(--litenode-surface-subtle);
-          --scalar-sidebar-search-border-color: var(--litenode-border-control);
-          --scalar-sidebar-search-color: var(--litenode-text-muted);
-          --scalar-sidebar-item-hover-background: var(--litenode-surface-hover);
-          --scalar-sidebar-item-hover-color: var(--litenode-text);
-          --scalar-sidebar-item-active-background: var(--litenode-surface-active);
-          --scalar-scrollbar-color: var(--litenode-border-strong);
-          --scalar-scrollbar-color-active: var(--litenode-text-soft);
+          --scalar-background-1: var(--acton-color-canvas);
+          --scalar-background-2: var(--acton-color-surface);
+          --scalar-background-3: var(--acton-color-surface-raised);
+          --scalar-background-4: var(--acton-color-surface-hover);
+          --scalar-background-accent: color-mix(in srgb, var(--acton-color-accent) 10%, transparent);
+          --scalar-background-danger: var(--acton-color-status-failed-surface);
+          --scalar-color-1: var(--acton-color-text);
+          --scalar-color-2: var(--acton-color-text-muted);
+          --scalar-color-3: var(--acton-color-text-muted);
+          --scalar-color-accent: var(--acton-color-accent);
+          --scalar-color-danger: var(--acton-color-status-failed-text);
+          --scalar-border-color: var(--acton-color-border);
+          --scalar-button-1: var(--acton-color-primary);
+          --scalar-button-1-color: var(--acton-color-primary-foreground);
+          --scalar-button-1-hover: var(--acton-color-primary-hover);
+          --scalar-link-color: var(--acton-color-accent);
+          --scalar-link-color-hover: var(--acton-color-accent);
+          --scalar-link-color-visited: var(--acton-color-accent);
+          --scalar-sidebar-background-1: var(--acton-color-surface);
+          --scalar-sidebar-border-color: var(--acton-color-border);
+          --scalar-sidebar-color-1: var(--acton-color-text);
+          --scalar-sidebar-color-2: var(--acton-color-text-muted);
+          --scalar-sidebar-color-active: var(--acton-color-text);
+          --scalar-sidebar-search-background: var(--acton-color-surface-raised);
+          --scalar-sidebar-search-border-color: var(--acton-color-border-control);
+          --scalar-sidebar-search-color: var(--acton-color-text-muted);
+          --scalar-sidebar-item-hover-background: var(--acton-color-surface-hover);
+          --scalar-sidebar-item-hover-color: var(--acton-color-text);
+          --scalar-sidebar-item-active-background: var(--acton-color-surface-active);
+          --scalar-scrollbar-color: var(--acton-color-border-strong);
+          --scalar-scrollbar-color-active: var(--acton-color-text-subtle);
         }
         .scalar-app {
-          background: var(--litenode-bg) !important;
-          color: var(--litenode-text);
+          background: var(--acton-color-canvas) !important;
+          color: var(--acton-color-text);
           letter-spacing: 0;
         }
         .scalar-app .references-layout {
-          background: var(--litenode-bg) !important;
+          background: var(--acton-color-canvas) !important;
         }
         .scalar-app .t-doc__sidebar {
-          background: var(--litenode-surface) !important;
-          border-right: 1px solid var(--litenode-border) !important;
-          color: var(--litenode-text);
+          background: var(--acton-color-surface) !important;
+          border-right: 1px solid var(--acton-color-border) !important;
+          color: var(--acton-color-text);
           font-size: 14px;
         }
         .scalar-app .t-doc__sidebar button {
@@ -164,12 +164,12 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
           line-height: 1.2;
         }
         .scalar-app .t-doc__sidebar button:hover {
-          background: var(--litenode-surface-hover) !important;
-          color: var(--litenode-text) !important;
+          background: var(--acton-color-surface-hover) !important;
+          color: var(--acton-color-text) !important;
         }
         .scalar-app .t-doc__sidebar .bg-sidebar-b-active {
-          background: var(--litenode-surface-active) !important;
-          color: var(--litenode-text-strong) !important;
+          background: var(--acton-color-surface-active) !important;
+          color: var(--acton-color-text) !important;
         }
         .scalar-app .sidebar-heading-type {
           min-width: 34px;
@@ -184,21 +184,21 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
           letter-spacing: 0;
         }
         .scalar-app .scalar-card {
-          border: 1px solid var(--litenode-border-control) !important;
+          border: 1px solid var(--acton-color-border-control) !important;
           border-radius: 8px !important;
-          background: var(--litenode-surface) !important;
+          background: var(--acton-color-surface) !important;
           box-shadow: var(--litenode-inset-highlight);
         }
         .scalar-app .show-api-client-button {
           min-height: 26px;
-          border: 1px solid var(--litenode-border-control) !important;
+          border: 1px solid var(--acton-color-border-control) !important;
           border-radius: 6px;
-          background: var(--litenode-surface-raised) !important;
-          color: var(--litenode-text) !important;
+          background: var(--acton-color-surface-raised) !important;
+          color: var(--acton-color-text) !important;
           box-shadow: var(--litenode-inset-highlight);
         }
         .scalar-app .show-api-client-button:hover {
-          background: var(--litenode-surface-hover) !important;
+          background: var(--acton-color-surface-hover) !important;
         }
         .scalar-app .show-api-client-button span,
         .scalar-app .show-api-client-button svg {
@@ -206,14 +206,14 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
           fill: currentColor !important;
         }
         .scalar-app .client-libraries {
-          color: var(--litenode-text-muted) !important;
+          color: var(--acton-color-text-muted) !important;
           font-size: 0.82rem;
         }
         .scalar-app .client-libraries.rendered-code-sdks {
           margin-inline-end: 8px;
         }
         .scalar-app .client-libraries__active {
-          color: var(--litenode-text) !important;
+          color: var(--acton-color-text) !important;
         }
         .scalar-app pre,
         .scalar-app code {

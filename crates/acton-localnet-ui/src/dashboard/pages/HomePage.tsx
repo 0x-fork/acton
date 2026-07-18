@@ -1,6 +1,5 @@
 import {BookOpen, Check, Copy, FastForward, X} from "lucide-react"
-import {useToast} from "@acton/ui"
-import {Button, Card, CardContent, CardHeader, CardTitle, Input} from "@acton/shared-ui"
+import {Button, Input, useToast} from "@acton/ui"
 import {Link, useNavigate} from "react-router-dom"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent} from "react"
@@ -80,6 +79,7 @@ interface NodeInfoRow {
   readonly isLoading?: boolean
   readonly title?: string
   readonly variant?: "time"
+  readonly visualPlaceholder?: string
 }
 
 export const HomePage: FC<HomePageProps> = ({client}) => {
@@ -145,6 +145,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         label: "Uptime",
         value: nodeInfo ? formatDuration(nodeInfo.uptime_seconds) : undefined,
         isLoading,
+        visualPlaceholder: "<uptime>",
       },
       {
         label: "State source",
@@ -165,6 +166,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         title: nodeTimeOffset ? `${nodeTime} (${nodeTimeOffset})` : nodeTime,
         isLoading,
         variant: "time",
+        visualPlaceholder: "<time>",
       },
     ]
   }, [nodeInfo])
@@ -393,11 +395,11 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
 
       <section className={styles.homeLayout}>
         <div className={styles.homeTopRow}>
-          <Card className={`${styles.dashboardCard} ${styles.homeCard}`}>
-            <CardHeader className={styles.dashboardCardHeader}>
-              <CardTitle className={styles.dashboardCardTitle}>Node info</CardTitle>
-            </CardHeader>
-            <CardContent className={`${styles.dashboardCardContent} ${styles.nodeInfoList}`}>
+          <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
+            <header className={styles.dashboardCardHeader}>
+              <h2 className={styles.dashboardCardTitle}>Node info</h2>
+            </header>
+            <div className={`${styles.dashboardCardContent} ${styles.nodeInfoList}`}>
               {nodeInfoRows.map(row => {
                 const value = row.value ?? "—"
                 const title = row.title ?? value
@@ -419,7 +421,11 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                       </Link>
                     ) : row.variant === "time" ? (
                       <div className={styles.nodeInfoTimeControl} title={title}>
-                        <span className={styles.nodeInfoTimeText}>
+                        <span
+                          className={styles.nodeInfoTimeText}
+                          data-visual-dynamic={row.visualPlaceholder ? "time" : undefined}
+                          data-visual-placeholder={row.visualPlaceholder}
+                        >
                           <span className={styles.nodeInfoValueText}>{value}</span>
                           {row.secondaryValue && (
                             <span className={styles.nodeInfoValueMeta}>{row.secondaryValue}</span>
@@ -439,7 +445,12 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                         </button>
                       </div>
                     ) : (
-                      <span className={styles.nodeInfoValue} title={title}>
+                      <span
+                        className={styles.nodeInfoValue}
+                        title={title}
+                        data-visual-dynamic={row.visualPlaceholder ? "time" : undefined}
+                        data-visual-placeholder={row.visualPlaceholder}
+                      >
                         <span className={styles.nodeInfoValueText}>{value}</span>
                         {row.secondaryValue && (
                           <span className={styles.nodeInfoValueMeta}>{row.secondaryValue}</span>
@@ -449,14 +460,14 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                   </div>
                 )
               })}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
-          <Card className={`${styles.dashboardCard} ${styles.homeCard}`}>
-            <CardHeader className={styles.dashboardCardHeader}>
-              <CardTitle className={styles.dashboardCardTitle}>Endpoints</CardTitle>
-            </CardHeader>
-            <CardContent className={`${styles.dashboardCardContent} ${styles.endpointList}`}>
+          <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
+            <header className={styles.dashboardCardHeader}>
+              <h2 className={styles.dashboardCardTitle}>Endpoints</h2>
+            </header>
+            <div className={`${styles.dashboardCardContent} ${styles.endpointList}`}>
               {endpointRows.map(endpoint => {
                 const isCopied = copiedEndpoint === endpoint.value
 
@@ -491,8 +502,8 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                   </div>
                 )
               })}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </div>
 
         {homeState.error ? (
@@ -641,9 +652,13 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isAdvancingTime || !parsedTimeAdvanceSeconds}>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  trailingIcon={<FastForward size={15} />}
+                  disabled={isAdvancingTime || !parsedTimeAdvanceSeconds}
+                >
                   {isAdvancingTime ? "Advancing..." : "Advance"}
-                  <FastForward size={15} />
                 </Button>
               </div>
             </form>

@@ -2,9 +2,9 @@
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   box-sizing: border-box;
   -webkit-overflow-scrolling: touch;
 }
@@ -19,9 +19,9 @@
 .tableTitle {
   height: 52px;
   padding: 0 18px;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
-  color: var(--litenode-text);
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  border-bottom: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-raised);
   display: flex;
   align-items: center;
   font-size: 0.86rem;
@@ -33,25 +33,25 @@
 .table th {
   height: 36px;
   padding: 0 14px;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.7rem;
   font-weight: 650;
   letter-spacing: 0;
   line-height: 1;
   text-align: left;
   text-transform: uppercase;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
-  background: var(--tonscan-row-hover, var(--litenode-surface-subtle));
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-row);
   box-sizing: border-box;
 }
 
 .table td {
   height: 46px;
   padding: 0 14px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.82rem;
   line-height: 1.35;
-  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-top: 1px solid var(--acton-color-border);
   box-sizing: border-box;
   vertical-align: middle;
 }
@@ -61,12 +61,12 @@
 }
 
 .row {
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   transition: background-color 120ms ease;
 }
 
 .row:hover {
-  background: var(--litenode-row-hover);
+  background: var(--acton-color-surface-row);
 }
 
 .rowInteractive {
@@ -75,7 +75,7 @@
 
 .rowInteractive:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2px var(--litenode-focus);
+  box-shadow: inset 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .accountCell {
@@ -94,7 +94,7 @@
 
 .accountText {
   display: block;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.78rem;
   font-weight: 500;
 }
@@ -124,23 +124,23 @@
 }
 
 .statusActive {
-  color: var(--tonscan-success);
-  background: var(--litenode-success-bg);
+  color: var(--acton-color-status-passed);
+  background: var(--acton-color-status-passed-surface);
 }
 
 .statusFrozen {
-  color: var(--litenode-text-subtle);
-  background: var(--litenode-surface-raised);
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-raised);
 }
 
 .statusUninit {
-  color: var(--litenode-text-muted);
-  background: var(--litenode-surface-subtle);
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-raised);
 }
 
 .statusNonexist {
-  color: var(--tonscan-error);
-  background: var(--litenode-danger-bg-soft);
+  color: var(--acton-color-status-failed);
+  background: var(--acton-color-status-failed-surface);
 }
 
 .typeValue {
@@ -149,7 +149,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   display: block;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-size: 0.8rem;
   font-weight: 600;
 }
@@ -163,7 +163,7 @@
 }
 
 .balanceCell {
-  color: var(--litenode-text) !important;
+  color: var(--acton-color-text) !important;
   font-weight: 600;
 }
 
@@ -179,7 +179,7 @@
   height: 11px;
   overflow: hidden;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--litenode-text) 8%, var(--litenode-surface-subtle));
+  background: color-mix(in srgb, var(--acton-color-text) 8%, var(--acton-color-surface-raised));
 }
 
 .skeletonLine::after {
@@ -189,7 +189,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--litenode-text) 8%, transparent),
+    color-mix(in srgb, var(--acton-color-text) 8%, transparent),
     transparent
   );
   transform: translateX(-100%);
@@ -217,10 +217,10 @@
 
 .emptyState {
   min-height: 62px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
-  color: var(--litenode-text-muted);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text-muted);
   display: flex;
   align-items: center;
   justify-content: center;

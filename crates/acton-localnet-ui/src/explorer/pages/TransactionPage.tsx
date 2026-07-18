@@ -4,6 +4,7 @@ import {
   type ContractVerifiedSource,
   type ContractData,
   type LoadedTransactionActions,
+  type ResolveVerifiedSourceByCodeHash,
   type TransactionBlockRef,
   TransactionDetails,
   type TransactionInfo,
@@ -14,7 +15,7 @@ import {
   decodeStorageShardAccount,
   getTransactionComputePhase,
   type ValueFlowItem,
-} from "@acton/shared-ui"
+} from "@acton/transaction-ui"
 import {Address} from "@ton/core"
 import {
   AlertCircle,
@@ -22,7 +23,9 @@ import {
   Bug,
   CheckCircle2,
   CircleDotDashed,
+  Database,
   GitBranch,
+  Info,
   ListChecks,
   XCircle,
 } from "lucide-react"
@@ -33,9 +36,12 @@ import type {V3Action, V3Metadata} from "../api/types"
 import {addressKey} from "../api/compilerAbi"
 import {resolveCompilerAbis} from "../api/compilerAbiResolver"
 import {buildTraceTransactionInfos} from "../api/traceTransactions"
+import {buildActionValueFlowMovements} from "../api/valueFlowActions"
 import {ActionHistoryTable} from "../components/AccountDetails"
-import {AddressChip} from "../components/AddressChip"
-import {Breadcrumbs} from "../components/Breadcrumbs"
+import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
+import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
+import {TraceStateChangesPanel} from "../components/TraceStateChangesPanel"
+import {TraceOverviewTable, type TraceOverviewData} from "../components/TraceOverviewTable"
 import {
   formatAddress as formatDisplayAddress,
   hashToHex,
@@ -48,7 +54,7 @@ import {useAddressFormat, useNetworkInfo} from "../hooks/useNetworkInfo"
 import {openExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import type {ExplorerMetadataRegistry} from "../metadata/types"
-import type {RetraceResultAndCode} from "../retrace/txTrace/lib/types"
+import type {RetraceResultAndCode, RetraceTraceResult} from "../retrace/txTrace/lib/types"
 import TransactionRetracePanel from "../retrace/txTrace/ui/TransactionRetracePanel"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 
@@ -59,13 +65,19 @@ interface TransactionPageProps {
   readonly openRetraceOnLoad?: boolean
 }
 
-type TabType = "transactions" | "value-flow" | "event-overview"
+type TabType = "transactions" | "value-flow" | "event-overview" | "state-changes" | "details"
 
 const parseTabType = (tab: string | null, supportsActions: boolean): TabType => {
+  if (tab === "details" || tab === "overview") {
+    return "details"
+  }
+  if (tab === "state-changes" || tab === "transactions") {
+    return tab
+  }
   if (supportsActions && (tab === null || tab === "" || tab === "event-overview")) {
     return "event-overview"
   }
-  return tab === "transactions" ? "transactions" : "value-flow"
+  return "value-flow"
 }
 
 const MAX_TRACE_TREE_FLOW_WIDTH = 1800
@@ -104,6 +116,7 @@ interface TraceTransactionNodeProps {
     event: ExplorerNavigationClickEvent,
   ) => void
   readonly loadActions: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
+  readonly resolveVerifiedSourceByCodeHash: ResolveVerifiedSourceByCodeHash
 }
 
 const mapTraceTransactions = (
@@ -187,6 +200,54 @@ const withRetracedStorage = (
   })
 }
 
+const withRetracedTraceStorage = (
+  transactions: readonly TransactionInfo[],
+  retracedTransactions: RetraceTraceResult["result"]["transactions"],
+): TransactionInfo[] => {
+  return mapTraceTransactions(transactions, tx => {
+    const retracedTx = retracedTransactions[transactionHashHex(tx).toLowerCase()]
+    if (!retracedTx) {
+      return {...tx}
+    }
+
+    const parsedStorageBefore = decodeStorageShardAccount(
+      retracedTx.account.shardAccountBefore,
+      tx.contractAbi,
+    )
+    const parsedStorageAfter = decodeStorageShardAccount(
+      retracedTx.account.shardAccountAfter,
+      tx.contractAbi,
+    )
+
+    return {
+      ...tx,
+      vmLogDiff: retracedTx.emulatedTx.vmLogs,
+      executorLogs: retracedTx.emulatedTx.executorLogs,
+      actions: retracedTx.emulatedTx.c5,
+      outActions: retracedTx.emulatedTx.actions,
+      shardAccountBefore: retracedTx.account.shardAccountBefore,
+      shardAccountAfter: retracedTx.account.shardAccountAfter,
+      accountBalanceBefore: retracedTx.money.balanceBefore,
+      accountBalanceAfter: retracedTx.money.balanceAfter,
+      parsedStorageBefore: parsedStorageBefore ?? tx.parsedStorageBefore,
+      parsedStorageAfter: parsedStorageAfter ?? tx.parsedStorageAfter,
+    }
+  })
+}
+
+async function loadVerifiedSourceByCodeHash(
+  metadataRegistry: ExplorerMetadataRegistry,
+  codeHash: string,
+): Promise<ContractVerifiedSource | undefined> {
+  try {
+    const source = await metadataRegistry.getSource({codeHash})
+    return source.verified && source.bundles.length > 0 ? source : undefined
+  } catch (error) {
+    console.debug(`Failed to fetch verified source for ${codeHash}`, error)
+    return undefined
+  }
+}
+
 async function loadVerifiedSourcesByCodeHash({
   metadataRegistry,
   codeHashes,
@@ -204,16 +265,8 @@ async function loadVerifiedSourcesByCodeHash({
   const sources = await Promise.all(
     uniqueCodeHashes.map(
       async (codeHash): Promise<readonly [string, ContractVerifiedSource] | undefined> => {
-        try {
-          const source = await metadataRegistry.getSource({codeHash})
-          if (!source.verified || source.bundles.length === 0) {
-            return undefined
-          }
-          return [codeHash, source] as const
-        } catch (error) {
-          console.debug(`Failed to fetch verified source for ${codeHash}`, error)
-          return undefined
-        }
+        const source = await loadVerifiedSourceByCodeHash(metadataRegistry, codeHash)
+        return source ? ([codeHash, source] as const) : undefined
       },
     ),
   )
@@ -248,6 +301,10 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const {fetchName} = useAddressBook()
   const {network} = useNetworkInfo()
   const metadataRegistry = useMetadataRegistry()
+  const resolveVerifiedSourceByCodeHash = useCallback(
+    (codeHash: string) => loadVerifiedSourceByCodeHash(metadataRegistry, codeHash),
+    [metadataRegistry],
+  )
   const addressFormat = useAddressFormat()
   const [traceLookupHash, setTraceLookupHash] = useState(hash)
   const supportsTraceActions = client.usesToncenterApiEndpoint() && network.supportsActions
@@ -259,11 +316,18 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const [valueFlow, setValueFlow] = useState<ValueFlowItem[]>([])
   const [traceActions, setTraceActions] = useState<readonly V3Action[]>([])
   const [traceActionMetadata, setTraceActionMetadata] = useState<V3Metadata>({})
+  const [traceOverview, setTraceOverview] = useState<TraceOverviewData | undefined>()
   const [hoveredAction, setHoveredAction] = useState<V3Action | undefined>()
+  const [stateChangesStatus, setStateChangesStatus] = useState<{
+    readonly traceHash?: string
+    readonly isLoading: boolean
+    readonly error?: string
+  }>({isLoading: false})
   const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
   const fetchNameRef = useRef(fetchName)
   const addressFormatRef = useRef(addressFormat)
   const loadedActionsByHashRef = useRef(new Map<string, LoadedTransactionActions>())
+  const stateChangesRequestedHashRef = useRef<string | undefined>(undefined)
   const showLoadingSkeleton = useDelayedLoadingVisibility(loading, 500)
   const {flowMetrics: treeFlowMetrics, rootRef: treeSectionRef} =
     useAvailableFlowMetrics<HTMLDivElement>(MAX_TRACE_TREE_FLOW_WIDTH)
@@ -290,6 +354,8 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     return highlightedIds.size > 0 ? highlightedIds : undefined
   }, [hoveredAction, traces])
   const isWideTraceTree = traces.length > WIDE_TRACE_TREE_TRANSACTION_THRESHOLD
+  const currentStateChangesStatus =
+    stateChangesStatus.traceHash === traceLookupHash.toLowerCase() ? stateChangesStatus : undefined
   const treeSectionStyle = useMemo<CSSProperties | undefined>(() => {
     if (!isWideTraceTree) {
       return undefined
@@ -319,7 +385,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     address: string,
     options: {readonly shorten: boolean},
   ): JSX.Element => (
-    <AddressChip
+    <ExplorerAddressChip
       address={address}
       onAddressClick={handleContractClick}
       resolveName={false}
@@ -432,6 +498,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     setExpandedRetraceHash(undefined)
     setRetraceAttempt(0)
     setHoveredAction(undefined)
+    stateChangesRequestedHashRef.current = undefined
     loadedActionsByHashRef.current.clear()
   }, [traceLookupHash])
 
@@ -454,6 +521,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       setVerifiedSourcesByCodeHash(new Map())
       setTraceActions([])
       setTraceActionMetadata({})
+      setTraceOverview(undefined)
       setHoveredAction(undefined)
       try {
         const data = await client.getTraces(traceLookupHash, {
@@ -548,15 +616,35 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
             }),
           )
 
-          const nextValueFlow = buildValueFlowItems(processed)
+          const actions = trace.actions ?? []
+          const nextTraceOverview: TraceOverviewData = {
+            traceId: trace.trace_id,
+            externalHash: trace.external_hash ?? undefined,
+            masterchainSeqnoStart: trace.mc_seqno_start,
+            masterchainSeqnoEnd: trace.mc_seqno_end,
+            startLt: trace.start_lt,
+            endLt: trace.end_lt,
+            startUtime: trace.start_utime,
+            endUtime: trace.end_utime,
+            isIncomplete: trace.is_incomplete,
+            transactionCount: trace.trace_info.transactions,
+            messageCount: trace.trace_info.messages,
+            pendingMessageCount: trace.trace_info.pending_messages,
+            traceState: trace.trace_info.trace_state,
+          }
+          const nextValueFlow = buildValueFlowItems(
+            processed,
+            buildActionValueFlowMovements(actions, data.metadata),
+          )
           if (isActive) {
             setTraces(processed)
             setContracts(contractsMap)
             setCompilerAbisByCodeHash(new Map(abiByCodeHash))
             setVerifiedSourcesByCodeHash(stateInitVerifiedSources)
             setValueFlow(nextValueFlow)
-            setTraceActions(trace.actions ?? [])
+            setTraceActions(actions)
             setTraceActionMetadata(data.metadata)
+            setTraceOverview(nextTraceOverview)
           }
         } else if (isActive) setError("Transaction not found or has no trace yet.")
       } catch (error) {
@@ -573,6 +661,62 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       isActive = false
     }
   }, [client, metadataRegistry, traceLookupHash, supportsTraceActions])
+
+  useEffect(() => {
+    const requestedHash = traceLookupHash.toLowerCase()
+    if (
+      activeTab !== "state-changes" ||
+      traces.length === 0 ||
+      stateChangesRequestedHashRef.current?.toLowerCase() === requestedHash
+    ) {
+      return
+    }
+
+    let isActive = true
+    let completed = false
+    stateChangesRequestedHashRef.current = requestedHash
+    setStateChangesStatus({traceHash: requestedHash, isLoading: true})
+
+    const loadTraceStateChanges = async () => {
+      try {
+        const {traceTransactionTree} = await import("../retrace/txTrace/lib/traceTx")
+        const replayedTrace = await traceTransactionTree(traceLookupHash, network)
+        if (!isActive) return
+
+        if (!replayedTrace.result.stateUpdateHashOk) {
+          const divergentTransactions = Object.values(replayedTrace.result.transactions).filter(
+            result => !result.stateUpdateHashOk,
+          ).length
+          throw new Error(
+            `State changes could not be verified for ${divergentTransactions} ${divergentTransactions === 1 ? "transaction" : "transactions"}`,
+          )
+        }
+
+        setTraces(currentTraces =>
+          withRetracedTraceStorage(currentTraces, replayedTrace.result.transactions),
+        )
+        setStateChangesStatus({traceHash: requestedHash, isLoading: false})
+        completed = true
+      } catch (error) {
+        console.error("Failed to retrace transaction tree:", error)
+        if (!isActive) return
+
+        setStateChangesStatus({
+          traceHash: requestedHash,
+          isLoading: false,
+          error: error instanceof Error ? error.message : "Failed to load decoded state changes",
+        })
+      }
+    }
+
+    void loadTraceStateChanges()
+    return () => {
+      isActive = false
+      if (!completed && stateChangesRequestedHashRef.current === requestedHash) {
+        stateChangesRequestedHashRef.current = undefined
+      }
+    }
+  }, [activeTab, network, traceLookupHash, traces.length])
 
   if (loading) {
     return showLoadingSkeleton ? (
@@ -648,7 +792,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       <div className={styles.content}>
         {traces.length > 0 && (
           <>
-            <Breadcrumbs
+            <ExplorerBreadcrumbs
               items={[
                 {
                   label: traceAddressDisplay,
@@ -709,8 +853,21 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                       emptyState="No actions found"
                       showTimeColumn={false}
                       interactiveRows={false}
+                      className={styles.valueFlowPanel}
                       onAddressClick={handleContractClick}
                       onActionHoverChange={setHoveredAction}
+                    />
+                  )}
+
+                  {activeTab === "state-changes" && (
+                    <TraceStateChangesPanel
+                      transactions={traces}
+                      contracts={contracts}
+                      verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
+                      resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+                      isLoading={currentStateChangesStatus?.isLoading ?? false}
+                      error={currentStateChangesStatus?.error}
+                      onContractClick={handleContractClick}
                     />
                   )}
 
@@ -727,9 +884,19 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                           getBlockPath={blockPath}
                           onBlockClick={handleBlockClick}
                           loadActions={loadTransactionActions}
+                          resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
                         />
                       ))}
                     </div>
+                  )}
+
+                  {activeTab === "details" && traceOverview && (
+                    <TraceOverviewTable
+                      data={traceOverview}
+                      transactions={traces}
+                      actionCount={supportsTraceActions ? traceActions.length : undefined}
+                      onBlockClick={handleBlockClick}
+                    />
                   )}
                 </div>
               </div>
@@ -758,6 +925,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                 getBlockPath={blockPath}
                 onBlockClick={handleBlockClick}
                 loadActions={loadTransactionActions}
+                resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
               />
             </div>
           </>
@@ -780,11 +948,19 @@ function TraceTabs({
   showEventOverview = false,
   onTabChange,
 }: TraceTabsProps): JSX.Element {
+  const activeTabRef = useRef<HTMLButtonElement>(null)
+
+  useLayoutEffect(() => {
+    if (disabled) return
+    activeTabRef.current?.scrollIntoView({block: "nearest", inline: "nearest"})
+  }, [activeTab, disabled])
+
   return (
     <div className={styles.tabs} aria-hidden={disabled ? "true" : undefined}>
       {showEventOverview && (
         <button
           type="button"
+          ref={activeTab === "event-overview" ? activeTabRef : undefined}
           className={`${styles.tab} ${activeTab === "event-overview" ? styles.tabActive : ""}`}
           onClick={() => onTabChange?.("event-overview")}
           disabled={disabled}
@@ -795,6 +971,7 @@ function TraceTabs({
       )}
       <button
         type="button"
+        ref={activeTab === "value-flow" ? activeTabRef : undefined}
         className={`${styles.tab} ${activeTab === "value-flow" ? styles.tabActive : ""}`}
         onClick={() => onTabChange?.("value-flow")}
         disabled={disabled}
@@ -804,12 +981,33 @@ function TraceTabs({
       </button>
       <button
         type="button"
+        ref={activeTab === "transactions" ? activeTabRef : undefined}
         className={`${styles.tab} ${activeTab === "transactions" ? styles.tabActive : ""}`}
         onClick={() => onTabChange?.("transactions")}
         disabled={disabled}
         tabIndex={disabled ? -1 : undefined}
       >
         <GitBranch size={16} /> Transactions
+      </button>
+      <button
+        type="button"
+        ref={activeTab === "state-changes" ? activeTabRef : undefined}
+        className={`${styles.tab} ${activeTab === "state-changes" ? styles.tabActive : ""}`}
+        onClick={() => onTabChange?.("state-changes")}
+        disabled={disabled}
+        tabIndex={disabled ? -1 : undefined}
+      >
+        <Database size={16} /> State Changes
+      </button>
+      <button
+        type="button"
+        ref={activeTab === "details" ? activeTabRef : undefined}
+        className={`${styles.tab} ${activeTab === "details" ? styles.tabActive : ""}`}
+        onClick={() => onTabChange?.("details")}
+        disabled={disabled}
+        tabIndex={disabled ? -1 : undefined}
+      >
+        <Info size={16} /> Details
       </button>
     </div>
   )
@@ -851,8 +1049,12 @@ function TransactionTraceSkeleton({
             <div className={styles.tabContent}>
               {activeTab === "transactions" ? (
                 <TraceDetailsSkeleton />
+              ) : activeTab === "state-changes" ? (
+                <StateChangesSkeleton />
               ) : activeTab === "event-overview" ? (
                 <ActionHistorySkeleton />
+              ) : activeTab === "details" ? (
+                <TraceOverviewSkeleton />
               ) : (
                 <ValueFlowSkeleton />
               )}
@@ -864,6 +1066,28 @@ function TransactionTraceSkeleton({
           <TraceTreeSkeleton />
         </div>
       </div>
+    </div>
+  )
+}
+
+function TraceOverviewSkeleton(): JSX.Element {
+  return (
+    <div className={styles.skeletonOverviewTable} aria-hidden="true">
+      {[0, 1, 2, 3, 4, 5].map(index => (
+        <div key={`trace-overview-skeleton-${index}`} className={styles.skeletonOverviewRow}>
+          <span className={styles.skeletonOverviewTitle}>
+            <span className={`${styles.skeleton} ${styles.skeletonOverviewLabel}`} />
+          </span>
+          <span className={styles.skeletonOverviewContent}>
+            {[0, 1, 2].map(itemIndex => (
+              <span
+                key={`trace-overview-skeleton-${index}-${itemIndex}`}
+                className={`${styles.skeleton} ${styles.skeletonOverviewValue}`}
+              />
+            ))}
+          </span>
+        </div>
+      ))}
     </div>
   )
 }
@@ -951,6 +1175,29 @@ function TraceDetailsSkeleton(): JSX.Element {
   )
 }
 
+function StateChangesSkeleton(): JSX.Element {
+  return (
+    <div className={styles.skeletonStateChanges} aria-hidden="true">
+      {[0, 1].map(index => (
+        <div key={`state-changes-skeleton-${index}`} className={styles.skeletonStateCard}>
+          <div className={styles.skeletonStateHeader}>
+            <span className={`${styles.skeleton} ${styles.skeletonStateAddress}`} />
+          </div>
+          <div className={styles.skeletonStateGrid}>
+            {[0, 1, 2, 3].map(cellIndex => (
+              <span
+                key={`state-changes-skeleton-${index}-${cellIndex}`}
+                className={`${styles.skeleton} ${styles.skeletonStateCell}`}
+              />
+            ))}
+          </div>
+          <span className={`${styles.skeleton} ${styles.skeletonStateStorage}`} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function TraceTreeSkeleton(): JSX.Element {
   return (
     <div className={styles.skeletonTree} aria-hidden="true">
@@ -981,6 +1228,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
   getBlockPath,
   onBlockClick,
   loadActions,
+  resolveVerifiedSourceByCodeHash,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null)
   const childrenRef = useRef<HTMLDivElement>(null)
@@ -1057,6 +1305,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
             getBlockPath={getBlockPath}
             onBlockClick={onBlockClick}
             loadActions={loadActions}
+            resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
           />
         </div>
         {children.length > 0 && (
@@ -1088,6 +1337,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
               getBlockPath={getBlockPath}
               onBlockClick={onBlockClick}
               loadActions={loadActions}
+              resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
             />
           ))}
         </div>

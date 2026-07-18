@@ -1,7 +1,33 @@
 .appShell {
+  --explorer-network-accent: linear-gradient(89deg, #2b82eb, #1cc8ff);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
-  background: var(--tonscan-bg);
-  color: var(--tonscan-text-primary);
+  background: var(--acton-color-canvas);
+  color: var(--acton-color-text);
+}
+
+.appShell[data-network-kind="testnet"] {
+  --explorer-network-accent: linear-gradient(89deg, #2d83ec, #1affa3);
+}
+
+.appShell[data-network-kind="custom"] {
+  --explorer-network-accent: linear-gradient(89deg, #f59e0b, #fb923c);
+}
+
+.appShell[data-network-kind="testnet"]::before,
+.appShell[data-network-kind="custom"]::before {
+  position: absolute;
+  z-index: 40;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--explorer-network-accent);
+  content: "";
+  pointer-events: none;
 }
 
 .header {
@@ -9,14 +35,14 @@
   z-index: 20;
   min-height: 52px;
   padding: 0 28px;
-  background: color-mix(in srgb, var(--tonscan-bg) 88%, transparent);
+  background: color-mix(in srgb, var(--acton-color-canvas) 88%, transparent);
   backdrop-filter: blur(16px) saturate(1.08);
   -webkit-backdrop-filter: blur(16px) saturate(1.08);
   box-sizing: border-box;
 }
 
 .headerHome {
-  background: var(--tonscan-bg);
+  background: var(--acton-color-canvas);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
@@ -56,7 +82,7 @@
   align-items: center;
   gap: 9px;
   min-width: 0;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-size: var(--font-size-md);
   font-weight: 850;
   line-height: 1;
@@ -78,9 +104,9 @@
   gap: 4px;
   margin-left: 0;
   padding: 2px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--tonscan-card-bg) 58%, transparent);
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 58%, transparent);
 }
 
 .navLink {
@@ -93,15 +119,15 @@
   border: 0;
   border-radius: 9px;
   background: transparent;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1;
   text-decoration: none;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .headerIconButton {
@@ -111,23 +137,23 @@
   box-sizing: border-box;
   min-height: 38px;
   padding: 0 10px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--tonscan-card-bg) 64%, transparent);
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 64%, transparent);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   text-decoration: none;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .navLink:hover,
 .headerIconButton:hover {
-  color: var(--tonscan-text-primary);
-  background: color-mix(in srgb, var(--litenode-surface-hover) 82%, transparent);
+  color: var(--acton-color-text);
+  background: color-mix(in srgb, var(--acton-color-surface-hover) 82%, transparent);
 }
 
 .headerActions {
@@ -152,32 +178,32 @@
   width: 128px;
   min-height: 38px;
   padding: 0 10px 0 12px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--tonscan-card-bg) 64%, transparent);
-  color: var(--tonscan-text-primary);
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 64%, transparent);
+  color: var(--acton-color-text);
   box-shadow: none;
   box-sizing: border-box;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    box-shadow var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    box-shadow var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .networkTrigger:hover,
 .networkTrigger[aria-expanded="true"] {
-  border-color: var(--litenode-border-strong);
-  background: color-mix(in srgb, var(--litenode-surface-hover) 82%, transparent);
+  border-color: var(--acton-color-border-strong);
+  background: color-mix(in srgb, var(--acton-color-surface-hover) 82%, transparent);
   box-shadow: none;
 }
 
 .networkTriggerLabel {
   overflow: hidden;
   color: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1;
   letter-spacing: 0;
   text-overflow: ellipsis;
@@ -191,10 +217,10 @@
   z-index: 40;
   width: 300px;
   padding: 6px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 10px;
-  background: var(--tonscan-card-bg);
-  box-shadow: var(--shadow-popover);
+  background: var(--acton-color-surface-raised);
+  box-shadow: var(--acton-shadow-popover);
   box-sizing: border-box;
   overflow: hidden;
   transform-origin: top right;
@@ -229,12 +255,12 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   text-align: left;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .networkOption {
@@ -244,7 +270,7 @@
 
 .networkOption:hover,
 .networkOption[data-active="true"] {
-  background: var(--litenode-surface-hover);
+  background: var(--acton-color-surface-hover);
 }
 
 .networkOptionRow {
@@ -254,12 +280,12 @@
   min-height: 48px;
   border-radius: 8px;
   background: transparent;
-  transition: background-color var(--transition-duration-fast);
+  transition: background-color var(--acton-duration-fast);
 }
 
 .networkOptionRow:hover,
 .networkOptionRow[data-active="true"] {
-  background: var(--litenode-surface-hover);
+  background: var(--acton-color-surface-hover);
 }
 
 .networkOptionSelect {
@@ -273,7 +299,7 @@
   padding: 0 8px 0 10px;
   border: 0;
   background: transparent;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   text-align: left;
   cursor: pointer;
 }
@@ -296,18 +322,18 @@
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   opacity: 0.78;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast),
-    opacity var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast),
+    opacity var(--acton-duration-fast);
 }
 
 .networkIconButton:hover {
-  background: var(--litenode-surface-active);
-  color: var(--tonscan-text-primary);
+  background: var(--acton-color-surface-active);
+  color: var(--acton-color-text);
   opacity: 1;
 }
 
@@ -320,9 +346,9 @@
 
 .networkOptionLabel {
   overflow: hidden;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.1;
   letter-spacing: 0;
   text-overflow: ellipsis;
@@ -331,9 +357,9 @@
 
 .networkOptionMeta {
   overflow: hidden;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.1;
   letter-spacing: 0;
   text-overflow: ellipsis;
@@ -343,7 +369,7 @@
 .networkMenuDivider {
   height: 1px;
   margin: 6px 4px;
-  background: var(--tonscan-border);
+  background: var(--acton-color-border);
 }
 
 .networkAddOption,
@@ -351,7 +377,7 @@
   justify-content: flex-start;
   gap: 8px;
   min-height: 36px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .networkAddButtonFrame {
@@ -387,8 +413,8 @@
 
 .networkAddOption:hover,
 .networkShareOption:hover {
-  color: var(--tonscan-text-primary);
-  background: var(--litenode-surface-hover);
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
 }
 
 .networkAddPanel {
@@ -430,9 +456,9 @@
 }
 
 .networkFormTitle {
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1;
 }
 
@@ -444,90 +470,21 @@
 }
 
 .networkFieldLabel {
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1;
   letter-spacing: 0;
 }
 
 .networkInput {
-  width: 100%;
-  height: 36px;
-  padding: 0 11px;
-  border: 1px solid var(--litenode-border-control);
-  border-radius: 8px;
-  background: var(--litenode-surface);
-  color: var(--tonscan-text-primary);
-  font: inherit;
-  font-size: var(--font-size-xs);
-  line-height: 1;
-  box-sizing: border-box;
-  outline: none;
-  transition:
-    border-color var(--transition-duration-fast),
-    box-shadow var(--transition-duration-fast),
-    background-color var(--transition-duration-fast);
+  font-size: var(--acton-font-size-xs);
 }
 
-.networkInput::placeholder {
-  color: var(--tonscan-text-secondary);
-}
-
-.networkInput:hover {
-  border-color: var(--litenode-border-strong);
-}
-
-.networkInput:focus-visible {
-  border-color: var(--litenode-border-strong);
-  box-shadow: 0 0 0 2px var(--litenode-focus);
-}
-
-.networkInput:disabled {
-  opacity: 0.7;
-}
-
-.networkCheckboxRow {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 10px;
+.networkCheckbox {
   min-height: 42px;
   margin-top: 4px;
   padding-inline: 3px;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  line-height: 1;
-  letter-spacing: 0;
-  cursor: pointer;
-}
-
-.networkCheckboxRow input {
-  width: 14px;
-  height: 14px;
-  margin: 1px 0 0;
-  accent-color: var(--tonscan-accent);
-}
-
-.networkCheckboxText {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.networkCheckboxLabel {
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  line-height: 1;
-}
-
-.networkCheckboxDescription {
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  line-height: 1.25;
 }
 
 .networkFormActions {
@@ -542,36 +499,36 @@
   padding: 0 10px;
   border-radius: 7px;
   font: inherit;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 1;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast),
-    box-shadow var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast),
+    box-shadow var(--acton-duration-fast);
 }
 
 .networkCancelButton {
   border: 1px solid transparent;
   background: transparent;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .networkCancelButton:hover {
-  color: var(--tonscan-text-primary);
-  background: var(--litenode-surface-hover);
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-hover);
 }
 
 .networkSubmitButton {
-  border: 1px solid var(--litenode-border-control);
-  background: var(--litenode-primary);
-  color: var(--litenode-primary-foreground);
+  border: 1px solid var(--acton-color-border-control);
+  background: var(--acton-color-primary);
+  color: var(--acton-color-primary-foreground);
 }
 
 .networkSubmitButton:hover {
-  background: var(--litenode-primary-hover);
+  background: var(--acton-color-primary-hover);
 }
 
 .headerActions [data-theme-toggle] {
@@ -579,8 +536,8 @@
   flex: 0 0 auto;
   min-height: 38px;
   padding: 5px;
-  border-color: var(--litenode-border-control);
-  background: color-mix(in srgb, var(--tonscan-card-bg) 64%, transparent);
+  border-color: var(--acton-color-border-control);
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 64%, transparent);
   box-sizing: border-box;
 }
 
@@ -608,11 +565,14 @@
 .networkCancelButton:focus-visible,
 .networkSubmitButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .main {
-  min-height: calc(100vh - 52px);
+  display: flex;
+  flex: 1 0 auto;
+  min-height: 0;
+  flex-direction: column;
 }
 
 @media (max-width: 640px) {

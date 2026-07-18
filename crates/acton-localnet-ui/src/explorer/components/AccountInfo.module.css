@@ -1,7 +1,7 @@
 .card {
   position: relative;
   height: 100%;
-  background: var(--tonscan-card-bg);
+  background: var(--acton-color-surface-raised);
   border: 0;
   border-radius: 12px;
   box-shadow: none;
@@ -51,9 +51,9 @@
 
 .label {
   flex: 0 0 144px;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 20px;
 }
 
@@ -64,17 +64,17 @@
   gap: 8px;
   min-width: 0;
   min-height: 20px;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
 }
 
 .primaryValue {
   min-width: 0;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
@@ -96,8 +96,8 @@
 }
 
 .contractTypeSeparator {
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
   line-height: 20px;
 }
 
@@ -111,31 +111,31 @@
 }
 
 .contractDescriptionTitle {
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .contractDescriptionText,
 .contractDescriptionLink {
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
 }
 
 .contractDescriptionLink {
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
   text-decoration: none;
 }
 
 .contractDescriptionLink:hover {
-  color: var(--tonscan-accent);
+  color: var(--acton-color-accent);
   text-decoration: underline;
 }
 
 .contractDescriptionLink:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .contractDescriptionLinks {
@@ -153,27 +153,27 @@
   min-width: 0;
   max-width: 100%;
   padding: 0;
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
   border-radius: 4px;
   text-decoration: none;
-  transition: color var(--transition-duration-fast);
+  transition: color var(--acton-duration-fast);
 }
 
 .contractDescriptionLinkItem:hover {
-  color: var(--tonscan-accent);
+  color: var(--acton-color-accent);
 }
 
 .contractDescriptionLinkItem:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .contractDescriptionLinkKind {
   display: block;
   min-width: 0;
-  color: color-mix(in srgb, var(--tonscan-text-secondary) 72%, transparent);
+  color: color-mix(in srgb, var(--acton-color-text-muted) 72%, transparent);
   font-size: 11px;
-  font-weight: var(--font-weight-normal);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 13px;
   text-transform: lowercase;
 }
@@ -182,8 +182,8 @@
   display: block;
   min-width: 0;
   color: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
   overflow-wrap: anywhere;
 }
@@ -193,7 +193,7 @@
 }
 
 .mutedValue {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .addressValue {
@@ -201,9 +201,9 @@
   flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -225,9 +225,9 @@
 
 .customName {
   min-width: 0;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   overflow-wrap: anywhere;
 }
@@ -241,23 +241,9 @@
 }
 
 .editInput {
-  width: 100%;
-  min-width: 0;
-  height: 36px;
-  box-sizing: border-box;
-  background: var(--litenode-surface-subtle);
-  border: 1px solid var(--litenode-border-control);
+  background: var(--acton-color-surface-raised);
   border-radius: 10px;
-  color: var(--tonscan-text-primary);
-  font: inherit;
-  font-size: var(--font-size-sm);
-  outline: none;
-  padding: 0 10px;
-}
-
-.editInput:focus {
-  border-color: var(--litenode-border-strong);
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  font-size: var(--acton-font-size-sm);
 }
 
 .renameSaveButton,
@@ -266,25 +252,25 @@
   padding: 0 12px;
   border-radius: 10px;
   font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast),
-    opacity var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast),
+    opacity var(--acton-duration-fast);
 }
 
 .renameSaveButton {
-  border: 1px solid var(--litenode-primary);
-  background: var(--litenode-primary);
-  color: var(--litenode-primary-foreground);
+  border: 1px solid var(--acton-color-primary);
+  background: var(--acton-color-primary);
+  color: var(--acton-color-primary-foreground);
 }
 
 .renameSaveButton:hover:not(:disabled) {
-  border-color: var(--litenode-primary-hover);
-  background: var(--litenode-primary-hover);
+  border-color: var(--acton-color-primary-hover);
+  background: var(--acton-color-primary-hover);
 }
 
 .renameSaveButton:disabled {
@@ -293,13 +279,13 @@
 }
 
 .renameCancelButton {
-  border: 1px solid var(--litenode-border-control);
-  background: var(--litenode-surface-subtle);
-  color: var(--tonscan-text-primary);
+  border: 1px solid var(--acton-color-border-control);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
 }
 
 .renameCancelButton:hover {
-  background: var(--litenode-control-hover);
+  background: var(--acton-color-surface-hover);
 }
 
 .iconButton,
@@ -311,22 +297,22 @@
   width: 16px;
   height: 16px;
   padding: 0;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .iconButton:hover,
 .qrToggle:hover {
   background: transparent;
   border-color: transparent;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .favoriteButtonActive {
@@ -342,7 +328,7 @@
 .moreLink:focus-visible,
 .externalLink:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .qrToggle {
@@ -359,7 +345,7 @@
 }
 
 .saveIcon {
-  color: var(--tonscan-success);
+  color: var(--acton-color-status-passed);
 }
 
 .assetRow {
@@ -377,7 +363,7 @@
   min-width: 0;
   min-height: 20px;
   padding: 0;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   background: transparent;
   border: 0;
   border-radius: 4px;
@@ -394,7 +380,7 @@
 .assetPreviewStack:focus-visible,
 .collectiblesLink:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .assetIconImage {
@@ -427,7 +413,7 @@
   width: 20px;
   height: 20px;
   box-sizing: border-box;
-  border: 2px solid var(--tonscan-card-bg);
+  border: 2px solid var(--acton-color-surface-raised);
   border-radius: 50%;
   flex: 0 0 auto;
 }
@@ -435,12 +421,12 @@
 .assetPreviewIcon {
   display: block;
   object-fit: cover;
-  background: var(--litenode-neutral-bg);
+  background: var(--acton-color-surface-group);
 }
 
 .assetPreviewPlaceholder {
   display: inline-block;
-  background: var(--litenode-neutral-bg);
+  background: var(--acton-color-surface-group);
 }
 
 .assetPreviewIcon + .assetPreviewIcon,
@@ -455,14 +441,14 @@
   align-items: center;
   min-height: 20px;
   padding: 0;
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
   background: transparent;
   border: 0;
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
 }
 
 .moreLink:hover {
@@ -496,13 +482,13 @@
 .collectibleThumb {
   display: block;
   object-fit: cover;
-  background: var(--litenode-neutral-bg);
+  background: var(--acton-color-surface-group);
 }
 
 .collectibleThumbPlaceholder {
   display: inline-block;
-  border: 1px solid var(--litenode-border-control);
-  background: var(--litenode-neutral-bg);
+  border: 1px solid var(--acton-color-border-control);
+  background: var(--acton-color-surface-group);
 }
 
 .statusBar {
@@ -514,8 +500,8 @@
   margin-top: auto;
   padding-top: 0;
   border-top: 0;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
   line-height: 18px;
 }
 
@@ -526,8 +512,8 @@
   min-height: 18px;
   padding: 0;
   border-radius: 0;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
 }
 
@@ -542,30 +528,30 @@
 
 .statusActive {
   background: transparent;
-  color: var(--tonscan-success);
+  color: var(--acton-color-status-passed);
 }
 
 .statusFrozen {
   background: transparent;
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
 }
 
 .statusUninit {
   background: transparent;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .statusNonexist {
   background: transparent;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .statusAddress {
   display: block;
   flex: 0 1 auto;
   min-width: 0;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
   line-height: 18px;
   font-variant-numeric: tabular-nums;
   overflow: hidden;
@@ -577,15 +563,15 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--tonscan-link);
-  font-size: var(--font-size-xs);
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-xs);
   line-height: 18px;
   border-radius: 6px;
   text-decoration: none;
 }
 
 .externalLink:hover {
-  color: var(--tonscan-accent);
+  color: var(--acton-color-accent);
   text-decoration: underline;
 }
 
@@ -626,7 +612,7 @@
   display: block;
   max-width: 100%;
   height: auto;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .qrPopover {
@@ -636,10 +622,10 @@
   z-index: 20;
   width: 204px;
   padding: 12px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 14px;
-  background: var(--tonscan-card-bg);
-  box-shadow: var(--litenode-shadow-popover);
+  background: var(--acton-color-surface-raised);
+  box-shadow: var(--acton-shadow-popover);
 }
 
 .qrPopoverHeader {
@@ -648,9 +634,9 @@
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 10px;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .qrPopoverBody {
@@ -659,16 +645,16 @@
   justify-content: center;
   min-height: 132px;
   border-radius: 10px;
-  background: var(--tonscan-card-bg);
+  background: var(--acton-color-surface-raised);
 }
 
 .skeleton {
   display: block;
   background: linear-gradient(
     90deg,
-    var(--tonscan-row-hover) 0%,
-    var(--litenode-control-hover) 45%,
-    var(--tonscan-row-hover) 90%
+    var(--acton-color-surface-row) 0%,
+    var(--acton-color-surface-hover) 45%,
+    var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;
   animation: skeleton-shimmer 1.15s ease-in-out infinite;
@@ -710,9 +696,9 @@
   height: 16px;
   background: linear-gradient(
     90deg,
-    var(--tonscan-row-hover) 0%,
-    var(--litenode-control-hover) 45%,
-    var(--tonscan-row-hover) 90%
+    var(--acton-color-surface-row) 0%,
+    var(--acton-color-surface-hover) 45%,
+    var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;
   border-radius: 999px;

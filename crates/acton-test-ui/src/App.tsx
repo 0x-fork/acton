@@ -1,104 +1,44 @@
 import type * as React from "react"
-import {useCallback, useEffect, useMemo, useRef, useState} from "react"
+import {PanelLeft} from "lucide-react"
+import {useCallback, useEffect, useRef, useState} from "react"
 import {FiWifiOff} from "react-icons/fi"
 
-import type {ThemeMode} from "@acton/ui"
-import type {TestReport, Trace} from "@acton/shared-ui"
+import type {TestReport} from "./types/test"
 
 import styles from "./App.module.css"
 import {Coverage} from "./components/Coverage/Coverage"
-import {GasProfile, type GasProfileReport} from "./components/GasProfile/GasProfile"
-import {DocsSidebarIcon} from "./components/Sidebar/DocsSidebarIcon"
+import {GasProfile} from "./components/GasProfile/GasProfile"
 import {Sidebar} from "./components/Sidebar/Sidebar"
 import {TestDetails} from "./components/TestDetails/TestDetails"
+import {useRunnerConnection} from "./hooks/useRunnerConnection"
+import {useTestTrace} from "./hooks/useTestTrace"
+import {useTestUiBootstrap} from "./hooks/useTestUiBootstrap"
 
-const RUNNER_HEALTH_POLL_INTERVAL_MS = 1500
 const SIDEBAR_TRANSITION_MS = 250
 
 type ActiveView = "tests" | "coverage" | "profile"
 
-const readInitialTheme = (): ThemeMode => {
-  const storedTheme = localStorage.getItem("theme")
-  if (storedTheme === "dark" || storedTheme === "light") {
-    return storedTheme
-  }
-
-  return globalThis.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-}
-
-const formatResponseError = (response: Response, body: string): string => {
-  const status = `${response.status} ${response.statusText}`.trim()
-  const trimmedBody = body.trim()
-
-  if (trimmedBody.length === 0) {
-    return status
-  }
-
-  try {
-    const json = JSON.parse(trimmedBody) as {error?: unknown}
-    if (typeof json.error === "string" && json.error.trim().length > 0) {
-      return `${status}: ${json.error}`
-    }
-  } catch {
-    // Fall through to the raw response body below.
-  }
-
-  return `${status}: ${trimmedBody.slice(0, 500)}`
-}
-
-const parseTraceResponse = async (
-  response: Response,
-  tracePath: string,
-): Promise<Trace | undefined> => {
-  if (response.status === 204) {
-    return undefined
-  }
-
-  const body = await response.text()
-
-  if (!response.ok) {
-    throw new Error(formatResponseError(response, body))
-  }
-
-  if (body.trim().length === 0) {
-    return undefined
-  }
-
-  try {
-    return JSON.parse(body) as Trace
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error)
-    throw new Error(`Trace ${tracePath} is not valid JSON: ${reason}`)
-  }
-}
-
 export const App: React.FC = () => {
-  const [reports, setReports] = useState<TestReport[]>([])
+  const {connectionLost, markConnected} = useRunnerConnection()
+  const {
+    reports,
+    reportsLoading: loading,
+    projectRoot,
+    capabilitiesLoaded,
+    coverageAvailable,
+    gasProfileAvailable,
+  } = useTestUiBootstrap(markConnected)
   const [selectedTest, setSelectedTest] = useState<TestReport | undefined>()
-  const [currentTrace, setCurrentTrace] = useState<Trace | undefined>()
-  const [currentTraceError, setCurrentTraceError] = useState<string | undefined>()
-  const [isCurrentTraceLoading, setIsCurrentTraceLoading] = useState(false)
-  const [projectRoot, setProjectRoot] = useState<string>("")
-  const [theme, setTheme] = useState<ThemeMode>(readInitialTheme)
-  const [loading, setLoading] = useState(true)
-  const [coverageLcov, setCoverageLcov] = useState<string | undefined>()
-  const [coverageLoaded, setCoverageLoaded] = useState(false)
-  const [gasProfile, setGasProfile] = useState<GasProfileReport | undefined>()
-  const [gasProfileLoaded, setGasProfileLoaded] = useState(false)
-  const [connectionLost, setConnectionLost] = useState(false)
+  const {
+    trace: currentTrace,
+    error: currentTraceError,
+    loading: isCurrentTraceLoading,
+  } = useTestTrace(selectedTest)
   const [activeView, setActiveView] = useState<ActiveView>(() => {
     const saved = localStorage.getItem("activeMainView")
     return saved === "coverage" || saved === "profile" ? saved : "tests"
   })
 
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark-theme", theme === "dark")
-    localStorage.setItem("theme", theme)
-  }, [theme])
-
-  const toggleTheme = useCallback(() => {
-    setTheme(prev => (prev === "light" ? "dark" : "light"))
-  }, [])
   const handleActiveViewChange = useCallback((view: ActiveView) => {
     setActiveView(view)
     localStorage.setItem("activeMainView", view)
@@ -123,60 +63,9 @@ export const App: React.FC = () => {
   const sidebarClosingTimeout = useRef<ReturnType<typeof globalThis.setTimeout> | undefined>(
     undefined,
   )
-  const hasConnectedToRunner = useRef(false)
-  const traceFetchController = useRef<AbortController | undefined>(undefined)
-  const traceFetchId = useRef(0)
-
-  const markRunnerConnected = useCallback(() => {
-    hasConnectedToRunner.current = true
-    setConnectionLost(false)
-  }, [])
-
   const handleSelectTest = useCallback((test: TestReport) => {
-    traceFetchController.current?.abort()
-    const fetchId = traceFetchId.current + 1
-    traceFetchId.current = fetchId
     setSelectedTest(test)
-    setCurrentTrace(undefined)
-    setCurrentTraceError(undefined)
     localStorage.setItem("selectedTest", `${test.suite_name}::${test.name}`)
-    if (test.trace_path) {
-      setIsCurrentTraceLoading(true)
-      const controller = new AbortController()
-      traceFetchController.current = controller
-      void fetch(`/api/trace/${encodeURIComponent(test.trace_path)}`, {signal: controller.signal})
-        .then(res => parseTraceResponse(res, test.trace_path ?? "<unknown>"))
-        .then(data => {
-          if (traceFetchId.current !== fetchId) return
-          setCurrentTrace(data)
-          setCurrentTraceError(undefined)
-        })
-        .catch((error: unknown) => {
-          if (error instanceof Error && error.name === "AbortError") {
-            return
-          }
-
-          const message = error instanceof Error ? error.message : String(error)
-          console.error("Failed to fetch trace", {
-            suite: test.suite_name,
-            test: test.name,
-            tracePath: test.trace_path,
-            error,
-          })
-          if (traceFetchId.current !== fetchId) return
-          setCurrentTrace(undefined)
-          setCurrentTraceError(message)
-        })
-        .finally(() => {
-          if (traceFetchId.current === fetchId) {
-            setIsCurrentTraceLoading(false)
-          }
-        })
-    } else {
-      setIsCurrentTraceLoading(false)
-      setCurrentTrace(undefined)
-      setCurrentTraceError(undefined)
-    }
   }, [])
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -309,145 +198,6 @@ export const App: React.FC = () => {
   }, [clearSidebarClosingTimeout, clearSidebarPinningTimeout])
 
   useEffect(() => {
-    const coverageController = new AbortController()
-    const gasProfileController = new AbortController()
-    const reportsController = new AbortController()
-    const configController = new AbortController()
-
-    void fetch("/api/config", {signal: configController.signal})
-      .then(async res => (await res.json()) as {project_root: string})
-      .then(data => {
-        markRunnerConnected()
-        setProjectRoot(data.project_root)
-      })
-      .catch(error => {
-        if (error instanceof Error && error.name === "AbortError") {
-          return
-        }
-
-        console.error("Failed to fetch config", error)
-      })
-
-    void fetch("/api/reports", {signal: reportsController.signal})
-      .then(async res => (await res.json()) as TestReport[])
-      .then(data => {
-        markRunnerConnected()
-        setReports(data)
-        setLoading(false)
-      })
-      .catch(error => {
-        if (error instanceof Error && error.name === "AbortError") {
-          return
-        }
-
-        console.error("Failed to fetch reports", error)
-        setLoading(false)
-      })
-
-    void fetch("/api/coverage.lcov", {signal: coverageController.signal})
-      .then(async response => {
-        if (response.status === 204) {
-          markRunnerConnected()
-          setCoverageLcov(undefined)
-          setCoverageLoaded(true)
-          return
-        }
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch coverage report: ${response.status}`)
-        }
-
-        const lcov = await response.text()
-        markRunnerConnected()
-        setCoverageLcov(lcov)
-        setCoverageLoaded(true)
-      })
-      .catch(error => {
-        if (error instanceof Error && error.name === "AbortError") {
-          return
-        }
-
-        console.error("Failed to fetch coverage report", error)
-        setCoverageLcov(undefined)
-        setCoverageLoaded(true)
-      })
-
-    void fetch("/api/gas-profile", {signal: gasProfileController.signal})
-      .then(async response => {
-        if (response.status === 204) {
-          markRunnerConnected()
-          setGasProfile(undefined)
-          setGasProfileLoaded(true)
-          return
-        }
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch gas profile: ${response.status}`)
-        }
-
-        const profile = (await response.json()) as GasProfileReport
-        markRunnerConnected()
-        setGasProfile(profile)
-        setGasProfileLoaded(true)
-      })
-      .catch(error => {
-        if (error instanceof Error && error.name === "AbortError") {
-          return
-        }
-
-        console.error("Failed to fetch gas profile", error)
-        setGasProfile(undefined)
-        setGasProfileLoaded(true)
-      })
-
-    return () => {
-      coverageController.abort()
-      gasProfileController.abort()
-      reportsController.abort()
-      configController.abort()
-    }
-  }, [markRunnerConnected])
-
-  useEffect(() => {
-    const checkRunnerConnection = () => {
-      const controller = new AbortController()
-
-      void fetch("/api/health", {
-        cache: "no-store",
-        signal: controller.signal,
-      })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Runner health check failed: ${response.status}`)
-          }
-
-          markRunnerConnected()
-        })
-        .catch(error => {
-          if (error instanceof Error && error.name === "AbortError") {
-            return
-          }
-
-          if (hasConnectedToRunner.current) {
-            setConnectionLost(true)
-          }
-        })
-
-      return controller
-    }
-
-    const currentController = checkRunnerConnection()
-    const intervalId = globalThis.setInterval(() => {
-      void checkRunnerConnection()
-    }, RUNNER_HEALTH_POLL_INTERVAL_MS)
-
-    return () => {
-      currentController.abort()
-      globalThis.clearInterval(intervalId)
-    }
-  }, [markRunnerConnected])
-
-  useEffect(() => {
     if (reports.length === 0) {
       return
     }
@@ -466,28 +216,19 @@ export const App: React.FC = () => {
   }, [handleSelectTest, reports, selectedTest])
 
   useEffect(() => {
-    if (coverageLoaded && coverageLcov === undefined && activeView === "coverage") {
+    if (capabilitiesLoaded && !coverageAvailable && activeView === "coverage") {
       handleActiveViewChange("tests")
     }
-    if (gasProfileLoaded && gasProfile === undefined && activeView === "profile") {
+    if (capabilitiesLoaded && !gasProfileAvailable && activeView === "profile") {
       handleActiveViewChange("tests")
     }
   }, [
     activeView,
-    coverageLcov,
-    coverageLoaded,
-    gasProfile,
-    gasProfileLoaded,
+    capabilitiesLoaded,
+    coverageAvailable,
+    gasProfileAvailable,
     handleActiveViewChange,
   ])
-
-  const selectedTestGasProfile = useMemo(() => {
-    if (selectedTest === undefined) {
-      return
-    }
-
-    return gasProfile?.tests?.find(profile => profile.name === selectedTest.name)
-  }, [gasProfile, selectedTest])
 
   if (loading && reports.length === 0) {
     return <div className={styles.loadingContainer}>Loading...</div>
@@ -554,8 +295,6 @@ export const App: React.FC = () => {
             onCollapse={toggleSidebar}
             isCollapsed={isSidebarCollapsed}
             className={styles.floatingSidebar}
-            theme={theme}
-            onToggleTheme={toggleTheme}
           />
         </div>
       </div>
@@ -568,7 +307,7 @@ export const App: React.FC = () => {
           aria-label="Expand sidebar"
           title="Expand sidebar"
         >
-          <DocsSidebarIcon />
+          <PanelLeft aria-hidden="true" />
         </button>
       )}
 
@@ -588,7 +327,7 @@ export const App: React.FC = () => {
       />
 
       <div className={styles.mainContent}>
-        {(coverageLcov !== undefined || gasProfile !== undefined) && (
+        {(coverageAvailable || gasProfileAvailable) && (
           <div className={styles.viewTabs} role="tablist" aria-label="Main view">
             <button
               type="button"
@@ -599,7 +338,7 @@ export const App: React.FC = () => {
             >
               Tests
             </button>
-            {coverageLcov !== undefined && (
+            {coverageAvailable && (
               <button
                 type="button"
                 role="tab"
@@ -612,7 +351,7 @@ export const App: React.FC = () => {
                 Coverage
               </button>
             )}
-            {gasProfile !== undefined && (
+            {gasProfileAvailable && (
               <button
                 type="button"
                 role="tab"
@@ -629,12 +368,12 @@ export const App: React.FC = () => {
         )}
 
         <div className={styles.mainPanel}>
-          {activeView === "profile" && gasProfile !== undefined ? (
+          {activeView === "profile" && gasProfileAvailable ? (
             <div className={styles.profileView}>
-              <GasProfile profile={gasProfile} projectRoot={projectRoot} />
+              <GasProfile projectRoot={projectRoot} />
             </div>
-          ) : activeView === "coverage" && coverageLcov !== undefined ? (
-            <Coverage lcov={coverageLcov} projectRoot={projectRoot} />
+          ) : activeView === "coverage" && coverageAvailable ? (
+            <Coverage projectRoot={projectRoot} />
           ) : selectedTest ? (
             <TestDetails
               test={selectedTest}
@@ -642,8 +381,8 @@ export const App: React.FC = () => {
               traceError={currentTraceError}
               isTraceLoading={isCurrentTraceLoading}
               projectRoot={projectRoot}
-              gasProfile={selectedTestGasProfile}
-              gasProfileLoaded={gasProfileLoaded}
+              gasProfileAvailable={gasProfileAvailable}
+              gasProfileAvailabilityLoaded={capabilitiesLoaded}
               isSidebarCollapsed={isSidebarCollapsed}
               onExpandSidebar={expandSidebar}
             />

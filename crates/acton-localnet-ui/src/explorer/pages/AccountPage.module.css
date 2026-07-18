@@ -11,17 +11,17 @@
 
 .loading {
   text-align: center;
-  padding: var(--spacing-xl);
-  color: var(--tonscan-text-secondary);
+  padding: var(--acton-space-8);
+  color: var(--acton-color-text-muted);
 }
 
 .empty {
   text-align: center;
-  padding: var(--spacing-xl);
-  color: var(--tonscan-text-secondary);
-  background-color: var(--tonscan-card-bg);
+  padding: var(--acton-space-8);
+  color: var(--acton-color-text-muted);
+  background-color: var(--acton-color-surface-raised);
   border-radius: 16px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
 }
 
 .accountIssue {
@@ -33,10 +33,10 @@
   background:
     linear-gradient(
       135deg,
-      color-mix(in srgb, var(--litenode-danger-bg-soft) 72%, transparent),
-      color-mix(in srgb, var(--tonscan-card-bg) 94%, var(--tonscan-error))
+      color-mix(in srgb, var(--acton-color-status-failed-surface) 72%, transparent),
+      color-mix(in srgb, var(--acton-color-surface-raised) 94%, var(--acton-color-status-failed))
     ),
-    var(--tonscan-card-bg);
+    var(--acton-color-surface-raised);
   box-sizing: border-box;
 }
 
@@ -46,25 +46,25 @@
 
 .accountIssueEyebrow {
   margin-bottom: 6px;
-  color: var(--tonscan-error);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-status-failed);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 16px;
 }
 
 .accountIssueTitle {
   margin: 0;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-size: 1.25rem;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--acton-font-weight-bold);
   line-height: 28px;
 }
 
 .accountIssueDescription {
   max-width: 72ch;
   margin: 8px 0 0;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
   line-height: 20px;
 }
 
@@ -75,23 +75,23 @@
   max-width: 76ch;
   margin: 14px 0 0;
   padding: 8px 10px;
-  color: var(--tonscan-text-primary);
-  background: var(--tonscan-bg-secondary);
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-raised);
   border-radius: 10px;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
 }
 
 .accountIssueHintLabel {
   flex: 0 0 auto;
-  color: var(--tonscan-text-primary);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .accountIssueHintText {
   min-width: 0;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   overflow-wrap: anywhere;
 }
 
@@ -130,7 +130,7 @@
   min-width: 0;
   min-height: 133px;
   padding: 20px 24px;
-  background: var(--tonscan-card-bg);
+  background: var(--acton-color-surface-raised);
   border: 0;
   border-radius: 12px;
   box-shadow: none;
@@ -177,9 +177,9 @@
 .jettonName {
   display: block;
   min-width: 0;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 20px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -188,17 +188,17 @@
 
 .jettonSymbol {
   margin-top: 0;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
 }
 
 .jettonSupply {
   min-width: 0;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -209,14 +209,14 @@
   align-self: flex-start;
   min-height: 18px;
   padding: 0;
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
   background: transparent;
   border: 0;
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
 }
 
@@ -226,44 +226,12 @@
 
 .jettonMetadataButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
-}
-
-.addressCopyButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  color: var(--tonscan-text-secondary);
-  background: transparent;
-  border: 0;
-  border-radius: 7px;
-  cursor: pointer;
-  transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
-}
-
-.addressCopyButton:hover {
-  color: var(--tonscan-text-primary);
-  background: var(--tonscan-bg-secondary);
-}
-
-.addressCopyButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
-}
-
-.addressCopyButtonCopied {
-  color: var(--tonscan-text-primary);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .jettonDescription {
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
   line-height: 1.5;
   max-width: 68ch;
   overflow-wrap: anywhere;
@@ -271,7 +239,7 @@
 
 .jettonDivider {
   height: 1px;
-  background: var(--tonscan-border);
+  background: var(--acton-color-border);
 }
 
 .accountDetailRows {
@@ -295,17 +263,17 @@
 }
 
 .accountDetailLabel {
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
   line-height: 20px;
 }
 
 .accountDetailValue {
   min-width: 0;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -324,27 +292,12 @@
   max-width: calc(100% - 28px);
 }
 
-.accountDetailLink {
-  color: var(--tonscan-text-primary);
-  cursor: pointer;
-  border-radius: 6px;
-}
-
-.accountDetailLink:hover {
-  color: var(--tonscan-link);
-}
-
-.accountDetailLink:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
-}
-
 .nftPanel {
   min-width: 0;
   min-height: 133px;
   padding: 24px;
   border-radius: 12px;
-  background: var(--tonscan-card-bg);
+  background: var(--acton-color-surface-raised);
   box-sizing: border-box;
 }
 
@@ -366,7 +319,7 @@
 .nftPanelDivider {
   height: 1px;
   margin: 18px 0 20px;
-  background: var(--tonscan-border);
+  background: var(--acton-color-border);
 }
 
 .nftPanelBody {
@@ -386,9 +339,9 @@
 
 .nftPanelTitle {
   min-width: 0;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-size: 1rem;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--acton-font-weight-bold);
   line-height: 22px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -399,14 +352,14 @@
   align-self: flex-start;
   min-height: 18px;
   padding: 0;
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
   background: transparent;
   border: 0;
   border-radius: 4px;
   cursor: pointer;
   font: inherit;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
 }
 
@@ -416,14 +369,14 @@
 
 .nftPanelMetadataButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .nftPanelDescription {
   max-width: 56ch;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   display: -webkit-box;
   overflow: hidden;
@@ -437,7 +390,7 @@
   width: 120px;
   aspect-ratio: 1;
   border-radius: 12px;
-  background: var(--tonscan-bg-secondary);
+  background: var(--acton-color-surface-raised);
   overflow: hidden;
 }
 
@@ -470,7 +423,7 @@
   box-sizing: border-box;
   padding: 24px;
   overflow: auto;
-  background: var(--tonscan-card-bg);
+  background: var(--acton-color-surface-raised);
   border-radius: 12px;
   box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.12),
@@ -479,9 +432,9 @@
 
 .metadataTitle {
   margin: 0;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-size: 1.25rem;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--acton-font-weight-bold);
   line-height: 24px;
 }
 
@@ -502,9 +455,9 @@
   gap: 6px;
   min-width: 0;
   margin-bottom: 14px;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-size: 1.25rem;
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--acton-font-weight-bold);
   line-height: 24px;
 }
 
@@ -538,24 +491,24 @@
   width: 22px;
   height: 22px;
   padding: 0;
-  color: var(--tonscan-card-bg);
-  background: var(--tonscan-text-secondary);
+  color: var(--acton-color-surface-raised);
+  background: var(--acton-color-text-muted);
   border: 0;
   border-radius: 50%;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .metadataCloseButton:hover {
-  color: var(--tonscan-card-bg);
-  background: var(--tonscan-text-primary);
+  color: var(--acton-color-surface-raised);
+  background: var(--acton-color-text);
 }
 
 .metadataCloseButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .metadataSummary {
@@ -574,9 +527,9 @@
 
 .metadataLabel {
   flex: 0 0 144px;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-bold);
   line-height: 20px;
 }
 
@@ -584,34 +537,19 @@
   display: block;
   flex: 1 1 auto;
   min-width: 0;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.metadataLink {
-  color: var(--tonscan-link);
-  cursor: pointer;
-}
-
-.metadataLink:hover {
-  text-decoration: underline;
-}
-
-.metadataLink:focus-visible {
-  outline: none;
-  border-radius: 6px;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
-}
-
 .metadataDescription {
   margin: 0;
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
   line-height: 20px;
 }
 
@@ -619,7 +557,7 @@
   position: relative;
   min-width: 0;
   overflow: hidden;
-  background: var(--litenode-control-hover);
+  background: var(--acton-color-surface-hover);
   border-radius: 12px;
 }
 
@@ -634,7 +572,7 @@
   width: 24px;
   height: 24px;
   padding: 0;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   background: transparent;
   border: 0;
   border-radius: 8px;
@@ -642,31 +580,18 @@
 }
 
 .metadataJsonCopyButton:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .metadataJsonCopyButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .metadataJson {
-  margin: 0;
-  padding: 16px 44px 16px 16px;
-  overflow: auto;
-  color: var(--tonscan-text-primary);
-  background: transparent;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  line-height: 18px;
-}
-
-.metadataJsonKey {
-  color: var(--tonscan-text-primary);
-}
-
-.metadataJsonValue {
-  color: var(--tonscan-link);
+  --acton-highlighted-code-font-size: var(--acton-font-size-xs);
+  --acton-highlighted-code-line-height: 18px;
+  --acton-highlighted-code-padding: 16px 44px 16px 16px;
 }
 
 @media (max-width: 1100px) {
@@ -776,12 +701,12 @@
 
   .metadataLabel {
     flex-basis: auto;
-    font-size: var(--font-size-sm);
+    font-size: var(--acton-font-size-sm);
   }
 
   .metadataValue,
   .metadataDescription {
-    font-size: var(--font-size-sm);
+    font-size: var(--acton-font-size-sm);
   }
 
   .metadataJsonFrame {
@@ -790,7 +715,7 @@
 
   .metadataJson {
     padding: 16px 40px 16px 16px;
-    font-size: var(--font-size-xs);
+    font-size: var(--acton-font-size-xs);
   }
 
   .metadataJsonCopyButton {

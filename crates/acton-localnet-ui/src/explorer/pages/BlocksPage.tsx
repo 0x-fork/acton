@@ -1,17 +1,17 @@
 import {Check, ChevronLeft, ChevronRight, ChevronsRight, Copy} from "lucide-react"
 import {Link, useNavigate, useParams} from "react-router-dom"
-import {Button} from "@acton/shared-ui"
+import {Button} from "@acton/ui"
 import {useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 
 import type {TonClient} from "../api/client"
 import type {V3Block, V3TransactionListItem} from "../api/types"
-import {Breadcrumbs} from "../components/Breadcrumbs"
+import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {
   DeveloperTransactionList,
   DeveloperTransactionListSkeleton,
 } from "../components/DeveloperTransactionList"
-import {AddressChip} from "../components/AddressChip"
+import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {hashToHex} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
@@ -132,7 +132,7 @@ export const BlocksPage: FC<BlocksPageProps> = ({client}) => {
 
   return (
     <div className={styles.container}>
-      <Breadcrumbs items={[{label: "Blocks"}]} />
+      <ExplorerBreadcrumbs items={[{label: "Blocks"}]} />
       <section className={styles.hero}>
         <div>
           <h1 className={styles.title}>Blocks</h1>
@@ -301,7 +301,7 @@ export const BlockDetailsPage: FC<BlocksPageProps> = ({client}) => {
 
   return (
     <div className={styles.container}>
-      <Breadcrumbs
+      <ExplorerBreadcrumbs
         items={[
           {label: "Blocks", path: routes.blocksPath},
           {label: hasValidRoute ? `${title} ${seqno}` : title},
@@ -320,33 +320,33 @@ export const BlockDetailsPage: FC<BlocksPageProps> = ({client}) => {
               type="button"
               variant="outline"
               size="sm"
+              leadingIcon={<ChevronLeft size={14} />}
               disabled={!prevPath}
               onClick={() => prevPath && void navigate(prevPath)}
             >
-              <ChevronLeft size={14} />
               Prev block
             </Button>
             <Button
               type="button"
               variant="outline"
               size="sm"
+              trailingIcon={<ChevronRight size={14} />}
               disabled={!nextPath}
               onClick={() => nextPath && void navigate(nextPath)}
             >
               Next block
-              <ChevronRight size={14} />
             </Button>
             <Button
               type="button"
               variant="outline"
               size="sm"
+              trailingIcon={<ChevronsRight size={14} />}
               disabled={
                 !latestPath || (state.block !== undefined && latestPath === blockPath(state.block))
               }
               onClick={() => latestPath && void navigate(latestPath)}
             >
               Latest
-              <ChevronsRight size={14} />
             </Button>
           </div>
         ) : null}
@@ -434,7 +434,13 @@ const BlockTableSection: FC<{
                   </Link>
                 </td>
                 <td>{block.tx_count.toLocaleString()}</td>
-                <td title={formatAbsoluteBlockTime(block)}>{formatCompactBlockTime(block)}</td>
+                <td
+                  title={formatAbsoluteBlockTime(block)}
+                  data-visual-dynamic="time"
+                  data-visual-placeholder="<time>"
+                >
+                  {formatCompactBlockTime(block)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -483,7 +489,7 @@ const BlockTransactionsTable: FC<{
               >
                 <td>{index + 1}</td>
                 <td>
-                  <AddressChip
+                  <ExplorerAddressChip
                     address={transaction.account}
                     fallback="Account"
                     onAddressClick={onOpenAccount}
@@ -627,6 +633,7 @@ const BlockSummaryTable: FC<{readonly block: V3Block}> = ({block}) => {
         label="Generated at"
         value={formatAbsoluteBlockTime(block)}
         title={formatAbsoluteBlockTime(block)}
+        visualPlaceholder="<time>"
       />
       <SummaryItem label="Root hash" value={block.root_hash} copyValue={block.root_hash} mono />
       <SummaryItem label="File hash" value={block.file_hash} copyValue={block.file_hash} mono />
@@ -642,14 +649,24 @@ interface SummaryItemProps {
   readonly title?: string
   readonly copyValue?: string
   readonly mono?: boolean
+  readonly visualPlaceholder?: string
 }
 
-const SummaryItem: FC<SummaryItemProps> = ({label, value, title, copyValue, mono = false}) => (
+const SummaryItem: FC<SummaryItemProps> = ({
+  label,
+  value,
+  title,
+  copyValue,
+  mono = false,
+  visualPlaceholder,
+}) => (
   <div className={styles.blockSummaryRow}>
     <span className={styles.blockSummaryLabel}>{label}</span>
     <span
       className={`${styles.blockSummaryValue} ${copyValue ? styles.blockSummaryValueWithCopy : ""} ${mono ? styles.blocksMonoCell : ""}`}
       title={title ?? value}
+      data-visual-dynamic={visualPlaceholder ? "time" : undefined}
+      data-visual-placeholder={visualPlaceholder}
     >
       {copyValue ? (
         <>

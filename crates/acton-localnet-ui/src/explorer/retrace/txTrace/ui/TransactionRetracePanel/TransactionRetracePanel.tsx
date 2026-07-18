@@ -1,19 +1,18 @@
-import {type CSSProperties, useEffect, useState} from "react"
+import {Suspense, lazy, type CSSProperties, useEffect, useState} from "react"
 import {X} from "lucide-react"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
-import {useToast} from "@acton/ui"
-import type {ContractData} from "@acton/shared-ui"
+import {InlineLoader, useToast} from "@acton/ui"
+import type {ContractData} from "@acton/transaction-ui"
 
 import {useNetworkInfo} from "../../../../hooks/useNetworkInfo"
 import {useAvailableFlowMetrics} from "../../../../hooks/useAvailableFlowMetrics"
 import type {ExplorerMetadataRegistry} from "../../../../metadata/types"
-import {traceTx} from "../../lib/traceTx"
 import type {RetraceResultAndCode} from "../../lib/types"
-import InlineLoader from "../InlineLoader"
-import RetraceWorkspace from "../RetraceWorkspace"
 import "../../../Retrace.tokens.css"
 import styles from "./TransactionRetracePanel.module.css"
+
+const RetraceWorkspace = lazy(() => import("../RetraceWorkspace"))
 
 type RetracePanelState =
   | {readonly type: "loading"}
@@ -61,6 +60,7 @@ export default function TransactionRetracePanel({
       setState({type: "loading"})
 
       try {
+        const {traceTx} = await import("../../lib/traceTx")
         const result = await traceTx(txHash, network, metadataRegistry, {codeHash})
         if (isActive) {
           setState({type: "ready", result})
@@ -114,11 +114,7 @@ export default function TransactionRetracePanel({
       <div className={styles.content}>
         {state.type === "loading" && (
           <div className={styles.loadingState}>
-            <InlineLoader
-              message="Tracing transaction"
-              subtext="This may take a few moments"
-              loading={true}
-            />
+            <InlineLoader message="Tracing transaction" subtext="This may take a few moments" />
           </div>
         )}
 
@@ -130,12 +126,20 @@ export default function TransactionRetracePanel({
         )}
 
         {state.type === "ready" && (
-          <RetraceWorkspace
-            result={state.result}
-            contractAbi={contractAbi}
-            contracts={contracts}
-            onContractClick={onContractClick}
-          />
+          <Suspense
+            fallback={
+              <div className={styles.loadingState}>
+                <InlineLoader message="Loading debug workspace" subtext="Preparing trace view" />
+              </div>
+            }
+          >
+            <RetraceWorkspace
+              result={state.result}
+              contractAbi={contractAbi}
+              contracts={contracts}
+              onContractClick={onContractClick}
+            />
+          </Suspense>
         )}
       </div>
     </div>
