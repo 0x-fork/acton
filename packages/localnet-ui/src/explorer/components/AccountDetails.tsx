@@ -1461,7 +1461,9 @@ export function ActionHistoryTable({
             <DataTableHeaderCell columnWidth="11rem">Action</DataTableHeaderCell>
             <DataTableHeaderCell>Address</DataTableHeaderCell>
             <DataTableHeaderCell columnWidth="9rem" aria-label="Details" />
-            <DataTableHeaderCell align="right">Value</DataTableHeaderCell>
+            <DataTableHeaderCell align="right" columnWidth="12rem">
+              Value
+            </DataTableHeaderCell>
           </DataTableRow>
         </DataTableHead>
         <DataTableBody>

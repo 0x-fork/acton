@@ -644,11 +644,14 @@
 }
 
 .valueContainer {
+  width: 12rem;
+  min-width: 12rem;
   text-align: right;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   justify-content: center;
+  white-space: nowrap;
 }
 
 th.valueContainer {

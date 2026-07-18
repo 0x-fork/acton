@@ -32,7 +32,7 @@ export function ValueFlowTable({
   const totalFee = items.reduce((sum, item) => sum + item.fee, 0n)
   const showTotal = items.length > 1
   const assets = collectAssets(items)
-  const numericColumnWidth = `${66 / (assets.length + 2)}%`
+  const numericColumnWidth = "12rem"
   const sortedItems = items.toSorted((left, right) => {
     const leftLetter = contracts.get(left.address)?.letter
     const rightLetter = contracts.get(right.address)?.letter
@@ -51,11 +51,11 @@ export function ValueFlowTable({
   })
 
   return (
-    <DataTable className={className} minWidth={`${34 + assets.length * 10}rem`}>
+    <DataTable className={className} minWidth={`${20 + (assets.length + 2) * 12}rem`}>
       <DataTableTable aria-label="Value flow" rowDividers={false}>
         <DataTableHead>
           <DataTableRow>
-            <DataTableHeaderCell columnWidth="34%">Account</DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth="20rem">Account</DataTableHeaderCell>
             <DataTableHeaderCell align="right" columnWidth={numericColumnWidth}>
               Balance Change
             </DataTableHeaderCell>

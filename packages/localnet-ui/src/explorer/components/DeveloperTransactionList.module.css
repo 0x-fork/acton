@@ -11,7 +11,7 @@
 
 .table {
   width: 100%;
-  min-width: 680px;
+  min-width: 720px;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -164,7 +164,8 @@
 
 .valueHeader,
 .valueCell {
-  width: 144px;
+  width: 12rem;
+  min-width: 12rem;
   text-align: right !important;
   white-space: nowrap;
 }
@@ -256,7 +257,7 @@
 
 @media (max-width: 720px) {
   .table {
-    min-width: 640px;
+    min-width: 720px;
   }
 
   .table th,
@@ -274,10 +275,5 @@
   .opcodeHeader,
   .opcodeCell {
     width: 190px;
-  }
-
-  .valueHeader,
-  .valueCell {
-    width: 132px;
   }
 }

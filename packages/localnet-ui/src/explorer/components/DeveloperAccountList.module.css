@@ -157,6 +157,7 @@
 .balanceHeader,
 .balanceCell {
   width: 260px;
+  min-width: 12rem;
   padding-right: 18px !important;
   text-align: right !important;
   white-space: nowrap;
@@ -261,7 +262,7 @@
 
   .balanceHeader,
   .balanceCell {
-    width: 184px;
+    width: 12rem;
     padding-right: 18px !important;
   }
 }
