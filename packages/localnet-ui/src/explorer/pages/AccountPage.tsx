@@ -87,6 +87,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
   const [currentNftCollectionItems, setCurrentNftCollectionItems] = useState<NftItem[]>([])
   const [nftItems, setNftItems] = useState<NftItem[]>([])
   const [holders, setHolders] = useState<JettonWallet[]>([])
+  const [holdersLoadedAccountKey, setHoldersLoadedAccountKey] = useState<string | undefined>()
   const [jettonWalletsLoading, setJettonWalletsLoading] = useState(false)
   const [jettonWalletLoading, setJettonWalletLoading] = useState(false)
   const [nftItemsLoading, setNftItemsLoading] = useState(false)
@@ -165,6 +166,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
         setCurrentNftCollectionItems([])
         setNftItems([])
         setHolders([])
+        setHoldersLoadedAccountKey(undefined)
         setJettonWalletsLoading(false)
         setJettonWalletLoading(false)
         setNftItemsLoading(false)
@@ -206,6 +208,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
         setCurrentNftCollectionItems([])
         setNftItems([])
         setHolders([])
+        setHoldersLoadedAccountKey(undefined)
         setJettonWalletsLoading(false)
         setJettonWalletLoading(false)
         setNftItemsLoading(false)
@@ -243,6 +246,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
           setCurrentNftCollectionItems([])
           setNftItems([])
           setHolders([])
+          setHoldersLoadedAccountKey(undefined)
           setJettonWalletsLoading(false)
           setJettonWalletLoading(false)
           setNftItemsLoading(false)
@@ -681,7 +685,12 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     let isActive = true
 
     const loadHolders = async () => {
-      if (!formattedAddress || activeTab !== "holders" || !isJettonMasterAccount) {
+      if (
+        !formattedAddress ||
+        activeTab !== "holders" ||
+        !isJettonMasterAccount ||
+        holdersLoadedAccountKey === accountRequestKey
+      ) {
         return
       }
 
@@ -695,7 +704,10 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
       } catch (error) {
         console.error("Failed to fetch jetton holders", error)
       } finally {
-        if (isActive) setHoldersLoading(false)
+        if (isActive) {
+          setHoldersLoadedAccountKey(accountRequestKey)
+          setHoldersLoading(false)
+        }
       }
     }
 
@@ -703,7 +715,19 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     return () => {
       isActive = false
     }
-  }, [accountAddressKey, activeTab, client, isJettonMasterAccount])
+  }, [
+    accountAddressKey,
+    accountRequestKey,
+    activeTab,
+    client,
+    holdersLoadedAccountKey,
+    isJettonMasterAccount,
+  ])
+
+  const holdersPending =
+    holdersLoading ||
+    (activeTab === "holders" &&
+      (accountLoading || (isJettonMasterAccount && holdersLoadedAccountKey !== accountRequestKey)))
 
   const handleSearch = (addr: string, event?: ExplorerNavigationClickEvent) => {
     const finalAddr = addr ? normalizeAddress(addr, addressFormat) : ""
@@ -711,6 +735,10 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
   }
 
   const handleTabChange = (tab: string) => {
+    if (tab === "holders" && holdersLoadedAccountKey !== accountRequestKey) {
+      setHoldersLoading(true)
+    }
+
     const hash = tab === "contract" ? "contract-storage" : tab
     void navigate(`${location.pathname}#${hash}`, {replace: true})
   }
@@ -1051,7 +1079,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
             holders={holders}
             tokensLoading={jettonWalletsLoading}
             nftsLoading={nftItemsLoading}
-            holdersLoading={holdersLoading}
+            holdersLoading={holdersPending}
             transactionsLoading={transactionsLoading}
             transactionsError={accountUnavailable ? undefined : transactionsError}
             transactionsHasMore={transactionsHasMore}

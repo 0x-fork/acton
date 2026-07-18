@@ -1,89 +1,7 @@
-import {Button, Dialog, RawDataBlock} from "@acton/ui"
-import {useState} from "react"
+import {createElement} from "react"
 
-import styles from "./dialogGallery.module.css"
+import {DialogGallerySamples} from "./dialogGallerySamples"
 import type {ComponentGallery} from "./types"
-
-const metadataJson = JSON.stringify(
-  {
-    address: "0:b113a994b5024a16719f69139328eb759596c38a25f59028b146fecdc3621dfe",
-    decimals: "6",
-    name: "Tether USD",
-    symbol: "USD₮",
-  },
-  undefined,
-  2,
-)
-const diagnosticEntries = Array.from({length: 18}, (_, index) => `Diagnostic entry ${index + 1}`)
-
-function StandardDialogSample() {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <article className={styles.sample}>
-      <div className={styles.sampleText}>
-        <h4>Inspection dialog</h4>
-        <p>A compact modal combines structured details with existing technical-data components.</p>
-      </div>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
-        Open dialog
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen} title="Metadata" maxWidth="38rem">
-        <div className={styles.dialogContent}>
-          <div className={styles.identity}>
-            <span className={styles.avatar} aria-hidden="true">
-              T
-            </span>
-            <div>
-              <h3>Tether USD</h3>
-              <p>Tether Token for Tether USD</p>
-            </div>
-          </div>
-          <dl className={styles.details}>
-            <div>
-              <dt>Symbol</dt>
-              <dd>USD₮</dd>
-            </div>
-            <div>
-              <dt>Mintable</dt>
-              <dd>true</dd>
-            </div>
-          </dl>
-          <RawDataBlock title="Raw metadata" value={metadataJson} copyLabel="metadata JSON" />
-        </div>
-      </Dialog>
-    </article>
-  )
-}
-
-function ScrollingDialogSample() {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <article className={styles.sample}>
-      <div className={styles.sampleText}>
-        <h4>Long content</h4>
-        <p>The shared frame stays inside the viewport while only the dialog content scrolls.</p>
-      </div>
-      <Button variant="outline" onClick={() => setOpen(true)}>
-        Open long dialog
-      </Button>
-      <Dialog
-        open={open}
-        onOpenChange={setOpen}
-        title="Trace diagnostics"
-        description="A deliberately long example for viewport and focus checks."
-        maxWidth="34rem"
-      >
-        <ol className={styles.longList}>
-          {diagnosticEntries.map(entry => (
-            <li key={entry}>{entry}</li>
-          ))}
-        </ol>
-      </Dialog>
-    </article>
-  )
-}
 
 export const dialogGallery = {
   id: "dialog",
@@ -111,12 +29,7 @@ export const dialogGallery = {
       title: "Display States",
       description:
         "Standard and long-content dialogs exercise composition, dismissal, focus management, and viewport scrolling.",
-      content: (
-        <div className={styles.sampleGrid}>
-          <StandardDialogSample />
-          <ScrollingDialogSample />
-        </div>
-      ),
+      content: createElement(DialogGallerySamples),
     },
   ],
 } satisfies ComponentGallery

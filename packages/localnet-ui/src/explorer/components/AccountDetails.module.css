@@ -1,4 +1,5 @@
 .historyHeaderRow {
+  background: var(--acton-color-surface-raised);
   border-bottom: 0 !important;
 }
 
@@ -7,6 +8,7 @@
 }
 
 .historyHeaderGroup {
+  background: var(--acton-color-surface-raised);
   border-bottom: 0 !important;
 }
 
@@ -24,7 +26,7 @@
 }
 
 .table thead {
-  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
 }
 
 .table tbody tr:last-child {
@@ -41,11 +43,27 @@
 }
 
 .table th {
-  height: 3rem;
+  box-sizing: border-box;
+  height: 2.25rem;
   padding: 0 var(--acton-space-4);
+  border-bottom: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-2xs);
+  font-weight: var(--acton-font-weight-semibold);
+  letter-spacing: 0;
+  line-height: 1;
   text-align: left;
+  text-transform: uppercase;
   vertical-align: middle;
-  font-weight: var(--acton-font-weight-utility);
+  white-space: nowrap;
+}
+
+.table th:first-child {
+  padding-left: var(--acton-space-5);
+}
+
+.table th:last-child {
+  padding-right: var(--acton-space-5);
 }
 
 .table td {
@@ -367,9 +385,10 @@
 
 .tableHeader {
   color: var(--acton-color-text-muted) !important;
-  text-transform: uppercase;
-  font-size: var(--acton-font-size-xs) !important;
-  letter-spacing: 0.05em;
+  font-size: var(--acton-font-size-2xs) !important;
+  font-weight: var(--acton-font-weight-semibold);
+  letter-spacing: 0;
+  line-height: 1;
 }
 
 .row {
