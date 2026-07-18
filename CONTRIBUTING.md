@@ -328,7 +328,7 @@ just test-ui-e2e-update
 ```
 
 Commit the updated files under
-`crates/acton-test-ui/e2e/__image_snapshots__/`.
+`packages/test-ui/e2e/__image_snapshots__/`.
 
 Useful E2E environment variables:
 
@@ -607,7 +607,7 @@ Use this as a quick local matrix before pushing:
 | Change type                                                                                                  | Required local checks                                                                                           |
 | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
 | Rust-only code                                                                                               | `just check`                                                                                                    |
-| UI code (`crates/acton-*-ui`, root `package.json`)                                                           | `just check` + `just build-ui` + `just check-ui`; for Test UI behavior/screenshots also run `just test-ui-e2e`  |
+| UI code (`packages/`, root `package.json`)                                                                    | `just check` + `just build-ui` + `just check-ui`; for Test UI behavior/screenshots also run `just test-ui-e2e`  |
 | Dependency or lockfile changes (`Cargo.lock`, root `bun.lock`, tree-sitter/code extension package manifests) | `just check-security`                                                                                           |
 | Standard library / docgen inputs (`lib/`, `crates/tolk-compiler/assets/tolk-stdlib`, linter rule metadata)   | `just check` + `acton docgen` and commit generated docs                                                         |
 | Docs site content/config/dependencies (`docs/`)                                                              | `just check-docs`                                                                                               |
@@ -627,8 +627,8 @@ It needs `cargo-shear`, `cargo-deny`, `cargo-audit`, and `typos-cli` locally;
 `just install-tools` installs them together with the optional coverage and WASM tools.
 `typos` uses `_typos.toml` excludes for `docs/` and selected generated or imported trees.
 
-If your PR touches UI code (`crates/acton-test-ui`, `crates/acton-localnet-ui`,
-`crates/acton-transaction-ui`, or root UI config in `package.json`), you must also
+If your PR touches UI code (`packages/test-ui`, `packages/localnet-ui`,
+`packages/transaction-ui`, or root UI config in `package.json`), you must also
 run:
 
 ```bash

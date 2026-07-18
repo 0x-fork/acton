@@ -17,7 +17,7 @@
 "test-runner":
   - changed-files:
       - any-glob-to-any-file:
-          - "crates/acton-test-ui/**"
+          - "packages/test-ui/**"
           - "src/commands/test/**"
 
 "IDE Support":
@@ -78,7 +78,7 @@
 "localnet":
   - changed-files:
       - any-glob-to-any-file:
-          - "crates/acton-localnet-ui/**"
+          - "packages/localnet-ui/**"
           - "crates/ton-indexer/**"
           - "crates/ton-localnet/**"
           - "src/commands/localnet/**"
@@ -116,9 +116,9 @@
 "UI":
   - changed-files:
       - any-glob-to-any-file:
-          - "crates/acton-explorer-ui/**"
-          - "crates/acton-localnet-ui/**"
-          - "crates/acton-transaction-ui/**"
-          - "crates/acton-test-ui/**"
-          - "crates/acton-ui/**"
-          - "crates/acton-ui-gallery/**"
+          - "packages/explorer-ui/**"
+          - "packages/localnet-ui/**"
+          - "packages/transaction-ui/**"
+          - "packages/test-ui/**"
+          - "packages/ui/**"
+          - "packages/ui-gallery/**"

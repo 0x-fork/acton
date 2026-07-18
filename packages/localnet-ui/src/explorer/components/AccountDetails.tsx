@@ -1454,16 +1454,14 @@ export function ActionHistoryTable({
 
   return (
     <DataTable className={className} minWidth={showTimeColumn ? "48rem" : "42rem"}>
-      <DataTableTable aria-label="Event overview" rowDividers={false}>
+      <DataTableTable aria-label="Event overview" layout="auto" rowDividers={false}>
         <DataTableHead>
           <DataTableRow>
             {showTimeColumn && <DataTableHeaderCell columnWidth="4rem">Time</DataTableHeaderCell>}
             <DataTableHeaderCell columnWidth="11rem">Action</DataTableHeaderCell>
             <DataTableHeaderCell>Address</DataTableHeaderCell>
             <DataTableHeaderCell columnWidth="9rem" aria-label="Details" />
-            <DataTableHeaderCell align="right" columnWidth="10rem">
-              Value
-            </DataTableHeaderCell>
+            <DataTableHeaderCell align="right">Value</DataTableHeaderCell>
           </DataTableRow>
         </DataTableHead>
         <DataTableBody>

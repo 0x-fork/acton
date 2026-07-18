@@ -3,7 +3,7 @@ import process from "node:process"
 
 import {defineConfig, devices} from "@playwright/test"
 
-const repositoryRoot = path.resolve(import.meta.dirname, "..")
+const repositoryRoot = path.resolve(import.meta.dirname, "../..")
 const localnetNodePort = Number(process.env.ACTON_UI_E2E_NODE_PORT ?? 15_411)
 const localnetUiPort = Number(process.env.ACTON_UI_E2E_LOCALNET_UI_PORT ?? 14_306)
 const explorerUiPort = Number(process.env.ACTON_UI_E2E_EXPLORER_UI_PORT ?? 14_307)
@@ -53,7 +53,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `cargo run --bin acton -- localnet start --port ${localnetNodePort} --load-state ui-e2e/fixtures/localnet/ui-state.json --no-mining`,
+      command: `cargo run --bin acton -- localnet start --port ${localnetNodePort} --load-state packages/ui-e2e/fixtures/localnet/ui-state.json --no-mining`,
       cwd: repositoryRoot,
       url: `http://127.0.0.1:${localnetNodePort}/acton_nodeInfo`,
       reuseExistingServer: false,
@@ -61,14 +61,14 @@ export default defineConfig({
     },
     {
       command: `VITE_LOCALNET_PROXY_TARGET=http://127.0.0.1:${localnetNodePort} bunx vite build && VITE_LOCALNET_PROXY_TARGET=http://127.0.0.1:${localnetNodePort} bunx vite preview --host 127.0.0.1 --port ${localnetUiPort}`,
-      cwd: path.join(repositoryRoot, "crates/acton-localnet-ui"),
+      cwd: path.join(repositoryRoot, "packages/localnet-ui"),
       port: localnetUiPort,
       reuseExistingServer: false,
       timeout: 60_000,
     },
     {
       command: `bunx vite build && bunx vite preview --host 127.0.0.1 --port ${explorerUiPort}`,
-      cwd: path.join(repositoryRoot, "crates/acton-explorer-ui"),
+      cwd: path.join(repositoryRoot, "packages/explorer-ui"),
       port: explorerUiPort,
       reuseExistingServer: false,
       timeout: 60_000,

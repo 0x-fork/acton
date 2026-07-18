@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@acton/ui": path.resolve(import.meta.dirname, "../acton-ui/src"),
+      "@acton/ui": path.resolve(import.meta.dirname, "../ui/src"),
     },
   },
   build: {

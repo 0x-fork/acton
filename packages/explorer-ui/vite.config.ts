@@ -20,8 +20,8 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@acton/transaction-ui": path.resolve(import.meta.dirname, "../acton-transaction-ui/src"),
-      "@tasm-spec": path.resolve(import.meta.dirname, "../tasm-core/spec"),
+      "@acton/transaction-ui": path.resolve(import.meta.dirname, "../transaction-ui/src"),
+      "@tasm-spec": path.resolve(import.meta.dirname, "../../crates/tasm-core/spec"),
       "vite-plugin-node-polyfills/shims/buffer": path.resolve(
         nodePolyfillsRoot,
         "shims/buffer/index.ts",

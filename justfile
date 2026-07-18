@@ -40,13 +40,13 @@ install-test-ui-e2e-browsers:
     bun run playwright install chromium
 
 test-ui-e2e-run: install-test-ui-e2e-browsers
-    bunx tsc -p crates/acton-test-ui/tsconfig.e2e.json --noEmit
+    bunx tsc -p packages/test-ui/tsconfig.e2e.json --noEmit
     bun run test:e2e:test-ui
 
 test-ui-e2e: build-ui build-dev test-ui-e2e-run
 
 test-ui-e2e-update: build-ui build-dev install-test-ui-e2e-browsers
-    bunx tsc -p crates/acton-test-ui/tsconfig.e2e.json --noEmit
+    bunx tsc -p packages/test-ui/tsconfig.e2e.json --noEmit
     CHECK_UI_SNAPSHOTS=1 bun run test:e2e:test-ui -- --update-snapshots
 
 _tree-sitter-test grammar:
@@ -155,8 +155,8 @@ coverage-clean:
 
 build-ui:
     bun ci
-    cd crates/acton-test-ui && bun ci && bun run build
-    cd crates/acton-localnet-ui && bun ci && bun run build
+    cd packages/test-ui && bun ci && bun run build
+    cd packages/localnet-ui && bun ci && bun run build
 
 check-ui-ci:
     bun run lint
@@ -178,7 +178,7 @@ precommit: fmt fmt-ui build build-ui check check-ui
 
 clean:
     cargo clean
-    rm -rf crates/acton-test-ui/dist
+    rm -rf packages/test-ui/dist
 
 generate-schema:
     cargo run -p xtask -- schema --schema acton-toml

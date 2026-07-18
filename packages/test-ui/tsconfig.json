@@ -15,10 +15,8 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "paths": {
-      "@acton/transaction-ui": ["../acton-transaction-ui/src/index.ts"],
-      "@tasm-spec/*": ["../tasm-core/spec/*"]
-    },
-    "types": ["vite/client", "node"]
+      "@acton/transaction-ui": ["../transaction-ui/src/index.ts"]
+    }
   },
-  "include": ["src", "functions", "../acton-localnet-ui/src/explorer"]
+  "include": ["src", "vite.config.ts"]
 }

@@ -7,13 +7,13 @@
   },
   "files": {
     "includes": [
-      "crates/acton-explorer-ui/**",
-      "crates/acton-localnet-ui/**",
-      "crates/acton-ui/**",
-      "crates/acton-ui-gallery/**",
-      "crates/acton-transaction-ui/**",
-      "crates/acton-test-ui/**",
-      "ui-e2e/**"
+      "packages/explorer-ui/**",
+      "packages/localnet-ui/**",
+      "packages/ui/**",
+      "packages/ui-gallery/**",
+      "packages/transaction-ui/**",
+      "packages/test-ui/**",
+      "packages/ui-e2e/**"
     ]
   },
   "formatter": {

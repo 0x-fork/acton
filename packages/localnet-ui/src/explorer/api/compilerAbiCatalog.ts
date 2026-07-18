@@ -1,6 +1,6 @@
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
-import dataAbisUrl from "../../../../acton-abi-catalog/data/data-abis.json?url"
+import dataAbisUrl from "../../../../../crates/acton-abi-catalog/data/data-abis.json?url"
 
 import type {ContractAbiLink, ExtendedContractABI} from "./compilerAbi"
 

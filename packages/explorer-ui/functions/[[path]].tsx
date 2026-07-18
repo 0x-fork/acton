@@ -1,5 +1,5 @@
 import {ImageResponse} from "@cloudflare/pages-plugin-vercel-og/api"
-import abiCatalogData from "../../acton-abi-catalog/data/data-abis.json"
+import abiCatalogData from "../../../crates/acton-abi-catalog/data/data-abis.json"
 import {AccountOgImage, type AccountOgPreview} from "../src/og/AccountOgImage"
 
 const OG_IMAGE_VERSION = "5"
