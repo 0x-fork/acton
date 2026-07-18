@@ -53,6 +53,7 @@ interface SearchResult {
   readonly workspace?: boolean
   readonly image?: string
   readonly fallbackImage?: string
+  readonly isNsfw?: boolean
 }
 
 interface LoadedSearchAssets {
@@ -222,6 +223,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
           icon: Image,
           image: contentString(item.content, "image"),
           fallbackImage: NFT_PLACEHOLDER_IMAGE,
+          isNsfw: item.is_nsfw,
         })
         if (results.length >= 12) {
           break
@@ -424,6 +426,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
                         <img
                           src={result.image}
                           alt=""
+                          className={result.isNsfw ? styles.nsfwImage : undefined}
                           onError={event => {
                             const fallbackImage = result.fallbackImage
                             if (fallbackImage && !event.currentTarget.src.endsWith(fallbackImage)) {

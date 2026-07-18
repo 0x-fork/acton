@@ -45,6 +45,7 @@ interface AccountInfoProps {
 interface CollectiblePreview {
   readonly image?: string
   readonly imageSources?: readonly string[]
+  readonly isNsfw?: boolean
   readonly name?: string
 }
 
@@ -487,7 +488,9 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                                   key={`${item.image}-${index}`}
                                   src={item.image}
                                   alt={item.name || "NFT"}
-                                  className={styles.collectibleThumb}
+                                  className={`${styles.collectibleThumb} ${
+                                    item.isNsfw ? styles.nsfwImage : ""
+                                  }`}
                                   onError={event =>
                                     replaceBrokenImageWithFallback(
                                       event,

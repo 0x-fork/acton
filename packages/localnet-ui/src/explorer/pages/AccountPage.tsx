@@ -784,6 +784,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     ...getImageSources(currentNftItem?.content, NFT_IMAGE_SOURCE_KEYS),
   ]
   const nftItemImage = nftItemImageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE
+  const nftItemIsNsfw = nftItemTokenInfo?.is_nsfw === true || currentNftItem?.is_nsfw === true
   const nftItemMetadataJson = currentNftItem
     ? JSON.stringify(
         {
@@ -820,11 +821,13 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     ...getImageSources(collectionSample?.content, NFT_COLLECTION_IMAGE_SOURCE_KEYS),
   ]
   const nftCollectionImage = nftCollectionImageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE
+  const nftCollectionIsNsfw = nftCollectionTokenInfo?.is_nsfw === true
   const collectiblePreviews = nftItems.slice(0, 8).map(item => {
     const imageSources = getImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
     return {
       image: imageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE,
       imageSources,
+      isNsfw: item.is_nsfw,
       name:
         contentString(item.content, "name") ||
         contentString(item.content, "collection_name") ||
@@ -991,7 +994,9 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
                           <img
                             src={nftItemImage}
                             alt={nftItemName}
-                            className={styles.nftPanelImage}
+                            className={`${styles.nftPanelImage} ${
+                              nftItemIsNsfw ? styles.nsfwImage : ""
+                            }`}
                             onError={event =>
                               replaceBrokenImageWithFallback(event, nftItemImageSources)
                             }
@@ -1033,7 +1038,9 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
                           <img
                             src={nftCollectionImage}
                             alt={nftCollectionName}
-                            className={styles.nftPanelImage}
+                            className={`${styles.nftPanelImage} ${
+                              nftCollectionIsNsfw ? styles.nsfwImage : ""
+                            }`}
                             onError={event =>
                               replaceBrokenImageWithFallback(event, nftCollectionImageSources)
                             }
@@ -1198,7 +1205,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
                       alt={activeMetadataTitle}
                       className={`${styles.metadataTokenImage} ${
                         currentNftItem ? styles.metadataNftImage : ""
-                      }`}
+                      } ${currentNftItem && nftItemIsNsfw ? styles.nsfwImage : ""}`}
                       onError={event =>
                         replaceBrokenImageWithFallback(event, activeMetadataImageSources)
                       }

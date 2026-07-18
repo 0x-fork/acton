@@ -147,7 +147,9 @@ export const NftsPage: FC<NftsPageProps> = ({client}) => {
                           <img
                             src={image}
                             alt=""
-                            className={styles.assetTableImage}
+                            className={`${styles.assetTableImage} ${
+                              item.is_nsfw ? styles.nsfwImage : ""
+                            }`}
                             onError={event => {
                               const imageElement = event.currentTarget
                               if (imageElement.getAttribute("src") !== NFT_PLACEHOLDER_IMAGE) {

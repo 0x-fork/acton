@@ -401,6 +401,10 @@
   display: block;
 }
 
+.nsfwImage {
+  filter: blur(12px);
+}
+
 .metadataOverlay {
   position: fixed;
   inset: 0;

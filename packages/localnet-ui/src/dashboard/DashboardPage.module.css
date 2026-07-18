@@ -893,6 +893,10 @@
   object-fit: cover;
 }
 
+.nsfwImage {
+  filter: blur(8px);
+}
+
 .assetTableText {
   display: flex;
   min-width: 0;

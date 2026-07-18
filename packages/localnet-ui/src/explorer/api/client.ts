@@ -176,6 +176,7 @@ function attachNftItemMetadata(item: NftItem, metadata: JettonWalletMetadata | u
   const tokenInfo = metadata?.[item.address]?.token_info?.find(info => info.type === "nft_items")
   const tokenExtra = isRecord(tokenInfo?.extra) ? tokenInfo.extra : {}
   const content: Record<string, unknown> = {...tokenExtra}
+  const isNsfw = booleanValue(tokenInfo?.is_nsfw)
 
   if (tokenInfo) {
     for (const key of NFT_CONTENT_KEYS) {
@@ -203,12 +204,13 @@ function attachNftItemMetadata(item: NftItem, metadata: JettonWalletMetadata | u
     content.name = domainName
   }
 
-  if (Object.keys(content).length === 0) {
+  if (Object.keys(content).length === 0 && isNsfw === undefined) {
     return item
   }
 
   return {
     ...item,
+    ...(isNsfw === undefined ? {} : {is_nsfw: isNsfw}),
     content: {
       ...item.content,
       ...content,

@@ -485,6 +485,10 @@
   background: var(--acton-color-surface-group);
 }
 
+.nsfwImage {
+  filter: blur(8px);
+}
+
 .collectibleThumbPlaceholder {
   display: inline-block;
   border: 1px solid var(--acton-color-border-control);
