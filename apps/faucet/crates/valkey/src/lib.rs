@@ -21,6 +21,19 @@ pub enum AntifraudModule {
     SuccessfulClaimWindow,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct AntifraudStats {
+    pub wallet_balance: u64,
+    pub sent_amount_window: u64,
+    pub successful_claim_window: u64,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct FaucetStats {
+    pub total_sent_nanotons: u64,
+    pub antifraud: AntifraudStats,
+}
+
 impl AntifraudModule {
     pub const fn name(self) -> &'static str {
         match self {
@@ -102,6 +115,31 @@ impl ValkeyStore {
             .query_async(&mut connection)
             .await
             .context("Failed to increment antifraud trigger count")
+    }
+
+    pub async fn get_stats(&self) -> anyhow::Result<FaucetStats> {
+        let mut connection = self.connection.clone();
+        let values: (Option<u64>, Option<u64>, Option<u64>, Option<u64>) = redis::cmd("MGET")
+            .arg(TOTAL_SENT_NANOTONS_KEY)
+            .arg(antifraud_trigger_count_key(AntifraudModule::WalletBalance))
+            .arg(antifraud_trigger_count_key(
+                AntifraudModule::SentAmountWindow,
+            ))
+            .arg(antifraud_trigger_count_key(
+                AntifraudModule::SuccessfulClaimWindow,
+            ))
+            .query_async(&mut connection)
+            .await
+            .context("Failed to get faucet stats")?;
+
+        Ok(FaucetStats {
+            total_sent_nanotons: values.0.unwrap_or_default(),
+            antifraud: AntifraudStats {
+                wallet_balance: values.1.unwrap_or_default(),
+                sent_amount_window: values.2.unwrap_or_default(),
+                successful_claim_window: values.3.unwrap_or_default(),
+            },
+        })
     }
 
     pub async fn reserve_sent_amount_window(

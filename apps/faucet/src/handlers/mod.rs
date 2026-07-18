@@ -11,6 +11,7 @@ mod challenge;
 mod claim;
 mod health;
 mod robots;
+mod stats;
 
 pub(crate) use claim::CreateClaim;
 
@@ -30,6 +31,7 @@ pub(crate) fn router(state: AppState) -> Router {
         .route("/ready", get(health::ok))
         .route("/health", get(health::ok))
         .route("/metrics", get(health::ok))
+        .route("/stats", get(stats::get_stats))
         .route("/version", get(health::version))
         .merge(airdrop_routes)
         .with_state(state)
