@@ -532,6 +532,35 @@ address, and composes copying from `CopyInlineAction`.
   action as a sibling rather than nesting interactive elements.
 - Do not wrap ContractChip in another copy control.
 
+## NftChip
+
+Status: ready
+
+Import:
+
+```tsx
+import {NftChip} from "@acton/ui"
+```
+
+Use NftChip for a compact NFT identity inside value flows and action tables. It
+owns the positive asset treatment, optional preview image, and native clickable
+state while metadata lookup and navigation remain caller-owned.
+
+### States To Review Visually
+
+- Text-only fallback
+- NFT with preview image
+- Clickable NFT with hover and keyboard focus
+- Long labels constrained by a narrow parent
+
+### Agent Guidance
+
+- Pass the already-resolved label and image URL; keep NFT metadata APIs outside
+  `@acton/ui`.
+- Use `onImageError` when the caller owns a fallback image chain.
+- Use `onClick` for navigation instead of wrapping the chip in a link or button.
+- Do not add underlines or replace the positive asset color on hover.
+
 ## ParsedValueView
 
 Status: ready

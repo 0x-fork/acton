@@ -10,6 +10,7 @@ import {
   DataTableHeaderCell,
   DataTableRow,
   DataTableTable,
+  NftChip,
 } from "@acton/ui"
 import {
   BadgeDollarSign,
@@ -82,6 +83,11 @@ import {
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
 import {ExplorerAddressChip} from "./ExplorerAddressChip"
+import {
+  getImageSources,
+  NFT_IMAGE_SOURCE_KEYS,
+  replaceBrokenImageWithFallback,
+} from "./imageFallbacks"
 import {Nfts} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
@@ -172,13 +178,23 @@ interface HistoryTextValueLine {
   readonly tone: HistoryValueTone
 }
 
-interface HistorySwapValueLine {
-  readonly kind: "swap"
-  readonly from: HistoryTextValueLine
-  readonly to: HistoryTextValueLine
+interface HistoryNftValueLine {
+  readonly kind: "nft"
+  readonly label: string
+  readonly tone: "positive"
+  readonly address?: string
+  readonly imageSources: readonly string[]
 }
 
-type HistoryValueLine = HistoryTextValueLine | HistorySwapValueLine
+type HistoryInlineValueLine = HistoryTextValueLine | HistoryNftValueLine
+
+interface HistorySwapValueLine {
+  readonly kind: "swap"
+  readonly from: HistoryInlineValueLine
+  readonly to: HistoryInlineValueLine
+}
+
+type HistoryValueLine = HistoryInlineValueLine | HistorySwapValueLine
 
 export interface HistoryActionInfo {
   readonly rowKey: string
@@ -1247,24 +1263,74 @@ function HistoryTechnicalCell({
   )
 }
 
-function HistoryValueCellLine({line}: {readonly line: HistoryValueLine}): JSX.Element {
+function HistoryValueCellLine({
+  line,
+  onAddressClick,
+}: {
+  readonly line: HistoryValueLine
+  readonly onAddressClick?: (address: string, event?: MouseEvent<HTMLElement>) => void
+}): JSX.Element {
   if (line.kind === "swap") {
     return (
       <div className={`${styles.swapValue} ${styles.historyValue}`}>
-        <span className={`${historyValueToneClass(line.from.tone)} ${styles.swapValueSegment}`}>
-          {line.from.label}
-        </span>
+        <HistoryTextValue
+          line={line.from}
+          className={`${historyValueToneClass(line.from.tone)} ${styles.swapValueSegment}`}
+          onAddressClick={onAddressClick}
+        />
         <ChevronRight className={styles.swapValueArrow} aria-hidden="true" />
-        <span className={`${historyValueToneClass(line.to.tone)} ${styles.swapValueSegment}`}>
-          {line.to.label}
-        </span>
+        <HistoryTextValue
+          line={line.to}
+          className={`${historyValueToneClass(line.to.tone)} ${styles.swapValueSegment}`}
+          onAddressClick={onAddressClick}
+        />
       </div>
     )
   }
 
   return (
-    <div className={`${historyValueToneClass(line.tone)} ${styles.historyValue}`}>{line.label}</div>
+    <div className={styles.historyValue}>
+      <HistoryTextValue
+        line={line}
+        className={historyValueToneClass(line.tone)}
+        onAddressClick={onAddressClick}
+      />
+    </div>
   )
+}
+
+function HistoryTextValue({
+  line,
+  className,
+  onAddressClick,
+}: {
+  readonly line: HistoryInlineValueLine
+  readonly className: string
+  readonly onAddressClick?: (address: string, event?: MouseEvent<HTMLElement>) => void
+}): JSX.Element {
+  if (line.kind === "nft") {
+    const address = line.address
+    return (
+      <NftChip
+        className={className}
+        label={line.label}
+        imageSrc={line.imageSources[0]}
+        onImageError={event => replaceBrokenImageWithFallback(event, line.imageSources)}
+        ariaLabel={address && onAddressClick ? `Open ${line.label}` : undefined}
+        title={address && onAddressClick ? `Open ${line.label}` : line.label}
+        onClick={
+          address && onAddressClick
+            ? event => {
+                event.stopPropagation()
+                onAddressClick(address, event)
+              }
+            : undefined
+        }
+      />
+    )
+  }
+
+  return <span className={className}>{line.label}</span>
 }
 
 interface ActionHistoryRowsProps {
@@ -1361,7 +1427,11 @@ export function ActionHistoryRows({
             <Cell className={styles.valueContainer}>
               <div className={styles.historyValueStack}>
                 {info.valueLines.map((line, lineIndex) => (
-                  <HistoryValueCellLine key={`${info.rowKey}:value:${lineIndex}`} line={line} />
+                  <HistoryValueCellLine
+                    key={`${info.rowKey}:value:${lineIndex}`}
+                    line={line}
+                    onAddressClick={onAddressClick}
+                  />
                 ))}
               </div>
             </Cell>
@@ -2136,8 +2206,12 @@ function getHistoryActionDisplay(
         false,
         "Auction",
         valueLines(
-          tonValueLine(action.details.min_bid, "neutral"),
-          tonValueLine(action.details.max_bid, "neutral"),
+          auctionNftValueLine(
+            action.details.min_bid ?? action.details.max_bid,
+            action.details.nft_item,
+            action.details.nft_item_index,
+            context.metadata,
+          ),
         ),
       )
     case "nft_cancel_sale":
@@ -2872,21 +2946,42 @@ function nftValueLine(
   itemAddress: string | null | undefined,
   itemIndex: string | null | undefined,
   metadata: V3Metadata,
-): HistoryTextValueLine | undefined {
+): HistoryNftValueLine | undefined {
   const tokenInfo = itemAddress
     ? getMetadataTokenInfo(metadata, itemAddress, "nft_items")
     : undefined
   const name = metadataTokenString(tokenInfo, "name")
-  if (name) {
-    return {kind: "text", label: name, tone: "neutral"}
+  const label = name ?? (isNonEmptyString(itemIndex) ? `NFT #${itemIndex}` : undefined)
+  if (!label && !itemAddress) return undefined
+
+  const imageSources = getImageSources(tokenInfo, NFT_IMAGE_SOURCE_KEYS)
+  return {
+    kind: "nft",
+    label: label ?? "NFT",
+    tone: "positive",
+    ...(itemAddress ? {address: itemAddress} : {}),
+    imageSources,
   }
-  if (isNonEmptyString(itemIndex)) {
-    return {kind: "text", label: `NFT #${itemIndex}`, tone: "neutral"}
+}
+
+function auctionNftValueLine(
+  minimumBid: string | null,
+  itemAddress: string | null,
+  itemIndex: string | null,
+  metadata: V3Metadata,
+): HistoryValueLine | undefined {
+  const bid = tonValueLine(minimumBid, "neutral")
+  const nft = nftValueLine(itemAddress, itemIndex, metadata)
+
+  if (bid && nft) {
+    return {
+      kind: "swap",
+      from: bid,
+      to: nft,
+    }
   }
-  if (itemAddress) {
-    return {kind: "text", label: "NFT", tone: "neutral"}
-  }
-  return undefined
+
+  return bid ?? nft
 }
 
 function formatReadableNumber(value: string, maximumFractionDigits = 9): string {
