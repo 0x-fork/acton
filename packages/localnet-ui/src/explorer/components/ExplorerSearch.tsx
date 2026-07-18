@@ -15,7 +15,7 @@ import {useAddressBook} from "../hooks/useAddressBook"
 import type {TonAssetsNameMatch} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import type {ExplorerRoutes} from "../hooks/explorerRoutesContext"
-import {useAddressFormat} from "../hooks/useNetworkInfo"
+import {useNetworkInfo} from "../hooks/useNetworkInfo"
 
 import {formatAddress, hashToHex, parseAddress} from "./utils"
 import type {AddressFormatOptions} from "./utils"
@@ -61,7 +61,8 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
   className,
   variant = "hero",
 }) => {
-  const addressFormat = useAddressFormat()
+  const {addressFormat, network} = useNetworkInfo()
+  const historyStorageKey = `${EXPLORER_HISTORY_STORAGE_KEY}:${network.label}`
   const routes = useExplorerRoutePaths()
   const navigate = useNavigate()
   const {showToast} = useToast()
@@ -79,8 +80,8 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
   const visibleHistory = hasQuery ? [] : history
 
   useEffect(() => {
-    setHistory(readSearchHistory())
-  }, [])
+    setHistory(readSearchHistory(historyStorageKey))
+  }, [historyStorageKey])
 
   useEffect(() => {
     let isActive = true
@@ -96,10 +97,13 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
     }
   }, [])
 
-  const persistHistory = useCallback((nextHistory: readonly string[]) => {
-    setHistory(nextHistory)
-    localStorage.setItem(EXPLORER_HISTORY_STORAGE_KEY, JSON.stringify(nextHistory))
-  }, [])
+  const persistHistory = useCallback(
+    (nextHistory: readonly string[]) => {
+      setHistory(nextHistory)
+      localStorage.setItem(historyStorageKey, JSON.stringify(nextHistory))
+    },
+    [historyStorageKey],
+  )
 
   const addToHistory = useCallback(
     (value: string) => {
@@ -498,8 +502,8 @@ function getSearchMatchScore(
   return 3
 }
 
-function readSearchHistory(): readonly string[] {
-  const savedHistory = localStorage.getItem(EXPLORER_HISTORY_STORAGE_KEY)
+function readSearchHistory(storageKey: string): readonly string[] {
+  const savedHistory = localStorage.getItem(storageKey)
   if (!savedHistory) {
     return []
   }
