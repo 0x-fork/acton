@@ -1311,6 +1311,59 @@ content that needs multiple lines, links, small actions, or structured detail.
   popover.
 - Do not reuse the popover shadow on other components.
 
+## Dialog
+
+Status: ready
+
+Import:
+
+```tsx
+import { Dialog } from "@acton/ui"
+```
+
+Use Dialog for modal content that needs focus trapping, Escape and outside-click
+dismissal, a shared backdrop, and a consistent close action. The component owns
+the modal frame and scroll behavior while callers own the domain content.
+
+### Composition
+
+```tsx
+<Dialog
+  open={open}
+  onOpenChange={setOpen}
+  title="Metadata"
+  maxWidth="42rem"
+>
+  <MetadataDetails />
+</Dialog>
+```
+
+- `title`: required accessible dialog title.
+- `description`: optional accessible supporting text below the title.
+- `open` and `onOpenChange`: controlled state, including Escape, close-button,
+  and outside-press changes.
+- `maxWidth`: caps the shared responsive popup width.
+- `contentClassName`: caller-owned content layout hook; keep the shared header,
+  close button, surface, and backdrop unchanged.
+- `closeLabel`: accessible label for the standard close action.
+
+### States To Review Visually
+
+- Light and dark themes
+- Content shorter and taller than the viewport
+- Keyboard focus, Escape close, and focus return
+- Outside-press close
+- Narrow mobile viewport
+
+### Agent Guidance
+
+- Use Dialog instead of local fixed overlays and manual Escape listeners.
+- Keep dialog contents in existing domain components such as RawDataBlock,
+  DataTable, and AddressChip.
+- Do not add another close button or backdrop inside the caller content.
+- Use Popover for compact anchored context; use Dialog for modal inspection or
+  workflows.
+
 ## InfoPopover
 
 Status: ready

@@ -405,197 +405,86 @@
   filter: blur(12px);
 }
 
-.metadataOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.64);
-  backdrop-filter: blur(6px);
-}
-
-.metadataDialog {
-  position: relative;
+.metadataDialogContent {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  width: min(600px, 100%);
-  max-height: min(680px, calc(100dvh - 48px));
-  box-sizing: border-box;
-  padding: 24px;
-  overflow: auto;
-  background: var(--acton-color-surface-raised);
-  border-radius: 12px;
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.12),
-    0 4px 4px rgba(0, 0, 0, 0.04);
+  gap: var(--acton-space-5);
 }
 
-.metadataTitle {
-  margin: 0;
-  color: var(--acton-color-text);
-  font-size: 1.25rem;
-  font-weight: var(--acton-font-weight-bold);
-  line-height: 24px;
-}
-
-.metadataHero {
+.metadataOverview {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 32px;
-  align-items: start;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--acton-space-4);
 }
 
-.metadataMain {
+.metadataIdentity {
   min-width: 0;
 }
 
 .metadataTokenTitle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  margin-bottom: 14px;
+  margin: 0;
   color: var(--acton-color-text);
-  font-size: 1.25rem;
+  font-size: var(--acton-font-size-lg);
   font-weight: var(--acton-font-weight-bold);
-  line-height: 24px;
-}
-
-.metadataTokenTitle span {
-  min-width: 0;
+  line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .metadataTokenImage {
-  width: 100px;
-  height: 100px;
-  margin-top: 0;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   object-fit: cover;
-  flex: 0 0 auto;
 }
 
 .metadataNftImage {
-  border-radius: 12px;
-}
-
-.metadataCloseButton {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  color: var(--acton-color-surface-raised);
-  background: var(--acton-color-text-muted);
-  border: 0;
-  border-radius: 50%;
-  cursor: pointer;
-  transition:
-    background-color var(--acton-duration-fast),
-    color var(--acton-duration-fast);
-}
-
-.metadataCloseButton:hover {
-  color: var(--acton-color-surface-raised);
-  background: var(--acton-color-text);
-}
-
-.metadataCloseButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+  border-radius: var(--acton-radius-panel);
 }
 
 .metadataSummary {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--acton-space-4) var(--acton-space-6);
+  margin: 0;
+  padding: var(--acton-space-4) 0;
+  border-top: 1px solid var(--acton-color-border);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .metadataRow {
   display: flex;
-  align-items: flex-start;
-  gap: 0;
+  flex-direction: column;
+  gap: var(--acton-space-1);
   min-width: 0;
-  min-height: 20px;
 }
 
 .metadataLabel {
-  flex: 0 0 144px;
-  color: var(--acton-color-text);
-  font-size: var(--acton-font-size-sm);
-  font-weight: var(--acton-font-weight-bold);
-  line-height: 20px;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.35;
 }
 
 .metadataValue {
-  display: block;
-  flex: 1 1 auto;
   min-width: 0;
-  color: var(--acton-color-text);
-  font-size: var(--acton-font-size-sm);
-  font-weight: var(--acton-font-weight-normal);
-  line-height: 20px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.metadataDescription {
   margin: 0;
   color: var(--acton-color-text);
   font-size: var(--acton-font-size-sm);
-  line-height: 20px;
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
-.metadataJsonFrame {
-  position: relative;
-  min-width: 0;
-  overflow: hidden;
-  background: var(--acton-color-surface-hover);
-  border-radius: 12px;
-}
-
-.metadataJsonCopyButton {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
+.metadataDescription {
+  max-width: 56ch;
+  margin: var(--acton-space-1) 0 0;
   color: var(--acton-color-text-muted);
-  background: transparent;
-  border: 0;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.metadataJsonCopyButton:hover {
-  color: var(--acton-color-text);
-}
-
-.metadataJsonCopyButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
-}
-
-.metadataJson {
-  --acton-highlighted-code-font-size: var(--acton-font-size-xs);
-  --acton-highlighted-code-line-height: 18px;
-  --acton-highlighted-code-padding: 16px 44px 16px 16px;
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 1100px) {
@@ -659,73 +548,17 @@
     align-items: flex-start;
   }
 
-  .metadataOverlay {
-    padding: 12px;
-  }
-
-  .metadataDialog {
-    gap: 20px;
-    max-height: calc(100dvh - 24px);
-    padding: 24px 16px 16px;
-    border-radius: 14px;
-  }
-
-  .metadataTitle,
-  .metadataTokenTitle {
-    font-size: 1.25rem;
-    line-height: 24px;
-  }
-
-  .metadataHero {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 20px;
-  }
-
-  .metadataTokenTitle {
-    margin-bottom: 14px;
+  .metadataDialogContent {
+    gap: var(--acton-space-4);
   }
 
   .metadataTokenImage {
-    width: 88px;
-    height: 88px;
-    margin-top: 0;
+    width: 60px;
+    height: 60px;
   }
 
-  .metadataCloseButton {
-    top: 10px;
-    right: 10px;
-    width: 28px;
-    height: 28px;
-  }
-
-  .metadataRow {
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .metadataLabel {
-    flex-basis: auto;
-    font-size: var(--acton-font-size-sm);
-  }
-
-  .metadataValue,
-  .metadataDescription {
-    font-size: var(--acton-font-size-sm);
-  }
-
-  .metadataJsonFrame {
-    border-radius: 12px;
-  }
-
-  .metadataJson {
-    padding: 16px 40px 16px 16px;
-    font-size: var(--acton-font-size-xs);
-  }
-
-  .metadataJsonCopyButton {
-    top: 10px;
-    right: 10px;
-    width: 24px;
-    height: 24px;
+  .metadataSummary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--acton-space-3);
   }
 }

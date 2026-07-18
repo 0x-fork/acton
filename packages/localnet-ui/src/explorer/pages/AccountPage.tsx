@@ -1,9 +1,8 @@
-import {Copy, X} from "lucide-react"
 import {useLocation, useNavigate, useParams} from "react-router-dom"
 import {useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 
-import {HighlightedCode} from "@acton/ui"
+import {Dialog, HighlightedCode, RawDataBlock} from "@acton/ui"
 
 import type {TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
@@ -104,7 +103,6 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
   const [verifiedSource, setVerifiedSource] = useState<VerificationSourceResponse | undefined>()
   const [verifiedSourceLoading, setVerifiedSourceLoading] = useState(false)
   const [jettonMetadataOpen, setJettonMetadataOpen] = useState(false)
-  const [jettonMetadataCopied, setJettonMetadataCopied] = useState(false)
   const activeAccountKeyRef = useRef<string | undefined>(undefined)
   const transactionHashesRef = useRef<Set<string>>(new Set())
 
@@ -498,32 +496,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
 
   useEffect(() => {
     setJettonMetadataOpen(false)
-    setJettonMetadataCopied(false)
   }, [accountAddressKey])
-
-  useEffect(() => {
-    if (!jettonMetadataCopied) {
-      return
-    }
-
-    const timer = setTimeout(() => setJettonMetadataCopied(false), 1600)
-    return () => clearTimeout(timer)
-  }, [jettonMetadataCopied])
-
-  useEffect(() => {
-    if (!jettonMetadataOpen) {
-      return
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setJettonMetadataOpen(false)
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown)
-    return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [jettonMetadataOpen])
 
   useEffect(() => {
     let isActive = true
@@ -1099,152 +1072,119 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
             activeTabHash={activeTab}
             onTabChange={handleTabChange}
           />
-          {jettonMetadataOpen && activeMetadataJson && (
-            <div
-              className={styles.metadataOverlay}
-              role="presentation"
-              onClick={event => {
-                if (event.target === event.currentTarget) {
-                  setJettonMetadataOpen(false)
-                }
-              }}
+          {activeMetadataJson && (
+            <Dialog
+              open={jettonMetadataOpen}
+              onOpenChange={setJettonMetadataOpen}
+              title="Metadata"
+              closeLabel="Close metadata"
+              maxWidth="42rem"
+              contentClassName={styles.metadataDialogContent}
             >
-              <section
-                className={styles.metadataDialog}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="account-metadata-title"
-              >
-                <button
-                  type="button"
-                  className={styles.metadataCloseButton}
-                  onClick={() => setJettonMetadataOpen(false)}
-                  aria-label="Close metadata"
-                >
-                  <X size={18} strokeWidth={3} />
-                </button>
-                <h2 id="account-metadata-title" className={styles.metadataTitle}>
-                  Metadata
-                </h2>
-                <div className={styles.metadataHero}>
-                  <div className={styles.metadataMain}>
-                    <div className={styles.metadataTokenTitle}>
-                      <span>{activeMetadataTitle}</span>
-                    </div>
-                    <div className={styles.metadataSummary}>
-                      <div className={styles.metadataRow}>
-                        <span className={styles.metadataLabel}>Address</span>
-                        <span className={styles.metadataValue}>
-                          <ExplorerAddressChip address={formattedAddress} variant="plain" />
-                        </span>
-                      </div>
-                      {jettonMaster && (
-                        <>
-                          <div className={styles.metadataRow}>
-                            <span className={styles.metadataLabel}>Owner</span>
-                            {jettonMasterAdminAddress ? (
-                              <span className={styles.metadataValue}>
-                                <ExplorerAddressChip
-                                  address={jettonMasterAdminAddress}
-                                  onAddressClick={handleSearch}
-                                  variant="plain"
-                                />
-                              </span>
-                            ) : (
-                              <span className={styles.metadataValue}>None</span>
-                            )}
-                          </div>
-                          {tokenTotalSupplyLabel && (
-                            <div className={styles.metadataRow}>
-                              <span className={styles.metadataLabel}>Max.supply</span>
-                              <span className={styles.metadataValue}>{tokenTotalSupplyLabel}</span>
-                            </div>
-                          )}
-                          <div className={styles.metadataRow}>
-                            <span className={styles.metadataLabel}>Mintable</span>
-                            <span className={styles.metadataValue}>
-                              {String(jettonMaster.mintable)}
-                            </span>
-                          </div>
-                        </>
-                      )}
-                      {currentNftItem && (
-                        <>
-                          <div className={styles.metadataRow}>
-                            <span className={styles.metadataLabel}>Owner</span>
-                            {nftItemOwnerAddress ? (
-                              <span className={styles.metadataValue}>
-                                <ExplorerAddressChip
-                                  address={nftItemOwnerAddress}
-                                  onAddressClick={handleSearch}
-                                  variant="plain"
-                                />
-                              </span>
-                            ) : (
-                              <span className={styles.metadataValue}>No owner</span>
-                            )}
-                          </div>
-                          <div className={styles.metadataRow}>
-                            <span className={styles.metadataLabel}>Collection</span>
-                            {nftItemCollectionAddress ? (
-                              <span className={styles.metadataValue}>
-                                <ExplorerAddressChip
-                                  address={nftItemCollectionAddress}
-                                  onAddressClick={handleSearch}
-                                  variant="plain"
-                                />
-                              </span>
-                            ) : (
-                              <span className={styles.metadataValue}>Standalone</span>
-                            )}
-                          </div>
-                          <div className={styles.metadataRow}>
-                            <span className={styles.metadataLabel}>Index</span>
-                            <span className={styles.metadataValue}>#{currentNftItem.index}</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {activeMetadataImage && (
-                    <img
-                      src={activeMetadataImage}
-                      alt={activeMetadataTitle}
-                      className={`${styles.metadataTokenImage} ${
-                        currentNftItem ? styles.metadataNftImage : ""
-                      } ${currentNftItem && nftItemIsNsfw ? styles.nsfwImage : ""}`}
-                      onError={event =>
-                        replaceBrokenImageWithFallback(event, activeMetadataImageSources)
-                      }
-                    />
+              <div className={styles.metadataOverview}>
+                {activeMetadataImage && (
+                  <img
+                    src={activeMetadataImage}
+                    alt=""
+                    className={`${styles.metadataTokenImage} ${
+                      currentNftItem ? styles.metadataNftImage : ""
+                    } ${currentNftItem && nftItemIsNsfw ? styles.nsfwImage : ""}`}
+                    onError={event =>
+                      replaceBrokenImageWithFallback(event, activeMetadataImageSources)
+                    }
+                  />
+                )}
+                <div className={styles.metadataIdentity}>
+                  <h3 className={styles.metadataTokenTitle}>{activeMetadataTitle}</h3>
+                  {(jettonMaster?.jetton_content.description || nftItemDescription) && (
+                    <p className={styles.metadataDescription}>
+                      {jettonMaster?.jetton_content.description || nftItemDescription}
+                    </p>
                   )}
                 </div>
-                {(jettonMaster?.jetton_content.description || nftItemDescription) && (
-                  <p className={styles.metadataDescription}>
-                    {jettonMaster?.jetton_content.description || nftItemDescription}
-                  </p>
-                )}
-                <div className={styles.metadataJsonFrame}>
-                  <button
-                    type="button"
-                    className={styles.metadataJsonCopyButton}
-                    onClick={() => {
-                      void navigator.clipboard.writeText(activeMetadataJson)
-                      setJettonMetadataCopied(true)
-                    }}
-                    aria-label={jettonMetadataCopied ? "Metadata copied" : "Copy metadata JSON"}
-                    title={jettonMetadataCopied ? "Copied" : "Copy metadata JSON"}
-                  >
-                    <Copy size={18} />
-                  </button>
-                  <HighlightedCode
-                    className={styles.metadataJson}
-                    value={activeMetadataJson}
-                    language="json"
-                  />
+              </div>
+              <dl className={styles.metadataSummary}>
+                <div className={styles.metadataRow}>
+                  <dt className={styles.metadataLabel}>Address</dt>
+                  <dd className={styles.metadataValue}>
+                    <ExplorerAddressChip address={formattedAddress} variant="plain" />
+                  </dd>
                 </div>
-              </section>
-            </div>
+                {jettonMaster && (
+                  <>
+                    <div className={styles.metadataRow}>
+                      <dt className={styles.metadataLabel}>Owner</dt>
+                      <dd className={styles.metadataValue}>
+                        {jettonMasterAdminAddress ? (
+                          <ExplorerAddressChip
+                            address={jettonMasterAdminAddress}
+                            onAddressClick={handleSearch}
+                            variant="plain"
+                          />
+                        ) : (
+                          "None"
+                        )}
+                      </dd>
+                    </div>
+                    {tokenTotalSupplyLabel && (
+                      <div className={styles.metadataRow}>
+                        <dt className={styles.metadataLabel}>Max supply</dt>
+                        <dd className={styles.metadataValue}>{tokenTotalSupplyLabel}</dd>
+                      </div>
+                    )}
+                    <div className={styles.metadataRow}>
+                      <dt className={styles.metadataLabel}>Mintable</dt>
+                      <dd className={styles.metadataValue}>{String(jettonMaster.mintable)}</dd>
+                    </div>
+                  </>
+                )}
+                {currentNftItem && (
+                  <>
+                    <div className={styles.metadataRow}>
+                      <dt className={styles.metadataLabel}>Owner</dt>
+                      <dd className={styles.metadataValue}>
+                        {nftItemOwnerAddress ? (
+                          <ExplorerAddressChip
+                            address={nftItemOwnerAddress}
+                            onAddressClick={handleSearch}
+                            variant="plain"
+                          />
+                        ) : (
+                          "No owner"
+                        )}
+                      </dd>
+                    </div>
+                    <div className={styles.metadataRow}>
+                      <dt className={styles.metadataLabel}>Collection</dt>
+                      <dd className={styles.metadataValue}>
+                        {nftItemCollectionAddress ? (
+                          <ExplorerAddressChip
+                            address={nftItemCollectionAddress}
+                            onAddressClick={handleSearch}
+                            variant="plain"
+                          />
+                        ) : (
+                          "Standalone"
+                        )}
+                      </dd>
+                    </div>
+                    <div className={styles.metadataRow}>
+                      <dt className={styles.metadataLabel}>Index</dt>
+                      <dd className={styles.metadataValue}>#{currentNftItem.index}</dd>
+                    </div>
+                  </>
+                )}
+              </dl>
+              <RawDataBlock
+                title="Raw metadata"
+                value={activeMetadataJson}
+                copyLabel="metadata JSON"
+                maxHeight="18rem"
+                customContent={
+                  <HighlightedCode value={activeMetadataJson} language="json" maxHeight="18rem" />
+                }
+              />
+            </Dialog>
           )}
         </>
       )}

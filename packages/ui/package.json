@@ -18,6 +18,7 @@
     "./components/contract-chip": "./src/components/ContractChip/index.ts",
     "./components/data-table": "./src/components/DataTable/index.ts",
     "./components/disclosure-toggle": "./src/components/DisclosureToggle/index.ts",
+    "./components/dialog": "./src/components/Dialog/index.ts",
     "./components/exit-code-chip": "./src/components/ExitCodeChip/index.ts",
     "./components/highlighted-code": "./src/components/HighlightedCode/index.ts",
     "./components/ide-selector": "./src/components/IdeSelector/index.ts",

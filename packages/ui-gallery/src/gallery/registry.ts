@@ -7,6 +7,7 @@ import {codeViewerGallery} from "./codeViewerGallery"
 import {contentTabsGallery} from "./contentTabsGallery"
 import {contractChipGallery} from "./contractChipGallery"
 import {dataTableGallery} from "./dataTableGallery"
+import {dialogGallery} from "./dialogGallery"
 import {disclosureToggleGallery} from "./disclosureToggleGallery"
 import {exitCodeChipGallery} from "./exitCodeChipGallery"
 import {highlightedCodeGallery} from "./highlightedCodeGallery"
@@ -46,6 +47,7 @@ export const galleries = [
   inlineLoaderGallery,
   codeViewerGallery,
   contractChipGallery,
+  dialogGallery,
   disclosureToggleGallery,
   exitCodeChipGallery,
   opcodeChipGallery,
