@@ -1,4 +1,4 @@
-import {Breadcrumbs, type BreadcrumbsItem} from "@acton/ui"
+import {Breadcrumbs, type BreadcrumbsItem, CopyInlineAction, InlineActions} from "@acton/ui"
 import {Link} from "react-router-dom"
 import type {FC, ReactNode} from "react"
 
@@ -12,6 +12,11 @@ export interface ExplorerBreadcrumbItem {
   readonly path?: string
   readonly isAddress?: boolean
   readonly isHash?: boolean
+  readonly copy?: Readonly<{
+    readonly value: string
+    readonly label: string
+    readonly copiedLabel: string
+  }>
 }
 
 interface ExplorerBreadcrumbsProps {
@@ -29,20 +34,37 @@ function createBreadcrumbLink(path: string): BreadcrumbLink {
 }
 
 function formatItem(item: ExplorerBreadcrumbItem): ReactNode {
-  if (item.isAddress) {
+  const label = item.isAddress ? (
+    <ExplorerAddressChip
+      address={item.label}
+      className={styles.address}
+      copyable={false}
+      variant="plain"
+    />
+  ) : item.isHash ? (
+    formatAddress(item.label)
+  ) : (
+    item.label
+  )
+
+  if (item.copy) {
     return (
-      <ExplorerAddressChip
-        address={item.label}
-        className={styles.address}
-        copyable={false}
-        variant="plain"
-      />
+      <InlineActions
+        visibility="hover"
+        actions={
+          <CopyInlineAction
+            value={item.copy.value}
+            label={item.copy.label}
+            copiedLabel={item.copy.copiedLabel}
+          />
+        }
+      >
+        {label}
+      </InlineActions>
     )
   }
-  if (item.isHash) {
-    return formatAddress(item.label)
-  }
-  return item.label
+
+  return label
 }
 
 export const ExplorerBreadcrumbs: FC<ExplorerBreadcrumbsProps> = ({items}) => {

@@ -286,6 +286,7 @@ export const BlockDetailsPage: FC<BlocksPageProps> = ({client}) => {
 
   const title = workchain === -1 ? "Masterchain block" : "Workchain block"
   const hasValidRoute = Number.isInteger(workchain) && Number.isInteger(seqno) && Boolean(shard)
+  const blockId = hasValidRoute ? formatToncenterBlockId({workchain, shard, seqno}) : undefined
   const latestPath = state.latestBlock ? blockPath(state.latestBlock) : undefined
   const canOpenPrev = hasValidRoute && seqno > 1
   const prevPath = canOpenPrev ? blockPath({workchain, shard, seqno: seqno - 1}) : undefined
@@ -304,7 +305,12 @@ export const BlockDetailsPage: FC<BlocksPageProps> = ({client}) => {
       <ExplorerBreadcrumbs
         items={[
           {label: "Blocks", path: routes.blocksPath},
-          {label: hasValidRoute ? formatToncenterBlockId({workchain, shard, seqno}) : title},
+          {
+            label: blockId ?? title,
+            copy: blockId
+              ? {value: blockId, label: "Copy block ID", copiedLabel: "Block ID copied"}
+              : undefined,
+          },
         ]}
       />
       <section className={styles.hero}>

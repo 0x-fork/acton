@@ -799,7 +799,15 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                   path: routes.addressPath(traceAddressDisplay),
                   isAddress: true,
                 },
-                {label: hash, isHash: true},
+                {
+                  label: hash,
+                  isHash: true,
+                  copy: {
+                    value: hash,
+                    label: "Copy transaction hash",
+                    copiedLabel: "Transaction hash copied",
+                  },
+                },
               ]}
             />
             <div className={styles.preTreeContent}>

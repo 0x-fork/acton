@@ -109,6 +109,7 @@
 .balanceHeader,
 .balanceCell {
   width: 34%;
+  min-width: 12rem;
   text-align: right !important;
 }
 
