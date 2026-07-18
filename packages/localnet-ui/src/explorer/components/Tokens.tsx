@@ -1,3 +1,14 @@
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableEmpty,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableSkeletonRows,
+  DataTableTable,
+} from "@acton/ui"
 import {useEffect, useState} from "react"
 import type {FC} from "react"
 
@@ -5,6 +16,7 @@ import type {TonClient} from "../api/client"
 import type {JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
+import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import styles from "./Tokens.module.css"
 import {
   TOKEN_IMAGE_SOURCE_KEYS,
@@ -66,96 +78,113 @@ export const Tokens: FC<TokensProps> = ({wallets, client, onAddressClick}) => {
     }
   }, [wallets, client])
 
-  if (wallets.length === 0) {
-    return <div className={styles.empty}>No tokens found</div>
-  }
-
   return (
-    <div className={styles.container}>
-      <div className={styles.list}>
-        {wallets.map(w => {
-          const master = w.master ?? mastersByAddress.get(toRawAddress(w.jetton))
-          const decimals = Number(master?.jetton_content?.decimals || 9)
-          const rawBalance = Number(w.balance)
-          const rawSupply = Number(master?.total_supply || "0")
-          const balance = rawBalance / 10 ** decimals
-          const supplyShare = rawSupply > 0 ? rawBalance / rawSupply : undefined
-          const supplyShareLabel =
-            supplyShare === undefined
-              ? "Unknown"
-              : supplyShare === 0
-                ? "0%"
-                : supplyShare < 0.0001
-                  ? "<0.01%"
-                  : `${(supplyShare * 100).toLocaleString(undefined, {
-                      maximumFractionDigits: supplyShare < 0.01 ? 2 : 1,
-                    })}%`
-          const symbol = master?.jetton_content?.symbol || "UNKNOWN"
-          const imageSources = getImageSources(master?.jetton_content, TOKEN_IMAGE_SOURCE_KEYS)
-          const image = getPrimaryImageSource(master?.jetton_content, TOKEN_IMAGE_SOURCE_KEYS)
+    <DataTable className={styles.embeddedTable} minWidth="54rem">
+      <DataTableTable aria-label="Tokens" layout="fixed">
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell>Token</DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth="22rem">Amount</DataTableHeaderCell>
+            <DataTableHeaderCell align="right" columnWidth="18rem">
+              Wallet address
+            </DataTableHeaderCell>
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
+          {wallets.length === 0 ? (
+            <DataTableEmpty colSpan={3}>No tokens found</DataTableEmpty>
+          ) : (
+            wallets.map(wallet => {
+              const master = wallet.master ?? mastersByAddress.get(toRawAddress(wallet.jetton))
+              const decimals = Number(master?.jetton_content?.decimals || 9)
+              const balance = Number(wallet.balance) / 10 ** decimals
+              const symbol = master?.jetton_content?.symbol || "UNKNOWN"
+              const name = master?.jetton_content?.name || "Unknown Jetton"
+              const imageSources = getImageSources(master?.jetton_content, TOKEN_IMAGE_SOURCE_KEYS)
+              const image = getPrimaryImageSource(master?.jetton_content, TOKEN_IMAGE_SOURCE_KEYS)
 
-          return (
-            <div
-              key={w.address}
-              className={styles.walletItem}
-              onClick={event => onAddressClick?.(w.jetton, event)}
-              onKeyDown={e => {
-                if (e.key === "Enter" || e.key === " ") {
-                  onAddressClick?.(w.jetton)
-                }
-              }}
-              role="button"
-              tabIndex={0}
-            >
-              <img
-                src={image}
-                alt={symbol}
-                className={styles.jettonImage}
-                onError={event => replaceBrokenImageWithFallback(event, imageSources)}
-              />
-              <div className={styles.jettonInfoMain}>
-                <div className={styles.jettonName}>
-                  {master?.jetton_content?.name || "Unknown Jetton"}
-                </div>
-                <div className={styles.jettonBalanceRow}>
-                  <span className={styles.balanceValue}>
-                    {balance.toLocaleString(undefined, {
-                      maximumFractionDigits: decimals,
-                    })}
-                  </span>
-                  <span className={styles.jettonSymbol}>{symbol}</span>
-                </div>
-              </div>
-              <div className={styles.supplyInfo}>
-                <div className={styles.supplyShareValue}>{supplyShareLabel}</div>
-                <div className={styles.supplyShareLabel}>of supply</div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
+              return (
+                <DataTableRow
+                  key={wallet.address}
+                  interactive={Boolean(onAddressClick)}
+                  tabIndex={onAddressClick ? 0 : undefined}
+                  onClick={event => onAddressClick?.(wallet.jetton, event)}
+                  onKeyDown={
+                    onAddressClick
+                      ? event => {
+                          if (event.target !== event.currentTarget) return
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault()
+                            event.currentTarget.click()
+                          }
+                        }
+                      : undefined
+                  }
+                >
+                  <DataTableCell>
+                    <div className={styles.tokenIdentity}>
+                      <img
+                        src={image}
+                        alt=""
+                        className={styles.jettonImage}
+                        onError={event => replaceBrokenImageWithFallback(event, imageSources)}
+                      />
+                      <strong className={styles.jettonName} title={name}>
+                        {name}
+                      </strong>
+                    </div>
+                  </DataTableCell>
+                  <DataTableCell tone="strong">
+                    <span className={styles.amount}>
+                      <span className={styles.balanceValue}>
+                        {balance.toLocaleString(undefined, {
+                          maximumFractionDigits: decimals,
+                        })}
+                      </span>
+                      <span className={styles.jettonSymbol}>{symbol}</span>
+                    </span>
+                  </DataTableCell>
+                  <DataTableCell align="right">
+                    <ExplorerAddressChip
+                      address={wallet.address}
+                      copyPlacement="left"
+                      onAddressClick={onAddressClick}
+                      resolveName={false}
+                    />
+                  </DataTableCell>
+                </DataTableRow>
+              )
+            })
+          )}
+        </DataTableBody>
+      </DataTableTable>
+    </DataTable>
   )
 }
 
 export const TokensSkeleton: FC = () => {
   return (
-    <div className={styles.container} aria-label="Loading tokens">
-      <div className={styles.list}>
-        {Array.from({length: 5}, (_, index) => (
-          <div key={`token-skeleton-${index}`} className={styles.walletItemSkeleton}>
-            <div className={`${styles.skeleton} ${styles.jettonImageSkeleton}`} />
-            <div className={styles.jettonInfoMain}>
-              <div className={`${styles.skeleton} ${styles.jettonNameSkeleton}`} />
-              <div className={`${styles.skeleton} ${styles.jettonBalanceSkeleton}`} />
-            </div>
-            <div className={styles.supplyInfo}>
-              <div className={`${styles.skeleton} ${styles.supplyValueSkeleton}`} />
-              <div className={`${styles.skeleton} ${styles.supplyLabelSkeleton}`} />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <DataTable className={styles.embeddedTable} minWidth="54rem">
+      <DataTableTable aria-label="Loading tokens" layout="fixed">
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell>Token</DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth="22rem">Amount</DataTableHeaderCell>
+            <DataTableHeaderCell align="right" columnWidth="18rem">
+              Wallet address
+            </DataTableHeaderCell>
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
+          <DataTableSkeletonRows
+            columns={3}
+            rows={5}
+            alignments={["left", "left", "right"]}
+            widths={["14rem", "8rem", "14rem"]}
+            rowKeyPrefix="token-table-skeleton"
+          />
+        </DataTableBody>
+      </DataTableTable>
+    </DataTable>
   )
 }
