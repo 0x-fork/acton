@@ -8,6 +8,7 @@ export interface ExplorerRoutes {
   readonly favoritesPath: string
   readonly abiDetailsPath: (slug: string) => string
   readonly addressPath: (address: string) => string
+  readonly blockPath: (workchain: number, shard: string, seqno: number) => string
   readonly transactionPath: (hash: string) => string
   readonly transactionTracePath: (hash: string) => string
 }
@@ -24,6 +25,8 @@ export const createExplorerRoutes = (basePath: string): ExplorerRoutes => {
     favoritesPath: path("/favorites"),
     abiDetailsPath: slug => path(`/abi/${encodeURIComponent(slug)}`),
     addressPath: address => path(`/address/${encodeURIComponent(address)}`),
+    blockPath: (workchain, shard, seqno) =>
+      `/block/${workchain}/${encodeURIComponent(shard)}/${seqno}`,
     transactionPath: hash => path(`/tx/${encodeURIComponent(hash)}`),
     transactionTracePath: hash => path(`/tx/${encodeURIComponent(hash)}/trace`),
   }

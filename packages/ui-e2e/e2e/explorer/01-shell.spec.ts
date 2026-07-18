@@ -8,7 +8,7 @@ test.describe("Explorer shell", () => {
     await page.goto("/")
     await expect(page.getByRole("link", {name: "actonscan"})).toBeVisible()
     await expect(page.getByRole("navigation", {name: "Explorer navigation"})).toBeVisible()
-    await expect(page.getByPlaceholder("Search by address or hash").last()).toBeVisible()
+    await expect(page.getByPlaceholder("Search by address, hash, or block").last()).toBeVisible()
   })
 
   test("renders the landing page and primary navigation", async ({page}) => {
@@ -16,6 +16,21 @@ test.describe("Explorer shell", () => {
     await expect(page.getByRole("link", {name: "ABI"})).toBeVisible()
     await expect(page.getByRole("link", {name: "Sources"})).toBeVisible()
     await expect(page.getByRole("button", {name: "Mainnet"})).toBeVisible()
+  })
+
+  test("opens blocks by masterchain seqno and toncenter block ID", async ({page}) => {
+    const search = page.getByPlaceholder("Search by address, hash, or block").last()
+
+    await search.fill("123")
+    await search.press("Enter")
+    await expect(page).toHaveURL(/\/block\/-1\/8000000000000000\/123$/)
+    await expect(page.getByText("(-1,8000000000000000,123)", {exact: true})).toBeVisible()
+
+    await page.goto("/")
+    await search.fill("(0,A000000000000000,456)")
+    await search.press("Enter")
+    await expect(page).toHaveURL(/\/block\/0\/A000000000000000\/456$/)
+    await expect(page.getByText("(0,A000000000000000,456)", {exact: true})).toBeVisible()
   })
 
   test.describe("visual snapshots", () => {

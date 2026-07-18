@@ -7,7 +7,7 @@ test.describe("Localnet shell", () => {
     await prepareVisualPage(page, {app: "localnet"})
     await page.goto("/explorer")
     await expect(page.getByRole("complementary", {name: "Main navigation"})).toBeVisible()
-    await expect(page.getByPlaceholder("Search by address or hash")).toBeVisible()
+    await expect(page.getByPlaceholder("Search by address, hash, or block")).toBeVisible()
     await expect(page.getByText("Failed to load wallets")).toHaveCount(0)
   })
 

@@ -1,4 +1,4 @@
-import {SearchInput, useToast} from "@acton/ui"
+import {SearchInput, formatToncenterBlockId, useToast} from "@acton/ui"
 import type {SearchInputItem} from "@acton/ui"
 import {FileCode2, History, Search} from "lucide-react"
 import {useCallback, useEffect, useMemo, useState} from "react"
@@ -46,7 +46,14 @@ interface AbiSearchIndexEntry {
 
 const MAX_HISTORY_ITEMS = 5
 const MAX_ABI_SEARCH_MATCHES = 6
-const INVALID_SEARCH_DESCRIPTION = "Paste a valid TON address, transaction hash, or ABI name."
+const MASTERCHAIN_WORKCHAIN = -1
+const MASTERCHAIN_SHARD = "8000000000000000"
+const MAX_BLOCK_NUMBER = 2_147_483_647
+const MIN_WORKCHAIN = -2_147_483_648
+const MAX_WORKCHAIN = 2_147_483_647
+const TONCENTER_BLOCK_ID_PATTERN = /^\(\s*(-?\d+)\s*,\s*([\da-f]{16})\s*,\s*(\d+)\s*\)$/i
+const INVALID_SEARCH_DESCRIPTION =
+  "Paste a valid TON address, transaction hash, block ID, or ABI name."
 const OPCODE_NOT_FOUND_DESCRIPTION = "No ABI declaration found for opcode"
 
 export const ExplorerSearch: FC<ExplorerSearchProps> = ({
@@ -234,7 +241,7 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
           setIsInvalid(false)
         }
       }}
-      placeholder="Search by address or hash"
+      placeholder="Search by address, hash, or block"
       size={variant === "header" ? "sm" : "lg"}
       value={input}
     />
@@ -249,6 +256,14 @@ function resolveSearchTarget(
   const trimmed = value.trim()
   if (!trimmed) {
     return undefined
+  }
+
+  const block = parseBlockSearchQuery(trimmed)
+  if (block) {
+    return {
+      displayValue: formatToncenterBlockId(block),
+      path: routes.blockPath(block.workchain, block.shard, block.seqno),
+    }
   }
 
   const parsedAddress = parseAddress(trimmed)
@@ -269,6 +284,40 @@ function resolveSearchTarget(
   }
 
   return undefined
+}
+
+function parseBlockSearchQuery(
+  value: string,
+): {workchain: number; shard: string; seqno: number} | undefined {
+  if (/^\d+$/.test(value)) {
+    const seqno = parseBlockNumber(value)
+    return seqno === undefined
+      ? undefined
+      : {workchain: MASTERCHAIN_WORKCHAIN, shard: MASTERCHAIN_SHARD, seqno}
+  }
+
+  const match = TONCENTER_BLOCK_ID_PATTERN.exec(value)
+  if (!match) {
+    return undefined
+  }
+
+  const workchain = Number(match[1])
+  const seqno = parseBlockNumber(match[3])
+  if (
+    !Number.isSafeInteger(workchain) ||
+    workchain < MIN_WORKCHAIN ||
+    workchain > MAX_WORKCHAIN ||
+    seqno === undefined
+  ) {
+    return undefined
+  }
+
+  return {workchain, shard: match[2].toUpperCase(), seqno}
+}
+
+function parseBlockNumber(value: string): number | undefined {
+  const number = Number(value)
+  return Number.isSafeInteger(number) && number <= MAX_BLOCK_NUMBER ? number : undefined
 }
 
 function formatHistoryItem(value: string, addressFormat: AddressFormatOptions): string {

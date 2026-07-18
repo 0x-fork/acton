@@ -100,7 +100,7 @@ export const Nfts: FC<NftsProps> = ({items, onAddressClick}) => {
                 <img
                   src={image}
                   alt={name}
-                  className={styles.nftImage}
+                  className={`${styles.nftImage} ${item.is_nsfw ? styles.nsfwImage : ""}`}
                   onError={event => replaceBrokenImageWithFallback(event, imageSources)}
                 />
               </div>

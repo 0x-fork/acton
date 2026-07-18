@@ -90,6 +90,10 @@
   transition: transform 180ms ease;
 }
 
+.nsfwImage {
+  filter: blur(12px);
+}
+
 .nftInfo {
   min-width: 0;
   display: flex;

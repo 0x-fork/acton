@@ -1,6 +1,6 @@
 import {Check, ChevronLeft, ChevronRight, ChevronsRight, Copy} from "lucide-react"
 import {Link, useNavigate, useParams} from "react-router-dom"
-import {Button} from "@acton/ui"
+import {Button, formatToncenterBlockId} from "@acton/ui"
 import {useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 
@@ -304,7 +304,7 @@ export const BlockDetailsPage: FC<BlocksPageProps> = ({client}) => {
       <ExplorerBreadcrumbs
         items={[
           {label: "Blocks", path: routes.blocksPath},
-          {label: hasValidRoute ? `${title} ${seqno}` : title},
+          {label: hasValidRoute ? formatToncenterBlockId({workchain, shard, seqno}) : title},
         ]}
       />
       <section className={styles.hero}>
@@ -413,7 +413,7 @@ const BlockTableSection: FC<{
           <tbody>
             {blocks.map(block => (
               <tr
-                key={blockKey(block)}
+                key={formatToncenterBlockId(block)}
                 className={styles.blocksTableRow}
                 tabIndex={0}
                 onClick={event => onOpenBlock(block, event)}
@@ -709,10 +709,6 @@ const TableStateBlock: FC<{
 
 function blockPath(block: Pick<V3Block, "workchain" | "shard" | "seqno">): string {
   return `/block/${block.workchain}/${encodeURIComponent(block.shard)}/${block.seqno}`
-}
-
-function blockKey(block: Pick<V3Block, "workchain" | "shard" | "seqno">): string {
-  return `${block.workchain}:${block.shard}:${block.seqno}`
 }
 
 function isSameBlock(block: V3Block, workchain: number, shard: string, seqno: number): boolean {

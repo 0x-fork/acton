@@ -3,12 +3,12 @@ import type {MouseEventHandler, ReactNode} from "react"
 import {cx} from "../../lib/cx"
 import {CopyInlineAction, InlineActions} from "../InlineActions/InlineActions"
 
+import {formatToncenterBlockId} from "./blockId"
 import styles from "./BlockChip.module.css"
 
-export interface BlockChipProps {
-  readonly workchain: number
-  readonly shard: string
-  readonly seqno: number | string
+import type {ToncenterBlockId} from "./blockId"
+
+export interface BlockChipProps extends ToncenterBlockId {
   readonly className?: string
   readonly highlighted?: boolean
   readonly href?: string
@@ -31,7 +31,7 @@ export function BlockChip({
   const content = label ?? seqno
   const chipClassName = cx(styles.blockChip, highlighted && styles.highlighted, className)
   const chipTitle = title ?? `Block ${seqno}`
-  const toncenterBlockId = `(${workchain},${shard},${seqno})`
+  const toncenterBlockId = formatToncenterBlockId({workchain, shard, seqno})
 
   return (
     <InlineActions
