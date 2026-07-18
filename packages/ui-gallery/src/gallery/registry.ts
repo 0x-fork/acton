@@ -19,6 +19,7 @@ import {inlineButtonGallery} from "./inlineButtonGallery"
 import {inlineLoaderGallery} from "./inlineLoaderGallery"
 import {markdownTextGallery} from "./markdownTextGallery"
 import {modeViewerGallery} from "./modeViewerGallery"
+import {nftChipGallery} from "./nftChipGallery"
 import {opcodeChipGallery} from "./opcodeChipGallery"
 import {pillTabsGallery} from "./pillTabsGallery"
 import {parsedBodySectionGallery} from "./parsedBodySectionGallery"
@@ -47,6 +48,7 @@ export const galleries = [
   inlineLoaderGallery,
   codeViewerGallery,
   contractChipGallery,
+  nftChipGallery,
   dialogGallery,
   disclosureToggleGallery,
   exitCodeChipGallery,
