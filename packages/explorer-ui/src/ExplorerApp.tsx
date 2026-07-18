@@ -2,7 +2,15 @@ import {Checkbox, Input, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
 import {Check, ChevronDown, Edit2, Github, Plus, Share2, Star, Trash2} from "lucide-react"
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
-import {BrowserRouter, Link, Navigate, Route, Routes, useLocation} from "react-router-dom"
+import {
+  BrowserRouter,
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom"
 
 import {TonClient} from "../../localnet-ui/src/explorer/api/client"
 import {getBundledCompilerAbis} from "../../localnet-ui/src/explorer/api/compilerAbiCatalog"
@@ -55,6 +63,7 @@ type NetworkFormMode =
 
 const EXPLORER_NETWORK_STORAGE_KEY = "explorerNetwork"
 const EXPLORER_CUSTOM_NETWORKS_STORAGE_KEY = "explorerCustomNetworks"
+const EXPLORER_NETWORK_QUERY_PARAM = "network"
 const DEFAULT_CUSTOM_NETWORK_NAME = "Devnet"
 const SHARED_NETWORK_NAME_QUERY_PARAM = "network.name"
 const SHARED_NETWORK_V2_QUERY_PARAM = "network.v2"
@@ -255,6 +264,12 @@ const serializeCustomExplorerNetwork = (
 const readSelectedExplorerNetwork = (
   networks: readonly SelectableExplorerNetwork[],
 ): SelectableExplorerNetworkId => {
+  if (
+    new URLSearchParams(globalThis.location.search).get(EXPLORER_NETWORK_QUERY_PARAM) === "testnet"
+  ) {
+    return "testnet"
+  }
+
   const storedNetwork = localStorage.getItem(EXPLORER_NETWORK_STORAGE_KEY)
   return networks.find(network => network.id === storedNetwork)?.id ?? "mainnet"
 }
@@ -785,6 +800,39 @@ const ExplorerHeaderFrame: FC<{readonly children: ReactNode}> = ({children}) => 
   return <header className={headerClassName}>{children}</header>
 }
 
+const ExplorerNetworkUrlSync: FC<{
+  readonly networkId: SelectableExplorerNetworkId
+}> = ({networkId}) => {
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search)
+    if (networkId === "testnet") {
+      if (searchParams.get(EXPLORER_NETWORK_QUERY_PARAM) === networkId) {
+        return
+      }
+      searchParams.set(EXPLORER_NETWORK_QUERY_PARAM, networkId)
+    } else {
+      if (!searchParams.has(EXPLORER_NETWORK_QUERY_PARAM)) {
+        return
+      }
+      searchParams.delete(EXPLORER_NETWORK_QUERY_PARAM)
+    }
+
+    void navigate(
+      {
+        pathname: location.pathname,
+        search: searchParams.toString(),
+        hash: location.hash,
+      },
+      {replace: true},
+    )
+  }, [location.hash, location.pathname, location.search, navigate, networkId])
+
+  return null
+}
+
 export const ExplorerApp: FC = () => {
   const [networkState, setNetworkState] = useState<ExplorerNetworkState>(
     readInitialExplorerNetworkState,
@@ -888,6 +936,7 @@ export const ExplorerApp: FC = () => {
 
   return (
     <BrowserRouter>
+      <ExplorerNetworkUrlSync networkId={networkId} />
       <ToastProvider>
         <StaticNetworkInfoProvider network={networkConfig}>
           <ExplorerRoutesProvider basePath="">
