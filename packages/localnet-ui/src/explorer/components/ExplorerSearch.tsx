@@ -162,7 +162,9 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
               const displayAddress = parsedAddress.toString(addressFormat)
               setInput("")
               addToHistory(domain)
-              void navigate(routes.addressPath(displayAddress))
+              void navigate(routes.addressPath(displayAddress), {
+                state: {explorerPageTitle: domain},
+              })
             })
             .catch(() => {
               if (searchRequestIdRef.current !== requestId) return
@@ -408,7 +410,9 @@ function openTonAssetsNameMatch({
   const displayAddress = parseAddress(match.address)?.toString(addressFormat) ?? match.address
   setInput("")
   addToHistory(displayAddress)
-  void navigate(routes.addressPath(displayAddress))
+  void navigate(routes.addressPath(displayAddress), {
+    state: {explorerPageTitle: match.name},
+  })
 }
 
 function openAbiNameMatch({

@@ -32,6 +32,7 @@ import {AccountPage} from "../../localnet-ui/src/explorer/pages/AccountPage"
 import {AbiCatalogPage, AbiDetailsPage} from "../../localnet-ui/src/explorer/pages/AbiCatalogPage"
 import {SourceCatalogPage} from "../../localnet-ui/src/explorer/pages/SourceCatalogPage"
 import {ExplorerSearch} from "../../localnet-ui/src/explorer/components/ExplorerSearch"
+import {ExplorerDocumentTitle} from "../../localnet-ui/src/explorer/components/ExplorerDocumentTitle"
 import {ExplorerIndexPage} from "../../localnet-ui/src/explorer/pages/ExplorerIndexPage"
 import {FavoriteAccountsPage} from "../../localnet-ui/src/explorer/pages/FavoriteAccountsPage"
 import {TransactionPage} from "../../localnet-ui/src/explorer/pages/TransactionPage"
@@ -942,6 +943,11 @@ export const ExplorerApp: FC = () => {
           <ExplorerRoutesProvider basePath="">
             <MetadataRegistryProvider registry={metadataRegistry}>
               <AddressBookProvider>
+                <ExplorerDocumentTitle
+                  productName={
+                    networkId === "mainnet" ? "actonscan" : `actonscan ${networkConfig.label}`
+                  }
+                />
                 <div className={styles.appShell} data-network-kind={networkKind}>
                   <DeveloperExplorerBanner />
                   <ExplorerHeaderFrame>

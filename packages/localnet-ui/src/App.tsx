@@ -1,4 +1,4 @@
-import {BrowserRouter, Navigate, Route, Routes} from "react-router-dom"
+import {BrowserRouter, Navigate, Route, Routes, useLocation} from "react-router-dom"
 import {Check, KeyRound, ShieldCheck, X} from "lucide-react"
 import {Input, ToastProvider} from "@acton/ui"
 import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"
@@ -6,6 +6,7 @@ import type {FC, ReactNode} from "react"
 
 import {TonClient} from "./explorer/api/client"
 import {getBundledCompilerAbis} from "./explorer/api/compilerAbiCatalog"
+import {useExplorerPageTitle} from "./explorer/components/ExplorerDocumentTitle"
 import {AccountPage} from "./explorer/pages/AccountPage"
 import {AbiCatalogPage, AbiDetailsPage} from "./explorer/pages/AbiCatalogPage"
 import {BlockDetailsPage, BlocksPage} from "./explorer/pages/BlocksPage"
@@ -54,6 +55,18 @@ const ApiCallsPage = lazy(async () => {
   const module = await import("./dashboard/pages/ApiCallsPage")
   return {default: module.ApiCallsPage}
 })
+
+const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
+  "/dashboard": "Dashboard",
+  "/faucet": "Faucet",
+  "/wallets": "Wallets",
+  "/tokens": "Tokens",
+  "/nfts": "NFTs",
+  "/api-reference/v2": "API Reference v2",
+  "/api-reference/v3": "API Reference v3",
+  "/api-reference/control": "Control API Reference",
+  "/api-calls": "API Calls",
+}
 export const App: FC = () => {
   const [localnetApiToken, setLocalnetApiTokenState] = useState<string | undefined>(
     readInitialLocalnetApiToken,
@@ -193,6 +206,7 @@ const AppContent: FC<AppContentProps> = ({
 
   return (
     <>
+      <LocalnetDocumentTitle />
       <div className={styles.app}>
         <main className={styles.main}>
           <Routes>
@@ -404,6 +418,14 @@ const AppContent: FC<AppContentProps> = ({
       )}
     </>
   )
+}
+
+const LocalnetDocumentTitle: FC = () => {
+  const {pathname} = useLocation()
+  const explorerPageTitle = useExplorerPageTitle()
+  const pageTitle = explorerPageTitle ?? LOCALNET_PAGE_TITLES[pathname]
+
+  return <title>{pageTitle ? `${pageTitle} · TON Localnet UI` : "TON Localnet UI"}</title>
 }
 
 const RouteSuspense: FC<{readonly children: ReactNode}> = ({children}) => (
