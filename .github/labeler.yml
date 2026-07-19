@@ -83,6 +83,11 @@
           - "crates/ton-localnet/**"
           - "src/commands/localnet/**"
 
+"explorer":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "packages/explorer-ui/**"
+
 "wallets":
   - changed-files:
       - any-glob-to-any-file:
@@ -116,9 +121,4 @@
 "UI":
   - changed-files:
       - any-glob-to-any-file:
-          - "packages/explorer-ui/**"
-          - "packages/localnet-ui/**"
-          - "packages/transaction-ui/**"
-          - "packages/test-ui/**"
-          - "packages/ui/**"
-          - "packages/ui-gallery/**"
+          - "packages/**"
