@@ -399,7 +399,7 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
         onChange={event => onRootIndexChange(nonNegativeInteger(event.target.value, 0))}
         description={
           rootCount === undefined
-            ? "Root cells are numbered from 0"
+            ? "0-based index"
             : `${rootCount} ${rootCount === 1 ? "root" : "roots"} available`
         }
         mono
@@ -412,14 +412,14 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
         max={128}
         value={maxDepth}
         onChange={event => onMaxDepthChange(boundedInteger(event.target.value, 8, 0, 128))}
-        description="Maximum raw depth"
+        description="Raw depth limit"
       />
     </div>
 
     <Checkbox
       className={styles.strictOption}
       label="Strict parsing"
-      description="Only show decoded formats that use the entire root cell"
+      description="Require full cell consumption"
       checked={strict}
       onChange={event => onStrictChange(event.currentTarget.checked)}
     />

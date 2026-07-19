@@ -127,6 +127,10 @@ export function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 86_400)}d`
 }
 
+export function shortenIdentifier(value: string): string {
+  return value.length > 12 ? `${value.slice(0, 6)}…${value.slice(-6)}` : value
+}
+
 export function formatAddress(
   address: string,
   shorten: boolean = true,
@@ -149,7 +153,7 @@ export function formatAddress(
   }
 
   if (displayAddress.length > 12) {
-    return `${displayAddress.slice(0, 6)}…${displayAddress.slice(-6)}`
+    return shortenIdentifier(displayAddress)
   }
   return displayAddress
 }

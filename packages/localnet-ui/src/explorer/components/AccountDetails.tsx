@@ -91,7 +91,14 @@ import {
 import {Nfts} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
-import {formatNano, formatTimeAgo, hashToHex, isSameAddress, parseAddress} from "./utils"
+import {
+  formatNano,
+  formatTimeAgo,
+  hashToHex,
+  isSameAddress,
+  parseAddress,
+  shortenIdentifier,
+} from "./utils"
 
 type Tabs = "history" | "contract" | "tokens" | "nfts" | "holders"
 
@@ -181,6 +188,7 @@ interface HistoryTextValueLine {
 interface HistoryNftValueLine {
   readonly kind: "nft"
   readonly label: string
+  readonly fullLabel: string
   readonly tone: "positive"
   readonly address?: string
   readonly imageSources: readonly string[]
@@ -1316,8 +1324,8 @@ function HistoryTextValue({
         label={line.label}
         imageSrc={line.imageSources[0]}
         onImageError={event => replaceBrokenImageWithFallback(event, line.imageSources)}
-        ariaLabel={address && onAddressClick ? `Open ${line.label}` : undefined}
-        title={address && onAddressClick ? `Open ${line.label}` : line.label}
+        ariaLabel={address && onAddressClick ? `Open ${line.fullLabel}` : undefined}
+        title={address && onAddressClick ? `Open ${line.fullLabel}` : line.fullLabel}
         onClick={
           address && onAddressClick
             ? event => {
@@ -2067,8 +2075,13 @@ function getHistoryActionDisplay(
         true,
         "DNS",
         valueLines(
-          tonValueLine(action.details.price, "negative"),
-          nftValueLine(action.details.nft_item, action.details.nft_item_index, context.metadata),
+          tonToNftValueLine(
+            action.details.price,
+            "negative",
+            action.details.nft_item,
+            action.details.nft_item_index,
+            context.metadata,
+          ),
         ),
       )
     case "dns_release":
@@ -2206,8 +2219,9 @@ function getHistoryActionDisplay(
         false,
         "Auction",
         valueLines(
-          auctionNftValueLine(
+          tonToNftValueLine(
             action.details.min_bid ?? action.details.max_bid,
+            "neutral",
             action.details.nft_item,
             action.details.nft_item_index,
             context.metadata,
@@ -2951,37 +2965,41 @@ function nftValueLine(
     ? getMetadataTokenInfo(metadata, itemAddress, "nft_items")
     : undefined
   const name = metadataTokenString(tokenInfo, "name")
-  const label = name ?? (isNonEmptyString(itemIndex) ? `NFT #${itemIndex}` : undefined)
-  if (!label && !itemAddress) return undefined
+  const fullLabel = name ?? (isNonEmptyString(itemIndex) ? `NFT #${itemIndex}` : undefined)
+  if (!fullLabel && !itemAddress) return undefined
+  const label =
+    name ?? (isNonEmptyString(itemIndex) ? `NFT #${shortenIdentifier(itemIndex)}` : "NFT")
 
   const imageSources = getImageSources(tokenInfo, NFT_IMAGE_SOURCE_KEYS)
   return {
     kind: "nft",
-    label: label ?? "NFT",
+    label,
+    fullLabel: fullLabel ?? "NFT",
     tone: "positive",
     ...(itemAddress ? {address: itemAddress} : {}),
     imageSources,
   }
 }
 
-function auctionNftValueLine(
-  minimumBid: string | null,
+function tonToNftValueLine(
+  amount: string | null,
+  amountTone: HistoryValueTone,
   itemAddress: string | null,
   itemIndex: string | null,
   metadata: V3Metadata,
 ): HistoryValueLine | undefined {
-  const bid = tonValueLine(minimumBid, "neutral")
+  const ton = tonValueLine(amount, amountTone)
   const nft = nftValueLine(itemAddress, itemIndex, metadata)
 
-  if (bid && nft) {
+  if (ton && nft) {
     return {
       kind: "swap",
-      from: bid,
+      from: ton,
       to: nft,
     }
   }
 
-  return bid ?? nft
+  return ton ?? nft
 }
 
 function formatReadableNumber(value: string, maximumFractionDigits = 9): string {
