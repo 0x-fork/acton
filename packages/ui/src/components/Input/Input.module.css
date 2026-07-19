@@ -70,19 +70,34 @@
   display: block;
 }
 
-.shortcut {
+.trailingDecoration {
   position: absolute;
   z-index: 1;
   top: 50%;
   right: var(--acton-space-3);
   display: inline-flex;
   align-items: center;
+  gap: var(--acton-space-2);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.suffix {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.shortcut {
+  display: inline-flex;
+  align-items: center;
   gap: 0.125rem;
   color: var(--acton-color-text-subtle);
   font-family: var(--acton-font-sans);
   font-size: var(--acton-font-size-compact);
-  pointer-events: none;
-  transform: translateY(-50%);
 }
 
 .shortcut kbd {
@@ -153,6 +168,14 @@
   padding-inline-end: 4rem;
 }
 
+.withSuffix {
+  padding-inline-end: 4.5rem;
+}
+
+.withShortcutAndSuffix {
+  padding-inline-end: 7rem;
+}
+
 .mono {
   font-family: var(--acton-font-mono);
   font-variant-ligatures: none;
@@ -164,11 +187,28 @@
   gap: var(--acton-space-2);
 }
 
-.label {
-  color: var(--acton-color-text-muted);
+.labelRow {
+  display: flex;
+  min-width: 0;
+  height: 1.25em;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--acton-space-3);
   font-size: var(--acton-font-size-sm);
-  font-weight: var(--acton-font-weight-medium);
   line-height: 1.25;
+}
+
+.label {
+  min-width: 0;
+  color: var(--acton-color-text-muted);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.labelAction {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
 }
 
 .required {

@@ -1,4 +1,5 @@
 import {addressChipGallery} from "./addressChipGallery"
+import {abiValueEditorGallery} from "./abiValueEditorGallery"
 import {blockChipGallery} from "./blockChipGallery"
 import {buttonGallery} from "./buttonGallery"
 import {breadcrumbsGallery} from "./breadcrumbsGallery"
@@ -28,6 +29,7 @@ import {parsedValueViewGallery} from "./parsedValueViewGallery"
 import {popoverGallery} from "./popoverGallery"
 import {rawDataBlockGallery} from "./rawDataBlockGallery"
 import {searchInputGallery} from "./searchInputGallery"
+import {selectGallery} from "./selectGallery"
 import {skeletonGallery} from "./skeletonGallery"
 import {themeSwitchGallery} from "./themeSwitchGallery"
 import {toastGallery} from "./toastGallery"
@@ -38,9 +40,11 @@ import type {ComponentGallery} from "./types"
 export const galleries = [
   tokensGallery,
   addressChipGallery,
+  abiValueEditorGallery,
   blockChipGallery,
   buttonGallery,
   inputGallery,
+  selectGallery,
   searchInputGallery,
   breadcrumbsGallery,
   inlineButtonGallery,

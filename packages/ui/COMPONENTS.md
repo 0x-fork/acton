@@ -236,6 +236,8 @@ row item.
   accessible label/title, and resets after 2000ms by default.
 - `CopyInlineAction` uses copy/check icons by default; pass `icon` and
   `copiedIcon` only when the surrounding domain needs different symbols.
+- `variant="danger"` gives destructive actions the shared danger color and
+  hover treatment.
 
 ### Visibility Rules
 
@@ -252,8 +254,7 @@ row item.
 - Use `InlineAction` for icon-only buttons and always provide a clear `label`.
 - Use `CopyInlineAction` instead of wiring copy state by hand when the action
   should change to a check mark after copying.
-- Keep `InlineAction` visually neutral; handle destructive intent through label,
-  placement, confirmation, or surrounding context.
+- Use `variant="danger"` for destructive actions such as removing a row.
 - Use `size="compact"` only when the surrounding value is itself compact; keep
   the default size for standalone inline actions.
 - Use `InlineButton` instead when the action needs a visible text label like
@@ -288,12 +289,17 @@ and forwards native attributes and refs.
 - `size`: `sm`, `md`, or `lg`; `md` is the default.
 - `label`: optional accessible field label. Omit it when the caller already
   renders a linked label.
+- `labelAction`: optional action rendered at the right edge of the label row.
+  Use it for a compact secondary action such as reload or paste; interactive
+  content stays outside the native label.
 - `description`: optional neutral helper text linked with
   `aria-describedby`.
 - `invalid`: applies validation styling and `aria-invalid` without owning an
   error message.
 - `leadingIcon`: optional decorative icon for standard search, token, or
   credential fields. The icon is hidden from assistive technology.
+- `suffix`: optional short unit or decoration such as `"GRAM"`, `"ms"`, or
+  `"%"`. It is linked to the input through `aria-describedby`.
 - `shortcut`: optional global modifier shortcut key, such as `"K"`. Input
   renders the platform modifier and focuses and selects itself when the
   shortcut is pressed.
@@ -329,6 +335,66 @@ and forwards native attributes and refs.
   actions belong in a dedicated InputGroup.
 - Do not add an inline error-message API to Input.
 
+## Select
+
+Status: ready
+
+Import:
+
+```tsx
+import { Select } from "@acton/ui"
+```
+
+Use Select for choosing one value from a concise, known option set. It renders
+a native `select`, forwards native attributes and refs, and preserves native
+keyboard, focus, option, and form behavior.
+
+### Composition
+
+```tsx
+<Select
+  label="Network"
+  description="Network used to resolve the account state."
+  defaultValue="mainnet"
+>
+  <option value="mainnet">Mainnet</option>
+  <option value="testnet">Testnet</option>
+</Select>
+```
+
+- `size`: `sm`, `md`, or `lg`; `md` is the default.
+- `label`: optional accessible field label. Omit it when the caller already
+  renders a linked label.
+- `description`: optional neutral helper text linked with
+  `aria-describedby`.
+- `invalid`: applies validation styling and `aria-invalid` without owning an
+  error message.
+- `fieldClassName`: layout hook for the optional label/description wrapper;
+  `className` always targets the native select.
+- Native select attributes, `option` and `optgroup` children, and refs are
+  forwarded unchanged, apart from `size`, which controls Acton control density.
+
+### States To Review Visually
+
+- Empty placeholder option and selected value
+- Hover and keyboard focus
+- Disabled
+- Invalid
+- Required label
+- Small, medium, and large
+
+### Agent Guidance
+
+- Use native `option` and `optgroup` elements as children.
+- Prefer the built-in label and description when no surrounding form field
+  owns them.
+- Use `invalid` or `aria-invalid` to expose validation state, then report the
+  actual validation or request failure through Toast.
+- Keep option labels short enough to scan in a native dropdown.
+- Do not add a second chevron or override native interaction behavior.
+- Use a dedicated searchable picker instead when options require search, rich
+  content, or asynchronous loading.
+
 ## SearchInput
 
 Status: ready
@@ -361,7 +427,13 @@ history persistence, validation messages, and navigation.
 />
 ```
 
-- `size`: `sm` for headers and dense toolbars, or `lg` for primary page search.
+- `size`: `sm` for headers and dense toolbars, `md` for form controls, or `lg`
+  for primary page search.
+- `variant`: `search` is the default search surface; `field` matches regular
+  form controls and omits the search icon for suggestion-backed inputs.
+- `inputClassName`: styles the native input surface without affecting the
+  autocomplete anchor or popup.
+- `disabled`: disables typing, focus-open behavior, and the suggestion list.
 - `items`: resolved rows with a stable `id`, label, optional description and
   icon, and an `onSelect` callback.
 - `onRemove`: optional history-row command. SearchInput supplies the remove
@@ -370,6 +442,8 @@ history persistence, validation messages, and navigation.
   control should stay open.
 - `open` and `onOpenChange`: optional controlled visibility for previews or
   coordinated layouts. Normal product usage can leave visibility uncontrolled.
+- `onFocus`: optional hook for suggestion wrappers that need to reset their
+  filtering state whenever the field receives focus.
 
 ### States To Review Visually
 

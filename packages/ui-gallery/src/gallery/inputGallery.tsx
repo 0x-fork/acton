@@ -1,5 +1,5 @@
-import {Input} from "@acton/ui"
-import {KeyRound, Search} from "lucide-react"
+import {InlineAction, Input} from "@acton/ui"
+import {KeyRound, RefreshCw, Search} from "lucide-react"
 import {useState} from "react"
 
 import styles from "./inputGallery.module.css"
@@ -38,6 +38,13 @@ function FieldSamples() {
         placeholder="https://example.com/api/v3"
         required
       />
+      <Input
+        label="Address"
+        labelAction={
+          <InlineAction label="Reload address" icon={<RefreshCw />} onClick={() => undefined} />
+        }
+        defaultValue="EQD36XRy1lSfSB8zmISQKBsa5bmeixAWwD6vUUhOXXur8c8Y"
+      />
     </div>
   )
 }
@@ -63,6 +70,7 @@ function TechnicalSamples() {
       <Input
         type="number"
         label="Amount"
+        suffix="GRAM"
         min="0"
         inputMode="decimal"
         value={value}
@@ -88,11 +96,12 @@ export const inputGallery = {
     "Use invalid or aria-invalid for validation styling; report the actual failure through Toast.",
     "Use mono for code hashes, raw addresses, and other fixed-width technical values.",
     "Use shortcut for a global modifier shortcut that focuses and selects the input.",
+    "Use suffix for short units such as GRAM, ms, or %.",
     "Autocomplete, autocorrect, capitalization, and spellcheck default to off; opt in for human-language fields.",
   ],
   avoid: [
     "Do not use Input for multiline content, file uploads, checkboxes, or selects.",
-    "Do not add icons, shortcuts, suffix buttons, or unit labels with external absolute positioning; use the supported decorative props or a dedicated composite control.",
+    "Do not add icons, shortcuts, suffix buttons, or unit labels with external absolute positioning; use the supported decorative props.",
     "Do not render validation or request error messages inside Input; use Toast and preserve aria-invalid.",
   ],
   sections: [
