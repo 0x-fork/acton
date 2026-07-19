@@ -28,6 +28,7 @@ import type {
   ExplorerNetworkInfo,
 } from "../../localnet-ui/src/explorer/hooks/useNetworkInfo"
 import {BlockDetailsPage, BlocksPage} from "../../localnet-ui/src/explorer/pages/BlocksPage"
+import {CellInspectorPage} from "../../localnet-ui/src/explorer/pages/CellInspectorPage"
 import {AccountPage} from "../../localnet-ui/src/explorer/pages/AccountPage"
 import {AbiCatalogPage, AbiDetailsPage} from "../../localnet-ui/src/explorer/pages/AbiCatalogPage"
 import {SourceCatalogPage} from "../../localnet-ui/src/explorer/pages/SourceCatalogPage"
@@ -1020,6 +1021,7 @@ export const ExplorerApp: FC = () => {
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />
                       <Route path="/sources" element={<SourceCatalogPage />} />
+                      <Route path="/cell" element={<CellInspectorPage />} />
                       <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />
                       <Route
                         path="/block/:workchain/:shard/:seqno"

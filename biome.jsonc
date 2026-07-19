@@ -6,7 +6,10 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["packages/**"]
+    "includes": [
+      "packages/**",
+      "!!packages/localnet-ui/src/explorer/cell-inspector/block.tlb.generated.ts"
+    ]
   },
   "formatter": {
     "enabled": true,

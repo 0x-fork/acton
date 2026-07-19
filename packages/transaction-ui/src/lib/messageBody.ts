@@ -31,6 +31,47 @@ interface ParsableMessage {
   readonly body: Cell
 }
 
+/** Compiler ABI together with the registry metadata that identified it. */
+export interface ExtendedContractABI {
+  readonly compiler_abi: ContractABI
+  readonly display_name?: string
+  readonly code_hashes: readonly string[]
+  readonly links?: readonly unknown[]
+}
+
+export type CellDecodeCategory = "comment" | "message" | "storage"
+
+export type CellMessageDirection = "incoming-internal" | "incoming-external" | "outgoing"
+
+export interface CellDecodeConsumption {
+  readonly initialBits: number
+  readonly initialRefs: number
+  readonly remainingBits: number
+  readonly remainingRefs: number
+  readonly complete: boolean
+}
+
+export type CellDecodeProvenance =
+  | {
+      readonly source: "text-comment"
+      readonly parser: "built-in"
+    }
+  | {
+      readonly source: "compiler-abi"
+      readonly displayName?: string
+      readonly codeHashes: readonly string[]
+    }
+
+export interface DecodedCellWithAbi {
+  readonly category: CellDecodeCategory
+  readonly direction?: CellMessageDirection
+  readonly directionCandidates?: readonly CellMessageDirection[]
+  readonly name: string
+  readonly value: ParsedValue
+  readonly provenance: CellDecodeProvenance
+  readonly consumption?: CellDecodeConsumption
+}
+
 const BOUNCED_BODY_PREFIX = 0xff_ff_ff_ff
 const RICH_BOUNCE_BODY_PREFIX = 0xff_ff_ff_fe
 
@@ -824,9 +865,8 @@ const textCommentTailValue = (slice: Slice): ParsedValue => {
   return toSerializedCellScalar("Slice", slice.asCell())
 }
 
-const tryDecodeTextCommentBody = (message: ParsableMessage): ParsedTransactionBody | undefined => {
-  const baseSlice = createBodyParser(message)
-  if (!baseSlice || baseSlice.remainingBits < 32) {
+const tryDecodeTextCommentSlice = (baseSlice: Slice): ParsedTransactionBody | undefined => {
+  if (baseSlice.remainingBits < 32) {
     return undefined
   }
 
@@ -843,6 +883,11 @@ const tryDecodeTextCommentBody = (message: ParsableMessage): ParsedTransactionBo
       entries: [{key: "text", value: textCommentTailValue(parser)}],
     },
   }
+}
+
+const tryDecodeTextCommentBody = (message: ParsableMessage): ParsedTransactionBody | undefined => {
+  const baseSlice = createBodyParser(message)
+  return baseSlice ? tryDecodeTextCommentSlice(baseSlice) : undefined
 }
 
 const resolveCandidateOpcodeName = (
@@ -867,35 +912,35 @@ const createBouncedOpcodeBody = (name: string, body: Slice): ParsedTransactionBo
   },
 })
 
-const tryDecodeMessageWithCandidates = (
-  message: ParsableMessage,
+interface SliceCandidateDecodeOptions {
+  readonly opcode?: number
+  readonly requireOpcodeMatch?: boolean
+  readonly preserveUndecodedBody?: boolean
+  readonly onAcceptedRemainder?: (parser: Slice) => void
+}
+
+const tryDecodeSliceWithCandidates = (
+  baseSlice: Slice,
   abi: ContractABI,
   candidates: readonly MessageCandidate[],
   nestedPayloadAbis: readonly ContractABI[] = [],
+  options: SliceCandidateDecodeOptions = {},
 ): ParsedTransactionBody | undefined => {
   if (candidates.length === 0) {
     return undefined
   }
 
-  const baseSlice = createBodyParser(message)
-  if (!baseSlice) {
-    return undefined
-  }
-
   const ctx = new DynamicCtx(abi)
-  const bouncedInternal = isBouncedInternalMessage(message)
-  const opcode = bouncedInternal ? getOpcodeAfterBouncePrefix(message) : undefined
-  const skipGenericBouncedDecode = bouncedInternal && opcode !== undefined
-  const bouncedOpcodeName = bouncedInternal
+  const matchedOpcodeName = options.requireOpcodeMatch
     ? candidates
-        .map(candidate => resolveCandidateOpcodeName(abi, ctx.symbols, candidate, opcode))
+        .map(candidate => resolveCandidateOpcodeName(abi, ctx.symbols, candidate, options.opcode))
         .find(name => name !== undefined)
     : undefined
 
   for (const candidate of candidates) {
     const parser = baseSlice.clone()
-    const candidateOpcodeName = skipGenericBouncedDecode
-      ? resolveCandidateOpcodeName(abi, ctx.symbols, candidate, opcode)
+    const candidateOpcodeName = options.requireOpcodeMatch
+      ? resolveCandidateOpcodeName(abi, ctx.symbols, candidate, options.opcode)
       : undefined
     try {
       const decoded: unknown = unpackFromSliceDynamic(ctx, candidate.body_ty_idx, parser) as unknown
@@ -914,21 +959,42 @@ const tryDecodeMessageWithCandidates = (
         }),
       }
 
-      if (skipGenericBouncedDecode && !candidateOpcodeName) {
+      if (options.requireOpcodeMatch && !candidateOpcodeName) {
         continue
       }
 
+      options.onAcceptedRemainder?.(parser)
       return parsedBody
     } catch {
       continue
     }
   }
 
-  if (bouncedOpcodeName) {
-    return createBouncedOpcodeBody(bouncedOpcodeName, baseSlice)
+  if (options.preserveUndecodedBody && matchedOpcodeName) {
+    return createBouncedOpcodeBody(matchedOpcodeName, baseSlice)
   }
 
   return undefined
+}
+
+const tryDecodeMessageWithCandidates = (
+  message: ParsableMessage,
+  abi: ContractABI,
+  candidates: readonly MessageCandidate[],
+  nestedPayloadAbis: readonly ContractABI[] = [],
+): ParsedTransactionBody | undefined => {
+  const baseSlice = createBodyParser(message)
+  if (!baseSlice) {
+    return undefined
+  }
+
+  const bouncedInternal = isBouncedInternalMessage(message)
+  const opcode = bouncedInternal ? getOpcodeAfterBouncePrefix(message) : undefined
+  return tryDecodeSliceWithCandidates(baseSlice, abi, candidates, nestedPayloadAbis, {
+    opcode,
+    requireOpcodeMatch: bouncedInternal && opcode !== undefined,
+    preserveUndecodedBody: bouncedInternal,
+  })
 }
 
 const tryDecodeIncomingMessageWithAbi = (
@@ -1269,6 +1335,137 @@ const tryDecodeStorageCellWithAbi = (
 ): ParsedContractStorage | undefined => {
   return tryDecodeStorageSliceWithAbi(dataCell.beginParse(), abi)
 }
+
+/**
+ * Decodes a standalone cell with a compiler ABI without manufacturing a TON message envelope.
+ *
+ * Message bodies are tried before storage because ABI message prefixes make them more specific.
+ * The direction describes the ABI candidate group that matched; it is not inferred from the cell.
+ */
+export const decodeCellWithAbi = (
+  cell: Cell,
+  abi: ExtendedContractABI,
+  additionalAbis: readonly ExtendedContractABI[] = [],
+): DecodedCellWithAbi | undefined => {
+  let baseSlice: Slice
+  try {
+    baseSlice = cell.beginParse()
+  } catch {
+    return undefined
+  }
+
+  const textComment = tryDecodeTextCommentSlice(baseSlice)
+  if (textComment) {
+    return {
+      category: "comment",
+      name: textComment.name,
+      value: textComment.value,
+      provenance: {source: "text-comment", parser: "built-in"},
+    }
+  }
+
+  const compilerAbi = abi.compiler_abi
+  const nestedPayloadAbis = [
+    compilerAbi,
+    ...additionalAbis.map(candidate => candidate.compiler_abi),
+  ]
+  const opcode = baseSlice.remainingBits >= 32 ? Number(baseSlice.preloadUint(32)) : undefined
+  const symbols = createSymTable(compilerAbi)
+  const declarationCandidates =
+    opcode === undefined
+      ? []
+      : getDeclarationCandidates(compilerAbi, opcode).filter(
+          candidate =>
+            resolveCandidateOpcodeName(compilerAbi, symbols, candidate, opcode) !== undefined,
+        )
+  const messageCandidates: readonly [
+    CellMessageDirection | undefined,
+    readonly MessageCandidate[],
+  ][] = [
+    ["incoming-internal", compilerAbi.incoming_messages],
+    ["incoming-external", compilerAbi.incoming_external],
+    ["outgoing", compilerAbi.outgoing_messages],
+    [undefined, declarationCandidates],
+  ]
+
+  const messageMatches: {
+    readonly direction?: CellMessageDirection
+    readonly message: ParsedTransactionBody
+    readonly consumption?: CellDecodeConsumption
+  }[] = []
+  for (const [direction, candidates] of messageCandidates) {
+    let messageConsumption: CellDecodeConsumption | undefined
+    const message = tryDecodeSliceWithCandidates(
+      baseSlice,
+      compilerAbi,
+      candidates,
+      nestedPayloadAbis,
+      {
+        onAcceptedRemainder: parser => {
+          messageConsumption = cellDecodeConsumption(baseSlice, parser)
+        },
+      },
+    )
+    if (message) {
+      messageMatches.push({direction, message, consumption: messageConsumption})
+    }
+  }
+
+  const selectedMessage = messageMatches[0]
+  if (selectedMessage) {
+    const directionCandidates = [
+      ...new Set(
+        messageMatches
+          .map(match => match.direction)
+          .filter((direction): direction is CellMessageDirection => direction !== undefined),
+      ),
+    ]
+    return {
+      category: "message",
+      ...(directionCandidates.length === 1 ? {direction: directionCandidates[0]} : {}),
+      ...(directionCandidates.length > 1 ? {directionCandidates} : {}),
+      name: selectedMessage.message.name,
+      value: selectedMessage.message.value,
+      consumption: selectedMessage.consumption,
+      provenance: {
+        source: "compiler-abi",
+        displayName: abi.display_name,
+        codeHashes: abi.code_hashes,
+      },
+    }
+  }
+
+  const storage = tryDecodeStorageSliceWithAbi(baseSlice, compilerAbi)
+  if (!storage) {
+    return undefined
+  }
+
+  return {
+    category: "storage",
+    name: storage.name,
+    value: storage.value,
+    consumption: {
+      initialBits: baseSlice.remainingBits,
+      initialRefs: baseSlice.remainingRefs,
+      remainingBits: 0,
+      remainingRefs: 0,
+      complete: true,
+    },
+    provenance: {
+      source: "compiler-abi",
+      displayName: abi.display_name,
+      codeHashes: abi.code_hashes,
+    },
+  }
+}
+
+const cellDecodeConsumption = (initial: Slice, parser: Slice): CellDecodeConsumption => ({
+  initialBits: initial.remainingBits,
+  initialRefs: initial.remainingRefs,
+  remainingBits: parser.remainingBits,
+  remainingRefs: parser.remainingRefs,
+  complete: parser.remainingBits === 0 && parser.remainingRefs === 0,
+})
 
 export const decodeStorageDataCell = (
   dataCellBase64: string | null | undefined,

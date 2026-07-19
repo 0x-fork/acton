@@ -3,6 +3,7 @@ import type {FC} from "react"
 import {
   Activity,
   ArrowUpRight,
+  Binary,
   Boxes,
   BookOpen,
   Brackets,
@@ -64,6 +65,7 @@ const mainItems: SidebarItem[] = [
 const sourceItems: SidebarItem[] = [
   {label: "Sources", icon: FileCode2, path: "/explorer/sources"},
   {label: "ABI", icon: FileJson, path: "/explorer/abi"},
+  {label: "Cell Inspector", icon: Binary, path: "/explorer/cell"},
 ]
 
 const apiItems: SidebarItem[] = [
@@ -110,6 +112,7 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
       location.pathname === "/explorer/blocks" ||
       location.pathname === "/explorer/sources" ||
       location.pathname.startsWith("/explorer/abi") ||
+      location.pathname === "/explorer/cell" ||
       location.pathname === "/explorer/favorites"
     ) {
       return
@@ -210,6 +213,7 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
                           location.pathname !== "/explorer/blocks" &&
                           location.pathname !== "/explorer/sources" &&
                           !location.pathname.startsWith("/explorer/abi") &&
+                          location.pathname !== "/explorer/cell" &&
                           location.pathname !== "/explorer/favorites"
                         : item.path === "/explorer/blocks"
                           ? location.pathname === "/explorer/blocks" ||

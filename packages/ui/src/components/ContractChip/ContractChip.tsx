@@ -79,6 +79,11 @@ export function ContractChip({
         event.stopPropagation()
         onContractClick?.(displayAddress, event)
       }}
+      onAuxClick={event => {
+        if (event.button !== 1) return
+        event.stopPropagation()
+        onContractClick?.(displayAddress, event)
+      }}
     >
       {content}
     </button>

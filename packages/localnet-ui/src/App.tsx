@@ -10,6 +10,7 @@ import {useExplorerPageTitle} from "./explorer/components/ExplorerDocumentTitle"
 import {AccountPage} from "./explorer/pages/AccountPage"
 import {AbiCatalogPage, AbiDetailsPage} from "./explorer/pages/AbiCatalogPage"
 import {BlockDetailsPage, BlocksPage} from "./explorer/pages/BlocksPage"
+import {CellInspectorPage} from "./explorer/pages/CellInspectorPage"
 import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
 import {FavoriteAccountsPage} from "./explorer/pages/FavoriteAccountsPage"
 import {SourceCatalogPage} from "./explorer/pages/SourceCatalogPage"
@@ -367,6 +368,14 @@ const AppContent: FC<AppContentProps> = ({
               element={
                 <DashboardPage {...dashboardProps} embedded>
                   <SourceCatalogPage />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/cell"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <CellInspectorPage />
                 </DashboardPage>
               }
             />
