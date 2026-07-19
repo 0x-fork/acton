@@ -57,12 +57,19 @@ pub(crate) fn run(args: DeployExplorerArgs) -> Result<()> {
     ensure_checkout(&checkout_dir, &args.repository)?;
     prepare_branch(&checkout_dir, &args.branch)?;
     sync_dist(&dist_dir, &checkout_dir, cname.as_deref())?;
-    commit_and_push(&checkout_dir, &args.branch, &args.message)?;
+    let deployed_commit = commit_and_push(&checkout_dir, &args.branch, &args.message)?;
 
-    println!(
-        "Explorer deploy pushed to `{}` branch `{}`",
-        args.repository, args.branch
-    );
+    if let Some(commit) = deployed_commit {
+        println!(
+            "Explorer deploy pushed to `{}` branch `{}`",
+            args.repository, args.branch
+        );
+        if let Some(url) = github_commit_url(&args.repository, &commit) {
+            println!("Deployed commit: {url}");
+        } else {
+            println!("Deployed commit: {commit}");
+        }
+    }
     Ok(())
 }
 
@@ -262,21 +269,64 @@ fn copy_dir_recursive(from: &Path, to: &Path) -> Result<()> {
     Ok(())
 }
 
-fn commit_and_push(checkout_dir: &Path, branch: &str, message: &str) -> Result<()> {
+fn commit_and_push(checkout_dir: &Path, branch: &str, message: &str) -> Result<Option<String>> {
     run_inherited(git(checkout_dir).arg("add").arg("-A"))?;
 
     if !has_staged_changes(checkout_dir)? {
         println!("Deploy checkout has no changes; skipping commit and push");
-        return Ok(());
+        return Ok(None);
     }
 
     run_inherited(git(checkout_dir).arg("commit").arg("-m").arg(message))?;
+    let commit = current_commit(checkout_dir)?;
     run_inherited(
         git(checkout_dir)
             .arg("push")
             .arg("origin")
             .arg(format!("HEAD:{branch}")),
-    )
+    )?;
+    Ok(Some(commit))
+}
+
+fn current_commit(checkout_dir: &Path) -> Result<String> {
+    let output = git(checkout_dir)
+        .arg("rev-parse")
+        .arg("HEAD")
+        .output()
+        .context("failed to read deployed commit SHA")?;
+    if !output.status.success() {
+        bail!("git rev-parse HEAD failed with status {}", output.status);
+    }
+
+    let commit = String::from_utf8(output.stdout).context("deployed commit SHA is not UTF-8")?;
+    let commit = commit.trim();
+    if commit.is_empty() {
+        bail!("git rev-parse HEAD returned an empty commit SHA");
+    }
+    Ok(commit.to_owned())
+}
+
+fn github_commit_url(repository: &str, commit: &str) -> Option<String> {
+    let repository_path = if let Some(path) = repository.strip_prefix("git@github.com:") {
+        path.to_owned()
+    } else {
+        let url = Url::parse(repository).ok()?;
+        if url.host_str()? != "github.com" {
+            return None;
+        }
+        url.path().trim_start_matches('/').to_owned()
+    };
+    let repository_path = repository_path.trim_end_matches('/');
+    let repository_path = repository_path
+        .strip_suffix(".git")
+        .unwrap_or(repository_path);
+    if repository_path.is_empty() {
+        return None;
+    }
+
+    Some(format!(
+        "https://github.com/{repository_path}/commit/{commit}"
+    ))
 }
 
 fn has_staged_changes(checkout_dir: &Path) -> Result<bool> {
@@ -323,7 +373,7 @@ fn run_inherited(command: &mut Command) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_cname;
+    use super::{github_commit_url, normalize_cname};
 
     #[test]
     fn cname_keeps_bare_domain() {
@@ -350,5 +400,21 @@ mod tests {
     fn cname_rejects_url_without_host() {
         let error = normalize_cname(Some("file:///explorer")).unwrap_err();
         assert!(error.to_string().contains("does not contain a host"));
+    }
+
+    #[test]
+    fn commit_url_supports_https_repository() {
+        assert_eq!(
+            github_commit_url("https://github.com/i582/actonscan", "abc123").as_deref(),
+            Some("https://github.com/i582/actonscan/commit/abc123")
+        );
+    }
+
+    #[test]
+    fn commit_url_supports_ssh_repository() {
+        assert_eq!(
+            github_commit_url("git@github.com:i582/actonscan.git", "abc123").as_deref(),
+            Some("https://github.com/i582/actonscan/commit/abc123")
+        );
     }
 }
