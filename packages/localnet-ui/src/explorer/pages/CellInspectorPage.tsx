@@ -17,7 +17,6 @@ import {
 } from "@acton/transaction-ui"
 import {CircleAlert} from "lucide-react"
 import {useCallback, useDeferredValue, useEffect, useRef, useState, type FC} from "react"
-import {useSearchParams} from "react-router-dom"
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import {getBundledCompilerAbiCatalog} from "../api/compilerAbiCatalog"
@@ -52,14 +51,10 @@ interface AbiResolution {
 
 interface DisassemblyState {
   readonly source?: string
+  readonly codeHash?: string
   readonly loading: boolean
   readonly available?: boolean
   readonly error?: string
-}
-
-interface VerifiedCodeState {
-  readonly source?: string
-  readonly codeHash?: string
   readonly verifiedSource?: ContractVerifiedSource
 }
 
@@ -95,7 +90,6 @@ const EMPTY_CELL_INSPECTOR_DRAFT: CellInspectorDraft = {
 }
 
 export const CellInspectorPage: FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams()
   const metadataRegistry = useMetadataRegistry()
   const resolveVerifiedSourceByCodeHash = useCallback(
     async (codeHash: string): Promise<ContractVerifiedSource | undefined> => {
@@ -108,7 +102,7 @@ export const CellInspectorPage: FC = () => {
     },
     [metadataRegistry],
   )
-  const [initialDraft] = useState(() => readCellInspectorDraft(searchParams.get("cell")))
+  const [initialDraft] = useState(() => readCellInspectorDraft(readCellQuery()))
   const [input, setInput] = useState(initialDraft.input)
   const [rootIndex, setRootIndex] = useState(initialDraft.rootIndex)
   const [strict, setStrict] = useState(initialDraft.strict)
@@ -123,9 +117,7 @@ export const CellInspectorPage: FC = () => {
   const [disassembly, setDisassembly] = useState<DisassemblyState>({
     loading: false,
   })
-  const [verifiedCode, setVerifiedCode] = useState<VerifiedCodeState>({})
   const parseSequence = useRef(0)
-  const cellQueryRef = useRef(searchParams.get("cell"))
   const deferredInput = useDeferredValue(input)
 
   useEffect(() => {
@@ -142,17 +134,6 @@ export const CellInspectorPage: FC = () => {
 
     return () => globalThis.clearTimeout(timer)
   }, [customTlb, customTlbVisible, input, maxDepth, rootIndex, strict])
-
-  useEffect(() => {
-    const cell = searchParams.get("cell")
-    if (cell === cellQueryRef.current) return
-    cellQueryRef.current = cell
-    if (cell === null || cell === input) return
-
-    setInput(cell)
-    setRootIndex(0)
-    setActiveTab("parsed")
-  }, [input, searchParams])
 
   useEffect(() => {
     let active = true
@@ -184,6 +165,7 @@ export const CellInspectorPage: FC = () => {
     const sequence = ++parseSequence.current
     if (!trimmedInput) {
       setInspection({status: "idle"})
+      replaceCellQuery()
       return
     }
 
@@ -205,6 +187,7 @@ export const CellInspectorPage: FC = () => {
         .then(result => {
           if (parseSequence.current === sequence) {
             setInspection({status: "ready", result})
+            replaceCellQuery(cellQueryValue(result))
           }
         })
         .catch(error => {
@@ -221,6 +204,7 @@ export const CellInspectorPage: FC = () => {
                 warnings: [],
               },
             })
+            replaceCellQuery()
           }
         })
     }, 140)
@@ -242,29 +226,6 @@ export const CellInspectorPage: FC = () => {
     result && result.status !== "error" ? result.provenance.confidence.level : undefined
 
   useEffect(() => {
-    if (inspection.status === "loading") return
-
-    const nextCell =
-      inspection.status === "ready" &&
-      inspection.result.status !== "error" &&
-      inspection.result.bocBase64 &&
-      inspection.result.bocBase64.length <= MAX_CELL_QUERY_LENGTH
-        ? inspection.result.bocBase64
-        : undefined
-    const currentCell = searchParams.get("cell") ?? undefined
-    if (currentCell === nextCell) return
-
-    const nextSearchParams = new URLSearchParams(searchParams)
-    if (nextCell) {
-      nextSearchParams.set("cell", nextCell)
-    } else {
-      nextSearchParams.delete("cell")
-    }
-    cellQueryRef.current = nextCell ?? null
-    setSearchParams(nextSearchParams, {replace: true})
-  }, [inspection, searchParams, setSearchParams])
-
-  useEffect(() => {
     if (!disassemblySource) {
       setDisassembly({loading: false})
       return
@@ -272,23 +233,34 @@ export const CellInspectorPage: FC = () => {
 
     let active = true
     const source = disassemblySource
-    setDisassembly({source, loading: true, available: false})
+    const codeHash = selectedRootCodeHash
+    const preferCode = resultConfidenceLevel === "low"
+    setDisassembly({source, codeHash, loading: true, available: false})
     void disassembleBocHex(source)
-      .then(value => {
-        if (active) {
-          const disassembled = value.disasm.trim()
-          const available = !value.isEmptyCell && !value.isEmbeddedData && disassembled.length > 0
-          setDisassembly({
-            source,
-            loading: false,
-            available,
-          })
+      .then(async value => {
+        if (!active) return
+
+        const disassembled = value.disasm.trim()
+        const available = !value.isEmptyCell && !value.isEmbeddedData && disassembled.length > 0
+        setDisassembly({source, codeHash, loading: false, available})
+        if (available && preferCode) {
+          setActiveTab(current => (current === "parsed" ? "code" : current))
         }
+        if (!available || !codeHash) return
+
+        const verifiedSource = await resolveVerifiedSourceByCodeHash(codeHash)
+        if (!active || !verifiedSource) return
+
+        setDisassembly(current =>
+          current.source === source ? {...current, verifiedSource} : current,
+        )
+        setActiveTab(current => (current === "parsed" ? "code" : current))
       })
       .catch(error => {
         if (active) {
           setDisassembly({
             source,
+            codeHash,
             loading: false,
             available: false,
             error: error instanceof Error ? error.message : String(error),
@@ -299,45 +271,12 @@ export const CellInspectorPage: FC = () => {
     return () => {
       active = false
     }
-  }, [disassemblySource])
-
-  useEffect(() => {
-    if (!disassemblySource || !selectedRootCodeHash || disassembly.available !== true) {
-      setVerifiedCode({})
-      return
-    }
-
-    let active = true
-    const source = disassemblySource
-    const codeHash = selectedRootCodeHash
-    setVerifiedCode({source, codeHash})
-    void resolveVerifiedSourceByCodeHash(codeHash).then(verifiedSource => {
-      if (active) {
-        setVerifiedCode({source, codeHash, verifiedSource})
-      }
-    })
-
-    return () => {
-      active = false
-    }
   }, [
-    disassembly.available,
     disassemblySource,
     resolveVerifiedSourceByCodeHash,
+    resultConfidenceLevel,
     selectedRootCodeHash,
   ])
-
-  const verifiedCodeAvailable =
-    disassembly.available === true &&
-    verifiedCode.source === disassemblySource &&
-    verifiedCode.verifiedSource !== undefined
-  const preferCode = resultConfidenceLevel === "low" || verifiedCodeAvailable
-
-  useEffect(() => {
-    if (disassembly.available && preferCode) {
-      setActiveTab(current => (current === "parsed" ? "code" : current))
-    }
-  }, [disassembly.available, preferCode])
 
   return (
     <section className={styles.container}>
@@ -352,6 +291,7 @@ export const CellInspectorPage: FC = () => {
         <CellInspectorInputPanel
           input={input}
           onInputChange={value => {
+            replaceCellQuery()
             setInput(value)
             setRootIndex(0)
             setActiveTab("parsed")
@@ -384,7 +324,6 @@ export const CellInspectorPage: FC = () => {
               activeTab={activeTab}
               onTabChange={setActiveTab}
               disassembly={disassembly}
-              verifiedCode={verifiedCode}
               resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
             />
           ) : null}
@@ -661,7 +600,6 @@ function ResultOutput({
   activeTab,
   onTabChange,
   disassembly,
-  verifiedCode,
   resolveVerifiedSourceByCodeHash,
 }: {
   readonly result: CellInspectorParseResult
@@ -669,7 +607,6 @@ function ResultOutput({
   readonly activeTab: OutputTab
   readonly onTabChange: (tab: OutputTab) => void
   readonly disassembly: DisassemblyState
-  readonly verifiedCode: VerifiedCodeState
   readonly resolveVerifiedSourceByCodeHash: (
     codeHash: string,
   ) => Promise<ContractVerifiedSource | undefined>
@@ -683,8 +620,8 @@ function ResultOutput({
     disassembly.source === result.selectedRootBocHex && disassembly.available === true
   const verifiedCodeAvailable =
     codeTabAvailable &&
-    verifiedCode.source === result.selectedRootBocHex &&
-    verifiedCode.verifiedSource !== undefined
+    disassembly.source === result.selectedRootBocHex &&
+    disassembly.verifiedSource !== undefined
   const orderedTabs =
     codeTabAvailable && (confidence.level === "low" || verifiedCodeAvailable)
       ? [CODE_OUTPUT_TAB, ...OUTPUT_TABS.filter(tab => tab.id !== "code")]
@@ -789,7 +726,6 @@ function ResultOutput({
         {visibleActiveTab === "code" && (
           <CodeOutput
             state={disassembly}
-            verifiedCode={verifiedCode}
             resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
           />
         )}
@@ -854,11 +790,9 @@ function CodeBlock({
 
 function CodeOutput({
   state,
-  verifiedCode,
   resolveVerifiedSourceByCodeHash,
 }: {
   readonly state: DisassemblyState
-  readonly verifiedCode: VerifiedCodeState
   readonly resolveVerifiedSourceByCodeHash: (
     codeHash: string,
   ) => Promise<ContractVerifiedSource | undefined>
@@ -881,8 +815,8 @@ function CodeOutput({
     <CodeCellDetails
       cell={{bocHex: state.source, fieldName: "Cell Inspector root"}}
       verifiedSourcesByCodeHash={
-        verifiedCode.source === state.source && verifiedCode.codeHash && verifiedCode.verifiedSource
-          ? new Map([[verifiedCode.codeHash, verifiedCode.verifiedSource]])
+        state.codeHash && state.verifiedSource
+          ? new Map([[state.codeHash, state.verifiedSource]])
           : undefined
       }
       resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
@@ -972,6 +906,39 @@ function readTextComment(value: SerializableValue): string | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined
   const record = value as Readonly<Record<string, SerializableValue>>
   return record.kind === "text-comment" && typeof record.text === "string" ? record.text : undefined
+}
+
+function readCellQuery(): string | null {
+  if (typeof globalThis.location === "undefined") return null
+  return new URLSearchParams(globalThis.location.search).get("cell")
+}
+
+function cellQueryValue(result: CellInspectorParseResult): string | undefined {
+  return result.status !== "error" &&
+    result.bocBase64 &&
+    result.bocBase64.length <= MAX_CELL_QUERY_LENGTH
+    ? result.bocBase64
+    : undefined
+}
+
+function replaceCellQuery(cell?: string): void {
+  if (typeof globalThis.location === "undefined" || typeof globalThis.history === "undefined") {
+    return
+  }
+
+  const url = new URL(globalThis.location.href)
+  if ((url.searchParams.get("cell") ?? undefined) === cell) return
+
+  if (cell) {
+    url.searchParams.set("cell", cell)
+  } else {
+    url.searchParams.delete("cell")
+  }
+  globalThis.history.replaceState(
+    globalThis.history.state,
+    "",
+    `${url.pathname}${url.search}${url.hash}`,
+  )
 }
 
 function readCellInspectorDraft(urlCell: string | null = null): CellInspectorDraft {
