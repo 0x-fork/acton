@@ -81,6 +81,7 @@ jobs:
         run: |
           cargo xtask deploy-explorer \
             --branch pages \
+            --checkout "${RUNNER_TEMP}/actonscan-pages" \
             --cname "${ACTONSCAN_URL}" \
             --message "Deploy actonscan from ${DEPLOY_COMMIT}"
 
