@@ -92,6 +92,7 @@ import {Nfts} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
 import {
+  formatAbsoluteTime,
   formatNano,
   formatTimeAgo,
   hashToHex,
@@ -3086,7 +3087,7 @@ function formatTransactionTime(
     return {label: "-", title: "Unknown time"}
   }
 
-  const absolute = formatAbsoluteTime(utime)
+  const absolute = formatAbsoluteTime(utime, nowSeconds)
   if (timeFormat === "absolute") {
     return {label: absolute, title: absolute}
   }
@@ -3109,18 +3110,6 @@ function formatRelativeTime(utime: number, nowSeconds: number): string {
   if (diff < 2_629_800) return `${Math.floor(diff / 604_800)}w ago`
   if (diff < 31_557_600) return `${Math.floor(diff / 2_629_800)}mo ago`
   return `${Math.floor(diff / 31_557_600)}y ago`
-}
-
-function formatAbsoluteTime(utime: number): string {
-  const date = new Date(utime * 1000)
-  const day = date.toLocaleString("default", {day: "numeric"})
-  const month = date.toLocaleString("default", {month: "short"})
-  const time = date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
-  return `${day} ${month}, ${time}`
 }
 
 function resolveMessageName(

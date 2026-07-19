@@ -109,15 +109,24 @@ export function formatTimeAgo(
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
   if (diff < 86_400) return `${Math.floor(diff / 3600)}h ago`
 
+  return formatAbsoluteTime(utime, nowSeconds)
+}
+
+export function formatAbsoluteTime(
+  utime: number,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+): string {
   const date = new Date(utime * 1000)
+  const currentYear = new Date(nowSeconds * 1000).getFullYear()
   const day = date.getDate()
   const month = date.toLocaleString("default", {month: "short"})
+  const year = date.getFullYear() === currentYear ? "" : ` ${date.getFullYear()}`
   const time = date.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   })
-  return `${day} ${month}, ${time}`
+  return `${day} ${month}${year}, ${time}`
 }
 
 export function formatDuration(seconds: number): string {
