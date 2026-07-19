@@ -38,6 +38,8 @@ interface TonClientOptions {
   readonly toncenterApiKey?: string
 }
 
+export type AccountHistorySortOrder = "asc" | "desc"
+
 export type CompilerAbiLoader = (
   codeHashes: readonly string[],
 ) => Promise<Record<string, ExtendedContractABI | null>>
@@ -333,6 +335,7 @@ export class TonClient {
     address: string,
     limit = 20,
     offset = 0,
+    sort: AccountHistorySortOrder = "desc",
   ): Promise<V3TransactionsResponse> {
     const url = this.buildUrl(this.v3BaseUrl, "/transactions")
     url.searchParams.append("account", address)
@@ -340,7 +343,7 @@ export class TonClient {
     if (offset > 0) {
       url.searchParams.append("offset", offset.toString())
     }
-    url.searchParams.append("sort", "desc")
+    url.searchParams.append("sort", sort)
     return this.request(url, "Failed to fetch account transactions")
   }
 
@@ -486,14 +489,19 @@ export class TonClient {
     return this.request(url, "Failed to fetch traces")
   }
 
-  async getAccountActions(address: string, limit = 20, offset = 0): Promise<V3ActionsResponse> {
+  async getAccountActions(
+    address: string,
+    limit = 20,
+    offset = 0,
+    sort: AccountHistorySortOrder = "desc",
+  ): Promise<V3ActionsResponse> {
     const url = this.buildUrl(this.v3BaseUrl, "/actions")
     url.searchParams.append("account", address)
     url.searchParams.append("limit", limit.toString())
     if (offset > 0) {
       url.searchParams.append("offset", offset.toString())
     }
-    url.searchParams.append("sort", "desc")
+    url.searchParams.append("sort", sort)
     return this.request(url, "Failed to fetch account actions")
   }
 

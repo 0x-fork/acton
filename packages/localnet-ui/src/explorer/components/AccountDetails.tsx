@@ -68,7 +68,7 @@ import type {
   V3TransactionListItem,
   VerificationSourceResponse,
 } from "../api/types"
-import type {TonClient} from "../api/client"
+import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import {addressKey} from "../api/compilerAbi"
 import {
   getMetadataTokenInfo,
@@ -139,6 +139,8 @@ interface AccountDetailsProps {
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
   readonly onLoadMoreTransactions?: () => void
   readonly onLoadMoreActions?: () => void
+  readonly historySortOrder?: AccountHistorySortOrder
+  readonly onHistorySortOrderChange?: (sortOrder: AccountHistorySortOrder) => void
   readonly activeTabHash?: string
   readonly onTabChange?: (tab: Tabs) => void
 }
@@ -148,7 +150,6 @@ const TRANSACTION_SKELETON_ROWS = 5
 const TRANSACTION_FILTERS_STORAGE_KEY = "acton.account.transactionFilters.v1"
 type PaginationItem = number | "ellipsis-left" | "ellipsis-right"
 type AccountHistoryMode = "actions" | "transactions"
-type AccountSortOrder = "desc" | "asc"
 export type AccountTimeFormat = "relative" | "smart" | "absolute"
 type HistoryValueTone = "positive" | "negative" | "empty" | "neutral"
 
@@ -160,7 +161,7 @@ interface AccountTransactionFilters {
   readonly historyMode: AccountHistoryMode
   readonly hiddenActionKeys: readonly string[]
   readonly hiddenToncenterActionKeys: readonly string[]
-  readonly sortOrder: AccountSortOrder
+  readonly sortOrder: AccountHistorySortOrder
   readonly timeFormat: AccountTimeFormat
 }
 
@@ -285,6 +286,8 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   onTransactionClick,
   onLoadMoreTransactions,
   onLoadMoreActions,
+  historySortOrder,
+  onHistorySortOrderChange,
   activeTabHash,
   onTabChange,
 }) => {
@@ -297,6 +300,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   >()
   const [transactionFilters, setTransactionFilters] =
     useState<AccountTransactionFilters>(readTransactionFilters)
+  const effectiveSortOrder = historySortOrder ?? transactionFilters.sortOrder
   const showNftsTab = !nftsLoading && nftItems.length > 0
   const effectiveHistoryMode: AccountHistoryMode =
     actionsSupported && transactionFilters.historyMode === "actions" ? "actions" : "transactions"
@@ -407,19 +411,19 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
       .filter(row => !hiddenActionKeys.has(row.info.actionKey))
       .sort((left, right) => {
         const comparison = compareTransactionsByTime(left.tx, right.tx)
-        return transactionFilters.sortOrder === "desc" ? -comparison : comparison
+        return effectiveSortOrder === "desc" ? -comparison : comparison
       })
     return next
-  }, [transactionRows, hiddenActionKeys, transactionFilters.sortOrder])
+  }, [transactionRows, hiddenActionKeys, effectiveSortOrder])
   const visibleActionRows = useMemo(() => {
     const next = actionRows
       .filter(row => !hiddenActionKeys.has(row.info.actionKey))
       .sort((left, right) => {
         const comparison = compareActionsByTime(left.info, right.info)
-        return transactionFilters.sortOrder === "desc" ? -comparison : comparison
+        return effectiveSortOrder === "desc" ? -comparison : comparison
       })
     return next
-  }, [actionRows, hiddenActionKeys, transactionFilters.sortOrder])
+  }, [actionRows, hiddenActionKeys, effectiveSortOrder])
   const currentHistoryPaginated = effectiveHistoryMode === "transactions" && transactionsPaginated
   const totalPages = currentHistoryPaginated
     ? Math.max(1, Math.ceil(visibleTransactionRows.length / ITEMS_PER_PAGE))
@@ -497,15 +501,16 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     effectiveHistoryMode,
     transactionFilters.hiddenActionKeys,
     transactionFilters.hiddenToncenterActionKeys,
-    transactionFilters.sortOrder,
+    effectiveSortOrder,
   ])
 
   useEffect(() => {
     setCurrentPage(page => Math.min(page, totalPages))
   }, [totalPages])
 
-  const setSortOrder = (sortOrder: AccountSortOrder) => {
+  const setSortOrder = (sortOrder: AccountHistorySortOrder) => {
     setTransactionFilters(filters => ({...filters, sortOrder}))
+    onHistorySortOrderChange?.(sortOrder)
   }
 
   const setTimeFormat = (timeFormat: AccountTimeFormat) => {
@@ -724,9 +729,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                       <button
                         type="button"
                         className={`${styles.segmentedOption} ${
-                          transactionFilters.sortOrder === "desc"
-                            ? styles.segmentedOptionActive
-                            : ""
+                          effectiveSortOrder === "desc" ? styles.segmentedOptionActive : ""
                         }`}
                         onClick={() => setSortOrder("desc")}
                       >
@@ -735,7 +738,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                       <button
                         type="button"
                         className={`${styles.segmentedOption} ${
-                          transactionFilters.sortOrder === "asc" ? styles.segmentedOptionActive : ""
+                          effectiveSortOrder === "asc" ? styles.segmentedOptionActive : ""
                         }`}
                         onClick={() => setSortOrder("asc")}
                       >
@@ -1238,7 +1241,7 @@ function readTransactionFilters(): AccountTransactionFilters {
       : []
     const historyMode: AccountHistoryMode =
       parsed.historyMode === "transactions" ? "transactions" : "actions"
-    const sortOrder: AccountSortOrder = parsed.sortOrder === "asc" ? "asc" : "desc"
+    const sortOrder: AccountHistorySortOrder = parsed.sortOrder === "asc" ? "asc" : "desc"
     const timeFormat: AccountTimeFormat =
       parsed.timeFormat === "relative" ||
       parsed.timeFormat === "smart" ||
@@ -1250,6 +1253,10 @@ function readTransactionFilters(): AccountTransactionFilters {
   } catch {
     return DEFAULT_TRANSACTION_FILTERS
   }
+}
+
+export function readAccountHistorySortOrder(): AccountHistorySortOrder {
+  return readTransactionFilters().sortOrder
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

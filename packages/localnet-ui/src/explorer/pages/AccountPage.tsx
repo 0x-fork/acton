@@ -4,7 +4,7 @@ import type {FC, ReactNode} from "react"
 
 import {Dialog, HighlightedCode, RawDataBlock} from "@acton/ui"
 
-import type {TonClient} from "../api/client"
+import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import type {
   AddressInformation,
@@ -24,7 +24,7 @@ import type {
 import {AccountInfo} from "../components/AccountInfo"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
-import {AccountDetails} from "../components/AccountDetails"
+import {AccountDetails, readAccountHistorySortOrder} from "../components/AccountDetails"
 import {
   NFT_COLLECTION_IMAGE_SOURCE_KEYS,
   NFT_IMAGE_SOURCE_KEYS,
@@ -73,6 +73,9 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
   const [accountStateV3, setAccountStateV3] = useState<V3AccountState | undefined>()
   const [accountDomain, setAccountDomain] = useState<string | undefined>()
   const [transactions, setTransactions] = useState<V3TransactionListItem[]>([])
+  const [historySortOrder, setHistorySortOrder] = useState<AccountHistorySortOrder>(
+    readAccountHistorySortOrder,
+  )
   const [actions, setActions] = useState<V3Action[]>([])
   const [actionMetadata, setActionMetadata] = useState<V3Metadata>({})
   const [highlightedTransactionHashes, setHighlightedTransactionHashes] = useState<string[]>([])
@@ -108,6 +111,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
   const [verifiedSourceLoading, setVerifiedSourceLoading] = useState(false)
   const [jettonMetadataOpen, setJettonMetadataOpen] = useState(false)
   const activeAccountKeyRef = useRef<string | undefined>(undefined)
+  const activeHistoryRequestKeyRef = useRef<string | undefined>(undefined)
   const transactionHashesRef = useRef<Set<string>>(new Set())
 
   const formattedAddress = useMemo(
@@ -119,6 +123,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     () => `${network.id}:${accountAddressKey}`,
     [accountAddressKey, network.id],
   )
+  const historyRequestKey = `${accountRequestKey}:${historySortOrder}`
   const activeTab = useMemo<AccountTab>(() => {
     const tab = location.hash.replace("#", "")
     if (tab.startsWith("contract-")) {
@@ -148,6 +153,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     const load = () => {
       if (!formattedAddress) {
         activeAccountKeyRef.current = undefined
+        activeHistoryRequestKeyRef.current = undefined
         setAccountState(undefined)
         setAccountStateV3(undefined)
         setAccountDomain(undefined)
@@ -185,7 +191,9 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
       }
 
       const isAddressChange = activeAccountKeyRef.current !== accountRequestKey
+      const isHistoryChange = activeHistoryRequestKeyRef.current !== historyRequestKey
       activeAccountKeyRef.current = accountRequestKey
+      activeHistoryRequestKeyRef.current = historyRequestKey
 
       if (isAddressChange) {
         setAccountLoading(true)
@@ -218,6 +226,19 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
         setJettonWalletLoading(false)
         setNftItemsLoading(false)
         setHoldersLoading(false)
+      } else if (isHistoryChange) {
+        setTransactionsLoading(true)
+        setActionsLoading(supportsAccountActions)
+        setTransactions([])
+        setActions([])
+        setActionMetadata({})
+        setHighlightedTransactionHashes([])
+        transactionHashesRef.current = new Set()
+        setTransactionsHasMore(false)
+        setTransactionsLoadingMore(false)
+        setActionsOffset(0)
+        setActionsHasMore(false)
+        setActionsLoadingMore(false)
       }
       setAccountError(undefined)
       setTransactionsError(undefined)
@@ -269,7 +290,12 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
 
       const loadTransactions = async () => {
         try {
-          const txs = await client.getAccountTransactions(formattedAddress, initialTransactionLimit)
+          const txs = await client.getAccountTransactions(
+            formattedAddress,
+            initialTransactionLimit,
+            0,
+            historySortOrder,
+          )
           if (!isActive) return
           updateDomains(txs.address_book)
           setTransactions([...txs.transactions])
@@ -304,7 +330,12 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
         }
 
         try {
-          const response = await client.getAccountActions(formattedAddress, ACTION_PAGE_SIZE)
+          const response = await client.getAccountActions(
+            formattedAddress,
+            ACTION_PAGE_SIZE,
+            0,
+            historySortOrder,
+          )
           if (!isActive) return
           updateDomains(response.address_book)
           setActions([...response.actions])
@@ -325,7 +356,9 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
         }
       }
 
-      void loadAccountState()
+      if (isAddressChange || !isHistoryChange) {
+        void loadAccountState()
+      }
       void loadTransactions()
       void loadActions()
     }
@@ -334,7 +367,15 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     return () => {
       isActive = false
     }
-  }, [accountRequestKey, client, initialTransactionLimit, supportsAccountActions, updateDomains])
+  }, [
+    accountRequestKey,
+    client,
+    historyRequestKey,
+    historySortOrder,
+    initialTransactionLimit,
+    supportsAccountActions,
+    updateDomains,
+  ])
 
   const loadMoreTransactions = async () => {
     if (
@@ -353,6 +394,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
         formattedAddress,
         transactionPageSize,
         transactions.length,
+        historySortOrder,
       )
       updateDomains(txs.address_book)
       transactionHashesRef.current = transactionHashSet([...transactions, ...txs.transactions])
@@ -381,7 +423,12 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     setActionsLoadingMore(true)
     setActionsError(undefined)
     try {
-      const response = await client.getAccountActions(formattedAddress, ACTION_PAGE_SIZE, offset)
+      const response = await client.getAccountActions(
+        formattedAddress,
+        ACTION_PAGE_SIZE,
+        offset,
+        historySortOrder,
+      )
       updateDomains(response.address_book)
       setActions(current => [...current, ...response.actions])
       setActionMetadata(current => ({...current, ...response.metadata}))
@@ -1111,6 +1158,8 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
             onTransactionClick={handleTransactionClick}
             onLoadMoreTransactions={loadMoreTransactions}
             onLoadMoreActions={loadMoreActions}
+            historySortOrder={historySortOrder}
+            onHistorySortOrderChange={setHistorySortOrder}
             activeTabHash={activeTab}
             onTabChange={handleTabChange}
           />
