@@ -31,6 +31,7 @@ test-results/
 Thumbs.db
 
 .env
+.worktree/
 
 gen/
 *.mnemonic
