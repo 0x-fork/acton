@@ -8,18 +8,30 @@ test.describe("Explorer shell", () => {
     await page.goto("/")
     await expect(page.getByRole("link", {name: "actonscan"})).toBeVisible()
     await expect(page.getByRole("navigation", {name: "Explorer navigation"})).toBeVisible()
-    await expect(page.getByPlaceholder("Search by address, hash, or block").last()).toBeVisible()
+    await expect(page.getByRole("combobox", {name: "Explorer search"}).last()).toBeVisible()
   })
 
   test("renders the landing page and primary navigation", async ({page}) => {
-    await expect(page.getByRole("link", {name: "Blocks"})).toBeVisible()
-    await expect(page.getByRole("link", {name: "ABI"})).toBeVisible()
-    await expect(page.getByRole("link", {name: "Sources"})).toBeVisible()
+    const primaryNavigation = page.getByRole("navigation", {name: "Explorer navigation"})
+    await expect(primaryNavigation.getByRole("link", {name: "Blocks"})).toBeVisible()
+    await expect(primaryNavigation.getByRole("link", {name: "ABI"})).toBeVisible()
+    await expect(primaryNavigation.getByRole("link", {name: "Sources"})).toBeVisible()
+    await expect(primaryNavigation.getByRole("link", {name: "Emulate"})).toHaveCount(0)
     await expect(page.getByRole("button", {name: "Mainnet"})).toBeVisible()
+
+    const developerTools = page.getByRole("navigation", {name: "Developer tools"})
+    await expect(developerTools.getByRole("link", {name: /Emulate/})).toHaveAttribute(
+      "href",
+      "/emulate",
+    )
+    await expect(developerTools.getByRole("link", {name: /Cell Inspector/})).toHaveAttribute(
+      "href",
+      "/cell",
+    )
   })
 
   test("opens blocks by masterchain seqno and toncenter block ID", async ({page}) => {
-    const search = page.getByPlaceholder("Search by address, hash, or block").last()
+    const search = page.getByRole("combobox", {name: "Explorer search"}).last()
 
     await search.fill("123")
     await search.press("Enter")

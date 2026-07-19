@@ -7,13 +7,23 @@ test.describe("Localnet shell", () => {
     await prepareVisualPage(page, {app: "localnet"})
     await page.goto("/explorer")
     await expect(page.getByRole("complementary", {name: "Main navigation"})).toBeVisible()
-    await expect(page.getByPlaceholder("Search by address, hash, or block")).toBeVisible()
+    await expect(page.getByRole("combobox", {name: "Explorer search"})).toBeVisible()
     await expect(page.getByText("Failed to load wallets")).toHaveCount(0)
   })
 
   test("renders explorer inside dashboard navigation", async ({page}) => {
     await expect(page.getByRole("button", {name: "Collapse navigation"})).toBeVisible()
     await expect(page.getByRole("button", {name: "Set localnet API token"})).toBeVisible()
+
+    const developerTools = page.getByRole("navigation", {name: "Developer tools"})
+    await expect(developerTools.getByRole("link", {name: /Emulate/})).toHaveAttribute(
+      "href",
+      "/explorer/emulate",
+    )
+    await expect(developerTools.getByRole("link", {name: /Cell Inspector/})).toHaveAttribute(
+      "href",
+      "/explorer/cell",
+    )
   })
 
   test.describe("visual snapshots", () => {

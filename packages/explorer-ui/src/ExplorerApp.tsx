@@ -968,9 +968,6 @@ export const ExplorerApp: FC = () => {
                           <Link className={styles.navLink} to="/blocks">
                             Blocks
                           </Link>
-                          <Link className={styles.navLink} to="/emulate">
-                            Emulate
-                          </Link>
                           <Link className={styles.navLink} to="/abi">
                             ABI
                           </Link>
