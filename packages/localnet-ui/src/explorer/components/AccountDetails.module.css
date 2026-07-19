@@ -662,6 +662,12 @@
   white-space: nowrap;
 }
 
+.technicalLabelPopoverContent {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .valueContainer {
   width: 12rem;
   min-width: 12rem;

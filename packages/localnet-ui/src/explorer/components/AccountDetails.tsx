@@ -11,6 +11,7 @@ import {
   DataTableRow,
   DataTableTable,
   NftChip,
+  Popover,
 } from "@acton/ui"
 import {
   BadgeDollarSign,
@@ -155,6 +156,7 @@ type HistoryValueTone = "positive" | "negative" | "empty" | "neutral"
 
 interface HistoryTechnicalLabel {
   readonly label: string
+  readonly showInPopover?: boolean
 }
 
 interface AccountTransactionFilters {
@@ -1272,10 +1274,21 @@ function HistoryTechnicalCell({
     return null
   }
 
+  const label = <span className={styles.technicalLabel}>{technicalLabel.label}</span>
+  if (!technicalLabel.showInPopover) {
+    return label
+  }
+
   return (
-    <span className={styles.technicalLabel} title={technicalLabel.label}>
-      {technicalLabel.label}
-    </span>
+    <Popover
+      ariaLabel="Full message comment"
+      content={<span className={styles.technicalLabelPopoverContent}>{technicalLabel.label}</span>}
+      interaction="hover"
+      maxWidth="28rem"
+      placement="top"
+    >
+      {label}
+    </Popover>
   )
 }
 
@@ -2002,7 +2015,7 @@ function commentTechnicalLabel(
   }
 
   const label = comment.trim()
-  return label ? {label} : undefined
+  return label ? {label, showInPopover: true} : undefined
 }
 
 function getHistoryActionDisplay(
