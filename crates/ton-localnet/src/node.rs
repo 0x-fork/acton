@@ -7,7 +7,7 @@ use crate::block::{
         MasterchainBlockBuildContext,
     },
 };
-use crate::executor::{ExecContext, FeeEstimationExecution, TvmExecutor};
+use crate::executor::{ExecContext, ExecResult, FeeEstimationExecution, TvmExecutor};
 use crate::localnet::{
     LocalnetAccountBalance, LocalnetAccountStateChange, LocalnetBlockId, LocalnetEstimateFeeResult,
     LocalnetEstimatedFee, compute_normalized_ext_in_hash,
@@ -289,6 +289,41 @@ impl Node {
             boc,
             MessageKind::Internal,
             "acton_sendInternalMessage accepts only internal messages",
+        )
+    }
+
+    /// Executes an internal message against the latest account state without storing the
+    /// transaction, changing the account, or adding either message to the localnet queue.
+    pub(crate) fn preflight_internal_boc(&mut self, boc: &BocBytes) -> anyhow::Result<ExecResult> {
+        let msg_hash = boc.hash()?;
+        let (msg_meta, kind) = parse_msg_meta_with_kind(boc, msg_hash)?;
+        if kind != MessageKind::Internal {
+            anyhow::bail!("Jetton mint preflight accepts only internal messages");
+        }
+        let dst = msg_meta
+            .dst
+            .ok_or_else(|| anyhow::anyhow!("Internal message has no destination"))?;
+        let shard_account_boc = self.get_shard_account_for_emulation(&dst, None)?;
+        let (lt, gen_utime, block_seqno) = self.emulation_context(None)?;
+        let config_boc = self
+            .cas
+            .get(&self.globals.config_boc_hash)
+            .context("Config missing")?;
+        let vm_global_libs = self.build_vm_global_libs_boc()?;
+        let ctx = ExecContext {
+            lt,
+            gen_utime,
+            rand_seed: None,
+            ignore_chksig: false,
+            prev_blocks_info: self.prev_blocks_info_at(block_seqno),
+        };
+
+        self.executor.execute(
+            &shard_account_boc,
+            boc,
+            &ctx,
+            &config_boc,
+            vm_global_libs.as_ref(),
         )
     }
 

@@ -53,6 +53,34 @@
         }
       }
     },
+    "/acton_fundJetton": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "fundJetton",
+        "summary": "Mint jettons to an account",
+        "description": "Finds the jetton master in localnet state, verifies that it is mintable and has an admin, converts the display amount using the decimals from jetton metadata, preflights the legacy 0x15 and current 0x642b7d07 mint layouts, and queues the uniquely accepted message for the next block.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundJettonRequest"
+              },
+              "example": {
+                "address": "0:2222222222222222222222222222222222222222222222222222222222222222",
+                "jetton_master": "0:3333333333333333333333333333333333333333333333333333333333333333",
+                "amount": "12.5"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SendInternalMessageResponse"
+          }
+        }
+      }
+    },
     "/acton_getAddressName": {
       "get": {
         "tags": ["Localnet Control"],
@@ -1265,6 +1293,23 @@
             "type": "integer",
             "minimum": 0,
             "description": "Amount in nanograms."
+          }
+        }
+      },
+      "FundJettonRequest": {
+        "type": "object",
+        "required": ["address", "jetton_master", "amount"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "jetton_master": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^[0-9]+(?:\\.[0-9]*)?$",
+            "description": "Positive display-unit amount. The server reads decimals from the jetton master metadata and defaults to 9 when the metadata value is missing or invalid."
           }
         }
       },

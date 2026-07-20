@@ -1,6 +1,5 @@
 import {ArrowUpRight, Check, ChevronDown, Coins, Loader2} from "lucide-react"
 import {Button, Dialog, Input, useToast} from "@acton/ui"
-import type {Address} from "@ton/core"
 import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
 import {useSearchParams} from "react-router-dom"
@@ -16,11 +15,7 @@ import {
 import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
 import {QUICK_AMOUNTS, TOKEN_PLACEHOLDER_IMAGE} from "../constants"
 import {parseGramAmount} from "../dashboardUtils"
-import {
-  buildJettonMintInternalMessageBoc,
-  normalizeJettonDecimals,
-  parseJettonAmount,
-} from "../jettonFaucet"
+import {normalizeJettonDecimals, parseJettonAmount} from "../jettonFaucet"
 import usdtLogo from "../assets/usdt-logo.png"
 
 import styles from "../DashboardPage.module.css"
@@ -303,7 +298,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
 
     try {
       if (isJettonMode) {
-        await mintJettons(parsedAddress, normalized)
+        await mintJettons(normalized)
       } else {
         if (tonAmountNano === undefined) {
           return
@@ -346,7 +341,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
     }
   }
 
-  async function mintJettons(recipientAddress: Address, normalized: string) {
+  async function mintJettons(normalized: string) {
     const parsedMinter = parseAddress(jettonMinter.trim())
     if (!parsedMinter) {
       showToast({
@@ -367,25 +362,9 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
     })
 
     try {
-      const [master] = await client.getJettonMasters([normalizedMinter])
-      if (!master) {
-        throw new Error(TOKEN_MINTER_NOT_FOUND_MESSAGE)
-      }
-      if (!master.mintable) {
-        throw new Error(TOKEN_MINTER_NOT_MINTABLE_MESSAGE)
-      }
-      if (!master.admin_address) {
-        throw new Error("This jetton master has no admin address, so faucet cannot mint it.")
-      }
-
-      const adminAddress = parseAddress(master.admin_address)
-      if (!adminAddress) {
-        throw new Error("Jetton master admin address is invalid.")
-      }
-
-      const decimals = normalizeJettonDecimals(master.jetton_content.decimals)
-      const jettonAmount = parseJettonAmount(amount, decimals)
-      if (jettonAmount === undefined) {
+      const master = jettonMasters.find(item => isSameAddress(item.address, normalizedMinter))
+      const decimals = normalizeJettonDecimals(master?.jetton_content.decimals)
+      if (parseJettonAmount(amount, decimals) === undefined) {
         updateToast(toastId, {
           variant: "error",
           title: "Invalid amount",
@@ -395,14 +374,8 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
         return
       }
 
-      const boc = buildJettonMintInternalMessageBoc({
-        minter: parsedMinter,
-        admin: adminAddress,
-        recipient: recipientAddress,
-        jettonAmount,
-      })
-      const symbol = jettonSymbol(master)
-      const msgHash = await client.sendInternalMessage(boc)
+      const symbol = master ? jettonSymbol(master) : selectedAssetSymbol
+      const msgHash = await client.fundJetton(normalized, normalizedMinter, amount.trim())
       await updateFaucetResultToast({
         toastId,
         title: "Mint sent",

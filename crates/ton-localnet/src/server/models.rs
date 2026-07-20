@@ -19,6 +19,13 @@ pub struct FaucetRequest {
 }
 
 #[derive(Deserialize)]
+pub struct JettonFaucetRequest {
+    pub address: String,
+    pub jetton_master: String,
+    pub amount: String,
+}
+
+#[derive(Deserialize)]
 pub struct StatePathRequest {
     pub path: String,
 }

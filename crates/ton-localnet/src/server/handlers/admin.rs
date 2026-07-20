@@ -4,10 +4,11 @@ use crate::localnet::{Localnet, LocalnetAccountStateChange, LocalnetMiningMode};
 use crate::server::models::{
     ChangeAccountStatePayload, ChangeAccountStateRequest, CodeHashRequest,
     CreateRecoveryPointRequest, ExportRecoveryPointRequest, FaucetRequest, GetApiCallsRequest,
-    GetVerifiedSourceRequest, ImportRecoveryPointRequest, IncreaseTimeRequest, MineBlocksRequest,
-    RegisterCompilerAbisRequest, RegisterVerifiedSourcesRequest, RevertRecoveryPointRequest,
-    SetAddressNameRequest, SetMiningModeRequest, SetNetworkConditionsRequest,
-    SetNextBlockTimestampRequest, SetShardAccountRequest, SetTimeRequest, StatePathRequest,
+    GetVerifiedSourceRequest, ImportRecoveryPointRequest, IncreaseTimeRequest, JettonFaucetRequest,
+    MineBlocksRequest, RegisterCompilerAbisRequest, RegisterVerifiedSourcesRequest,
+    RevertRecoveryPointRequest, SetAddressNameRequest, SetMiningModeRequest,
+    SetNetworkConditionsRequest, SetNextBlockTimestampRequest, SetShardAccountRequest,
+    SetTimeRequest, StatePathRequest,
 };
 use crate::server::{
     ApiCallLog, NetworkConditions, NetworkConditionsInfo, StartupWallet, StateSourceInfo,
@@ -49,6 +50,17 @@ pub async fn faucet(
 ) -> Response {
     handle_result(
         node.faucet(payload.address, payload.amount),
+        v2::map_send_internal_message,
+    )
+    .await
+}
+
+pub async fn jetton_faucet(
+    State(node): State<Arc<Localnet>>,
+    Json(payload): Json<JettonFaucetRequest>,
+) -> Response {
+    handle_result(
+        node.jetton_faucet(payload.address, payload.jetton_master, payload.amount),
         v2::map_send_internal_message,
     )
     .await

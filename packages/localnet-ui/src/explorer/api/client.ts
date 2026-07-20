@@ -828,6 +828,16 @@ export class TonClient {
     return response.hash
   }
 
+  async fundJetton(address: string, jettonMaster: string, amount: string): Promise<string> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_fundJetton")
+    const response = await this.request<SendInternalMessageResponse>(url, "Failed to fund jetton", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({address, jetton_master: jettonMaster, amount}),
+    })
+    return response.hash
+  }
+
   async setShardAccount(address: string, shardAccount: string): Promise<void> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_setShardAccount")
     await this.request<null>(url, "Failed to set shard account", {

@@ -18,13 +18,13 @@ use super::handlers::{
     get_transactions_by_masterchain_block_v3, get_transactions_by_message_v3, get_transactions_std,
     get_transactions_v3, get_verified_source, get_vesting, get_wallet_information,
     get_wallet_information_v3, get_wallet_states_v3, import_recovery_point, increase_time,
-    json_rpc, list_compiler_abis, list_recovery_points, list_verified_sources, load_state,
-    lookup_block, mine_blocks, pack_address, register_compiler_abis, register_verified_sources,
-    revert_recovery_point, run_get_method, run_get_method_std, run_get_method_v3, send_boc,
-    send_boc_return_hash, send_internal_message, send_message_v3, set_address_name,
-    set_mining_mode, set_network_conditions, set_next_block_timestamp, set_shard_account, set_time,
-    source_trace::build_source_trace, streaming_sse, streaming_ws, try_locate_result_tx,
-    try_locate_source_tx, try_locate_tx, unpack_address,
+    jetton_faucet, json_rpc, list_compiler_abis, list_recovery_points, list_verified_sources,
+    load_state, lookup_block, mine_blocks, pack_address, register_compiler_abis,
+    register_verified_sources, revert_recovery_point, run_get_method, run_get_method_std,
+    run_get_method_v3, send_boc, send_boc_return_hash, send_internal_message, send_message_v3,
+    set_address_name, set_mining_mode, set_network_conditions, set_next_block_timestamp,
+    set_shard_account, set_time, source_trace::build_source_trace, streaming_sse, streaming_ws,
+    try_locate_result_tx, try_locate_source_tx, try_locate_tx, unpack_address,
 };
 use crate::server::{
     ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType,
@@ -196,6 +196,7 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
     let api_calls_for_admin = state.api_calls.clone();
     let acton_router = Router::new()
         .route("/acton_fundAccount", post(faucet))
+        .route("/acton_fundJetton", post(jetton_faucet))
         .route("/acton_getAddressName", get(get_address_name))
         .route("/acton_setAddressName", post(set_address_name))
         .route("/acton_getCompilerAbi", get(get_compiler_abi))

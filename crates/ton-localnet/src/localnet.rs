@@ -1,5 +1,6 @@
 use crate::LocalnetError;
 use crate::executor::TvmEmulatorAdapter;
+use crate::jetton_faucet;
 use crate::node::{Node, NodeClockInfo, StateSource};
 use crate::node_snapshot::{NodeStateSnapshot, read_snapshot_from_path, write_snapshot_to_path};
 use crate::storage;
@@ -576,6 +577,12 @@ pub(crate) enum Request {
         amount: u128,
         resp: oneshot::Sender<anyhow::Result<LocalnetAcceptedInternalMessage>>,
     },
+    JettonFaucet {
+        recipient: Addr,
+        jetton_master: Addr,
+        amount: String,
+        resp: oneshot::Sender<anyhow::Result<LocalnetAcceptedInternalMessage>>,
+    },
     GetTraces {
         tx_hash: Hash256,
         resp: oneshot::Sender<anyhow::Result<storage::TraceNode>>,
@@ -921,6 +928,13 @@ impl Localnet {
         boc_str: String,
     ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
         let boc = BocBytes::from_base64(&boc_str).context("Invalid BOC base64")?;
+        self.enqueue_internal_boc(boc).await
+    }
+
+    async fn enqueue_internal_boc(
+        &self,
+        boc: BocBytes,
+    ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::SendInternalBoc { boc, resp }).await?;
         rx.await?
@@ -1397,6 +1411,28 @@ impl Localnet {
             .send(Request::Faucet {
                 address,
                 amount,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn jetton_faucet(
+        &self,
+        address_str: String,
+        jetton_master_str: String,
+        amount_str: String,
+    ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
+        let recipient = Addr::parse(&address_str)
+            .map_err(|_| LocalnetError::invalid_request("Invalid recipient address"))?;
+        let jetton_master = Addr::parse(&jetton_master_str)
+            .map_err(|_| LocalnetError::invalid_request("Invalid jetton master address"))?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::JettonFaucet {
+                recipient,
+                jetton_master,
+                amount: amount_str,
                 resp,
             })
             .await?;
@@ -2157,6 +2193,16 @@ fn process_loop_request(
         } => {
             let res = node
                 .faucet(&address, amount)
+                .map(|msg_hash| LocalnetAcceptedInternalMessage { msg_hash });
+            let _ = resp.send(res);
+        }
+        Request::JettonFaucet {
+            recipient,
+            jetton_master,
+            amount,
+            resp,
+        } => {
+            let res = jetton_faucet::mint(node, &jetton_master, &recipient, &amount)
                 .map(|msg_hash| LocalnetAcceptedInternalMessage { msg_hash });
             let _ = resp.send(res);
         }

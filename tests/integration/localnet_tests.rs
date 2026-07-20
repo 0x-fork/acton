@@ -4469,6 +4469,77 @@ fn localnet_v3_indexes_real_jetton_actions() {
 }
 
 #[test]
+fn localnet_jetton_faucet_detects_legacy_v1_mint_layout() {
+    let project = jetton_v1_action_project("localnet-legacy-jetton-faucet");
+    let (node, script_output) = run_localnet_action_project(&project, "scripts/jetton.tolk");
+    let recipient = extract_canonical_addr_marker(&script_output, "RECIPIENT=");
+    let jetton_master = extract_canonical_addr_marker(&script_output, "JETTON_MASTER=");
+    let recipient_wallet =
+        extract_canonical_addr_marker(&script_output, "JETTON_RECIPIENT_WALLET=");
+
+    let faucet = node.post_json(
+        "/acton_fundJetton",
+        &json!({
+            "address": recipient,
+            "jetton_master": jetton_master,
+            "amount": "7",
+        }),
+    );
+    let message_hash = faucet["result"]["hash"]
+        .as_str()
+        .expect("legacy jetton faucet must return a message hash");
+    let transactions = node.wait_for_non_empty_v3_transactions(
+        &format!(
+            "/api/v3/transactionsByMessage?msg_hash={}&direction=in&limit=10",
+            encode_query_component(message_hash),
+        ),
+        Duration::from_secs(12),
+    );
+    let mint_transaction = transactions["transactions"]
+        .as_array()
+        .and_then(|transactions| transactions.first())
+        .expect("legacy mint transaction must be indexed");
+    let master_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getTokenData?address={jetton_master}"),
+        Duration::from_secs(12),
+    );
+    let wallet_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getTokenData?address={recipient_wallet}"),
+        Duration::from_secs(12),
+    );
+    let master = response_payload(&master_response);
+    let wallet = response_payload(&wallet_response);
+
+    let snapshot = json!({
+        "faucet": {
+            "ok": faucet["ok"],
+            "message_hash_present": !message_hash.is_empty(),
+        },
+        "mint_transaction": {
+            "in_opcode": mint_transaction["in_msg"]["opcode"],
+            "out_opcodes": mint_transaction["out_msgs"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|message| message["opcode"].clone())
+                .collect::<Vec<_>>(),
+        },
+        "master_total_supply": master["total_supply"],
+        "recipient_wallet_balance": wallet["balance"],
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/localnet_jetton_faucet_detects_legacy_v1_mint_layout.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn localnet_v3_indexes_real_nft_actions() {
     let project = nft_v1_action_project("localnet-v3-real-nft-actions");
     let (node, script_output) = run_localnet_action_project(&project, "scripts/nft.tolk");
@@ -6721,15 +6792,36 @@ fn localnet_supports_v3_account_states_endpoint() {
     let owner_address = extract_prefixed_line_value(&script_stdout, "JETTON_ADMIN OWNER_ADDRESS=");
     wait_until_address_state_active(&node, &minter_address, Duration::from_secs(12));
 
-    let mint_result = project
-        .acton()
-        .script("scripts/mint.tolk")
-        .verify_network("localnet")
-        .env("JETTON_ADMIN", "deployer")
-        .env("JETTON_MINTER_ADDRESS", &minter_address)
-        .run();
-    let mint_status = mint_result.output.get_output().status.code().unwrap_or(1);
-    assert_eq!(mint_status, 0, "Mint script failed");
+    let jetton_faucet = node.post_json(
+        "/acton_fundJetton",
+        &json!({
+            "address": owner_address,
+            "jetton_master": minter_address,
+            "amount": "100",
+        }),
+    );
+    let (invalid_amount_status, invalid_amount_response) = node.post_json_with_status(
+        "/acton_fundJetton",
+        &json!({
+            "address": owner_address,
+            "jetton_master": minter_address,
+            "amount": "0",
+        }),
+    );
+    let mint_message_hash = jetton_faucet["result"]["hash"]
+        .as_str()
+        .expect("jetton faucet must return the queued message hash");
+    let mint_transactions = node.wait_for_non_empty_v3_transactions(
+        &format!(
+            "/api/v3/transactionsByMessage?msg_hash={}&direction=in&limit=10",
+            encode_query_component(mint_message_hash),
+        ),
+        Duration::from_secs(12),
+    );
+    let mint_transaction = mint_transactions["transactions"]
+        .as_array()
+        .and_then(|transactions| transactions.first())
+        .expect("jetton faucet transaction must be indexed");
 
     let wallets_response = wait_for_ok_response(
         &node,
@@ -6956,13 +7048,30 @@ fn localnet_supports_v3_account_states_endpoint() {
     let master_token = response_payload(&master_token_data);
     let wallet_token = response_payload(&wallet_token_data);
     let token_data_summary = json!({
+        "faucet": {
+            "ok": jetton_faucet["ok"],
+            "result_type": jetton_faucet["result"]["@type"],
+            "message_hash_present": jetton_faucet["result"]["hash"].as_str()
+                .is_some_and(|value| !value.is_empty()),
+            "in_opcode": mint_transaction["in_msg"]["opcode"],
+            "out_opcodes": mint_transaction["out_msgs"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|message| message["opcode"].clone())
+                .collect::<Vec<_>>(),
+            "invalid_amount": {
+                "status": invalid_amount_status,
+                "ok": invalid_amount_response["ok"],
+                "code": invalid_amount_response["code"],
+                "error": invalid_amount_response["error"],
+            },
+        },
         "master": {
             "type": master_token["@type"],
             "contract_type": master_token["contract_type"],
             "address_present": master_token["address"].as_str().is_some_and(|value| !value.is_empty()),
-            "total_supply_positive": master_token["total_supply"].as_str()
-                .and_then(|value| value.parse::<u128>().ok())
-                .is_some_and(|value| value > 0),
+            "total_supply": master_token["total_supply"],
             "wallet_code_present": master_token["jetton_wallet_code"].as_str()
                 .is_some_and(|value| !value.is_empty()),
             "content_type": master_token["jetton_content"]["type"],
@@ -6973,9 +7082,7 @@ fn localnet_supports_v3_account_states_endpoint() {
             "address_present": wallet_token["address"].as_str().is_some_and(|value| !value.is_empty()),
             "owner_present": wallet_token["owner"].as_str().is_some_and(|value| !value.is_empty()),
             "master_present": wallet_token["jetton"].as_str().is_some_and(|value| !value.is_empty()),
-            "balance_positive": wallet_token["balance"].as_str()
-                .and_then(|value| value.parse::<u128>().ok())
-                .is_some_and(|value| value > 0),
+            "balance": wallet_token["balance"],
             "wallet_code_present": wallet_token["jetton_wallet_code"].as_str()
                 .is_some_and(|value| !value.is_empty()),
         },
@@ -6986,7 +7093,10 @@ fn localnet_supports_v3_account_states_endpoint() {
         }
     });
     assertion().eq(
-        pretty_json_for_snapshot(&token_data_summary, project.path()),
+        format!(
+            "{}\n",
+            pretty_json_for_snapshot(&token_data_summary, project.path())
+        ),
         snapbox::file!("snapshots/localnet/test_localnet_v2_token_data.summary.json"),
     );
 
