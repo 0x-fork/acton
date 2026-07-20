@@ -106,6 +106,7 @@
   margin: 0;
   color: var(--acton-color-text);
   text-align: end;
+  white-space: nowrap;
 }
 
 .edgeText {

@@ -170,16 +170,26 @@ const changedMapValueDiff = requiredStorageDiff(
     name: "Permissions",
     value: {
       kind: "map",
-      typeName: "map<int, bool>",
-      entries: [{key: {kind: "scalar", value: "1"}, value: {kind: "boolean", value: true}}],
+      typeName: "map<uint256, bool>",
+      entries: [
+        {
+          key: {kind: "scalar", value: "255", typeName: "uint256"},
+          value: {kind: "boolean", value: true},
+        },
+      ],
     },
   },
   {
     name: "Permissions",
     value: {
       kind: "map",
-      typeName: "map<int, bool>",
-      entries: [{key: {kind: "scalar", value: "1"}, value: {kind: "boolean", value: false}}],
+      typeName: "map<uint256, bool>",
+      entries: [
+        {
+          key: {kind: "scalar", value: "255", typeName: "uint256"},
+          value: {kind: "boolean", value: false},
+        },
+      ],
     },
   },
 )
@@ -290,7 +300,7 @@ export const parsedValueDiffViewGallery = {
         "A stable key changes only its value, while replacing a key renders one removed pair and one added pair.",
       content: (
         <div className={styles.grid}>
-          {diffSample("value changed", changedMapValueDiff)}
+          {diffSample("uint256 value changed", changedMapValueDiff)}
           {diffSample("key replaced", changedMapKeyDiff)}
           {diffSample("last map entry removed", lastMapEntryRemovedDiff)}
           {diffSample("last array item removed", lastArrayItemRemovedDiff)}

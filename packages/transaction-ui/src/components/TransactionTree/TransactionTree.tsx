@@ -102,6 +102,7 @@ const TREE_MIN_SIZE = {height: 80, width: 800} as const
 const TREE_PADDING = {top: 8, right: 32, bottom: 8, left: 50} as const
 const TREE_DETAILS_GAP = 15
 const TREE_EDGE_LABEL = {width: 150, height: 64, failedHeight: 84, x: -180, y: -40} as const
+const TREE_ACCOUNT_LABEL_MAX_LENGTH = 20
 const ACTION_HIGHLIGHT_SCROLL_DELAY_MS = 200
 
 const INITIAL_TREE_LAYOUT: TreeLayout = {
@@ -793,7 +794,9 @@ export function TransactionTree({
             }}
           >
             <div className={styles.topText}>
-              <p className={styles.edgeTextTitle}>{nodeDatum.name}</p>
+              <p className={styles.edgeTextTitle} aria-label={nodeDatum.name}>
+                {fmt.truncateMiddle(nodeDatum.name, TREE_ACCOUNT_LABEL_MAX_LENGTH)}
+              </p>
               {nodeDatum.attributes?.value && (
                 <p className={styles.edgeTextContent}>{nodeDatum.attributes.value as string}</p>
               )}

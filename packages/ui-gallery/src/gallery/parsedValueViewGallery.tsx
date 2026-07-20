@@ -71,6 +71,21 @@ const mapValue: ParsedValue = {
   ],
 }
 
+const uint256MapValue: ParsedValue = {
+  kind: "map",
+  typeName: "map<uint256, string>",
+  entries: [
+    {
+      key: {
+        kind: "scalar",
+        value: "79361050166793331075214131622218060964406539857827620575770963283574719222885",
+        typeName: "uint256",
+      },
+      value: {kind: "scalar", value: '"uri"'},
+    },
+  ],
+}
+
 const nestedArrayValue: ParsedValue = {
   kind: "array",
   items: [
@@ -281,6 +296,7 @@ export const parsedValueViewGallery = {
       content: (
         <div className={styles.structureGrid}>
           {valueSample("map<int, address>", mapValue, {contracts})}
+          {valueSample("map<uint256, string>", uint256MapValue)}
           {valueSample("map → object / array / map", nestedMapValue, {
             contracts,
             formatAddress: formatFriendlyAddress,

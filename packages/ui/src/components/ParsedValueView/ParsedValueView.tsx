@@ -72,6 +72,9 @@ function ParsedMapEntry({
             formatAddress={formatAddress}
             onContractClick={onContractClick}
             renderCodeCellDetails={renderCodeCellDetails}
+            fieldName={
+              entry.key.kind === "scalar" && entry.key.typeName === "uint256" ? "key" : undefined
+            }
           />
         </div>
       </div>
