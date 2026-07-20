@@ -1,5 +1,5 @@
-import {BookOpen, Check, Copy, FastForward, X} from "lucide-react"
-import {Button, Input, useToast} from "@acton/ui"
+import {BookOpen, Check, Copy, FastForward} from "lucide-react"
+import {Button, Dialog, Input, useToast} from "@acton/ui"
 import {Link, useNavigate} from "react-router-dom"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent} from "react"
@@ -302,23 +302,6 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
     }
   }, [copiedEndpoint])
 
-  useEffect(() => {
-    if (!isTimeModalOpen) {
-      return
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isAdvancingTime) {
-        setIsTimeModalOpen(false)
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown)
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown)
-    }
-  }, [isAdvancingTime, isTimeModalOpen])
-
   const openTimeAdvanceModal = useCallback(() => {
     setTimeAdvanceSeconds(DEFAULT_TIME_ADVANCE_SECONDS)
     setTimeAdvanceError(undefined)
@@ -553,120 +536,99 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         </div>
       </section>
 
-      {isTimeModalOpen && (
-        <div
-          className={styles.timeModalBackdrop}
-          onMouseDown={event => {
-            if (event.target === event.currentTarget) {
-              closeTimeAdvanceModal()
-            }
-          }}
-        >
-          <section
-            className={styles.timeModal}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="node-time-modal-title"
-          >
-            <div className={styles.timeModalHeader}>
-              <h2 id="node-time-modal-title" className={styles.timeModalTitle}>
-                Advance time
-              </h2>
+      <Dialog
+        open={isTimeModalOpen}
+        title="Advance time"
+        className={styles.dashboardDialog}
+        maxWidth={420}
+        dismissible={!isAdvancingTime}
+        closeLabel="Close time control"
+        onOpenChange={open => {
+          if (!open) closeTimeAdvanceModal()
+        }}
+      >
+        <form className={styles.timeModalContent} onSubmit={handleTimeAdvanceSubmit}>
+          <div className={styles.fieldBlock}>
+            <label className={styles.label} htmlFor="node-time-advance-seconds">
+              Seconds
+            </label>
+            <Input
+              id="node-time-advance-seconds"
+              className={styles.fieldInput}
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              value={timeAdvanceSeconds}
+              disabled={isAdvancingTime}
+              onChange={event => {
+                setTimeAdvanceSeconds(event.target.value)
+                setTimeAdvanceError(undefined)
+              }}
+            />
+          </div>
+
+          <div className={styles.timeAdvancePresets}>
+            {TIME_ADVANCE_PRESETS.map(preset => (
               <button
+                key={preset.seconds}
                 type="button"
-                className={styles.timeModalCloseButton}
-                aria-label="Close time control"
+                className={styles.timeAdvancePresetButton}
+                aria-label={`Add ${preset.label} to time shift`}
                 disabled={isAdvancingTime}
-                onClick={closeTimeAdvanceModal}
+                onClick={() => {
+                  setTimeAdvanceSeconds(currentSeconds =>
+                    addTimeAdvanceSeconds(currentSeconds, preset.seconds),
+                  )
+                  setTimeAdvanceError(undefined)
+                }}
               >
-                <X size={18} />
+                {preset.label}
               </button>
+            ))}
+          </div>
+
+          <div className={styles.timeAdvancePreview}>
+            <div className={styles.timeAdvancePreviewRow}>
+              <span>Shift</span>
+              <strong>{timeAdvanceShiftValue}</strong>
             </div>
+            <div className={styles.timeAdvancePreviewRow}>
+              <span>Current</span>
+              <strong>{timeAdvanceCurrentValue}</strong>
+            </div>
+            <div className={styles.timeAdvancePreviewRow}>
+              <span>After</span>
+              <strong>{timeAdvanceTargetValue}</strong>
+            </div>
+          </div>
 
-            <form className={styles.timeModalContent} onSubmit={handleTimeAdvanceSubmit}>
-              <div className={styles.fieldBlock}>
-                <label className={styles.label} htmlFor="node-time-advance-seconds">
-                  Seconds
-                </label>
-                <Input
-                  id="node-time-advance-seconds"
-                  className={styles.fieldInput}
-                  type="number"
-                  min="0"
-                  step="1"
-                  inputMode="numeric"
-                  value={timeAdvanceSeconds}
-                  disabled={isAdvancingTime}
-                  onChange={event => {
-                    setTimeAdvanceSeconds(event.target.value)
-                    setTimeAdvanceError(undefined)
-                  }}
-                />
-              </div>
+          {timeAdvanceError && (
+            <div className={styles.timeAdvanceError} role="alert">
+              {timeAdvanceError}
+            </div>
+          )}
 
-              <div className={styles.timeAdvancePresets}>
-                {TIME_ADVANCE_PRESETS.map(preset => (
-                  <button
-                    key={preset.seconds}
-                    type="button"
-                    className={styles.timeAdvancePresetButton}
-                    aria-label={`Add ${preset.label} to time shift`}
-                    disabled={isAdvancingTime}
-                    onClick={() => {
-                      setTimeAdvanceSeconds(currentSeconds =>
-                        addTimeAdvanceSeconds(currentSeconds, preset.seconds),
-                      )
-                      setTimeAdvanceError(undefined)
-                    }}
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className={styles.timeAdvancePreview}>
-                <div className={styles.timeAdvancePreviewRow}>
-                  <span>Shift</span>
-                  <strong>{timeAdvanceShiftValue}</strong>
-                </div>
-                <div className={styles.timeAdvancePreviewRow}>
-                  <span>Current</span>
-                  <strong>{timeAdvanceCurrentValue}</strong>
-                </div>
-                <div className={styles.timeAdvancePreviewRow}>
-                  <span>After</span>
-                  <strong>{timeAdvanceTargetValue}</strong>
-                </div>
-              </div>
-
-              {timeAdvanceError && (
-                <div className={styles.timeAdvanceError} role="alert">
-                  {timeAdvanceError}
-                </div>
-              )}
-
-              <div className={styles.timeModalActions}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isAdvancingTime}
-                  onClick={closeTimeAdvanceModal}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  trailingIcon={<FastForward size={15} />}
-                  disabled={isAdvancingTime || !parsedTimeAdvanceSeconds}
-                >
-                  {isAdvancingTime ? "Advancing..." : "Advance"}
-                </Button>
-              </div>
-            </form>
-          </section>
-        </div>
-      )}
+          <div className={styles.timeModalActions}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isAdvancingTime}
+              onClick={closeTimeAdvanceModal}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              trailingIcon={<FastForward size={15} />}
+              disabled={isAdvancingTime || !parsedTimeAdvanceSeconds}
+            >
+              {isAdvancingTime ? "Advancing..." : "Advance"}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
     </>
   )
 }

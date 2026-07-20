@@ -1,5 +1,5 @@
-import {ArrowUpRight, Check, ChevronDown, Coins, Loader2, X} from "lucide-react"
-import {Button, Input, useToast} from "@acton/ui"
+import {ArrowUpRight, Check, ChevronDown, Coins, Loader2} from "lucide-react"
+import {Button, Dialog, Input, useToast} from "@acton/ui"
 import type {Address} from "@ton/core"
 import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
@@ -110,16 +110,8 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
     const frame = globalThis.requestAnimationFrame(() => {
       minterInputRef.current?.focus()
     })
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsAssetModalOpen(false)
-      }
-    }
-
-    globalThis.addEventListener("keydown", onKeyDown)
     return () => {
       globalThis.cancelAnimationFrame(frame)
-      globalThis.removeEventListener("keydown", onKeyDown)
     }
   }, [isAssetModalOpen])
 
@@ -689,132 +681,105 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
         </form>
       </section>
 
-      {isAssetModalOpen && (
-        <div
-          className={styles.assetModalBackdrop}
-          onMouseDown={event => {
-            if (event.target === event.currentTarget) {
-              setIsAssetModalOpen(false)
-            }
-          }}
-        >
-          <section
-            className={styles.assetModal}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="faucet-asset-modal-title"
-          >
-            <div className={styles.assetModalHeader}>
-              <div>
-                <h2 id="faucet-asset-modal-title" className={styles.assetModalTitle}>
-                  Asset
-                </h2>
-              </div>
-              <button
-                type="button"
-                className={styles.assetModalCloseButton}
-                aria-label="Close asset selector"
-                onClick={() => setIsAssetModalOpen(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
+      <Dialog
+        open={isAssetModalOpen}
+        title="Asset"
+        className={styles.dashboardDialog}
+        maxWidth={560}
+        closeLabel="Close asset selector"
+        onOpenChange={setIsAssetModalOpen}
+      >
+        <div className={styles.assetModalContent}>
+          <div className={styles.assetChoiceList}>
+            <button
+              type="button"
+              className={`${styles.assetChoiceButton} ${isJettonMode ? "" : styles.assetChoiceButtonSelected}`}
+              onClick={selectGramAsset}
+            >
+              <img src={GRAM_LOGO_IMAGE} alt="" className={styles.assetChoiceImage} />
+              <span className={styles.assetChoiceText}>
+                <span className={styles.assetChoiceTitle}>GRAM</span>
+                <span className={styles.assetChoiceSubtitle}>Native localnet balance</span>
+              </span>
+              {!isJettonMode && <Check size={17} className={styles.assetChoiceCheck} />}
+            </button>
 
-            <div className={styles.assetModalContent}>
-              <div className={styles.assetChoiceList}>
+            {jettonOptions.map(option => {
+              const isSelected = isJettonMode && isSameAddress(option.value, jettonMinter)
+              return (
                 <button
+                  key={option.id}
                   type="button"
-                  className={`${styles.assetChoiceButton} ${isJettonMode ? "" : styles.assetChoiceButtonSelected}`}
-                  onClick={selectGramAsset}
+                  className={`${styles.assetChoiceButton} ${isSelected ? styles.assetChoiceButtonSelected : ""}`}
+                  onClick={() => selectJettonAsset(option)}
                 >
-                  <img src={GRAM_LOGO_IMAGE} alt="" className={styles.assetChoiceImage} />
+                  {option.image ? (
+                    <img
+                      src={option.image}
+                      alt=""
+                      className={styles.assetChoiceImage}
+                      onError={event => {
+                        const imageElement = event.currentTarget
+                        if (imageElement.getAttribute("src") !== TOKEN_PLACEHOLDER_IMAGE) {
+                          imageElement.src = TOKEN_PLACEHOLDER_IMAGE
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span className={styles.assetChoiceIcon}>
+                      <Coins size={18} />
+                    </span>
+                  )}
                   <span className={styles.assetChoiceText}>
-                    <span className={styles.assetChoiceTitle}>GRAM</span>
-                    <span className={styles.assetChoiceSubtitle}>Native localnet balance</span>
+                    <span className={styles.assetChoiceTitle}>{option.title}</span>
+                    <span className={styles.assetChoiceSubtitle}>{option.subtitle}</span>
                   </span>
-                  {!isJettonMode && <Check size={17} className={styles.assetChoiceCheck} />}
+                  {option.badge && <span className={styles.assetChoiceBadge}>{option.badge}</span>}
+                  {isSelected && <Check size={17} className={styles.assetChoiceCheck} />}
                 </button>
-
-                {jettonOptions.map(option => {
-                  const isSelected = isJettonMode && isSameAddress(option.value, jettonMinter)
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={`${styles.assetChoiceButton} ${isSelected ? styles.assetChoiceButtonSelected : ""}`}
-                      onClick={() => selectJettonAsset(option)}
-                    >
-                      {option.image ? (
-                        <img
-                          src={option.image}
-                          alt=""
-                          className={styles.assetChoiceImage}
-                          onError={event => {
-                            const imageElement = event.currentTarget
-                            if (imageElement.getAttribute("src") !== TOKEN_PLACEHOLDER_IMAGE) {
-                              imageElement.src = TOKEN_PLACEHOLDER_IMAGE
-                            }
-                          }}
-                        />
-                      ) : (
-                        <span className={styles.assetChoiceIcon}>
-                          <Coins size={18} />
-                        </span>
-                      )}
-                      <span className={styles.assetChoiceText}>
-                        <span className={styles.assetChoiceTitle}>{option.title}</span>
-                        <span className={styles.assetChoiceSubtitle}>{option.subtitle}</span>
-                      </span>
-                      {option.badge && (
-                        <span className={styles.assetChoiceBadge}>{option.badge}</span>
-                      )}
-                      {isSelected && <Check size={17} className={styles.assetChoiceCheck} />}
-                    </button>
-                  )
-                })}
-                {jettonsLoading && (
-                  <div className={styles.assetLookupStatus}>
-                    <Loader2 size={14} className={styles.spinning} />
-                    Loading local jettons...
-                  </div>
-                )}
+              )
+            })}
+            {jettonsLoading && (
+              <div className={styles.assetLookupStatus}>
+                <Loader2 size={14} className={styles.spinning} />
+                Loading local jettons...
               </div>
+            )}
+          </div>
 
-              <div className={styles.assetMinterLookup}>
-                <label className={styles.label} htmlFor="dashboard-asset-minter">
-                  Paste token minter address
-                </label>
-                <Input
-                  ref={minterInputRef}
-                  id="dashboard-asset-minter"
-                  className={styles.fieldInput}
-                  placeholder="EQ..."
-                  value={minterAddressDraft}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  onChange={event => {
-                    setMinterAddressDraft(event.target.value)
-                  }}
-                  onPaste={event => {
-                    const pastedText = event.clipboardData.getData("text")
-                    const parsedMinter = parseAddress(pastedText.trim())
-                    if (!parsedMinter) {
-                      return
-                    }
+          <div className={styles.assetMinterLookup}>
+            <label className={styles.label} htmlFor="dashboard-asset-minter">
+              Paste token minter address
+            </label>
+            <Input
+              ref={minterInputRef}
+              id="dashboard-asset-minter"
+              className={styles.fieldInput}
+              placeholder="EQ..."
+              value={minterAddressDraft}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              onChange={event => {
+                setMinterAddressDraft(event.target.value)
+              }}
+              onPaste={event => {
+                const pastedText = event.clipboardData.getData("text")
+                const parsedMinter = parseAddress(pastedText.trim())
+                if (!parsedMinter) {
+                  return
+                }
 
-                    event.preventDefault()
-                    const normalizedMinter = parsedMinter.toString(addressFormat)
-                    lastAutoMinterLookupAddressRef.current = normalizedMinter
-                    setMinterAddressDraft(normalizedMinter)
-                    void loadMinterAddress(normalizedMinter)
-                  }}
-                />
-              </div>
-            </div>
-          </section>
+                event.preventDefault()
+                const normalizedMinter = parsedMinter.toString(addressFormat)
+                lastAutoMinterLookupAddressRef.current = normalizedMinter
+                setMinterAddressDraft(normalizedMinter)
+                void loadMinterAddress(normalizedMinter)
+              }}
+            />
+          </div>
         </div>
-      )}
+      </Dialog>
     </>
   )
 }

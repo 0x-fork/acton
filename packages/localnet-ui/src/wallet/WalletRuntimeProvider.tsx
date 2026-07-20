@@ -1,5 +1,5 @@
-import {Check, Copy, KeyRound, Shield, X} from "lucide-react"
-import {Button, useToast} from "@acton/ui"
+import {Check, Copy, KeyRound, Shield} from "lucide-react"
+import {Button, Dialog, useToast} from "@acton/ui"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {
@@ -372,7 +372,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
         await walletKit.handleTonConnectUrl(url.trim())
         setTonConnectUrl("")
         showToast({
-          variant: "success",
+          variant: "info",
           title: "TON Connect request received",
           description: "Review and approve the request in Acton.",
         })
@@ -688,7 +688,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
       {pendingConnectRequest && (
         <ModalShell
           title="Connection Request"
-          subtitle={`${getDappName(pendingConnectRequest.preview.dAppInfo?.name)} wants to connect.`}
+          subtitle={`${getDappName(pendingConnectRequest.preview.dAppInfo?.name)} wants to connect`}
           onDismiss={() => setPendingConnectRequest(undefined)}
         >
           <div className={styles.permissionsList}>
@@ -711,7 +711,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           </div>
 
           <div className={styles.walletPicker}>
-            <span className={styles.label}>Connect with</span>
+            <span className={styles.walletPickerLabel}>Connect with</span>
             {runtimeWallets.map(wallet => {
               const isSelected = wallet.id === selectedConnectWallet?.id
               const walletAddress = normalizeAddress(wallet.record.address, addressFormat)
@@ -854,25 +854,20 @@ interface ModalShellProps {
 }
 
 const ModalShell: FC<ModalShellProps> = ({title, subtitle, onDismiss, children}) => (
-  <div className={styles.modalBackdrop}>
-    <div className={styles.modalCard}>
-      <div className={styles.modalHeader}>
-        <div className={styles.modalTitleRow}>
-          <h3 className={styles.modalTitle}>{title}</h3>
-          <button
-            type="button"
-            className={styles.modalCloseButton}
-            onClick={onDismiss}
-            aria-label="Close request"
-          >
-            <X size={16} />
-          </button>
-        </div>
-        <p className={styles.modalSubtitle}>{subtitle}</p>
-      </div>
-      <div className={styles.modalContent}>{children}</div>
-    </div>
-  </div>
+  <Dialog
+    open
+    title={title}
+    description={subtitle}
+    className={styles.modalDialog}
+    maxWidth={520}
+    closeLabel="Close request"
+    contentClassName={styles.modalContent}
+    onOpenChange={open => {
+      if (!open) onDismiss()
+    }}
+  >
+    {children}
+  </Dialog>
 )
 
 interface MetaRowProps {

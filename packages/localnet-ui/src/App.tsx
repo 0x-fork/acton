@@ -1,6 +1,6 @@
 import {BrowserRouter, Navigate, Route, Routes, useLocation} from "react-router-dom"
-import {Check, KeyRound, ShieldCheck, X} from "lucide-react"
-import {Input, ToastProvider} from "@acton/ui"
+import {Check, KeyRound, ShieldCheck} from "lucide-react"
+import {Dialog, Input, ToastProvider} from "@acton/ui"
 import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 
@@ -477,21 +477,6 @@ const LocalnetAuthOverlay: FC<LocalnetAuthOverlayProps> = ({
     inputRef.current?.focus()
   }, [])
 
-  useEffect(() => {
-    if (!canDismiss) {
-      return
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose()
-      }
-    }
-
-    globalThis.addEventListener("keydown", onKeyDown)
-    return () => globalThis.removeEventListener("keydown", onKeyDown)
-  }, [canDismiss, onClose])
-
   const title = required ? "Localnet API token required" : "Localnet API token"
   const description =
     required && localnetApiToken
@@ -499,91 +484,68 @@ const LocalnetAuthOverlay: FC<LocalnetAuthOverlayProps> = ({
       : "Paste the localnet API token to use protected routes from this browser. The token will be saved locally."
 
   return (
-    <div className={styles.authOverlay}>
-      <button
-        type="button"
-        className={styles.authBackdrop}
-        aria-label="Close localnet API token dialog"
-        disabled={!canDismiss}
-        onClick={onClose}
-      />
-      <section
-        className={styles.authPanel}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="localnet-auth-title"
-        aria-describedby="localnet-auth-description"
+    <Dialog
+      open
+      title={title}
+      description={description}
+      className={styles.authDialog}
+      leadingIcon={
+        <span className={styles.authIcon} aria-hidden="true">
+          <ShieldCheck size={21} />
+        </span>
+      }
+      maxWidth={440}
+      dismissible={canDismiss}
+      closeLabel="Close localnet API token dialog"
+      onOpenChange={open => {
+        if (!open) onClose()
+      }}
+    >
+      <form
+        className={styles.authForm}
+        onSubmit={event => {
+          event.preventDefault()
+          const nextToken = draftToken.trim()
+          if (nextToken) {
+            onSave(nextToken)
+          }
+        }}
       >
-        <div className={styles.authHeader}>
-          <span className={styles.authIcon} aria-hidden="true">
-            <ShieldCheck size={21} />
-          </span>
-          <div className={styles.authTitleBlock}>
-            <h2 id="localnet-auth-title" className={styles.authTitle}>
-              {title}
-            </h2>
-            <p id="localnet-auth-description" className={styles.authDescription}>
-              {description}
-            </p>
-          </div>
-          {canDismiss && (
+        <Input
+          ref={inputRef}
+          id="localnet-api-token"
+          className={styles.authInput}
+          type="password"
+          label="API token"
+          leadingIcon={<KeyRound size={17} />}
+          value={draftToken}
+          placeholder="Paste token"
+          onChange={event => setDraftToken(event.target.value)}
+        />
+
+        <div className={styles.authActions}>
+          <button
+            type="submit"
+            className={`${styles.authActionButton} ${styles.authPrimaryButton}`}
+            disabled={!draftToken.trim()}
+          >
+            <Check size={16} />
+            <span>Save token</span>
+          </button>
+          {localnetApiToken && (
             <button
               type="button"
-              className={styles.authCloseButton}
-              onClick={onClose}
-              aria-label="Close localnet API token dialog"
+              className={styles.authActionButton}
+              onClick={() => {
+                setDraftToken("")
+                onClear()
+              }}
             >
-              <X size={17} />
+              Clear stored token
             </button>
           )}
         </div>
-
-        <form
-          className={styles.authForm}
-          onSubmit={event => {
-            event.preventDefault()
-            const nextToken = draftToken.trim()
-            if (nextToken) {
-              onSave(nextToken)
-            }
-          }}
-        >
-          <Input
-            ref={inputRef}
-            id="localnet-api-token"
-            className={styles.authInput}
-            type="password"
-            label="API token"
-            leadingIcon={<KeyRound size={17} />}
-            value={draftToken}
-            placeholder="Paste token"
-            onChange={event => setDraftToken(event.target.value)}
-          />
-
-          <div className={styles.authActions}>
-            <button
-              type="submit"
-              className={`${styles.authActionButton} ${styles.authPrimaryButton}`}
-              disabled={!draftToken.trim()}
-            >
-              <Check size={16} />
-              <span>Save token</span>
-            </button>
-            {localnetApiToken && (
-              <button
-                type="button"
-                className={styles.authActionButton}
-                onClick={() => {
-                  setDraftToken("")
-                  onClear()
-                }}
-              >
-                Clear stored token
-              </button>
-            )}
-          </div>
-        </form>
-      </section>
-    </div>
+      </form>
+    </Dialog>
   )
 }

@@ -12,6 +12,8 @@ export interface DialogProps {
   readonly closeLabel?: string
   readonly contentClassName?: string
   readonly description?: ReactNode
+  readonly dismissible?: boolean
+  readonly leadingIcon?: ReactNode
   readonly maxWidth?: CSSProperties["maxWidth"]
   readonly onOpenChange: (open: boolean) => void
   readonly open: boolean
@@ -24,15 +26,22 @@ export function Dialog({
   closeLabel = "Close dialog",
   contentClassName,
   description,
+  dismissible = true,
+  leadingIcon,
   maxWidth,
   onOpenChange,
   open,
   title,
 }: DialogProps) {
   const {theme} = useTheme()
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen || dismissible) {
+      onOpenChange(nextOpen)
+    }
+  }
 
   return (
-    <DialogBase.Root open={open} onOpenChange={onOpenChange}>
+    <DialogBase.Root open={open} onOpenChange={handleOpenChange}>
       <DialogBase.Portal>
         <DialogBase.Backdrop className={styles.backdrop} data-theme={theme} />
         <DialogBase.Viewport className={styles.viewport}>
@@ -46,6 +55,9 @@ export function Dialog({
             }
           >
             <header className={styles.header}>
+              {leadingIcon !== undefined && leadingIcon !== null && (
+                <div className={styles.leadingIcon}>{leadingIcon}</div>
+              )}
               <div className={styles.heading}>
                 <DialogBase.Title className={styles.title}>{title}</DialogBase.Title>
                 {description !== undefined && description !== null && (
@@ -54,9 +66,11 @@ export function Dialog({
                   </DialogBase.Description>
                 )}
               </div>
-              <DialogBase.Close className={styles.closeButton} aria-label={closeLabel}>
-                <X size={18} aria-hidden="true" />
-              </DialogBase.Close>
+              {dismissible && (
+                <DialogBase.Close className={styles.closeButton} aria-label={closeLabel}>
+                  <X size={18} aria-hidden="true" />
+                </DialogBase.Close>
+              )}
             </header>
             <div className={cx(styles.content, contentClassName)}>{children}</div>
           </DialogBase.Popup>

@@ -1894,95 +1894,12 @@
   border-radius: 999px;
 }
 
-.assetModalBackdrop,
-.timeModalBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 95;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-  background: var(--acton-color-overlay-surface);
-  backdrop-filter: blur(2px);
-}
-
-.assetModal,
-.timeModal {
-  max-height: min(760px, calc(100vh - 36px));
-  overflow: auto;
-  border: 1px solid var(--acton-color-border);
-  border-radius: 18px;
+.dashboardDialog {
   background: var(--acton-color-surface);
-  box-shadow: var(--acton-shadow-overlay);
-}
-
-.assetModal {
-  width: min(560px, 100%);
-}
-
-.timeModal {
-  width: min(420px, 100%);
-}
-
-.assetModalHeader,
-.timeModalHeader {
-  padding: 14px 20px 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.assetModalTitle,
-.timeModalTitle {
-  margin: 0;
-  color: var(--acton-color-text);
-  font-size: 1.05rem;
-  font-weight: 650;
-  line-height: 1;
-}
-
-.assetModalCloseButton,
-.timeModalCloseButton {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--acton-color-text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease,
-    box-shadow 120ms ease;
-}
-
-.assetModalCloseButton:hover,
-.timeModalCloseButton:hover:not(:disabled) {
-  background: var(--acton-color-surface-hover);
-  color: var(--acton-color-text);
-}
-
-.assetModalCloseButton:focus-visible,
-.timeModalCloseButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
-}
-
-.timeModalCloseButton:disabled {
-  cursor: default;
-  opacity: 0.5;
 }
 
 .assetModalContent,
 .timeModalContent {
-  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -2700,26 +2617,6 @@
   .assetSelectorSymbol {
     max-width: 56px;
     font-size: 0.82rem;
-  }
-
-  .assetModalBackdrop,
-  .timeModalBackdrop {
-    align-items: flex-end;
-    padding: 10px;
-  }
-
-  .assetModal,
-  .timeModal {
-    max-height: min(700px, calc(100vh - 20px));
-    border-radius: 16px;
-  }
-
-  .assetModalHeader,
-  .assetModalContent,
-  .timeModalHeader,
-  .timeModalContent {
-    padding-right: 16px;
-    padding-left: 16px;
   }
 
   .assetChoiceBadge {

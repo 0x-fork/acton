@@ -4,7 +4,7 @@
   bottom: var(--acton-space-4);
   left: auto;
   top: auto;
-  z-index: 1000;
+  z-index: 1100;
   width: min(24rem, calc(100vw - var(--acton-space-4) * 2));
   color: var(--acton-color-text);
   font-family: var(--acton-font-sans);

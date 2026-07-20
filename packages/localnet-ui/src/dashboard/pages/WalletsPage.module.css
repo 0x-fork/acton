@@ -54,7 +54,7 @@
 .modalActions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
 }
 
@@ -511,81 +511,20 @@
   text-align: right;
 }
 
-.modalBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-  background: var(--acton-color-overlay-surface);
-  backdrop-filter: blur(2px);
-}
-
-.modalCard {
-  width: min(520px, 100%);
-  max-height: min(720px, calc(100vh - 36px));
-  overflow: auto;
-  border: 1px solid var(--acton-color-border);
-  border-radius: 16px;
-  background: var(--acton-color-surface);
-  box-shadow: var(--acton-shadow-overlay);
-}
-
-.modalHeader {
-  padding: 20px 20px 0;
-}
-
-.modalTitleRow {
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.modalTitle {
-  margin: 0;
-  color: var(--acton-color-text);
-  font-size: 1.05rem;
-  font-weight: 600;
-}
-
-.modalCloseButton {
-  width: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--acton-color-text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-
-.modalCloseButton:hover {
-  color: var(--acton-color-text);
-  background: var(--acton-color-surface-hover);
-}
-
-.modalCloseButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
-}
-
-.modalSubtitle {
-  margin: 8px 0 0;
+.walletPickerLabel {
   color: var(--acton-color-text-muted);
   font-size: 0.9rem;
   line-height: 1.45;
 }
 
+.modalDialog {
+  --acton-dialog-description-gap: var(--acton-space-2);
+
+  background: var(--acton-color-surface);
+}
+
 .modalContent {
   gap: 16px;
-  padding: 20px;
 }
 
 .permissionItem,
