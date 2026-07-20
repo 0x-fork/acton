@@ -358,6 +358,16 @@
   line-height: 1.45;
 }
 
+.methodErrorLink {
+  color: inherit;
+  font-weight: var(--acton-font-weight-emphasis);
+  text-underline-offset: 3px;
+}
+
+.methodErrorLink:hover {
+  text-decoration-thickness: 2px;
+}
+
 .result {
   display: flex;
   flex-direction: column;

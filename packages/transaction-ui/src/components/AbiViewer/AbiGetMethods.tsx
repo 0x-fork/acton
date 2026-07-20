@@ -46,6 +46,7 @@ export function AbiGetMethods({abi, runGetMethod, addressSuggestions = []}: AbiG
               key={`${method.name}:${method.tvm_method_id}`}
               method={method}
               ctx={ctx}
+              errors={abi.thrown_errors}
               runGetMethod={runGetMethod}
               addressSuggestions={addressSuggestions}
             />
@@ -91,11 +92,13 @@ export function AbiReadonlyGetMethodsSection({
 function AbiRunnableGetMethod({
   method,
   ctx,
+  errors,
   runGetMethod,
   addressSuggestions,
 }: {
   readonly method: ABIGetMethod
   readonly ctx: DynamicCtx
+  readonly errors: ContractABI["thrown_errors"]
   readonly runGetMethod: AbiRunGetMethod
   readonly addressSuggestions: readonly TonAddressSuggestion[]
 }) {
@@ -112,6 +115,12 @@ function AbiRunnableGetMethod({
     )
     setRunState({status: "idle"})
   }, [ctx, method])
+
+  const resolvedAbiError =
+    runState.status === "error" && runState.result && runState.result.exit_code !== 0
+      ? errors.find(error => error.err_code === runState.result?.exit_code)
+      : undefined
+  const resolvedAbiErrorName = resolvedAbiError?.name?.trim()
 
   const runMethod = async () => {
     const requestId = ++requestIdRef.current
@@ -197,7 +206,26 @@ function AbiRunnableGetMethod({
       {runState.status === "loading" && <AbiGetMethodSkeleton />}
       {runState.status === "error" && (
         <>
-          <div className={styles.methodError}>{runState.error}</div>
+          <div className={styles.methodError}>
+            {resolvedAbiErrorName && runState.result ? (
+              <>
+                Get method exited with{" "}
+                <a
+                  className={styles.methodErrorLink}
+                  href={`#${abiSymbolAnchorId(
+                    "error",
+                    resolvedAbiErrorName,
+                    String(runState.result.exit_code),
+                  )}`}
+                >
+                  {resolvedAbiErrorName}
+                </a>{" "}
+                ({runState.result.exit_code}).
+              </>
+            ) : (
+              runState.error
+            )}
+          </div>
           {runState.result && (
             <div className={styles.result}>
               <AbiGetMethodExecutionDetails result={runState.result} />

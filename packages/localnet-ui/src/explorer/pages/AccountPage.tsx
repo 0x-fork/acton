@@ -127,7 +127,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
   const historyRequestKey = `${accountRequestKey}:${historySortOrder}`
   const activeTab = useMemo<AccountTab>(() => {
     const tab = location.hash.replace("#", "")
-    if (tab.startsWith("contract-")) {
+    if (tab.startsWith("contract-") || tab.startsWith("abi-")) {
       return "contract"
     }
     return isAccountTab(tab) ? tab : "history"

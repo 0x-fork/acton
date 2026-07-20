@@ -51,7 +51,7 @@ function readContractHashTab(): ContractCodeTab {
   if (hash === "contract-source") {
     return "source"
   }
-  if (hash === "contract-abi") {
+  if (hash === "contract-abi" || hash.startsWith("abi-")) {
     return "abi"
   }
   return "storage"
