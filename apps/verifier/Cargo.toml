@@ -63,3 +63,6 @@ utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
+
+[build-dependencies]
+chrono = "0.4"

@@ -3,7 +3,7 @@ use base64::{
     Engine as _,
     engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD},
 };
-use reqwest::{Client, StatusCode};
+use reqwest::{Client, RequestBuilder, StatusCode, header::USER_AGENT};
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -11,6 +11,11 @@ use crate::config::Config;
 
 const TONCENTER_API_KEY_HEADER: &str = "X-API-Key";
 const CODE_HASH_BYTES: usize = 32;
+
+fn user_agent() -> String {
+    let git_hash = option_env!("GIT_HASH").unwrap_or("unknown");
+    format!("ton-verifier/{} ({git_hash})", env!("CARGO_PKG_VERSION"))
+}
 
 #[async_trait]
 pub trait BlockchainClient: Send + Sync + 'static {
@@ -48,21 +53,30 @@ impl ToncenterClient {
             self.base_url.trim_end_matches('/')
         )
     }
-}
 
-#[async_trait]
-impl BlockchainClient for ToncenterClient {
-    async fn get_code_hash(&self, address: &str) -> Result<Option<String>, BlockchainError> {
+    fn account_states_request(&self, address: &str) -> RequestBuilder {
         let mut request = self
             .http
             .get(self.account_states_url())
-            .query(&[("address", address), ("include_boc", "false")]);
+            .query(&[("address", address), ("include_boc", "false")])
+            .header(USER_AGENT, user_agent());
 
         if let Some(api_key) = &self.api_key {
             request = request.header(TONCENTER_API_KEY_HEADER, api_key);
         }
 
-        let response = request.send().await.map_err(BlockchainError::Transport)?;
+        request
+    }
+}
+
+#[async_trait]
+impl BlockchainClient for ToncenterClient {
+    async fn get_code_hash(&self, address: &str) -> Result<Option<String>, BlockchainError> {
+        let response = self
+            .account_states_request(address)
+            .send()
+            .await
+            .map_err(BlockchainError::Transport)?;
         let status = response.status();
         let body = response.text().await.map_err(BlockchainError::Transport)?;
 
@@ -153,7 +167,27 @@ struct AccountState {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_code_hash;
+    use reqwest::header::USER_AGENT;
+
+    use super::{ToncenterClient, normalize_code_hash, user_agent};
+
+    #[test]
+    fn toncenter_request_has_user_agent() {
+        let client = ToncenterClient::new("https://toncenter.com".to_owned(), None);
+        let request = client.account_states_request("EQ123").build();
+        let Ok(request) = request else {
+            panic!("Toncenter request should be valid");
+        };
+        let expected_user_agent = user_agent();
+
+        assert_eq!(
+            request
+                .headers()
+                .get(USER_AGENT)
+                .and_then(|value| value.to_str().ok()),
+            Some(expected_user_agent.as_str())
+        );
+    }
 
     #[test]
     fn normalize_code_hash_keeps_hex_as_lowercase() {
