@@ -400,7 +400,7 @@ const AppContent: FC<AppContentProps> = ({
               path="/explorer/address/:address"
               element={
                 <DashboardPage {...dashboardProps} embedded>
-                  <AccountPage client={client} />
+                  <AccountPage client={client} enableJettonMint />
                 </DashboardPage>
               }
             />

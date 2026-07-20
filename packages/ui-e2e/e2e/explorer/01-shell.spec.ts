@@ -1,6 +1,12 @@
 import {expect, test} from "@playwright/test"
 
-import {expectVisualSnapshot, prepareVisualPage, visualSnapshotsEnabled} from "../support/visual"
+import {JETTON_MASTER_ADDRESS, mockJettonMaster} from "../support/jettonMaster"
+import {
+  expectVisualSnapshot,
+  explorerLocalnetStorage,
+  prepareVisualPage,
+  visualSnapshotsEnabled,
+} from "../support/visual"
 
 test.describe("Explorer shell", () => {
   test.beforeEach(async ({page}) => {
@@ -43,6 +49,15 @@ test.describe("Explorer shell", () => {
     await search.press("Enter")
     await expect(page).toHaveURL(/\/block\/0\/A000000000000000\/456$/)
     await expect(page.getByText("(0,A000000000000000,456)", {exact: true})).toBeVisible()
+  })
+
+  test("does not show the localnet-only mint action", async ({page}) => {
+    await prepareVisualPage(page, {app: "explorer", storage: explorerLocalnetStorage()})
+    await mockJettonMaster(page, true)
+    await page.goto(`/address/${JETTON_MASTER_ADDRESS}`)
+
+    await expect(page.getByRole("button", {name: "Metadata"})).toBeVisible()
+    await expect(page.getByRole("button", {name: "Mint token"})).toHaveCount(0)
   })
 
   test.describe("visual snapshots", () => {

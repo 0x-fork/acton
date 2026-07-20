@@ -229,6 +229,11 @@
   box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
+.jettonMintButton {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
 .jettonDescription {
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);

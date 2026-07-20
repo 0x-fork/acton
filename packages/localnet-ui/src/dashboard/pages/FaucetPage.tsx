@@ -3,6 +3,7 @@ import {Button, Input, useToast} from "@acton/ui"
 import type {Address} from "@ton/core"
 import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
+import {useSearchParams} from "react-router-dom"
 
 import type {JettonMaster, StartupWallet} from "../../explorer/api/types"
 import type {TonClient} from "../../explorer/api/client"
@@ -50,6 +51,8 @@ interface FaucetOption {
 export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
   const {dismissToast, showToast, updateToast} = useToast()
   const addressFormat = useAddressFormat()
+  const [searchParams] = useSearchParams()
+  const requestedJettonMinter = searchParams.get("jetton")?.trim() ?? ""
   const [mode, setMode] = useState<FaucetMode>("ton")
   const [address, setAddress] = useState("")
   const [jettonMinter, setJettonMinter] = useState("")
@@ -66,6 +69,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
   const lastAutoMinterLookupAddressRef = useRef<string | undefined>(undefined)
   const minterLookupSequenceRef = useRef(0)
   const minterLookupToastRef = useRef<string | undefined>(undefined)
+  const loadedJettonMinterQueryRef = useRef<string | undefined>(undefined)
   const amountNano = useMemo(() => parseGramAmount(amount), [amount])
   const isJettonMode = mode === "jetton"
   const isSubmitDisabled =
@@ -266,6 +270,19 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
   )
   const selectedAssetSymbol = isJettonMode ? (selectedJettonOption?.badge ?? "JETTON") : "GRAM"
   const selectedAssetTitle = isJettonMode ? (selectedJettonOption?.title ?? "Jetton") : "GRAM"
+
+  useEffect(() => {
+    if (
+      jettonsLoading ||
+      requestedJettonMinter.length === 0 ||
+      loadedJettonMinterQueryRef.current === requestedJettonMinter
+    ) {
+      return
+    }
+
+    loadedJettonMinterQueryRef.current = requestedJettonMinter
+    void loadMinterAddress(requestedJettonMinter)
+  }, [jettonsLoading, requestedJettonMinter])
 
   async function handleSubmit(event?: FormEvent): Promise<void> {
     event?.preventDefault()

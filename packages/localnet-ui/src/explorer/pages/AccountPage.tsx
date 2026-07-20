@@ -2,7 +2,7 @@ import {useLocation, useNavigate, useParams} from "react-router-dom"
 import {useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 
-import {Dialog, HighlightedCode, RawDataBlock} from "@acton/ui"
+import {Button, Dialog, HighlightedCode, RawDataBlock} from "@acton/ui"
 
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
@@ -44,6 +44,7 @@ import styles from "./AccountPage.module.css"
 
 interface AccountPageProps {
   readonly client: TonClient
+  readonly enableJettonMint?: boolean
 }
 
 const INITIAL_TRANSACTION_LIMIT = 20
@@ -60,7 +61,7 @@ interface AccountLoadIssue {
   readonly networkLabel: string
 }
 
-export const AccountPage: FC<AccountPageProps> = ({client}) => {
+export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = false}) => {
   const {address = ""} = useParams<{address: string}>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -1001,6 +1002,21 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
                           )}
                         </div>
                       </div>
+                      {enableJettonMint && jettonMaster?.mintable && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className={styles.jettonMintButton}
+                          onClick={() =>
+                            void navigate(
+                              `/faucet?jetton=${encodeURIComponent(toRawAddress(jettonMaster.address))}`,
+                            )
+                          }
+                        >
+                          Mint token
+                        </Button>
+                      )}
                       {!jettonMaster && jettonWalletAccount && jettonWalletMaster && (
                         <>
                           <div className={styles.jettonDivider} />
