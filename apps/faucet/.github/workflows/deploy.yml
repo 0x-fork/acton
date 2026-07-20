@@ -38,10 +38,18 @@ jobs:
           mkdir -p dist/docker
           cp target/release/faucet-backend dist/docker/faucet-backend
 
+      - name: Read package version
+        id: package
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 \
+            | jq -er '.packages[] | select(.name == "faucet-backend") | .version')
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
       - name: Compute Docker image tags
         id: image
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         env:
+          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
           REF_NAME: ${{ env.REF_NAME }}
           REPOSITORY: ${{ github.repository }}
           SHA: ${{ github.sha }}
@@ -54,6 +62,7 @@ jobs:
 
             const fullShaTag = `sha-${sha}`;
             const shortShaTag = `sha-${shortSha}`;
+            const versionTag = `v${process.env.PACKAGE_VERSION.replace(/\+/g, '-')}`;
             const branchTag = process.env.REF_NAME
               .toLowerCase()
               .replace(/[^a-z0-9_.-]+/g, '-')
@@ -65,6 +74,7 @@ jobs:
             const tags = [
               `${imageRepo}:${fullShaTag}`,
               `${imageRepo}:${shortShaTag}`,
+              `${imageRepo}:${versionTag}`,
               `${imageRepo}:${branchTag}`,
             ].join('\n');
 
@@ -73,6 +83,7 @@ jobs:
             core.setOutput('short_sha', shortSha);
             core.setOutput('full_sha_tag', fullShaTag);
             core.setOutput('short_sha_tag', shortShaTag);
+            core.setOutput('version_tag', versionTag);
             core.setOutput('branch_tag', branchTag);
             core.setOutput('tags', tags);
 
@@ -99,6 +110,7 @@ jobs:
           SOURCE_REF: ${{ env.REF_NAME }}
           FULL_SHA_TAG: ${{ steps.image.outputs.full_sha_tag }}
           SHORT_SHA_TAG: ${{ steps.image.outputs.short_sha_tag }}
+          VERSION_TAG: ${{ steps.image.outputs.version_tag }}
           BRANCH_TAG: ${{ steps.image.outputs.branch_tag }}
         run: |
           {
@@ -108,6 +120,7 @@ jobs:
             echo "- Image repo: \`${IMAGE_REPO}\`"
             echo "- Full SHA tag: \`${FULL_SHA_TAG}\`"
             echo "- Short SHA tag: \`${SHORT_SHA_TAG}\`"
+            echo "- Version tag: \`${VERSION_TAG}\`"
             echo "- Branch tag: \`${BRANCH_TAG}\`"
             echo ""
             echo '```'
