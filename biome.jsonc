@@ -48,7 +48,6 @@
       "a11y": {
         "preset": "all",
         "noNoninteractiveElementInteractions": "off",
-        "noStaticElementInteractions": "off",
         "noSvgWithoutTitle": "off",
         "useAriaPropsSupportedByRole": "off",
         "useSemanticElements": "off"
@@ -124,7 +123,6 @@
       },
       "security": {
         "preset": "all",
-        "noDangerouslySetInnerHtml": "off",
         "noSecrets": "off"
       },
       "suspicious": {

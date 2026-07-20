@@ -1148,6 +1148,7 @@ export function EmulatePage({client}: EmulatePageProps) {
       open={timeOverrideOpen}
       onToggle={event => setTimeOverrideOpen(event.currentTarget.open)}
     >
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Native summary is interactive; the click initializes the default timestamp before opening. */}
       <summary
         className={styles.timeOverrideSummary}
         aria-label="Override timestamp"

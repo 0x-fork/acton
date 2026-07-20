@@ -539,6 +539,7 @@ function SourceVariableRow({
       role="treeitem"
       aria-expanded={hasChildren ? expanded : undefined}
     >
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Pointer handlers manage selection and double-click; the nested button provides the accessible toggle. */}
       <div
         className={styles.sourceVariableRow}
         style={rowStyle}
