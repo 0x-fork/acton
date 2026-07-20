@@ -176,7 +176,6 @@ function mapRetraceError(error: unknown): TxTraceError {
   if (error instanceof Error) {
     message = error.message
   } else if (error !== null && error !== undefined) {
-    // eslint-disable-next-line @typescript-eslint/no-base-to-string
     message = String(error)
   }
 
