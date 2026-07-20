@@ -174,8 +174,9 @@ _openapi:
       - content: >-
           Finds the jetton master in localnet state, verifies that it is
           mintable and has an admin, converts the display amount using the
-          decimals from jetton metadata, and queues the mint message for the
-          next block.
+          decimals from jetton metadata, preflights the legacy 0x15 and current
+          0x642b7d07 mint layouts, and queues the uniquely accepted message for
+          the next block.
         heading: mint-jettons-to-an-account
       - content: >-
           Returns local names for the requested addresses. Missing names are
