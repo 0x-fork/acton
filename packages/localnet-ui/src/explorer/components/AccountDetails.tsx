@@ -95,6 +95,7 @@ import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
 import {
   formatAbsoluteTime,
+  formatAddress,
   formatNano,
   formatTimeAgo,
   hashToHex,
@@ -187,6 +188,8 @@ interface HistoryTransactionRow {
 interface HistoryTextValueLine {
   readonly kind: "text"
   readonly label: string
+  readonly fullLabel?: string
+  readonly unitLabel?: string
   readonly tone: HistoryValueTone
 }
 
@@ -1387,7 +1390,17 @@ function HistoryTextValue({
     )
   }
 
-  return <span className={className}>{line.label}</span>
+  return (
+    <span className={className} title={line.fullLabel}>
+      {line.label}
+      {line.unitLabel ? (
+        <>
+          {" "}
+          <span>{line.unitLabel}</span>
+        </>
+      ) : null}
+    </span>
+  )
 }
 
 interface ActionHistoryRowsProps {
@@ -2956,9 +2969,13 @@ function assetValueLine(
   const readableAmount = formatReadableNumber(formattedAmount, options.maximumFractionDigits)
   const displayTone = isZeroDisplayNumber(readableAmount) ? "neutral" : tone
   const sign = options.showSign === false ? "" : valueSign(displayTone)
+  const fullAssetLabel = symbol ?? formatAddress(asset, false)
+  const assetLabel = symbol ?? shortenIdentifier(fullAssetLabel, 3)
   return {
     kind: "text",
-    label: `${sign}${readableAmount}${symbol ? ` ${symbol}` : ""}`,
+    label: `${sign}${readableAmount}`,
+    ...(symbol ? {} : {fullLabel: `${sign}${readableAmount} ${fullAssetLabel}`}),
+    unitLabel: assetLabel,
     tone: displayTone,
   }
 }
@@ -3060,10 +3077,10 @@ function formatReadableNumber(value: string, maximumFractionDigits = 9): string 
 
 function valueSign(tone: HistoryValueTone): string {
   if (tone === "positive") {
-    return "+ "
+    return "+"
   }
   if (tone === "negative") {
-    return "- "
+    return "−"
   }
   return ""
 }
