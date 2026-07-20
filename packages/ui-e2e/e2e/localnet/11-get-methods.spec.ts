@@ -37,7 +37,13 @@ const compilerAbi = {
   outgoing_messages: [],
   storage: {},
   struct_instantiations: [],
-  thrown_errors: [],
+  thrown_errors: [
+    {
+      err_code: 292,
+      name: "InvalidAsset",
+      description: "The provided asset cannot be used by this method",
+    },
+  ],
   unique_types: [
     {kind: "void"},
     {kind: "int"},
@@ -75,7 +81,41 @@ const openGetMethods = async (page: Page) => {
   await expect(page.locator("article").filter({hasText: "balanceOf"})).toBeVisible()
 }
 
+const mockGetMethodError = async (page: Page) => {
+  await page.route(
+    url => url.pathname === "/api/v3/runGetMethod",
+    async route => {
+      const request = route.request().postDataJSON() as {readonly method: string}
+      expect(request.method).toBe("totalSupply")
+      await route.fulfill({
+        json: {
+          exit_code: 292,
+          gas_used: 143,
+          stack: [],
+          vm_log: "",
+        },
+      })
+    },
+  )
+}
+
 test.describe("Account get methods", () => {
+  test("shows network-aware address formats on hover", async ({page}) => {
+    await openGetMethods(page)
+
+    await page.getByLabel("Show address formats").hover()
+    const popover = page.getByRole("dialog", {name: "Address formats", exact: true})
+    const values = popover.locator("code")
+
+    await expect(popover).toBeVisible()
+    await expect(values).toHaveCount(3)
+    await expect(values.nth(0)).toHaveText(/^k/)
+    await expect(values.nth(1)).toHaveText(/^0/)
+    await expect(values.nth(2)).toHaveText(JETTON_MASTER_ADDRESS)
+
+    await expect(popover.getByRole("button", {name: /^Copy .* address$/})).toHaveCount(3)
+  })
+
   test("opens ABI get methods in a dedicated account tab and runs one", async ({page}) => {
     await page.route(
       url => url.pathname === "/api/v3/runGetMethod",
@@ -111,12 +151,42 @@ test.describe("Account get methods", () => {
     await expect(page).toHaveURL(/#get-methods$/)
   })
 
+  test("links a resolved get-method error to its ABI declaration", async ({page}) => {
+    await mockGetMethodError(page)
+    await openGetMethods(page)
+
+    const method = page.locator("article").filter({hasText: "totalSupply"})
+    await method.getByRole("button", {name: "Run"}).click()
+    await expect(method).toContainText("Get method exited with InvalidAsset (292).")
+
+    await method.getByRole("link", {name: "InvalidAsset"}).click()
+    await expect(page).toHaveURL(/#abi-error-invalidasset-292$/)
+    await expect(page.getByText("InvalidAsset", {exact: true})).toBeVisible()
+  })
+
   test.describe("visual snapshots", () => {
     test.skip(!visualSnapshotsEnabled, "Set CHECK_UI_SNAPSHOTS=1 on macOS")
 
     test("loc-account-get-methods", async ({page}) => {
       await openGetMethods(page)
       await expectVisualSnapshot(page, "loc-account-get-methods")
+    })
+
+    test("loc-account-address-formats", async ({page}) => {
+      await openGetMethods(page)
+      await page.getByLabel("Show address formats").hover()
+      await expect(page.getByRole("dialog", {name: "Address formats", exact: true})).toBeVisible()
+      await expectVisualSnapshot(page, "loc-account-address-formats")
+    })
+
+    test("loc-account-get-method-error", async ({page}) => {
+      await mockGetMethodError(page)
+      await openGetMethods(page)
+
+      const method = page.locator("article").filter({hasText: "totalSupply"})
+      await method.getByRole("button", {name: "Run"}).click()
+      await expect(method.getByRole("link", {name: "InvalidAsset"})).toBeVisible()
+      await expectVisualSnapshot(page, "loc-account-get-method-error")
     })
   })
 })

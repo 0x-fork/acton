@@ -198,16 +198,60 @@
 
 .addressValue {
   display: block;
-  flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
   color: var(--acton-color-text);
+  cursor: help;
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.addressPopover {
+  flex: 0 1 auto;
+}
+
+.addressFormats {
+  display: grid;
+  gap: 10px;
+  width: min(32rem, calc(100vw - 56px));
+}
+
+.addressFormatRow {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.addressFormatLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
+  line-height: 1.35;
+}
+
+.addressFormatValueRow {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.addressFormatValue {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  user-select: all;
 }
 
 .addressActions {

@@ -46,15 +46,18 @@ export function parseAddress(address: string): Address | undefined {
 }
 
 export interface AddressFormatOptions {
+  readonly bounceable?: boolean
   readonly testOnly?: boolean
 }
 
 const defaultAddressFormat: Required<AddressFormatOptions> = {
+  bounceable: true,
   testOnly: true,
 }
 
 function getAddressFormatOptions(options?: AddressFormatOptions): Required<AddressFormatOptions> {
   return {
+    bounceable: options?.bounceable ?? defaultAddressFormat.bounceable,
     testOnly: options?.testOnly ?? defaultAddressFormat.testOnly,
   }
 }

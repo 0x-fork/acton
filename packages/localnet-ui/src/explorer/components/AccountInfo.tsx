@@ -3,7 +3,7 @@ import {Check, Copy, Edit2, QrCode, Star} from "lucide-react"
 import {QRCodeSVG} from "qrcode.react"
 import {useEffect, useId, useRef, useState} from "react"
 import type {FC} from "react"
-import {InfoPopover, Input, Popover} from "@acton/ui"
+import {CopyInlineAction, InfoPopover, Input, Popover} from "@acton/ui"
 
 import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {TonClient} from "../api/client"
@@ -80,6 +80,8 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const resolvedName = useAddressName(address)
   const {addressFormat, forkNetwork, network} = useNetworkInfo()
   const displayAddress = normalizeAddress(address, addressFormat)
+  const bounceableAddress = normalizeAddress(address, {...addressFormat, bounceable: true})
+  const nonBounceableAddress = normalizeAddress(address, {...addressFormat, bounceable: false})
   const rawAddress = toRawAddress(address)
 
   const [tokenMastersByAddress, setTokenMastersByAddress] = useState<
@@ -242,6 +244,46 @@ export const AccountInfo: FC<AccountInfoProps> = ({
       className={styles.qrSvg}
     />
   )
+  const addressFormats = (
+    <div className={styles.addressFormats}>
+      <div className={styles.addressFormatRow}>
+        <span className={styles.addressFormatLabel}>Bounceable</span>
+        <div className={styles.addressFormatValueRow}>
+          <code className={styles.addressFormatValue}>{bounceableAddress}</code>
+          <CopyInlineAction
+            size="compact"
+            value={bounceableAddress}
+            label="Copy bounceable address"
+            copiedLabel="Bounceable address copied"
+          />
+        </div>
+      </div>
+      <div className={styles.addressFormatRow}>
+        <span className={styles.addressFormatLabel}>Non-bounceable</span>
+        <div className={styles.addressFormatValueRow}>
+          <code className={styles.addressFormatValue}>{nonBounceableAddress}</code>
+          <CopyInlineAction
+            size="compact"
+            value={nonBounceableAddress}
+            label="Copy non-bounceable address"
+            copiedLabel="Non-bounceable address copied"
+          />
+        </div>
+      </div>
+      <div className={styles.addressFormatRow}>
+        <span className={styles.addressFormatLabel}>Raw</span>
+        <div className={styles.addressFormatValueRow}>
+          <code className={styles.addressFormatValue}>{rawAddress}</code>
+          <CopyInlineAction
+            size="compact"
+            value={rawAddress}
+            label="Copy raw address"
+            copiedLabel="Raw address copied"
+          />
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className={cardClassName}>
@@ -313,9 +355,16 @@ export const AccountInfo: FC<AccountInfoProps> = ({
             <div className={`${styles.infoRow} ${styles.addressInfoRow}`}>
               <div className={styles.label}>Address</div>
               <div className={styles.rowValue}>
-                <span className={styles.addressValue} title={displayAddress}>
-                  {addressRowText}
-                </span>
+                <Popover
+                  aria-label="Show address formats"
+                  ariaLabel="Address formats"
+                  className={styles.addressPopover}
+                  content={addressFormats}
+                  maxWidth="min(36rem, calc(100vw - 32px))"
+                  placement="bottom"
+                >
+                  <span className={styles.addressValue}>{addressRowText}</span>
+                </Popover>
                 <span className={styles.addressActions}>
                   <button
                     type="button"
