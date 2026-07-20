@@ -1,5 +1,6 @@
 import {SearchInput, formatToncenterBlockId, useToast} from "@acton/ui"
 import type {SearchInputItem} from "@acton/ui"
+import {abiSymbolAnchorId} from "@acton/transaction-ui/abi"
 import {FileCode2, History, Search} from "lucide-react"
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC} from "react"
@@ -21,7 +22,6 @@ import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {formatAddress, hashToHex, parseAddress} from "./utils"
 import type {AddressFormatOptions} from "./utils"
 
-import {abiSymbolAnchorId} from "./abiAnchors"
 type ExplorerSearchVariant = "hero" | "header"
 
 interface ExplorerSearchProps {

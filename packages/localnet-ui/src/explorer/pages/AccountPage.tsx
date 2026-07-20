@@ -52,7 +52,7 @@ const REMOTE_TRANSACTION_PAGE_SIZE = 20
 const LOCAL_TRANSACTION_PAGE_SIZE = 1000
 const ACTION_PAGE_SIZE = 20
 const NEW_TRANSACTION_APPEAR_MS = 1400
-type AccountTab = "history" | "contract" | "tokens" | "nfts" | "holders"
+type AccountTab = "history" | "contract" | "get-methods" | "tokens" | "nfts" | "holders"
 
 interface AccountLoadIssue {
   readonly title: string
@@ -1483,6 +1483,7 @@ function isAccountTab(value: string): value is AccountTab {
   return (
     value === "history" ||
     value === "contract" ||
+    value === "get-methods" ||
     value === "tokens" ||
     value === "nfts" ||
     value === "holders"

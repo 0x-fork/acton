@@ -1,5 +1,6 @@
 import {addressChipGallery} from "./addressChipGallery"
 import {abiValueEditorGallery} from "./abiValueEditorGallery"
+import {abiViewerGallery} from "./abiViewerGallery"
 import {blockChipGallery} from "./blockChipGallery"
 import {buttonGallery} from "./buttonGallery"
 import {breadcrumbsGallery} from "./breadcrumbsGallery"
@@ -41,6 +42,7 @@ export const galleries = [
   tokensGallery,
   addressChipGallery,
   abiValueEditorGallery,
+  abiViewerGallery,
   blockChipGallery,
   buttonGallery,
   inputGallery,

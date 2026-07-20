@@ -1,7 +1,8 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
-import type {ContractABI} from "@ton/tolk-abi-to-typescript"
+import {AbiPanel, type AbiTab} from "@acton/transaction-ui/abi"
 import {InlineAction, InlineActions, Input, useToast} from "@acton/ui"
+import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 import {Link, useParams} from "react-router-dom"
 
@@ -10,7 +11,6 @@ import {
   getBundledCompilerAbiCatalog,
   type BundledCompilerAbiCatalogEntry,
 } from "../api/compilerAbiCatalog"
-import {AbiPanel, type AbiTab} from "../components/abi-viewer"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {JsonUploadField} from "../components/JsonUploadField"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
@@ -422,7 +422,6 @@ export const AbiDetailsPage: FC = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         abi={entry.abi.compiler_abi}
-        getMethodsMode="readonly"
         heightMode="content"
         showSymbolAnchors
       />

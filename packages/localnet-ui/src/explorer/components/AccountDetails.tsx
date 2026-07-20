@@ -1,6 +1,6 @@
 import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {CSSProperties, FC, JSX, KeyboardEvent as ReactKeyboardEvent, MouseEvent} from "react"
-import {fmt} from "@acton/transaction-ui"
+import {AbiGetMethods, fmt} from "@acton/transaction-ui"
 import {
   DataTable,
   DataTableBody,
@@ -49,6 +49,7 @@ import {
   RefreshCw,
   ServerCog,
   ShieldCheck,
+  SquareFunction,
   SquareStack,
   UsersRound,
   Vault,
@@ -102,7 +103,7 @@ import {
   shortenIdentifier,
 } from "./utils"
 
-type Tabs = "history" | "contract" | "tokens" | "nfts" | "holders"
+type Tabs = "history" | "contract" | "get-methods" | "tokens" | "nfts" | "holders"
 
 interface AccountDetailsProps {
   readonly transactions: V3TransactionListItem[]
@@ -314,22 +315,26 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
       activeTabHash &&
       (activeTabHash === "history" ||
         activeTabHash === "contract" ||
+        (activeTabHash === "get-methods" && compilerAbi !== undefined) ||
         activeTabHash === "tokens" ||
         (activeTabHash === "nfts" && showNftsTab) ||
         activeTabHash === "holders")
     ) {
       setActiveTab(activeTabHash as Tabs)
     }
-  }, [activeTabHash, showNftsTab])
+  }, [activeTabHash, compilerAbi, showNftsTab])
 
   useEffect(() => {
-    if (activeTab !== "nfts" || showNftsTab) {
+    const unavailable =
+      (activeTab === "nfts" && !showNftsTab) ||
+      (activeTab === "get-methods" && compilerAbi === undefined)
+    if (!unavailable) {
       return
     }
 
     setActiveTab("history")
     onTabChange?.("history")
-  }, [activeTab, onTabChange, showNftsTab])
+  }, [activeTab, compilerAbi, onTabChange, showNftsTab])
 
   const handleTabClick = (tab: Tabs) => {
     setActiveTab(tab)
@@ -638,6 +643,18 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
           </span>
           Contract
         </button>
+        {compilerAbi && (
+          <button
+            type="button"
+            className={`${styles.tab} ${activeTab === "get-methods" ? styles.tabActive : ""}`}
+            onClick={() => handleTabClick("get-methods")}
+          >
+            <span className={styles.tabIcon} aria-hidden="true">
+              <SquareFunction size={18} />
+            </span>
+            Methods
+          </button>
+        )}
         <div className={styles.flexSpacer} />
         {activeTab === "history" && (
           <>
@@ -1123,6 +1140,12 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
             </div>
           )}
         </div>
+      ) : activeTab === "get-methods" && compilerAbi ? (
+        <AbiGetMethods
+          key={ownerAddress}
+          abi={compilerAbi}
+          runGetMethod={(method, stack) => client.runGetMethod(ownerAddress, method, stack)}
+        />
       ) : (
         <div className={styles.tokensContent}>
           {accountLoading && !accountState ? (
@@ -1131,8 +1154,6 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
             <Suspense fallback={<ContractCodeSkeleton />}>
               <ContractCode
                 codeBoc={accountState?.code ?? ""}
-                ownerAddress={ownerAddress}
-                client={client}
                 dataBoc={accountState?.data ?? undefined}
                 compilerAbi={compilerAbi}
                 compilerAbiLoading={compilerAbiLoading}

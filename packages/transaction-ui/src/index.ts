@@ -1,5 +1,6 @@
 export * from "./components/CodeCellDetails/CodeCellDetails"
 export * from "./components/AbiValueEditor/AbiValueEditor"
+export * from "./components/AbiViewer"
 export * from "./components/TonAddressInput/TonAddressInput"
 export * from "./components/ContractSourcePanel/ContractSourcePanel"
 export * from "./components/DisasmSection/DisasmSection"

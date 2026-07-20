@@ -59,12 +59,6 @@
   font-weight: var(--acton-font-weight-bold);
 }
 
-.groupHeader .typeLabel {
-  padding: 0.125rem var(--acton-space-1-5);
-  border-radius: var(--acton-radius-control-sm);
-  background: var(--acton-color-surface);
-}
-
 .group .group > .groupHeader {
   min-height: 1.5rem;
   padding-bottom: 0;
@@ -74,11 +68,6 @@
 .group .group > .groupHeader .fieldLabel {
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-semibold);
-}
-
-.group .group > .groupHeader .typeLabel {
-  padding: 0;
-  background: transparent;
 }
 
 .textInput,

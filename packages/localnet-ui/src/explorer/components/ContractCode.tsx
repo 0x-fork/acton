@@ -4,26 +4,24 @@ import type {FC, JSX} from "react"
 import {ParsedValueView, RawDataBlock} from "@acton/ui"
 
 import {
+  AbiPanel,
   ContractSourcePanel,
   decodeStorageDataCell,
+  type AbiTab,
   type ContractData,
   type ContractVerifiedSource,
 } from "@acton/transaction-ui"
 import {Cell} from "@ton/core"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
-import type {TonClient} from "../api/client"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
-import {AbiPanel, type AbiTab} from "./abi-viewer"
 import {formatAddress, type AddressFormatOptions} from "./utils"
 
 import styles from "./ContractCode.module.css"
 
 interface ContractCodeProps {
   readonly codeBoc: string
-  readonly ownerAddress: string
-  readonly client: TonClient
   readonly dataBoc?: string
   readonly compilerAbi?: ContractABI
   readonly compilerAbiLoading?: boolean
@@ -70,8 +68,6 @@ function writeContractHashTab(tab: ContractCodeTab): void {
 
 export const ContractCode: FC<ContractCodeProps> = ({
   codeBoc,
-  ownerAddress,
-  client,
   dataBoc,
   compilerAbi,
   compilerAbiLoading = false,
@@ -182,14 +178,7 @@ export const ContractCode: FC<ContractCodeProps> = ({
           ) : compilerAbiLoading ? (
             <AbiLoadingSkeleton />
           ) : compilerAbi ? (
-            <AbiPanel
-              activeTab={activeAbiTab}
-              onTabChange={setActiveAbiTab}
-              abi={compilerAbi}
-              ownerAddress={ownerAddress}
-              client={client}
-              getMethodsMode="interactive"
-            />
+            <AbiPanel activeTab={activeAbiTab} onTabChange={setActiveAbiTab} abi={compilerAbi} />
           ) : (
             <div className={`${styles.empty} ${styles.panelEmpty}`}>
               No ABI registered for this contract
