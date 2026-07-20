@@ -1,8 +1,9 @@
 import {ImageResponse} from "@cloudflare/pages-plugin-vercel-og/api"
 import abiCatalogData from "../../../crates/acton-abi-catalog/data/data-abis.json"
 import {AccountOgImage, type AccountOgPreview} from "../src/og/AccountOgImage"
+import {PageOgImage, pageOgPreviewForKey, pageOgPreviewForPath} from "../src/og/PageOgImage"
 
-const OG_IMAGE_VERSION = "5"
+const OG_IMAGE_VERSION = "6"
 const OG_IMAGE_WIDTH = 1200
 const OG_IMAGE_HEIGHT = 630
 
@@ -68,6 +69,10 @@ export async function onRequest(context: PagesContext) {
     return renderAbiOgPng(context)
   }
 
+  if (url.pathname === "/og/page.png") {
+    return renderPageOgPng(context)
+  }
+
   const metadata = await getRouteMetadata(url, context.env)
   const assetResponse = await context.next()
   const response =
@@ -131,6 +136,26 @@ async function renderAbiOgPng(context: PagesContext) {
   })
 }
 
+async function renderPageOgPng(context: PagesContext) {
+  const url = new URL(context.request.url)
+  const preview = pageOgPreviewForKey(url.searchParams.get("page") || "home")
+  const image = new ImageResponse(<PageOgImage preview={preview} />, {
+    width: OG_IMAGE_WIDTH,
+    height: OG_IMAGE_HEIGHT,
+    headers: {
+      "cache-control": "public, max-age=86400",
+    },
+  })
+  const bytes = await image.arrayBuffer()
+
+  return new Response(bytes, {
+    headers: {
+      "content-type": "image/png",
+      "cache-control": "public, max-age=86400",
+    },
+  })
+}
+
 function shouldInjectHtml(request: Request, response: Response) {
   if (request.method !== "GET") {
     return false
@@ -139,6 +164,20 @@ function shouldInjectHtml(request: Request, response: Response) {
 }
 
 async function getRouteMetadata(url: URL, env: Env): Promise<RouteMetadata | undefined> {
+  const pagePreview = pageOgPreviewForPath(url.pathname)
+  if (pagePreview) {
+    const image = absoluteUrl(
+      url,
+      `/og/page.png?page=${encodeURIComponent(pagePreview.key)}&v=${OG_IMAGE_VERSION}`,
+    )
+    return {
+      title: pagePreview.metadataTitle,
+      description: pagePreview.metadataDescription,
+      image,
+      url: url.href,
+    }
+  }
+
   const abiSlug = abiSlugFromPath(url.pathname)
   if (abiSlug) {
     const preview = getAbiPreview(abiSlug)

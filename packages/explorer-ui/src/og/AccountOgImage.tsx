@@ -11,7 +11,15 @@ export type AccountOgPreview = {
   avatarText: string
 }
 
-export function AccountOgImage({preview}: {preview: AccountOgPreview}) {
+export function AccountOgImage({
+  preview,
+  variant = "account",
+}: {
+  preview: AccountOgPreview
+  variant?: "account" | "page"
+}) {
+  const isPagePreview = variant === "page"
+
   return (
     <div
       style={{
@@ -25,16 +33,18 @@ export function AccountOgImage({preview}: {preview: AccountOgPreview}) {
         fontFamily: "sans serif",
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.13) 2px, transparent 3px)",
-          backgroundSize: "26px 26px",
-          opacity: 0.32,
-          transform: "translate(520px, 24px) rotate(-13deg)",
-        }}
-      />
+      {!isPagePreview && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.13) 2px, transparent 3px)",
+            backgroundSize: "26px 26px",
+            opacity: 0.32,
+            transform: "translate(520px, 24px) rotate(-13deg)",
+          }}
+        />
+      )}
       <div
         style={{
           position: "absolute",
@@ -111,12 +121,13 @@ export function AccountOgImage({preview}: {preview: AccountOgPreview}) {
               style={{
                 display: "flex",
                 flexDirection: "column",
-                marginTop: 30,
+                marginTop: isPagePreview ? 48 : 30,
+                marginLeft: isPagePreview ? -208 : 0,
                 color: "#f0f0f2",
-                fontSize: 31,
+                fontSize: isPagePreview ? 38 : 31,
                 fontWeight: 700,
-                lineHeight: 1.2,
-                maxWidth: 780,
+                lineHeight: isPagePreview ? 1.25 : 1.2,
+                maxWidth: isPagePreview ? 980 : 780,
               }}
             >
               {wrapText(preview.detail, preview.detailLines ?? 3, 43).map((line, index) => (

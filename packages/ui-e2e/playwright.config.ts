@@ -67,7 +67,7 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: `bunx vite build && bunx vite preview --host 127.0.0.1 --port ${explorerUiPort}`,
+      command: `bun run build && XDG_CONFIG_HOME=../../target/wrangler-config WRANGLER_LOG_PATH=../../target/wrangler-logs bunx wrangler pages dev dist --ip 127.0.0.1 --port ${explorerUiPort} --compatibility-date 2026-06-18`,
       cwd: path.join(repositoryRoot, "packages/explorer-ui"),
       port: explorerUiPort,
       reuseExistingServer: false,
