@@ -1274,7 +1274,14 @@ function HistoryTechnicalCell({
     return null
   }
 
-  const label = <span className={styles.technicalLabel}>{technicalLabel.label}</span>
+  const label = (
+    <span
+      className={styles.technicalLabel}
+      title={technicalLabel.showInPopover ? undefined : technicalLabel.label}
+    >
+      {technicalLabel.label}
+    </span>
+  )
   if (!technicalLabel.showInPopover) {
     return label
   }
