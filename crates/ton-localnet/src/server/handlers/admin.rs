@@ -6,7 +6,7 @@ use crate::server::models::{
     CreateRecoveryPointRequest, ExportRecoveryPointRequest, FaucetRequest, GetApiCallsRequest,
     GetVerifiedSourceRequest, ImportRecoveryPointRequest, IncreaseTimeRequest, MineBlocksRequest,
     RegisterCompilerAbisRequest, RegisterVerifiedSourcesRequest, RevertRecoveryPointRequest,
-    SendBocRequest, SetAddressNameRequest, SetMiningModeRequest, SetNetworkConditionsRequest,
+    SetAddressNameRequest, SetMiningModeRequest, SetNetworkConditionsRequest,
     SetNextBlockTimestampRequest, SetShardAccountRequest, SetTimeRequest, StatePathRequest,
 };
 use crate::server::{
@@ -19,12 +19,14 @@ use axum::{
     body::Bytes,
     extract::Query,
     extract::{RawQuery, State},
+    response::Response,
 };
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
+use ton_api::toncenter::v2::requests::SendBocRequest;
 
 const VERIFIER_SOURCE_URL: &str = "https://verifier.acton.monster/api/v1/verification/source";
 const VERIFIER_ABI_URL: &str = "https://verifier.acton.monster/api/v1/abi";
@@ -44,7 +46,7 @@ fn build_verifier_http_client() -> Result<reqwest::Client, reqwest::Error> {
 pub async fn faucet(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<FaucetRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.faucet(payload.address, payload.amount),
         v2::map_send_internal_message,
@@ -69,7 +71,7 @@ pub async fn get_status(
     State(node): State<Arc<Localnet>>,
     State(state_source): State<Arc<StateSourceInfo>>,
     State(network_conditions): State<NetworkConditions>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         async move {
             let masterchain_info = node.get_masterchain_info().await?;
@@ -94,7 +96,7 @@ pub async fn get_status(
 
 pub async fn get_startup_wallets(
     State(startup_wallets): State<Arc<Vec<StartupWallet>>>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         async move { Ok::<_, anyhow::Error>(startup_wallets.as_ref().clone()) },
         |res| serde_json::to_value(res).unwrap_or(Value::Null),
@@ -105,7 +107,7 @@ pub async fn get_startup_wallets(
 pub async fn set_network_conditions(
     State(network_conditions): State<NetworkConditions>,
     Json(payload): Json<SetNetworkConditionsRequest>,
-) -> Json<Value> {
+) -> Response {
     network_conditions.set_response_delay_ms(payload.response_delay_ms);
     handle_result(
         async move { Ok::<_, anyhow::Error>(network_conditions.info()) },
@@ -114,7 +116,7 @@ pub async fn set_network_conditions(
     .await
 }
 
-pub async fn mine_blocks(State(node): State<Arc<Localnet>>, body: Bytes) -> Json<Value> {
+pub async fn mine_blocks(State(node): State<Arc<Localnet>>, body: Bytes) -> Response {
     handle_result(
         async move {
             let payload = if body.is_empty() {
@@ -133,7 +135,7 @@ pub async fn mine_blocks(State(node): State<Arc<Localnet>>, body: Bytes) -> Json
 pub async fn set_mining_mode(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<SetMiningModeRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.set_mining_mode(LocalnetMiningMode {
             skip_empty_blocks: payload.skip_empty_blocks,
@@ -146,7 +148,7 @@ pub async fn set_mining_mode(
 pub async fn create_recovery_point(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<CreateRecoveryPointRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.create_recovery_point(payload.name, payload.force),
         |res| serde_json::to_value(res).unwrap_or(Value::Null),
@@ -154,7 +156,7 @@ pub async fn create_recovery_point(
     .await
 }
 
-pub async fn list_recovery_points(State(node): State<Arc<Localnet>>) -> Json<Value> {
+pub async fn list_recovery_points(State(node): State<Arc<Localnet>>) -> Response {
     handle_result(node.list_recovery_points(), |res| {
         serde_json::to_value(res).unwrap_or(Value::Null)
     })
@@ -164,7 +166,7 @@ pub async fn list_recovery_points(State(node): State<Arc<Localnet>>) -> Json<Val
 pub async fn revert_recovery_point(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<RevertRecoveryPointRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(node.revert_recovery_point(payload.name), |res| {
         serde_json::to_value(res).unwrap_or(Value::Null)
     })
@@ -174,7 +176,7 @@ pub async fn revert_recovery_point(
 pub async fn export_recovery_point(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<ExportRecoveryPointRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.export_recovery_point(payload.name, payload.path),
         |res| serde_json::to_value(res).unwrap_or(Value::Null),
@@ -185,7 +187,7 @@ pub async fn export_recovery_point(
 pub async fn import_recovery_point(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<ImportRecoveryPointRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.import_recovery_point(payload.name, payload.path, payload.force),
         |res| serde_json::to_value(res).unwrap_or(Value::Null),
@@ -196,7 +198,7 @@ pub async fn import_recovery_point(
 pub async fn increase_time(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<IncreaseTimeRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(node.increase_time(payload.seconds), |res| {
         serde_json::to_value(res).unwrap_or(Value::Null)
     })
@@ -206,7 +208,7 @@ pub async fn increase_time(
 pub async fn set_time(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<SetTimeRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(node.set_time(payload.timestamp), |res| {
         serde_json::to_value(res).unwrap_or(Value::Null)
     })
@@ -216,7 +218,7 @@ pub async fn set_time(
 pub async fn set_next_block_timestamp(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<SetNextBlockTimestampRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(node.set_next_block_timestamp(payload.timestamp), |res| {
         serde_json::to_value(res).unwrap_or(Value::Null)
     })
@@ -226,7 +228,7 @@ pub async fn set_next_block_timestamp(
 pub async fn get_api_calls(
     State(api_calls): State<ApiCallLog>,
     Query(payload): Query<GetApiCallsRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         async move { Ok::<_, anyhow::Error>(api_calls.snapshot(payload.limit)) },
         |res| serde_json::to_value(res).unwrap_or(Value::Null),
@@ -237,21 +239,21 @@ pub async fn get_api_calls(
 pub async fn dump_state(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<StatePathRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(node.dump_state(payload.path), |()| Value::Null).await
 }
 
 pub async fn load_state(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<StatePathRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(node.load_state(payload.path), |()| Value::Null).await
 }
 
 pub async fn set_shard_account(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<SetShardAccountRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.set_shard_account(payload.address, payload.shard_account),
         |()| Value::Null,
@@ -262,7 +264,7 @@ pub async fn set_shard_account(
 pub async fn change_account_state(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<ChangeAccountStateRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         async move {
             let change = parse_account_state_change(payload.state)?;
@@ -277,7 +279,7 @@ pub async fn change_account_state(
 pub async fn send_internal_message(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<SendBocRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.send_internal_boc(payload.boc),
         v2::map_send_internal_message,
@@ -288,7 +290,7 @@ pub async fn send_internal_message(
 pub async fn set_address_name(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<SetAddressNameRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(node.set_address_name(payload.address, payload.name), |()| {
         Value::Null
     })
@@ -298,7 +300,7 @@ pub async fn set_address_name(
 pub async fn get_address_name(
     State(node): State<Arc<Localnet>>,
     RawQuery(query): RawQuery,
-) -> Json<Value> {
+) -> Response {
     let addresses = query
         .as_deref()
         .map(|query| {
@@ -318,7 +320,7 @@ pub async fn get_address_name(
 pub async fn register_compiler_abis(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<RegisterCompilerAbisRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         async move {
             let entries = payload
@@ -342,7 +344,7 @@ fn compiler_abi_registration_entry(abi: Value) -> anyhow::Result<(Hash256, Value
     Ok((parse_hash_any(code_hash)?, abi))
 }
 
-pub async fn list_compiler_abis(State(node): State<Arc<Localnet>>) -> Json<Value> {
+pub async fn list_compiler_abis(State(node): State<Arc<Localnet>>) -> Response {
     handle_result(node.list_compiler_abis(), |entries| {
         serde_json::to_value(
             entries
@@ -364,7 +366,7 @@ pub async fn list_compiler_abis(State(node): State<Arc<Localnet>>) -> Json<Value
 pub async fn delete_compiler_abi(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<CodeHashRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(node.delete_compiler_abi(payload.code_hash), |()| {
         Value::Null
     })
@@ -374,7 +376,7 @@ pub async fn delete_compiler_abi(
 pub async fn get_compiler_abi(
     State(node): State<Arc<Localnet>>,
     RawQuery(query): RawQuery,
-) -> Json<Value> {
+) -> Response {
     let code_hashes = query
         .as_deref()
         .map(|query| {
@@ -394,7 +396,7 @@ pub async fn get_compiler_abi(
 pub async fn register_verified_sources(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<RegisterVerifiedSourcesRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         async move {
             let entries = payload
@@ -426,7 +428,7 @@ pub async fn register_verified_sources(
 pub async fn get_registered_verified_source(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<GetVerifiedSourceRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         async move {
             let source = node
@@ -439,7 +441,7 @@ pub async fn get_registered_verified_source(
     .await
 }
 
-pub async fn list_verified_sources(State(node): State<Arc<Localnet>>) -> Json<Value> {
+pub async fn list_verified_sources(State(node): State<Arc<Localnet>>) -> Response {
     handle_result(node.list_verified_sources(), |entries| {
         serde_json::to_value(
             entries
@@ -461,7 +463,7 @@ pub async fn list_verified_sources(State(node): State<Arc<Localnet>>) -> Json<Va
 pub async fn delete_verified_source(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<CodeHashRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(node.delete_verified_source(payload.code_hash), |()| {
         Value::Null
     })
@@ -471,7 +473,7 @@ pub async fn delete_verified_source(
 pub async fn get_verified_source(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<GetVerifiedSourceRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         async move {
             if let Some(source) = node
@@ -687,13 +689,7 @@ fn verified_source_file_content(file: &Value) -> Option<String> {
 }
 
 fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
-    if let Ok(parsed) = Hash256::from_hex(hash) {
-        return Ok(parsed);
-    }
-    if let Ok(parsed) = Hash256::from_base64(hash) {
-        return Ok(parsed);
-    }
-    anyhow::bail!("Invalid hash format")
+    hash.parse()
 }
 
 fn parse_account_state_change(
