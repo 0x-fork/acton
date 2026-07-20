@@ -20,7 +20,23 @@
 .cardHeader {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--acton-space-2) var(--acton-space-4);
   min-height: 28px;
+}
+
+.balanceChange {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  min-width: 0;
+}
+
+.balanceLabel {
+  flex: 0 0 auto;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
 }
 
 .storageScroll {

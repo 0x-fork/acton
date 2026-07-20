@@ -239,7 +239,7 @@ function normalizeValueFlowAddress(address: string | undefined): string | undefi
   }
 }
 
-function getTransactionBalanceBefore(tx: TransactionInfo): bigint | undefined {
+export function getTransactionBalanceBefore(tx: TransactionInfo): bigint | undefined {
   return (
     tx.accountBalanceBefore ??
     getShardAccountBalance(tx.shardAccountBefore) ??
@@ -247,7 +247,7 @@ function getTransactionBalanceBefore(tx: TransactionInfo): bigint | undefined {
   )
 }
 
-function getTransactionBalanceAfter(tx: TransactionInfo): bigint | undefined {
+export function getTransactionBalanceAfter(tx: TransactionInfo): bigint | undefined {
   return (
     tx.accountBalanceAfter ??
     getShardAccountBalance(tx.shardAccountAfter) ??
