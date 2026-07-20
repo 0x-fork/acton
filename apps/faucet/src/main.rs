@@ -33,7 +33,7 @@ mod handlers;
 mod logger;
 mod wallet;
 
-pub const LONG_VERSION: &str = env!("ACTON_LONG_VERSION");
+pub const LONG_VERSION: &str = env!("FAUCET_LONG_VERSION");
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

@@ -3,8 +3,6 @@ use std::env;
 use std::process::Command;
 
 fn main() {
-    println!("cargo:rerun-if-env-changed=ACTON_RELEASE_CHANNEL");
-
     let pkg_version = env::var("CARGO_PKG_VERSION").expect("CARGO_PKG_VERSION must be set");
 
     let output = Command::new("git")
@@ -20,5 +18,5 @@ fn main() {
     let build_date = Utc::now().format("%Y-%m-%d").to_string();
     println!("cargo:rustc-env=BUILD_DATE={build_date}");
 
-    println!("cargo:rustc-env=ACTON_LONG_VERSION={pkg_version} ({git_hash} {build_date})");
+    println!("cargo:rustc-env=FAUCET_LONG_VERSION={pkg_version} ({git_hash} {build_date})");
 }
