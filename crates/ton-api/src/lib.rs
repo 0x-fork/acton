@@ -1,7 +1,6 @@
 use anyhow::{Context, anyhow};
 use num_bigint::{BigInt, ToBigInt};
 use reqwest::blocking::Response;
-use reqwest::header::USER_AGENT;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
@@ -33,7 +32,7 @@ const fn user_agent() -> &'static str {
 }
 
 fn http_client_builder() -> reqwest::blocking::ClientBuilder {
-    let builder = reqwest::blocking::Client::builder();
+    let builder = reqwest::blocking::Client::builder().user_agent(user_agent());
     if proxy_enabled() {
         builder
     } else {
@@ -132,7 +131,7 @@ impl TonApiClient {
     }
 
     fn build_request(&self, url: &str) -> reqwest::blocking::RequestBuilder {
-        let mut request = self.client.get(url).header(USER_AGENT, user_agent());
+        let mut request = self.client.get(url);
 
         if let Some(ref key) = self.api_key {
             request = request.header("X-API-Key", key);
@@ -142,7 +141,7 @@ impl TonApiClient {
     }
 
     fn build_post_request(&self, url: &str) -> reqwest::blocking::RequestBuilder {
-        let mut request = self.client.post(url).header(USER_AGENT, user_agent());
+        let mut request = self.client.post(url);
 
         if let Some(ref key) = self.api_key {
             request = request.header("X-API-Key", key);
