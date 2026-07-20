@@ -18,6 +18,8 @@ const DEFAULT_COMPILER_NODE_BIN: &str = "node";
 const DEFAULT_COMPILER_WORKER_PATH: &str = "compiler-worker/compile.mjs";
 const DEFAULT_COMPILER_TIMEOUT_MS: u64 = 5_000;
 const DEFAULT_SOURCE_REPOSITORY_REMOTE: &str = "origin";
+const DEFAULT_SOURCE_REPOSITORY_COMMIT_ENABLED: bool = true;
+const DEFAULT_SOURCE_REPOSITORY_PUSH_ENABLED: bool = true;
 const DEFAULT_SOURCE_REPOSITORY_AUTHOR_NAME: &str = "ton-verifier";
 const DEFAULT_SOURCE_REPOSITORY_AUTHOR_EMAIL: &str = "ton-verifier@example.invalid";
 const DEFAULT_REGISTRY_INDEX_PATH: &str = "verifier-index.sqlite3";
@@ -32,6 +34,8 @@ pub struct Config {
     source_repository_path: Option<PathBuf>,
     source_repository_remote: String,
     source_repository_branch: Option<String>,
+    source_repository_commit_enabled: bool,
+    source_repository_push_enabled: bool,
     source_repository_author_name: String,
     source_repository_author_email: String,
     registry_index_path: PathBuf,
@@ -116,6 +120,16 @@ impl Config {
     }
 
     #[must_use]
+    pub const fn source_repository_commit_enabled(&self) -> bool {
+        self.source_repository_commit_enabled
+    }
+
+    #[must_use]
+    pub const fn source_repository_push_enabled(&self) -> bool {
+        self.source_repository_push_enabled
+    }
+
+    #[must_use]
     pub fn source_repository_author_name(&self) -> &str {
         &self.source_repository_author_name
     }
@@ -157,6 +171,8 @@ impl Default for Config {
             source_repository_path: None,
             source_repository_remote: DEFAULT_SOURCE_REPOSITORY_REMOTE.to_owned(),
             source_repository_branch: None,
+            source_repository_commit_enabled: DEFAULT_SOURCE_REPOSITORY_COMMIT_ENABLED,
+            source_repository_push_enabled: DEFAULT_SOURCE_REPOSITORY_PUSH_ENABLED,
             source_repository_author_name: DEFAULT_SOURCE_REPOSITORY_AUTHOR_NAME.to_owned(),
             source_repository_author_email: DEFAULT_SOURCE_REPOSITORY_AUTHOR_EMAIL.to_owned(),
             registry_index_path: PathBuf::from(DEFAULT_REGISTRY_INDEX_PATH),
@@ -246,6 +262,14 @@ impl ConfigFile {
                 .remote
                 .unwrap_or_else(|| DEFAULT_SOURCE_REPOSITORY_REMOTE.to_owned()),
             source_repository_branch: self.source_repository.branch,
+            source_repository_commit_enabled: self
+                .source_repository
+                .commit_enabled
+                .unwrap_or(DEFAULT_SOURCE_REPOSITORY_COMMIT_ENABLED),
+            source_repository_push_enabled: self
+                .source_repository
+                .push_enabled
+                .unwrap_or(DEFAULT_SOURCE_REPOSITORY_PUSH_ENABLED),
             source_repository_author_name: self
                 .source_repository
                 .author_name
@@ -301,6 +325,8 @@ struct SourceRepositoryConfig {
     path: Option<PathBuf>,
     remote: Option<String>,
     branch: Option<String>,
+    commit_enabled: Option<bool>,
+    push_enabled: Option<bool>,
     author_name: Option<String>,
     author_email: Option<String>,
 }

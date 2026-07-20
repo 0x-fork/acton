@@ -21,6 +21,8 @@ fn example_config_toml_loads() {
     assert_eq!(config.source_repository_path(), None);
     assert_eq!(config.source_repository_remote(), "origin");
     assert_eq!(config.source_repository_branch(), None);
+    assert!(config.source_repository_commit_enabled());
+    assert!(config.source_repository_push_enabled());
     assert_eq!(config.source_repository_author_name(), "ton-verifier");
     assert_eq!(
         config.source_repository_author_email(),
@@ -82,6 +84,8 @@ api_key = "test-key"
 path = "/tmp/verifier-sources"
 remote = "github"
 branch = "verified-sources"
+commit_enabled = false
+push_enabled = false
 author_name = "Verifier Bot"
 author_email = "verifier@example.com"
 
@@ -108,6 +112,8 @@ path = "/tmp/verifier-index.sqlite3"
     );
     assert_eq!(config.source_repository_remote(), "github");
     assert_eq!(config.source_repository_branch(), Some("verified-sources"));
+    assert!(!config.source_repository_commit_enabled());
+    assert!(!config.source_repository_push_enabled());
     assert_eq!(config.source_repository_author_name(), "Verifier Bot");
     assert_eq!(
         config.source_repository_author_email(),

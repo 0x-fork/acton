@@ -17,6 +17,8 @@ name = "mainnet"
 # path = "source-repo"
 remote = "origin"
 # branch = "main"
+commit_enabled = true
+push_enabled = true
 author_name = "ton-verifier"
 author_email = "ton-verifier@example.invalid"
 

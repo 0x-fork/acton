@@ -106,6 +106,8 @@ pub struct GitSourceStorage {
     repo_path: Option<PathBuf>,
     remote: String,
     branch: Option<String>,
+    commit_enabled: bool,
+    push_enabled: bool,
     author_name: String,
     author_email: String,
     lock: Arc<Mutex<()>>,
@@ -118,6 +120,8 @@ impl GitSourceStorage {
             repo_path: config.source_repository_path().map(ToOwned::to_owned),
             remote: config.source_repository_remote().to_owned(),
             branch: config.source_repository_branch().map(ToOwned::to_owned),
+            commit_enabled: config.source_repository_commit_enabled(),
+            push_enabled: config.source_repository_push_enabled(),
             author_name: config.source_repository_author_name().to_owned(),
             author_email: config.source_repository_author_email().to_owned(),
             lock: Arc::new(Mutex::new(())),
@@ -147,26 +151,31 @@ impl GitSourceStorage {
         write_bundle_files(&files_dir, &request.files).await?;
         write_manifest(&bundle_dir, &request).await?;
 
-        git(repo_path, &["add", "--", &bundle_path]).await?;
+        if self.commit_enabled {
+            git(repo_path, &["add", "--", &bundle_path]).await?;
 
-        let staged = git_has_staged_changes(repo_path, &bundle_path).await?;
-        if staged {
-            let message = commit_message(&request);
-            git_with_author(
-                repo_path,
-                &["commit", "-m", &message, "--", &bundle_path],
-                self,
-            )
-            .await?;
+            let staged = git_has_staged_changes(repo_path, &bundle_path).await?;
+            if staged {
+                let message = commit_message(&request);
+                git_with_author(
+                    repo_path,
+                    &["commit", "-m", &message, "--", &bundle_path],
+                    self,
+                )
+                .await?;
+            }
         }
+
         let revision = git_output(repo_path, &["rev-parse", "HEAD"]).await?;
 
-        let branch = match &self.branch {
-            Some(branch) => branch.clone(),
-            None => current_branch(repo_path).await?,
-        };
-        let refspec = format!("HEAD:{branch}");
-        git(repo_path, &["push", &self.remote, &refspec]).await?;
+        if self.commit_enabled && self.push_enabled {
+            let branch = match &self.branch {
+                Some(branch) => branch.clone(),
+                None => current_branch(repo_path).await?,
+            };
+            let refspec = format!("HEAD:{branch}");
+            git(repo_path, &["push", &self.remote, &refspec]).await?;
+        }
 
         Ok(SourceStorageReceipt { revision })
     }
