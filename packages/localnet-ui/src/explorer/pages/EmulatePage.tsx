@@ -17,6 +17,7 @@ import {
   Button,
   Checkbox,
   ContentTabs,
+  CopyButton,
   InlineAction,
   InlineButton,
   Input,
@@ -428,6 +429,17 @@ export function EmulatePage({client}: EmulatePageProps) {
     (inputMode === "builder"
       ? Boolean(builderPreview.boc) && builderPreview.error === undefined
       : Boolean(rawMessage.trim()))
+  const copyMessageBocAction = (
+    <CopyButton
+      value={activeRawMessage}
+      label="Copy message BoC"
+      copiedLabel="Message BoC copied"
+      size="sm"
+      disabled={!activeRawMessage.trim()}
+    >
+      Copy BoC
+    </CopyButton>
+  )
 
   useEffect(() => {
     const fieldsFromUrl = readEmulateSearchFields(searchParams)
@@ -1288,17 +1300,19 @@ export function EmulatePage({client}: EmulatePageProps) {
         onValueChange={setInputMode}
         panelClassName={styles.inputModePanel}
       >
-        <Button
-          className={styles.emulateAction}
-          type="submit"
-          variant="primary"
-          size="sm"
-          leadingIcon={<Play size={16} />}
-          loading={isLoading}
-          disabled={!canEmulate}
-        >
-          Emulate
-        </Button>
+        <div className={styles.emulateActions}>
+          {copyMessageBocAction}
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            leadingIcon={<Play size={16} />}
+            loading={isLoading}
+            disabled={!canEmulate}
+          >
+            Emulate
+          </Button>
+        </div>
 
         {inputMode === "builder" ? (
           <div className={styles.builderGrid}>

@@ -14,12 +14,16 @@ Status: ready
 Import:
 
 ```tsx
-import { Button } from "@acton/ui"
+import { Button, CopyButton } from "@acton/ui"
 ```
 
 Use Button for explicit user-triggered commands: submit, confirm, start, stop,
 create, delete, or any action that changes application state. Do not use it for
 route navigation or passive status display.
+
+Use `CopyButton` when a copy command belongs in a regular button group. It uses
+the secondary variant by default and provides clipboard handling plus temporary
+copied feedback.
 
 ### Variants
 

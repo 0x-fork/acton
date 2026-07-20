@@ -162,11 +162,14 @@
   overflow: visible;
 }
 
-.emulateAction {
+.emulateActions {
   position: absolute;
   z-index: 1;
   inset-block-start: var(--acton-space-3);
   inset-inline-end: var(--acton-space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
 }
 
 .builderGrid {
@@ -629,6 +632,10 @@
   .payloadPanel {
     border-top: 1px solid var(--acton-color-border);
     border-left: 0;
+  }
+
+  .builderGrid > .builderPanel:first-child {
+    padding-block-start: calc(var(--acton-space-3) + 2rem + var(--acton-space-4));
   }
 
   .payloadInputHeader,
