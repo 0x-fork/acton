@@ -718,15 +718,10 @@ th.valueContainer {
   flex-direction: column;
   align-items: flex-end;
   gap: 2px;
-  width: 100%;
   min-width: 0;
 }
 
 .historyValue {
-  width: 100%;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-size: var(--acton-font-size-sm);
   font-variant-numeric: tabular-nums;
   line-height: 1.35;
