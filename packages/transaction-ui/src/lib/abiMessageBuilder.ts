@@ -42,6 +42,14 @@ export interface BuildAbiMessageBocOptions {
   readonly argsJson: string
 }
 
+export interface BuildEmptyMessageBocOptions {
+  readonly transport: AbiMessageTransport
+  readonly destination: string
+  readonly source?: string
+  readonly value?: string
+  readonly bounce?: boolean
+}
+
 export function listAbiMessageBuilderOptions(
   abi: ContractABI,
   transport: AbiMessageTransport,
@@ -75,9 +83,50 @@ export function buildAbiMessageBoc({
   const bodyValue = option.union ? buildUnionInput(option, normalizedInput) : normalizedInput
   const bodyBuilder = beginCell()
   packToBuilderDynamic(ctx, option.bodyTyIdx, bodyValue, bodyBuilder)
-  const body = bodyBuilder.endCell()
+  return buildMessageBoc({
+    transport: option.transport,
+    destinationAddress,
+    source,
+    value,
+    bounce,
+    body: bodyBuilder.endCell(),
+  })
+}
+
+export function buildEmptyMessageBoc({
+  transport,
+  destination,
+  source,
+  value,
+  bounce = true,
+}: BuildEmptyMessageBocOptions): string {
+  return buildMessageBoc({
+    transport,
+    destinationAddress: Address.parse(destination.trim()),
+    source,
+    value,
+    bounce,
+    body: beginCell().endCell(),
+  })
+}
+
+function buildMessageBoc({
+  transport,
+  destinationAddress,
+  source,
+  value,
+  bounce,
+  body,
+}: {
+  readonly transport: AbiMessageTransport
+  readonly destinationAddress: Address
+  readonly source?: string
+  readonly value?: string
+  readonly bounce: boolean
+  readonly body: Message["body"]
+}): string {
   const message =
-    option.transport === "external"
+    transport === "external"
       ? external({to: destinationAddress, body})
       : buildInternalMessage({
           source: Address.parse(requireField(source, "Source address")),

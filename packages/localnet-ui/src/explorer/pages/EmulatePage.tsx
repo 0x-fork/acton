@@ -28,6 +28,7 @@ import {
   AbiValueEditor,
   TonAddressInput,
   buildAbiMessageBoc,
+  buildEmptyMessageBoc,
   buildAbiStorageDataBoc,
   createAbiMessageSymbols,
   createAbiStorageSymbols,
@@ -97,6 +98,7 @@ const EMULATE_TIME_MODE_QUERY_PARAM = "timeMode"
 const EMULATE_INCREASE_TIME_QUERY_PARAM = "increaseTime"
 const EMULATE_TIMESTAMP_QUERY_PARAM = "timestamp"
 const DEFAULT_MESSAGE_VALUE = "0.5"
+const EMPTY_MESSAGE_ID = "empty"
 const MAX_UINT32 = 0xff_ff_ff_ff
 
 interface EmulateSearchFields {
@@ -332,11 +334,15 @@ export function EmulatePage({client}: EmulatePageProps) {
     () => builderOptions.find(option => option.id === selectedMessageId),
     [builderOptions, selectedMessageId],
   )
+  const isEmptyMessageSelected =
+    selectedMessageId === EMPTY_MESSAGE_ID || builderOptions.length === 0
   const builderPreview = useMemo(
     () =>
       buildBuilderPreview({
         abi: activeAbi,
         option: selectedBuilderOption,
+        transport: messageTransport,
+        empty: isEmptyMessageSelected,
         destination: targetAddress,
         source: sourceAddress,
         value: messageValue,
@@ -347,7 +353,9 @@ export function EmulatePage({client}: EmulatePageProps) {
       activeAbi,
       argsJson,
       bounce,
+      isEmptyMessageSelected,
       messageValue,
+      messageTransport,
       selectedBuilderOption,
       sourceAddress,
       targetAddress,
@@ -649,6 +657,10 @@ export function EmulatePage({client}: EmulatePageProps) {
   }, [preloadStateOverrideEntry, stateOverrideEnabled, stateOverrideEntries])
 
   useEffect(() => {
+    if (selectedMessageId === EMPTY_MESSAGE_ID) {
+      return
+    }
+
     if (builderOptions.length === 0) {
       if (selectedMessageId) {
         setSelectedMessageId("")
@@ -1456,23 +1468,20 @@ export function EmulatePage({client}: EmulatePageProps) {
                 </div>
               )}
 
-              {hasValidTargetAddress && activeAbi && (
+              {hasValidTargetAddress && (
                 <Select
                   fieldClassName={styles.field}
                   aria-label="Message"
-                  value={selectedMessageId}
+                  value={isEmptyMessageSelected ? EMPTY_MESSAGE_ID : selectedMessageId}
                   onChange={event => handleMessageOptionChange(event.target.value)}
-                  disabled={isLoading || builderOptions.length === 0}
+                  disabled={isLoading}
                 >
-                  {builderOptions.length === 0 ? (
-                    <option value="">No {messageTransport} ABI messages</option>
-                  ) : (
-                    builderOptions.map(option => (
-                      <option key={option.id} value={option.id}>
-                        {formatAbiMessageOptionSummary(option)}
-                      </option>
-                    ))
-                  )}
+                  <option value={EMPTY_MESSAGE_ID}>Empty message</option>
+                  {builderOptions.map(option => (
+                    <option key={option.id} value={option.id}>
+                      {formatAbiMessageOptionSummary(option)}
+                    </option>
+                  ))}
                 </Select>
               )}
 
@@ -1941,6 +1950,8 @@ function isValidAddress(value: string): boolean {
 function buildBuilderPreview({
   abi,
   option,
+  transport,
+  empty,
   destination,
   source,
   value,
@@ -1949,17 +1960,33 @@ function buildBuilderPreview({
 }: {
   readonly abi: ContractABI | undefined
   readonly option: AbiMessageBuilderOption | undefined
+  readonly transport: AbiMessageTransport
+  readonly empty: boolean
   readonly destination: string
   readonly source: string
   readonly value: string
   readonly bounce: boolean
   readonly argsJson: string
 }): {readonly boc: string; readonly error?: string} {
-  if (!abi || !option || !destination.trim()) {
+  if (!destination.trim()) {
     return {boc: ""}
   }
 
   try {
+    if (empty) {
+      return {
+        boc: buildEmptyMessageBoc({
+          transport,
+          destination,
+          source,
+          value,
+          bounce,
+        }),
+      }
+    }
+    if (!abi || !option) {
+      return {boc: ""}
+    }
     return {
       boc: buildAbiMessageBoc({
         abi,

@@ -5,6 +5,7 @@ import {
   SAMPLE_ADDRESS,
   abiValueToFormValue,
   buildAbiMessageBoc,
+  buildEmptyMessageBoc,
   decodeAbiValueFromCell,
   formatAbiMessageOptionSummary,
   listAbiMessageBuilderOptions,
@@ -130,6 +131,31 @@ describe("ABI message builder", () => {
     }).toMatchSnapshot()
   })
 
+  test("builds internal and external messages with empty bodies", () => {
+    const internalBoc = buildEmptyMessageBoc({
+      transport: "internal",
+      destination: DESTINATION_ADDRESS,
+      source: SAMPLE_ADDRESS,
+      value: "0.25",
+      bounce: false,
+    })
+    const externalBoc = buildEmptyMessageBoc({
+      transport: "external",
+      destination: DESTINATION_ADDRESS,
+    })
+
+    expect({
+      internal: {
+        boc: internalBoc,
+        message: summarizeEmptyMessage(loadMessage(Cell.fromHex(internalBoc).beginParse())),
+      },
+      external: {
+        boc: externalBoc,
+        message: summarizeEmptyMessage(loadMessage(Cell.fromHex(externalBoc).beginParse())),
+      },
+    }).toMatchSnapshot()
+  })
+
   test("rejects missing internal fields and malformed values", () => {
     const option = requireOption(listAbiMessageBuilderOptions(messageAbi, "internal"), 0)
     const base = {
@@ -176,6 +202,30 @@ function summarizeMessage(message: Message, abi: ContractABI, bodyTyIdx: number)
   return {
     info,
     body: abiValueToFormValue(decodeAbiValueFromCell(abi, bodyTyIdx, message.body)),
+  }
+}
+
+function summarizeEmptyMessage(message: Message) {
+  const info =
+    message.info.type === "internal"
+      ? {
+          type: message.info.type,
+          source: message.info.src.toString(),
+          destination: message.info.dest.toString(),
+          value: message.info.value.coins.toString(),
+          bounce: message.info.bounce,
+        }
+      : {
+          type: message.info.type,
+          destination: message.info.dest?.toString(),
+        }
+
+  return {
+    info,
+    body: {
+      bits: message.body.bits.length,
+      refs: message.body.refs.length,
+    },
   }
 }
 
