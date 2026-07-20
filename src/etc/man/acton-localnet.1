@@ -74,6 +74,18 @@ Load Localnet state from a JSON snapshot before startup.
 Dump Localnet state to a JSON snapshot on shutdown.
 .RE
 .sp
+\fB\-\-liteapi\fR
+.RS 4
+Start the LiteAPI server on the TCP port immediately after the Localnet HTTP
+port. LiteAPI is disabled by default.
+.RE
+.sp
+\fB\-\-liteapi\-port\fR \fIport\fR
+.RS 4
+Set the LiteAPI TCP port explicitly. Requires \fB\-\-liteapi\fR; otherwise LiteAPI
+uses the Localnet HTTP port plus one.
+.RE
+.sp
 \fB\-\-require\-auth\fR
 .RS 4
 Require a token for all Localnet HTTP API, control, emulate, and streaming

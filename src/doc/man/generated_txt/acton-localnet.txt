@@ -54,6 +54,14 @@ SUBCOMMANDS
           --dump-state path
               Dump Localnet state to a JSON snapshot on shutdown.
 
+          --liteapi
+              Start the LiteAPI server on the TCP port immediately after the
+              Localnet HTTP port. LiteAPI is disabled by default.
+
+          --liteapi-port port
+              Set the LiteAPI TCP port explicitly. Requires --liteapi;
+              otherwise LiteAPI uses the Localnet HTTP port plus one.
+
           --require-auth
               Require a token for all Localnet HTTP API, control, emulate, and
               streaming endpoints. The server prints the token on startup.

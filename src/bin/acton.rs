@@ -1175,6 +1175,19 @@ pub enum LocalnetCommand {
             help = "Require a token for all Localnet HTTP API, control, emulate, and streaming endpoints"
         )]
         require_auth: bool,
+        #[arg(
+            long,
+            help = "Start the LiteAPI server (default port: Localnet HTTP port + 1)"
+        )]
+        liteapi: bool,
+        #[arg(
+            long,
+            requires = "liteapi",
+            value_name = "PORT",
+            value_parser = clap::value_parser!(u16).range(1..),
+            help = "LiteAPI server port (default: Localnet HTTP port + 1)"
+        )]
+        liteapi_port: Option<u16>,
     },
     #[command(about = "Request GRAM from faucet")]
     Airdrop {
@@ -2578,6 +2591,8 @@ fn main() {
                 load_state,
                 dump_state,
                 require_auth,
+                liteapi,
+                liteapi_port,
             } => {
                 let resolved_localnet = resolve_localnet_settings(
                     port,
@@ -2610,6 +2625,8 @@ fn main() {
                         load_state,
                         dump_state,
                         require_auth,
+                        liteapi,
+                        liteapi_port,
                     )
                     .await
                 })

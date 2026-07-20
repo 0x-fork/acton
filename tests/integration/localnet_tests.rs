@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 use std::fmt::Write as _;
 use std::fs;
 use std::io::{ErrorKind, Read, Write};
-use std::net::TcpListener;
+use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -518,6 +518,71 @@ fn localnet_start_port_conflict_is_reported_with_hint() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/localnet/test_localnet_start_port_conflict.stderr.txt",
         );
+}
+
+#[test]
+fn localnet_liteapi_is_opt_in() {
+    let default_project = ProjectBuilder::new("localnet-liteapi-default-off").build();
+    let default_node = default_project.localnet().start();
+    let default_liteapi_port = default_node
+        .port()
+        .checked_add(1)
+        .expect("reserved localnet port must leave room for LiteAPI");
+    let default_liteapi = match TcpListener::bind(("127.0.0.1", default_liteapi_port)) {
+        Ok(_listener) => "available",
+        Err(_) => "occupied",
+    };
+    default_node.stop();
+
+    let enabled_project = ProjectBuilder::new("localnet-liteapi-enabled").build();
+    let enabled_node = enabled_project.localnet().arg("--liteapi").start();
+    let enabled_liteapi_port = enabled_node
+        .port()
+        .checked_add(1)
+        .expect("reserved localnet port must leave room for LiteAPI");
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let enabled_liteapi = loop {
+        if TcpStream::connect(("127.0.0.1", enabled_liteapi_port)).is_ok() {
+            break "reachable";
+        }
+        if Instant::now() >= deadline {
+            break "unreachable";
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    enabled_node.stop();
+
+    let explicit_project = ProjectBuilder::new("localnet-liteapi-explicit-port").build();
+    let explicit_builder = explicit_project.localnet();
+    let explicit_port_probe =
+        TcpListener::bind(("127.0.0.1", 0)).expect("failed to reserve explicit LiteAPI test port");
+    let explicit_port = explicit_port_probe
+        .local_addr()
+        .expect("failed to read explicit LiteAPI test port")
+        .port();
+    drop(explicit_port_probe);
+    let explicit_port_arg = explicit_port.to_string();
+    let explicit_node = explicit_builder
+        .args(["--liteapi", "--liteapi-port", explicit_port_arg.as_str()])
+        .start();
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let explicit_liteapi = loop {
+        if TcpStream::connect(("127.0.0.1", explicit_port)).is_ok() {
+            break "reachable";
+        }
+        if Instant::now() >= deadline {
+            break "unreachable";
+        }
+        thread::sleep(Duration::from_millis(10));
+    };
+    explicit_node.stop();
+
+    assertion().eq(
+        format!(
+            "without --liteapi: {default_liteapi}\nwith --liteapi: {enabled_liteapi}\nwith --liteapi-port: {explicit_liteapi}\n"
+        ),
+        snapbox::file!("snapshots/localnet/test_localnet_liteapi_opt_in.txt"),
+    );
 }
 
 #[test]

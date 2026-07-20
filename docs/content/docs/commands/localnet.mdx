@@ -185,6 +185,32 @@ Dump Localnet state to a JSON snapshot on shutdown.
 <CommandOption>
 <CommandOptionTitle>
 
+`--liteapi`
+
+</CommandOptionTitle>
+
+Start the LiteAPI server on the TCP port immediately after the Localnet HTTP
+port. LiteAPI is disabled by default.
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
+`--liteapi-port` _port_
+
+</CommandOptionTitle>
+
+Set the LiteAPI TCP port explicitly. Requires `--liteapi`; otherwise LiteAPI
+uses the Localnet HTTP port plus one.
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
 `--require-auth`
 
 </CommandOptionTitle>
