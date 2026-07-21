@@ -199,7 +199,7 @@ export const parsedValueViewGallery = {
   title: "ParsedValueView",
   status: "ready",
   summary:
-    "ParsedValueView renders a small ABI-independent value tree with consistent scalars, addresses, objects, arrays, maps, and empty states.",
+    "ParsedValueView renders a small ABI-independent value tree with consistent scalars, enums, addresses, objects, arrays, maps, and empty states.",
   importStatement: 'import {ParsedValueView} from "@acton/ui"',
   agentSummary:
     "Use ParsedValueView after domain code has decoded ABI or storage data into the exported minimal ParsedValue union. Keep parsing, ABI selection, and address-network policy outside the component.",
@@ -240,6 +240,28 @@ export const parsedValueViewGallery = {
             kind: "scalar",
             value: "0x73656e64",
             rawValue: "b5ee9c7201010101000a00001073656e64",
+          })}
+        </div>
+      ),
+    },
+    {
+      id: "parsed-value-enums",
+      title: "Enum Values",
+      description:
+        "Known enum members include their symbolic name and encoded value; unknown members preserve the enum type and actual value.",
+      content: (
+        <div className={styles.valueGrid}>
+          {valueSample("known member", {
+            kind: "scalar",
+            value: "FeatureMode.Enabled (1)",
+            rawValue: "1",
+            typeName: "FeatureMode",
+          })}
+          {valueSample("unknown member", {
+            kind: "scalar",
+            value: "FeatureMode(7)",
+            rawValue: "7",
+            typeName: "FeatureMode",
           })}
         </div>
       ),

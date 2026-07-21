@@ -1,0 +1,74 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`decodeCellWithAbi preserves enum member names and unknown encoded values 1`] = `
+{
+  "known": {
+    "category": "message",
+    "consumption": {
+      "complete": true,
+      "initialBits": 64,
+      "initialRefs": 0,
+      "remainingBits": 0,
+      "remainingRefs": 0,
+    },
+    "direction": "incoming-internal",
+    "name": "SetFeatureMode",
+    "provenance": {
+      "codeHashes": [
+        "enum-example-code-hash",
+      ],
+      "displayName": "EnumExample",
+      "source": "compiler-abi",
+    },
+    "value": {
+      "entries": [
+        {
+          "key": "mode",
+          "value": {
+            "kind": "scalar",
+            "rawValue": "1",
+            "typeName": "FeatureMode",
+            "value": "FeatureMode.Enabled (1)",
+          },
+        },
+      ],
+      "kind": "object",
+      "typeName": "SetFeatureMode",
+    },
+  },
+  "unknown": {
+    "category": "message",
+    "consumption": {
+      "complete": true,
+      "initialBits": 64,
+      "initialRefs": 0,
+      "remainingBits": 0,
+      "remainingRefs": 0,
+    },
+    "direction": "incoming-internal",
+    "name": "SetFeatureMode",
+    "provenance": {
+      "codeHashes": [
+        "enum-example-code-hash",
+      ],
+      "displayName": "EnumExample",
+      "source": "compiler-abi",
+    },
+    "value": {
+      "entries": [
+        {
+          "key": "mode",
+          "value": {
+            "kind": "scalar",
+            "rawValue": "7",
+            "typeName": "FeatureMode",
+            "value": "FeatureMode(7)",
+          },
+        },
+      ],
+      "kind": "object",
+      "typeName": "SetFeatureMode",
+    },
+  },
+}
+`;

@@ -56,6 +56,42 @@ const extendedAbi: ExtendedContractABI = {
   code_hashes: ["counter-code-hash"],
 }
 
+const enumAbi: ContractABI = {
+  ...counterAbi,
+  declarations: [
+    ...counterAbi.declarations,
+    {
+      encoded_as_ty_idx: 9,
+      kind: "enum",
+      members: [
+        {name: "Disabled", value: "0"},
+        {name: "Enabled", value: "1"},
+      ],
+      name: "FeatureMode",
+      ty_idx: 14,
+    },
+    {
+      fields: [{name: "mode", ty_idx: 14}],
+      kind: "struct",
+      name: "SetFeatureMode",
+      prefix: {prefix_len: 32, prefix_num: 2},
+      ty_idx: 15,
+    },
+  ],
+  incoming_messages: [{body_ty_idx: 15}],
+  unique_types: [
+    ...counterAbi.unique_types,
+    {kind: "EnumRef", enum_name: "FeatureMode"},
+    {kind: "StructRef", struct_name: "SetFeatureMode"},
+  ],
+}
+
+const enumExtendedAbi: ExtendedContractABI = {
+  compiler_abi: enumAbi,
+  display_name: "EnumExample",
+  code_hashes: ["enum-example-code-hash"],
+}
+
 describe("decodeCellWithAbi", () => {
   test("decodes text comments before ABI candidates", () => {
     const cell = beginCell().storeUint(0, 32).storeStringTail("hello").endCell()
@@ -179,5 +215,12 @@ describe("decodeCellWithAbi", () => {
       remainingRefs: 0,
       complete: false,
     })
+  })
+
+  test("preserves enum member names and unknown encoded values", () => {
+    const decodeMode = (mode: number) =>
+      decodeCellWithAbi(beginCell().storeUint(2, 32).storeUint(mode, 32).endCell(), enumExtendedAbi)
+
+    expect({known: decodeMode(1), unknown: decodeMode(7)}).toMatchSnapshot()
   })
 })

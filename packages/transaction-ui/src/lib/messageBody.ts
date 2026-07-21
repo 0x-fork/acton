@@ -665,6 +665,20 @@ function toParsedValueWithType(
         })),
       }
     }
+    case "EnumRef": {
+      if (typeof value !== "bigint") {
+        return undefined
+      }
+
+      const enumRef = context.symbols.getEnum(ty.enum_name)
+      const member = enumRef.members.find(candidate => BigInt(candidate.value) === value)
+      return {
+        kind: "scalar",
+        value: member ? `${ty.enum_name}.${member.name} (${value})` : `${ty.enum_name}(${value})`,
+        rawValue: value.toString(),
+        typeName: ty.enum_name,
+      }
+    }
     case "StructRef": {
       const structRef = context.symbols.getStruct(ty.struct_name)
       if (structRef.custom_pack_unpack?.unpack_from_slice) {
