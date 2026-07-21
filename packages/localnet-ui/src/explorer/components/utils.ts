@@ -5,8 +5,7 @@ import {Address} from "@ton/core"
 const HEX_HASH_RE = /^[a-fA-F0-9]{64}$/
 const BASE64_STD_RE = /^[A-Za-z0-9+/]+={0,2}$/
 const BASE64_URL_RE = /^[A-Za-z0-9_-]+$/
-const TON_DNS_DOMAIN_RE =
-  /^(?:[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?\.)+(?:ton|t\.me)$/i
+const TON_DNS_DOMAIN_RE = /^(?:[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?\.)+(?:ton|t\.me)$/i
 
 export function hashToHex(hash: string | null | undefined): string | undefined {
   const value = hash?.trim()
