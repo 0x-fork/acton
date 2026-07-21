@@ -1126,6 +1126,11 @@ export interface LocalnetNodeInfo extends LocalnetTimeInfo {
   }
 }
 
+export interface LocalnetCheckpoint {
+  readonly name: string
+  readonly block_seqno: number
+}
+
 export type ApiCallStatus = "success" | "failed"
 export type ApiCallType = "read" | "write"
 export type ApiCallFamily = "control" | "emulate" | "json_rpc" | "streaming" | "v2" | "v3"

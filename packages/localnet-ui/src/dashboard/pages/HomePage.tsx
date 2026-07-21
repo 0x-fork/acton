@@ -24,6 +24,7 @@ import {formatDuration} from "../../explorer/components/utils"
 import {useAddressBook} from "../../explorer/hooks/useAddressBook"
 import {useOpenExplorerPath} from "../../explorer/hooks/useOpenExplorerPath"
 import {useTransactionMessageNames} from "../../explorer/hooks/useTransactionMessageNames"
+import {NodeStateControls} from "../components/NodeStateControls"
 import {collectRecentAccounts} from "../dashboardUtils"
 
 import styles from "../DashboardPage.module.css"
@@ -383,6 +384,11 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
             <header className={styles.dashboardCardHeader}>
               <h2 className={styles.dashboardCardTitle}>Node info</h2>
+              <NodeStateControls
+                client={client}
+                latestBlockSeqno={nodeInfo?.last_block_seqno}
+                onStateChanged={() => setNodeInfo(undefined)}
+              />
             </header>
             <div className={`${styles.dashboardCardContent} ${styles.nodeInfoList}`}>
               {nodeInfoRows.map(row => {
@@ -696,12 +702,18 @@ function formatReadableDuration(totalSeconds: number): string {
 }
 
 function formatTimeOffset(offsetSeconds: number): string {
-  return formatDurationWithTimeUnits(offsetSeconds, {style: "compact", maxParts: 4})
+  return formatDurationWithTimeUnits(offsetSeconds, {
+    style: "compact",
+    maxParts: 4,
+  })
 }
 
 function formatDurationWithTimeUnits(
   totalSeconds: number,
-  options: {readonly style: "compact" | "readable"; readonly maxParts?: number},
+  options: {
+    readonly style: "compact" | "readable"
+    readonly maxParts?: number
+  },
 ): string {
   const sign = totalSeconds < 0 ? "-" : "+"
   let remainingSeconds = Math.abs(totalSeconds)

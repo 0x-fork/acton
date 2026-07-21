@@ -194,3 +194,105 @@ test("account history requests forward the requested sort order", async () => {
     globalThis.fetch = originalFetch
   }
 })
+
+test("localnet state and checkpoint methods transfer JSON through the control API", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: Array<{readonly url: URL; readonly init?: RequestInit}> = []
+  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(input.toString())
+    requests.push({url, init})
+
+    if (url.pathname.endsWith("/acton_dumpState")) {
+      return new Response('{"version":1,"kind":"state"}', {
+        headers: {"Content-Type": "application/json"},
+      })
+    }
+    if (url.pathname.endsWith("/acton_exportCheckpoint")) {
+      return new Response('{"version":1,"kind":"checkpoint"}', {
+        headers: {"Content-Type": "application/json"},
+      })
+    }
+    if (url.pathname.endsWith("/acton_listCheckpoints")) {
+      return Response.json({
+        ok: true,
+        result: [{name: "before-deploy", block_seqno: 7}],
+      })
+    }
+    if (url.pathname.endsWith("/acton_clearCheckpoints")) {
+      return Response.json({ok: true, result: {deleted: 1}})
+    }
+    if (url.pathname.endsWith("/acton_loadState")) {
+      return Response.json({ok: true, result: null})
+    }
+    if (url.pathname.endsWith("/acton_importCheckpoint")) {
+      return Response.json({
+        ok: true,
+        result: {name: url.searchParams.get("name"), block_seqno: 7},
+      })
+    }
+
+    const body = JSON.parse(String(init?.body)) as {name?: string}
+    return Response.json({
+      ok: true,
+      result: {
+        name: body.name ?? url.searchParams.get("name"),
+        block_seqno: 7,
+      },
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "http://localhost:8081/api/v2",
+      v3BaseUrl: "http://localhost:8081/api/v3",
+      addressNameBaseUrl: "http://localhost:8081",
+      localnetApiToken: "test-token",
+    })
+    const state = new Blob(['{"version":1}'], {type: "application/json"})
+
+    expect(await (await client.downloadState()).text()).toContain('"kind":"state"')
+    await expect(client.loadState(state)).resolves.toBeUndefined()
+    await expect(client.createCheckpoint("before-deploy")).resolves.toEqual({
+      name: "before-deploy",
+      block_seqno: 7,
+    })
+    await expect(client.listCheckpoints()).resolves.toEqual([
+      {name: "before-deploy", block_seqno: 7},
+    ])
+    await expect(client.restoreCheckpoint("before-deploy")).resolves.toEqual({
+      name: "before-deploy",
+      block_seqno: 7,
+    })
+    expect(await (await client.downloadCheckpoint("before-deploy")).text()).toContain(
+      '"kind":"checkpoint"',
+    )
+    await expect(client.importCheckpoint("imported", state)).resolves.toEqual({
+      name: "imported",
+      block_seqno: 7,
+    })
+    await expect(client.deleteCheckpoint("before-deploy")).resolves.toEqual({
+      name: "before-deploy",
+      block_seqno: 7,
+    })
+    await expect(client.clearCheckpoints()).resolves.toBe(1)
+
+    expect(requests.map(request => request.url.pathname)).toEqual([
+      "/acton_dumpState",
+      "/acton_loadState",
+      "/acton_createCheckpoint",
+      "/acton_listCheckpoints",
+      "/acton_restoreCheckpoint",
+      "/acton_exportCheckpoint",
+      "/acton_importCheckpoint",
+      "/acton_deleteCheckpoint",
+      "/acton_clearCheckpoints",
+    ])
+    expect(requests[6]?.url.searchParams.get("name")).toBe("imported")
+    expect(requests[6]?.url.searchParams.get("force")).toBe("false")
+    for (const request of requests) {
+      expect(new Headers(request.init?.headers).get("Authorization")).toBe("Bearer test-token")
+    }
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})

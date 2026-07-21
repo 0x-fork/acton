@@ -2,13 +2,12 @@ use super::utils::handle_result;
 use crate::api::toncenter_v2 as v2;
 use crate::localnet::{Localnet, LocalnetAccountStateChange, LocalnetMiningMode};
 use crate::server::models::{
-    ChangeAccountStatePayload, ChangeAccountStateRequest, CodeHashRequest,
-    CreateRecoveryPointRequest, ExportRecoveryPointRequest, FaucetRequest, GetApiCallsRequest,
-    GetVerifiedSourceRequest, ImportRecoveryPointRequest, IncreaseTimeRequest, JettonFaucetRequest,
-    MineBlocksRequest, RegisterCompilerAbisRequest, RegisterVerifiedSourcesRequest,
-    RevertRecoveryPointRequest, SetAddressNameRequest, SetMiningModeRequest,
-    SetNetworkConditionsRequest, SetNextBlockTimestampRequest, SetShardAccountRequest,
-    SetTimeRequest, StatePathRequest,
+    ChangeAccountStatePayload, ChangeAccountStateRequest, CheckpointRequest, CodeHashRequest,
+    CreateCheckpointRequest, FaucetRequest, GetApiCallsRequest, GetVerifiedSourceRequest,
+    ImportCheckpointQuery, IncreaseTimeRequest, JettonFaucetRequest, MineBlocksRequest,
+    RegisterCompilerAbisRequest, RegisterVerifiedSourcesRequest, SetAddressNameRequest,
+    SetMiningModeRequest, SetNetworkConditionsRequest, SetNextBlockTimestampRequest,
+    SetShardAccountRequest, SetTimeRequest,
 };
 use crate::server::{
     ApiCallLog, NetworkConditions, NetworkConditionsInfo, StartupWallet, StateSourceInfo,
@@ -20,7 +19,8 @@ use axum::{
     body::Bytes,
     extract::Query,
     extract::{RawQuery, State},
-    response::Response,
+    http::header::{CONTENT_DISPOSITION, CONTENT_TYPE},
+    response::{IntoResponse, Response},
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -157,51 +157,69 @@ pub async fn set_mining_mode(
     .await
 }
 
-pub async fn create_recovery_point(
+pub async fn create_checkpoint(
     State(node): State<Arc<Localnet>>,
-    Json(payload): Json<CreateRecoveryPointRequest>,
+    Json(payload): Json<CreateCheckpointRequest>,
 ) -> Response {
-    handle_result(
-        node.create_recovery_point(payload.name, payload.force),
-        |res| serde_json::to_value(res).unwrap_or(Value::Null),
-    )
-    .await
-}
-
-pub async fn list_recovery_points(State(node): State<Arc<Localnet>>) -> Response {
-    handle_result(node.list_recovery_points(), |res| {
+    handle_result(node.create_checkpoint(payload.name, payload.force), |res| {
         serde_json::to_value(res).unwrap_or(Value::Null)
     })
     .await
 }
 
-pub async fn revert_recovery_point(
-    State(node): State<Arc<Localnet>>,
-    Json(payload): Json<RevertRecoveryPointRequest>,
-) -> Response {
-    handle_result(node.revert_recovery_point(payload.name), |res| {
+pub async fn list_checkpoints(State(node): State<Arc<Localnet>>) -> Response {
+    handle_result(node.list_checkpoints(), |res| {
         serde_json::to_value(res).unwrap_or(Value::Null)
     })
     .await
 }
 
-pub async fn export_recovery_point(
+pub async fn restore_checkpoint(
     State(node): State<Arc<Localnet>>,
-    Json(payload): Json<ExportRecoveryPointRequest>,
+    Json(payload): Json<CheckpointRequest>,
 ) -> Response {
+    handle_result(node.restore_checkpoint(payload.name), |res| {
+        serde_json::to_value(res).unwrap_or(Value::Null)
+    })
+    .await
+}
+
+pub async fn delete_checkpoint(
+    State(node): State<Arc<Localnet>>,
+    Json(payload): Json<CheckpointRequest>,
+) -> Response {
+    handle_result(node.delete_checkpoint(payload.name), |res| {
+        serde_json::to_value(res).unwrap_or(Value::Null)
+    })
+    .await
+}
+
+pub async fn clear_checkpoints(State(node): State<Arc<Localnet>>) -> Response {
     handle_result(
-        node.export_recovery_point(payload.name, payload.path),
-        |res| serde_json::to_value(res).unwrap_or(Value::Null),
+        node.clear_checkpoints(),
+        |deleted| serde_json::json!({ "deleted": deleted }),
     )
     .await
 }
 
-pub async fn import_recovery_point(
+pub async fn export_checkpoint(
     State(node): State<Arc<Localnet>>,
-    Json(payload): Json<ImportRecoveryPointRequest>,
+    Query(payload): Query<CheckpointRequest>,
+) -> Response {
+    json_download_response(
+        node.export_checkpoint(payload.name).await,
+        "attachment; filename=acton-localnet-checkpoint.json",
+    )
+    .await
+}
+
+pub async fn import_checkpoint(
+    State(node): State<Arc<Localnet>>,
+    Query(payload): Query<ImportCheckpointQuery>,
+    body: Bytes,
 ) -> Response {
     handle_result(
-        node.import_recovery_point(payload.name, payload.path, payload.force),
+        node.import_checkpoint(payload.name, body.to_vec(), payload.force),
         |res| serde_json::to_value(res).unwrap_or(Value::Null),
     )
     .await
@@ -248,18 +266,33 @@ pub async fn get_api_calls(
     .await
 }
 
-pub async fn dump_state(
-    State(node): State<Arc<Localnet>>,
-    Json(payload): Json<StatePathRequest>,
-) -> Response {
-    handle_result(node.dump_state(payload.path), |()| Value::Null).await
+pub async fn dump_state(State(node): State<Arc<Localnet>>) -> Response {
+    json_download_response(
+        node.dump_state().await,
+        "attachment; filename=acton-localnet-state.json",
+    )
+    .await
 }
 
-pub async fn load_state(
-    State(node): State<Arc<Localnet>>,
-    Json(payload): Json<StatePathRequest>,
+pub async fn load_state(State(node): State<Arc<Localnet>>, body: Bytes) -> Response {
+    handle_result(node.load_state(body.to_vec()), |()| Value::Null).await
+}
+
+async fn json_download_response(
+    result: anyhow::Result<Vec<u8>>,
+    content_disposition: &'static str,
 ) -> Response {
-    handle_result(node.load_state(payload.path), |()| Value::Null).await
+    match result {
+        Ok(json) => (
+            [
+                (CONTENT_TYPE, "application/json"),
+                (CONTENT_DISPOSITION, content_disposition),
+            ],
+            json,
+        )
+            .into_response(),
+        Err(error) => handle_result(async { Err::<(), _>(error) }, |()| Value::Null).await,
+    }
 }
 
 pub async fn set_shard_account(

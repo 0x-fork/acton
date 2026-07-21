@@ -14,11 +14,8 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::path::Path;
 
-const NODE_STATE_SNAPSHOT_VERSION: u32 = 2;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NodeStateSnapshot {
-    pub version: u32,
     pub globals: SnapshotGlobals,
     pub time_offset_seconds: i64,
     pub next_block_timestamp: Option<u32>,
@@ -65,9 +62,17 @@ impl Node {
         write_snapshot_to_path(&snapshot, path)
     }
 
+    pub fn dump_state_to_json(&self) -> anyhow::Result<Vec<u8>> {
+        snapshot_to_json(&self.build_snapshot()?)
+    }
+
     pub fn load_state_from_path<P: AsRef<Path>>(&mut self, path: P) -> anyhow::Result<()> {
         let snapshot = read_snapshot_from_path(path)?;
         self.apply_snapshot(snapshot)
+    }
+
+    pub fn load_state_from_json(&mut self, json: &[u8]) -> anyhow::Result<()> {
+        self.apply_snapshot(snapshot_from_json(json)?)
     }
 
     pub(crate) fn build_snapshot(&self) -> anyhow::Result<NodeStateSnapshot> {
@@ -159,7 +164,6 @@ impl Node {
         let cas_entries = self.export_cas_entries()?;
 
         Ok(NodeStateSnapshot {
-            version: NODE_STATE_SNAPSHOT_VERSION,
             globals: SnapshotGlobals {
                 head_seqno: self.globals.head_seqno,
                 global_lt: self.globals.global_lt,
@@ -209,10 +213,6 @@ impl Node {
     }
 
     pub(crate) fn apply_snapshot(&mut self, mut snapshot: NodeStateSnapshot) -> anyhow::Result<()> {
-        if snapshot.version != NODE_STATE_SNAPSHOT_VERSION {
-            anyhow::bail!("Unsupported snapshot version: {}", snapshot.version);
-        }
-
         for block in &mut snapshot.history_masterchain_blocks {
             if block.config_boc_hash == Hash256::default() {
                 block.config_boc_hash = snapshot.globals.config_boc_hash;
@@ -342,6 +342,14 @@ pub(crate) fn read_snapshot_from_path<P: AsRef<Path>>(
     let reader = BufReader::new(file);
     let snapshot = serde_json::from_reader(reader)?;
     Ok(snapshot)
+}
+
+pub(crate) fn snapshot_from_json(json: &[u8]) -> anyhow::Result<NodeStateSnapshot> {
+    Ok(serde_json::from_slice(json)?)
+}
+
+pub(crate) fn snapshot_to_json(snapshot: &NodeStateSnapshot) -> anyhow::Result<Vec<u8>> {
+    Ok(serde_json::to_vec(snapshot)?)
 }
 
 pub(crate) fn write_snapshot_to_path<P: AsRef<Path>>(

@@ -26,11 +26,6 @@ pub struct JettonFaucetRequest {
 }
 
 #[derive(Deserialize)]
-pub struct StatePathRequest {
-    pub path: String,
-}
-
-#[derive(Deserialize)]
 pub struct SetShardAccountRequest {
     pub address: String,
     pub shard_account: String,
@@ -85,27 +80,20 @@ pub struct SetMiningModeRequest {
 }
 
 #[derive(Deserialize)]
-pub struct CreateRecoveryPointRequest {
+pub struct CreateCheckpointRequest {
     pub name: String,
     #[serde(default)]
     pub force: bool,
 }
 
 #[derive(Deserialize)]
-pub struct RevertRecoveryPointRequest {
+pub struct CheckpointRequest {
     pub name: String,
 }
 
 #[derive(Deserialize)]
-pub struct ExportRecoveryPointRequest {
+pub struct ImportCheckpointQuery {
     pub name: String,
-    pub path: String,
-}
-
-#[derive(Deserialize)]
-pub struct ImportRecoveryPointRequest {
-    pub name: String,
-    pub path: String,
     #[serde(default)]
     pub force: bool,
 }
