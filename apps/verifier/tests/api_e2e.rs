@@ -1,7 +1,7 @@
 mod support;
 
 use axum::{
-    body::Body,
+    body::{Body, to_bytes},
     http::{Method, Request, StatusCode, header},
 };
 use serde::Deserialize;
@@ -51,6 +51,17 @@ async fn healthz_returns_ok() {
 
     let body = response_json::<Value>(response).await;
     assert_eq!(body, json!({"ok": true}));
+}
+
+#[tokio::test]
+async fn version_returns_long_version() {
+    let response = get(app_state(&[], CODE_HASH_ONE), "/version").await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("version response body should be readable");
+    assert_eq!(body.as_ref(), env!("VERIFIER_LONG_VERSION").as_bytes());
 }
 
 #[tokio::test]
