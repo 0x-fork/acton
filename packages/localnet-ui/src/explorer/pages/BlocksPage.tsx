@@ -47,6 +47,7 @@ const LAST_TRANSACTIONS_FETCH_LIMIT = 12
 const BLOCK_TRANSACTIONS_LIMIT = 100
 const BLOCKS_REFRESH_MS = 2000
 const MASTERCHAIN_SHARD = "8000000000000000"
+const MIN_BLOCK_UNIX_TIME = 0
 const GLOBAL_CAPABILITIES = [
   {
     value: 1,
@@ -643,8 +644,34 @@ const BlockDateNavigation: FC<{
 }> = ({client, currentBlock, onOpenBlock}) => {
   const [isOpen, setIsOpen] = useState(false)
   const [dateValue, setDateValue] = useState("")
+  const [minDateValue, setMinDateValue] = useState(() =>
+    formatDateTimeLocalInput(MIN_BLOCK_UNIX_TIME),
+  )
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string>()
+
+  useEffect(() => {
+    let isActive = true
+    setMinDateValue(formatDateTimeLocalInput(MIN_BLOCK_UNIX_TIME))
+
+    const loadEarliestBlockTime = async () => {
+      try {
+        const response = await client.getBlocks({workchain: -1, limit: 1, sort: "asc"})
+        const unixTime = response.blocks[0] && blockUnixTime(response.blocks[0])
+        if (isActive && unixTime !== undefined) {
+          setMinDateValue(formatDateTimeLocalInput(unixTime))
+        }
+      } catch {
+        // Fall back to the minimum value supported by the block timestamp format.
+      }
+    }
+
+    void loadEarliestBlockTime()
+
+    return () => {
+      isActive = false
+    }
+  }, [client])
 
   const handleOpenChange = (nextOpen: boolean) => {
     setIsOpen(nextOpen)
@@ -700,6 +727,7 @@ const BlockDateNavigation: FC<{
             size="sm"
             label="Local date and time"
             value={dateValue}
+            min={minDateValue}
             disabled={isSearching}
             onChange={event => setDateValue(event.currentTarget.value)}
           />
