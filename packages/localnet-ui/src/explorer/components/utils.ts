@@ -115,6 +115,22 @@ export function formatTimeAgo(
   return formatAbsoluteTime(utime, nowSeconds)
 }
 
+export function formatRelativeTime(
+  utime: number,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+): string {
+  const diff = Math.max(0, nowSeconds - utime)
+
+  if (diff === 0) return "right now"
+  if (diff < 60) return `${diff}s ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86_400) return `${Math.floor(diff / 3600)}h ago`
+  if (diff < 604_800) return `${Math.floor(diff / 86_400)}d ago`
+  if (diff < 2_629_800) return `${Math.floor(diff / 604_800)}w ago`
+  if (diff < 31_557_600) return `${Math.floor(diff / 2_629_800)}mo ago`
+  return `${Math.floor(diff / 31_557_600)}y ago`
+}
+
 export function formatAbsoluteTime(
   utime: number,
   nowSeconds: number = Math.floor(Date.now() / 1000),

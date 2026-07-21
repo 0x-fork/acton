@@ -464,6 +464,29 @@
   text-underline-offset: 3px;
 }
 
+.blockDetailDocLink {
+  color: var(--acton-color-accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  text-decoration: none;
+}
+
+.blockDetailDocLink:hover {
+  color: var(--acton-color-accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.blockDetailDocLink svg {
+  position: relative;
+  top: -1px;
+}
+
+.blockDetailRelativeTime {
+  color: var(--acton-color-text-muted);
+}
+
 .blockCapabilitiesPopover {
   display: flex;
   flex-direction: column;

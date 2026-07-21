@@ -32,7 +32,7 @@ import {
   DeveloperTransactionListSkeleton,
 } from "../components/DeveloperTransactionList"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
-import {formatNano, hashToHex} from "../components/utils"
+import {formatNano, formatRelativeTime, hashToHex} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
@@ -1012,6 +1012,8 @@ const BlockSummaryTable: FC<{
   const masterchainShard = block.masterchain_block_ref?.shard ?? MASTERCHAIN_SHARD
   const prevKeyBlockSeqno = block.prev_key_block_seqno
   const minRefMcSeqno = block.min_ref_mc_seqno
+  const genUtime = blockUnixTime(block)
+  const absoluteGenTime = formatAbsoluteBlockTime(block)
   const hasGenSoftware =
     block.gen_software_version !== undefined || block.gen_software_capabilities !== undefined
 
@@ -1037,8 +1039,19 @@ const BlockSummaryTable: FC<{
       >
         <BlockDetailItem
           label="Gen utime"
-          value={formatAbsoluteBlockTime(block)}
-          title={formatAbsoluteBlockTime(block)}
+          value={
+            genUtime === undefined ? (
+              absoluteGenTime
+            ) : (
+              <>
+                {absoluteGenTime}{" "}
+                <span className={styles.blockDetailRelativeTime}>
+                  ({formatRelativeTime(genUtime)})
+                </span>
+              </>
+            )
+          }
+          title={absoluteGenTime}
           visualPlaceholder="<time>"
         />
         <BlockDetailItem label="Version" value={formatOptionalNumber(block.version)} mono />
@@ -1050,8 +1063,18 @@ const BlockSummaryTable: FC<{
         />
         {block.gen_software_version === undefined ? null : (
           <BlockDetailItem
-            label="Global version"
-            value={formatOptionalNumber(block.gen_software_version)}
+            label="Gen software version"
+            value={
+              <a
+                className={styles.blockDetailDocLink}
+                href={`https://github.com/ton-blockchain/ton/blob/master/doc/GlobalVersions.md#version-${block.gen_software_version}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {block.gen_software_version}
+                <ExternalLink size={11} aria-hidden="true" />
+              </a>
+            }
             mono
           />
         )}
@@ -1340,7 +1363,7 @@ const BlockDetailsSkeleton: FC<{
         <BlockDetailSkeletonItem label="Gen catchain seqno" />
         {showRawBlockFields ? (
           <>
-            <BlockDetailSkeletonItem label="Global version" />
+            <BlockDetailSkeletonItem label="Gen software version" />
             <BlockDetailSkeletonItem label="Capabilities" />
           </>
         ) : null}
