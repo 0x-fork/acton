@@ -210,7 +210,12 @@ impl VerificationIndex for SqliteVerificationIndex {
         let mut bundles = Vec::new();
         let code_hashes = source_storage.list_code_hashes().await?;
         let code_hash_count = code_hashes.len();
-        tracing::info!(code_hash_count, "scanning stored source bundles");
+        tracing::info!(
+            completed_code_hashes = 0,
+            total_code_hashes = code_hash_count,
+            bundle_count = 0,
+            "registry index rebuild progress"
+        );
 
         for (index, code_hash) in code_hashes.into_iter().enumerate() {
             for bundle in source_storage.list_bundles(&code_hash).await? {
@@ -218,10 +223,10 @@ impl VerificationIndex for SqliteVerificationIndex {
                 bundles.push(bundle);
             }
 
-            let processed = index + 1;
-            if processed.is_multiple_of(100) || processed == code_hash_count {
+            let completed = index + 1;
+            if completed.is_multiple_of(100) || completed == code_hash_count {
                 tracing::info!(
-                    processed_code_hashes = processed,
+                    completed_code_hashes = completed,
                     total_code_hashes = code_hash_count,
                     bundle_count = bundles.len(),
                     "registry index rebuild progress"
