@@ -152,6 +152,29 @@ const nestedMapValue: ParsedValue = {
   ],
 }
 
+const largeArrayValue: ParsedValue = {
+  kind: "array",
+  items: Array.from({length: 32}, (_, index) => ({
+    kind: "scalar",
+    value: String((index + 1) * 1_000_000),
+  })),
+}
+
+const largeMapValue: ParsedValue = {
+  kind: "map",
+  typeName: "map<uint32, bool>",
+  entries: Array.from({length: 24}, (_, index) => ({
+    key: {kind: "scalar", value: String(index), typeName: "uint32"},
+    value: {kind: "boolean", value: index % 3 === 0},
+  })),
+}
+
+const nestedLargeCollectionValue: ParsedValue = {
+  kind: "object",
+  typeName: "CollectionOwner",
+  entries: [{key: "history", value: largeArrayValue}],
+}
+
 function formatFriendlyAddress(address: string): string {
   return address === WALLET_ADDRESS ? FRIENDLY_WALLET_ADDRESS : address
 }
@@ -301,6 +324,19 @@ export const parsedValueViewGallery = {
             contracts,
             formatAddress: formatFriendlyAddress,
           })}
+        </div>
+      ),
+    },
+    {
+      id: "parsed-value-large-collections",
+      title: "Large Collections",
+      description:
+        "Long arrays and maps start collapsed, then use a bounded internal scroll area when expanded.",
+      content: (
+        <div className={styles.structureGrid}>
+          {valueSample("32-item array", largeArrayValue)}
+          {valueSample("24-entry map", largeMapValue)}
+          {valueSample("object → 32-item array", nestedLargeCollectionValue)}
         </div>
       ),
     },

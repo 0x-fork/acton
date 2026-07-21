@@ -16,6 +16,40 @@
   line-height: 1.4;
 }
 
+.parsedCollectionHeader {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  align-items: center;
+  gap: var(--acton-space-2);
+}
+
+.parsedCollectionCount {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.4;
+}
+
+.parsedCollectionToggle {
+  width: 4.5rem;
+  justify-content: flex-start;
+  margin-inline-start: var(--acton-space-4);
+}
+
+.parsedCollectionViewport {
+  max-height: min(24rem, 50dvh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline-end: var(--acton-space-2);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.parsedCollectionViewport::-webkit-scrollbar {
+  display: none;
+}
+
 .parsedTypeLabel {
   align-self: flex-start;
   color: var(--acton-color-text);
@@ -57,6 +91,11 @@
   color: var(--acton-color-text);
   font-size: var(--acton-font-size-sm);
   line-height: 1.35;
+}
+
+.parsedLargeCollectionValue {
+  align-self: start;
+  padding-block-start: var(--acton-space-1);
 }
 
 .codeCellPopover {

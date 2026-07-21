@@ -668,6 +668,7 @@ address, boolean, null, void, array, object, and map nodes recursively.
 - Empty and populated arrays
 - Empty and populated objects
 - Empty and populated maps
+- Collapsed and expanded large arrays and maps
 - Nested structures on narrow screens
 
 ### Agent Guidance
@@ -683,6 +684,8 @@ address, boolean, null, void, array, object, and map nodes recursively.
   `code` or `cell`, pass `renderCodeCellDetails` to add the shared code-inspector
   action. Keep BoC decoding, source lookup, and disassembly in domain code.
 - Reuse ContractChip metadata and `formatAddress` for address nodes.
+- Arrays and maps with more than eight entries start collapsed and use a bounded
+  component-owned scroll area when expanded. Objects keep their natural layout.
 - Do not duplicate the recursive array, object, or map layout in callers.
 
 ## ParsedValueDiffView
@@ -709,6 +712,7 @@ domain code.
 - Serialized cell-like values with raw copy actions
 - Nested object and array changes
 - Nested map additions, removals, and changed values
+- Large array and map diffs with hidden unchanged entries
 - Empty containers
 
 ### Agent Guidance
@@ -719,6 +723,8 @@ domain code.
 - Pass ContractChip metadata and `formatAddress` for address leaves.
 - Provide a `ParsedValueDiff` directly only when comparison already belongs to
   domain code.
+- Array and map diffs hide unchanged entries by default and expose them through
+  the component-owned toggle. Object fields remain visible and non-collapsible.
 - Do not pass ABI objects, cells, dictionaries, or parser contexts.
 - Do not duplicate ParsedValueView leaf formatting inside diff consumers.
 
