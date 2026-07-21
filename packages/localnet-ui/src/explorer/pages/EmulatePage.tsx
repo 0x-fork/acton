@@ -9,7 +9,9 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
+  Send,
   SlidersHorizontal,
+  TriangleAlert,
   Trash2,
   WandSparkles,
 } from "lucide-react"
@@ -18,6 +20,7 @@ import {
   Checkbox,
   ContentTabs,
   CopyButton,
+  Dialog,
   InlineAction,
   InlineButton,
   Input,
@@ -48,7 +51,15 @@ import {
 } from "@acton/transaction-ui"
 import {useNavigate, useSearchParams} from "react-router-dom"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-import {Address, Cell, fromNano, loadShardAccount, toNano, type ShardAccount} from "@ton/core"
+import {
+  Address,
+  Cell,
+  fromNano,
+  loadMessage,
+  loadShardAccount,
+  toNano,
+  type ShardAccount,
+} from "@ton/core"
 
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
@@ -56,8 +67,9 @@ import {useAddressBook} from "../hooks/useAddressBook"
 import {useFavoriteAccounts} from "../hooks/useFavoriteAccounts"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {openExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
-import {formatAddress, normalizeAddress} from "../components/utils"
+import {formatAddress, hashToHex, normalizeAddress} from "../components/utils"
 import type {TonClient} from "../api/client"
+import {waitForTraceTransactionHash} from "../api/waitForTraceTransactionHash"
 import {addressKey} from "../api/compilerAbi"
 import {resolveCompilerAbis} from "../api/compilerAbiResolver"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
@@ -191,7 +203,7 @@ interface AccountStateOverrideDraft {
 }
 
 export function EmulatePage({client}: EmulatePageProps) {
-  const {network} = useNetworkInfo()
+  const {network, nodeInfo} = useNetworkInfo()
   const addressFormat = useAddressFormat()
   const {fetchName, getCachedName, prefetchNames} = useAddressBook()
   const {favorites} = useFavoriteAccounts()
@@ -199,7 +211,7 @@ export function EmulatePage({client}: EmulatePageProps) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const routes = useExplorerRoutePaths()
-  const {showToast} = useToast()
+  const {showToast, updateToast} = useToast()
   const [inputMode, setInputMode] = useState<EmulateInputMode>("builder")
   const [targetAddress, setTargetAddress] = useState(
     () => readEmulateSearchFields(searchParams).targetAddress,
@@ -241,6 +253,8 @@ export function EmulatePage({client}: EmulatePageProps) {
     readonly AccountStateOverrideDraft[]
   >([])
   const stateOverrideEnabled = stateOverrideEntries.length > 0
+  const [isSendingToLocalnet, setIsSendingToLocalnet] = useState(false)
+  const [sendConfirmationOpen, setSendConfirmationOpen] = useState(false)
   const [state, setState] = useState<EmulateState>({type: "idle"})
   const [activeTab, setActiveTab] = useState<TransactionTraceTabType>("value-flow")
   const [selectedHash, setSelectedHash] = useState<string | undefined>()
@@ -431,12 +445,12 @@ export function EmulatePage({client}: EmulatePageProps) {
           preview?.error === undefined
         )
       }))
-  const canEmulate =
-    canApplyStateOverride &&
-    !timeOverrideInvalid &&
-    (inputMode === "builder"
+  const hasValidMessage =
+    inputMode === "builder"
       ? Boolean(builderPreview.boc) && builderPreview.error === undefined
-      : Boolean(rawMessage.trim()))
+      : Boolean(rawMessage.trim())
+  const canEmulate = canApplyStateOverride && !timeOverrideInvalid && hasValidMessage
+  const canSendToLocalnet = nodeInfo !== undefined && hasValidMessage
   const copyMessageBocAction = (
     <CopyButton
       value={activeRawMessage}
@@ -896,6 +910,70 @@ export function EmulatePage({client}: EmulatePageProps) {
     }
   }
 
+  const sendToLocalnet = async () => {
+    const toastId = showToast({
+      title: "Sending message",
+      description: "Submitting the message to localnet.",
+      variant: "loading",
+      durationMs: 60_000,
+    })
+
+    try {
+      setIsSendingToLocalnet(true)
+      const messageCell = parseRawMessageBoc(activeRawMessage)
+      const message = loadMessage(messageCell.asSlice())
+      const boc = messageCell.toBoc().toString("base64")
+      const hash =
+        message.info.type === "internal"
+          ? await client.sendInternalMessage(boc)
+          : message.info.type === "external-in"
+            ? await client.sendExternalMessage(boc)
+            : undefined
+
+      if (!hash) {
+        throw new Error("External-out messages cannot be sent to localnet")
+      }
+
+      updateToast(toastId, {
+        title: "Waiting for transaction",
+        description: "Message accepted. Resolving the trace link.",
+        variant: "loading",
+        durationMs: 60_000,
+      })
+
+      const rawTxHash = await waitForTraceTransactionHash(client, hash)
+      const txHash = hashToHex(rawTxHash) ?? rawTxHash
+
+      updateToast(toastId, {
+        title: "Message sent to localnet",
+        description: txHash ? (
+          <a href={routes.transactionPath(txHash)}>View transaction</a>
+        ) : (
+          "Message accepted. Its transaction is not indexed yet."
+        ),
+        variant: "success",
+        durationMs: 8000,
+      })
+    } catch (error) {
+      updateToast(toastId, {
+        title: "Failed to send message to localnet",
+        description: error instanceof Error ? error.message : "Failed to send message",
+        variant: "error",
+        durationMs: 8000,
+      })
+    } finally {
+      setIsSendingToLocalnet(false)
+    }
+  }
+
+  const handleSendToLocalnet = () => {
+    if (stateOverrideEnabled) {
+      setSendConfirmationOpen(true)
+      return
+    }
+    void sendToLocalnet()
+  }
+
   const handleReset = () => {
     setTargetAddress("")
     setSourceAddress("")
@@ -1315,13 +1393,26 @@ export function EmulatePage({client}: EmulatePageProps) {
       >
         <div className={styles.emulateActions}>
           {copyMessageBocAction}
+          {nodeInfo && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              leadingIcon={<Send size={15} />}
+              loading={isSendingToLocalnet}
+              disabled={!canSendToLocalnet || isLoading}
+              onClick={handleSendToLocalnet}
+            >
+              Send to localnet
+            </Button>
+          )}
           <Button
             type="submit"
             variant="primary"
             size="sm"
             leadingIcon={<Play size={16} />}
             loading={isLoading}
-            disabled={!canEmulate}
+            disabled={!canEmulate || isSendingToLocalnet}
           >
             Emulate
           </Button>
@@ -1550,6 +1641,41 @@ export function EmulatePage({client}: EmulatePageProps) {
     </header>
   )
 
+  const sendConfirmationDialog = (
+    <Dialog
+      open={sendConfirmationOpen}
+      onOpenChange={setSendConfirmationOpen}
+      title="Send without account overrides?"
+      description="Account overrides are used only for emulation."
+      leadingIcon={<TriangleAlert size={20} aria-hidden="true" />}
+      maxWidth={460}
+      closeLabel="Cancel sending message"
+    >
+      <div className={styles.sendConfirmationContent}>
+        <p className={styles.sendConfirmationText}>
+          This message will execute against the current localnet state. The configured account
+          {stateOverrideAccountCount === 1 ? " override is" : " overrides are"} not written to
+          localnet, so the resulting transaction may differ from the emulation.
+        </p>
+        <div className={styles.sendConfirmationActions}>
+          <Button type="button" variant="secondary" onClick={() => setSendConfirmationOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => {
+              setSendConfirmationOpen(false)
+              void sendToLocalnet()
+            }}
+          >
+            Send without overrides
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  )
+
   if (state.type === "ready") {
     return (
       <div className={`${styles.page} ${styles.pageReady}`}>
@@ -1585,6 +1711,7 @@ export function EmulatePage({client}: EmulatePageProps) {
           {simulationHeader}
           {simulationForm}
         </section>
+        {sendConfirmationDialog}
       </div>
     )
   }
@@ -1594,6 +1721,7 @@ export function EmulatePage({client}: EmulatePageProps) {
       <ExplorerBreadcrumbs items={[{label: "Emulate"}]} />
       {simulationHeader}
       {simulationForm}
+      {sendConfirmationDialog}
     </div>
   )
 }

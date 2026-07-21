@@ -172,6 +172,26 @@
   gap: var(--acton-space-3);
 }
 
+.sendConfirmationContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-5);
+}
+
+.sendConfirmationText {
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.55;
+}
+
+.sendConfirmationActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--acton-space-2);
+}
+
 .builderGrid {
   display: grid;
   grid-template-columns: minmax(280px, 0.74fr) minmax(420px, 1.26fr);

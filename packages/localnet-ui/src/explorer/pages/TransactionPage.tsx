@@ -14,6 +14,7 @@ import {
   getTransactionComputePhase,
   type ValueFlowItem,
 } from "@acton/transaction-ui"
+import {InlineAction} from "@acton/ui"
 import {
   AlertCircle,
   ArrowLeft,
@@ -24,6 +25,7 @@ import {
   GitBranch,
   Info,
   ListChecks,
+  Star,
   XCircle,
 } from "lucide-react"
 import {useNavigate, useParams, useSearchParams} from "react-router-dom"
@@ -40,6 +42,7 @@ import {hashToHex, normalizeAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useAvailableFlowMetrics} from "../hooks/useAvailableFlowMetrics"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
+import {useFavoriteTransactions} from "../hooks/useFavoriteTransactions"
 import {useAddressFormat, useNetworkInfo} from "../hooks/useNetworkInfo"
 import {openExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
@@ -282,6 +285,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const [error, setError] = useState<string | undefined>()
   const {fetchName, updateDomains} = useAddressBook()
   const {network} = useNetworkInfo()
+  const {isFavorite, toggleFavorite} = useFavoriteTransactions()
   const metadataRegistry = useMetadataRegistry()
   const resolveVerifiedSourceByCodeHash = useCallback(
     (codeHash: string) => loadVerifiedSourceByCodeHash(metadataRegistry, codeHash),
@@ -315,6 +319,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     const requestedHash = hash.toLowerCase()
     return traces.find(tx => transactionHashHex(tx).toLowerCase() === requestedHash)
   }, [hash, traces])
+  const favorite = isFavorite(hash)
   const currentStateChangesStatus =
     stateChangesStatus.traceHash === traceLookupHash.toLowerCase() ? stateChangesStatus : undefined
 
@@ -374,6 +379,19 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     },
     [hash, navigate, openRetraceOnLoad, routes, searchParams],
   )
+
+  const handleToggleFavorite = useCallback(() => {
+    if (!selectedTraceTransaction) {
+      return
+    }
+
+    toggleFavorite({
+      hash: transactionHashHex(selectedTraceTransaction),
+      account: selectedTraceTransaction.address?.toString(),
+      lt: selectedTraceTransaction.lt,
+      timestamp: selectedTraceTransaction.transaction.now,
+    })
+  }, [selectedTraceTransaction, toggleFavorite])
 
   const loadTransactionActions = useCallback(
     async (tx: TransactionInfo): Promise<LoadedTransactionActions> => {
@@ -665,6 +683,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
           },
         },
       ]}
+      isFavorite={favorite}
       stateChangesLoading={currentStateChangesStatus?.isLoading ?? false}
       stateChangesError={currentStateChangesStatus?.error}
       onTabChange={handleActiveTabChange}
@@ -672,6 +691,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       onContractClick={handleContractClick}
       onTransactionSelect={handleTransactionSelect}
       onBlockClick={handleBlockClick}
+      onToggleFavorite={selectedTraceTransaction ? handleToggleFavorite : undefined}
       loadActions={loadTransactionActions}
       resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
       renderSelectedTransactionExtra={renderSelectedTransactionExtra}
@@ -700,6 +720,7 @@ export interface TransactionTraceViewProps {
   readonly hoveredAction?: V3Action
   readonly nowSeconds?: number
   readonly breadcrumbs?: ComponentProps<typeof ExplorerBreadcrumbs>["items"]
+  readonly isFavorite?: boolean
   readonly stateChangesLoading?: boolean
   readonly stateChangesError?: string
   readonly onTabChange: (tab: TransactionTraceTabType) => void
@@ -710,6 +731,7 @@ export interface TransactionTraceViewProps {
     blockRef: TransactionBlockRef,
     event?: ExplorerNavigationClickEvent,
   ) => void
+  readonly onToggleFavorite?: () => void
   readonly getBlockPath?: (blockRef: TransactionBlockRef) => string | undefined
   readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
   readonly resolveVerifiedSourceByCodeHash?: ResolveVerifiedSourceByCodeHash
@@ -737,6 +759,7 @@ export function TransactionTraceView({
   hoveredAction,
   nowSeconds = Math.floor(Date.now() / 1000),
   breadcrumbs,
+  isFavorite = false,
   stateChangesLoading = false,
   stateChangesError,
   onTabChange,
@@ -744,6 +767,7 @@ export function TransactionTraceView({
   onContractClick,
   onTransactionSelect,
   onBlockClick,
+  onToggleFavorite,
   getBlockPath = blockPath,
   loadActions,
   resolveVerifiedSourceByCodeHash,
@@ -829,8 +853,21 @@ export function TransactionTraceView({
                       </>
                     )}
                   </div>
-                  <div className={styles.value}>
-                    {new Date(firstTrace.transaction.now * 1000).toLocaleString()}
+                  <div className={styles.overviewMeta}>
+                    <div className={styles.value}>
+                      {new Date(firstTrace.transaction.now * 1000).toLocaleString()}
+                    </div>
+                    {onToggleFavorite && (
+                      <InlineAction
+                        className={isFavorite ? styles.favoriteActionActive : undefined}
+                        label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                        icon={
+                          <Star className={isFavorite ? styles.favoriteIconActive : undefined} />
+                        }
+                        aria-pressed={isFavorite}
+                        onClick={onToggleFavorite}
+                      />
+                    )}
                   </div>
                 </div>
               </div>

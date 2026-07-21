@@ -6,6 +6,7 @@ import {useSearchParams} from "react-router-dom"
 
 import type {JettonMaster, StartupWallet} from "../../explorer/api/types"
 import type {TonClient} from "../../explorer/api/client"
+import {waitForTraceTransactionHash} from "../../explorer/api/waitForTraceTransactionHash"
 import {
   formatAddress,
   hashToHex,
@@ -414,7 +415,8 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
       durationMs: 60_000,
     })
 
-    const txHash = await waitForTraceTransactionHash(msgHash)
+    const rawTxHash = await waitForTraceTransactionHash(client, msgHash)
+    const txHash = hashToHex(rawTxHash) ?? rawTxHash
 
     updateToast(toastId, {
       variant: "success",
@@ -511,27 +513,6 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
         minterLookupToastRef.current = undefined
       }
     }
-  }
-
-  async function waitForTraceTransactionHash(msgHash: string): Promise<string | undefined> {
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      if (attempt > 0) {
-        await delay(500)
-      }
-
-      try {
-        const response = await client.getTracesByMessageHash(msgHash)
-        const txHash =
-          response.traces[0]?.trace.tx_hash ?? response.traces[0]?.transactions_order[0]
-        if (txHash) {
-          return hashToHex(txHash) ?? txHash
-        }
-      } catch {
-        // The mint message can be accepted before the next scheduled block indexes its trace.
-      }
-    }
-
-    return undefined
   }
 
   const symbolHint = isJettonMode ? (selectedJettonOption?.badge ?? "jettons") : "GRAM"
@@ -755,12 +736,6 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
       </Dialog>
     </>
   )
-}
-
-function delay(durationMs: number): Promise<void> {
-  return new Promise(resolve => {
-    globalThis.setTimeout(resolve, durationMs)
-  })
 }
 
 interface FaucetDropdownInputProps {

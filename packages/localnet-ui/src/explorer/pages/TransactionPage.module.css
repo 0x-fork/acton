@@ -57,6 +57,25 @@
   gap: 12px;
 }
 
+.overviewMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.favoriteActionActive {
+  color: #d3a416;
+}
+
+.favoriteActionActive:hover:not(:disabled) {
+  color: #d3a416;
+}
+
+.favoriteIconActive {
+  fill: currentColor;
+}
+
 .status {
   display: flex;
   align-items: center;

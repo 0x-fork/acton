@@ -57,6 +57,10 @@ interface SendInternalMessageResponse {
   readonly hash: string
 }
 
+interface SendExternalMessageResponse {
+  readonly hash: string
+}
+
 interface DnsRecordsResponse {
   readonly records: readonly {
     readonly dns_wallet?: string | null
@@ -888,6 +892,20 @@ export class TonClient {
     const response = await this.request<SendInternalMessageResponse>(
       url,
       "Failed to send internal message",
+      {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({boc}),
+      },
+    )
+    return response.hash
+  }
+
+  async sendExternalMessage(boc: string): Promise<string> {
+    const url = this.buildUrl(this.v2BaseUrl, "/sendBocReturnHash")
+    const response = await this.request<SendExternalMessageResponse>(
+      url,
+      "Failed to send external message",
       {
         method: "POST",
         headers: {"Content-Type": "application/json"},
