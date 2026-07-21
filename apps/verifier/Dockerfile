@@ -15,7 +15,7 @@ FROM rust:1.95-slim-bookworm AS rust-builder
 WORKDIR /build
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential pkg-config ca-certificates libssl-dev \
+    && apt-get install -y --no-install-recommends build-essential pkg-config ca-certificates git libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY Cargo.toml Cargo.lock rust-toolchain.toml build.rs ./
