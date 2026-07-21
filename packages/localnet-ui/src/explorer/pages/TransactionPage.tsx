@@ -10,6 +10,7 @@ import {
   type TransactionInfo,
   TransactionTree,
   ValueFlowTable,
+  decodeTransactionMessageBody,
   decodeStorageShardAccount,
   getTransactionComputePhase,
   type ValueFlowItem,
@@ -790,6 +791,16 @@ export function TransactionTraceView({
     tx => transactionHashHex(tx).toLowerCase() === hash.toLowerCase(),
   )
   const selectedTransactionId = selectedTraceTransaction?.id
+  const decodedMessageNamesByTransactionHash = useMemo(() => {
+    const names = new Map<string, string>()
+    for (const tx of traces) {
+      const parsedBody = decodeTransactionMessageBody(tx, contracts, [], compilerAbisByCodeHash)
+      if (parsedBody && parsedBody.opcode === undefined) {
+        names.set(transactionHashHex(tx).toLowerCase(), parsedBody.name)
+      }
+    }
+    return names
+  }, [compilerAbisByCodeHash, contracts, traces])
   const highlightedTransactionIds = useMemo(() => {
     if (!hoveredAction) {
       return undefined
@@ -895,6 +906,7 @@ export function TransactionTraceView({
                     <ActionHistoryTable
                       actions={traceActions}
                       actionMetadata={traceActionMetadata}
+                      decodedMessageNamesByTransactionHash={decodedMessageNamesByTransactionHash}
                       ownerAddress={traceAddress}
                       client={client}
                       nowSeconds={nowSeconds}

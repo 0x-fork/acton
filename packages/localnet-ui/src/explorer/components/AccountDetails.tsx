@@ -1553,6 +1553,7 @@ export function ActionHistoryRows({
 interface ActionHistoryTableProps {
   readonly actions: readonly V3Action[]
   readonly actionMetadata?: V3Metadata
+  readonly decodedMessageNamesByTransactionHash?: ReadonlyMap<string, string>
   readonly ownerAddress: string
   readonly client: TonClient
   readonly nowSeconds: number
@@ -1566,9 +1567,12 @@ interface ActionHistoryTableProps {
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
 }
 
+const EMPTY_DECODED_MESSAGE_NAMES_BY_TRANSACTION_HASH: ReadonlyMap<string, string> = new Map()
+
 export function ActionHistoryTable({
   actions,
   actionMetadata = {},
+  decodedMessageNamesByTransactionHash = EMPTY_DECODED_MESSAGE_NAMES_BY_TRANSACTION_HASH,
   ownerAddress,
   client,
   nowSeconds,
@@ -1589,8 +1593,21 @@ export function ActionHistoryTable({
     addresses: actionAddresses,
   })
   const rows = useMemo(
-    () => buildHistoryActionRows(actions, ownerAddress, actionMetadata, messageNamesByAddress),
-    [actions, actionMetadata, messageNamesByAddress, ownerAddress],
+    () =>
+      buildHistoryActionRows(
+        actions,
+        ownerAddress,
+        actionMetadata,
+        messageNamesByAddress,
+        decodedMessageNamesByTransactionHash,
+      ),
+    [
+      actions,
+      actionMetadata,
+      decodedMessageNamesByTransactionHash,
+      messageNamesByAddress,
+      ownerAddress,
+    ],
   )
 
   return (
@@ -1883,11 +1900,17 @@ function getHistoryActionInfo(
   ownerAddress: string,
   metadata: V3Metadata,
   messageNamesByAddress: MessageNamesByAddress,
+  decodedMessageNamesByTransactionHash: ReadonlyMap<string, string>,
   fallbackIndex: number,
 ): HistoryActionInfo {
   const display = getHistoryActionDisplay(action, {metadata, ownerAddress})
   const transactionHashes = action.transactions.filter(isNonEmptyString)
-  const transactionHash = transactionHashes.map(hashToHex).find(isNonEmptyString)
+  const normalizedTransactionHashes = transactionHashes.map(hashToHex).filter(isNonEmptyString)
+  const transactionHash = normalizedTransactionHashes[0]
+  const decodedMessageName = normalizedTransactionHashes
+    .map(hash => decodedMessageNamesByTransactionHash.get(hash.toLowerCase()))
+    .find(isNonEmptyString)
+  const technicalLabel = getHistoryActionTechnicalLabel(action, messageNamesByAddress)
 
   return {
     rowKey: getActionRowKey(action, fallbackIndex),
@@ -1901,7 +1924,10 @@ function getHistoryActionInfo(
     relationLabel: display.relationLabel,
     actionKey: `toncenter:${action.type}`,
     actionLabel: getHistoryActionLabel(action, display.isIncoming),
-    technicalLabel: getHistoryActionTechnicalLabel(action, messageNamesByAddress),
+    technicalLabel:
+      decodedMessageName && technicalLabel?.label.startsWith("0x")
+        ? {label: decodedMessageName}
+        : technicalLabel,
     valueLines: display.valueLines,
   }
 }
@@ -1911,10 +1937,21 @@ function buildHistoryActionRows(
   ownerAddress: string,
   metadata: V3Metadata,
   messageNamesByAddress: MessageNamesByAddress,
+  decodedMessageNamesByTransactionHash: ReadonlyMap<
+    string,
+    string
+  > = EMPTY_DECODED_MESSAGE_NAMES_BY_TRANSACTION_HASH,
 ): readonly HistoryActionRow[] {
   return actions.map((action, index) => ({
     action,
-    info: getHistoryActionInfo(action, ownerAddress, metadata, messageNamesByAddress, index),
+    info: getHistoryActionInfo(
+      action,
+      ownerAddress,
+      metadata,
+      messageNamesByAddress,
+      decodedMessageNamesByTransactionHash,
+      index,
+    ),
   }))
 }
 
