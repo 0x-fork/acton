@@ -1,4 +1,5 @@
 import {
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   ChevronsRight,
@@ -13,10 +14,12 @@ import {
   CopyButton,
   CopyInlineAction,
   InlineActions,
+  Input,
+  Popover,
   formatToncenterBlockId,
 } from "@acton/ui"
 import {useEffect, useMemo, useState} from "react"
-import type {FC, ReactNode} from "react"
+import type {FC, FormEvent, ReactNode} from "react"
 
 import type {TonClient} from "../api/client"
 import type {V3Block, V3BlockId, V3TransactionListItem} from "../api/types"
@@ -400,6 +403,11 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
               >
                 Next block
               </Button>
+              <BlockDateNavigation
+                client={client}
+                currentBlock={state.block}
+                onOpenBlock={block => void navigate(blockPath(block))}
+              />
               <Button
                 type="button"
                 variant="outline"
@@ -509,6 +517,108 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
         )}
       </section>
     </div>
+  )
+}
+
+const BlockDateNavigation: FC<{
+  readonly client: TonClient
+  readonly currentBlock?: V3Block
+  readonly onOpenBlock: (block: V3Block) => void
+}> = ({client, currentBlock, onOpenBlock}) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const [dateValue, setDateValue] = useState("")
+  const [isSearching, setIsSearching] = useState(false)
+  const [error, setError] = useState<string>()
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setIsOpen(nextOpen)
+    setError(undefined)
+    if (nextOpen && currentBlock) {
+      const unixTime = blockUnixTime(currentBlock)
+      if (unixTime !== undefined) {
+        setDateValue(formatDateTimeLocalInput(unixTime))
+      }
+    }
+  }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const timestamp = new Date(dateValue).getTime()
+    if (!Number.isFinite(timestamp)) {
+      setError("Select a valid date and time")
+      return
+    }
+
+    setIsSearching(true)
+    setError(undefined)
+    try {
+      const response = await client.getBlocks({
+        workchain: -1,
+        endUtime: Math.floor(timestamp / 1000),
+        limit: 1,
+        sort: "desc",
+      })
+      const block = response.blocks[0]
+      if (!block) {
+        setError("No masterchain block exists at or before this time")
+        return
+      }
+
+      setIsOpen(false)
+      onOpenBlock(block)
+    } catch {
+      setError("Failed to find a block. Try again")
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  return (
+    <Popover
+      ariaLabel="Navigate to block by date"
+      content={
+        <form className={styles.blockDateForm} onSubmit={event => void handleSubmit(event)}>
+          <Input
+            type="datetime-local"
+            step={1}
+            size="sm"
+            label="Local date and time"
+            value={dateValue}
+            disabled={isSearching}
+            onChange={event => setDateValue(event.currentTarget.value)}
+          />
+          <p className={styles.blockDateHint}>
+            Opens the latest masterchain block at or before this time
+          </p>
+          {error ? (
+            <p className={styles.blockDateError} role="alert">
+              {error}
+            </p>
+          ) : null}
+          <div className={styles.blockDateActions}>
+            <Button type="submit" variant="primary" size="sm" disabled={!dateValue || isSearching}>
+              {isSearching ? "Finding…" : "Open block"}
+            </Button>
+          </div>
+        </form>
+      }
+      interaction="click"
+      placement="bottom"
+      open={isOpen}
+      onOpenChange={handleOpenChange}
+      maxWidth="min(24rem, calc(100vw - 2rem))"
+      triggerAsChild
+    >
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        leadingIcon={<CalendarDays size={14} />}
+        disabled={!currentBlock}
+      >
+        By date
+      </Button>
+    </Popover>
   )
 }
 
@@ -1179,6 +1289,12 @@ function getBlockActions(
 function blockUnixTime(block: V3Block): number | undefined {
   const value = Number(block.gen_utime)
   return Number.isFinite(value) && value > 0 ? value : undefined
+}
+
+function formatDateTimeLocalInput(unixTime: number): string {
+  const date = new Date(unixTime * 1000)
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().slice(0, 19)
 }
 
 function formatAbsoluteBlockTime(block: V3Block): string {
