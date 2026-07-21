@@ -12,6 +12,7 @@ import {
 import type {BackendContractInfo, BackendTransaction} from "../model/backend"
 import type {
   ContractData,
+  ParsedTransactionBody,
   TransactionInfo,
   ValueFlowAsset,
   ValueFlowAssetChange,
@@ -52,17 +53,21 @@ function parseActions(actionsBase64?: string): {
   }
 }
 
-export function getTransactionOpcode(tx: Transaction): number | undefined {
+export function getTransactionOpcode(
+  tx: Transaction,
+  parsedBody?: ParsedTransactionBody,
+): number | undefined {
   const inMessage = tx.inMessage
-  return inMessage ? getMessageOpcode(inMessage) : undefined
+  return inMessage ? getMessageOpcode(inMessage, parsedBody) : undefined
 }
 
 export function resolveTransactionOpcodeName(
   tx: TransactionInfo,
   contracts: Map<string, ContractData>,
   allContracts: readonly BackendContractInfo[],
+  parsedBody: ParsedTransactionBody | undefined = tx.parsedBody,
 ): string | undefined {
-  const opcode = getTransactionOpcode(tx.transaction)
+  const opcode = getTransactionOpcode(tx.transaction, parsedBody)
   if (opcode === undefined) {
     return undefined
   }

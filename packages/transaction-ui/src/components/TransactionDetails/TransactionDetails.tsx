@@ -32,7 +32,11 @@ import {
   type ContractVerifiedSource,
 } from "../ContractSourcePanel/ContractSourcePanel"
 import * as fmt from "../../lib/format"
-import {decodeMessageBody, decodeStateInitData, getShardAccountBalance} from "../../lib/messageBody"
+import {
+  decodeStateInitData,
+  decodeTransactionMessageBody,
+  getShardAccountBalance,
+} from "../../lib/messageBody"
 import {
   computeSendMode,
   getTransactionActionPhase,
@@ -259,11 +263,12 @@ export function TransactionDetails({
     ...allContracts.map(contract => contract.abi),
     ...(compilerAbisByCodeHash ? [...compilerAbisByCodeHash.values()] : []),
   ].filter((abi): abi is NonNullable<ContractData["abi"]> => abi !== undefined)
-  const parsedBody =
-    tx.parsedBody ??
-    (inMessage
-      ? decodeMessageBody(inMessage, contracts, tx.address?.toString(), additionalMessageBodyAbis)
-      : undefined)
+  const parsedBody = decodeTransactionMessageBody(
+    tx,
+    contracts,
+    allContracts,
+    compilerAbisByCodeHash,
+  )
   const parsedStateInitData = decodeStateInitData(
     stateInitData,
     targetContractWithAbi,
@@ -272,8 +277,9 @@ export function TransactionDetails({
   )
   const sendMode = computeSendMode(tx)
 
-  const opcode = getTransactionOpcode(tx.transaction)
-  const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts)
+  const opcode = getTransactionOpcode(tx.transaction, parsedBody)
+  const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts, parsedBody)
+  const opcodeDisplayName = parsedBody && opcode === undefined ? parsedBody.name : opcodeName
   const resolvedOutActions = loadedActions?.outActions ?? tx.outActions
   const resolvedExecutorActions = loadedActions?.executorActions ?? tx.executorActions
 
@@ -522,7 +528,7 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Opcode</div>
                 <div className={styles.multiColumnItemValue}>
-                  <OpcodeChip opcode={opcode} abiName={opcodeName} showOpcode={true} />
+                  <OpcodeChip opcode={opcode} abiName={opcodeDisplayName} showOpcode={true} />
                 </div>
               </div>
             </div>

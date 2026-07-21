@@ -5,6 +5,7 @@ import type {BackendExecutorAction} from "./backend"
 
 export interface ParsedTransactionBody {
   readonly name: string
+  readonly opcode?: number
   readonly value: ParsedValue
 }
 

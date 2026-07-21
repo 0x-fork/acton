@@ -19,6 +19,7 @@ import type {
 import type {ContractVerifiedSource} from "../ContractSourcePanel/ContractSourcePanel"
 import type {ResolveVerifiedSourceByCodeHash} from "../CodeCellDetails/CodeCellDetails"
 import * as fmt from "../../lib/format"
+import {decodeTransactionMessageBody} from "../../lib/messageBody"
 import {
   getTransactionActionPhase,
   getTransactionComputePhase,
@@ -427,10 +428,22 @@ export function TransactionTree({
               inMessage?.info.type === "internal" ? inMessage.info.value.coins : undefined,
             )
 
-      const opcode = getTransactionOpcode(tx.transaction)
+      const parsedBody = decodeTransactionMessageBody(
+        tx,
+        contracts,
+        allContracts,
+        compilerAbisByCodeHash,
+      )
+      const opcode = getTransactionOpcode(tx.transaction, parsedBody)
       const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
-      const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts)
-      const opcodeHex = opcodeName ?? (opcode === undefined ? "empty" : `0x${opcode.toString(16)}`)
+      const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts, parsedBody)
+      const opcodeHex =
+        opcodeName ??
+        (parsedBody && opcode === undefined
+          ? parsedBody.name
+          : opcode === undefined
+            ? "empty"
+            : `0x${opcode.toString(16)}`)
 
       const contractLetter = thisAddress ? (targetContract?.letter ?? "?") : "?"
 
@@ -553,6 +566,7 @@ export function TransactionTree({
     selectedTransactionIdState,
     highlightedTransactionIds,
     allContracts,
+    compilerAbisByCodeHash,
   ])
 
   const renderCustomNodeElement = ({nodeDatum}: CustomNodeElementProps): React.JSX.Element => {
