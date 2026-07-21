@@ -3,8 +3,22 @@ import {describe, expect, test} from "bun:test"
 import {
   formatAbsoluteTime,
   formatTimeAgo,
+  parseTonDnsSearchQuery,
   shortenIdentifier,
 } from "../src/explorer/components/utils"
+
+describe("parseTonDnsSearchQuery", () => {
+  test("accepts .ton and .t.me TON DNS names", () => {
+    expect(parseTonDnsSearchQuery("foundation.ton")).toBe("foundation.ton")
+    expect(parseTonDnsSearchQuery("  MONK.T.ME  ")).toBe("monk.t.me")
+  })
+
+  test("rejects unsupported or malformed domains", () => {
+    expect(parseTonDnsSearchQuery("monk.me")).toBeUndefined()
+    expect(parseTonDnsSearchQuery("t.me/monk")).toBeUndefined()
+    expect(parseTonDnsSearchQuery("-monk.t.me")).toBeUndefined()
+  })
+})
 
 describe("shortenIdentifier", () => {
   test("keeps short identifiers unchanged", () => {
