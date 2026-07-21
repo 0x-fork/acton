@@ -32,7 +32,14 @@ Configured relative paths resolve from the project root. `--db-path` overrides
 the configured value for a single run; a relative CLI path resolves from the
 current working directory.
 
-This is useful for long-running local environments.
+SQLite preserves committed blocks, transactions, messages, account history,
+latest account state and blockchain config, CAS data, compiler ABIs, and
+verified sources. Account keys include the workchain, so basechain and
+masterchain addresses cannot collide.
+
+Queued but unmined messages, pending time overrides, address aliases, and
+derived token/NFT caches belong to the running process. Use a JSON state file
+or checkpoint when those runtime details must be carried over exactly.
 
 ## JSON State Files
 
@@ -45,7 +52,13 @@ acton localnet state load states/localnet.json
 
 `state load` replaces the current live state and clears all in-memory
 checkpoints. The CLI reads and writes the file itself; the localnet server only
-receives the JSON bytes.
+receives the JSON bytes. State and checkpoint imports validate their block
+history, CAS hashes, config, account references, transactions, messages, and
+queue references before replacing live or SQLite state.
+
+State and checkpoint exports are written through a temporary file in the same
+directory and atomically moved into place, so a failed write does not truncate
+an existing export.
 
 You can also load state during startup:
 
@@ -70,8 +83,8 @@ acton localnet start \
 ```
 
 <Callout>
-`--load-state` cannot be used when a database path comes from either
-`--db-path` or `[localnet].db-path`.
+  `--load-state` cannot be used when a database path comes from either `--db-path` or
+  `[localnet].db-path`.
 </Callout>
 
 ## Checkpoints
@@ -122,9 +135,9 @@ state file can also bring back explorer-oriented metadata and local admin state.
 
 ## Choosing a Strategy
 
-| Use case                                      | Recommended mode                |
-|-----------------------------------------------|---------------------------------|
-| Stable long-lived local environment           | `--db-path`                     |
-| Portable, shareable local state               | `localnet state dump/load`     |
-| Repeated restore points in one process         | `localnet checkpoint`          |
-| Fast ad-hoc experimentation                   | in-memory (no flags)            |
+| Use case                               | Recommended mode           |
+| -------------------------------------- | -------------------------- |
+| Stable long-lived local environment    | `--db-path`                |
+| Portable, shareable local state        | `localnet state dump/load` |
+| Repeated restore points in one process | `localnet checkpoint`      |
+| Fast ad-hoc experimentation            | in-memory (no flags)       |

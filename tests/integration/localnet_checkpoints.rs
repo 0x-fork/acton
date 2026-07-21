@@ -6,7 +6,7 @@ use crate::support::localnet::{
     wait_for_address_balance_at_least,
 };
 use crate::support::project::ProjectBuilder;
-use serde_json::json;
+use serde_json::{Value, json};
 use std::time::Duration;
 use ton_api::toncenter::v2::responses::TonlibErrorResponse;
 
@@ -176,6 +176,13 @@ fn failed_forced_checkpoint_import_preserves_existing_checkpoint() {
         "/acton_importCheckpoint?name=stable&force=true",
         b"not valid checkpoint JSON".to_vec(),
     );
+    let mut invalid_state = node.get_json("/acton_dumpState");
+    invalid_state["globals"]["config_boc_hash"] = Value::String("ff".repeat(32));
+    let (semantic_status, semantic_error): (u16, TonlibErrorResponse) = node
+        .post_bytes_with_status_as(
+            "/acton_importCheckpoint?name=stable&force=true",
+            serde_json::to_vec(&invalid_state).expect("invalid checkpoint must serialize"),
+        );
     let listed = node.get_json("/acton_listCheckpoints");
     let restored = node.post_json("/acton_restoreCheckpoint", &json!({ "name": "stable" }));
 
@@ -188,6 +195,11 @@ fn failed_forced_checkpoint_import_preserves_existing_checkpoint() {
             "status": status,
             "code": error.code,
             "reported_error": !error.error.is_empty(),
+        },
+        "failed_semantic_import": {
+            "status": semantic_status,
+            "code": semantic_error.code,
+            "reported_error": !semantic_error.error.is_empty(),
         },
         "list_after_failure": {
             "ok": listed["ok"],

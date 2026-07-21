@@ -8,6 +8,8 @@ use crate::support::project::ProjectBuilder;
 use serde_json::{Value, json};
 use std::fs;
 
+const GIVER_ADDRESS: &str = "0:5555555555555555555555555555555555555555555555555555555555555555";
+
 #[test]
 fn localnet_state_dump_and_load_replace_live_state_and_clear_checkpoints() {
     let project = ProjectBuilder::new("localnet-state-transfer").build();
@@ -218,6 +220,7 @@ fn sqlite_state_dump_preserves_transactions_and_historical_account_states() {
         },
         "sqlite_reopen": {
             "head_seqno_preserved": sqlite["head_seqno"] == live["head_seqno"],
+            "giver_balance_preserved": sqlite["giver_balance"] == live["giver_balance"],
             "latest_state_preserved": sqlite["latest_balance"] == live["latest_balance"],
             "historical_state_preserved": sqlite["historical_balance"] == live["historical_balance"],
             "transactions_preserved": sqlite["transaction_hashes"] == live["transaction_hashes"],
@@ -237,6 +240,7 @@ fn sqlite_state_dump_preserves_transactions_and_historical_account_states() {
         "clean_node_load": {
             "output": load_output.get_stdout().trim(),
             "head_seqno_preserved": loaded["head_seqno"] == live["head_seqno"],
+            "giver_balance_preserved": loaded["giver_balance"] == live["giver_balance"],
             "latest_state_preserved": loaded["latest_balance"] == live["latest_balance"],
             "historical_state_preserved": loaded["historical_balance"] == live["historical_balance"],
             "transactions_preserved": loaded["transaction_hashes"] == live["transaction_hashes"],
@@ -244,12 +248,14 @@ fn sqlite_state_dump_preserves_transactions_and_historical_account_states() {
         "sqlite_load": {
             "output": sqlite_load_output.get_stdout().trim(),
             "head_seqno_preserved": imported_view["head_seqno"] == live["head_seqno"],
+            "giver_balance_preserved": imported_view["giver_balance"] == live["giver_balance"],
             "latest_state_preserved": imported_view["latest_balance"] == live["latest_balance"],
             "historical_state_preserved": imported_view["historical_balance"] == live["historical_balance"],
             "transactions_preserved": imported_view["transaction_hashes"] == live["transaction_hashes"],
         },
         "sqlite_load_after_reopen": {
             "head_seqno_preserved": reopened_import_view["head_seqno"] == live["head_seqno"],
+            "giver_balance_preserved": reopened_import_view["giver_balance"] == live["giver_balance"],
             "latest_state_preserved": reopened_import_view["latest_balance"] == live["latest_balance"],
             "historical_state_preserved": reopened_import_view["historical_balance"] == live["historical_balance"],
             "transactions_preserved": reopened_import_view["transaction_hashes"] == live["transaction_hashes"],
@@ -270,6 +276,9 @@ fn persistence_view(
     historical_seqno: u32,
 ) -> Value {
     let latest = node.get_json(&format!("/api/v2/getAddressInformation?address={address}"));
+    let giver = node.get_json(&format!(
+        "/api/v2/getAddressInformation?address={GIVER_ADDRESS}"
+    ));
     let historical = node.get_json(&format!(
         "/api/v2/getAddressInformation?address={address}&seqno={historical_seqno}"
     ));
@@ -286,6 +295,7 @@ fn persistence_view(
 
     json!({
         "head_seqno": latest_masterchain_seqno(node),
+        "giver_balance": parse_address_balance(&giver).to_string(),
         "latest_balance": parse_address_balance(&latest).to_string(),
         "historical_balance": parse_address_balance(&historical).to_string(),
         "transaction_hashes": transaction_hashes,

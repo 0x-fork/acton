@@ -776,6 +776,7 @@ impl Checkpoints {
         let name = normalize_checkpoint_name(name)?;
         let replacement_index = self.replacement_index(&name, force)?;
         let snapshot = snapshot_from_json(json)?;
+        Node::validate_snapshot(&snapshot)?;
         Ok(self.store_snapshot(snapshot, name, replacement_index))
     }
 

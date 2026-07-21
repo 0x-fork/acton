@@ -11,6 +11,11 @@
     "reported_error": true,
     "status": 500
   },
+  "failed_semantic_import": {
+    "code": 500,
+    "reported_error": true,
+    "status": 500
+  },
   "list_after_failure": {
     "ok": true,
     "result": [

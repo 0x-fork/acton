@@ -1,6 +1,7 @@
 use acton_config::color::OwoColorize;
 use anyhow::Context;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 pub async fn localnet_state_dump_cmd(
@@ -20,12 +21,7 @@ pub async fn localnet_state_dump_cmd(
     let json =
         super::get_localnet_control_bytes(port, auth_token, "acton_dumpState", &[], "Dump state")
             .await?;
-    if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(&path, json)?;
+    write_json_atomically(&path, &json)?;
 
     println!(
         "{} localnet state to {}",
@@ -224,12 +220,7 @@ pub async fn localnet_checkpoint_export_cmd(
         "Export checkpoint",
     )
     .await?;
-    if let Some(parent) = out.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(&out, json)?;
+    write_json_atomically(&out, &json)?;
 
     println!(
         "{} localnet checkpoint {} to {}",
@@ -284,6 +275,21 @@ fn resolve_project_path(path: PathBuf) -> PathBuf {
     } else {
         acton_config::config::project_root().join(path)
     }
+}
+
+fn write_json_atomically(path: &Path, json: &[u8]) -> anyhow::Result<()> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(parent)?;
+
+    let mut temp = tempfile::NamedTempFile::new_in(parent)?;
+    temp.write_all(json)?;
+    temp.as_file_mut().flush()?;
+    temp.as_file().sync_all()?;
+    temp.persist(path).map_err(|error| error.error)?;
+    Ok(())
 }
 
 fn normalize_checkpoint_name(name: &str) -> anyhow::Result<String> {

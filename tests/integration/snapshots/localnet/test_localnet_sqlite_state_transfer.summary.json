@@ -1,5 +1,6 @@
 {
   "clean_node_load": {
+    "giver_balance_preserved": true,
     "head_seqno_preserved": true,
     "historical_state_preserved": true,
     "latest_state_preserved": true,
@@ -22,6 +23,7 @@
     "transaction_count": 2
   },
   "sqlite_load": {
+    "giver_balance_preserved": true,
     "head_seqno_preserved": true,
     "historical_state_preserved": true,
     "latest_state_preserved": true,
@@ -29,12 +31,14 @@
     "transactions_preserved": true
   },
   "sqlite_load_after_reopen": {
+    "giver_balance_preserved": true,
     "head_seqno_preserved": true,
     "historical_state_preserved": true,
     "latest_state_preserved": true,
     "transactions_preserved": true
   },
   "sqlite_reopen": {
+    "giver_balance_preserved": true,
     "head_seqno_preserved": true,
     "historical_state_preserved": true,
     "latest_state_preserved": true,

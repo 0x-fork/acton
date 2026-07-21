@@ -196,9 +196,9 @@ impl Node {
         state_source: StateSource,
         db_path: Option<P>,
     ) -> anyhow::Result<Self> {
-        let config_cell =
+        let initial_config_cell =
             Boc::decode(&config_boc).context("Failed to decode blockchain config BOC")?;
-        let config_hash = Hash256::from(config_cell.repr_hash());
+        let initial_config_hash = Hash256::from(initial_config_cell.repr_hash());
 
         let persistence = db_path.map(NodePersistence::open).transpose()?;
         let (mut latest, mut history, indexes, head_seqno) = if let Some(persistence) = &persistence
@@ -220,16 +220,26 @@ impl Node {
         };
         for block in &mut history.masterchain_blocks {
             if block.config_boc_hash == Hash256::default() {
-                block.config_boc_hash = config_hash;
+                block.config_boc_hash = initial_config_hash;
             }
         }
+        let config_hash = history
+            .masterchain_blocks
+            .last()
+            .map_or(initial_config_hash, |block| block.config_boc_hash);
 
         let mut cas = if let Some(persistence) = &persistence {
             CellStore::with_conn(persistence.connection())
         } else {
             CellStore::new()
         };
-        cas.put(config_boc, config_hash);
+        cas.put(config_boc, initial_config_hash);
+        let config_cell = if config_hash == initial_config_hash {
+            initial_config_cell
+        } else {
+            cas.get_cell(&config_hash)
+                .context("Persisted blockchain config missing")?
+        };
 
         latest
             .accounts
@@ -273,6 +283,9 @@ impl Node {
             pending_freeze_current: VecDeque::new(),
         };
         node.rebuild_global_libraries_from_accounts()?;
+        if node.persistence.is_some() {
+            node.build_snapshot().context("Invalid SQLite state")?;
+        }
         Ok(node)
     }
 
@@ -1226,7 +1239,7 @@ impl Node {
         Ok(())
     }
 
-    fn collect_code_library_refs_from_shard_account(
+    pub(crate) fn collect_code_library_refs_from_shard_account(
         shard_account_boc: &BocBytes,
     ) -> anyhow::Result<Vec<Hash256>> {
         let cell = Boc::decode(shard_account_boc).context("Failed to decode shard account BOC")?;
@@ -1250,7 +1263,7 @@ impl Node {
         Self::collect_library_refs(&code)
     }
 
-    fn collect_library_refs(root: &Cell) -> anyhow::Result<Vec<Hash256>> {
+    pub(crate) fn collect_library_refs(root: &Cell) -> anyhow::Result<Vec<Hash256>> {
         let mut hashes = HashSet::new();
         let mut visited = HashSet::new();
         Self::collect_library_refs_inner(root, &mut hashes, &mut visited)?;
@@ -1278,7 +1291,7 @@ impl Node {
         Ok(())
     }
 
-    fn extract_public_libraries_from_shard_account(
+    pub(crate) fn extract_public_libraries_from_shard_account(
         shard_account_boc: &BocBytes,
     ) -> anyhow::Result<HashMap<Hash256, Cell>> {
         let cell = Boc::decode(shard_account_boc).context("Failed to decode shard account BOC")?;
@@ -1327,7 +1340,7 @@ impl Node {
         );
 
         if let Some(persistence) = &self.persistence {
-            persistence.persist_commit(&pending, &self.history)?;
+            persistence.persist_commit(&pending, &self.history, &self.latest)?;
         }
 
         // Apply delta
@@ -2606,10 +2619,6 @@ impl Node {
             .map_or(0, |block| block.gen_utime)
     }
 
-    pub(crate) fn bump_offset_to_at_least(&mut self, timestamp: u32) -> anyhow::Result<()> {
-        self.clock.bump_offset_to_at_least(timestamp)
-    }
-
     fn empty_shard_account_boc() -> anyhow::Result<BocBytes> {
         Self::shard_account_boc(OptionalAccount(None), HashBytes::ZERO, 0)
     }
@@ -3084,8 +3093,8 @@ mod tests {
         Transaction, TxInfo,
     };
     use tycho_types::models::{
-        Account, CurrencyCollection, IntAddr, OptionalAccount, SimpleLib, StateInit, StdAddr,
-        StdAddrFormat,
+        Account, BlockchainConfigParams, CurrencyCollection, IntAddr, OptionalAccount, SimpleLib,
+        StateInit, StdAddr, StdAddrFormat,
     };
 
     struct NoopExecutor;
@@ -3251,6 +3260,68 @@ mod tests {
     }
 
     #[test]
+    fn db_reopen_restores_latest_block_config() {
+        const TEST_PARAM: u32 = 999;
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-config-reopen-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+        let initial_config =
+            BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            initial_config.clone(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+
+        let mut marker = CellBuilder::new();
+        marker
+            .store_u32(0xfeed_cafe)
+            .expect("test config marker must fit");
+        let mut params = BlockchainConfigParams::from_raw(node.config_cell.clone());
+        params
+            .set_raw(
+                TEST_PARAM,
+                marker.build().expect("test config marker must build"),
+            )
+            .expect("test config param must be inserted");
+        let config_cell = params
+            .as_dict()
+            .root()
+            .as_ref()
+            .expect("config dictionary must remain non-empty")
+            .clone();
+        let config_hash = Hash256::from(config_cell.repr_hash());
+        node.cas
+            .put(BocBytes::from(Boc::encode(config_cell)), config_hash);
+        node.globals.config_boc_hash = config_hash;
+        node.mine_block().expect("config block must be mined");
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            initial_config,
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+
+        assert_eq!(reopened.globals.config_boc_hash, config_hash);
+        assert_eq!(Hash256::from(reopened.config_cell.repr_hash()), config_hash);
+
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
     fn compiler_abi_registry_persists_across_db_reopen() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -3392,17 +3463,18 @@ mod tests {
         let in_msg_hash_norm = Hash256([0x21; 32]);
         let out_msg_hash = Hash256([0x12; 32]);
         let block_hash = Hash256([0x13; 32]);
-        let dummy_boc = BocBytes::from(Boc::encode(Cell::default()));
+        let dummy_cell = Cell::default();
+        let dummy_hash = Hash256::from(dummy_cell.repr_hash());
+        let dummy_boc = BocBytes::from(Boc::encode(dummy_cell));
         let account_boc = make_uninit_shard_account_boc(account);
         let account_meta = store_test_account_meta(&mut node, &account_boc, AccountStatus::Uninit);
-        node.cas.put(dummy_boc.clone(), in_msg_hash);
-        node.cas.put(dummy_boc, out_msg_hash);
+        node.cas.put(dummy_boc, dummy_hash);
         node.history.msg_by_hash.insert(
             in_msg_hash,
             MsgMeta {
                 msg_hash: in_msg_hash,
                 hash_norm: Some(in_msg_hash_norm),
-                msg_boc_hash: in_msg_hash,
+                msg_boc_hash: dummy_hash,
                 src: None,
                 dst: Some(account),
                 value: None,
@@ -3416,7 +3488,7 @@ mod tests {
             MsgMeta {
                 msg_hash: out_msg_hash,
                 hash_norm: None,
-                msg_boc_hash: out_msg_hash,
+                msg_boc_hash: dummy_hash,
                 src: Some(account),
                 dst: Some(test_addr(0x43)),
                 value: Some(1),
@@ -3539,6 +3611,55 @@ mod tests {
     }
 
     #[test]
+    fn db_reopen_preserves_account_workchain() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-address-reopen-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc.clone(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+
+        let masterchain_account = Addr {
+            workchain: -1,
+            addr: [0x45; 32],
+        };
+        node.set_shard_account(
+            &masterchain_account,
+            make_uninit_shard_account_boc(masterchain_account),
+        )
+        .expect("masterchain account must persist");
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+
+        assert!(reopened.latest.accounts.contains_key(&masterchain_account));
+        assert!(!reopened.latest.accounts.contains_key(&Addr {
+            workchain: 0,
+            addr: masterchain_account.addr,
+        }));
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
     fn snapshot_load_rebuilds_historical_account_and_out_message_indexes() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -3552,8 +3673,16 @@ mod tests {
         let snapshot_path = temp_root.join("state.json");
 
         let account = test_addr(0x44);
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account_boc = make_uninit_shard_account_boc(account);
+        let account_hash = Hash256::from(
+            Boc::decode(&account_boc)
+                .expect("account BOC must decode")
+                .repr_hash(),
+        );
+        node.cas.put(account_boc, account_hash);
         let account_meta = AccountMeta {
-            account_hash: Hash256([0x41; 32]),
+            account_hash,
             status: AccountStatus::Active,
             balance: 7,
             extra_currencies: Vec::new(),
@@ -3564,8 +3693,24 @@ mod tests {
             frozen_hash: None,
         };
         let tx_hash = Hash256([0x10; 32]);
-        let out_msg_hash = Hash256([0x11; 32]);
-        let mut node = make_test_node(Box::new(NoopExecutor));
+        let message_cell = Cell::default();
+        let out_msg_hash = Hash256::from(message_cell.repr_hash());
+        node.cas
+            .put(BocBytes::from(Boc::encode(message_cell)), out_msg_hash);
+        node.history.msg_by_hash.insert(
+            out_msg_hash,
+            MsgMeta {
+                msg_hash: out_msg_hash,
+                hash_norm: None,
+                msg_boc_hash: out_msg_hash,
+                src: Some(account),
+                dst: None,
+                value: None,
+                bounce: None,
+                created_lt: None,
+                created_at: None,
+            },
+        );
         node.globals.head_seqno = 2;
         node.history.blocks.push(BlockMeta {
             seqno: 1,
@@ -3577,13 +3722,26 @@ mod tests {
             block_hash: Hash256([0x12; 32]),
             file_hash: Hash256([0x12; 32]),
         });
-        node.history.deltas_by_seqno = vec![vec![AccountDelta {
-            addr: account,
-            old_hash: None,
-            new_hash: Some(account_meta.account_hash),
-            old_meta: None,
-            new_meta: Some(account_meta.clone()),
-        }]];
+        node.history.blocks.push(BlockMeta {
+            seqno: 2,
+            prev_seqno: Some(1),
+            gen_utime: 4,
+            start_lt: 10,
+            end_lt: 10,
+            tx_hashes: Vec::new(),
+            block_hash: Hash256([0x13; 32]),
+            file_hash: Hash256([0x13; 32]),
+        });
+        node.history.deltas_by_seqno = vec![
+            vec![AccountDelta {
+                addr: account,
+                old_hash: None,
+                new_hash: Some(account_meta.account_hash),
+                old_meta: None,
+                new_meta: Some(account_meta.clone()),
+            }],
+            Vec::new(),
+        ];
         node.history.tx_by_hash.insert(
             tx_hash,
             TxMeta {
@@ -3622,6 +3780,62 @@ mod tests {
         );
         assert_eq!(loaded.indexes.tx_by_block.get(&1), Some(&vec![tx_hash]));
 
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn invalid_snapshot_does_not_replace_memory_or_sqlite_state() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-atomic-snapshot-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc.clone(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+        let before = node.dump_state_to_json().expect("state must dump");
+        let mut invalid: Value = serde_json::from_slice(&before).expect("state must be valid JSON");
+        invalid["globals"]["config_boc_hash"] = Value::String("ff".repeat(32));
+        let invalid = serde_json::to_vec(&invalid).expect("invalid state must serialize");
+
+        let error = node
+            .load_state_from_json(&invalid)
+            .expect_err("state with missing config must be rejected");
+        assert!(error.to_string().contains("Config missing"));
+        assert_eq!(
+            node.dump_state_to_json()
+                .expect("live state must still dump"),
+            before,
+            "failed load must not mutate live state"
+        );
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+        assert_eq!(
+            reopened
+                .dump_state_to_json()
+                .expect("reopened state must dump"),
+            before,
+            "failed load must not replace SQLite state"
+        );
+
+        drop(reopened);
         let _ = std::fs::remove_dir_all(temp_root);
     }
 
