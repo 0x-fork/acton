@@ -183,7 +183,7 @@ async fn verify_tact_with_real_compiler_and_stores_generated_sources() {
     assert_eq!(body.bundles.len(), 1);
     assert_eq!(body.bundles[0].compiler.language, "tact");
     assert_eq!(body.bundles[0].compiler.version, "1.6.13");
-    assert_eq!(body.bundles[0].entrypoint, "contract.pkg");
+    assert_eq!(body.bundles[0].entrypoint, "contract/contract.tact");
     let files = &body.bundles[0].files;
     assert!(files.iter().any(|file| file.path == "contract.pkg"));
     assert!(

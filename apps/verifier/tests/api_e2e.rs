@@ -33,7 +33,7 @@ const SOURCES_MAIN: &str = r#"[{"path":"main.tolk","is_entrypoint":true}]"#;
 const SOURCES_FUNC_MAIN: &str =
     r#"[{"path":"main.fc","is_entrypoint":true,"include_in_command":true}]"#;
 const SOURCES_TACT_PKG: &str = r#"[{"path":"contract.pkg","is_entrypoint":true}]"#;
-const TACT_PKG_1_6_13: &str = r#"{"compiler":{"version":"1.6.13"}}"#;
+const TACT_PKG_1_6_13: &str = r#"{"compiler":{"version":"1.6.13","parameters":"{\"entrypoint\":\"./contract.tact\",\"options\":{}}"}}"#;
 const SOURCES_TWO_FILES: &str = r#"[
   {"path":"main.tolk","is_entrypoint":true},
   {"path":"imports/lib.tolk","is_entrypoint":false}
@@ -656,7 +656,7 @@ async fn verify_accepts_tact_and_reads_compiler_version_from_pkg() {
     };
     assert_eq!(snapshot.0, "tact");
     assert_eq!(snapshot.1, "1.6.13");
-    assert_eq!(snapshot.2, "contract.pkg");
+    assert_eq!(snapshot.2, "contract.tact");
 }
 
 #[tokio::test]

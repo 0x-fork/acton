@@ -25,7 +25,7 @@ pub(super) fn prepare(
     let language = Language::parse(language)?;
     validate_sources(sources)?;
 
-    let entrypoint = language.entrypoint(sources)?;
+    let entrypoint = language.entrypoint(sources, files)?;
     let compiler_version = language.compiler_version(compile_params, sources, files)?;
     let import_mappings = language.import_mappings(compile_params)?;
 
@@ -64,11 +64,15 @@ impl Language {
         }
     }
 
-    fn entrypoint(self, sources: &[SourceMetadata]) -> Result<String, ApiError> {
+    fn entrypoint(
+        self,
+        sources: &[SourceMetadata],
+        files: &BTreeMap<String, ReceivedFile>,
+    ) -> Result<String, ApiError> {
         match self {
             Self::Func => func::entrypoint(sources),
             Self::Tolk => tolk::entrypoint(sources),
-            Self::Tact => tact::entrypoint(sources),
+            Self::Tact => tact::entrypoint(sources, files),
         }
     }
 
