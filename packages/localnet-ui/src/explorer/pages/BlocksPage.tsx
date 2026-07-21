@@ -887,6 +887,8 @@ const BlockTransactionsTable: FC<{
           <tbody>
             {transactions.map((transaction, index) => {
               const hash = hashToHex(transaction.hash) ?? transaction.hash
+              const exitCode = formatTransactionExitCode(transaction)
+              const hasNonZeroExitCode = exitCode !== "0" && exitCode !== "Unknown"
               return (
                 <tr
                   key={`${transaction.hash}:${transaction.lt}`}
@@ -922,8 +924,12 @@ const BlockTransactionsTable: FC<{
                       />
                     </span>
                   </td>
-                  <td className={styles.blocksExitCodeCell}>
-                    {formatTransactionExitCode(transaction)}
+                  <td
+                    className={`${styles.blocksExitCodeCell} ${
+                      hasNonZeroExitCode ? styles.blocksExitCodeFailure : ""
+                    }`}
+                  >
+                    {exitCode}
                   </td>
                 </tr>
               )

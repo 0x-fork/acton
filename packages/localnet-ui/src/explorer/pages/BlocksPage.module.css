@@ -228,6 +228,10 @@
   text-align: right;
 }
 
+.blocksTable td.blocksExitCodeFailure {
+  color: var(--acton-color-danger-text);
+}
+
 .blockDetailToolbar {
   display: flex;
   flex-wrap: wrap;
