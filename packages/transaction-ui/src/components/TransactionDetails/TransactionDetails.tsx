@@ -40,6 +40,7 @@ import {
   getTransactionOpcode,
   getTransactionSourceLabel,
   getTransactionTriggerLabel,
+  isSystemSourceAddress,
   resolveTransactionOpcodeName,
 } from "../../lib/transaction"
 
@@ -215,6 +216,16 @@ export function TransactionDetails({
       ? {...targetContract, abi: targetAbi}
       : targetContract
   const sourceLabel = getTransactionSourceLabel(tx.transaction)
+  const internalSource = inMessage?.info.type === "internal" ? inMessage.info.src : undefined
+  const internalSourceAddress = internalSource?.toString()
+  const sourceContracts =
+    internalSource && internalSourceAddress && isSystemSourceAddress(internalSource)
+      ? new Map(contracts).set(internalSourceAddress, {
+          displayName: "System",
+          address: internalSource,
+          letter: "S",
+        })
+      : contracts
   const hasMessageBody =
     // biome-ignore lint/suspicious/noDoubleEquals: ok
     inMessage != undefined &&
@@ -395,12 +406,12 @@ export function TransactionDetails({
               </span>
             ) : (
               <span className={styles.triggerRoute}>
-                {sourceLabel ? (
+                {sourceLabel && !internalSource ? (
                   <span className={styles.messageEndpointBadge}>{sourceLabel}</span>
                 ) : (
                   <ContractChip
-                    address={tx.transaction.inMessage?.info.src?.toString()}
-                    contracts={contracts}
+                    address={internalSourceAddress}
+                    contracts={sourceContracts}
                     onContractClick={onContractClick}
                   />
                 )}

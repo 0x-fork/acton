@@ -309,10 +309,17 @@ export function getTransactionTriggerLabel(tx: Transaction): string | undefined 
   return undefined
 }
 
+export function isSystemSourceAddress(address: Address | null | undefined): boolean {
+  return address?.workChain === -1 && address.hash.every(byte => byte === 0)
+}
+
 export function getTransactionSourceLabel(tx: Transaction): string | undefined {
   const inMessage = tx.inMessage
   if (inMessage?.info.type === "external-in") {
     return "External In"
+  }
+  if (inMessage?.info.type === "internal" && isSystemSourceAddress(inMessage.info.src)) {
+    return "System"
   }
   return getTransactionTriggerLabel(tx)
 }

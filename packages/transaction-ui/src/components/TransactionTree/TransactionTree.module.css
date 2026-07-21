@@ -124,6 +124,15 @@
   pointer-events: none;
 }
 
+.systemRootNode {
+  pointer-events: auto;
+  cursor: help;
+}
+
+.systemRootNode * {
+  cursor: help;
+}
+
 .rootCircle {
   cursor: default;
 }
@@ -193,6 +202,14 @@
   word-wrap: break-word;
   word-break: break-all;
   overflow-wrap: break-word;
+}
+
+.tooltipDescription {
+  word-break: normal;
+}
+
+.systemTooltip {
+  width: min(20rem, calc(100vw - 64px));
 }
 
 .tooltipAddressChip {
