@@ -3093,7 +3093,12 @@ fn wait_for_transaction_impl(
             println!("Awaiting transaction... [Attempt {attempt}/{attempts}]");
         }
 
-        match poll_send_result_v2(&api_client, &dest_address, &target_hash) {
+        match poll_send_result_v2(
+            &api_client,
+            &dest_address,
+            &target_hash,
+            ctx.execution_started_at,
+        ) {
             Ok(Some(polled)) => {
                 if let Some(reason) = &polled.root_failure {
                     let link = transaction_link(ctx, &dest_address, &polled);
@@ -3219,6 +3224,7 @@ fn poll_send_result_v2(
     client: &TonApiClient,
     dest_address: &str,
     target_hash: &HashBytes,
+    execution_started_at: i64,
 ) -> anyhow::Result<Option<PolledSendResult>> {
     let txs = client.get_transactions(dest_address, Some(100), None, None)?;
     for tx in txs {
@@ -3227,6 +3233,11 @@ fn poll_send_result_v2(
         let parsed_tx: Transaction = tx_cell
             .parse::<Transaction>()
             .context("Failed to parse transaction from toncenter BoC")?;
+        // Transaction timestamps have one-second precision, so a transaction produced in the
+        // same second as the script started is current; only strictly older matches are stale.
+        if i64::from(parsed_tx.now) < execution_started_at {
+            continue;
+        }
         let Some(in_msg_cell) = parsed_tx.in_msg.as_ref() else {
             continue;
         };
