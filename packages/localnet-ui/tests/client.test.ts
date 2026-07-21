@@ -32,6 +32,70 @@ test("getShardAccountCell reads the unwrapped V2 response", async () => {
   }
 })
 
+test("masterchain shard blocks are resolved from the V2 shard snapshot", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  const shardBlock = {
+    workchain: 0,
+    shard: "8000000000000000",
+    seqno: 84_021_699,
+    root_hash: "root-hash",
+    file_hash: "file-hash",
+    created_by: "created-by",
+    rand_seed: "rand-seed",
+    start_lt: "89777846000000",
+    end_lt: "89777846000001",
+    gen_utime: "1783903686",
+    tx_count: 0,
+  }
+  globalThis.fetch = mock(async input => {
+    const url = new URL(input.toString())
+    requests.push(url)
+    if (url.pathname.endsWith("/getShards")) {
+      return Response.json({
+        ok: true,
+        result: {
+          "@type": "blocks.shards",
+          shards: [
+            {
+              "@type": "ton.blockIdExt",
+              workchain: 0,
+              shard: "-9223372036854775808",
+              seqno: shardBlock.seqno,
+              root_hash: shardBlock.root_hash,
+              file_hash: shardBlock.file_hash,
+            },
+          ],
+        },
+      })
+    }
+    return Response.json({blocks: [shardBlock]})
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    await expect(client.getMasterchainBlockShards(79_299_165)).resolves.toEqual({
+      blocks: [shardBlock],
+    })
+    expect(requests).toHaveLength(2)
+    expect(requests[0]?.pathname).toBe("/api/v2/getShards")
+    expect(requests[0]?.searchParams.get("seqno")).toBe("79299165")
+    expect(requests[1]?.pathname).toBe("/api/v3/blocks")
+    expect(requests[1]?.searchParams.get("workchain")).toBe("0")
+    expect(requests[1]?.searchParams.get("shard")).toBe("8000000000000000")
+    expect(requests[1]?.searchParams.get("seqno")).toBe("84021699")
+    expect(requests[1]?.searchParams.get("root_hash")).toBe(shardBlock.root_hash)
+    expect(requests[1]?.searchParams.get("file_hash")).toBe(shardBlock.file_hash)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("account history requests forward the requested sort order", async () => {
   const originalFetch = globalThis.fetch
   const requests: string[] = []

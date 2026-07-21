@@ -541,9 +541,9 @@ Import:
 import { BlockChip } from "@acton/ui"
 ```
 
-Use BlockChip for a compact block seqno link or read-only value. It has one
-accent visual treatment shared with AddressChip and an optional coordinated
-highlight state.
+Use BlockChip for a compact block seqno or full block ID link/read-only value.
+It has one accent visual treatment shared with AddressChip and an optional
+coordinated highlight state.
 
 ### Composition
 
@@ -553,10 +553,12 @@ highlight state.
   shard={block.shard}
   seqno={block.seqno}
   href={blockPath(block)}
+  display="full"
 />
 ```
 
 - `workchain`, `shard`, and `seqno`: identify the block; only seqno is displayed.
+- `display="full"`: displays `(workchain,shard,seqno)` instead of only the seqno.
 - `href`: renders a native link; without it the chip is read-only.
 - `label`: optional display content when the caller needs more context than the
   raw seqno.
@@ -568,12 +570,15 @@ highlight state.
 
 - Read-only block
 - Linked block and hover highlight
+- Full block ID
 - Coordinated highlighted state
 - Keyboard focus
 
 ### Agent Guidance
 
 - Keep workchain, shard, route construction, and data fetching in the caller.
+- Use `display="full"` where a bare seqno would be ambiguous, such as previous
+  block references. Keep dense block tables on the default seqno display.
 - Preserve `href` when integrating a client router so modifier-click remains useful.
 - Do not add variants; BlockChip intentionally has one visual treatment.
 

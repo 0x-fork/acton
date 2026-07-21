@@ -1026,6 +1026,10 @@ export const ExplorerApp: FC = () => {
                       <Route path="/emulate" element={<EmulatePage client={client} />} />
                       <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />
                       <Route
+                        path="/block/last"
+                        element={<BlockDetailsPage client={client} latest />}
+                      />
+                      <Route
                         path="/block/:workchain/:shard/:seqno"
                         element={<BlockDetailsPage client={client} />}
                       />

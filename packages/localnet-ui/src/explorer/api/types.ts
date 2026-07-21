@@ -28,6 +28,11 @@ export interface BlockId {
   readonly file_hash: string
 }
 
+export interface Shards {
+  readonly "@type": "blocks.shards"
+  readonly shards: readonly BlockId[]
+}
+
 export interface AddressInformation {
   readonly balance: string
   readonly code: string | null
@@ -989,6 +994,8 @@ export interface V3BlockId {
 export interface V3Block extends V3BlockId {
   readonly root_hash: string
   readonly file_hash: string
+  readonly created_by: string
+  readonly rand_seed: string
   readonly start_lt: string
   readonly end_lt: string
   readonly gen_utime: string | number
@@ -1010,6 +1017,10 @@ export interface V3Block extends V3BlockId {
   readonly vert_seqno_incr?: boolean
   readonly want_merge?: boolean
   readonly want_split?: boolean
+  readonly gen_software_version?: number
+  readonly gen_software_capabilities?: number
+  readonly in_msg_descr_length?: number
+  readonly out_msg_descr_length?: number
 }
 
 export interface V3BlocksResponse {

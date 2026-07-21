@@ -15,6 +15,7 @@ import type {
   LocalnetNodeInfo,
   LocalnetTimeInfo,
   NftItem,
+  Shards,
   StartupWallet,
   StreamingTransactionsEvent,
   SourceTraceResponse,
@@ -533,6 +534,25 @@ export class TonClient {
     appendOptionalSearchParam(url, "offset", options.offset)
     appendOptionalSearchParam(url, "sort", options.sort)
     return this.request(url, "Failed to fetch blocks")
+  }
+
+  async getMasterchainBlockShards(seqno: number): Promise<V3BlocksResponse> {
+    const url = this.buildUrl(this.v2BaseUrl, "/getShards")
+    url.searchParams.append("seqno", seqno.toString())
+    const {shards} = await this.request<Shards>(url, "Failed to fetch masterchain block shards")
+    const responses = await Promise.all(
+      shards.map(shard =>
+        this.getBlocks({
+          workchain: shard.workchain,
+          shard: v2ShardToV3Shard(shard.shard),
+          seqno: shard.seqno,
+          rootHash: shard.root_hash,
+          fileHash: shard.file_hash,
+          limit: 1,
+        }),
+      ),
+    )
+    return {blocks: responses.flatMap(response => response.blocks)}
   }
 
   async getBlockTransactions(
@@ -1172,6 +1192,10 @@ function appendOptionalSearchParam(
   if (value !== undefined) {
     url.searchParams.append(name, value.toString())
   }
+}
+
+function v2ShardToV3Shard(shard: string): string {
+  return BigInt.asUintN(64, BigInt(shard)).toString(16).padStart(16, "0").toUpperCase()
 }
 
 function isStreamingTransactionsEvent(value: unknown): value is StreamingTransactionsEvent {

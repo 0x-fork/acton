@@ -241,6 +241,14 @@ const AppContent: FC<AppContentProps> = ({
               }
             />
             <Route
+              path="/block/last"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <BlockDetailsPage client={client} latest />
+                </DashboardPage>
+              }
+            />
+            <Route
               path="/block/:workchain/:shard/:seqno"
               element={
                 <DashboardPage {...dashboardProps} embedded>
