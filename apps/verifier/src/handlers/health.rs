@@ -7,7 +7,7 @@ pub async fn handler() -> impl IntoResponse {
     Json(HealthResponse { ok: true })
 }
 
-pub(crate) async fn version() -> &'static str {
+pub async fn version() -> &'static str {
     LONG_VERSION
 }
 

@@ -18,7 +18,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential pkg-config ca-certificates libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY Cargo.toml Cargo.lock rust-toolchain.toml clippy.toml ./
+COPY Cargo.toml Cargo.lock rust-toolchain.toml build.rs ./
 COPY src ./src
 COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
