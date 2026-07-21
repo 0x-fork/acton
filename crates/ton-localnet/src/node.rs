@@ -3366,7 +3366,7 @@ mod tests {
     }
 
     #[test]
-    fn db_reopen_restores_block_messages_and_msg_to_tx_index() {
+    fn db_reopen_restores_transactions_messages_and_account_history() {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system time must be after unix epoch")
@@ -3393,6 +3393,8 @@ mod tests {
         let out_msg_hash = Hash256([0x12; 32]);
         let block_hash = Hash256([0x13; 32]);
         let dummy_boc = BocBytes::from(Boc::encode(Cell::default()));
+        let account_boc = make_uninit_shard_account_boc(account);
+        let account_meta = store_test_account_meta(&mut node, &account_boc, AccountStatus::Uninit);
         node.cas.put(dummy_boc.clone(), in_msg_hash);
         node.cas.put(dummy_boc, out_msg_hash);
         node.history.msg_by_hash.insert(
@@ -3453,15 +3455,46 @@ mod tests {
             block_meta,
             masterchain_block_meta: None,
             tx_metas: vec![tx_meta.clone()],
-            deltas: Vec::new(),
+            deltas: vec![AccountDelta {
+                addr: account,
+                old_hash: None,
+                new_hash: Some(account_meta.account_hash),
+                old_meta: None,
+                new_meta: Some(account_meta.clone()),
+            }],
             out_msg_hashes: vec![out_msg_hash],
             msg_to_tx: vec![(in_msg_hash, tx_hash)],
             deferred_msg_hashes: Vec::new(),
         })
         .expect("commit must persist");
+        node.apply_commit(PendingCommit {
+            block_meta: BlockMeta {
+                seqno: 2,
+                prev_seqno: Some(1),
+                gen_utime: 4,
+                start_lt: 2,
+                end_lt: 2,
+                tx_hashes: Vec::new(),
+                block_hash: Hash256([0x14; 32]),
+                file_hash: Hash256([0x14; 32]),
+            },
+            masterchain_block_meta: None,
+            tx_metas: Vec::new(),
+            deltas: vec![AccountDelta {
+                addr: account,
+                old_hash: Some(account_meta.account_hash),
+                new_hash: None,
+                old_meta: Some(account_meta.clone()),
+                new_meta: None,
+            }],
+            out_msg_hashes: Vec::new(),
+            msg_to_tx: Vec::new(),
+            deferred_msg_hashes: Vec::new(),
+        })
+        .expect("account removal must persist");
         drop(node);
 
-        let reopened = Node::with_db_path(
+        let mut reopened = Node::with_db_path(
             Box::new(NoopExecutor),
             config_boc,
             StateSource::Local,
@@ -3491,6 +3524,14 @@ mod tests {
         assert_eq!(
             reopened.indexes.tx_by_out_msg.get(&out_msg_hash),
             Some(&tx_hash)
+        );
+        assert!(!reopened.latest.accounts.contains_key(&account));
+        assert_eq!(reopened.history.deltas_by_seqno.len(), 2);
+        assert_eq!(
+            reopened
+                .get_address_information_at_block(&account, 1)
+                .map(|meta| meta.account_hash),
+            Some(account_meta.account_hash)
         );
 
         drop(reopened);

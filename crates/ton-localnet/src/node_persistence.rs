@@ -1,7 +1,7 @@
 use crate::node_snapshot::NodeStateSnapshot;
 use crate::storage::{
-    AccountMeta, BlockMeta, History, Indexes, LatestState, MasterchainBlockMeta, MsgMeta,
-    PendingCommit, ReverseLtKey, TxMeta,
+    AccountDelta, AccountMeta, BlockMeta, History, Indexes, LatestState, MasterchainBlockMeta,
+    MsgMeta, PendingCommit, ReverseLtKey, TxMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256, Seqno};
 use core::cmp;
@@ -109,6 +109,30 @@ impl NodePersistence {
                 .insert(block.seqno, block.tx_hashes.clone());
         }
 
+        let mut stmt = conn.prepare("SELECT seqno, data FROM account_deltas ORDER BY seqno ASC")?;
+        let delta_iter = stmt.query_map([], |row| {
+            let seqno: Seqno = row.get(0)?;
+            let data: Vec<u8> = row.get(1)?;
+            let deltas = serde_json::from_slice::<Vec<AccountDelta>>(&data)
+                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+            Ok((seqno, deltas))
+        })?;
+        for row in delta_iter {
+            let (seqno, deltas) = row?;
+            if seqno == 0 {
+                continue;
+            }
+            history.deltas_by_seqno.resize(seqno as usize, Vec::new());
+            for delta in &deltas {
+                indexes
+                    .account_deltas_by_addr
+                    .entry(delta.addr)
+                    .or_default()
+                    .insert(seqno, delta.clone());
+            }
+            history.deltas_by_seqno[seqno as usize - 1] = deltas;
+        }
+
         let mut stmt = conn.prepare("SELECT address, data FROM accounts")?;
         let acc_iter = stmt.query_map([], |row| {
             let addr = addr_from_db_bytes(row.get(0)?)?;
@@ -203,12 +227,23 @@ impl NodePersistence {
             )?;
         }
 
+        let deltas_data = serde_json::to_vec(&pending.deltas)?;
+        tx.execute(
+            "INSERT OR REPLACE INTO account_deltas (seqno, data) VALUES (?1, ?2)",
+            params![pending.block_meta.seqno, deltas_data],
+        )?;
+
         for delta in &pending.deltas {
             if let Some(new_meta) = &delta.new_meta {
                 let account_data = serde_json::to_vec(new_meta)?;
                 tx.execute(
                     "INSERT OR REPLACE INTO accounts (address, data) VALUES (?1, ?2)",
                     params![delta.addr.addr.to_vec(), account_data],
+                )?;
+            } else {
+                tx.execute(
+                    "DELETE FROM accounts WHERE address = ?1",
+                    params![delta.addr.addr.to_vec()],
                 )?;
             }
         }
@@ -337,6 +372,7 @@ impl NodePersistence {
         tx.execute("DELETE FROM cas", [])?;
         tx.execute("DELETE FROM blocks", [])?;
         tx.execute("DELETE FROM masterchain_blocks", [])?;
+        tx.execute("DELETE FROM account_deltas", [])?;
         tx.execute("DELETE FROM transactions", [])?;
         tx.execute("DELETE FROM messages", [])?;
         tx.execute("DELETE FROM accounts", [])?;
@@ -363,6 +399,15 @@ impl NodePersistence {
             tx.execute(
                 "INSERT OR REPLACE INTO masterchain_blocks (seqno, data) VALUES (?1, ?2)",
                 params![block.seqno, block_data],
+            )?;
+        }
+
+        for (index, deltas) in snapshot.history_deltas_by_seqno.iter().enumerate() {
+            let seqno = index as Seqno + 1;
+            let data = serde_json::to_vec(deltas)?;
+            tx.execute(
+                "INSERT OR REPLACE INTO account_deltas (seqno, data) VALUES (?1, ?2)",
+                params![seqno, data],
             )?;
         }
 
@@ -428,6 +473,10 @@ fn init_schema(conn: &Connection) -> anyhow::Result<()> {
     )?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS masterchain_blocks (seqno INTEGER PRIMARY KEY, data BLOB)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS account_deltas (seqno INTEGER PRIMARY KEY, data BLOB)",
         [],
     )?;
     conn.execute(
