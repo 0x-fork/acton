@@ -2,7 +2,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     sync::{Arc, Mutex, MutexGuard},
-    time::{SystemTime, SystemTimeError, UNIX_EPOCH},
+    time::{Instant, SystemTime, SystemTimeError, UNIX_EPOCH},
 };
 
 use async_trait::async_trait;
@@ -194,19 +194,49 @@ impl VerificationIndex for SqliteVerificationIndex {
         source_storage: &dyn SourceStorage,
     ) -> Result<(), VerificationIndexError> {
         let indexed_revision = revision_or_unknown(source_storage.current_revision().await?);
-        if self.indexed_revision()? == Some(indexed_revision.clone()) {
+        let previous_revision = self.indexed_revision()?;
+        if previous_revision.as_deref() == Some(indexed_revision.as_str()) {
+            tracing::debug!(revision = %indexed_revision, "registry index is current");
             return Ok(());
         }
 
+        let started_at = Instant::now();
+        tracing::info!(
+            previous_revision = previous_revision.as_deref().unwrap_or("<none>"),
+            storage_revision = %indexed_revision,
+            "registry index is stale; rebuilding"
+        );
+
         let mut bundles = Vec::new();
-        for code_hash in source_storage.list_code_hashes().await? {
+        let code_hashes = source_storage.list_code_hashes().await?;
+        let code_hash_count = code_hashes.len();
+        tracing::info!(code_hash_count, "scanning stored source bundles");
+
+        for (index, code_hash) in code_hashes.into_iter().enumerate() {
             for bundle in source_storage.list_bundles(&code_hash).await? {
                 validate_stored_bundle(&bundle, &code_hash)?;
                 bundles.push(bundle);
             }
+
+            let processed = index + 1;
+            if processed.is_multiple_of(100) || processed == code_hash_count {
+                tracing::info!(
+                    processed_code_hashes = processed,
+                    total_code_hashes = code_hash_count,
+                    bundle_count = bundles.len(),
+                    "registry index rebuild progress"
+                );
+            }
         }
 
-        self.replace_all(&indexed_revision, &bundles)
+        self.replace_all(&indexed_revision, &bundles)?;
+        tracing::info!(
+            revision = %indexed_revision,
+            bundle_count = bundles.len(),
+            elapsed_ms = started_at.elapsed().as_secs_f64() * 1_000.0,
+            "registry index rebuilt"
+        );
+        Ok(())
     }
 
     async fn upsert_bundle(
