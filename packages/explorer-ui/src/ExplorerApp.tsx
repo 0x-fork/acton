@@ -993,8 +993,8 @@ export const ExplorerApp: FC = () => {
                         <Link
                           className={styles.headerIconButton}
                           to="/favorites"
-                          title="Favorite accounts"
-                          aria-label="Favorite accounts"
+                          title="Favorites"
+                          aria-label="Favorites"
                         >
                           <Star size={18} />
                         </Link>

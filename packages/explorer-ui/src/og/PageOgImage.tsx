@@ -83,9 +83,9 @@ const PAGE_OG_PREVIEWS: Record<PageOgKey, PageOgPreview> = {
     key: "favorites",
     title: "Favorites",
     badge: "Watchlist",
-    description: "Keep the accounts and contracts you care about close",
-    metadataTitle: "Favorite TON accounts · actonscan",
-    metadataDescription: "Open your saved TON accounts and contracts on actonscan.",
+    description: "Keep favorite accounts and transactions one click away",
+    metadataTitle: "TON favorites · actonscan",
+    metadataDescription: "Open your saved TON accounts and transactions on actonscan.",
   },
   transaction: {
     key: "transaction",

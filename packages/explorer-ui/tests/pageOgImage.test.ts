@@ -32,3 +32,11 @@ describe("pageOgPreviewForPath", () => {
 test("unknown image keys fall back to the home preview", () => {
   expect(pageOgPreviewForKey("unknown").key).toBe("home")
 })
+
+test("favorites preview describes every supported favorite type", () => {
+  expect(pageOgPreviewForKey("favorites")).toMatchObject({
+    title: "Favorites",
+    metadataTitle: "TON favorites · actonscan",
+    metadataDescription: "Open your saved TON accounts and transactions on actonscan.",
+  })
+})

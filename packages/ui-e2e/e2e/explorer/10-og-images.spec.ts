@@ -21,7 +21,7 @@ test.describe("Explorer Open Graph previews", () => {
       expect(response.ok(), preview.route).toBeTruthy()
 
       const html = await response.text()
-      expect(html).toContain(`/og/page.png?page=${preview.key}&amp;v=6`)
+      expect(html).toContain(`/og/page.png?page=${preview.key}&amp;v=7`)
     }
   })
 

@@ -62,6 +62,43 @@ test("getShardAccountCell reads the unwrapped V2 response", async () => {
   }
 })
 
+test("localnet message submission uses the endpoint for each message type", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: Array<{readonly url: URL; readonly init?: RequestInit}> = []
+  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(input.toString())
+    requests.push({url, init})
+    return Response.json({
+      ok: true,
+      result: {
+        hash: url.pathname.endsWith("/sendBocReturnHash") ? "external-hash" : "internal-hash",
+      },
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    await expect(client.sendInternalMessage("internal-boc")).resolves.toBe("internal-hash")
+    await expect(client.sendExternalMessage("external-boc")).resolves.toBe("external-hash")
+
+    expect(requests.map(request => request.url.pathname)).toEqual([
+      "/api/acton_sendInternalMessage",
+      "/api/v2/sendBocReturnHash",
+    ])
+    expect(requests.map(request => JSON.parse(String(request.init?.body)))).toEqual([
+      {boc: "internal-boc"},
+      {boc: "external-boc"},
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("masterchain shard blocks are resolved from the V2 shard snapshot", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
