@@ -1,6 +1,36 @@
 import {expect, mock, test} from "bun:test"
+import {beginCell} from "@ton/core"
 
 import {TonClient} from "../src/explorer/api/client"
+
+test("raw blocks are loaded from the selected TonAPI LiteServer", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  const blockCell = beginCell().storeUint(0x11_ef_55_aa, 32).endCell()
+  globalThis.fetch = mock(async input => {
+    requests.push(new URL(input.toString()))
+    return Response.json({data: blockCell.toBoc().toString("hex")})
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+    const extendedBlockId =
+      "(-1,8000000000000000,81088003,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)"
+
+    const result = await client.getRawBlockBoc(extendedBlockId, "testnet")
+
+    expect(result.hash().equals(blockCell.hash())).toBe(true)
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.origin).toBe("https://testnet.tonapi.io")
+    expect(decodeURIComponent(requests[0]?.pathname.split("/").at(-1) ?? "")).toBe(extendedBlockId)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
 
 test("getShardAccountCell reads the unwrapped V2 response", async () => {
   const originalFetch = globalThis.fetch

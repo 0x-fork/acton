@@ -40,6 +40,7 @@ interface TonClientOptions {
 }
 
 export type AccountHistorySortOrder = "asc" | "desc"
+export type RawBlockNetwork = "mainnet" | "testnet"
 
 export type CompilerAbiLoader = (
   codeHashes: readonly string[],
@@ -83,6 +84,10 @@ interface GetBlockTransactionsOptions {
   readonly shard: string
   readonly seqno: number
   readonly limit?: number
+}
+
+interface RawBlockResponse {
+  readonly data: string
 }
 
 interface GetTracesOptions {
@@ -534,6 +539,17 @@ export class TonClient {
     appendOptionalSearchParam(url, "offset", options.offset)
     appendOptionalSearchParam(url, "sort", options.sort)
     return this.request(url, "Failed to fetch blocks")
+  }
+
+  async getRawBlockBoc(extendedBlockId: string, network: RawBlockNetwork): Promise<Cell> {
+    const origin = network === "testnet" ? "https://testnet.tonapi.io" : "https://tonapi.io"
+    const url = new URL(`/v2/liteserver/get_block/${encodeURIComponent(extendedBlockId)}`, origin)
+    const response = await this.request<RawBlockResponse>(url, "Failed to fetch raw block")
+    if (!/^(?:[0-9a-f]{2})+$/i.test(response.data)) {
+      throw new Error("Raw block response contains invalid BoC data")
+    }
+
+    return Cell.fromHex(response.data)
   }
 
   async getMasterchainBlockShards(seqno: number): Promise<V3BlocksResponse> {

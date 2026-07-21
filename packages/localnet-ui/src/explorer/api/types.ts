@@ -1018,7 +1018,8 @@ export interface V3Block extends V3BlockId {
   readonly want_merge?: boolean
   readonly want_split?: boolean
   readonly gen_software_version?: number
-  readonly gen_software_capabilities?: number
+  readonly gen_software_capabilities?: string | number
+  readonly fees_collected?: string
   readonly in_msg_descr_length?: number
   readonly out_msg_descr_length?: number
 }

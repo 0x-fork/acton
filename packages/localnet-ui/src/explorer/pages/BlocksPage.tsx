@@ -15,13 +15,16 @@ import {
   CopyInlineAction,
   InlineActions,
   Input,
+  ModeViewer,
   Popover,
   formatToncenterBlockId,
+  type ModeInfo,
+  type ModeParser,
 } from "@acton/ui"
 import {useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
 
-import type {TonClient} from "../api/client"
+import type {RawBlockNetwork, TonClient} from "../api/client"
 import type {V3Block, V3BlockId, V3TransactionListItem} from "../api/types"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {
@@ -29,7 +32,7 @@ import {
   DeveloperTransactionListSkeleton,
 } from "../components/DeveloperTransactionList"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
-import {hashToHex} from "../components/utils"
+import {formatNano, hashToHex} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
@@ -44,6 +47,82 @@ const LAST_TRANSACTIONS_FETCH_LIMIT = 12
 const BLOCK_TRANSACTIONS_LIMIT = 100
 const BLOCKS_REFRESH_MS = 2000
 const MASTERCHAIN_SHARD = "8000000000000000"
+const GLOBAL_CAPABILITIES = [
+  {
+    value: 1,
+    name: "capIhrEnabled",
+    description: "Enables Instant Hypercube Routing.",
+  },
+  {
+    value: 2,
+    name: "capCreateStatsEnabled",
+    description: "Enables creation statistics in the masterchain state.",
+  },
+  {
+    value: 4,
+    name: "capBounceMsgBody",
+    description: "Allows bounced messages to retain part of the original message body.",
+  },
+  {
+    value: 8,
+    name: "capReportVersion",
+    description: "Makes collators report their supported version and capabilities in blocks.",
+  },
+  {
+    value: 16,
+    name: "capSplitMergeTransactions",
+    description: "Enables shard split and merge transactions.",
+  },
+  {
+    value: 32,
+    name: "capShortDequeue",
+    description: "Enables short dequeue records in block message queues.",
+  },
+  {
+    value: 64,
+    name: "capStoreOutMsgQueueSize",
+    description: "Stores the outgoing message queue size in the shard state.",
+  },
+  {
+    value: 128,
+    name: "capMsgMetadata",
+    description: "Enables transaction-chain metadata in message envelopes.",
+  },
+  {
+    value: 256,
+    name: "capDeferMessages",
+    description: "Enables deferred message processing through dispatch queues.",
+  },
+  {
+    value: 512,
+    name: "capFullCollatedData",
+    description: "Enables full collated data for block validation.",
+  },
+] as const
+
+const parseGlobalCapabilities: ModeParser = mode => {
+  const flags: ModeInfo[] = GLOBAL_CAPABILITIES.filter(
+    capability => Math.floor(mode / capability.value) % 2 === 1,
+  ).map(capability => ({...capability}))
+  const knownValue = flags.reduce((sum, flag) => sum + flag.value, 0)
+  const unknownValue = mode - knownValue
+
+  if (unknownValue > 0) {
+    flags.push({
+      value: unknownValue,
+      name: "Unknown capabilities",
+      description: "Capability bits that are not known to this explorer version.",
+    })
+  } else if (mode === 0) {
+    flags.push({
+      value: 0,
+      name: "No capabilities",
+      description: "This block does not report any enabled global capabilities.",
+    })
+  }
+
+  return flags
+}
 
 interface BlocksPageProps {
   readonly client: TonClient
@@ -221,6 +300,8 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
   const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
   const {prefetchNames, updateDomains} = useAddressBook()
+  const rawBlockNetwork: RawBlockNetwork | undefined =
+    network.id === "mainnet" || network.id === "testnet" ? network.id : undefined
   const routeWorkchain = Number(params.workchain)
   const routeShard = params.shard ?? ""
   const routeSeqno = Number(params.seqno)
@@ -290,7 +371,20 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
           return
         }
 
-        const [transactionsResponse, shardchainResponse] = await Promise.all([
+        const rawBlockMetadataPromise =
+          rawBlockNetwork &&
+          (block.gen_software_version === undefined ||
+            block.gen_software_capabilities === undefined ||
+            block.fees_collected === undefined)
+            ? client
+                .getRawBlockBoc(getExtendedBlockId(block), rawBlockNetwork)
+                .then(async cell => {
+                  const {parseBlockMetadata} = await import("../cell-inspector/blockParser")
+                  return parseBlockMetadata(cell)
+                })
+                .catch(() => undefined)
+            : Promise.resolve(undefined)
+        const [transactionsResponse, shardchainResponse, rawBlockMetadata] = await Promise.all([
           client.getBlockTransactions({
             workchain: block.workchain,
             shard: block.shard,
@@ -300,6 +394,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
           block.workchain === -1
             ? client.getMasterchainBlockShards(block.seqno)
             : Promise.resolve({blocks: []}),
+          rawBlockMetadataPromise,
         ])
 
         if (!isActive) {
@@ -308,7 +403,17 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
 
         updateDomains(transactionsResponse.address_book)
         setState({
-          block,
+          block: rawBlockMetadata
+            ? {
+                ...block,
+                gen_software_version:
+                  block.gen_software_version ?? rawBlockMetadata.genSoftwareVersion,
+                gen_software_capabilities:
+                  block.gen_software_capabilities ??
+                  rawBlockMetadata.genSoftwareCapabilities?.toString(),
+                fees_collected: block.fees_collected ?? rawBlockMetadata.feesCollected.toString(),
+              }
+            : block,
           latestBlock: latestResponse.blocks[0],
           shardchainBlocks: shardchainResponse.blocks,
           transactions: transactionsResponse.transactions,
@@ -331,7 +436,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
     return () => {
       isActive = false
     }
-  }, [client, latest, routeShard, routeSeqno, routeWorkchain, updateDomains])
+  }, [client, latest, rawBlockNetwork, routeShard, routeSeqno, routeWorkchain, updateDomains])
 
   const workchain = latest ? (state.block?.workchain ?? -1) : routeWorkchain
   const shard = latest ? (state.block?.shard ?? MASTERCHAIN_SHARD) : routeShard
@@ -350,7 +455,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
     () => state.transactions.map(transaction => transaction.account),
     [state.transactions],
   )
-  const blockActions = state.block ? getBlockActions(state.block, network.testOnly) : undefined
+  const blockActions = state.block ? getBlockActions(state.block, rawBlockNetwork) : undefined
 
   useEffect(() => {
     void prefetchNames(transactionAddresses)
@@ -425,31 +530,35 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
 
             {state.block && blockActions ? (
               <div className={styles.blockHeaderActions} aria-label="Block actions">
-                <a
-                  className={styles.blockActionLink}
-                  href={blockActions.downloadUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <Download size={15} aria-hidden="true" />
-                  Download
-                </a>
-                {blockActions.configUrl ? (
+                {blockActions.downloadUrl ? (
                   <a
                     className={styles.blockActionLink}
-                    href={blockActions.configUrl}
+                    href={blockActions.downloadUrl}
                     target="_blank"
                     rel="noreferrer"
                   >
-                    <FileJson size={15} aria-hidden="true" />
-                    Config
+                    <Download size={15} aria-hidden="true" />
+                    Download
                   </a>
-                ) : (
-                  <span className={`${styles.blockActionLink} ${styles.blockActionLinkDisabled}`}>
-                    <FileJson size={15} aria-hidden="true" />
-                    Config
-                  </span>
-                )}
+                ) : null}
+                {rawBlockNetwork ? (
+                  blockActions.configUrl ? (
+                    <a
+                      className={styles.blockActionLink}
+                      href={blockActions.configUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <FileJson size={15} aria-hidden="true" />
+                      Config
+                    </a>
+                  ) : (
+                    <span className={`${styles.blockActionLink} ${styles.blockActionLinkDisabled}`}>
+                      <FileJson size={15} aria-hidden="true" />
+                      Config
+                    </span>
+                  )
+                ) : null}
                 <CopyButton
                   value={blockActions.extendedBlockId}
                   label="Copy extended block ID"
@@ -460,25 +569,29 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
                 >
                   Copy block ID
                 </CopyButton>
-                <span className={styles.blockActionSeparator} aria-hidden="true" />
-                <a
-                  className={styles.blockExplorerLink}
-                  href={blockActions.tonscanUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Tonscan
-                  <ExternalLink size={13} aria-hidden="true" />
-                </a>
-                <a
-                  className={styles.blockExplorerLink}
-                  href={blockActions.toncoinUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  toncoin.org
-                  <ExternalLink size={13} aria-hidden="true" />
-                </a>
+                {rawBlockNetwork ? (
+                  <>
+                    <span className={styles.blockActionSeparator} aria-hidden="true" />
+                    <a
+                      className={styles.blockExplorerLink}
+                      href={blockActions.tonscanUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Tonscan
+                      <ExternalLink size={13} aria-hidden="true" />
+                    </a>
+                    <a
+                      className={styles.blockExplorerLink}
+                      href={blockActions.toncoinUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      toncoin.org
+                      <ExternalLink size={13} aria-hidden="true" />
+                    </a>
+                  </>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -487,7 +600,10 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({client, latest = fa
         {state.error ? (
           <TableStateBlock>{state.error}</TableStateBlock>
         ) : state.isLoading || !state.block ? (
-          <BlockDetailsSkeleton showShardchainBlocks={workchain === -1} />
+          <BlockDetailsSkeleton
+            showShardchainBlocks={workchain === -1}
+            showRawBlockFields={rawBlockNetwork !== undefined}
+          />
         ) : (
           <>
             <BlockSummaryTable
@@ -934,16 +1050,15 @@ const BlockSummaryTable: FC<{
         />
         {block.gen_software_version === undefined ? null : (
           <BlockDetailItem
-            label="Gen software version"
+            label="Global version"
             value={formatOptionalNumber(block.gen_software_version)}
             mono
           />
         )}
         {block.gen_software_capabilities === undefined ? null : (
           <BlockDetailItem
-            label="Gen software capabilities"
-            value={formatOptionalNumber(block.gen_software_capabilities)}
-            mono
+            label="Capabilities"
+            value={<BlockCapabilities value={block.gen_software_capabilities} />}
           />
         )}
       </BlockDetailSection>
@@ -1033,6 +1148,12 @@ const BlockSummaryTable: FC<{
 
       <BlockDetailSection label="Activity">
         <BlockDetailItem label="Tx quantity" value={block.tx_count.toLocaleString()} mono />
+        {block.fees_collected === undefined ? null : (
+          <BlockDetailItem
+            label="Fees collected"
+            value={`${formatNano(block.fees_collected)} GRAM`}
+          />
+        )}
         {block.in_msg_descr_length === undefined ? null : (
           <BlockDetailItem
             label="In msg descr length"
@@ -1134,6 +1255,32 @@ const BooleanValue: FC<{readonly value: boolean | undefined}> = ({value}) => {
   )
 }
 
+const BlockCapabilities: FC<{readonly value: string | number}> = ({value}) => {
+  const mode = Number(value)
+  if (!Number.isSafeInteger(mode) || mode < 0) {
+    return <>{value}</>
+  }
+
+  return (
+    <Popover
+      ariaLabel={`Explain global capabilities ${value}`}
+      content={
+        <span className={styles.blockCapabilitiesPopover}>
+          <span className={styles.blockCapabilitiesPopoverTitle}>Enabled capabilities</span>
+          <ModeViewer mode={mode} parseMode={parseGlobalCapabilities} />
+        </span>
+      }
+      interaction="click"
+      placement="top"
+      maxWidth="min(42rem, calc(100vw - 2rem))"
+    >
+      <button type="button" className={styles.blockCapabilitiesTrigger}>
+        {value}
+      </button>
+    </Popover>
+  )
+}
+
 const BlockDetailSkeletonItem: FC<{
   readonly label: string
   readonly valueClassName?: string
@@ -1147,9 +1294,10 @@ const BlockDetailSkeletonItem: FC<{
   </div>
 )
 
-const BlockDetailsSkeleton: FC<{readonly showShardchainBlocks: boolean}> = ({
-  showShardchainBlocks,
-}) => (
+const BlockDetailsSkeleton: FC<{
+  readonly showShardchainBlocks: boolean
+  readonly showRawBlockFields: boolean
+}> = ({showShardchainBlocks, showRawBlockFields}) => (
   <>
     <section className={styles.blockDetailsPanel} aria-label="Loading block details">
       <BlockDetailSection label="Identity" contentClassName={styles.blockFourColumnGrid}>
@@ -1182,11 +1330,20 @@ const BlockDetailsSkeleton: FC<{readonly showShardchainBlocks: boolean}> = ({
         />
       </BlockDetailSection>
 
-      <BlockDetailSection label="Generation" contentClassName={styles.blockFourColumnGrid}>
+      <BlockDetailSection
+        label="Generation"
+        contentClassName={showRawBlockFields ? undefined : styles.blockFourColumnGrid}
+      >
         <BlockDetailSkeletonItem label="Gen utime" />
         <BlockDetailSkeletonItem label="Version" />
         <BlockDetailSkeletonItem label="Vert seqno" />
         <BlockDetailSkeletonItem label="Gen catchain seqno" />
+        {showRawBlockFields ? (
+          <>
+            <BlockDetailSkeletonItem label="Global version" />
+            <BlockDetailSkeletonItem label="Capabilities" />
+          </>
+        ) : null}
       </BlockDetailSection>
 
       <BlockDetailSection label="References">
@@ -1207,6 +1364,7 @@ const BlockDetailsSkeleton: FC<{readonly showShardchainBlocks: boolean}> = ({
 
       <BlockDetailSection label="Activity">
         <BlockDetailSkeletonItem label="Tx quantity" />
+        {showRawBlockFields ? <BlockDetailSkeletonItem label="Fees collected" /> : null}
       </BlockDetailSection>
 
       <BlockDetailSection label="Flags" contentClassName={styles.blockSixColumnGrid}>
@@ -1251,38 +1409,48 @@ function formatBlockHash(value: string): string {
   return hashToHex(value) ?? value
 }
 
-function formatOptionalNumber(value: number | undefined): string {
+function formatOptionalNumber(value: string | number | undefined): string {
   return value === undefined ? "—" : value.toString()
+}
+
+function getExtendedBlockId(block: V3Block): string {
+  const rootHash = formatBlockHash(block.root_hash)
+  const fileHash = formatBlockHash(block.file_hash)
+  return `(${block.workchain},${block.shard},${block.seqno},${rootHash},${fileHash})`
 }
 
 function getBlockActions(
   block: V3Block,
-  testOnly: boolean,
+  rawBlockNetwork: RawBlockNetwork | undefined,
 ): {
-  readonly downloadUrl: string
+  readonly downloadUrl?: string
   readonly configUrl?: string
   readonly tonscanUrl: string
   readonly toncoinUrl: string
   readonly extendedBlockId: string
 } {
   const blockId = formatToncenterBlockId(block)
-  const rootHash = formatBlockHash(block.root_hash)
-  const fileHash = formatBlockHash(block.file_hash)
-  const tonapiOrigin = testOnly ? "https://testnet.tonapi.io" : "https://tonapi.io"
-  const tonviewerOrigin = testOnly ? "https://testnet.tonviewer.com" : "https://tonviewer.com"
-  const tonscanOrigin = testOnly ? "https://testnet.tonscan.org" : "https://tonscan.org"
-  const toncoinOrigin = testOnly
-    ? "https://test-explorer.toncoin.org"
-    : "https://explorer.toncoin.org"
+  const tonapiOrigin =
+    rawBlockNetwork === "testnet" ? "https://testnet.tonapi.io" : "https://tonapi.io"
+  const tonviewerOrigin =
+    rawBlockNetwork === "testnet" ? "https://testnet.tonviewer.com" : "https://tonviewer.com"
+  const tonscanOrigin =
+    rawBlockNetwork === "testnet" ? "https://testnet.tonscan.org" : "https://tonscan.org"
+  const toncoinOrigin =
+    rawBlockNetwork === "testnet"
+      ? "https://test-explorer.toncoin.org"
+      : "https://explorer.toncoin.org"
   return {
-    downloadUrl: `${tonapiOrigin}/v2/blockchain/blocks/${encodeURIComponent(blockId)}/boc`,
+    downloadUrl: rawBlockNetwork
+      ? `${tonapiOrigin}/v2/blockchain/blocks/${encodeURIComponent(blockId)}/boc`
+      : undefined,
     configUrl:
-      block.prev_key_block_seqno && block.prev_key_block_seqno > 0
+      rawBlockNetwork && block.prev_key_block_seqno && block.prev_key_block_seqno > 0
         ? `${tonviewerOrigin}/config/${block.prev_key_block_seqno}`
         : undefined,
     tonscanUrl: `${tonscanOrigin}/block/${block.workchain}:${block.shard}:${block.seqno}`,
     toncoinUrl: `${toncoinOrigin}/search?workchain=${block.workchain}&shard=${encodeURIComponent(block.shard)}&seqno=${block.seqno}`,
-    extendedBlockId: `(${block.workchain},${block.shard},${block.seqno},${rootHash},${fileHash})`,
+    extendedBlockId: getExtendedBlockId(block),
   }
 }
 
