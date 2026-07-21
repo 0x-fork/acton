@@ -9,6 +9,8 @@
   --code-tree-text: #6c6c78;
   --code-tree-muted: #9a9aa5;
   --code-active-bg: #f4f6fa;
+  --code-output-folder-bg: rgba(245, 158, 11, 0.1);
+  --code-output-folder-text: #a16207;
   --text-primary: #09090b;
   --text-secondary: #71717a;
   --text-muted: #a1a1aa;
@@ -108,6 +110,8 @@
   --code-tree-text: var(--text-secondary);
   --code-tree-muted: var(--text-muted);
   --code-active-bg: var(--hover-bg);
+  --code-output-folder-bg: rgba(245, 158, 11, 0.12);
+  --code-output-folder-text: #fbbf24;
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
   --text-muted: #71717a;
@@ -1231,6 +1235,15 @@ a {
 .file-tree-folder {
   color: var(--code-tree-muted);
   font-weight: var(--font-weight-medium);
+}
+
+.file-tree-folder-output {
+  background: var(--code-output-folder-bg);
+  color: var(--code-output-folder-text);
+}
+
+.file-tree-folder-output svg {
+  color: currentColor;
 }
 
 .file-tree-file {

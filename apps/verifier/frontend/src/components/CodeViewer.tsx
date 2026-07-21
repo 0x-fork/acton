@@ -197,9 +197,14 @@ function FileTreeRows({
       {nodes.map(node => {
         const depthStyle = {"--depth": String(depth)} as CSSProperties
         if (node.kind === "folder") {
+          const folderClassName =
+            node.path === "output"
+              ? "file-tree-row file-tree-folder file-tree-folder-output"
+              : "file-tree-row file-tree-folder"
+
           return (
             <div key={node.path}>
-              <div className="file-tree-row file-tree-folder" style={depthStyle}>
+              <div className={folderClassName} style={depthStyle}>
                 <Folder size={14} aria-hidden="true" />
                 <span>{node.name}</span>
               </div>
