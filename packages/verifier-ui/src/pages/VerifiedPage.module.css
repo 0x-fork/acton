@@ -60,6 +60,28 @@
   transition: opacity var(--acton-duration-fast) var(--acton-ease-standard);
 }
 
+.paginationCell {
+  padding: 10px 14px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.paginationStatus {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
+.paginationActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .codeHashCell:hover .hashCopyButton,
 .codeHashCell:focus-within .hashCopyButton {
   opacity: 1;
@@ -74,5 +96,14 @@
   .title {
     font-size: var(--acton-font-size-2xl);
     line-height: 1.2;
+  }
+
+  .pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .paginationActions > button {
+    flex: 1;
   }
 }

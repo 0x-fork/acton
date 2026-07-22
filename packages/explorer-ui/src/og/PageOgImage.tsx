@@ -6,6 +6,8 @@ export type PageOgKey =
   | "block"
   | "abi"
   | "sources"
+  | "verified"
+  | "verified-contract"
   | "cell"
   | "emulate"
   | "favorites"
@@ -63,6 +65,24 @@ const PAGE_OG_PREVIEWS: Record<PageOgKey, PageOgPreview> = {
     metadataTitle: "Verified TON sources · actonscan",
     metadataDescription: "Browse verified TON smart-contract source code on actonscan.",
   },
+  verified: {
+    key: "verified",
+    title: "Verified contracts",
+    badge: "Source registry",
+    description: "Browse reproducible source bundles matched to deployed TON contract code",
+    metadataTitle: "Verified TON contracts · actonscan",
+    metadataDescription:
+      "Browse verified TON smart-contract source bundles, compilers, and code hashes on actonscan.",
+  },
+  "verified-contract": {
+    key: "verified-contract",
+    title: "Verified contract",
+    badge: "Source bundle",
+    description: "Review the exact sources and compiler settings matched to on-chain code",
+    metadataTitle: "Verified TON contract · actonscan",
+    metadataDescription:
+      "Review verified source code, compiler metadata, and source bundles for a TON contract on actonscan.",
+  },
   cell: {
     key: "cell",
     title: "Cell Inspector",
@@ -108,6 +128,8 @@ export function pageOgPreviewForPath(pathname: string): PageOgPreview | undefine
   if (normalizedPath === "/blocks") return PAGE_OG_PREVIEWS.blocks
   if (normalizedPath === "/abi") return PAGE_OG_PREVIEWS.abi
   if (normalizedPath === "/sources") return PAGE_OG_PREVIEWS.sources
+  if (normalizedPath === "/verified") return PAGE_OG_PREVIEWS.verified
+  if (/^\/verified\/[^/]+$/.test(normalizedPath)) return PAGE_OG_PREVIEWS["verified-contract"]
   if (normalizedPath === "/cell") return PAGE_OG_PREVIEWS.cell
   if (normalizedPath === "/emulate") return PAGE_OG_PREVIEWS.emulate
   if (normalizedPath === "/favorites") return PAGE_OG_PREVIEWS.favorites

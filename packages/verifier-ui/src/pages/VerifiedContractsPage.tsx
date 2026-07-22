@@ -4,11 +4,13 @@ import {
   DataTableBody,
   DataTableCell,
   DataTableEmpty,
+  DataTableFooter,
   DataTableHead,
   DataTableHeaderCell,
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  Button,
 } from "@acton/ui"
 import {useEffect, useMemo, useState} from "react"
 import type {KeyboardEvent as ReactKeyboardEvent} from "react"
@@ -68,26 +70,35 @@ export interface VerifiedContractsPageProps {
 export function VerifiedContractsPage({
   api,
   onOpenContract,
-  limit = 100,
+  limit = 25,
   className,
 }: VerifiedContractsPageProps) {
+  const pageSize = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), 99) : 25
+  const [page, setPage] = useState(0)
   const [items, setItems] = useState<readonly LastVerifiedItem[]>([])
+  const [hasNextPage, setHasNextPage] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | undefined>()
 
   useEffect(() => {
     let cancelled = false
 
+    setIsLoading(true)
+    setError(undefined)
+
     api
-      .fetchLastVerified(limit)
+      .fetchLastVerified(pageSize + 1, page * pageSize)
       .then(response => {
         if (!cancelled) {
-          setItems(response.items)
+          setItems(response.items.slice(0, pageSize))
+          setHasNextPage(response.items.length > pageSize)
           setError(undefined)
         }
       })
       .catch(error => {
         if (!cancelled) {
+          setItems([])
+          setHasNextPage(false)
           setError(error instanceof Error ? error.message : String(error))
         }
       })
@@ -100,7 +111,7 @@ export function VerifiedContractsPage({
     return () => {
       cancelled = true
     }
-  }, [api, limit])
+  }, [api, page, pageSize])
 
   const sortedItems = useMemo(
     () => [...items].sort((left, right) => right.verified_at - left.verified_at),
@@ -173,6 +184,37 @@ export function VerifiedContractsPage({
               ))
             )}
           </DataTableBody>
+          {(page > 0 || hasNextPage) && (
+            <DataTableFooter>
+              <DataTableRow>
+                <DataTableCell className={styles.paginationCell} colSpan={5}>
+                  <div className={styles.pagination}>
+                    <span className={styles.paginationStatus} aria-live="polite">
+                      Page {page + 1}
+                    </span>
+                    <div className={styles.paginationActions}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={isLoading || page === 0}
+                        onClick={() => setPage(current => Math.max(0, current - 1))}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={isLoading || Boolean(error) || !hasNextPage}
+                        onClick={() => setPage(current => current + 1)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                </DataTableCell>
+              </DataTableRow>
+            </DataTableFooter>
+          )}
         </DataTableTable>
       </DataTable>
     </section>

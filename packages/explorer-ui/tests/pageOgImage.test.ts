@@ -9,6 +9,8 @@ describe("pageOgPreviewForPath", () => {
     ["/blocks/", "blocks"],
     ["/abi", "abi"],
     ["/sources", "sources"],
+    ["/verified", "verified"],
+    ["/verified/92bf1e3962a54b88", "verified-contract"],
     ["/cell", "cell"],
     ["/emulate", "emulate"],
     ["/favorites", "favorites"],
@@ -38,5 +40,16 @@ test("favorites preview describes every supported favorite type", () => {
     title: "Favorites",
     metadataTitle: "TON favorites · actonscan",
     metadataDescription: "Open your saved TON accounts and transactions on actonscan.",
+  })
+})
+
+test("verified routes use dedicated social metadata", () => {
+  expect(pageOgPreviewForKey("verified")).toMatchObject({
+    title: "Verified contracts",
+    metadataTitle: "Verified TON contracts · actonscan",
+  })
+  expect(pageOgPreviewForKey("verified-contract")).toMatchObject({
+    title: "Verified contract",
+    metadataTitle: "Verified TON contract · actonscan",
   })
 })
