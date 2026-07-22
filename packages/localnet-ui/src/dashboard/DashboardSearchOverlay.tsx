@@ -16,6 +16,7 @@ import type {TonClient} from "../explorer/api/client"
 import type {JettonMaster, NftItem} from "../explorer/api/types"
 import {NftImage} from "../explorer/components/NftImage"
 import {formatAddress, hashToHex, parseAddress} from "../explorer/components/utils"
+import {useExplorerRoutePaths} from "../explorer/hooks/useExplorerRoutePaths"
 import {useAddressFormat} from "../explorer/hooks/useNetworkInfo"
 
 import {loadApiSearchIndex, type ApiSearchIndexEntry} from "./apiSearchIndex"
@@ -120,6 +121,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
   const [hiddenNftResultIds, setHiddenNftResultIds] = useState<ReadonlySet<string>>(() => new Set())
   const navigate = useNavigate()
   const addressFormat = useAddressFormat()
+  const routes = useExplorerRoutePaths()
   const [searchQuery, setSearchQuery] = useState("")
   const [searchAssetsState, setSearchAssetsState] = useState<SearchAssetsState>({
     tokens: [],
@@ -159,7 +161,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
         id: `address-${address}`,
         title: "Open address",
         description: formatAddress(address, false, addressFormat),
-        href: `/explorer/address/${encodeURIComponent(address)}`,
+        href: routes.addressPath(address),
         icon: CircleUserRound,
       })
     }
@@ -199,7 +201,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
         id: `token-${token.address}`,
         title: name,
         description: `Token · ${symbol}`,
-        href: `/explorer/address/${encodeURIComponent(token.address)}`,
+        href: routes.addressPath(token.address),
         icon: Boxes,
         image: token.jetton_content.image,
         fallbackImage: TOKEN_PLACEHOLDER_IMAGE,
@@ -222,7 +224,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
           id: `nft-${item.address}`,
           title: name,
           description: collectionName ? `NFT · ${collectionName}` : `NFT · #${item.index}`,
-          href: `/explorer/address/${encodeURIComponent(item.address)}`,
+          href: routes.addressPath(item.address),
           icon: Image,
           image: contentString(item.content, "image"),
           fallbackImage: NFT_PLACEHOLDER_IMAGE,
@@ -239,6 +241,7 @@ export const DashboardSearchOverlay: FC<DashboardSearchOverlayProps> = ({
   }, [
     addressFormat,
     apiSearchState.entries,
+    routes,
     searchAssetsState.nfts,
     searchAssetsState.tokens,
     searchQuery,

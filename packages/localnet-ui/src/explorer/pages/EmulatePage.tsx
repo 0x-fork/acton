@@ -67,7 +67,7 @@ import {useAddressBook} from "../hooks/useAddressBook"
 import {useFavoriteAccounts} from "../hooks/useFavoriteAccounts"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {openExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
-import {formatAddress, hashToHex, normalizeAddress} from "../components/utils"
+import {formatAddress, hashToHex} from "../components/utils"
 import type {TonClient} from "../api/client"
 import {waitForTraceTransactionHash} from "../api/waitForTraceTransactionHash"
 import {addressKey} from "../api/compilerAbi"
@@ -748,10 +748,9 @@ export function EmulatePage({client}: EmulatePageProps) {
 
   const handleContractClick = useCallback(
     (address: string, event?: ExplorerNavigationClickEvent) => {
-      const formattedAddress = normalizeAddress(address, addressFormat)
-      openExplorerPath(navigate, routes.addressPath(formattedAddress), event)
+      openExplorerPath(navigate, routes.addressPath(address), event)
     },
-    [addressFormat, navigate, routes],
+    [navigate, routes],
   )
 
   const handleBlockClick = useCallback(

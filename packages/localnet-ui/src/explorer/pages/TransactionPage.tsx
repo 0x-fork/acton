@@ -330,8 +330,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   addressFormatRef.current = addressFormat
 
   const handleContractClick = (address: string, event?: ExplorerNavigationClickEvent) => {
-    const formattedAddr = normalizeAddress(address, addressFormat)
-    openExplorerPath(navigate, routes.addressPath(formattedAddr), event)
+    openExplorerPath(navigate, routes.addressPath(address), event)
   }
   const handleBlockClick = (
     blockRef: TransactionBlockRef,

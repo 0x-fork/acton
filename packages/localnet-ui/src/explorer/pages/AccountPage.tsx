@@ -792,8 +792,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
       (accountLoading || (isJettonMasterAccount && holdersLoadedAccountKey !== accountRequestKey)))
 
   const handleSearch = (addr: string, event?: ExplorerNavigationClickEvent) => {
-    const finalAddr = addr ? normalizeAddress(addr, addressFormat) : ""
-    openPath(finalAddr ? routes.addressPath(finalAddr) : routes.rootPath, event)
+    openPath(addr ? routes.addressPath(addr) : routes.rootPath, event)
   }
 
   const handleTabChange = (tab: string) => {

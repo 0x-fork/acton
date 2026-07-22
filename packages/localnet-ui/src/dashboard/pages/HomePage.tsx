@@ -22,6 +22,7 @@ import {
 } from "../../explorer/components/DeveloperTransactionList"
 import {formatDuration} from "../../explorer/components/utils"
 import {useAddressBook} from "../../explorer/hooks/useAddressBook"
+import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
 import {useOpenExplorerPath} from "../../explorer/hooks/useOpenExplorerPath"
 import {useTransactionMessageNames} from "../../explorer/hooks/useTransactionMessageNames"
 import {NodeStateControls} from "../components/NodeStateControls"
@@ -85,6 +86,7 @@ interface NodeInfoRow {
 
 export const HomePage: FC<HomePageProps> = ({client}) => {
   const navigate = useNavigate()
+  const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
   const {showToast} = useToast()
   const {prefetchNames, updateDomains} = useAddressBook()
@@ -520,7 +522,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               openPath(`/explorer/tx/${encodeURIComponent(hashHex)}`, event)
             }}
             onAddressClick={(address, event) => {
-              openPath(`/explorer/address/${encodeURIComponent(address)}`, event)
+              openPath(routes.addressPath(address), event)
             }}
           />
         )}
@@ -535,7 +537,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               title="Recent accounts"
               accounts={recentAccountItems}
               onAddressClick={(address, event) => {
-                openPath(`/explorer/address/${encodeURIComponent(address)}`, event)
+                openPath(routes.addressPath(address), event)
               }}
             />
           )}

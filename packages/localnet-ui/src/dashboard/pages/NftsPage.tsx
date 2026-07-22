@@ -15,10 +15,11 @@ import type {FC} from "react"
 
 import type {TonClient} from "../../explorer/api/client"
 import type {NftItem} from "../../explorer/api/types"
-import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 import {ExplorerAddressChip} from "../../explorer/components/ExplorerAddressChip"
 import {NftImage} from "../../explorer/components/NftImage"
 import {NFT_IMAGE_SOURCE_KEYS, getImageSources} from "../../explorer/components/imageFallbacks"
+import {useExplorerRoutePaths} from "../../explorer/hooks/useExplorerRoutePaths"
+import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 import {contentString} from "../dashboardUtils"
 
 import styles from "../DashboardPage.module.css"
@@ -35,6 +36,7 @@ interface NftsState {
 
 export const NftsPage: FC<NftsPageProps> = ({client}) => {
   const navigate = useNavigate()
+  const routes = useExplorerRoutePaths()
   const [hiddenAddresses, setHiddenAddresses] = useState<ReadonlySet<string>>(() => new Set())
   const [nftsState, setNftsState] = useState<NftsState>({
     items: [],
@@ -127,7 +129,7 @@ export const NftsPage: FC<NftsPageProps> = ({client}) => {
                   const imageSources = getImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
                   const collectionName =
                     contentString(item.collection?.collection_content, "name") || "Standalone"
-                  const href = `/explorer/address/${encodeURIComponent(item.address)}`
+                  const href = routes.addressPath(item.address)
 
                   return (
                     <DataTableRow
