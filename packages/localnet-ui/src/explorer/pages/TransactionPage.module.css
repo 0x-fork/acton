@@ -973,7 +973,7 @@
 
 @media (max-width: 520px) {
   .container {
-    padding: 16px;
+    padding: 12px 8px 28px;
     gap: 12px;
   }
 
@@ -981,8 +981,45 @@
     gap: 12px;
   }
 
+  .preTreeContent {
+    margin-top: -4px;
+  }
+
   .overviewCard {
-    margin-top: 4px;
+    position: relative;
+    padding: 16px;
+  }
+
+  .overviewHeader {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .status {
+    width: 100%;
+    padding-right: 32px;
+  }
+
+  .overviewMeta {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .favoriteAction {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+  }
+
+  .overviewMeta .value {
+    word-break: normal;
+    line-height: 1.35;
+  }
+
+  .tabs {
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
   }
 
   .skeletonBreadcrumbs {

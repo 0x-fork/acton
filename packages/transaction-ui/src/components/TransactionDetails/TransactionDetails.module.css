@@ -235,6 +235,10 @@
   display: flex;
 }
 
+.messageOpcode {
+  width: 100%;
+}
+
 .booleanTrue {
   font-weight: var(--acton-font-weight-emphasis);
   color: var(--acton-color-success);

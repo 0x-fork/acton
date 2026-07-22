@@ -869,7 +869,7 @@ export function TransactionTraceView({
                     </div>
                     {onToggleFavorite && (
                       <InlineAction
-                        className={isFavorite ? styles.favoriteActionActive : undefined}
+                        className={`${styles.favoriteAction} ${isFavorite ? styles.favoriteActionActive : ""}`}
                         label={isFavorite ? "Remove from favorites" : "Add to favorites"}
                         icon={
                           <Star className={isFavorite ? styles.favoriteIconActive : undefined} />
@@ -912,6 +912,7 @@ export function TransactionTraceView({
                       emptyState="No actions found"
                       showTimeColumn={false}
                       interactiveRows={false}
+                      mobileCards
                       className={styles.valueFlowPanel}
                       onAddressClick={onContractClick}
                       onActionHoverChange={onActionHoverChange}

@@ -1,5 +1,17 @@
 import {Checkbox, Input, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
-import {Check, ChevronDown, Edit2, Github, Plus, Share2, Star, Trash2} from "lucide-react"
+import {
+  Check,
+  ChevronDown,
+  Edit2,
+  Github,
+  Menu,
+  Plus,
+  Search,
+  Share2,
+  Star,
+  Trash2,
+  X,
+} from "lucide-react"
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {
@@ -836,10 +848,29 @@ const ExplorerNetworkUrlSync: FC<{
   return null
 }
 
+const MobileHeaderRouteSync: FC<{readonly onNavigate: () => void}> = ({onNavigate}) => {
+  const location = useLocation()
+  const routeIdentity = `${location.pathname}${location.search}${location.hash}`
+
+  useEffect(() => {
+    if (routeIdentity.length > 0) {
+      onNavigate()
+    }
+  }, [onNavigate, routeIdentity])
+
+  return null
+}
+
 export const ExplorerApp: FC = () => {
   const [networkState, setNetworkState] = useState<ExplorerNetworkState>(
     readInitialExplorerNetworkState,
   )
+  const [mobileHeaderPanel, setMobileHeaderPanel] = useState<"navigation" | "search">()
+  const mobileNavigationRef = useRef<HTMLDivElement>(null)
+  const mobileSearchRef = useRef<HTMLDivElement>(null)
+  const mobileNavigationOpen = mobileHeaderPanel === "navigation"
+  const mobileSearchOpen = mobileHeaderPanel === "search"
+  const closeMobileHeaderPanels = useCallback(() => setMobileHeaderPanel(undefined), [])
   const selectableNetworks = useMemo<readonly SelectableExplorerNetwork[]>(
     () => [...EXPLORER_NETWORKS, ...networkState.customNetworks],
     [networkState.customNetworks],
@@ -937,9 +968,37 @@ export const ExplorerApp: FC = () => {
     }
   }, [])
 
+  useEffect(() => {
+    if (!mobileHeaderPanel) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        (mobileNavigationRef.current?.contains(event.target) ||
+          mobileSearchRef.current?.contains(event.target))
+      ) {
+        return
+      }
+      closeMobileHeaderPanels()
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeMobileHeaderPanels()
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown, true)
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [closeMobileHeaderPanels, mobileHeaderPanel])
+
   return (
     <BrowserRouter>
       <ExplorerNetworkUrlSync networkId={networkId} />
+      <MobileHeaderRouteSync onNavigate={closeMobileHeaderPanels} />
       <ToastProvider>
         <StaticNetworkInfoProvider network={networkConfig}>
           <ExplorerRoutesProvider basePath="">
@@ -990,17 +1049,45 @@ export const ExplorerApp: FC = () => {
                           onEditNetwork={handleEditNetwork}
                           onDeleteNetwork={handleDeleteNetwork}
                         />
+                        <div className={styles.mobileSearchRoot} ref={mobileSearchRef}>
+                          <button
+                            type="button"
+                            className={styles.headerIconButton}
+                            aria-label={mobileSearchOpen ? "Close search" : "Open search"}
+                            aria-controls="explorer-mobile-search"
+                            aria-expanded={mobileSearchOpen}
+                            onClick={() =>
+                              setMobileHeaderPanel(current =>
+                                current === "search" ? undefined : "search",
+                              )
+                            }
+                          >
+                            {mobileSearchOpen ? <X size={18} /> : <Search size={18} />}
+                          </button>
+                          {mobileSearchOpen && (
+                            <div id="explorer-mobile-search" className={styles.mobileSearchPanel}>
+                              <ExplorerSearch
+                                autoFocus
+                                className={styles.mobileSearch}
+                                client={client}
+                                variant="header"
+                              />
+                            </div>
+                          )}
+                        </div>
                         <Link
-                          className={styles.headerIconButton}
+                          className={`${styles.headerIconButton} ${styles.desktopHeaderAction}`}
                           to="/favorites"
                           title="Favorites"
                           aria-label="Favorites"
                         >
                           <Star size={18} />
                         </Link>
-                        <ThemeSwitch />
+                        <span className={styles.desktopHeaderAction}>
+                          <ThemeSwitch />
+                        </span>
                         <a
-                          className={styles.headerIconButton}
+                          className={`${styles.headerIconButton} ${styles.desktopHeaderAction}`}
                           href="https://github.com/ton-blockchain/acton"
                           target="_blank"
                           rel="noreferrer"
@@ -1009,6 +1096,58 @@ export const ExplorerApp: FC = () => {
                         >
                           <Github size={18} />
                         </a>
+                        <div className={styles.mobileNavigationRoot} ref={mobileNavigationRef}>
+                          <button
+                            type="button"
+                            className={styles.headerIconButton}
+                            aria-label={
+                              mobileNavigationOpen ? "Close navigation" : "Open navigation"
+                            }
+                            aria-controls="explorer-mobile-navigation"
+                            aria-expanded={mobileNavigationOpen}
+                            onClick={() =>
+                              setMobileHeaderPanel(current =>
+                                current === "navigation" ? undefined : "navigation",
+                              )
+                            }
+                          >
+                            {mobileNavigationOpen ? <X size={18} /> : <Menu size={18} />}
+                          </button>
+                          {mobileNavigationOpen && (
+                            <nav
+                              id="explorer-mobile-navigation"
+                              className={styles.mobileNavigation}
+                              aria-label="Mobile explorer navigation"
+                            >
+                              <Link to="/blocks" onClick={closeMobileHeaderPanels}>
+                                Blocks
+                              </Link>
+                              <Link to="/abi" onClick={closeMobileHeaderPanels}>
+                                ABI
+                              </Link>
+                              <Link to="/sources" onClick={closeMobileHeaderPanels}>
+                                Sources
+                              </Link>
+                              <Link to="/favorites" onClick={closeMobileHeaderPanels}>
+                                <span>Favorites</span>
+                                <Star size={17} aria-hidden="true" />
+                              </Link>
+                              <a
+                                href="https://github.com/ton-blockchain/acton"
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={closeMobileHeaderPanels}
+                              >
+                                <span>GitHub</span>
+                                <Github size={17} aria-hidden="true" />
+                              </a>
+                              <div className={styles.mobileThemeRow}>
+                                <span>Appearance</span>
+                                <ThemeSwitch />
+                              </div>
+                            </nav>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </ExplorerHeaderFrame>

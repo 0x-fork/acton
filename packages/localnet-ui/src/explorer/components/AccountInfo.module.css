@@ -415,6 +415,10 @@
   font: inherit;
 }
 
+.assetLink {
+  flex: 0 1 auto;
+}
+
 .assetLink:disabled,
 .collectiblesLink:disabled {
   cursor: default;
@@ -493,6 +497,8 @@
   font: inherit;
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-normal);
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .moreLink:hover {
@@ -792,6 +798,19 @@
     width: 100%;
     align-items: flex-start;
     flex-wrap: wrap;
+  }
+
+  .assetRow,
+  .collectiblesRow {
+    width: 100%;
+  }
+
+  .assetLink {
+    align-items: flex-start;
+  }
+
+  .assetLink .primaryValue {
+    min-width: 0;
   }
 
   .addressInfoRow .rowValue {

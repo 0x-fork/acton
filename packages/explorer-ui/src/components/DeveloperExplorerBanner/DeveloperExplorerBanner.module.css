@@ -128,3 +128,26 @@
     display: none;
   }
 }
+
+@media (max-width: 520px) {
+  .inner {
+    min-height: 40px;
+  }
+
+  .message {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+
+  .message strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .publicExplorerPrompt,
+  .separator {
+    display: none;
+  }
+}

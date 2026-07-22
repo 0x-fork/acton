@@ -54,8 +54,11 @@ export function ValueFlowTable({
   })
 
   return (
-    <DataTable className={className} minWidth={`${20 + (assets.length + 2) * 12}rem`}>
-      <DataTableTable aria-label="Value flow" rowDividers={false}>
+    <DataTable
+      className={`${styles.root} ${className ?? ""}`}
+      minWidth={`var(--value-flow-table-min-width, ${20 + (assets.length + 2) * 12}rem)`}
+    >
+      <DataTableTable className={styles.table} aria-label="Value flow" rowDividers={false}>
         <DataTableHead>
           <DataTableRow>
             <DataTableHeaderCell columnWidth="20rem">Account</DataTableHeaderCell>
@@ -83,14 +86,14 @@ export function ValueFlowTable({
           ) : (
             sortedItems.map(item => (
               <DataTableRow key={item.address}>
-                <DataTableCell>
+                <DataTableCell className={styles.accountCell}>
                   <ContractChip
                     address={item.address}
                     contracts={contracts}
                     onContractClick={onContractClick}
                   />
                 </DataTableCell>
-                <DataTableCell align="right">
+                <DataTableCell align="right" data-mobile-label="Balance change">
                   <span className={item.change > 0n ? styles.positive : undefined}>
                     {formatSignedCurrency(item.change)}
                   </span>
@@ -98,7 +101,11 @@ export function ValueFlowTable({
                 {assets.map(asset => {
                   const assetChange = item.assetChanges.find(change => change.asset.id === asset.id)
                   return (
-                    <DataTableCell key={asset.id} align="right">
+                    <DataTableCell
+                      key={asset.id}
+                      align="right"
+                      data-mobile-label={asset.symbol ?? formatAddress(asset.id)}
+                    >
                       {assetChange && (
                         <span
                           className={
@@ -113,7 +120,9 @@ export function ValueFlowTable({
                     </DataTableCell>
                   )
                 })}
-                <DataTableCell align="right">{formatCurrency(item.fee)}</DataTableCell>
+                <DataTableCell align="right" data-mobile-label="Network fee">
+                  {formatCurrency(item.fee)}
+                </DataTableCell>
               </DataTableRow>
             ))
           )}

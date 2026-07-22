@@ -1,4 +1,13 @@
-import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import type {CSSProperties, FC, JSX, KeyboardEvent as ReactKeyboardEvent, MouseEvent} from "react"
 import {AbiGetMethods, fmt} from "@acton/transaction-ui"
 import {
@@ -299,6 +308,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   onTabChange,
 }) => {
   const [activeTab, setActiveTab] = useState<Tabs>("history")
+  const activeTabRef = useRef<HTMLButtonElement>(null)
   const filterPopoverRef = useRef<HTMLDivElement>(null)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
@@ -344,6 +354,10 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     setActiveTab(tab)
     onTabChange?.(tab)
   }
+
+  useLayoutEffect(() => {
+    activeTabRef.current?.scrollIntoView({block: "nearest", inline: "nearest"})
+  }, [activeTab])
 
   const [currentPage, setCurrentPage] = useState(1)
   const [hoveredAddress, setHoveredAddress] = useState<string | undefined>()
@@ -593,76 +607,83 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   return (
     <section className={styles.tableCard}>
       <div className={styles.tabs}>
-        <button
-          type="button"
-          className={`${styles.tab} ${activeTab === "history" ? styles.tabActive : ""}`}
-          onClick={() => handleTabClick("history")}
-        >
-          <span className={styles.tabIcon} aria-hidden="true">
-            <History size={18} />
-          </span>
-          History
-        </button>
-        <button
-          type="button"
-          className={`${styles.tab} ${activeTab === "tokens" ? styles.tabActive : ""}`}
-          onClick={() => handleTabClick("tokens")}
-        >
-          <span className={styles.tabIcon} aria-hidden="true">
-            <Coins size={18} />
-          </span>
-          Tokens
-        </button>
-        {(showHoldersTab || jettonMaster) && (
+        <div className={styles.primaryTabs}>
           <button
             type="button"
-            className={`${styles.tab} ${activeTab === "holders" ? styles.tabActive : ""}`}
-            onClick={() => handleTabClick("holders")}
+            ref={activeTab === "history" ? activeTabRef : undefined}
+            className={`${styles.tab} ${activeTab === "history" ? styles.tabActive : ""}`}
+            onClick={() => handleTabClick("history")}
           >
             <span className={styles.tabIcon} aria-hidden="true">
-              <UsersRound size={18} />
+              <History size={18} />
             </span>
-            Holders
+            History
           </button>
-        )}
-        {showNftsTab && (
           <button
             type="button"
-            className={`${styles.tab} ${activeTab === "nfts" ? styles.tabActive : ""}`}
-            onClick={() => handleTabClick("nfts")}
+            ref={activeTab === "tokens" ? activeTabRef : undefined}
+            className={`${styles.tab} ${activeTab === "tokens" ? styles.tabActive : ""}`}
+            onClick={() => handleTabClick("tokens")}
           >
             <span className={styles.tabIcon} aria-hidden="true">
-              <Image size={18} />
+              <Coins size={18} />
             </span>
-            Collectibles
+            Tokens
           </button>
-        )}
-        <button
-          type="button"
-          className={`${styles.tab} ${activeTab === "contract" ? styles.tabActive : ""}`}
-          onClick={() => handleTabClick("contract")}
-        >
-          <span className={styles.tabIcon} aria-hidden="true">
-            <Braces size={18} />
-          </span>
-          Contract
-        </button>
-        {compilerAbi && (
+          {(showHoldersTab || jettonMaster) && (
+            <button
+              type="button"
+              ref={activeTab === "holders" ? activeTabRef : undefined}
+              className={`${styles.tab} ${activeTab === "holders" ? styles.tabActive : ""}`}
+              onClick={() => handleTabClick("holders")}
+            >
+              <span className={styles.tabIcon} aria-hidden="true">
+                <UsersRound size={18} />
+              </span>
+              Holders
+            </button>
+          )}
+          {showNftsTab && (
+            <button
+              type="button"
+              ref={activeTab === "nfts" ? activeTabRef : undefined}
+              className={`${styles.tab} ${activeTab === "nfts" ? styles.tabActive : ""}`}
+              onClick={() => handleTabClick("nfts")}
+            >
+              <span className={styles.tabIcon} aria-hidden="true">
+                <Image size={18} />
+              </span>
+              Collectibles
+            </button>
+          )}
           <button
             type="button"
-            className={`${styles.tab} ${activeTab === "get-methods" ? styles.tabActive : ""}`}
-            onClick={() => handleTabClick("get-methods")}
+            ref={activeTab === "contract" ? activeTabRef : undefined}
+            className={`${styles.tab} ${activeTab === "contract" ? styles.tabActive : ""}`}
+            onClick={() => handleTabClick("contract")}
           >
             <span className={styles.tabIcon} aria-hidden="true">
-              <SquareFunction size={18} />
+              <Braces size={18} />
             </span>
-            Methods
+            Contract
           </button>
-        )}
-        <div className={styles.flexSpacer} />
+          {compilerAbi && (
+            <button
+              type="button"
+              ref={activeTab === "get-methods" ? activeTabRef : undefined}
+              className={`${styles.tab} ${activeTab === "get-methods" ? styles.tabActive : ""}`}
+              onClick={() => handleTabClick("get-methods")}
+            >
+              <span className={styles.tabIcon} aria-hidden="true">
+                <SquareFunction size={18} />
+              </span>
+              Methods
+            </button>
+          )}
+        </div>
         {activeTab === "history" && (
-          <>
-            <div className={styles.tab}>
+          <div className={styles.tabActions}>
+            <div className={`${styles.tab} ${styles.calendarTab}`}>
               <span className={styles.tabIcon} aria-hidden="true">
                 <CalendarDays size={17} />
               </span>
@@ -791,10 +812,17 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                       ))}
                     </div>
                   </section>
+                  <button
+                    type="button"
+                    className={styles.filtersCloseButton}
+                    onClick={() => setIsFiltersOpen(false)}
+                  >
+                    Close
+                  </button>
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
       </div>
 
@@ -1451,7 +1479,7 @@ export function ActionHistoryRows({
         const rowContent = (
           <>
             {showTimeColumn && (
-              <Cell className={`${styles.time} ${styles.timeColumn}`}>
+              <Cell className={`${styles.time} ${styles.timeColumn}`} data-mobile-area="time">
                 {!continuesFromTrace && formattedTime && (
                   <span
                     title={formattedTime.title}
@@ -1463,7 +1491,7 @@ export function ActionHistoryRows({
                 )}
               </Cell>
             )}
-            <Cell className={styles.actionColumn}>
+            <Cell className={styles.actionColumn} data-mobile-area="action">
               <div className={styles.action}>
                 <ActionIcon className={styles.actionIcon} aria-hidden="true" />
                 <span
@@ -1474,7 +1502,7 @@ export function ActionHistoryRows({
                 </span>
               </div>
             </Cell>
-            <Cell>
+            <Cell data-mobile-area="address">
               <div className={styles.addressWrapper}>
                 {info.relationLabel && (
                   <span className={styles.addressRelation}>{info.relationLabel}</span>
@@ -1492,10 +1520,10 @@ export function ActionHistoryRows({
                 )}
               </div>
             </Cell>
-            <Cell className={styles.technicalColumn}>
+            <Cell className={styles.technicalColumn} data-mobile-area="technical">
               <HistoryTechnicalCell technicalLabel={info.technicalLabel} />
             </Cell>
-            <Cell className={styles.valueContainer}>
+            <Cell className={styles.valueContainer} data-mobile-area="value">
               <div className={styles.historyValueStack}>
                 {info.valueLines.map((line, lineIndex) => (
                   <HistoryValueCellLine
@@ -1562,6 +1590,7 @@ interface ActionHistoryTableProps {
   readonly className?: string
   readonly showTimeColumn?: boolean
   readonly interactiveRows?: boolean
+  readonly mobileCards?: boolean
   readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
   readonly onActionHoverChange?: (action: V3Action | undefined) => void
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
@@ -1581,6 +1610,7 @@ export function ActionHistoryTable({
   className,
   showTimeColumn = true,
   interactiveRows = true,
+  mobileCards = false,
   onAddressClick,
   onActionHoverChange,
   onTransactionClick,
@@ -1611,7 +1641,10 @@ export function ActionHistoryTable({
   )
 
   return (
-    <DataTable className={className} minWidth={showTimeColumn ? "48rem" : "42rem"}>
+    <DataTable
+      className={`${className ?? ""} ${mobileCards ? styles.mobileCardTable : ""}`}
+      minWidth={showTimeColumn ? "48rem" : "42rem"}
+    >
       <DataTableTable aria-label="Event overview" layout="auto" rowDividers={false}>
         <DataTableHead>
           <DataTableRow>

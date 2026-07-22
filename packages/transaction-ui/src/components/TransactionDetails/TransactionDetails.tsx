@@ -528,7 +528,12 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Opcode</div>
                 <div className={styles.multiColumnItemValue}>
-                  <OpcodeChip opcode={opcode} abiName={opcodeDisplayName} showOpcode={true} />
+                  <OpcodeChip
+                    className={styles.messageOpcode}
+                    opcode={opcode}
+                    abiName={opcodeDisplayName}
+                    showOpcode={true}
+                  />
                 </div>
               </div>
             </div>

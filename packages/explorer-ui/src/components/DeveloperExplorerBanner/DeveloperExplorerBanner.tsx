@@ -38,7 +38,7 @@ export function DeveloperExplorerBanner() {
           <span className={styles.separator} aria-hidden="true">
             ·
           </span>
-          <span>Looking for a public TON explorer?</span>
+          <span className={styles.publicExplorerPrompt}>Looking for a public TON explorer?</span>
           <a className={styles.link} href="https://tonscan.org" target="_blank" rel="noreferrer">
             Visit Tonscan
             <ExternalLink size={13} aria-hidden="true" />

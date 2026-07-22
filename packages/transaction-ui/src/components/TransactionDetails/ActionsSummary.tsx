@@ -389,7 +389,12 @@ const renderActionDetails = (
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Opcode:</span>
                   <div className={styles.detailValue}>
-                    <OpcodeChip opcode={opcode} abiName={opcodeDisplayName} showOpcode={true} />
+                    <OpcodeChip
+                      className={styles.messageOpcode}
+                      opcode={opcode}
+                      abiName={opcodeDisplayName}
+                      showOpcode={true}
+                    />
                   </div>
                 </div>
                 {parsedBody && (
