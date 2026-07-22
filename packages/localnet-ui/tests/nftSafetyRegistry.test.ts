@@ -1,32 +1,53 @@
 import {expect, test} from "bun:test"
+import {sha256_sync} from "@ton/crypto"
 
-import {isRegisteredNsfwNft} from "../src/explorer/nftSafetyRegistry"
+import {createNftSafetyMatcher, NSFW_NFT_REGISTRY} from "../src/explorer/nftSafetyRegistry"
+
+const hashRegistryValue = (value: string): string => sha256_sync(value).toString("hex")
+
+const contentHash = "a".repeat(64)
+const isRegisteredNsfwNft = createNftSafetyMatcher({
+  imageUrlHashes: [hashRegistryValue("https://images.example/blocked.png")],
+  imageHostSuffixHashes: [hashRegistryValue("blocked.example")],
+  contentHashes: [contentHash],
+  collectionNameHashes: [hashRegistryValue("blocked collection")],
+})
+
+const toncenterProxyUrl = (source: string): string => {
+  const encodedSource = btoa(source).replace(/\+/g, "-").replace(/\//g, "_").replace(/[=]+$/, "")
+  return `https://proxy.toncenter.com/proxy-id/pr:small/${encodedSource}`
+}
+
+test("stores only anonymized registry values", () => {
+  expect(
+    Object.values(NSFW_NFT_REGISTRY)
+      .flat()
+      .every(value => /^[0-9a-f]{64}$/.test(value)),
+  ).toBe(true)
+})
 
 test("matches manually registered NFT content before and after downloading it", () => {
   expect({
     urlWithChangingQuery: isRegisteredNsfwNft({
-      imageUrl: "https://cloudmetrics.cyou/images/3?t=1783902740484",
+      imageUrl: "https://images.example/blocked.png?t=changing-value",
     }),
     randomizedSubdomain: isRegisteredNsfwNft({
-      imageUrl: "https://new-random-name.cloudmetrics.cyou/images/other",
+      imageUrl: "https://new-random-name.blocked.example/images/other",
     }),
-    proxiedUrlWithChangingQuery: isRegisteredNsfwNft({
-      imageUrl:
-        "https://cache.tonapi.io/imgproxy/wDYWflKVCrSqqoVsEEXrJWTgPzfxJZUbygFjXcqdOcc/rs:fill:1500:1500:1/g:no/aHR0cHM6Ly80NjI5LmNsb3VkbWV0cmljcy5jeW91L2ltYWdlcy8zP3Q9MTc4MzYyNzgyMzIzNw.webp?t=new-value",
+    exactUrlWithChangingQuery: isRegisteredNsfwNft({
+      imageUrl: "https://images.example/blocked.png?t=new-value",
     }),
     normalizedCollectionName: isRegisteredNsfwNft({
-      collectionName: "  BUNKER   of Death 1781768564560 ",
+      collectionName: "  BLOCKED   collection ",
     }),
     contentHash: isRegisteredNsfwNft({
-      contentHash: "sha256:EAD9E3C5F260785E8852C0DCA7AD1FD7E6690B03009A158A849243E59685AA7D",
+      contentHash: `sha256:${contentHash.toUpperCase()}`,
     }),
     toncenterProxyWithCanonicalHash: isRegisteredNsfwNft({
-      imageUrl:
-        "https://proxy.toncenter.com/F0W0fr2CnSPVMdgFNe9x87X1TkFGKz7rUBtHpWmNXwc/pr:small/bG9jYWw6Ly8vc2hhMjU2L2VhZDllM2M1ZjI2MDc4NWU4ODUyYzBkY2E3YWQxZmQ3ZTY2OTBiMDMwMDlhMTU4YTg0OTI0M2U1OTY4NWFhN2Q",
+      imageUrl: toncenterProxyUrl(`local:///sha256/${contentHash}`),
     }),
     toncenterProxyWithRegisteredSourceUrl: isRegisteredNsfwNft({
-      imageUrl:
-        "https://imgproxy.toncenter.com/hD7GRJtQMYSy89vvq6xqb-tVtbtBhpdE2S7xjNYiqcw/pr:small/aHR0cHM6Ly9tenQzLmNsb3VkbWV0cmljcy5jeW91L2ltYWdlcy8zP3Q9MTc4MTkwNTYxOTE4MQ",
+      imageUrl: toncenterProxyUrl("https://cdn.blocked.example/images/other?t=changing-value"),
     }),
     unknown: isRegisteredNsfwNft({
       imageUrl: "https://example.com/safe.png",
@@ -36,8 +57,8 @@ test("matches manually registered NFT content before and after downloading it", 
   }).toMatchInlineSnapshot(`
     {
       "contentHash": true,
+      "exactUrlWithChangingQuery": true,
       "normalizedCollectionName": true,
-      "proxiedUrlWithChangingQuery": true,
       "randomizedSubdomain": true,
       "toncenterProxyWithCanonicalHash": true,
       "toncenterProxyWithRegisteredSourceUrl": true,
