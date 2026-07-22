@@ -3,7 +3,6 @@
   background: var(--acton-color-surface-raised);
   border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  box-shadow: var(--acton-shadow-surface);
 }
 
 .summaryGrid {

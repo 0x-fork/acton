@@ -11,7 +11,6 @@
   background: var(--acton-color-surface-raised);
   border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  box-shadow: var(--acton-shadow-surface);
 }
 
 .summaryMain {
@@ -102,7 +101,7 @@
   min-width: 0;
   padding: 10px 11px;
   border-radius: 10px;
-  background: var(--acton-color-surface-raised);
+  background: var(--acton-color-surface-row);
 }
 
 .summaryFact span {
@@ -132,7 +131,7 @@
   padding: 14px;
   border: 0;
   border-radius: 10px;
-  background: var(--acton-color-surface-raised);
+  background: var(--acton-color-surface-row);
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -161,7 +160,7 @@
   padding: 13px;
   border: 0;
   border-radius: 10px;
-  background: var(--acton-color-surface-raised);
+  background: var(--acton-color-surface-row);
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
   gap: 10px;

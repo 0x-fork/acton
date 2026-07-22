@@ -1159,6 +1159,8 @@ highlighting, copy action, optional external action, and responsive file picker.
 - `attachedToTabs`: removes the leading top corner radius when the viewer sits
   directly below a tab bar.
 - `emptyMessage`: caller-provided text for an empty source bundle.
+- Directories named `output` receive a generated-artifact accent in the file
+  tree so compiled files remain visually distinct from source directories.
 
 ### States To Review Visually
 

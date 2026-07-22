@@ -237,7 +237,11 @@ function FileTreeRows({
             <li key={node.path} className={styles.treeItem}>
               <button
                 type="button"
-                className={cx(styles.treeRow, styles.folderRow)}
+                className={cx(
+                  styles.treeRow,
+                  styles.folderRow,
+                  node.name === "output" && styles.outputFolderRow,
+                )}
                 style={depthStyle}
                 aria-expanded={expanded}
                 onClick={() => onToggleFolder(node.path)}
