@@ -18,7 +18,7 @@ use crate::{
     },
 };
 
-const INDEX_SCHEMA_VERSION: i64 = 7;
+const INDEX_SCHEMA_VERSION: i64 = 8;
 const UNKNOWN_REVISION: &str = "unknown";
 
 #[async_trait]
@@ -39,10 +39,10 @@ pub trait VerificationIndex: Send + Sync + 'static {
         code_hash: &str,
     ) -> Result<IndexedVerificationStatus, VerificationIndexError>;
 
-    async fn bundles(
+    async fn bundle(
         &self,
         code_hash: &str,
-    ) -> Result<Vec<StoredSourceBundle>, VerificationIndexError>;
+    ) -> Result<Option<StoredSourceBundle>, VerificationIndexError>;
 
     async fn last_verified(
         &self,
@@ -61,7 +61,6 @@ pub type SharedVerificationIndex = Arc<dyn VerificationIndex>;
 #[derive(Clone, Debug)]
 pub struct IndexedVerificationStatus {
     pub verified: bool,
-    pub bundle_count: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -164,7 +163,7 @@ impl SqliteVerificationIndex {
     fn replace_all(
         &self,
         indexed_revision: &str,
-        bundles: &[StoredSourceBundle],
+        sources: &[StoredSourceBundle],
     ) -> Result<(), VerificationIndexError> {
         let indexed_at = now_unix_seconds()?;
         {
@@ -176,7 +175,7 @@ impl SqliteVerificationIndex {
             transaction.execute("delete from verified_bundles", [])?;
             transaction.execute("delete from registry_index_state", [])?;
 
-            for bundle in bundles {
+            for bundle in sources {
                 insert_bundle(&transaction, bundle, indexed_at)?;
             }
             set_index_state(&transaction, indexed_revision, indexed_at)?;
@@ -208,20 +207,20 @@ impl VerificationIndex for SqliteVerificationIndex {
             "registry index is stale; rebuilding"
         );
 
-        let mut bundles = Vec::new();
+        let mut sources = Vec::new();
         let code_hashes = source_storage.list_code_hashes().await?;
         let code_hash_count = code_hashes.len();
         tracing::info!(
             completed_code_hashes = 0,
             total_code_hashes = code_hash_count,
-            bundle_count = 0,
+            verified_code_hash_count = 0,
             "registry index rebuild progress"
         );
 
         for (index, code_hash) in code_hashes.into_iter().enumerate() {
-            for bundle in source_storage.list_bundles(&code_hash).await? {
+            if let Some(bundle) = source_storage.load_bundle(&code_hash).await? {
                 validate_stored_bundle(&bundle, &code_hash)?;
-                bundles.push(bundle);
+                sources.push(bundle);
             }
 
             let completed = index + 1;
@@ -229,16 +228,16 @@ impl VerificationIndex for SqliteVerificationIndex {
                 tracing::info!(
                     completed_code_hashes = completed,
                     total_code_hashes = code_hash_count,
-                    bundle_count = bundles.len(),
+                    verified_code_hash_count = sources.len(),
                     "registry index rebuild progress"
                 );
             }
         }
 
-        self.replace_all(&indexed_revision, &bundles)?;
+        self.replace_all(&indexed_revision, &sources)?;
         tracing::info!(
             revision = %indexed_revision,
-            bundle_count = bundles.len(),
+            verified_code_hash_count = sources.len(),
             elapsed_ms = started_at.elapsed().as_secs_f64() * 1_000.0,
             "registry index rebuilt"
         );
@@ -257,11 +256,7 @@ impl VerificationIndex for SqliteVerificationIndex {
             let mut connection = self.connection()?;
             let transaction = connection.transaction()?;
 
-            delete_bundle_rows(
-                &transaction,
-                &bundle.manifest.code_hash,
-                &bundle.manifest.source_bundle_hash,
-            )?;
+            delete_bundle_rows(&transaction, &bundle.manifest.code_hash)?;
             insert_bundle(&transaction, bundle, indexed_at)?;
             if let Some(indexed_revision) = indexed_revision {
                 set_index_state(&transaction, indexed_revision, indexed_at)?;
@@ -277,33 +272,25 @@ impl VerificationIndex for SqliteVerificationIndex {
         &self,
         code_hash: &str,
     ) -> Result<IndexedVerificationStatus, VerificationIndexError> {
-        let bundle_count = {
+        let verified = {
             let connection = self.connection()?;
             connection.query_row(
-                "select count(*) from verified_bundles where code_hash = ?1",
+                "select exists(select 1 from verified_bundles where code_hash = ?1)",
                 params![code_hash],
-                |row| row.get::<_, i64>(0),
+                |row| row.get::<_, bool>(0),
             )?
         };
 
-        Ok(IndexedVerificationStatus {
-            verified: bundle_count > 0,
-            bundle_count: usize::try_from(bundle_count).map_err(|_| {
-                VerificationIndexError::InvalidInteger {
-                    field: "bundle_count",
-                    value: bundle_count,
-                }
-            })?,
-        })
+        Ok(IndexedVerificationStatus { verified })
     }
 
-    async fn bundles(
+    async fn bundle(
         &self,
         code_hash: &str,
-    ) -> Result<Vec<StoredSourceBundle>, VerificationIndexError> {
-        {
-            let connection = self.connection()?;
-            let mut statement = connection.prepare(
+    ) -> Result<Option<StoredSourceBundle>, VerificationIndexError> {
+        let connection = self.connection()?;
+        let row = connection
+            .query_row(
                 r"
                 select
                   source_bundle_hash,
@@ -313,32 +300,26 @@ impl VerificationIndex for SqliteVerificationIndex {
                   source_map_json
                 from verified_bundles
                 where code_hash = ?1
-                order by source_bundle_hash
                 ",
-            )?;
-            let rows = statement.query_map(params![code_hash], |row| {
-                let source_bundle_hash: String = row.get(0)?;
-                Ok(IndexedBundleRow {
-                    source_bundle_hash,
-                    verified_at: row.get(1)?,
-                    compiler_json: row.get(2)?,
-                    storage_revision: row.get(3)?,
-                    source_map_json: row.get(4)?,
-                })
-            })?;
-
-            let mut bundles = Vec::new();
-            for row in rows {
-                let row = row?;
-                let bundle = bundle_from_row(&connection, code_hash, row)?;
-                validate_stored_bundle(&bundle, code_hash)?;
-                bundles.push(bundle);
-            }
-
-            drop(statement);
-            drop(connection);
-            Ok(bundles)
-        }
+                params![code_hash],
+                |row| {
+                    Ok(IndexedBundleRow {
+                        source_bundle_hash: row.get(0)?,
+                        verified_at: row.get(1)?,
+                        compiler_json: row.get(2)?,
+                        storage_revision: row.get(3)?,
+                        source_map_json: row.get(4)?,
+                    })
+                },
+            )
+            .optional()?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let bundle = bundle_from_row(&connection, code_hash, row)?;
+        drop(connection);
+        validate_stored_bundle(&bundle, code_hash)?;
+        Ok(Some(bundle))
     }
 
     async fn last_verified(
@@ -366,27 +347,24 @@ impl VerificationIndex for SqliteVerificationIndex {
                 select 1
                 from bundle_abis
                 where bundle_abis.code_hash = verified_bundles.code_hash
-                  and bundle_abis.source_bundle_hash = verified_bundles.source_bundle_hash
               ) as has_tolk_abi,
               (
                 select bundle_abis.abi_json
                 from bundle_abis
                 where bundle_abis.code_hash = verified_bundles.code_hash
-                  and bundle_abis.source_bundle_hash = verified_bundles.source_bundle_hash
                 order by bundle_abis.path asc
                 limit 1
               ) as abi_json
             from verified_bundles
             left join bundle_files
               on bundle_files.code_hash = verified_bundles.code_hash
-             and bundle_files.source_bundle_hash = verified_bundles.source_bundle_hash
             group by
               verified_bundles.code_hash,
               verified_bundles.source_bundle_hash,
               verified_bundles.verified_at,
               verified_bundles.compiler_json,
               verified_bundles.storage_revision
-            order by verified_bundles.verified_at desc, verified_bundles.source_bundle_hash desc
+            order by verified_bundles.verified_at desc, verified_bundles.code_hash desc
             limit ?1 offset ?2
             ",
         )?;
@@ -428,7 +406,6 @@ impl VerificationIndex for SqliteVerificationIndex {
             from bundle_abis
             join verified_bundles
               on verified_bundles.code_hash = bundle_abis.code_hash
-             and verified_bundles.source_bundle_hash = bundle_abis.source_bundle_hash
             where (?1 is null or bundle_abis.code_hash = ?1)
             group by bundle_abis.code_hash, bundle_abis.abi_json
             order by max(verified_bundles.verified_at) desc, bundle_abis.code_hash desc
@@ -534,43 +511,37 @@ fn initialize_schema(connection: &Connection) -> Result<(), VerificationIndexErr
         );
 
         create table if not exists verified_bundles (
-          code_hash text not null,
+          code_hash text primary key,
           source_bundle_hash text not null,
           verified_at integer not null,
           compiler_json text not null,
           storage_revision text not null,
           source_map_json text,
-          indexed_at integer not null,
-          primary key (code_hash, source_bundle_hash)
+          indexed_at integer not null
         );
 
         create table if not exists bundle_files (
           code_hash text not null,
-          source_bundle_hash text not null,
           path text not null,
           content_hash text not null,
           content text not null,
           include_in_command integer,
           is_stdlib integer,
           has_include_directives integer,
-          primary key (code_hash, source_bundle_hash, path)
+          primary key (code_hash, path)
         );
 
         create table if not exists bundle_abis (
           code_hash text not null,
-          source_bundle_hash text not null,
           path text not null,
           content_hash text not null,
           abi_json text not null,
           indexed_at integer not null,
-          primary key (code_hash, source_bundle_hash, path)
+          primary key (code_hash, path)
         );
 
-        create index if not exists verified_bundles_by_code_hash
-          on verified_bundles (code_hash);
-
         create index if not exists bundle_files_by_bundle
-          on bundle_files (code_hash, source_bundle_hash);
+          on bundle_files (code_hash);
 
         create index if not exists bundle_abis_by_code_hash
           on bundle_abis (code_hash);
@@ -598,7 +569,8 @@ fn insert_bundle(
           source_map_json,
           indexed_at
         ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-        on conflict (code_hash, source_bundle_hash) do update set
+        on conflict (code_hash) do update set
+          source_bundle_hash = excluded.source_bundle_hash,
           verified_at = excluded.verified_at,
           compiler_json = excluded.compiler_json,
           storage_revision = excluded.storage_revision,
@@ -627,18 +599,16 @@ fn insert_bundle(
             r"
             insert into bundle_files (
               code_hash,
-              source_bundle_hash,
               path,
               content_hash,
               content,
               include_in_command,
               is_stdlib,
               has_include_directives
-            ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7)
             ",
             params![
                 &manifest.code_hash,
-                &manifest.source_bundle_hash,
                 &file.path,
                 &file.content_hash,
                 &file.content,
@@ -653,16 +623,14 @@ fn insert_bundle(
                 r"
                 insert into bundle_abis (
                   code_hash,
-                  source_bundle_hash,
                   path,
                   content_hash,
                   abi_json,
                   indexed_at
-                ) values (?1, ?2, ?3, ?4, ?5, ?6)
+                ) values (?1, ?2, ?3, ?4, ?5)
                 ",
                 params![
                     &manifest.code_hash,
-                    &manifest.source_bundle_hash,
                     &file.path,
                     &file.content_hash,
                     abi_json.to_string(),
@@ -678,19 +646,18 @@ fn insert_bundle(
 fn delete_bundle_rows(
     transaction: &Transaction<'_>,
     code_hash: &str,
-    source_bundle_hash: &str,
 ) -> Result<(), VerificationIndexError> {
     transaction.execute(
-        "delete from bundle_abis where code_hash = ?1 and source_bundle_hash = ?2",
-        params![code_hash, source_bundle_hash],
+        "delete from bundle_abis where code_hash = ?1",
+        params![code_hash],
     )?;
     transaction.execute(
-        "delete from bundle_files where code_hash = ?1 and source_bundle_hash = ?2",
-        params![code_hash, source_bundle_hash],
+        "delete from bundle_files where code_hash = ?1",
+        params![code_hash],
     )?;
     transaction.execute(
-        "delete from verified_bundles where code_hash = ?1 and source_bundle_hash = ?2",
-        params![code_hash, source_bundle_hash],
+        "delete from verified_bundles where code_hash = ?1",
+        params![code_hash],
     )?;
     Ok(())
 }
@@ -721,7 +688,7 @@ fn bundle_from_row(
     code_hash: &str,
     row: IndexedBundleRow,
 ) -> Result<StoredSourceBundle, VerificationIndexError> {
-    let files = bundle_files(connection, code_hash, &row.source_bundle_hash)?;
+    let files = bundle_files(connection, code_hash)?;
     let compiler = serde_json::from_str::<CompilerMetadata>(&row.compiler_json)?;
     let source_map = row
         .source_map_json
@@ -745,7 +712,6 @@ fn bundle_from_row(
 fn bundle_files(
     connection: &Connection,
     code_hash: &str,
-    source_bundle_hash: &str,
 ) -> Result<Vec<StoredSourceFile>, VerificationIndexError> {
     let mut statement = connection.prepare(
         r"
@@ -757,11 +723,11 @@ fn bundle_files(
           is_stdlib,
           has_include_directives
         from bundle_files
-        where code_hash = ?1 and source_bundle_hash = ?2
+        where code_hash = ?1
         order by path
         ",
     )?;
-    let rows = statement.query_map(params![code_hash, source_bundle_hash], |row| {
+    let rows = statement.query_map(params![code_hash], |row| {
         Ok(StoredSourceFile {
             path: row.get(0)?,
             content_hash: row.get(1)?,

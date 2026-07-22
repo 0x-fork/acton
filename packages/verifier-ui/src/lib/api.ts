@@ -3,7 +3,7 @@ import {lookupTargetToQuery, type LookupTarget} from "./target"
 export interface VerificationSourceResponse {
   readonly code_hash: string
   readonly verified: boolean
-  readonly bundles: readonly SourceBundle[]
+  readonly bundle: SourceBundle | null
 }
 
 export interface SourceBundle {

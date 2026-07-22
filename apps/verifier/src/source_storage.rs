@@ -23,10 +23,10 @@ pub trait SourceStorage: Send + Sync + 'static {
         request: StoreSourceBundleRequest,
     ) -> Result<SourceStorageReceipt, SourceStorageError>;
 
-    async fn list_bundles(
+    async fn load_bundle(
         &self,
         code_hash: &str,
-    ) -> Result<Vec<StoredSourceBundle>, SourceStorageError>;
+    ) -> Result<Option<StoredSourceBundle>, SourceStorageError>;
 
     async fn list_code_hashes(&self) -> Result<Vec<String>, SourceStorageError>;
 
@@ -71,6 +71,7 @@ pub struct SourceStorageFile {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SourceStorageReceipt {
     pub revision: String,
+    pub created: bool,
 }
 
 #[derive(Clone, Default)]
@@ -85,10 +86,10 @@ impl SourceStorage for DisabledSourceStorage {
         Err(SourceStorageError::MissingConfig("source_repository.path"))
     }
 
-    async fn list_bundles(
+    async fn load_bundle(
         &self,
         _code_hash: &str,
-    ) -> Result<Vec<StoredSourceBundle>, SourceStorageError> {
+    ) -> Result<Option<StoredSourceBundle>, SourceStorageError> {
         Err(SourceStorageError::MissingConfig("source_repository.path"))
     }
 
@@ -138,35 +139,51 @@ impl GitSourceStorage {
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
         ensure_git_repo(repo_path).await?;
 
-        let bundle_path = bundle_relative_path(&request.code_hash, &request.source_bundle_hash);
+        let bundle_path = bundle_relative_path(&request.code_hash);
         let bundle_dir = repo_path.join(&bundle_path);
-        let files_dir = bundle_dir.join("files");
-        fs::create_dir_all(&files_dir)
+        let existing_revision = if fs::try_exists(bundle_dir.join("manifest.json"))
             .await
-            .map_err(|source| SourceStorageError::CreateDir {
-                path: files_dir.clone(),
+            .map_err(|source| SourceStorageError::ReadDir {
+                path: bundle_dir.clone(),
                 source,
+            })? {
+            let bundle = read_bundle(repo_path, &bundle_path).await?;
+            Some(bundle.storage_revision)
+        } else {
+            let verified_at = current_unix_timestamp()?;
+            let files_dir = bundle_dir.join("files");
+            fs::create_dir_all(&files_dir).await.map_err(|source| {
+                SourceStorageError::CreateDir {
+                    path: files_dir.clone(),
+                    source,
+                }
             })?;
 
-        write_bundle_files(&files_dir, &request.files).await?;
-        write_manifest(&bundle_dir, &request).await?;
+            write_bundle_files(&files_dir, &request.files).await?;
+            write_manifest(&bundle_dir, &request, verified_at).await?;
 
-        if self.commit_enabled {
-            git(repo_path, &["add", "--", &bundle_path]).await?;
+            if self.commit_enabled {
+                git(repo_path, &["add", "--", &bundle_path]).await?;
 
-            let staged = git_has_staged_changes(repo_path, &bundle_path).await?;
-            if staged {
-                let message = commit_message(&request);
-                git_with_author(
-                    repo_path,
-                    &["commit", "-m", &message, "--", &bundle_path],
-                    self,
-                )
-                .await?;
+                let staged = git_has_staged_changes(repo_path, &bundle_path).await?;
+                if staged {
+                    let message = commit_message(&request);
+                    git_with_author(
+                        repo_path,
+                        &["commit", "-m", &message, "--", &bundle_path],
+                        self,
+                    )
+                    .await?;
+                }
             }
-        }
+            None
+        };
 
-        let revision = git_output(repo_path, &["rev-parse", "HEAD"]).await?;
+        let created = existing_revision.is_none();
+        let revision = match existing_revision {
+            Some(revision) => revision,
+            None => git_output(repo_path, &["rev-parse", "HEAD"]).await?,
+        };
 
         if self.commit_enabled && self.push_enabled {
             let branch = match &self.branch {
@@ -177,70 +194,31 @@ impl GitSourceStorage {
             git(repo_path, &["push", &self.remote, &refspec]).await?;
         }
 
-        Ok(SourceStorageReceipt { revision })
+        Ok(SourceStorageReceipt { revision, created })
     }
 
-    async fn list_bundles_locked(
+    async fn load_bundle_locked(
         &self,
         code_hash: &str,
-    ) -> Result<Vec<StoredSourceBundle>, SourceStorageError> {
+    ) -> Result<Option<StoredSourceBundle>, SourceStorageError> {
         let repo_path = self
             .repo_path
             .as_deref()
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
         ensure_git_repo(repo_path).await?;
 
-        let code_hash_dir = repo_path.join(STORAGE_ROOT).join(code_hash);
-        if !fs::try_exists(&code_hash_dir)
+        let bundle_path = bundle_relative_path(code_hash);
+        let bundle_dir = repo_path.join(&bundle_path);
+        if !fs::try_exists(bundle_dir.join("manifest.json"))
             .await
             .map_err(|source| SourceStorageError::ReadDir {
-                path: code_hash_dir.clone(),
+                path: bundle_dir,
                 source,
             })?
         {
-            return Ok(Vec::new());
+            return Ok(None);
         }
-
-        let mut read_dir =
-            fs::read_dir(&code_hash_dir)
-                .await
-                .map_err(|source| SourceStorageError::ReadDir {
-                    path: code_hash_dir.clone(),
-                    source,
-                })?;
-        let mut bundles = Vec::new();
-        while let Some(entry) =
-            read_dir
-                .next_entry()
-                .await
-                .map_err(|source| SourceStorageError::ReadDir {
-                    path: code_hash_dir.clone(),
-                    source,
-                })?
-        {
-            let file_type =
-                entry
-                    .file_type()
-                    .await
-                    .map_err(|source| SourceStorageError::ReadDir {
-                        path: entry.path(),
-                        source,
-                    })?;
-            if !file_type.is_dir() {
-                continue;
-            }
-
-            let source_bundle_hash = entry.file_name().to_string_lossy().into_owned();
-            let bundle_path = bundle_relative_path(code_hash, &source_bundle_hash);
-            bundles.push(read_bundle(repo_path, &bundle_path).await?);
-        }
-
-        bundles.sort_by(|left, right| {
-            left.manifest
-                .source_bundle_hash
-                .cmp(&right.manifest.source_bundle_hash)
-        });
-        Ok(bundles)
+        read_bundle(repo_path, &bundle_path).await.map(Some)
     }
 
     async fn list_code_hashes_locked(&self) -> Result<Vec<String>, SourceStorageError> {
@@ -320,12 +298,12 @@ impl SourceStorage for GitSourceStorage {
         self.store_bundle_locked(request).await
     }
 
-    async fn list_bundles(
+    async fn load_bundle(
         &self,
         code_hash: &str,
-    ) -> Result<Vec<StoredSourceBundle>, SourceStorageError> {
+    ) -> Result<Option<StoredSourceBundle>, SourceStorageError> {
         let _guard = self.lock.lock().await;
-        self.list_bundles_locked(code_hash).await
+        self.load_bundle_locked(code_hash).await
     }
 
     async fn list_code_hashes(&self) -> Result<Vec<String>, SourceStorageError> {
@@ -424,8 +402,8 @@ async fn ensure_git_repo(repo_path: &Path) -> Result<(), SourceStorageError> {
     })
 }
 
-fn bundle_relative_path(code_hash: &str, source_bundle_hash: &str) -> String {
-    format!("{STORAGE_ROOT}/{code_hash}/{source_bundle_hash}")
+fn bundle_relative_path(code_hash: &str) -> String {
+    format!("{STORAGE_ROOT}/{code_hash}")
 }
 
 async fn write_bundle_files(
@@ -453,12 +431,8 @@ async fn write_bundle_files(
 async fn write_manifest(
     bundle_dir: &Path,
     request: &StoreSourceBundleRequest,
+    verified_at: u64,
 ) -> Result<(), SourceStorageError> {
-    let verified_at = match read_existing_verified_at(bundle_dir).await? {
-        Some(verified_at) => verified_at,
-        None => current_unix_timestamp()?,
-    };
-
     let mut files = request
         .files
         .iter()
@@ -486,30 +460,6 @@ async fn write_manifest(
     fs::write(&path, bytes)
         .await
         .map_err(|source| SourceStorageError::WriteFile { path, source })
-}
-
-async fn read_existing_verified_at(bundle_dir: &Path) -> Result<Option<u64>, SourceStorageError> {
-    let manifest_path = bundle_dir.join("manifest.json");
-    let manifest_bytes = match fs::read(&manifest_path).await {
-        Ok(bytes) => bytes,
-        Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(source) => {
-            return Err(SourceStorageError::ReadFile {
-                path: manifest_path,
-                source,
-            });
-        }
-    };
-
-    let manifest =
-        serde_json::from_slice::<DiskSourceBundleManifest>(&manifest_bytes).map_err(|source| {
-            SourceStorageError::DeserializeManifest {
-                path: manifest_path,
-                source,
-            }
-        })?;
-
-    Ok(Some(manifest.verified_at))
 }
 
 fn current_unix_timestamp() -> Result<u64, SourceStorageError> {

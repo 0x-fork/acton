@@ -20,6 +20,7 @@ impl MockSourceStorage {
         Self {
             outcome: MockSourceStorageOutcome::Confirmed(SourceStorageReceipt {
                 revision: "mock-revision".to_owned(),
+                created: true,
             }),
             recorded_requests: Arc::new(Mutex::new(Vec::new())),
             stored_bundles: Arc::new(Mutex::new(Vec::new())),
@@ -55,10 +56,21 @@ impl SourceStorage for MockSourceStorage {
 
         match &self.outcome {
             MockSourceStorageOutcome::Confirmed(receipt) => {
-                self.stored_bundles
+                let mut stored_bundles = self
+                    .stored_bundles
                     .lock()
-                    .expect("stored source bundles mutex should not be poisoned")
-                    .push(stored_bundle_from_request(&request, receipt));
+                    .expect("stored source bundles mutex should not be poisoned");
+                if stored_bundles
+                    .iter()
+                    .any(|stored| stored.manifest.code_hash == request.code_hash)
+                {
+                    return Ok(SourceStorageReceipt {
+                        revision: receipt.revision.clone(),
+                        created: false,
+                    });
+                }
+                stored_bundles.push(stored_bundle_from_request(&request, receipt));
+                drop(stored_bundles);
                 Ok(receipt.clone())
             }
             MockSourceStorageOutcome::Failed(message) => {
@@ -67,19 +79,18 @@ impl SourceStorage for MockSourceStorage {
         }
     }
 
-    async fn list_bundles(
+    async fn load_bundle(
         &self,
         code_hash: &str,
-    ) -> Result<Vec<StoredSourceBundle>, SourceStorageError> {
+    ) -> Result<Option<StoredSourceBundle>, SourceStorageError> {
         let stored_bundles = self
             .stored_bundles
             .lock()
             .expect("stored source bundles mutex should not be poisoned");
         Ok(stored_bundles
             .iter()
-            .filter(|bundle| bundle.manifest.code_hash == code_hash)
-            .cloned()
-            .collect())
+            .find(|bundle| bundle.manifest.code_hash == code_hash)
+            .cloned())
     }
 
     async fn list_code_hashes(&self) -> Result<Vec<String>, SourceStorageError> {

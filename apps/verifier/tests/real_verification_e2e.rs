@@ -107,11 +107,13 @@ async fn verify_tolk_with_real_compiler_and_stores_generated_abi() {
 
     let body = response_json::<VerificationSourceResponse>(response).await;
     assert!(body.verified);
-    assert_eq!(body.bundles.len(), 1);
-    assert_eq!(body.bundles[0].compiler.language, "tolk");
-    assert_eq!(body.bundles[0].compiler.version, "1.4.1");
-    assert_eq!(body.bundles[0].entrypoint, "main.tolk");
-    let files = &body.bundles[0].files;
+    let bundle = body
+        .bundle
+        .expect("verified source should include a bundle");
+    assert_eq!(bundle.compiler.language, "tolk");
+    assert_eq!(bundle.compiler.version, "1.4.1");
+    assert_eq!(bundle.entrypoint, "main.tolk");
+    let files = &bundle.files;
     let abi = files
         .iter()
         .find(|file| file.path == "output/main.abi.json")
@@ -180,11 +182,13 @@ async fn verify_tact_with_real_compiler_and_stores_generated_sources() {
 
     let body = response_json::<VerificationSourceResponse>(response).await;
     assert!(body.verified);
-    assert_eq!(body.bundles.len(), 1);
-    assert_eq!(body.bundles[0].compiler.language, "tact");
-    assert_eq!(body.bundles[0].compiler.version, "1.6.13");
-    assert_eq!(body.bundles[0].entrypoint, "contract/contract.tact");
-    let files = &body.bundles[0].files;
+    let bundle = body
+        .bundle
+        .expect("verified source should include a bundle");
+    assert_eq!(bundle.compiler.language, "tact");
+    assert_eq!(bundle.compiler.version, "1.6.13");
+    assert_eq!(bundle.entrypoint, "contract/contract.tact");
+    let files = &bundle.files;
     assert!(files.iter().any(|file| file.path == "contract.pkg"));
     assert!(
         files.iter().any(|file| has_extension(&file.path, "abi")),
@@ -300,7 +304,7 @@ async fn assert_verified(response: axum::response::Response, _language: &str, co
     let body = serde_json::from_slice::<VerifyResponse>(&body)
         .expect("verification response should contain valid JSON");
     assert_eq!(body.code_hash, code_hash);
-    assert_eq!(body.compiled_code_hash, code_hash);
+    assert_eq!(body.compiled_code_hash.as_deref(), Some(code_hash));
     assert_eq!(body.verification_result, "match");
     assert!(body.source_bundle_hash.is_some());
     assert!(body.storage_revision.is_some());
@@ -456,7 +460,7 @@ impl<'a> WorkerSourceMetadata<'a> {
 #[derive(Debug, Deserialize)]
 struct VerifyResponse {
     code_hash: String,
-    compiled_code_hash: String,
+    compiled_code_hash: Option<String>,
     verification_result: String,
     source_bundle_hash: Option<String>,
     storage_revision: Option<String>,
@@ -465,7 +469,7 @@ struct VerifyResponse {
 #[derive(Debug, Deserialize)]
 struct VerificationSourceResponse {
     verified: bool,
-    bundles: Vec<VerifiedSourceBundle>,
+    bundle: Option<VerifiedSourceBundle>,
 }
 
 #[derive(Debug, Deserialize)]

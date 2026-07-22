@@ -19,16 +19,17 @@ use verifier::{
 
 const CODE_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SOURCE_BUNDLE_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const SECOND_BUNDLE_HASH: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
 #[tokio::test]
-async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Error>> {
+async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<(), Box<dyn Error>> {
     let fixture = GitFixture::new()?;
     let config_path = fixture.write_config()?;
     let config = Config::load_from_path(config_path)?;
     let storage = GitSourceStorage::from_config(&config);
 
     let started_at = unix_timestamp()?;
-    let bundle_path = format!("sources/{CODE_HASH}/{SOURCE_BUNDLE_HASH}");
+    let bundle_path = format!("sources/{CODE_HASH}");
     let receipt = storage
         .store_bundle(StoreSourceBundleRequest {
             code_hash: CODE_HASH.to_owned(),
@@ -60,6 +61,7 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
         .await?;
 
     assert_eq!(receipt.revision.len(), 40);
+    assert!(receipt.created);
 
     let stored_main = fixture.repo_path.join(&bundle_path).join("files/main.tolk");
     let stored_lib = fixture
@@ -98,31 +100,86 @@ async fn git_source_storage_commits_and_pushes_bundle() -> Result<(), Box<dyn Er
         "verification timestamp should be recorded when the bundle is stored"
     );
 
-    let stored_bundles = storage.list_bundles(CODE_HASH).await?;
-    assert_eq!(stored_bundles.len(), 1);
-    assert_eq!(stored_bundles[0].manifest.code_hash, CODE_HASH);
-    assert_eq!(stored_bundles[0].manifest.verified_at, verified_at);
+    let stored_bundle = storage
+        .load_bundle(CODE_HASH)
+        .await?
+        .expect("stored bundle should exist");
+    assert_eq!(stored_bundle.manifest.code_hash, CODE_HASH);
+    assert_eq!(stored_bundle.manifest.verified_at, verified_at);
     assert_eq!(
-        stored_bundles[0].manifest.source_bundle_hash,
+        stored_bundle.manifest.source_bundle_hash,
         SOURCE_BUNDLE_HASH
     );
     assert_eq!(
-        stored_bundles[0]
+        stored_bundle
             .manifest
             .source_map
             .as_ref()
             .map(|data| data.debug_marks_base64.as_str()),
         Some("te6cckEBAQEAAgAAAEysuc0=")
     );
-    assert_eq!(stored_bundles[0].storage_revision, receipt.revision);
-    assert_eq!(stored_bundles[0].files.len(), 2);
-    assert_eq!(stored_bundles[0].files[0].path, "imports/lib.tolk");
-    assert_eq!(stored_bundles[0].files[0].content, "fun helper() {}");
-    assert_eq!(stored_bundles[0].files[1].path, "main.tolk");
+    assert_eq!(stored_bundle.storage_revision, receipt.revision);
+    assert_eq!(stored_bundle.files.len(), 2);
+    assert_eq!(stored_bundle.files[0].path, "imports/lib.tolk");
+    assert_eq!(stored_bundle.files[0].content, "fun helper() {}");
+    assert_eq!(stored_bundle.files[1].path, "main.tolk");
     assert_eq!(
-        stored_bundles[0].files[1].content,
+        stored_bundle.files[1].content,
         "import \"imports/lib.tolk\";"
     );
+
+    let second_receipt = storage
+        .store_bundle(StoreSourceBundleRequest {
+            code_hash: CODE_HASH.to_owned(),
+            source_bundle_hash: SECOND_BUNDLE_HASH.to_owned(),
+            compiler: CompilerMetadata {
+                language: "tolk".to_owned(),
+                version: "1.4.2".to_owned(),
+                entrypoint: "replacement.tolk".to_owned(),
+                params: json!({"compiler_version": "1.4.2"}),
+            },
+            source_map: None,
+            files: vec![SourceStorageFile {
+                path: "replacement.tolk".to_owned(),
+                content: "fun replacement() {}".to_owned(),
+                include_in_command: None,
+                is_stdlib: None,
+                has_include_directives: None,
+            }],
+        })
+        .await?;
+
+    assert!(!second_receipt.created);
+    assert_eq!(second_receipt.revision, receipt.revision);
+    assert!(
+        fixture
+            .repo_path
+            .join(&bundle_path)
+            .join("files/main.tolk")
+            .exists()
+    );
+    assert!(
+        fixture
+            .repo_path
+            .join(&bundle_path)
+            .join("files/imports/lib.tolk")
+            .exists()
+    );
+    assert!(
+        !fixture
+            .repo_path
+            .join(&bundle_path)
+            .join("files/replacement.tolk")
+            .exists()
+    );
+    let original = storage
+        .load_bundle(CODE_HASH)
+        .await?
+        .expect("original bundle should still exist");
+    assert_eq!(original.manifest.source_bundle_hash, SOURCE_BUNDLE_HASH);
+    assert_eq!(original.manifest.verified_at, verified_at);
+    assert_eq!(original.manifest.compiler.version, "1.4.1");
+    assert_eq!(original.files.len(), 2);
 
     let remote_head = git_output(
         fixture.temp.path(),

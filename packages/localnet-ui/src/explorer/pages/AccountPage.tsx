@@ -510,7 +510,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
           codeHash: accountCodeLookupHash,
         })
         if (!isActive) return
-        setVerifiedSource(source.verified && source.bundles.length > 0 ? source : undefined)
+        setVerifiedSource(source.verified && source.bundle ? source : undefined)
       } catch (error) {
         if (!isActive) return
         console.debug("Failed to fetch verified source", error)

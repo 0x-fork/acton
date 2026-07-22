@@ -3398,20 +3398,18 @@ mod tests {
         let source = json!({
             "code_hash": code_hash.to_hex(),
             "verified": true,
-            "bundles": [
-                {
-                    "source_bundle_hash": "source-bundle",
-                    "verified_at": 0,
-                    "storage_revision": "local",
-                    "entrypoint": "contracts/main.tolk",
-                    "compiler": {
-                        "language": "tolk",
-                        "version": "1.4.0",
-                        "params": {}
-                    },
-                    "files": []
-                }
-            ]
+            "bundle": {
+                "source_bundle_hash": "source-bundle",
+                "verified_at": 0,
+                "storage_revision": "local",
+                "entrypoint": "contracts/main.tolk",
+                "compiler": {
+                    "language": "tolk",
+                    "version": "1.4.0",
+                    "params": {}
+                },
+                "files": []
+            }
         });
 
         node.set_verified_source(code_hash, source.clone())

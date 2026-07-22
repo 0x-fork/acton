@@ -29,10 +29,10 @@ pub trait VerificationRegistry: Send + Sync + 'static {
         request: VerificationStatusRequest,
     ) -> Result<VerificationStatusReceipt, RegistryError>;
 
-    async fn verified_bundles(
+    async fn verified_bundle(
         &self,
-        request: VerifiedBundlesRequest,
-    ) -> Result<VerifiedBundlesReceipt, RegistryError>;
+        request: VerifiedBundleRequest,
+    ) -> Result<VerifiedBundleReceipt, RegistryError>;
 
     async fn last_verified(
         &self,
@@ -50,6 +50,7 @@ pub type SharedVerificationRegistry = Arc<dyn VerificationRegistry>;
 #[derive(Clone, Debug)]
 pub struct StoreVerifiedBundleReceipt {
     pub storage: SourceStorageReceipt,
+    pub bundle: StoredSourceBundle,
 }
 
 #[derive(Clone, Debug)]
@@ -58,7 +59,7 @@ pub struct VerificationStatusRequest {
 }
 
 #[derive(Clone, Debug)]
-pub struct VerifiedBundlesRequest {
+pub struct VerifiedBundleRequest {
     pub code_hash: String,
 }
 
@@ -78,12 +79,11 @@ pub struct AbiContractsRequest {
 #[derive(Clone, Debug)]
 pub struct VerificationStatusReceipt {
     pub verified: bool,
-    pub bundle_count: usize,
 }
 
 #[derive(Clone, Debug)]
-pub struct VerifiedBundlesReceipt {
-    pub bundles: Vec<StoredSourceBundle>,
+pub struct VerifiedBundleReceipt {
+    pub bundle: Option<StoredSourceBundle>,
 }
 
 #[derive(Clone, Debug)]
@@ -118,19 +118,16 @@ impl SourceVerificationRegistry {
     async fn load_stored_bundle(
         &self,
         code_hash: &str,
-        source_bundle_hash: &str,
     ) -> Result<StoredSourceBundle, RegistryError> {
-        for bundle in self.source_storage.list_bundles(code_hash).await? {
-            validate_stored_bundle(&bundle, code_hash)?;
-            if bundle.manifest.source_bundle_hash == source_bundle_hash {
-                return Ok(bundle);
-            }
-        }
-
-        Err(RegistryError::StoredBundleNotFound {
-            code_hash: code_hash.to_owned(),
-            source_bundle_hash: source_bundle_hash.to_owned(),
-        })
+        let bundle = self
+            .source_storage
+            .load_bundle(code_hash)
+            .await?
+            .ok_or_else(|| RegistryError::StoredBundleNotFound {
+                code_hash: code_hash.to_owned(),
+            })?;
+        validate_stored_bundle(&bundle, code_hash)?;
+        Ok(bundle)
     }
 }
 
@@ -149,17 +146,14 @@ impl VerificationRegistry for SourceVerificationRegistry {
     ) -> Result<StoreVerifiedBundleReceipt, RegistryError> {
         self.ensure_current().await?;
         let code_hash = request.code_hash.clone();
-        let source_bundle_hash = request.source_bundle_hash.clone();
         let storage = self.source_storage.store_bundle(request).await?;
-        let bundle = self
-            .load_stored_bundle(&code_hash, &source_bundle_hash)
-            .await?;
+        let bundle = self.load_stored_bundle(&code_hash).await?;
         let current_revision = self.source_storage.current_revision().await?;
         self.verification_index
             .upsert_bundle(&bundle, current_revision.as_deref())
             .await?;
 
-        Ok(StoreVerifiedBundleReceipt { storage })
+        Ok(StoreVerifiedBundleReceipt { storage, bundle })
     }
 
     async fn status(
@@ -171,17 +165,16 @@ impl VerificationRegistry for SourceVerificationRegistry {
 
         Ok(VerificationStatusReceipt {
             verified: status.verified,
-            bundle_count: status.bundle_count,
         })
     }
 
-    async fn verified_bundles(
+    async fn verified_bundle(
         &self,
-        request: VerifiedBundlesRequest,
-    ) -> Result<VerifiedBundlesReceipt, RegistryError> {
+        request: VerifiedBundleRequest,
+    ) -> Result<VerifiedBundleReceipt, RegistryError> {
         self.ensure_current().await?;
-        Ok(VerifiedBundlesReceipt {
-            bundles: self.verification_index.bundles(&request.code_hash).await?,
+        Ok(VerifiedBundleReceipt {
+            bundle: self.verification_index.bundle(&request.code_hash).await?,
         })
     }
 
@@ -225,11 +218,8 @@ pub enum RegistryError {
     SourceStorage(#[from] SourceStorageError),
     #[error(transparent)]
     VerificationIndex(#[from] VerificationIndexError),
-    #[error("stored bundle {source_bundle_hash} for code hash {code_hash} could not be indexed")]
-    StoredBundleNotFound {
-        code_hash: String,
-        source_bundle_hash: String,
-    },
+    #[error("stored bundle for code hash {code_hash} could not be indexed")]
+    StoredBundleNotFound { code_hash: String },
     #[error(transparent)]
     BundleValidation(#[from] StoredBundleValidationError),
 }

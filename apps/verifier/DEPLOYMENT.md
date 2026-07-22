@@ -17,7 +17,7 @@ At runtime the service needs:
 The verifier stores verified source bundles in Git under:
 
 ```text
-sources/{code_hash}/{source_bundle_hash}/
+sources/{code_hash}/
 ```
 
 Each bundle contains:
@@ -176,7 +176,13 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 10s
       timeout: 3s
       retries: 6
@@ -206,7 +212,7 @@ curl -sS http://127.0.0.1:3000/healthz
 Expected health response:
 
 ```json
-{"ok":true}
+{ "ok": true }
 ```
 
 ## Systemd Wrapper
@@ -303,13 +309,17 @@ Successful response should contain:
 }
 ```
 
+If the code hash was verified earlier, the verifier skips compilation and
+returns `verification_result: "already_verified"` with the original
+`source_bundle_hash` and `storage_revision`.
+
 Fetch verified source:
 
 ```bash
 curl -sS 'http://127.0.0.1:3000/api/v1/verification/source?code_hash=<code_hash>'
 ```
 
-Fetch recent verified bundles:
+Fetch recent verified contracts:
 
 ```bash
 curl -sS 'http://127.0.0.1:3000/api/v1/last_verified?limit=50&offset=0'

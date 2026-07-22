@@ -188,7 +188,7 @@
         "tags": ["Localnet Control"],
         "operationId": "getVerifiedSource",
         "summary": "Get verified contract source",
-        "description": "Proxies Acton verifier source lookup by address or code hash and returns verified source bundles when the contract is confirmed.",
+        "description": "Proxies Acton verifier source lookup by address or code hash and returns the verified source bundle when the contract is confirmed.",
         "parameters": [
           {
             "name": "address",
@@ -219,7 +219,7 @@
         "tags": ["Localnet Control"],
         "operationId": "getRegisteredVerifiedSource",
         "summary": "Get registered contract source",
-        "description": "Returns source bundles registered directly in the localnet node by address or code hash.",
+        "description": "Returns the source bundle registered directly in the localnet node for an address or code hash.",
         "parameters": [
           {
             "name": "address",
@@ -250,7 +250,7 @@
         "tags": ["Localnet Control"],
         "operationId": "listVerifiedSources",
         "summary": "List registered contract sources",
-        "description": "Returns source bundles registered directly in the localnet node.",
+        "description": "Returns source bundles registered directly in the localnet node, one per code hash.",
         "responses": {
           "200": {
             "$ref": "#/components/responses/RegisteredVerifiedSourcesResponse"
@@ -307,7 +307,9 @@
                         "incoming_messages": []
                       },
                       "display_name": "Wallet",
-                      "code_hashes": ["f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8="],
+                      "code_hashes": [
+                        "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8="
+                      ],
                       "links": []
                     }
                   }
@@ -343,7 +345,7 @@
                     "source": {
                       "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8=",
                       "verified": true,
-                      "bundles": []
+                      "bundle": null
                     }
                   }
                 ]
@@ -1005,7 +1007,7 @@
         }
       },
       "VerifiedSourceResponse": {
-        "description": "Successful wrapped response with source bundles returned by the Acton verifier.",
+        "description": "Successful wrapped response with the source bundle returned by the Acton verifier.",
         "content": {
           "application/json": {
             "schema": {
@@ -1027,7 +1029,7 @@
         }
       },
       "RegisteredVerifiedSourcesResponse": {
-        "description": "Successful wrapped response with registered source bundles.",
+        "description": "Successful wrapped response with registered sources, one bundle per code hash.",
         "content": {
           "application/json": {
             "schema": {
@@ -1498,7 +1500,7 @@
       },
       "VerificationSource": {
         "type": "object",
-        "required": ["code_hash", "verified", "bundles"],
+        "required": ["code_hash", "verified", "bundle"],
         "properties": {
           "code_hash": {
             "$ref": "#/components/schemas/Hash"
@@ -1506,11 +1508,13 @@
           "verified": {
             "type": "boolean"
           },
-          "bundles": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SourceBundle"
-            }
+          "bundle": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SourceBundle"
+              }
+            ],
+            "nullable": true
           }
         }
       },
@@ -1900,7 +1904,11 @@
       },
       "LocalnetTimeInfo": {
         "type": "object",
-        "required": ["current_unix_time", "time_offset_seconds", "next_block_timestamp"],
+        "required": [
+          "current_unix_time",
+          "time_offset_seconds",
+          "next_block_timestamp"
+        ],
         "properties": {
           "current_unix_time": {
             "type": "integer",

@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from "react"
+import {useMemo, useState} from "react"
 import type {JSX} from "react"
 
 import {Cell} from "@ton/core"
@@ -27,7 +27,7 @@ export type ContractSourceTab =
 export interface ContractVerifiedSource {
   readonly code_hash: string
   readonly verified: boolean
-  readonly bundles: readonly SourceBundle[]
+  readonly bundle: SourceBundle | null
 }
 
 interface SourceBundle {
@@ -86,7 +86,7 @@ export function ContractSourcePanel({
   const [activeTab, setActiveTab] = useState<ContractSourceTab>("verified")
   const codeData = useMemo(() => buildContractCodeData(codeBoc), [codeBoc])
   const resolvedVerifiedSource =
-    verifiedSource?.verified && verifiedSource.bundles.length > 0 ? verifiedSource : undefined
+    verifiedSource?.verified && verifiedSource.bundle ? verifiedSource : undefined
 
   if (!codeData) {
     return (
@@ -267,51 +267,21 @@ function VerifiedSourcePanel({
   readonly verificationExternal: boolean
   readonly compact: boolean
 }): JSX.Element {
-  const bundles = useMemo(
-    () => source.bundles.filter(bundle => bundle.files.length > 0),
-    [source.bundles],
-  )
-  const [selectedBundleHash, setSelectedBundleHash] = useState(bundles[0]?.source_bundle_hash ?? "")
-  const activeBundle =
-    bundles.find(bundle => bundle.source_bundle_hash === selectedBundleHash) ?? bundles[0]
+  const bundle = source.bundle
 
-  useEffect(() => {
-    setSelectedBundleHash(bundles[0]?.source_bundle_hash ?? "")
-  }, [bundles])
-
-  if (!activeBundle) {
+  if (!bundle || bundle.files.length === 0) {
     return <div className={styles.empty}>No verified source files stored for this contract</div>
   }
 
   return (
     <section className={styles.verifiedShell}>
-      {bundles.length > 1 && (
-        <div className={styles.verifiedHeader}>
-          <div className={styles.bundleTabs} role="tablist" aria-label="Verified source bundles">
-            {bundles.map(bundle => (
-              <button
-                key={bundle.source_bundle_hash}
-                type="button"
-                className={`${styles.bundleTab} ${
-                  bundle.source_bundle_hash === activeBundle.source_bundle_hash
-                    ? styles.bundleTabActive
-                    : ""
-                }`}
-                onClick={() => setSelectedBundleHash(bundle.source_bundle_hash)}
-              >
-                {shortenMiddle(bundle.source_bundle_hash, 8, 6)}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
       <CodeViewer
-        key={activeBundle.source_bundle_hash}
+        key={bundle.source_bundle_hash}
         attachedToTabs
         compact={compact}
         defaultFileTreeVisible={defaultFileTreeVisible}
-        files={activeBundle.files}
-        entrypoint={activeBundle.entrypoint}
+        files={bundle.files}
+        entrypoint={bundle.entrypoint}
         externalActionLabel="View verification"
         externalActionUrl={
           verificationUrl ?? `${VERIFIER_BASE_URL}/${encodeURIComponent(source.code_hash)}`
@@ -320,11 +290,4 @@ function VerifiedSourcePanel({
       />
     </section>
   )
-}
-
-function shortenMiddle(value: string, prefix = 8, suffix = 6): string {
-  if (value.length <= prefix + suffix + 1) {
-    return value
-  }
-  return `${value.slice(0, prefix)}…${value.slice(-suffix)}`
 }

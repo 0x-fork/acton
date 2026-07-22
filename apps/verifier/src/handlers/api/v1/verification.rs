@@ -12,7 +12,7 @@ use crate::{
     error::ApiError,
     registry::{
         AbiContractsRequest, LastVerifiedRequest, VerificationStatusReceipt,
-        VerificationStatusRequest, VerifiedBundlesRequest,
+        VerificationStatusRequest, VerifiedBundleRequest,
     },
     registry_index::{IndexedAbiContract, IndexedVerifiedBundleSummary},
     source_storage::{CompilerMetadata, SourceMapData, StoredSourceBundle, StoredSourceFile},
@@ -64,10 +64,10 @@ pub async fn status_handler(
     path = "/api/v1/verification/source",
     params(
         ("address" = Option<String>, Query, description = "TON address to resolve to the current code hash"),
-        ("code_hash" = Option<String>, Query, description = "Code hash to load verified source bundles for")
+        ("code_hash" = Option<String>, Query, description = "Code hash to load the verified source bundle for")
     ),
     responses(
-        (status = 200, description = "Verified source bundles for the resolved code hash", body = VerificationSourceResponse),
+        (status = 200, description = "Verified source bundle for the resolved code hash", body = VerificationSourceResponse),
         (status = 400, description = "Invalid or missing verification target", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
         (status = 502, description = "Blockchain, registry, or source lookup failure", body = crate::error::ErrorResponse)
@@ -84,21 +84,16 @@ pub async fn source_handler(
         .await?;
     let receipt = state
         .verification_registry()
-        .verified_bundles(VerifiedBundlesRequest {
+        .verified_bundle(VerifiedBundleRequest {
             code_hash: resolved_target.code_hash.clone(),
         })
         .await?;
-    let verified = !receipt.bundles.is_empty();
-    let bundles = receipt
-        .bundles
-        .into_iter()
-        .map(SourceBundleResponse::from)
-        .collect();
+    let bundle = receipt.bundle.map(SourceBundleResponse::from);
 
     Ok(Json(VerificationSourceResponse {
         code_hash: resolved_target.code_hash,
-        verified,
-        bundles,
+        verified: bundle.is_some(),
+        bundle,
     }))
 }
 
@@ -217,7 +212,6 @@ fn page_limit(limit: Option<usize>) -> usize {
 pub(super) struct VerificationStatusResponse {
     code_hash: String,
     verified: bool,
-    bundle_count: usize,
 }
 
 impl VerificationStatusResponse {
@@ -225,7 +219,6 @@ impl VerificationStatusResponse {
         Self {
             code_hash,
             verified: status.verified,
-            bundle_count: status.bundle_count,
         }
     }
 }
@@ -234,7 +227,7 @@ impl VerificationStatusResponse {
 pub(super) struct VerificationSourceResponse {
     code_hash: String,
     verified: bool,
-    bundles: Vec<SourceBundleResponse>,
+    bundle: Option<SourceBundleResponse>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

@@ -130,7 +130,7 @@ async fn api_routes_allow_browser_cors() {
 }
 
 #[tokio::test]
-async fn last_verified_returns_latest_verified_bundles() {
+async fn last_verified_returns_latest_verified_contracts() {
     let state = app_state(&[], CODE_HASH_ONE);
     let verify_response = post_verify(
         state.clone(),
@@ -250,7 +250,6 @@ async fn verification_status_reports_unverified_code_hash_without_stored_bundle(
     let body = response_json::<VerificationStatusResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(!body.verified);
-    assert_eq!(body.bundle_count, 0);
 }
 
 #[tokio::test]
@@ -280,7 +279,6 @@ async fn verification_status_reports_verified_after_successful_verify() {
     let body = response_json::<VerificationStatusResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(body.verified);
-    assert_eq!(body.bundle_count, 1);
 }
 
 #[tokio::test]
@@ -349,7 +347,7 @@ async fn verification_status_returns_not_found_when_address_has_no_code_hash() {
 
 #[tokio::test]
 async fn verification_source_returns_verified_bundle_files() {
-    let state = app_state(&[], CODE_HASH_ONE);
+    let (state, recorded_requests) = recording_source_storage_app_state(&[], CODE_HASH_ONE);
     let verify_response = post_verify(
         state.clone(),
         vec![
@@ -369,7 +367,7 @@ async fn verification_source_returns_verified_bundle_files() {
         .as_deref()
         .expect("verify response should include source bundle hash");
     let response = get(
-        state,
+        state.clone(),
         &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
     )
     .await;
@@ -379,15 +377,66 @@ async fn verification_source_returns_verified_bundle_files() {
     let body = response_json::<VerificationSourceResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(body.verified);
-    assert_eq!(body.bundles.len(), 1);
-    assert_eq!(body.bundles[0].source_bundle_hash, source_bundle_hash);
-    assert_eq!(body.bundles[0].verified_at, 1_700_000_000);
-    assert_eq!(body.bundles[0].compiler.language, "tolk");
-    assert_eq!(body.bundles[0].compiler.version, "1.4.1");
-    assert_eq!(body.bundles[0].entrypoint, "main.tolk");
-    assert_eq!(body.bundles[0].files.len(), 1);
-    assert_eq!(body.bundles[0].files[0].path, "main.tolk");
-    assert_eq!(body.bundles[0].files[0].content, "fun main() {}");
+    let bundle = body
+        .bundle
+        .expect("verified source should include a bundle");
+    assert_eq!(bundle.source_bundle_hash, source_bundle_hash);
+    assert_eq!(bundle.verified_at, 1_700_000_000);
+    assert_eq!(bundle.compiler.language, "tolk");
+    assert_eq!(bundle.compiler.version, "1.4.1");
+    assert_eq!(bundle.entrypoint, "main.tolk");
+    assert_eq!(bundle.files.len(), 1);
+    assert_eq!(bundle.files[0].path, "main.tolk");
+    assert_eq!(bundle.files[0].content, "fun main() {}");
+
+    let repeated_response = post_verify(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part(
+                "files",
+                "main.tolk",
+                "text/plain",
+                "fun main() { throw 1; }",
+            ),
+        ],
+    )
+    .await;
+    assert_eq!(repeated_response.status(), StatusCode::OK);
+    let repeated = response_json::<VerifyResponse>(repeated_response).await;
+    let repeated_hash = repeated
+        .source_bundle_hash
+        .expect("repeat response should include the stored source bundle hash");
+    assert_eq!(repeated.verification_result, "already_verified");
+    assert_eq!(repeated.compiled_code_hash, None);
+    assert_eq!(repeated_hash, source_bundle_hash);
+    assert_eq!(
+        recorded_requests
+            .lock()
+            .expect("recorded source storage requests mutex should not be poisoned")
+            .len(),
+        1,
+        "an already-verified code hash must not be stored again"
+    );
+
+    let response = get(
+        state.clone(),
+        &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
+    )
+    .await;
+    let body = response_json::<VerificationSourceResponse>(response).await;
+    let bundle = body.bundle.expect("verified bundle should still exist");
+    assert_eq!(bundle.source_bundle_hash, source_bundle_hash);
+    assert_eq!(bundle.files.len(), 1);
+    assert_eq!(bundle.files[0].content, "fun main() {}");
+
+    let response = get(state, "/api/v1/last_verified").await;
+    let body = response_json::<LastVerifiedResponse>(response).await;
+    assert_eq!(body.items.len(), 1);
+    assert_eq!(body.items[0].source_bundle_hash, source_bundle_hash);
 }
 
 #[tokio::test]
@@ -428,8 +477,12 @@ async fn verification_source_returns_stored_source_map_data() {
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = response_json::<VerificationSourceResponse>(response).await;
-    assert_eq!(body.bundles.len(), 1);
-    assert_eq!(body.bundles[0].source_map.as_ref(), Some(&source_map));
+    assert_eq!(
+        body.bundle
+            .as_ref()
+            .and_then(|bundle| bundle.source_map.as_ref()),
+        Some(&source_map)
+    );
 }
 
 #[tokio::test]
@@ -462,7 +515,7 @@ async fn verify_resolves_code_hash_from_address_with_mock_blockchain() {
 
     let body = response_json::<VerifyResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
-    assert_eq!(body.compiled_code_hash, CODE_HASH_ONE);
+    assert_eq!(body.compiled_code_hash.as_deref(), Some(CODE_HASH_ONE));
     assert_eq!(body.verification_result, "match");
     assert!(body.source_bundle_hash.is_some());
     assert_eq!(body.storage_revision.as_deref(), Some("mock-revision"));
@@ -492,7 +545,7 @@ async fn verify_accepts_valid_multipart_request_with_multiple_files() {
 
     let body = response_json::<VerifyResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_TWO);
-    assert_eq!(body.compiled_code_hash, CODE_HASH_TWO);
+    assert_eq!(body.compiled_code_hash.as_deref(), Some(CODE_HASH_TWO));
     assert_eq!(body.verification_result, "match");
     assert!(body.source_bundle_hash.is_some());
     assert_eq!(body.storage_revision.as_deref(), Some("mock-revision"));
@@ -690,7 +743,7 @@ async fn verify_accepts_code_hash_without_address() {
 
     let body = response_json::<VerifyResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
-    assert_eq!(body.compiled_code_hash, CODE_HASH_ONE);
+    assert_eq!(body.compiled_code_hash.as_deref(), Some(CODE_HASH_ONE));
     assert_eq!(body.verification_result, "match");
 }
 
@@ -713,7 +766,7 @@ async fn verify_accepts_address_and_code_hash_together() {
 
     let body = response_json::<VerifyResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
-    assert_eq!(body.compiled_code_hash, CODE_HASH_ONE);
+    assert_eq!(body.compiled_code_hash.as_deref(), Some(CODE_HASH_ONE));
     assert_eq!(body.verification_result, "match");
 }
 
@@ -736,7 +789,7 @@ async fn verify_normalizes_base64_code_hash_input() {
 
     let body = response_json::<VerifyResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
-    assert_eq!(body.compiled_code_hash, CODE_HASH_ONE);
+    assert_eq!(body.compiled_code_hash.as_deref(), Some(CODE_HASH_ONE));
     assert_eq!(body.verification_result, "match");
 }
 
@@ -758,7 +811,7 @@ async fn verify_returns_mismatch_when_compiled_hash_differs_from_target() {
 
     let body = response_json::<VerifyResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
-    assert_eq!(body.compiled_code_hash, CODE_HASH_TWO);
+    assert_eq!(body.compiled_code_hash.as_deref(), Some(CODE_HASH_TWO));
     assert_eq!(body.verification_result, "mismatch");
     assert_eq!(body.source_bundle_hash, None);
     assert!(body.storage_revision.is_none());
@@ -1230,7 +1283,7 @@ async fn assert_error_contains(response: axum::response::Response, expected: &st
 #[derive(Debug, Deserialize)]
 struct VerifyResponse {
     code_hash: String,
-    compiled_code_hash: String,
+    compiled_code_hash: Option<String>,
     verification_result: String,
     source_bundle_hash: Option<String>,
     storage_revision: Option<String>,
@@ -1240,14 +1293,13 @@ struct VerifyResponse {
 struct VerificationStatusResponse {
     code_hash: String,
     verified: bool,
-    bundle_count: usize,
 }
 
 #[derive(Debug, Deserialize)]
 struct VerificationSourceResponse {
     code_hash: String,
     verified: bool,
-    bundles: Vec<VerifiedSourceBundle>,
+    bundle: Option<VerifiedSourceBundle>,
 }
 
 #[derive(Debug, Deserialize)]

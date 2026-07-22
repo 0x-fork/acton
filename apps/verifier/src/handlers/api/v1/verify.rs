@@ -20,6 +20,7 @@ use crate::{
     blockchain::normalize_code_hash,
     compilers::{CompileGeneratedSource, CompileRequest, CompileSource},
     error::ApiError,
+    registry::VerifiedBundleRequest,
     source_bundle::{
         SourceBundleCompiler, SourceBundleFile, SourceBundleInput, SourceBundleSource,
         compute_source_bundle_hash,
@@ -139,6 +140,22 @@ async fn handle_multipart(
 
     let compile_input = prepare_compile_input(&language, &compile_params, sources, files)?;
     let resolved_target = state.verification_service().resolve_target(target).await?;
+    if let Some(bundle) = state
+        .verification_registry()
+        .verified_bundle(VerifiedBundleRequest {
+            code_hash: resolved_target.code_hash.clone(),
+        })
+        .await?
+        .bundle
+    {
+        return Ok(Json(VerifyResponse {
+            code_hash: resolved_target.code_hash,
+            compiled_code_hash: None,
+            verification_result: VerificationResult::AlreadyVerified,
+            source_bundle_hash: Some(bundle.manifest.source_bundle_hash),
+            storage_revision: Some(bundle.storage_revision),
+        }));
+    }
     let compiled = state
         .compiler_service()
         .compile(CompileRequest {
@@ -152,7 +169,7 @@ async fn handle_multipart(
         .await?;
     let compiled_code_hash = normalize_code_hash(&compiled.code_hash);
     let compiled_source_map_data = compiled.source_map.clone();
-    let verification_result =
+    let mut verification_result =
         VerificationResult::from_hashes(&resolved_target.code_hash, &compiled_code_hash);
     let (source_bundle_hash, storage_revision) = match verification_result {
         VerificationResult::Match => {
@@ -182,7 +199,7 @@ async fn handle_multipart(
                     })
                     .collect(),
             })?;
-            let storage = state
+            let stored = state
                 .verification_registry()
                 .store_verified_bundle(StoreSourceBundleRequest {
                     code_hash: resolved_target.code_hash.clone(),
@@ -196,11 +213,19 @@ async fn handle_multipart(
                     files: storage_files,
                     source_map: compiled_source_map_data,
                 })
-                .await?
-                .storage;
-            (Some(source_bundle_hash), Some(storage.revision))
+                .await?;
+            if !stored.storage.created {
+                verification_result = VerificationResult::AlreadyVerified;
+            }
+            (
+                Some(stored.bundle.manifest.source_bundle_hash),
+                Some(stored.storage.revision),
+            )
         }
         VerificationResult::Mismatch => (None, None),
+        VerificationResult::AlreadyVerified => {
+            unreachable!("hash comparison cannot produce an already-verified result")
+        }
     };
 
     print_verify_request(
@@ -215,7 +240,7 @@ async fn handle_multipart(
 
     Ok(Json(VerifyResponse {
         code_hash: resolved_target.code_hash,
-        compiled_code_hash,
+        compiled_code_hash: Some(compiled_code_hash),
         verification_result,
         source_bundle_hash,
         storage_revision,
@@ -558,7 +583,7 @@ pub(super) struct VerifyMultipartRequest {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub(super) struct VerifyResponse {
     code_hash: String,
-    compiled_code_hash: String,
+    compiled_code_hash: Option<String>,
     verification_result: VerificationResult,
     source_bundle_hash: Option<String>,
     storage_revision: Option<String>,
@@ -567,6 +592,7 @@ pub(super) struct VerifyResponse {
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub(super) enum VerificationResult {
+    AlreadyVerified,
     Match,
     Mismatch,
 }
@@ -584,6 +610,7 @@ impl VerificationResult {
 impl std::fmt::Display for VerificationResult {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::AlreadyVerified => formatter.write_str("already_verified"),
             Self::Match => formatter.write_str("match"),
             Self::Mismatch => formatter.write_str("mismatch"),
         }

@@ -14,7 +14,7 @@ on-chain code hash matches a code hash present in the source registry.
 The registry is off-chain. Git stores the source bundles and manifests, and the
 runtime registry layer serves reads from a SQLite index. The index can be
 rebuilt from the Git repository by scanning
-`sources/{code_hash}/{source_bundle_hash}/`.
+`sources/{code_hash}/`.
 
 ## Goals
 
@@ -22,7 +22,7 @@ rebuilt from the Git repository by scanning
   TON code hash.
 - Keep the public lookup key simple: `code_hash`.
 - Store enough compilation metadata to make verification reproducible.
-- Support multiple valid source bundles for the same code hash.
+- Keep exactly one current source bundle for each code hash.
 - Make the registry rebuildable from Git without relying on process-local state.
 - Keep the registry implementation pluggable behind Rust traits.
 
@@ -91,10 +91,9 @@ Source storage persists verified bundles in Git:
 ```text
 sources/
   <code_hash>/
-    <source_bundle_hash>/
-      manifest.json
-      files/
-        ...
+    manifest.json
+    files/
+      ...
 ```
 
 Git provides:
@@ -117,8 +116,8 @@ Current implementation:
 - `SourceVerificationRegistry` stores accepted bundles through `SourceStorage`.
 - It validates stored bundle manifests and file hashes.
 - It writes accepted bundles to Git and upserts them into SQLite.
-- It reports a `code_hash` as verified when the SQLite index contains at least
-  one valid source bundle for that hash.
+- It reports a `code_hash` as verified when the SQLite index contains its
+  source bundle.
 - If SQLite is missing or stale, it is rebuilt from Git.
 
 The handler layer depends on the `VerificationRegistry` trait, not directly on
@@ -159,6 +158,10 @@ The stable identifier is `source_bundle_hash`, computed from canonical metadata
 and file hashes. Git commit SHAs are useful audit metadata, but they are not the
 bundle identity.
 
+A `code_hash` has exactly one immutable source bundle. Once it is verified,
+later submissions return the stored `source_bundle_hash` and do not compile or
+replace the original bundle.
+
 Source files must be valid UTF-8. The API returns file content as text and does
 not expose a base64 source-content field.
 
@@ -166,15 +169,17 @@ not expose a base64 source-content field.
 
 1. Developer submits target and sources.
 2. Backend resolves the target `code_hash`.
-3. Backend validates source paths and build metadata.
-4. Backend compiles sources with the selected compiler.
-5. Backend compares compiled hash with target hash.
-6. If hashes differ, response is `mismatch` and nothing is stored.
-7. If hashes match, backend computes `source_bundle_hash`.
-8. Registry stores the bundle in Git.
-9. Registry validates that the stored bundle is indexable.
-10. Registry upserts the bundle into SQLite.
-11. API returns `verification_result=match`, `source_bundle_hash`, and
+3. If the code hash is already verified, the API immediately returns
+   `verification_result=already_verified` with the stored `source_bundle_hash`.
+4. Backend validates source paths and build metadata.
+5. Backend compiles sources with the selected compiler.
+6. Backend compares compiled hash with target hash.
+7. If hashes differ, response is `mismatch` and nothing is stored.
+8. If hashes match, backend computes `source_bundle_hash`.
+9. Registry stores the bundle in Git.
+10. Registry validates that the stored bundle is indexable.
+11. Registry upserts the bundle into SQLite.
+12. API returns `verification_result=match`, `source_bundle_hash`, and
     `storage_revision`.
 
 ## Lookup Flow
@@ -183,8 +188,8 @@ To check whether an address uses verified code:
 
 1. Read the current code hash of the address from TON.
 2. Query the registry by `code_hash`.
-3. If one or more valid source bundles exist, the code hash is verified.
-4. Return matching source bundles and build metadata.
+3. If a valid source bundle exists, the code hash is verified.
+4. Return the source bundle and build metadata.
 5. A user can independently recompute file hashes and recompile the bundle.
 
 ## API Model
@@ -206,13 +211,12 @@ Status responses include:
 
 - `code_hash`
 - `verified`
-- `bundle_count`
 
 Source responses include:
 
 - `code_hash`
 - `verified`
-- `bundles`
+- `bundle`, which is `null` when the code hash is not verified
 
 Each source bundle includes `source_bundle_hash`, `verified_at`,
 `storage_revision`, `entrypoint`, a grouped `compiler` object, and source
@@ -233,11 +237,8 @@ Important cases:
 - Backend process state is lost: registry can be rebuilt from Git.
 - Git content is unavailable: source lookup is temporarily unavailable.
 
-The backend should keep operations idempotent using:
-
-- `code_hash`
-- `source_bundle_hash`
-- deterministic storage paths
+The backend keeps writes deterministic by using `code_hash` as the storage key
+and `source_bundle_hash` as the integrity identifier of the current contents.
 
 ## Product Wording
 

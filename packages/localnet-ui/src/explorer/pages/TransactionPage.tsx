@@ -261,7 +261,7 @@ async function loadVerifiedSourceByCodeHash(
 ): Promise<ContractVerifiedSource | undefined> {
   try {
     const source = await metadataRegistry.getSource({codeHash})
-    return source.verified && source.bundles.length > 0 ? source : undefined
+    return source.verified && source.bundle ? source : undefined
   } catch (error) {
     console.debug(`Failed to fetch verified source for ${codeHash}`, error)
     return undefined

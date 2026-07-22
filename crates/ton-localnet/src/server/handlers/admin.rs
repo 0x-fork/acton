@@ -589,7 +589,7 @@ fn unverified_source_response(payload: &GetVerifiedSourceRequest) -> Value {
             parse_hash_any(code_hash).ok().map(|hash| hash.to_hex())
         }),
         "verified": false,
-        "bundles": [],
+        "bundle": null,
     })
 }
 
@@ -648,40 +648,34 @@ fn verified_source_compiler_abis(value: &Value) -> Vec<(Hash256, Value)> {
     let Ok(code_hash) = parse_hash_any(code_hash) else {
         return Vec::new();
     };
-    let Some(bundles) = value.get("bundles").and_then(Value::as_array) else {
+    let Some(compiler_abi) = value
+        .get("bundle")
+        .and_then(compiler_abi_from_verified_source_bundle)
+    else {
         return Vec::new();
     };
 
-    bundles
-        .iter()
-        .filter_map(compiler_abi_from_verified_source_bundle)
-        .map(|compiler_abi| {
-            (
-                code_hash,
-                compiler_abi_payload_value(&code_hash, compiler_abi),
-            )
-        })
-        .collect()
+    vec![(
+        code_hash,
+        compiler_abi_payload_value(&code_hash, compiler_abi),
+    )]
 }
 
 fn compiler_abis_from_registered_source(
     code_hash: &Hash256,
     value: &Value,
 ) -> Vec<(Hash256, Value)> {
-    let Some(bundles) = value.get("bundles").and_then(Value::as_array) else {
+    let Some(compiler_abi) = value
+        .get("bundle")
+        .and_then(compiler_abi_from_verified_source_bundle)
+    else {
         return Vec::new();
     };
 
-    bundles
-        .iter()
-        .filter_map(compiler_abi_from_verified_source_bundle)
-        .map(|compiler_abi| {
-            (
-                *code_hash,
-                compiler_abi_payload_value(code_hash, compiler_abi),
-            )
-        })
-        .collect()
+    vec![(
+        *code_hash,
+        compiler_abi_payload_value(code_hash, compiler_abi),
+    )]
 }
 
 fn compiler_abi_payload_value(code_hash: &Hash256, compiler_abi: Value) -> Value {
@@ -792,16 +786,14 @@ mod tests {
         let code_hash = Hash256([0x42; 32]);
         let source = json!({
             "code_hash": code_hash.to_hex(),
-            "bundles": [
-                {
-                    "files": [
-                        {
-                            "path": "output/counter.abi.json",
-                            "content": r#"{"contract_name":"Counter","get_methods":[]}"#
-                        }
-                    ]
-                }
-            ]
+            "bundle": {
+                "files": [
+                    {
+                        "path": "output/counter.abi.json",
+                        "content": r#"{"contract_name":"Counter","get_methods":[]}"#
+                    }
+                ]
+            }
         });
 
         let entries = verified_source_compiler_abis(&source);
@@ -842,20 +834,18 @@ mod tests {
         let code_hash = Hash256([0x11; 32]);
         let source = json!({
             "code_hash": code_hash.to_hex(),
-            "bundles": [
-                {
-                    "files": [
-                        {
-                            "path": "output/broken.abi.json",
-                            "content": "not json"
-                        },
-                        {
-                            "path": "src/main.tolk",
-                            "content": "fun main() {}"
-                        }
-                    ]
-                }
-            ]
+            "bundle": {
+                "files": [
+                    {
+                        "path": "output/broken.abi.json",
+                        "content": "not json"
+                    },
+                    {
+                        "path": "src/main.tolk",
+                        "content": "fun main() {}"
+                    }
+                ]
+            }
         });
 
         assert!(verified_source_compiler_abis(&source).is_empty());

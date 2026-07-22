@@ -1,4 +1,4 @@
-import {Button, CodeViewer, CopyInlineAction, HighlightedCode, PillTab, PillTabs} from "@acton/ui"
+import {Button, CodeViewer, CopyInlineAction, HighlightedCode} from "@acton/ui"
 import {useEffect, useMemo, useState} from "react"
 import {Download, ExternalLink} from "lucide-react"
 
@@ -11,7 +11,7 @@ import verificationBinaryIcon from "../assets/ton-verifier-icons/verification-bi
 import verificationBombIcon from "../assets/ton-verifier-icons/verification-bomb.svg"
 import verificationPaperIcon from "../assets/ton-verifier-icons/verification-paper.svg"
 import verifiedSourceIcon from "../assets/ton-verifier-icons/verified-light.svg"
-import type {SourceBundle, VerificationSourceResponse, VerifierApi} from "../lib/api"
+import type {VerificationSourceResponse, VerifierApi} from "../lib/api"
 import {downloadSourceArchive} from "../lib/source-archive"
 import {parseLookupTarget, shortenMiddle, type LookupTarget} from "../lib/target"
 import detailsStyles from "./ContractDetails.module.css"
@@ -194,36 +194,6 @@ function VerificationExplainer() {
   )
 }
 
-function BundleSelector({
-  bundles,
-  activeBundle,
-  onSelect,
-}: {
-  readonly bundles: readonly SourceBundle[]
-  readonly activeBundle: SourceBundle
-  readonly onSelect: (bundle: SourceBundle) => void
-}) {
-  if (bundles.length <= 1) {
-    return null
-  }
-
-  return (
-    <PillTabs role="tablist" ariaLabel="Source bundles">
-      {bundles.map(bundle => (
-        <PillTab
-          key={bundle.source_bundle_hash}
-          role="tab"
-          aria-selected={bundle.source_bundle_hash === activeBundle.source_bundle_hash}
-          selected={bundle.source_bundle_hash === activeBundle.source_bundle_hash}
-          onClick={() => onSelect(bundle)}
-        >
-          {shortenMiddle(bundle.source_bundle_hash, 8, 6)}
-        </PillTab>
-      ))}
-    </PillTabs>
-  )
-}
-
 function lookupAddress(lookupTarget: LookupTarget | undefined): string | undefined {
   return lookupTarget?.kind === "address" ? lookupTarget.value : undefined
 }
@@ -240,14 +210,7 @@ function VerifiedContract({
   readonly onSelectedSourcePathChange?: (path: string) => void
 }) {
   const address = lookupAddress(lookupTarget)
-  const [selectedBundleHash, setSelectedBundleHash] = useState(
-    data.bundles[0]?.source_bundle_hash ?? "",
-  )
-  const bundle = useMemo(
-    () =>
-      data.bundles.find(item => item.source_bundle_hash === selectedBundleHash) ?? data.bundles[0],
-    [data.bundles, selectedBundleHash],
-  )
+  const {bundle} = data
 
   if (!bundle) {
     return (
@@ -327,7 +290,6 @@ function VerifiedContract({
             {address && <DetailRow label="Address" value={address} monospace />}
             {verifiedAt && <DetailRow label="Verified at" value={verifiedAt} />}
             <DetailRow label="Code hash" value={data.code_hash} monospace />
-            <DetailRow label="Bundles" value={String(data.bundles.length)} />
             <DetailRow label="Bundle hash" value={bundle.source_bundle_hash} monospace />
             {bundle.storage_revision && (
               <DetailRow label="Storage revision" value={bundle.storage_revision} monospace />
@@ -366,11 +328,6 @@ function VerifiedContract({
               </div>
             </div>
             <div className={detailsStyles.sectionActions}>
-              <BundleSelector
-                bundles={data.bundles}
-                activeBundle={bundle}
-                onSelect={next => setSelectedBundleHash(next.source_bundle_hash)}
-              />
               <Button
                 size="sm"
                 variant="outline"

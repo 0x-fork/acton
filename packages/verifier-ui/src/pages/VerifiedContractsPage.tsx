@@ -187,7 +187,7 @@ export function VerifiedContractsPage({
             ) : (
               sortedItems.map(item => (
                 <DataTableRow
-                  key={`${item.code_hash}:${item.source_bundle_hash}`}
+                  key={item.code_hash}
                   interactive
                   role="link"
                   tabIndex={0}
