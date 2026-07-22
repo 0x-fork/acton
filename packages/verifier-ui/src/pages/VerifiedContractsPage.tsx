@@ -19,6 +19,34 @@ import type {LastVerifiedItem, VerifierApi} from "../lib/api"
 import {shortenMiddle} from "../lib/target"
 import styles from "./VerifiedPage.module.css"
 
+type PaginationItem = number | "ellipsis-start" | "ellipsis-end"
+
+const PAGINATION_BUTTON_COUNT = 7
+
+function paginationItems(currentPage: number, totalPages: number): readonly PaginationItem[] {
+  if (totalPages <= PAGINATION_BUTTON_COUNT) {
+    return Array.from({length: totalPages}, (_, index) => index)
+  }
+
+  const lastPage = totalPages - 1
+  if (currentPage <= 3) {
+    return [0, 1, 2, 3, 4, "ellipsis-end", lastPage]
+  }
+  if (currentPage >= lastPage - 3) {
+    return [0, "ellipsis-start", lastPage - 4, lastPage - 3, lastPage - 2, lastPage - 1, lastPage]
+  }
+
+  return [
+    0,
+    "ellipsis-start",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "ellipsis-end",
+    lastPage,
+  ]
+}
+
 function formatVerifiedAt(timestamp: number): string {
   if (!Number.isFinite(timestamp) || timestamp <= 0) {
     return "Unknown"
@@ -73,10 +101,10 @@ export function VerifiedContractsPage({
   limit = 25,
   className,
 }: VerifiedContractsPageProps) {
-  const pageSize = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), 99) : 25
+  const pageSize = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), 100) : 25
   const [page, setPage] = useState(0)
   const [items, setItems] = useState<readonly LastVerifiedItem[]>([])
-  const [hasNextPage, setHasNextPage] = useState(false)
+  const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | undefined>()
 
@@ -87,18 +115,26 @@ export function VerifiedContractsPage({
     setError(undefined)
 
     api
-      .fetchLastVerified(pageSize + 1, page * pageSize)
+      .fetchLastVerified(pageSize, page * pageSize)
       .then(response => {
         if (!cancelled) {
-          setItems(response.items.slice(0, pageSize))
-          setHasNextPage(response.items.length > pageSize)
+          const nextTotal = Math.max(0, Math.trunc(response.total))
+          const lastPage = Math.max(0, Math.ceil(nextTotal / pageSize) - 1)
+
+          setTotal(nextTotal)
+          if (page > lastPage) {
+            setItems([])
+            setPage(lastPage)
+            return
+          }
+
+          setItems(response.items)
           setError(undefined)
         }
       })
       .catch(error => {
         if (!cancelled) {
           setItems([])
-          setHasNextPage(false)
           setError(error instanceof Error ? error.message : String(error))
         }
       })
@@ -117,6 +153,8 @@ export function VerifiedContractsPage({
     () => [...items].sort((left, right) => right.verified_at - left.verified_at),
     [items],
   )
+  const totalPages = Math.ceil(total / pageSize)
+  const visiblePages = useMemo(() => paginationItems(page, totalPages), [page, totalPages])
 
   return (
     <section className={`${styles.container} ${className ?? ""}`}>
@@ -184,14 +222,11 @@ export function VerifiedContractsPage({
               ))
             )}
           </DataTableBody>
-          {(page > 0 || hasNextPage) && (
+          {(page > 0 || totalPages > 1) && (
             <DataTableFooter>
               <DataTableRow>
                 <DataTableCell className={styles.paginationCell} colSpan={5}>
                   <div className={styles.pagination}>
-                    <span className={styles.paginationStatus} aria-live="polite">
-                      Page {page + 1}
-                    </span>
                     <div className={styles.paginationActions}>
                       <Button
                         size="sm"
@@ -201,10 +236,38 @@ export function VerifiedContractsPage({
                       >
                         Previous
                       </Button>
+                      {totalPages > 0 && (
+                        <nav className={styles.paginationNumbers} aria-label="Pagination">
+                          {visiblePages.map(item =>
+                            typeof item === "string" ? (
+                              <span
+                                key={item}
+                                className={styles.paginationEllipsis}
+                                aria-hidden="true"
+                              >
+                                …
+                              </span>
+                            ) : (
+                              <Button
+                                key={item}
+                                className={styles.paginationNumber}
+                                size="sm"
+                                variant={item === page ? "secondary" : "ghost"}
+                                disabled={isLoading}
+                                aria-current={item === page ? "page" : undefined}
+                                aria-label={`Go to page ${item + 1}`}
+                                onClick={() => setPage(item)}
+                              >
+                                {item + 1}
+                              </Button>
+                            ),
+                          )}
+                        </nav>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={isLoading || Boolean(error) || !hasNextPage}
+                        disabled={isLoading || Boolean(error) || page + 1 >= totalPages}
                         onClick={() => setPage(current => current + 1)}
                       >
                         Next

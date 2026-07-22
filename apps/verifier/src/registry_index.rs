@@ -67,6 +67,7 @@ pub struct IndexedVerificationStatus {
 #[derive(Clone, Debug)]
 pub struct IndexedLastVerifiedPage {
     pub items: Vec<IndexedVerifiedBundleSummary>,
+    pub total: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -348,6 +349,10 @@ impl VerificationIndex for SqliteVerificationIndex {
         let limit_i64 = usize_to_i64("limit", limit)?;
         let offset_i64 = usize_to_i64("offset", offset)?;
         let connection = self.connection()?;
+        let total = connection.query_row("select count(*) from verified_bundles", [], |row| {
+            row.get::<_, i64>(0)
+        })?;
+        let total = i64_to_usize("total", total)?;
         let mut statement = connection.prepare(
             r"
             select
@@ -405,7 +410,7 @@ impl VerificationIndex for SqliteVerificationIndex {
         drop(statement);
         drop(connection);
 
-        Ok(IndexedLastVerifiedPage { items })
+        Ok(IndexedLastVerifiedPage { items, total })
     }
 
     async fn abi_contracts(

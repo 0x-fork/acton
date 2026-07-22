@@ -32,6 +32,7 @@ export interface SourceFile {
 
 export interface LastVerifiedResponse {
   readonly items: readonly LastVerifiedItem[]
+  readonly total: number
 }
 
 export interface LastVerifiedItem {

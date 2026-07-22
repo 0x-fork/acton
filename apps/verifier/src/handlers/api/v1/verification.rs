@@ -133,6 +133,7 @@ pub async fn last_verified_handler(
             .into_iter()
             .map(LastVerifiedItemResponse::from)
             .collect(),
+        total: receipt.total,
     }))
 }
 
@@ -310,6 +311,7 @@ impl From<StoredSourceFile> for SourceFileResponse {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub(super) struct LastVerifiedResponse {
     items: Vec<LastVerifiedItemResponse>,
+    total: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

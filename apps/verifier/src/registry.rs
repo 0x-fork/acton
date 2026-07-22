@@ -89,6 +89,7 @@ pub struct VerifiedBundlesReceipt {
 #[derive(Clone, Debug)]
 pub struct LastVerifiedReceipt {
     pub items: Vec<IndexedVerifiedBundleSummary>,
+    pub total: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -194,7 +195,10 @@ impl VerificationRegistry for SourceVerificationRegistry {
             .last_verified(request.limit, request.offset)
             .await?;
 
-        Ok(LastVerifiedReceipt { items: page.items })
+        Ok(LastVerifiedReceipt {
+            items: page.items,
+            total: page.total,
+        })
     }
 
     async fn abi_contracts(

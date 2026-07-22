@@ -67,19 +67,35 @@
 .pagination {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
-}
-
-.paginationStatus {
-  color: var(--acton-color-text-muted);
-  font-size: var(--acton-font-size-sm);
 }
 
 .paginationActions {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.paginationNumbers {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.paginationNumber {
+  min-width: 2rem;
+  padding-inline: 8px;
+}
+
+.paginationNumber[aria-current="page"] {
+  color: var(--acton-color-accent);
+}
+
+.paginationEllipsis {
+  width: 1.5rem;
+  color: var(--acton-color-text-muted);
+  text-align: center;
 }
 
 .codeHashCell:hover .hashCopyButton,
@@ -99,11 +115,20 @@
   }
 
   .pagination {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
   }
 
   .paginationActions > button {
     flex: 1;
+  }
+
+  .paginationActions {
+    flex-wrap: wrap;
+  }
+
+  .paginationNumbers {
+    order: -1;
+    width: 100%;
+    justify-content: center;
   }
 }

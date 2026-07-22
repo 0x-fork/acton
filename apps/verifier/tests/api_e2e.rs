@@ -155,6 +155,7 @@ async fn last_verified_returns_latest_verified_bundles() {
     assert_eq!(response.status(), StatusCode::OK);
 
     let body = response_json::<LastVerifiedResponse>(response).await;
+    assert_eq!(body.total, 1);
     assert_eq!(body.items.len(), 1);
     assert_eq!(body.items[0].code_hash, CODE_HASH_ONE);
     assert_eq!(body.items[0].source_bundle_hash, source_bundle_hash);
@@ -167,6 +168,7 @@ async fn last_verified_returns_latest_verified_bundles() {
     let response = get(state, "/api/v1/last_verified?offset=500").await;
     assert_eq!(response.status(), StatusCode::OK);
     let body = response_json::<LastVerifiedResponse>(response).await;
+    assert_eq!(body.total, 1);
     assert!(body.items.is_empty());
 }
 
@@ -1282,6 +1284,7 @@ struct VerifiedSourceFile {
 #[derive(Debug, Deserialize)]
 struct LastVerifiedResponse {
     items: Vec<LastVerifiedItem>,
+    total: usize,
 }
 
 #[derive(Debug, Deserialize)]
