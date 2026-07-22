@@ -12,7 +12,8 @@
     "packages/ui-gallery",
     "packages/transaction-ui",
     "packages/test-ui",
-    "packages/ui-e2e"
+    "packages/ui-e2e",
+    "packages/verifier-ui"
   ],
   "scripts": {
     "build": "bun --filter '*' build",

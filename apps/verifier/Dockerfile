@@ -2,18 +2,18 @@
 
 FROM node:22-bookworm-slim AS frontend-builder
 
-WORKDIR /frontend
+WORKDIR /workspace/packages/verifier-ui
 
-COPY apps/verifier/frontend/package.json apps/verifier/frontend/package-lock.json apps/verifier/frontend/.npmrc ./
-COPY packages/ui /packages/ui
+COPY packages/verifier-ui/package.json packages/verifier-ui/package-lock.json packages/verifier-ui/.npmrc ./
+COPY packages/ui /workspace/packages/ui
 RUN npm ci
 
-COPY apps/verifier/frontend ./
+COPY packages/verifier-ui ./
 RUN npm run build
 
 FROM rust:1.95-slim-bookworm AS rust-builder
 
-WORKDIR /build
+WORKDIR /build/apps/verifier
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential pkg-config ca-certificates git libssl-dev \
@@ -21,7 +21,7 @@ RUN apt-get update \
 
 COPY apps/verifier/Cargo.toml apps/verifier/Cargo.lock apps/verifier/rust-toolchain.toml apps/verifier/build.rs ./
 COPY apps/verifier/src ./src
-COPY --from=frontend-builder /frontend/dist ./frontend/dist
+COPY --from=frontend-builder /workspace/packages/verifier-ui/dist /build/packages/verifier-ui/dist
 
 RUN cargo build --release --locked
 
@@ -45,7 +45,7 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY --from=rust-builder /build/target/release/verifier /usr/local/bin/verifier
+COPY --from=rust-builder /build/apps/verifier/target/release/verifier /usr/local/bin/verifier
 COPY --chown=node:node --from=compiler-worker /compiler-worker /app/compiler-worker
 COPY apps/verifier/docker/entrypoint.sh /usr/local/bin/verifier-entrypoint
 

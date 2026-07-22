@@ -76,7 +76,7 @@ export const SearchBox: FC<SearchBoxProps> = ({
       setIsInvalid(false)
       addToHistory(target.displayValue)
       setShowHistoryDropdown(false)
-      window.location.assign(target.path)
+      globalThis.location.assign(target.path)
       return true
     },
     [addToHistory],

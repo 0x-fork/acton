@@ -1,4 +1,5 @@
 import {Checkbox, Input, Popover, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
+import {createVerifierApi, VerifiedContractPage, VerifiedContractsPage} from "@acton/verifier-ui"
 import {
   Check,
   ChevronDown,
@@ -22,6 +23,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useParams,
 } from "react-router-dom"
 
 import {TonClient} from "../../localnet-ui/src/explorer/api/client"
@@ -78,6 +80,9 @@ type NetworkFormMode =
 
 const EXPLORER_NETWORK_STORAGE_KEY = "explorerNetwork"
 const EXPLORER_CUSTOM_NETWORKS_STORAGE_KEY = "explorerCustomNetworks"
+const ACTON_VERIFIER_API = createVerifierApi({
+  baseUrl: "https://verifier.acton.monster/api/v1",
+})
 const EXPLORER_NETWORK_QUERY_PARAM = "network"
 const DEFAULT_CUSTOM_NETWORK_NAME = "Devnet"
 const SHARED_NETWORK_NAME_QUERY_PARAM = "network.name"
@@ -903,6 +908,14 @@ const DesktopMoreMenu: FC = () => {
               </span>
             </span>
           </Link>
+          <Link className={styles.desktopMoreItem} to="/verified" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Verified contracts</span>
+              <span className={styles.desktopMoreItemDescription}>
+                Browse verified on-chain source code
+              </span>
+            </span>
+          </Link>
         </nav>
       }
     >
@@ -915,6 +928,39 @@ const DesktopMoreMenu: FC = () => {
         <span aria-hidden="true">•••</span>
       </button>
     </Popover>
+  )
+}
+
+const VerifiedContractsRoute: FC = () => {
+  const navigate = useNavigate()
+
+  return (
+    <VerifiedContractsPage
+      api={ACTON_VERIFIER_API}
+      onOpenContract={item => {
+        void navigate(`/verified/${encodeURIComponent(item.code_hash)}`)
+      }}
+    />
+  )
+}
+
+const VerifiedContractRoute: FC = () => {
+  const {target = ""} = useParams<{target: string}>()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const selectedSourcePath = new URLSearchParams(location.search).get("file") ?? undefined
+
+  return (
+    <VerifiedContractPage
+      api={ACTON_VERIFIER_API}
+      target={target}
+      selectedSourcePath={selectedSourcePath}
+      onSelectedSourcePathChange={path => {
+        const params = new URLSearchParams(location.search)
+        params.set("file", path)
+        void navigate(`${location.pathname}?${params.toString()}`, {replace: true})
+      }}
+    />
   )
 }
 
@@ -1186,6 +1232,9 @@ export const ExplorerApp: FC = () => {
                               <Link to="/sources" onClick={closeMobileHeaderPanels}>
                                 Sources
                               </Link>
+                              <Link to="/verified" onClick={closeMobileHeaderPanels}>
+                                Verified contracts
+                              </Link>
                               <Link to="/cell" onClick={closeMobileHeaderPanels}>
                                 Cell Inspector
                               </Link>
@@ -1225,6 +1274,8 @@ export const ExplorerApp: FC = () => {
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />
                       <Route path="/sources" element={<SourceCatalogPage />} />
+                      <Route path="/verified" element={<VerifiedContractsRoute />} />
+                      <Route path="/verified/:target" element={<VerifiedContractRoute />} />
                       <Route path="/cell" element={<CellInspectorPage />} />
                       <Route path="/emulate" element={<EmulatePage client={client} />} />
                       <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />

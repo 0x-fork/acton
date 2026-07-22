@@ -1,4 +1,4 @@
-export type LookupTarget = {
+export interface LookupTarget {
   readonly kind: "address" | "code_hash"
   readonly value: string
 }
@@ -64,12 +64,12 @@ export function lookupPath(rawValue: string): string {
 }
 
 export function getPathLookupValue(): string {
-  const queryTarget = new URLSearchParams(window.location.search).get("target")
+  const queryTarget = new URLSearchParams(globalThis.location.search).get("target")
   if (queryTarget?.trim()) {
     return queryTarget.trim()
   }
 
-  const value = window.location.pathname.replace(/^\/+/, "")
+  const value = globalThis.location.pathname.replace(/^\/+/, "")
   return decodeURIComponent(value)
 }
 

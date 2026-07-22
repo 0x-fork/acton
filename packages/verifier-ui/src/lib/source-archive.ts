@@ -1,7 +1,7 @@
 import type {SourceBundle, SourceFile} from "./api"
 
 const encoder = new TextEncoder()
-const ZIP_UTF8_FLAG = 0x0800
+const ZIP_UTF8_FLAG = 0x08_00
 const ZIP_STORE_METHOD = 0
 const ZIP_VERSION = 20
 const ZIP_DOS_TIME = 0
@@ -20,17 +20,17 @@ const crcTable = new Uint32Array(256)
 for (let index = 0; index < crcTable.length; index += 1) {
   let value = index
   for (let bit = 0; bit < 8; bit += 1) {
-    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1
+    value = value & 1 ? 0xed_b8_83_20 ^ (value >>> 1) : value >>> 1
   }
   crcTable[index] = value >>> 0
 }
 
 function crc32(data: Uint8Array): number {
-  let value = 0xffffffff
+  let value = 0xff_ff_ff_ff
   for (const byte of data) {
     value = crcTable[(value ^ byte) & 0xff] ^ (value >>> 8)
   }
-  return (value ^ 0xffffffff) >>> 0
+  return (value ^ 0xff_ff_ff_ff) >>> 0
 }
 
 function writeUint16(buffer: Uint8Array, offset: number, value: number): void {
@@ -56,7 +56,7 @@ function archivePath(path: string, fallbackIndex: number): string {
 }
 
 function writeLocalHeader(output: Uint8Array, offset: number, entry: ZipEntry): number {
-  writeUint32(output, offset, 0x04034b50)
+  writeUint32(output, offset, 0x04_03_4b_50)
   writeUint16(output, offset + 4, ZIP_VERSION)
   writeUint16(output, offset + 6, ZIP_UTF8_FLAG)
   writeUint16(output, offset + 8, ZIP_STORE_METHOD)
@@ -73,7 +73,7 @@ function writeLocalHeader(output: Uint8Array, offset: number, entry: ZipEntry): 
 }
 
 function writeCentralDirectoryHeader(output: Uint8Array, offset: number, entry: ZipEntry): number {
-  writeUint32(output, offset, 0x02014b50)
+  writeUint32(output, offset, 0x02_01_4b_50)
   writeUint16(output, offset + 4, ZIP_VERSION)
   writeUint16(output, offset + 6, ZIP_VERSION)
   writeUint16(output, offset + 8, ZIP_UTF8_FLAG)
@@ -131,7 +131,7 @@ export function buildSourceArchive(bundle: SourceBundle): Blob {
     offset = writeCentralDirectoryHeader(output, offset, entry)
   }
 
-  writeUint32(output, offset, 0x06054b50)
+  writeUint32(output, offset, 0x06_05_4b_50)
   writeUint16(output, offset + 4, 0)
   writeUint16(output, offset + 6, 0)
   writeUint16(output, offset + 8, entries.length)
@@ -151,5 +151,5 @@ export function downloadSourceArchive(bundle: SourceBundle): void {
   document.body.append(link)
   link.click()
   link.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  globalThis.setTimeout(() => URL.revokeObjectURL(url), 0)
 }

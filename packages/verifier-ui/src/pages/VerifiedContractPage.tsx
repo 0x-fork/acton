@@ -1,17 +1,7 @@
-import {
-  Button,
-  CodeViewer,
-  CopyInlineAction,
-  HighlightedCode,
-  PillTab,
-  PillTabs,
-} from "@acton/ui"
+import {Button, CodeViewer, CopyInlineAction, HighlightedCode, PillTab, PillTabs} from "@acton/ui"
 import {useEffect, useMemo, useState} from "react"
-import {createRoot} from "react-dom/client"
 import {Download} from "lucide-react"
 
-import {AppShell} from "../components/AppShell"
-import {SearchBox} from "../components/SearchBox"
 import {StatusPill} from "../components/StatusPill"
 import compilerIcon from "../assets/ton-verifier-icons/compiler.svg"
 import contractIcon from "../assets/ton-verifier-icons/contract.svg"
@@ -21,10 +11,12 @@ import verificationBinaryIcon from "../assets/ton-verifier-icons/verification-bi
 import verificationBombIcon from "../assets/ton-verifier-icons/verification-bomb.svg"
 import verificationPaperIcon from "../assets/ton-verifier-icons/verification-paper.svg"
 import verifiedSourceIcon from "../assets/ton-verifier-icons/verified-light.svg"
-import {fetchVerificationSource, type SourceBundle, type VerificationSourceResponse} from "../lib/api"
+import type {SourceBundle, VerificationSourceResponse, VerifierApi} from "../lib/api"
 import {downloadSourceArchive} from "../lib/source-archive"
-import {getPathLookupValue, parseLookupTarget, shortenMiddle, type LookupTarget} from "../lib/target"
-import "../styles.css"
+import {parseLookupTarget, shortenMiddle, type LookupTarget} from "../lib/target"
+import detailsStyles from "./ContractDetails.module.css"
+import summaryStyles from "./ContractSummary.module.css"
+import styles from "./VerifiedContractPage.module.css"
 
 function DetailRow({
   label,
@@ -36,15 +28,13 @@ function DetailRow({
   readonly monospace?: boolean
 }) {
   return (
-    <div className={`detail-row ${monospace ? "detail-row-monospace" : ""}`}>
+    <div
+      className={`${detailsStyles.detailRow} ${monospace ? detailsStyles.detailRowMonospace : ""}`}
+    >
       <dt>{label}</dt>
       <dd>
         <span title={value}>{value}</span>
-        <CopyInlineAction
-          value={value}
-          label={`Copy ${label}`}
-          copiedLabel={`${label} copied`}
-        />
+        <CopyInlineAction value={value} label={`Copy ${label}`} copiedLabel={`${label} copied`} />
       </dd>
     </div>
   )
@@ -75,8 +65,8 @@ function PanelHeading({
   const Title = titleLevel
 
   return (
-    <div className="panel-heading">
-      <img className="panel-heading-icon" src={icon} alt="" aria-hidden="true" />
+    <div className={summaryStyles.panelHeading}>
+      <img className={summaryStyles.panelHeadingIcon} src={icon} alt="" aria-hidden="true" />
       <div>
         <span>{label}</span>
         <Title>{title}</Title>
@@ -106,16 +96,21 @@ const verificationPoints = [
 
 function VerificationExplainer() {
   return (
-    <section className="summary-proof" aria-label="How this contract is verified">
+    <section className={summaryStyles.summaryProof} aria-label="How this contract is verified">
       <PanelHeading
         icon={verificationIcon}
         label="Verification"
         title="How is this contract verified?"
       />
-      <div className="verification-point-grid">
+      <div className={summaryStyles.verificationPointGrid}>
         {verificationPoints.map(point => (
-          <div className="verification-point" key={point.text}>
-            <img className="verification-point-icon" src={point.icon} alt="" aria-hidden="true" />
+          <div className={summaryStyles.verificationPoint} key={point.text}>
+            <img
+              className={summaryStyles.verificationPointIcon}
+              src={point.icon}
+              alt=""
+              aria-hidden="true"
+            />
             <p>{point.text}</p>
           </div>
         ))}
@@ -161,9 +156,13 @@ function lookupAddress(lookupTarget: LookupTarget | undefined): string | undefin
 function VerifiedContract({
   data,
   lookupTarget,
+  selectedSourcePath,
+  onSelectedSourcePathChange,
 }: {
   readonly data: VerificationSourceResponse
   readonly lookupTarget: LookupTarget | undefined
+  readonly selectedSourcePath?: string
+  readonly onSelectedSourcePathChange?: (path: string) => void
 }) {
   const address = lookupAddress(lookupTarget)
   const [selectedBundleHash, setSelectedBundleHash] = useState(
@@ -177,7 +176,7 @@ function VerifiedContract({
 
   if (!bundle) {
     return (
-      <section className="empty-state">
+      <section className={styles["empty-state"]}>
         <StatusPill verified={false} />
         <h2>Contract is indexed, but no verified source bundle is available.</h2>
       </section>
@@ -198,36 +197,34 @@ function VerifiedContract({
     readableCompilerParams.length <= 112
       ? readableCompilerParams
       : JSON.stringify(bundle.compiler.params, null, 2)
-  const selectedSourcePath = new URLSearchParams(window.location.search).get("file") ?? undefined
-
   return (
     <>
-      <section className="contract-summary">
-        <div className="summary-main">
+      <section className={summaryStyles.contractSummary}>
+        <div className={summaryStyles.summaryMain}>
           <PanelHeading
             icon={contractIcon}
             label="Contract"
             title={address ? shortenMiddle(address, 18, 12) : "Verified code hash"}
             titleLevel="h1"
           />
-          <div className="summary-status-row">
+          <div className={summaryStyles.summaryStatusRow}>
             <StatusPill verified={data.verified} />
           </div>
-          <div className="summary-facts" aria-label="Source bundle summary">
-            <div className="summary-fact">
+          <div className={summaryStyles.summaryFacts}>
+            <div className={summaryStyles.summaryFact}>
               <span>Language</span>
               <strong>{bundle.compiler.language}</strong>
             </div>
-            <div className="summary-fact">
+            <div className={summaryStyles.summaryFact}>
               <span>Compiler</span>
               <strong>{bundle.compiler.version}</strong>
             </div>
-            <div className="summary-fact">
+            <div className={summaryStyles.summaryFact}>
               <span>Files</span>
               <strong>{bundle.files.length}</strong>
             </div>
           </div>
-          <div className="hash-card">
+          <div className={summaryStyles.hashCard}>
             <span>Verified code hash</span>
             <p title={data.code_hash}>{data.code_hash}</p>
           </div>
@@ -235,10 +232,15 @@ function VerifiedContract({
         <VerificationExplainer />
       </section>
 
-      <div className="contract-layout">
-        <section className="metadata-panel" aria-labelledby="verification-metadata-title">
-          <div className="metadata-panel-heading">
-            <img className="panel-heading-icon compact" src={compilerIcon} alt="" aria-hidden="true" />
+      <div className={detailsStyles.layout}>
+        <section className={detailsStyles.panel} aria-labelledby="verification-metadata-title">
+          <div className={detailsStyles.panelHeading}>
+            <img
+              className={`${summaryStyles.panelHeadingIcon} ${summaryStyles.compact}`}
+              src={compilerIcon}
+              alt=""
+              aria-hidden="true"
+            />
             <h2 id="verification-metadata-title">Verification metadata</h2>
           </div>
           <dl>
@@ -254,22 +256,31 @@ function VerifiedContract({
             <DetailRow label="Compiler" value={bundle.compiler.version} />
             <DetailRow label="Entrypoint" value={bundle.entrypoint} />
           </dl>
-          <div className="metadata-json">
-            <div className="metadata-json-title">Compile params</div>
-            <HighlightedCode className="highlighted-json" value={compilerParams} language="json" />
+          <div className={detailsStyles.metadataJson}>
+            <div className={detailsStyles.metadataJsonTitle}>Compile params</div>
+            <HighlightedCode
+              className={detailsStyles.highlightedJson}
+              value={compilerParams}
+              language="json"
+            />
           </div>
         </section>
 
-        <section className="source-section">
-          <div className="section-header">
-            <div className="section-title">
-              <img className="panel-heading-icon compact" src={verifiedSourceIcon} alt="" aria-hidden="true" />
+        <section className={detailsStyles.sourceSection}>
+          <div className={detailsStyles.sectionHeader}>
+            <div className={detailsStyles.sectionTitle}>
+              <img
+                className={`${summaryStyles.panelHeadingIcon} ${summaryStyles.compact}`}
+                src={verifiedSourceIcon}
+                alt=""
+                aria-hidden="true"
+              />
               <div>
                 <h2>Source bundle</h2>
-                <span>{bundle.files.length} files</span>
+                <span className={detailsStyles.fileCount}>{bundle.files.length} files</span>
               </div>
             </div>
-            <div className="section-actions">
+            <div className={detailsStyles.sectionActions}>
               <BundleSelector
                 bundles={data.bundles}
                 activeBundle={bundle}
@@ -287,20 +298,12 @@ function VerifiedContract({
           </div>
           <CodeViewer
             key={bundle.source_bundle_hash}
-            className="source-code-viewer"
+            className={detailsStyles.sourceCodeViewer}
             defaultSelectedPath={selectedSourcePath}
             emptyMessage="No source files stored for this bundle"
             files={bundle.files}
             entrypoint={bundle.entrypoint}
-            onSelectedPathChange={path => {
-              const url = new URL(window.location.href)
-              url.searchParams.set("file", path)
-              window.history.replaceState(
-                window.history.state,
-                "",
-                `${url.pathname}${url.search}${url.hash}`,
-              )
-            }}
+            onSelectedPathChange={onSelectedSourcePathChange}
           />
         </section>
       </div>
@@ -318,15 +321,16 @@ function UnverifiedContract({
   const address = lookupAddress(lookupTarget)
 
   return (
-    <section className="empty-state">
+    <section className={styles["empty-state"]}>
       <StatusPill verified={false} />
       <h1>Contract is not verified</h1>
       <p>
-        This target resolves to code hash <span className="mono-inline">{data.code_hash}</span>, but
-        there is no stored source bundle for it.
+        This target resolves to code hash{" "}
+        <span className={styles["mono-inline"]}>{data.code_hash}</span>, but there is no stored
+        source bundle for it.
       </p>
       {address && (
-        <dl className="summary-grid compact-grid">
+        <dl className={detailsStyles.summaryGrid}>
           <DetailRow label="Address" value={address} monospace />
         </dl>
       )}
@@ -334,8 +338,22 @@ function UnverifiedContract({
   )
 }
 
-function ContractPage() {
-  const rawLookup = getPathLookupValue()
+export interface VerifiedContractPageProps {
+  readonly api: VerifierApi
+  readonly target: string
+  readonly selectedSourcePath?: string
+  readonly onSelectedSourcePathChange?: (path: string) => void
+  readonly className?: string
+}
+
+export function VerifiedContractPage({
+  api,
+  target,
+  selectedSourcePath,
+  onSelectedSourcePathChange,
+  className,
+}: VerifiedContractPageProps) {
+  const rawLookup = target.trim()
   const lookupTarget = useMemo(() => {
     try {
       return parseLookupTarget(rawLookup)
@@ -353,9 +371,10 @@ function ContractPage() {
     const load = async () => {
       setLoading(true)
       setError(undefined)
+      setData(undefined)
       try {
         const target = parseLookupTarget(rawLookup)
-        const result = await fetchVerificationSource(target)
+        const result = await api.fetchVerificationSource(target)
         if (!cancelled) {
           setData(result)
         }
@@ -374,26 +393,27 @@ function ContractPage() {
     return () => {
       cancelled = true
     }
-  }, [rawLookup])
+  }, [api, rawLookup])
 
   return (
-    <AppShell headerAccessory={<SearchBox initialValue={rawLookup} variant="header" />}>
-      <div className="contract-page">
-        {loading ? (
-          <section className="loading-state">Loading verification state...</section>
-        ) : error ? (
-          <section className="empty-state error-state">
-            <h1>Could not load contract</h1>
-            <p>{error}</p>
-          </section>
-        ) : data?.verified ? (
-          <VerifiedContract data={data} lookupTarget={lookupTarget} />
-        ) : data ? (
-          <UnverifiedContract data={data} lookupTarget={lookupTarget} />
-        ) : null}
-      </div>
-    </AppShell>
+    <div className={`${styles.page} ${className ?? ""}`}>
+      {loading ? (
+        <section className={styles["loading-state"]}>Loading verification state...</section>
+      ) : error ? (
+        <section className={`${styles["empty-state"]} ${styles["error-state"]}`}>
+          <h1>Could not load contract</h1>
+          <p>{error}</p>
+        </section>
+      ) : data?.verified ? (
+        <VerifiedContract
+          data={data}
+          lookupTarget={lookupTarget}
+          selectedSourcePath={selectedSourcePath}
+          onSelectedSourcePathChange={onSelectedSourcePathChange}
+        />
+      ) : data ? (
+        <UnverifiedContract data={data} lookupTarget={lookupTarget} />
+      ) : null}
+    </div>
   )
 }
-
-createRoot(document.getElementById("root")!).render(<ContractPage />)

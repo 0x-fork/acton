@@ -9,13 +9,13 @@ build-dev:
 install: install-ui install-compiler-worker
 
 install-ui:
-    cd frontend && npm ci
+    cd ../../packages/verifier-ui && npm ci
 
 install-compiler-worker:
     cd compiler-worker && npm ci
 
 build-ui: install-ui
-    cd frontend && npm run build
+    cd ../../packages/verifier-ui && npm run build
 
 generate-registry:
     cd compiler-worker && npm run generate-registry
@@ -41,4 +41,4 @@ run: build-ui
 
 clean:
     cargo clean
-    rm -rf frontend/dist
+    rm -rf ../../packages/verifier-ui/dist

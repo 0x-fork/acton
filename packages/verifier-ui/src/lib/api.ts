@@ -56,38 +56,54 @@ export class ApiRequestError extends Error {
   }
 }
 
-export async function fetchLastVerified(limit = 12, offset = 0): Promise<LastVerifiedResponse> {
-  const params = new URLSearchParams({
-    limit: String(limit),
-    offset: String(offset),
-  })
-  const response = await fetch(`/api/v1/last_verified?${params.toString()}`, {
-    headers: {
-      accept: "application/json",
-    },
-  })
-
-  const body = (await response.json().catch(() => undefined)) as {error?: string} | undefined
-  if (!response.ok) {
-    throw new ApiRequestError(response.status, body?.error || `Request failed: ${response.status}`)
-  }
-
-  return body as LastVerifiedResponse
+export interface VerifierApi {
+  readonly fetchLastVerified: (limit?: number, offset?: number) => Promise<LastVerifiedResponse>
+  readonly fetchVerificationSource: (target: LookupTarget) => Promise<VerificationSourceResponse>
 }
 
-export async function fetchVerificationSource(
-  target: LookupTarget,
-): Promise<VerificationSourceResponse> {
-  const response = await fetch(`/api/v1/verification/source?${lookupTargetToQuery(target)}`, {
-    headers: {
-      accept: "application/json",
-    },
-  })
+export interface VerifierApiOptions {
+  readonly baseUrl?: string
+  readonly fetch?: typeof globalThis.fetch
+}
 
-  const body = (await response.json().catch(() => undefined)) as {error?: string} | undefined
-  if (!response.ok) {
-    throw new ApiRequestError(response.status, body?.error || `Request failed: ${response.status}`)
+export function createVerifierApi({
+  baseUrl = "/api/v1",
+  fetch: fetchImplementation = globalThis.fetch,
+}: VerifierApiOptions = {}): VerifierApi {
+  const normalizedBaseUrl = baseUrl.replace(/\/$/, "")
+
+  const request = async <T>(path: string): Promise<T> => {
+    const response = await fetchImplementation(`${normalizedBaseUrl}${path}`, {
+      headers: {
+        accept: "application/json",
+      },
+    })
+
+    const body = (await response.json().catch(() => undefined)) as
+      | ({error?: string} & T)
+      | undefined
+    if (!response.ok) {
+      throw new ApiRequestError(
+        response.status,
+        body?.error || `Request failed: ${response.status}`,
+      )
+    }
+
+    return body as T
   }
 
-  return body as VerificationSourceResponse
+  return {
+    fetchLastVerified(limit = 12, offset = 0) {
+      const params = new URLSearchParams({
+        limit: String(limit),
+        offset: String(offset),
+      })
+      return request<LastVerifiedResponse>(`/last_verified?${params.toString()}`)
+    },
+    fetchVerificationSource(target) {
+      return request<VerificationSourceResponse>(
+        `/verification/source?${lookupTargetToQuery(target)}`,
+      )
+    },
+  }
 }

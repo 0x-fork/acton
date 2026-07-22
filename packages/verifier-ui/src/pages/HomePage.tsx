@@ -1,11 +1,8 @@
-import {createRoot} from "react-dom/client"
-
 import {AppShell} from "../components/AppShell"
 import {SearchBox} from "../components/SearchBox"
 import styles from "./HomePage.module.css"
-import "../styles.css"
 
-function HomePage() {
+export function HomePage() {
   return (
     <AppShell>
       <div className={styles.inputPage}>
@@ -47,5 +44,3 @@ function HomePage() {
     </AppShell>
   )
 }
-
-createRoot(document.getElementById("root")!).render(<HomePage />)

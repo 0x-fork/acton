@@ -13,7 +13,7 @@ interface AppShellProps {
 }
 
 export function AppShell({children, headerAccessory}: AppShellProps) {
-  const pathname = window.location.pathname
+  const {pathname} = globalThis.location
   const isHomePage = pathname === "/"
   const headerClassName = isHomePage ? `${styles.header} ${styles.headerHome}` : styles.header
   const [mobileHeaderPanel, setMobileHeaderPanel] = useState<"navigation" | "search">()
@@ -54,12 +54,7 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
           <div className={styles.headerInner}>
             <div className={styles.headerPrimary}>
               <a className={styles.brand} href="/" aria-label="TON Verifier home">
-                <img
-                  className={styles.brandIcon}
-                  src={tonVerifierIcon}
-                  alt=""
-                  aria-hidden="true"
-                />
+                <img className={styles.brandIcon} src={tonVerifierIcon} alt="" aria-hidden="true" />
                 <span>TON Verifier</span>
               </a>
               <nav className={styles.nav} aria-label="TON Verifier navigation">
@@ -87,9 +82,7 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
                   aria-controls="verifier-mobile-search"
                   aria-expanded={mobileSearchOpen}
                   onClick={() =>
-                    setMobileHeaderPanel(current =>
-                      current === "search" ? undefined : "search",
-                    )
+                    setMobileHeaderPanel(current => (current === "search" ? undefined : "search"))
                   }
                 >
                   {mobileSearchOpen ? <X size={18} /> : <Search size={18} />}
@@ -135,11 +128,7 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
                     aria-label="Mobile TON Verifier navigation"
                   >
                     <a href="/verified">Verified contracts</a>
-                    <a
-                      href="https://github.com/i582/verifier"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
+                    <a href="https://github.com/i582/verifier" target="_blank" rel="noreferrer">
                       <span>GitHub</span>
                       <Github size={17} aria-hidden="true" />
                     </a>

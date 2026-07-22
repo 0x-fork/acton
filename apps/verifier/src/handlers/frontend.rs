@@ -11,10 +11,14 @@ use std::path::PathBuf;
 use std::path::{Component, Path};
 
 #[cfg(not(debug_assertions))]
-static FRONTEND_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/frontend/dist");
+static FRONTEND_DIR: Dir<'static> =
+    include_dir!("$CARGO_MANIFEST_DIR/../../packages/verifier-ui/dist");
 
 #[cfg(debug_assertions)]
-const FRONTEND_DIST: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/frontend/dist");
+const FRONTEND_DIST: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../packages/verifier-ui/dist"
+);
 
 pub async fn handler(uri: Uri) -> Response {
     let request_path = uri.path();
