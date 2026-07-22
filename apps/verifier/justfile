@@ -9,18 +9,19 @@ build-dev:
 install: install-ui install-compiler-worker
 
 install-ui:
-    cd ../../packages/verifier-ui && npm ci
+    cd ../.. && bun ci
 
 install-compiler-worker:
     cd compiler-worker && npm ci
 
 build-ui: install-ui
-    cd ../../packages/verifier-ui && npm run build
+    cd ../../packages/verifier-ui && bun run build
 
 generate-registry:
     cd compiler-worker && npm run generate-registry
 
 test: install-compiler-worker
+    cd compiler-worker && npm test
     cargo test --locked
 
 fmt:

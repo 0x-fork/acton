@@ -2,6 +2,7 @@ import semver from "semver";
 
 import { bocBase64CodeHashHex, normalizeSourcePath } from "./common.mjs";
 import { importTact } from "./registry.mjs";
+import { generatedTolkAbiSources } from "./tact-abi.mjs";
 
 export async function compileTact(input) {
   const pkgSource = tactPkgSource(input);
@@ -17,7 +18,14 @@ export async function compileTact(input) {
     );
   }
 
-  const tactModule = await importTact(input.compiler_version);
+  const importedTactModule = await importTact(input.compiler_version);
+  const tactModule =
+    typeof importedTactModule.verify === "function"
+      ? importedTactModule
+      : importedTactModule.default;
+  if (typeof tactModule?.verify !== "function") {
+    throw new Error(`Tact ${input.compiler_version} does not export verify()`);
+  }
   const output = [];
   const verificationResult = await tactModule.verify({
     pkg,
@@ -27,21 +35,35 @@ export async function compileTact(input) {
   if (!verificationResult.ok) {
     return {
       status: "compile_error",
-      error: [String(verificationResult.error), ...output.map(String)].join("\n"),
+      error: [String(verificationResult.error), ...output.map(String)].join(
+        "\n",
+      ),
     };
+  }
+
+  const generated = generatedSources(pkgSource.path, verificationResult.files);
+  const generatedTolkAbi = await generatedTolkAbiSources(
+    verificationResult.package,
+    generated,
+  );
+  if (generatedTolkAbi !== undefined) {
+    generated.push(...generatedTolkAbi);
   }
 
   return {
     status: "ok",
     code_hash: bocBase64CodeHashHex(verificationResult.package.code),
-    generated_sources: generatedSources(pkgSource.path, verificationResult.files),
+    generated_sources: generated,
   };
 }
 
 function tactPkgSource(input) {
   const pkgSource = input.sources
     .filter((source) => normalizeSourcePath(source.path).endsWith(".pkg"))
-    .sort((left, right) => left.path.split("/").length - right.path.split("/").length)[0];
+    .sort(
+      (left, right) =>
+        left.path.split("/").length - right.path.split("/").length,
+    )[0];
 
   if (!pkgSource) {
     throw new Error("Tact requires a .pkg source");

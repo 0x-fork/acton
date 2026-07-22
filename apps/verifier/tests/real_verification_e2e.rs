@@ -172,7 +172,7 @@ async fn verify_tact_with_real_compiler_and_stores_generated_sources() {
     assert_verified(response, "tact", TACT_CODE_HASH).await;
 
     let response = get(
-        state,
+        state.clone(),
         &format!("/api/v1/verification/source?code_hash={TACT_CODE_HASH}"),
     )
     .await;
@@ -194,6 +194,29 @@ async fn verify_tact_with_real_compiler_and_stores_generated_sources() {
         files.iter().any(|file| has_extension(&file.path, "tact")),
         "expected stored Tact bundle to include generated source"
     );
+    let types = files
+        .iter()
+        .find(|file| file.path == "output/Smoke.types.tolk")
+        .expect("expected stored Tact bundle to include generated Tolk types");
+    assert!(types.content.contains("contract Smoke"));
+    assert!(types.content.contains("storage: SmokeData"));
+
+    let abi = files
+        .iter()
+        .find(|file| file.path == "output/Smoke.abi.json")
+        .expect("expected stored Tact bundle to include generated Tolk ABI JSON");
+    let abi =
+        serde_json::from_str::<Value>(&abi.content).expect("generated Tolk ABI should be JSON");
+    assert_eq!(abi["abi_schema_version"], "1.0");
+    assert_eq!(abi["contract_name"], "Smoke");
+    assert_eq!(abi["compiler_name"], "tolk");
+    assert_eq!(abi["compiler_version"], "1.4.2");
+
+    let response = get(state, &format!("/api/v1/abi?code_hash={TACT_CODE_HASH}")).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json::<Value>(response).await;
+    assert_eq!(body["items"][0]["code_hash"], TACT_CODE_HASH);
+    assert_eq!(body["items"][0]["abi"]["contract_name"], "Smoke");
 }
 
 #[tokio::test]
@@ -264,9 +287,18 @@ async fn verify_fixture(
 }
 
 async fn assert_verified(response: axum::response::Response, _language: &str, code_hash: &str) {
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let body = response_json::<VerifyResponse>(response).await;
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("verification response body should be readable");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "verification response: {}",
+        String::from_utf8_lossy(&body)
+    );
+    let body = serde_json::from_slice::<VerifyResponse>(&body)
+        .expect("verification response should contain valid JSON");
     assert_eq!(body.code_hash, code_hash);
     assert_eq!(body.compiled_code_hash, code_hash);
     assert_eq!(body.verification_result, "match");

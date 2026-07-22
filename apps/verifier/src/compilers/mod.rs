@@ -38,7 +38,7 @@ impl NodeCompilerService {
 impl CompilerService for NodeCompilerService {
     async fn compile(&self, request: CompileRequest) -> Result<CompileOutput, CompilerError> {
         let input = serde_json::to_vec(&request).map_err(CompilerError::SerializeInput)?;
-        let worker_path = std::fs::canonicalize(&self.worker_path).map_err(|source| {
+        let worker_path = dunce::canonicalize(&self.worker_path).map_err(|source| {
             CompilerError::ResolveWorkerPath {
                 path: self.worker_path.clone(),
                 source,

@@ -643,7 +643,7 @@ fn insert_bundle(
             ],
         )?;
 
-        if let Some(abi_json) = tolk_abi_json(manifest, file) {
+        if let Some(abi_json) = compiler_abi_json(manifest, file) {
             transaction.execute(
                 r"
                 insert into bundle_abis (
@@ -816,8 +816,10 @@ fn abi_contract_from_row(
     })
 }
 
-fn tolk_abi_json(manifest: &SourceBundleManifest, file: &StoredSourceFile) -> Option<Value> {
-    if !manifest.compiler.language.eq_ignore_ascii_case("tolk") || !file.path.ends_with(".abi.json")
+fn compiler_abi_json(manifest: &SourceBundleManifest, file: &StoredSourceFile) -> Option<Value> {
+    let language = manifest.compiler.language.as_str();
+    if !(language.eq_ignore_ascii_case("tolk") || language.eq_ignore_ascii_case("tact"))
+        || !file.path.ends_with(".abi.json")
     {
         return None;
     }
