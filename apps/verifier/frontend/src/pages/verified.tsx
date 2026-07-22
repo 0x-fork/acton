@@ -1,9 +1,20 @@
+import {
+  CopyInlineAction,
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableEmpty,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableSkeletonRows,
+  DataTableTable,
+} from "@acton/ui"
 import {createRoot} from "react-dom/client"
 import {useEffect, useMemo, useState} from "react"
 import type {KeyboardEvent as ReactKeyboardEvent} from "react"
 
 import {AppShell} from "../components/AppShell"
-import {CopyValueButton} from "../components/CopyValueButton"
 import {fetchLastVerified, type LastVerifiedItem} from "../lib/api"
 import {lookupPath, shortenMiddle} from "../lib/target"
 import styles from "./VerifiedPage.module.css"
@@ -93,90 +104,74 @@ function VerifiedPage() {
           <h1 className={styles.title}>Verified contracts</h1>
         </section>
 
-        <section className={styles.tableFrame}>
-          <header className={styles.tableTitle}>Contracts</header>
-          {isLoading ? (
-            <VerifiedTableSkeleton />
-          ) : error ? (
-            <div className={styles.empty}>{error}</div>
-          ) : (
-            <div className={styles.tableScroller}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Code hash</th>
-                    <th>Name</th>
-                    <th>Compiler</th>
-                    <th>Files</th>
-                    <th>Verified at</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={5}>
-                        <div className="verified-empty">No verified contracts indexed yet</div>
-                      </td>
-                    </tr>
-                  ) : (
-                    sortedItems.map(item => {
-                      const path = lookupPath(item.code_hash)
+        <DataTable title="Contracts" minWidth="53.75rem">
+          <DataTableTable aria-label="Verified contracts">
+            <DataTableHead>
+              <DataTableRow>
+                <DataTableHeaderCell columnWidth="32%">Code hash</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="20%">Name</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="18%">Compiler</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="10%">Files</DataTableHeaderCell>
+                <DataTableHeaderCell>Verified at</DataTableHeaderCell>
+              </DataTableRow>
+            </DataTableHead>
+            <DataTableBody>
+              {isLoading ? (
+                <DataTableSkeletonRows
+                  columns={5}
+                  rows={8}
+                  widths={["72%", "54%", "48%", "2.5rem", "68%"]}
+                />
+              ) : error ? (
+                <DataTableEmpty colSpan={5}>{error}</DataTableEmpty>
+              ) : sortedItems.length === 0 ? (
+                <DataTableEmpty colSpan={5}>No verified contracts indexed yet</DataTableEmpty>
+              ) : (
+                sortedItems.map(item => {
+                  const path = lookupPath(item.code_hash)
 
-                      return (
-                        <tr
-                          key={`${item.code_hash}:${item.source_bundle_hash}`}
-                          className={styles.tableRow}
-                          role="link"
-                          tabIndex={0}
-                          aria-label={`Open code hash ${item.code_hash}`}
-                          onClick={() => openContract(path)}
-                          onKeyDown={event => handleRowKeyDown(event, path)}
-                        >
-                          <td>
-                            <div className={styles.codeHashCell}>
-                              <span className={styles.codeHash} title={item.code_hash}>
-                                {shortenMiddle(item.code_hash, 18, 12)}
-                              </span>
-                              <CopyValueButton
-                                className={styles.hashCopyButton}
-                                value={item.code_hash}
-                                label="code hash"
-                              />
-                            </div>
-                          </td>
-                          <td>
-                            <span className={styles.sourceName} title={sourceName(item)}>
-                              {sourceName(item)}
-                            </span>
-                          </td>
-                          <td>{compilerLabel(item)}</td>
-                          <td>{item.file_count}</td>
-                          <td>{formatVerifiedAt(item.verified_at)}</td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                  return (
+                    <DataTableRow
+                      key={`${item.code_hash}:${item.source_bundle_hash}`}
+                      interactive
+                      role="link"
+                      tabIndex={0}
+                      aria-label={`Open code hash ${item.code_hash}`}
+                      onClick={() => openContract(path)}
+                      onKeyDown={event => handleRowKeyDown(event, path)}
+                    >
+                      <DataTableCell>
+                        <div className={styles.codeHashCell}>
+                          <span className={styles.codeHash} title={item.code_hash}>
+                            {shortenMiddle(item.code_hash, 18, 12)}
+                          </span>
+                          <CopyInlineAction
+                            className={styles.hashCopyButton}
+                            value={item.code_hash}
+                            label="Copy code hash"
+                            copiedLabel="Code hash copied"
+                          />
+                        </div>
+                      </DataTableCell>
+                      <DataTableCell>
+                        <span className={styles.sourceName} title={sourceName(item)}>
+                          {sourceName(item)}
+                        </span>
+                      </DataTableCell>
+                      <DataTableCell truncate title={compilerLabel(item)}>
+                        {compilerLabel(item)}
+                      </DataTableCell>
+                      <DataTableCell>{item.file_count}</DataTableCell>
+                      <DataTableCell truncate>{formatVerifiedAt(item.verified_at)}</DataTableCell>
+                    </DataTableRow>
+                  )
+                })
+              )}
+            </DataTableBody>
+          </DataTableTable>
+        </DataTable>
       </section>
     </AppShell>
-  )
-}
-
-function VerifiedTableSkeleton() {
-  return (
-    <div className={styles.skeletonList} aria-label="Loading verified contracts">
-      {Array.from({length: 8}, (_, index) => (
-        <div className={styles.skeletonRow} key={index}>
-          <span />
-          <span />
-          <span />
-        </div>
-      ))}
-    </div>
   )
 }
 

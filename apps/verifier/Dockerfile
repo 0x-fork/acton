@@ -4,10 +4,11 @@ FROM node:22-bookworm-slim AS frontend-builder
 
 WORKDIR /frontend
 
-COPY frontend/package.json frontend/package-lock.json ./
+COPY apps/verifier/frontend/package.json apps/verifier/frontend/package-lock.json apps/verifier/frontend/.npmrc ./
+COPY packages/ui /packages/ui
 RUN npm ci
 
-COPY frontend ./
+COPY apps/verifier/frontend ./
 RUN npm run build
 
 FROM rust:1.95-slim-bookworm AS rust-builder
@@ -18,8 +19,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential pkg-config ca-certificates git libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY Cargo.toml Cargo.lock rust-toolchain.toml build.rs ./
-COPY src ./src
+COPY apps/verifier/Cargo.toml apps/verifier/Cargo.lock apps/verifier/rust-toolchain.toml apps/verifier/build.rs ./
+COPY apps/verifier/src ./src
 COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
 RUN cargo build --release --locked
@@ -28,13 +29,13 @@ FROM node:22-bookworm-slim AS compiler-worker
 
 WORKDIR /compiler-worker
 
-COPY compiler-worker/package.json compiler-worker/package-lock.json ./
-COPY compiler-worker/scripts ./scripts
+COPY apps/verifier/compiler-worker/package.json apps/verifier/compiler-worker/package-lock.json ./
+COPY apps/verifier/compiler-worker/scripts ./scripts
 RUN npm ci --omit=dev
 
-COPY compiler-worker/compile.mjs ./compile.mjs
-COPY compiler-worker/languages ./languages
-COPY compiler-worker/fixtures ./fixtures
+COPY apps/verifier/compiler-worker/compile.mjs ./compile.mjs
+COPY apps/verifier/compiler-worker/languages ./languages
+COPY apps/verifier/compiler-worker/fixtures ./fixtures
 
 FROM node:22-bookworm-slim AS runtime
 
@@ -46,7 +47,7 @@ WORKDIR /app
 
 COPY --from=rust-builder /build/target/release/verifier /usr/local/bin/verifier
 COPY --chown=node:node --from=compiler-worker /compiler-worker /app/compiler-worker
-COPY docker/entrypoint.sh /usr/local/bin/verifier-entrypoint
+COPY apps/verifier/docker/entrypoint.sh /usr/local/bin/verifier-entrypoint
 
 RUN chmod +x /usr/local/bin/verifier-entrypoint \
     && mkdir -p /etc/verifier /var/lib/verifier/source-repo /var/lib/verifier/registry-index \

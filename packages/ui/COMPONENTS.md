@@ -1147,6 +1147,10 @@ highlighting, copy action, optional external action, and responsive file picker.
 - `files`: minimal `{path, content}` records; domain-specific source metadata
   stays in the caller.
 - `entrypoint`: optional path selected initially and marked as `main`.
+- `defaultSelectedPath`: optional initial file path when the caller restores a
+  selection from navigation or persisted state.
+- `onSelectedPathChange`: optional callback for syncing file selection to URL
+  or application state.
 - `externalActionUrl` and `externalActionLabel`: optional navigation to a
   verifier, repository, artifact, or other source context.
 - `compact`: limits the source height for dense details panels.

@@ -73,6 +73,9 @@ function contractRouteFallback() {
 
 export default defineConfig({
   plugins: [react(), contractRouteFallback()],
+  resolve: {
+    dedupe: ["react", "react-dom"],
+  },
   build: {
     outDir: "dist",
     emptyOutDir: true,

@@ -26,7 +26,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: ./apps/verifier/Dockerfile
           load: true
           tags: ton-verifier:ci
           cache-from: type=gha
@@ -90,7 +90,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile
+          file: ./apps/verifier/Dockerfile
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

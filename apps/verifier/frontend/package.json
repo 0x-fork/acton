@@ -9,10 +9,10 @@
     "preview": "vite preview --host 127.0.0.1 --port 3007"
   },
   "dependencies": {
+    "@acton/ui": "file:../../../packages/ui",
     "lucide-react": "^0.474.0",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "shiki": "^3.22.0"
+    "react-dom": "^19.2.3"
   },
   "devDependencies": {
     "@types/react": "^19.2.7",

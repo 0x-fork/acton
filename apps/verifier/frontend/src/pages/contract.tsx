@@ -1,11 +1,16 @@
+import {
+  Button,
+  CodeViewer,
+  CopyInlineAction,
+  HighlightedCode,
+  PillTab,
+  PillTabs,
+} from "@acton/ui"
 import {useEffect, useMemo, useState} from "react"
 import {createRoot} from "react-dom/client"
 import {Download} from "lucide-react"
 
 import {AppShell} from "../components/AppShell"
-import {CodeViewer} from "../components/CodeViewer"
-import {CopyButton} from "../components/CopyButton"
-import {HighlightedJson} from "../components/HighlightedJson"
 import {SearchBox} from "../components/SearchBox"
 import {StatusPill} from "../components/StatusPill"
 import compilerIcon from "../assets/ton-verifier-icons/compiler.svg"
@@ -35,7 +40,11 @@ function DetailRow({
       <dt>{label}</dt>
       <dd>
         <span title={value}>{value}</span>
-        <CopyButton value={value} label={label} />
+        <CopyInlineAction
+          value={value}
+          label={`Copy ${label}`}
+          copiedLabel={`${label} copied`}
+        />
       </dd>
     </div>
   )
@@ -129,22 +138,19 @@ function BundleSelector({
   }
 
   return (
-    <div className="bundle-tabs" role="tablist" aria-label="Source bundles">
+    <PillTabs role="tablist" ariaLabel="Source bundles">
       {bundles.map(bundle => (
-        <button
+        <PillTab
           key={bundle.source_bundle_hash}
-          type="button"
           role="tab"
           aria-selected={bundle.source_bundle_hash === activeBundle.source_bundle_hash}
-          className={`bundle-tab ${
-            bundle.source_bundle_hash === activeBundle.source_bundle_hash ? "bundle-tab-active" : ""
-          }`}
+          selected={bundle.source_bundle_hash === activeBundle.source_bundle_hash}
           onClick={() => onSelect(bundle)}
         >
           {shortenMiddle(bundle.source_bundle_hash, 8, 6)}
-        </button>
+        </PillTab>
       ))}
-    </div>
+    </PillTabs>
   )
 }
 
@@ -179,6 +185,20 @@ function VerifiedContract({
   }
 
   const verifiedAt = formatVerifiedAt(bundle.verified_at)
+  const compactCompilerParams = JSON.stringify(bundle.compiler.params)
+  const readableCompilerParams =
+    compactCompilerParams.length <= 96
+      ? compactCompilerParams
+          .replaceAll(":", ": ")
+          .replaceAll(",", ", ")
+          .replace(/^\{/, "{ ")
+          .replace(/\}$/, " }")
+      : compactCompilerParams
+  const compilerParams =
+    readableCompilerParams.length <= 112
+      ? readableCompilerParams
+      : JSON.stringify(bundle.compiler.params, null, 2)
+  const selectedSourcePath = new URLSearchParams(window.location.search).get("file") ?? undefined
 
   return (
     <>
@@ -236,7 +256,7 @@ function VerifiedContract({
           </dl>
           <div className="metadata-json">
             <div className="metadata-json-title">Compile params</div>
-            <HighlightedJson value={bundle.compiler.params} />
+            <HighlightedCode className="highlighted-json" value={compilerParams} language="json" />
           </div>
         </section>
 
@@ -255,17 +275,33 @@ function VerifiedContract({
                 activeBundle={bundle}
                 onSelect={next => setSelectedBundleHash(next.source_bundle_hash)}
               />
-              <button
-                type="button"
-                className="download-sources-button"
+              <Button
+                size="sm"
+                variant="outline"
+                leadingIcon={<Download size={15} />}
                 onClick={() => downloadSourceArchive(bundle)}
               >
-                <Download size={15} aria-hidden="true" />
-                <span>Download sources</span>
-              </button>
+                Download sources
+              </Button>
             </div>
           </div>
-          <CodeViewer files={bundle.files} entrypoint={bundle.entrypoint} />
+          <CodeViewer
+            key={bundle.source_bundle_hash}
+            className="source-code-viewer"
+            defaultSelectedPath={selectedSourcePath}
+            emptyMessage="No source files stored for this bundle"
+            files={bundle.files}
+            entrypoint={bundle.entrypoint}
+            onSelectedPathChange={path => {
+              const url = new URL(window.location.href)
+              url.searchParams.set("file", path)
+              window.history.replaceState(
+                window.history.state,
+                "",
+                `${url.pathname}${url.search}${url.hash}`,
+              )
+            }}
+          />
         </section>
       </div>
     </>

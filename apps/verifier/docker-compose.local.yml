@@ -1,7 +1,8 @@
 services:
   verifier:
     build:
-      context: .
+      context: ../..
+      dockerfile: apps/verifier/Dockerfile
     image: ton-verifier:local
     environment:
       VERIFIER_NETWORK: ${VERIFIER_NETWORK:-localnet}

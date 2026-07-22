@@ -76,10 +76,10 @@ echo "$GHCR_TOKEN" | docker login ghcr.io -u <github-user> --password-stdin
 
 ## Build The Image Locally
 
-From the repository root:
+From the monorepo root:
 
 ```bash
-docker build -t ton-verifier:local .
+docker build -f apps/verifier/Dockerfile -t ton-verifier:local .
 ```
 
 Manual registry publishing is still possible:

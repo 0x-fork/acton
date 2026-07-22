@@ -9,13 +9,16 @@ docker pull ghcr.io/i582/verifier:latest
 Local development can build the image:
 
 ```bash
-docker build -t ton-verifier:local .
+docker build -f apps/verifier/Dockerfile -t ton-verifier:local .
 ```
 
 Or use the local build override:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+docker compose \
+  -f apps/verifier/docker-compose.yml \
+  -f apps/verifier/docker-compose.local.yml \
+  up -d --build
 ```
 
 Run with generated config:
