@@ -715,7 +715,23 @@ function getContractTypeLabels(
     .filter((value): value is string => value !== undefined)
 
   const labels = abiContractName ? [abiContractName, ...interfaceLabels] : interfaceLabels
-  return labels.length > 0 ? [...new Set(labels)] : ["Unknown"]
+  const seen = new Set<string>()
+  const uniqueLabels = labels.filter(label => {
+    const key = contractTypeLabelKey(label)
+    if (seen.has(key)) {
+      return false
+    }
+    seen.add(key)
+    return true
+  })
+  return uniqueLabels.length > 0 ? uniqueLabels : ["Unknown"]
+}
+
+function contractTypeLabelKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .replace(/interface$/, "")
 }
 
 function getInterfaceLabel(value: string): string | undefined {
