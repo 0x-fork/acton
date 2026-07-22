@@ -131,6 +131,68 @@
     color var(--acton-duration-fast);
 }
 
+.desktopMoreTrigger {
+  width: 40px;
+  padding: 0;
+  letter-spacing: 1px;
+}
+
+.desktopMorePopover {
+  padding: 6px;
+}
+
+.desktopMoreMenu {
+  display: flex;
+  width: 248px;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.desktopMoreItem {
+  display: block;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  color: var(--acton-color-text);
+  text-decoration: none;
+  transition:
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
+}
+
+.desktopMoreItem:hover {
+  background: var(--acton-color-surface-hover);
+}
+
+.desktopMoreItem:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.desktopMoreItemCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.desktopMoreItemTitle {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-emphasis);
+  line-height: 1.2;
+}
+
+.desktopMoreItemDescription {
+  overflow: hidden;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .headerIconButton {
   display: inline-flex;
   align-items: center;
@@ -199,13 +261,21 @@
   box-sizing: border-box;
   display: flex;
   width: min(280px, calc(100vw - 32px));
+  max-height: min(560px, calc(100dvh - 104px));
   flex-direction: column;
   gap: 3px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 6px;
   border: 1px solid var(--acton-color-border);
   border-radius: 14px;
   background: var(--acton-color-surface-raised);
   box-shadow: var(--acton-shadow-popover);
+  scrollbar-width: none;
+}
+
+.mobileNavigation::-webkit-scrollbar {
+  display: none;
 }
 
 .mobileNavigation > a,

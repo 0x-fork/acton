@@ -1,4 +1,4 @@
-import {Checkbox, Input, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
+import {Checkbox, Input, Popover, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
 import {
   Check,
   ChevronDown,
@@ -861,6 +861,63 @@ const MobileHeaderRouteSync: FC<{readonly onNavigate: () => void}> = ({onNavigat
   return null
 }
 
+const DesktopMoreMenu: FC = () => {
+  const [open, setOpen] = useState(false)
+  const closeMenu = () => setOpen(false)
+
+  useEffect(() => {
+    const mobileHeaderQuery = globalThis.matchMedia("(max-width: 640px)")
+    const closeOnMobile = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setOpen(false)
+      }
+    }
+
+    mobileHeaderQuery.addEventListener("change", closeOnMobile)
+    return () => mobileHeaderQuery.removeEventListener("change", closeOnMobile)
+  }, [])
+
+  return (
+    <Popover
+      interaction="click"
+      placement="bottom"
+      open={open}
+      onOpenChange={setOpen}
+      triggerAsChild
+      contentClassName={styles.desktopMorePopover}
+      content={
+        <nav className={styles.desktopMoreMenu} aria-label="More explorer navigation">
+          <Link className={styles.desktopMoreItem} to="/cell" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Cell Inspector</span>
+              <span className={styles.desktopMoreItemDescription}>
+                Inspect and decode TON cells
+              </span>
+            </span>
+          </Link>
+          <Link className={styles.desktopMoreItem} to="/emulate" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Emulator</span>
+              <span className={styles.desktopMoreItemDescription}>
+                Emulate transactions locally
+              </span>
+            </span>
+          </Link>
+        </nav>
+      }
+    >
+      <button
+        type="button"
+        className={`${styles.navLink} ${styles.desktopMoreTrigger}`}
+        aria-label="Open more navigation"
+        aria-expanded={open}
+      >
+        <span aria-hidden="true">•••</span>
+      </button>
+    </Popover>
+  )
+}
+
 export const ExplorerApp: FC = () => {
   const [networkState, setNetworkState] = useState<ExplorerNetworkState>(
     readInitialExplorerNetworkState,
@@ -1033,6 +1090,7 @@ export const ExplorerApp: FC = () => {
                           <Link className={styles.navLink} to="/sources">
                             Sources
                           </Link>
+                          <DesktopMoreMenu />
                         </nav>
                       </div>
                       <ExplorerSearch
@@ -1127,6 +1185,12 @@ export const ExplorerApp: FC = () => {
                               </Link>
                               <Link to="/sources" onClick={closeMobileHeaderPanels}>
                                 Sources
+                              </Link>
+                              <Link to="/cell" onClick={closeMobileHeaderPanels}>
+                                Cell Inspector
+                              </Link>
+                              <Link to="/emulate" onClick={closeMobileHeaderPanels}>
+                                Emulator
                               </Link>
                               <Link to="/favorites" onClick={closeMobileHeaderPanels}>
                                 <span>Favorites</span>
