@@ -525,7 +525,7 @@ export function TransactionDetails({
           >
             {messageCopyActions}
             <div className={styles.multiColumnRow}>
-              <div className={styles.multiColumnItem}>
+              <div className={`${styles.multiColumnItem} ${styles.messageOpcodeItem}`}>
                 <div className={styles.multiColumnItemTitle}>Opcode</div>
                 <div className={styles.multiColumnItemValue}>
                   <OpcodeChip

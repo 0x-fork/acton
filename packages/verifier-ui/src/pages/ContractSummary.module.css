@@ -104,7 +104,7 @@
   background: var(--acton-color-surface-row);
 }
 
-.summaryFact span {
+.summaryFact > span {
   display: block;
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
