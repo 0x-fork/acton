@@ -47,6 +47,33 @@
   overflow-wrap: anywhere;
 }
 
+.compilerLink {
+  min-width: 0;
+  width: fit-content;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--acton-color-accent);
+  text-decoration: none;
+}
+
+.compilerLink span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compilerLink svg {
+  flex: 0 0 auto;
+}
+
+.compilerLink:hover,
+.compilerLink:focus-visible {
+  text-decoration: underline;
+}
+
 @media (max-width: 720px) {
   .page {
     padding: 18px 14px 28px;

@@ -1,6 +1,6 @@
 import {Button, CodeViewer, CopyInlineAction, HighlightedCode, PillTab, PillTabs} from "@acton/ui"
 import {useEffect, useMemo, useState} from "react"
-import {Download} from "lucide-react"
+import {Download, ExternalLink} from "lucide-react"
 
 import {StatusPill} from "../components/StatusPill"
 import compilerIcon from "../assets/ton-verifier-icons/compiler.svg"
@@ -21,11 +21,15 @@ import styles from "./VerifiedContractPage.module.css"
 function DetailRow({
   label,
   value,
+  href,
   monospace = false,
+  copyable = true,
 }: {
   readonly label: string
   readonly value: string
+  readonly href?: string
   readonly monospace?: boolean
+  readonly copyable?: boolean
 }) {
   return (
     <div
@@ -33,10 +37,81 @@ function DetailRow({
     >
       <dt>{label}</dt>
       <dd>
-        <span title={value}>{value}</span>
-        <CopyInlineAction value={value} label={`Copy ${label}`} copiedLabel={`${label} copied`} />
+        {href ? (
+          <a
+            className={styles.compilerLink}
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            title={`View ${label.toLowerCase()} tag on GitHub`}
+          >
+            <span>{value}</span>
+            <ExternalLink size={13} aria-hidden="true" />
+          </a>
+        ) : (
+          <span title={value}>{value}</span>
+        )}
+        {copyable && (
+          <CopyInlineAction value={value} label={`Copy ${label}`} copiedLabel={`${label} copied`} />
+        )}
       </dd>
     </div>
+  )
+}
+
+const compilerTagSources: Readonly<
+  Record<string, {readonly repositoryUrl: string; readonly tagPrefix: string}>
+> = {
+  tact: {
+    repositoryUrl: "https://github.com/tact-lang/tact",
+    tagPrefix: "v",
+  },
+  tolk: {
+    repositoryUrl: "https://github.com/ton-blockchain/ton",
+    tagPrefix: "tolk-",
+  },
+}
+
+function compilerVersionUrl(language: string, version: string): string | undefined {
+  const source = compilerTagSources[language.trim().toLowerCase()]
+  const normalizedVersion = version.trim()
+  if (!source) {
+    return undefined
+  }
+  if (!normalizedVersion) {
+    return undefined
+  }
+
+  const tag = normalizedVersion.startsWith(source.tagPrefix)
+    ? normalizedVersion
+    : `${source.tagPrefix}${normalizedVersion}`
+  return `${source.repositoryUrl}/releases/tag/${encodeURIComponent(tag)}`
+}
+
+function CompilerVersionLink({
+  language,
+  version,
+}: {
+  readonly language: string
+  readonly version: string
+}) {
+  const href = compilerVersionUrl(language, version)
+
+  if (!href) {
+    return version
+  }
+
+  return (
+    <a
+      className={styles.compilerLink}
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      title={`View ${language} ${version} tag on GitHub`}
+    >
+      <span>{version}</span>
+      <ExternalLink size={13} aria-hidden="true" />
+    </a>
   )
 }
 
@@ -217,7 +292,12 @@ function VerifiedContract({
             </div>
             <div className={summaryStyles.summaryFact}>
               <span>Compiler</span>
-              <strong>{bundle.compiler.version}</strong>
+              <strong>
+                <CompilerVersionLink
+                  language={bundle.compiler.language}
+                  version={bundle.compiler.version}
+                />
+              </strong>
             </div>
             <div className={summaryStyles.summaryFact}>
               <span>Files</span>
@@ -253,7 +333,12 @@ function VerifiedContract({
               <DetailRow label="Storage revision" value={bundle.storage_revision} monospace />
             )}
             <DetailRow label="Language" value={bundle.compiler.language} />
-            <DetailRow label="Compiler" value={bundle.compiler.version} />
+            <DetailRow
+              label="Compiler"
+              value={bundle.compiler.version}
+              href={compilerVersionUrl(bundle.compiler.language, bundle.compiler.version)}
+              copyable={false}
+            />
             <DetailRow label="Entrypoint" value={bundle.entrypoint} />
           </dl>
           <div className={detailsStyles.metadataJson}>
