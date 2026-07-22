@@ -2,7 +2,9 @@ import {useLocation, useNavigate, useParams} from "react-router-dom"
 import {useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 
+import {codeLookupHashHex} from "@acton/transaction-ui"
 import {Button, Dialog, HighlightedCode, RawDataBlock} from "@acton/ui"
+import {Cell} from "@ton/core"
 
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
@@ -134,7 +136,15 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     return isAccountTab(tab) ? tab : "history"
   }, [location.hash])
   const accountInterfaces = accountStateV3?.interfaces ?? []
-  const accountCodeHash = accountStateV3?.code_hash
+  const accountCodeLookupHash = useMemo(() => {
+    if (!accountState?.code) return accountStateV3?.code_hash
+
+    try {
+      return codeLookupHashHex(Cell.fromBase64(accountState.code))
+    } catch {
+      return accountStateV3?.code_hash
+    }
+  }, [accountState?.code, accountStateV3?.code_hash])
   const compilerAbi = extendedContractAbi?.compiler_abi
   const isJettonMasterAccount = hasAccountInterface(accountInterfaces, "jetton_master")
   const isJettonWalletAccount = hasAccountInterface(accountInterfaces, "jetton_wallet")
@@ -452,7 +462,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     let isActive = true
 
     const loadCompilerAbi = async () => {
-      if (!accountCodeHash) {
+      if (!accountCodeLookupHash) {
         setExtendedContractAbi(undefined)
         setCompilerAbiLoading(false)
         setCompilerAbiError(undefined)
@@ -464,9 +474,9 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
       setCompilerAbiError(undefined)
 
       try {
-        const abis = await metadataRegistry.getCompilerAbis([accountCodeHash])
+        const abis = await metadataRegistry.getCompilerAbis([accountCodeLookupHash])
         if (!isActive) return
-        setExtendedContractAbi(abis[accountCodeHash] ?? undefined)
+        setExtendedContractAbi(abis[accountCodeLookupHash] ?? undefined)
         setCompilerAbiLoading(false)
       } catch (error) {
         if (!isActive) return
@@ -480,13 +490,13 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     return () => {
       isActive = false
     }
-  }, [accountCodeHash, metadataRegistry])
+  }, [accountCodeLookupHash, metadataRegistry])
 
   useEffect(() => {
     let isActive = true
 
     const loadVerifiedSource = async () => {
-      if (!accountCodeHash) {
+      if (!accountCodeLookupHash) {
         setVerifiedSource(undefined)
         setVerifiedSourceLoading(false)
         return
@@ -497,7 +507,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
 
       try {
         const source = await metadataRegistry.getSource({
-          codeHash: accountCodeHash,
+          codeHash: accountCodeLookupHash,
         })
         if (!isActive) return
         setVerifiedSource(source.verified && source.bundles.length > 0 ? source : undefined)
@@ -514,7 +524,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     return () => {
       isActive = false
     }
-  }, [accountCodeHash, metadataRegistry])
+  }, [accountCodeLookupHash, metadataRegistry])
 
   useEffect(() => {
     if (!formattedAddress) {
