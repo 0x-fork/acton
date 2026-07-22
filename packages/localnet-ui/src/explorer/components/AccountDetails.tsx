@@ -366,8 +366,8 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   )
   const actionAddresses = useMemo(() => collectActionMessageNameAddresses(actions), [actions])
   const messageNameAddresses = useMemo(
-    () => [...transactionAddresses, ...actionAddresses],
-    [transactionAddresses, actionAddresses],
+    () => (activeTab === "history" ? [...transactionAddresses, ...actionAddresses] : []),
+    [activeTab, transactionAddresses, actionAddresses],
   )
   const metadataRegistry = useMetadataRegistry()
   const messageNamesByAddress = useMessageNamesByAddress({
