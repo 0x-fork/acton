@@ -1446,6 +1446,7 @@ export interface NftItem {
   readonly index: string
   readonly init: boolean
   readonly is_nsfw?: boolean
+  readonly is_scam?: boolean
   readonly last_transaction_lt: string
   readonly on_sale: boolean
   readonly owner_address?: string

@@ -13,6 +13,7 @@ import {useFavoriteAccounts} from "../hooks/useFavoriteAccounts"
 import {useNetworkInfo, type ExplorerNetworkId} from "../hooks/useNetworkInfo"
 
 import styles from "./AccountInfo.module.css"
+import {NftImage} from "./NftImage"
 import {
   TOKEN_IMAGE_SOURCE_KEYS,
   getImageSources,
@@ -44,9 +45,11 @@ interface AccountInfoProps {
 }
 
 interface CollectiblePreview {
+  readonly address: string
   readonly image?: string
   readonly imageSources?: readonly string[]
-  readonly isNsfw?: boolean
+  readonly blurred?: boolean
+  readonly collectionName?: string
   readonly name?: string
 }
 
@@ -90,6 +93,9 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const [tokenMastersLoading, setTokenMastersLoading] = useState(false)
 
   const [copied, setCopied] = useState(false)
+  const [hiddenCollectibleAddresses, setHiddenCollectibleAddresses] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
   const favorite = isFavorite(address)
 
   useEffect(() => {
@@ -209,7 +215,9 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const canOpenTokens = Boolean(onMoreAssetsClick)
   const canOpenCollectibles = Boolean(onCollectiblesClick)
   const showCollectiblesRow = collectiblesLoading || collectiblesCount > 0
-  const visibleCollectibles = collectiblePreviews.slice(0, 8)
+  const visibleCollectibles = collectiblePreviews
+    .filter(item => !hiddenCollectibleAddresses.has(item.address))
+    .slice(0, 8)
   const firstMaster = firstWallet
     ? (firstWallet.master ?? tokenMastersByAddress.get(toRawAddress(firstWallet.jetton)))
     : undefined
@@ -532,20 +540,21 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                           <span className={styles.collectibleThumbs}>
                             {visibleCollectibles.map((item, index) =>
                               item.image ? (
-                                <img
-                                  key={`${item.image}-${index}`}
-                                  src={item.image}
-                                  alt={item.name || "NFT"}
-                                  className={`${styles.collectibleThumb} ${
-                                    item.isNsfw ? styles.nsfwImage : ""
-                                  }`}
-                                  onError={event =>
-                                    replaceBrokenImageWithFallback(
-                                      event,
-                                      item.imageSources ?? [item.image ?? ""],
-                                    )
-                                  }
-                                />
+                                <span key={item.address} className={styles.collectibleThumb}>
+                                  <NftImage
+                                    sources={item.imageSources ?? [item.image]}
+                                    alt={item.name || "NFT"}
+                                    className={styles.collectibleThumbImage}
+                                    blurredClassName={styles.blurredImage}
+                                    collectionName={item.collectionName}
+                                    blurred={item.blurred}
+                                    onNsfw={() => {
+                                      setHiddenCollectibleAddresses(current =>
+                                        new Set(current).add(item.address),
+                                      )
+                                    }}
+                                  />
+                                </span>
                               ) : (
                                 <span
                                   key={`collectible-placeholder-${index}`}

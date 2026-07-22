@@ -195,6 +195,100 @@ test("account history requests forward the requested sort order", async () => {
   }
 })
 
+test("NFT metadata preserves scam flags and excludes flagged or registered NSFW items", async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = mock(async () =>
+    Response.json({
+      nft_items: [
+        {
+          address: "0:nft",
+          code_hash: "code-hash",
+          content: {},
+          data_hash: "data-hash",
+          index: "3",
+          init: true,
+          last_transaction_lt: "42",
+          on_sale: false,
+        },
+        {
+          address: "0:nsfw",
+          code_hash: "nsfw-code-hash",
+          content: {},
+          data_hash: "nsfw-data-hash",
+          index: "4",
+          init: true,
+          last_transaction_lt: "43",
+          on_sale: false,
+        },
+        {
+          address: "0:registered-nsfw",
+          code_hash: "registered-code-hash",
+          content: {
+            _image_small:
+              "https://proxy.toncenter.com/F0W0fr2CnSPVMdgFNe9x87X1TkFGKz7rUBtHpWmNXwc/pr:small/bG9jYWw6Ly8vc2hhMjU2L2VhZDllM2M1ZjI2MDc4NWU4ODUyYzBkY2E3YWQxZmQ3ZTY2OTBiMDMwMDlhMTU4YTg0OTI0M2U1OTY4NWFhN2Q",
+          },
+          data_hash: "registered-data-hash",
+          index: "5",
+          init: true,
+          last_transaction_lt: "44",
+          on_sale: false,
+        },
+      ],
+      metadata: {
+        "0:nft": {
+          token_info: [
+            {
+              type: "nft_items",
+              name: "Flagged NFT",
+              is_nsfw: false,
+              is_scam: true,
+            },
+          ],
+        },
+        "0:nsfw": {
+          token_info: [
+            {
+              type: "nft_items",
+              name: "Hidden NFT",
+              is_nsfw: true,
+              is_scam: false,
+            },
+          ],
+        },
+      },
+    }),
+  ) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    expect(await client.getNftItems({address: ["0:nft"]})).toMatchInlineSnapshot(`
+      [
+        {
+          "address": "0:nft",
+          "code_hash": "code-hash",
+          "content": {
+            "name": "Flagged NFT",
+          },
+          "data_hash": "data-hash",
+          "index": "3",
+          "init": true,
+          "is_nsfw": false,
+          "is_scam": true,
+          "last_transaction_lt": "42",
+          "on_sale": false,
+        },
+      ]
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("localnet state and checkpoint methods transfer JSON through the control API", async () => {
   const originalFetch = globalThis.fetch
   const requests: Array<{readonly url: URL; readonly init?: RequestInit}> = []

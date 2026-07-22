@@ -524,13 +524,22 @@
 }
 
 .collectibleThumb {
-  display: block;
-  object-fit: cover;
+  display: inline-block;
+  overflow: hidden;
+  border-radius: 50%;
   background: var(--acton-color-surface-group);
 }
 
-.nsfwImage {
-  filter: blur(8px);
+.collectibleThumbImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.blurredImage {
+  filter: blur(4px);
+  transform: scale(1.35);
 }
 
 .collectibleThumbPlaceholder {

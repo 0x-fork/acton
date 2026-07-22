@@ -28,6 +28,7 @@ import type {
   V3TransactionsResponse,
   VerificationSourceResponse,
 } from "./types"
+import {isNftItemNsfw} from "../nftSafetyRegistry"
 
 interface TonClientOptions {
   readonly v2BaseUrl: string
@@ -200,6 +201,7 @@ function attachNftItemMetadata(item: NftItem, metadata: JettonWalletMetadata | u
   const tokenExtra = isRecord(tokenInfo?.extra) ? tokenInfo.extra : {}
   const content: Record<string, unknown> = {...tokenExtra}
   const isNsfw = booleanValue(tokenInfo?.is_nsfw)
+  const isScam = booleanValue(tokenInfo?.is_scam)
 
   if (tokenInfo) {
     for (const key of NFT_CONTENT_KEYS) {
@@ -227,13 +229,14 @@ function attachNftItemMetadata(item: NftItem, metadata: JettonWalletMetadata | u
     content.name = domainName
   }
 
-  if (Object.keys(content).length === 0 && isNsfw === undefined) {
+  if (Object.keys(content).length === 0 && isNsfw === undefined && isScam === undefined) {
     return item
   }
 
   return {
     ...item,
     ...(isNsfw === undefined ? {} : {is_nsfw: isNsfw}),
+    ...(isScam === undefined ? {} : {is_scam: isScam}),
     content: {
       ...item.content,
       ...content,
@@ -614,7 +617,9 @@ export class TonClient {
       }
 
       const response = await this.request<NftItemsResponse>(url, "Failed to fetch NFTs")
-      return response.nft_items.map(item => attachNftItemMetadata(item, response.metadata))
+      return response.nft_items
+        .map(item => attachNftItemMetadata(item, response.metadata))
+        .filter(item => !isNftItemNsfw(item))
     }
 
     if (addresses && addresses.length > 0) {

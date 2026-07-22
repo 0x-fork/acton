@@ -25,6 +25,7 @@ import {AccountInfo} from "../components/AccountInfo"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {AccountDetails, readAccountHistorySortOrder} from "../components/AccountDetails"
+import {NftImage} from "../components/NftImage"
 import {
   NFT_COLLECTION_IMAGE_SOURCE_KEYS,
   NFT_IMAGE_SOURCE_KEYS,
@@ -847,8 +848,10 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     ...getImageSources(nftItemTokenInfo, NFT_IMAGE_SOURCE_KEYS),
     ...getImageSources(currentNftItem?.content, NFT_IMAGE_SOURCE_KEYS),
   ]
-  const nftItemImage = nftItemImageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE
-  const nftItemIsNsfw = nftItemTokenInfo?.is_nsfw === true || currentNftItem?.is_nsfw === true
+  const nftItemCollectionName =
+    tokenInfoString(nftItemTokenInfo, "collection_name") ||
+    contentString(currentNftItem?.content, "collection_name")
+  const nftItemIsScam = nftItemTokenInfo?.is_scam === true || currentNftItem?.is_scam === true
   const nftItemMetadataJson = currentNftItem
     ? JSON.stringify(
         {
@@ -884,14 +887,16 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     ...getImageSources(nftCollectionTokenInfo, NFT_IMAGE_SOURCE_KEYS),
     ...getImageSources(collectionSample?.content, NFT_COLLECTION_IMAGE_SOURCE_KEYS),
   ]
-  const nftCollectionImage = nftCollectionImageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE
   const nftCollectionIsNsfw = nftCollectionTokenInfo?.is_nsfw === true
+  const nftCollectionIsScam = nftCollectionTokenInfo?.is_scam === true
   const collectiblePreviews = nftItems.slice(0, 8).map(item => {
     const imageSources = getImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
     return {
+      address: item.address,
       image: imageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE,
       imageSources,
-      isNsfw: item.is_nsfw,
+      blurred: item.is_scam === true,
+      collectionName: contentString(item.content, "collection_name"),
       name:
         contentString(item.content, "name") ||
         contentString(item.content, "collection_name") ||
@@ -1076,21 +1081,20 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
                           )}
                         </div>
                         <div className={styles.nftPanelMedia}>
-                          <img
-                            src={nftItemImage}
+                          <NftImage
+                            sources={nftItemImageSources}
                             alt={nftItemName}
-                            className={`${styles.nftPanelImage} ${
-                              nftItemIsNsfw ? styles.nsfwImage : ""
-                            }`}
-                            onError={event =>
-                              replaceBrokenImageWithFallback(event, nftItemImageSources)
-                            }
+                            className={styles.nftPanelImage}
+                            blurredClassName={styles.blurredImage}
+                            collectionName={nftItemCollectionName}
+                            blurred={nftItemIsScam}
+                            onNsfw={() => setCurrentNftItem(undefined)}
                           />
                         </div>
                       </div>
                     </div>
                   )}
-                  {accountState && nftCollectionName && !currentNftItem && (
+                  {accountState && nftCollectionName && !currentNftItem && !nftCollectionIsNsfw && (
                     <div className={styles.nftPanel}>
                       <div className={styles.nftPanelHeader}>
                         <div className={styles.nftPanelHeading}>
@@ -1120,15 +1124,13 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
                           )}
                         </div>
                         <div className={styles.nftPanelMedia}>
-                          <img
-                            src={nftCollectionImage}
+                          <NftImage
+                            sources={nftCollectionImageSources}
                             alt={nftCollectionName}
-                            className={`${styles.nftPanelImage} ${
-                              nftCollectionIsNsfw ? styles.nsfwImage : ""
-                            }`}
-                            onError={event =>
-                              replaceBrokenImageWithFallback(event, nftCollectionImageSources)
-                            }
+                            className={styles.nftPanelImage}
+                            blurredClassName={styles.blurredImage}
+                            collectionName={nftCollectionName}
+                            blurred={nftCollectionIsScam}
                           />
                         </div>
                       </div>
@@ -1189,18 +1191,27 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
               contentClassName={styles.metadataDialogContent}
             >
               <div className={styles.metadataOverview}>
-                {activeMetadataImage && (
-                  <img
-                    src={activeMetadataImage}
-                    alt=""
-                    className={`${styles.metadataTokenImage} ${
-                      currentNftItem ? styles.metadataNftImage : ""
-                    } ${currentNftItem && nftItemIsNsfw ? styles.nsfwImage : ""}`}
-                    onError={event =>
-                      replaceBrokenImageWithFallback(event, activeMetadataImageSources)
-                    }
-                  />
-                )}
+                {activeMetadataImage &&
+                  (currentNftItem ? (
+                    <NftImage
+                      sources={activeMetadataImageSources}
+                      alt=""
+                      className={`${styles.metadataTokenImage} ${styles.metadataNftImage}`}
+                      blurredClassName={styles.blurredImage}
+                      collectionName={nftItemCollectionName}
+                      blurred={nftItemIsScam}
+                      onNsfw={() => setCurrentNftItem(undefined)}
+                    />
+                  ) : (
+                    <img
+                      src={activeMetadataImage}
+                      alt=""
+                      className={styles.metadataTokenImage}
+                      onError={event =>
+                        replaceBrokenImageWithFallback(event, activeMetadataImageSources)
+                      }
+                    />
+                  ))}
                 <div className={styles.metadataIdentity}>
                   <h3 className={styles.metadataTokenTitle}>{activeMetadataTitle}</h3>
                   {(jettonMaster?.jetton_content.description || nftItemDescription) && (
