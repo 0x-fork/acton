@@ -6,14 +6,7 @@
   "author": "TON Core",
   "type": "module",
   "workspaces": [
-    "packages/explorer-ui",
-    "packages/localnet-ui",
-    "packages/ui",
-    "packages/ui-gallery",
-    "packages/transaction-ui",
-    "packages/test-ui",
-    "packages/ui-e2e",
-    "packages/verifier-ui"
+    "packages/*"
   ],
   "scripts": {
     "build": "bun --filter '*' build",
