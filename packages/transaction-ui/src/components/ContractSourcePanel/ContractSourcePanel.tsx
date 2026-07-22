@@ -1,5 +1,5 @@
-import {useMemo, useState} from "react"
 import type {JSX} from "react"
+import {useMemo, useState} from "react"
 
 import {Cell} from "@ton/core"
 import {Cell as TasmCell, runtime, text} from "@ton/tasm"
@@ -71,8 +71,6 @@ interface ContractSourcePanelProps {
   readonly verificationExternal?: boolean
   readonly compact?: boolean
 }
-
-const VERIFIER_BASE_URL = "https://verifier.acton.monster"
 
 export function ContractSourcePanel({
   codeBoc,
@@ -283,10 +281,8 @@ function VerifiedSourcePanel({
         files={bundle.files}
         entrypoint={bundle.entrypoint}
         externalActionLabel="View verification"
-        externalActionUrl={
-          verificationUrl ?? `${VERIFIER_BASE_URL}/${encodeURIComponent(source.code_hash)}`
-        }
-        externalActionExternal={verificationUrl ? verificationExternal : true}
+        externalActionUrl={verificationUrl ?? `/verified/${encodeURIComponent(source.code_hash)}`}
+        externalActionExternal={verificationUrl ? verificationExternal : false}
       />
     </section>
   )

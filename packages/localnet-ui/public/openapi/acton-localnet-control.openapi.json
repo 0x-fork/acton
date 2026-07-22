@@ -307,9 +307,7 @@
                         "incoming_messages": []
                       },
                       "display_name": "Wallet",
-                      "code_hashes": [
-                        "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8="
-                      ],
+                      "code_hashes": ["f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8="],
                       "links": []
                     }
                   }
@@ -1904,11 +1902,7 @@
       },
       "LocalnetTimeInfo": {
         "type": "object",
-        "required": [
-          "current_unix_time",
-          "time_offset_seconds",
-          "next_block_timestamp"
-        ],
+        "required": ["current_unix_time", "time_offset_seconds", "next_block_timestamp"],
         "properties": {
           "current_unix_time": {
             "type": "integer",
