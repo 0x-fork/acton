@@ -12,7 +12,7 @@ import {
   DataTableTable,
   Button,
 } from "@acton/ui"
-import {useEffect, useMemo, useState} from "react"
+import {useEffect, useMemo, useRef, useState} from "react"
 import type {KeyboardEvent as ReactKeyboardEvent} from "react"
 
 import type {LastVerifiedItem, VerifierApi} from "../lib/api"
@@ -91,6 +91,9 @@ function handleRowKeyDown(
 export interface VerifiedContractsPageProps {
   readonly api: VerifierApi
   readonly onOpenContract: (item: LastVerifiedItem) => void
+  readonly page?: number
+  readonly onPageChange?: (page: number) => void
+  readonly onContentReady?: () => void
   readonly limit?: number
   readonly className?: string
 }
@@ -98,15 +101,28 @@ export interface VerifiedContractsPageProps {
 export function VerifiedContractsPage({
   api,
   onOpenContract,
+  page: controlledPage,
+  onPageChange,
+  onContentReady,
   limit = 25,
   className,
 }: VerifiedContractsPageProps) {
   const pageSize = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), 100) : 25
-  const [page, setPage] = useState(0)
+  const [internalPage, setInternalPage] = useState(0)
+  const isPageControlled = controlledPage !== undefined
+  const page =
+    controlledPage !== undefined && Number.isFinite(controlledPage)
+      ? Math.max(0, Math.trunc(controlledPage))
+      : internalPage
   const [items, setItems] = useState<readonly LastVerifiedItem[]>([])
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | undefined>()
+  const onPageChangeRef = useRef(onPageChange)
+
+  useEffect(() => {
+    onPageChangeRef.current = onPageChange
+  }, [onPageChange])
 
   useEffect(() => {
     let cancelled = false
@@ -124,7 +140,10 @@ export function VerifiedContractsPage({
           setTotal(nextTotal)
           if (page > lastPage) {
             setItems([])
-            setPage(lastPage)
+            if (!isPageControlled) {
+              setInternalPage(lastPage)
+            }
+            onPageChangeRef.current?.(lastPage)
             return
           }
 
@@ -147,7 +166,14 @@ export function VerifiedContractsPage({
     return () => {
       cancelled = true
     }
-  }, [api, page, pageSize])
+  }, [api, isPageControlled, page, pageSize])
+
+  useEffect(() => {
+    const contentReady = !isLoading && (items.length > 0 || Boolean(error) || total === 0)
+    if (contentReady) {
+      onContentReady?.()
+    }
+  }, [error, isLoading, items.length, onContentReady, total])
 
   const sortedItems = useMemo(
     () => [...items].sort((left, right) => right.verified_at - left.verified_at),
@@ -155,6 +181,13 @@ export function VerifiedContractsPage({
   )
   const totalPages = Math.ceil(total / pageSize)
   const visiblePages = useMemo(() => paginationItems(page, totalPages), [page, totalPages])
+  const changePage = (nextPage: number) => {
+    const normalizedPage = Math.max(0, Math.trunc(nextPage))
+    if (!isPageControlled) {
+      setInternalPage(normalizedPage)
+    }
+    onPageChange?.(normalizedPage)
+  }
 
   return (
     <section className={`${styles.container} ${className ?? ""}`}>
@@ -232,7 +265,7 @@ export function VerifiedContractsPage({
                         size="sm"
                         variant="outline"
                         disabled={isLoading || page === 0}
-                        onClick={() => setPage(current => Math.max(0, current - 1))}
+                        onClick={() => changePage(page - 1)}
                       >
                         Previous
                       </Button>
@@ -256,7 +289,7 @@ export function VerifiedContractsPage({
                                 disabled={isLoading}
                                 aria-current={item === page ? "page" : undefined}
                                 aria-label={`Go to page ${item + 1}`}
-                                onClick={() => setPage(item)}
+                                onClick={() => changePage(item)}
                               >
                                 {item + 1}
                               </Button>
@@ -268,7 +301,7 @@ export function VerifiedContractsPage({
                         size="sm"
                         variant="outline"
                         disabled={isLoading || Boolean(error) || page + 1 >= totalPages}
-                        onClick={() => setPage(current => current + 1)}
+                        onClick={() => changePage(page + 1)}
                       >
                         Next
                       </Button>
