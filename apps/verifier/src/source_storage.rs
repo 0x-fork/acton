@@ -675,8 +675,8 @@ async fn current_branch(repo_path: &Path) -> Result<String, SourceStorageError> 
 
 fn commit_message(request: &StoreSourceBundleRequest) -> String {
     format!(
-        "Verify source bundle {}\n\ncode_hash: {}\nsource_bundle_hash: {}",
-        request.source_bundle_hash, request.code_hash, request.source_bundle_hash
+        "Verify code hash {}\n\ncode_hash: {}\nsource_bundle_hash: {}",
+        request.code_hash, request.code_hash, request.source_bundle_hash
     )
 }
 

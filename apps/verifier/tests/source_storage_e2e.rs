@@ -62,6 +62,12 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
 
     assert_eq!(receipt.revision.len(), 40);
     assert!(receipt.created);
+    assert_eq!(
+        git_output(&fixture.repo_path, ["log", "-1", "--format=%B"])?,
+        format!(
+            "Verify code hash {CODE_HASH}\n\ncode_hash: {CODE_HASH}\nsource_bundle_hash: {SOURCE_BUNDLE_HASH}"
+        )
+    );
 
     let stored_main = fixture.repo_path.join(&bundle_path).join("files/main.tolk");
     let stored_lib = fixture
