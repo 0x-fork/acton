@@ -1,10 +1,9 @@
 use axum::{Json, extract::State, http::StatusCode};
 use faucet_valkey::AntifraudModule;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use ton::ton_core::types::TonAddress;
 
 use crate::AppState;
+use crate::handlers::address::{AddressValidationError, parse_testnet_address};
 
 #[derive(Deserialize)]
 pub(super) struct ChallengeRequest {
@@ -34,8 +33,14 @@ pub(super) async fn create_challenge(
     State(state): State<AppState>,
     Json(payload): Json<ChallengeRequest>,
 ) -> ChallengeResult {
-    if TonAddress::from_str(&payload.address).is_err() {
-        return Err(bad_request("Invalid TON address"));
+    match parse_testnet_address(&payload.address) {
+        Ok(_) => {}
+        Err(AddressValidationError::Invalid) => {
+            return Err(bad_request("Invalid TON address"));
+        }
+        Err(AddressValidationError::Mainnet) => {
+            return Err(bad_request("Testnet TON address required"));
+        }
     }
 
     if payload.token_type == 0 {

@@ -3,6 +3,7 @@ import {expect, test} from "@playwright/test"
 import {prepareVisualPage} from "../support/visual"
 
 const ADDRESS = `0:${"11".repeat(32)}`
+const MAINNET_ADDRESS = "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACgQ"
 const DEVICE_UID = "12345678-1234-1234-1234-123456789abc"
 const ADDRESS_HISTORY_KEY = "actonscanFaucetAddressHistory"
 const REQUEST_HISTORY_KEY = "actonscanFaucetRequestHistory"
@@ -87,6 +88,23 @@ test.describe("Testnet faucet", () => {
     const notifications = page.getByRole("region", {name: "Notifications"})
     await expect(notifications).toContainText("Invalid address")
     await expect(notifications).toContainText("Enter a valid TON address")
+  })
+
+  test("rejects mainnet-friendly addresses before requesting a challenge", async ({page}) => {
+    let faucetRequests = 0
+    await page.route("https://faucet.acton.monster/**", async route => {
+      faucetRequests += 1
+      await route.abort()
+    })
+
+    await page.goto("/faucet?network=testnet")
+    await page.getByLabel("TON address").fill(MAINNET_ADDRESS)
+    await page.getByRole("button", {name: "Get testnet GRAM"}).click()
+
+    const notifications = page.getByRole("region", {name: "Notifications"})
+    await expect(notifications).toContainText("Mainnet address")
+    await expect(notifications).toContainText("Enter a Testnet address (kQ… or 0Q…)")
+    expect(faucetRequests).toBe(0)
   })
 
   test("solves the browser challenge and submits a claim", async ({page}) => {

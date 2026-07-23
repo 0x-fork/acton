@@ -1070,6 +1070,7 @@ dependencies = [
  "apalis-sqlite",
  "axum",
  "axum-governor",
+ "base64",
  "chrono",
  "dotenvy",
  "faucet-antifraud",

@@ -97,6 +97,33 @@ const PHASE_ORDER: Partial<Record<FaucetPhase, number>> = {
   queued: 4,
 }
 
+class MainnetAddressError extends Error {}
+
+function normalizeTestnetAddress(value: string): string {
+  if (!Address.isFriendly(value)) {
+    return Address.parse(value).toString({bounceable: false, testOnly: true})
+  }
+
+  const parsedAddress = Address.parseFriendly(value)
+  if (!parsedAddress.isTestOnly) {
+    throw new MainnetAddressError()
+  }
+
+  return parsedAddress.address.toString({bounceable: false, testOnly: true})
+}
+
+function addressErrorToast(error: unknown): {readonly title: string; readonly description: string} {
+  return error instanceof MainnetAddressError
+    ? {
+        title: "Mainnet address",
+        description: "Enter a Testnet address (kQ… or 0Q…)",
+      }
+    : {
+        title: "Invalid address",
+        description: "Enter a valid TON address",
+      }
+}
+
 export const FaucetPage: FC<FaucetPageProps> = props => {
   const {isTestnetSelected, selectedNetworkLabel, testnetClient} = props
   const {dismissToast, showToast, updateToast} = useToast()
@@ -191,17 +218,14 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
 
     let testnetAddress: string
     try {
-      testnetAddress = Address.parse(address.trim()).toString({
-        bounceable: false,
-        testOnly: true,
-      })
-    } catch {
+      testnetAddress = normalizeTestnetAddress(address.trim())
+    } catch (error) {
+      const errorToast = addressErrorToast(error)
       setPhase("error")
       setAddressInvalid(true)
       showToast({
         variant: "error",
-        title: "Invalid address",
-        description: "Enter a valid TON address",
+        ...errorToast,
         durationMs: 8000,
       })
       return

@@ -1,10 +1,9 @@
 use crate::AppState;
+use crate::handlers::address::{AddressValidationError, parse_testnet_address};
 use apalis::prelude::TaskSink;
 use axum::{Json, extract::State, http::StatusCode};
 use faucet_valkey::{AntifraudModule, SuccessfulClaimWindowDecision};
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use ton::ton_core::types::TonAddress;
 use tracing::{error, info, warn};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -41,9 +40,15 @@ pub(super) async fn create_claim(
     State(mut state): State<AppState>,
     Json(payload): Json<CreateClaimRequest>,
 ) -> ClaimResult {
-    let address = TonAddress::from_str(&payload.address)
-        .map(|address| address.to_hex())
-        .map_err(|_| bad_request("Invalid TON address"))?;
+    let address = match parse_testnet_address(&payload.address) {
+        Ok(address) => address.to_hex(),
+        Err(AddressValidationError::Invalid) => {
+            return Err(bad_request("Invalid TON address"));
+        }
+        Err(AddressValidationError::Mainnet) => {
+            return Err(bad_request("Testnet TON address required"));
+        }
+    };
 
     if !state.pow.can_process_version(payload.version) {
         return Err(bad_request("Unsupported challenge version"));
