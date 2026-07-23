@@ -1,7 +1,7 @@
 use anyhow::Context;
 use std::str::FromStr;
 
-const NANOTONS_PER_TON: u64 = 1_000_000_000;
+const NANOGRAMS_PER_GRAM: u64 = 1_000_000_000;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -153,7 +153,11 @@ impl Config {
             faucet: FaucetConfig {
                 mnemonic: std::env::var("FAUCET_MNEMONIC")
                     .context("FAUCET_MNEMONIC must be set")?,
-                amount: parse_env_nanotons("FAUCET_AMOUNT_NANOTONS", 1_000_000),
+                amount: parse_env_nanograms(
+                    "FAUCET_AMOUNT_NANOGRAMS",
+                    "FAUCET_AMOUNT_NANOTONS",
+                    1_000_000,
+                ),
                 message: std::env::var("FAUCET_MESSAGE")
                     .unwrap_or_else(|_| "Testnet faucet".to_string()),
             },
@@ -181,14 +185,16 @@ impl Config {
                 enabled: parse_env_bool("ANTIFRAUD_ENABLED", true),
                 wallet_balance: WalletBalanceCheckConfig {
                     enabled: parse_env_bool("ANTIFRAUD_WALLET_BALANCE_ENABLED", true),
-                    max_wallet_balance: parse_env_nanotons(
+                    max_wallet_balance: parse_env_nanograms(
+                        "ANTIFRAUD_WALLET_BALANCE_MAX_NANOGRAMS",
                         "ANTIFRAUD_WALLET_BALANCE_MAX_NANOTONS",
                         25_000_000_000,
                     ),
                 },
                 sent_amount_window: SentAmountWindowCheckConfig {
                     enabled: parse_env_bool("ANTIFRAUD_SENT_AMOUNT_WINDOW_ENABLED", true),
-                    max_amount: parse_env_nanotons(
+                    max_amount: parse_env_nanograms(
+                        "ANTIFRAUD_SENT_AMOUNT_WINDOW_MAX_NANOGRAMS",
                         "ANTIFRAUD_SENT_AMOUNT_WINDOW_MAX_NANOTONS",
                         10_000_000_000,
                     ),
@@ -229,33 +235,37 @@ where
     value.replace('_', "").parse().ok()
 }
 
-fn parse_env_nanotons(name: &str, default: u64) -> u64 {
+fn parse_env_nanograms(name: &str, legacy_name: &str, default: u64) -> u64 {
     std::env::var(name)
+        .or_else(|_| std::env::var(legacy_name))
         .ok()
-        .and_then(|value| parse_nanotons(&value))
+        .and_then(|value| parse_nanograms(&value))
         .unwrap_or(default)
 }
 
-fn parse_nanotons(value: &str) -> Option<u64> {
+fn parse_nanograms(value: &str) -> Option<u64> {
     let value = value.trim();
     let normalized = value.to_ascii_lowercase();
 
-    if let Some(ton_amount) = normalized.strip_suffix("ton") {
-        parse_ton_amount(ton_amount)
+    if let Some(gram_amount) = normalized
+        .strip_suffix("gram")
+        .or_else(|| normalized.strip_suffix("ton"))
+    {
+        parse_gram_amount(gram_amount)
     } else {
         parse_number(value)
     }
 }
 
-fn parse_ton_amount(value: &str) -> Option<u64> {
-    let tons = value.trim().replace('_', "").parse::<f64>().ok()?;
-    if !tons.is_finite() || tons < 0.0 {
+fn parse_gram_amount(value: &str) -> Option<u64> {
+    let grams = value.trim().replace('_', "").parse::<f64>().ok()?;
+    if !grams.is_finite() || grams < 0.0 {
         return None;
     }
 
-    let nanotons = tons * NANOTONS_PER_TON as f64;
-    let rounded = nanotons.round();
-    if (nanotons - rounded).abs() > 0.000_001 || rounded > u64::MAX as f64 {
+    let nanograms = grams * NANOGRAMS_PER_GRAM as f64;
+    let rounded = nanograms.round();
+    if (nanograms - rounded).abs() > 0.000_001 || rounded > u64::MAX as f64 {
         return None;
     }
 
@@ -279,7 +289,7 @@ fn parse_bool(value: &str) -> Option<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::{NANOTONS_PER_TON, parse_bool, parse_nanotons, parse_number};
+    use super::{NANOGRAMS_PER_GRAM, parse_bool, parse_nanograms, parse_number};
 
     #[test]
     fn parses_numbers_with_underscores() {
@@ -290,26 +300,37 @@ mod tests {
 
     #[test]
     fn rejects_invalid_numbers() {
-        assert_eq!(parse_number::<u64>("500 TON"), None);
+        assert_eq!(parse_number::<u64>("500 GRAM"), None);
     }
 
     #[test]
-    fn parses_nanotons() {
-        assert_eq!(parse_nanotons("500_000_000"), Some(500_000_000));
-        assert_eq!(parse_nanotons("1TON"), Some(NANOTONS_PER_TON));
-        assert_eq!(parse_nanotons("1ton"), Some(NANOTONS_PER_TON));
-        assert_eq!(parse_nanotons("0.5TON"), Some(500_000_000));
-        assert_eq!(parse_nanotons(".25ton"), Some(250_000_000));
-        assert_eq!(parse_nanotons("1e-9TON"), Some(1));
-        assert_eq!(parse_nanotons("1.000000001TON"), Some(1_000_000_001));
+    fn parses_nanograms() {
+        assert_eq!(parse_nanograms("500_000_000"), Some(500_000_000));
+        assert_eq!(parse_nanograms("1GRAM"), Some(NANOGRAMS_PER_GRAM));
+        assert_eq!(parse_nanograms("10GRAM"), Some(10 * NANOGRAMS_PER_GRAM));
+        assert_eq!(parse_nanograms("1gram"), Some(NANOGRAMS_PER_GRAM));
+        assert_eq!(parse_nanograms("0.5GRAM"), Some(500_000_000));
+        assert_eq!(parse_nanograms(".25gram"), Some(250_000_000));
+        assert_eq!(parse_nanograms("1e-9GRAM"), Some(1));
+        assert_eq!(
+            parse_nanograms("1.000000001GRAM"),
+            Some(1_000_000_001)
+        );
     }
 
     #[test]
-    fn rejects_invalid_nanoton_values() {
-        assert_eq!(parse_nanotons(""), None);
-        assert_eq!(parse_nanotons("TON"), None);
-        assert_eq!(parse_nanotons("1.0000000001TON"), None);
-        assert_eq!(parse_nanotons("oneTON"), None);
+    fn parses_legacy_ton_suffix() {
+        assert_eq!(parse_nanograms("1TON"), Some(NANOGRAMS_PER_GRAM));
+        assert_eq!(parse_nanograms("10TON"), Some(10 * NANOGRAMS_PER_GRAM));
+        assert_eq!(parse_nanograms("0.5ton"), Some(500_000_000));
+    }
+
+    #[test]
+    fn rejects_invalid_nanogram_values() {
+        assert_eq!(parse_nanograms(""), None);
+        assert_eq!(parse_nanograms("GRAM"), None);
+        assert_eq!(parse_nanograms("1.0000000001GRAM"), None);
+        assert_eq!(parse_nanograms("oneGRAM"), None);
     }
 
     #[test]

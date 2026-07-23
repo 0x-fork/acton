@@ -258,11 +258,11 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
             Ok(_) => {
                 record_successful_claim(&state, &task.address).await;
                 match state.valkey.add_sent_amount(amount).await {
-                    Ok(total_sent_nanotons) => {
+                    Ok(total_sent_nanograms) => {
                         info!(
                             address = %task.address,
                             amount,
-                            total_sent_nanotons,
+                            total_sent_nanograms,
                             "Recorded sent amount in Valkey"
                         );
                     }
@@ -438,7 +438,7 @@ async fn wait_for_sent_amount_window(
                 info!(
                     address = %address,
                     amount,
-                    reserved_total_nanotons = reservation.total,
+                    reserved_total_nanograms = reservation.total,
                     max_amount = reservation.max,
                     window_seconds = reservation.window_seconds,
                     "Reserved sent amount sliding window"
@@ -460,7 +460,7 @@ async fn wait_for_sent_amount_window(
                 }
                 warn!(
                     address = %address,
-                    current_sent_nanotons = current,
+                    current_sent_nanograms = current,
                     attempted_amount = attempted,
                     max_amount = max,
                     window_seconds,

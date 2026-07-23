@@ -11,7 +11,8 @@ const CHECK_SUCCESSFUL_CLAIM_WINDOW_SCRIPT: &str =
     include_str!("../scripts/check_successful_claim_window.lua");
 const RECORD_SUCCESSFUL_CLAIM_SCRIPT: &str = include_str!("../scripts/record_successful_claim.lua");
 
-const TOTAL_SENT_NANOTONS_KEY: &str = "faucet:stats:sent-nanotons";
+// Keep the existing key so deployments retain their accumulated stats.
+const TOTAL_SENT_NANOGRAMS_KEY: &str = "faucet:stats:sent-nanotons";
 const ANTIFRAUD_TRIGGER_COUNT_KEY_PREFIX: &str = "faucet:stats:antifraud";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -30,7 +31,7 @@ pub struct AntifraudStats {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct FaucetStats {
-    pub total_sent_nanotons: u64,
+    pub total_sent_nanograms: u64,
     pub antifraud: AntifraudStats,
 }
 
@@ -98,7 +99,7 @@ impl ValkeyStore {
     pub async fn add_sent_amount(&self, amount: u64) -> anyhow::Result<u64> {
         let mut connection = self.connection.clone();
         redis::cmd("INCRBY")
-            .arg(TOTAL_SENT_NANOTONS_KEY)
+            .arg(TOTAL_SENT_NANOGRAMS_KEY)
             .arg(amount)
             .query_async(&mut connection)
             .await
@@ -120,7 +121,7 @@ impl ValkeyStore {
     pub async fn get_stats(&self) -> anyhow::Result<FaucetStats> {
         let mut connection = self.connection.clone();
         let values: (Option<u64>, Option<u64>, Option<u64>, Option<u64>) = redis::cmd("MGET")
-            .arg(TOTAL_SENT_NANOTONS_KEY)
+            .arg(TOTAL_SENT_NANOGRAMS_KEY)
             .arg(antifraud_trigger_count_key(AntifraudModule::WalletBalance))
             .arg(antifraud_trigger_count_key(
                 AntifraudModule::SentAmountWindow,
@@ -133,7 +134,7 @@ impl ValkeyStore {
             .context("Failed to get faucet stats")?;
 
         Ok(FaucetStats {
-            total_sent_nanotons: values.0.unwrap_or_default(),
+            total_sent_nanograms: values.0.unwrap_or_default(),
             antifraud: AntifraudStats {
                 wallet_balance: values.1.unwrap_or_default(),
                 sent_amount_window: values.2.unwrap_or_default(),
