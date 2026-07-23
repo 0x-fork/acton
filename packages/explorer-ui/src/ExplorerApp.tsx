@@ -1393,7 +1393,13 @@ export const ExplorerApp: FC = () => {
                     <Routes>
                       <Route
                         path="/"
-                        element={<ExplorerIndexPage client={client} fillAvailableHeight />}
+                        element={
+                          <ExplorerIndexPage
+                            client={client}
+                            faucetPath={networkId === "testnet" ? "/faucet" : undefined}
+                            fillAvailableHeight
+                          />
+                        }
                       />
                       <Route path="/blocks" element={<BlocksPage client={client} />} />
                       <Route path="/abi" element={<AbiCatalogPage />} />

@@ -49,6 +49,10 @@
   gap: var(--acton-space-4);
 }
 
+.toolCardsWithFaucet {
+  grid-template-columns: repeat(3, minmax(0, 272px));
+}
+
 .toolCard {
   position: relative;
   min-width: 0;
@@ -106,12 +110,16 @@
   background: linear-gradient(135deg, #6d5ce7 0%, #3478ed 100%);
 }
 
+.faucetIcon {
+  background: linear-gradient(135deg, #2b82eb 0%, #1cc8ff 100%);
+}
+
 .toolCardBadge {
   position: absolute;
   top: var(--acton-space-2);
-  right: var(--acton-space-2);
+  right: var(--acton-space-3);
   color: var(--acton-color-text-muted);
-  padding: 2px var(--acton-space-2);
+  padding: 2px 0;
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.05em;
