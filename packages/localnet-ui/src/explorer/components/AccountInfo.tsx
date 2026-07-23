@@ -20,13 +20,14 @@ import {
   getPrimaryImageSource,
   replaceBrokenImageWithFallback,
 } from "./imageFallbacks"
-import {formatAddress, formatNano, normalizeAddress, toRawAddress} from "./utils"
+import {formatAddress, formatDnsName, formatNano, normalizeAddress, toRawAddress} from "./utils"
 
 const TOKEN_PREVIEW_LIMIT = 5
 
 interface AccountInfoProps {
   readonly address: string
   readonly domain?: string
+  readonly domains?: readonly string[]
   readonly state?: AddressInformation
   readonly extendedContractAbi?: ExtendedContractABI
   readonly contractInterfaces?: readonly string[]
@@ -53,24 +54,30 @@ interface CollectiblePreview {
   readonly name?: string
 }
 
-interface NameDetail {
-  readonly key: "custom" | "ton-assets" | "ton-dns"
+interface NameDetailGroup {
+  readonly key: string
   readonly label: string
-  readonly value: string
+  readonly values: readonly string[]
+  readonly formatDnsNames?: boolean
 }
 
-function nameDetail(
-  key: NameDetail["key"],
+function nameDetailGroup(
+  key: NameDetailGroup["key"],
   label: string,
-  value: string | undefined,
-): NameDetail | undefined {
-  const normalizedValue = value?.trim()
-  return normalizedValue ? {key, label, value: normalizedValue} : undefined
+  values: readonly (string | undefined)[],
+  excludedValue: string | undefined,
+  formatDnsNames = false,
+): NameDetailGroup | undefined {
+  const filteredValues = uniqueNames(values).filter(value => value !== excludedValue)
+  return filteredValues.length > 0
+    ? {key, label, values: filteredValues, formatDnsNames}
+    : undefined
 }
 
 export const AccountInfo: FC<AccountInfoProps> = ({
   address,
   domain,
+  domains = [],
   state,
   extendedContractAbi,
   contractInterfaces,
@@ -180,15 +187,35 @@ export const AccountInfo: FC<AccountInfoProps> = ({
 
   const displayName = customName || domain
   const normalizedDisplayName = displayName?.trim()
-  const nameDetails = [
-    nameDetail("custom", "Custom", nameSources.customName),
-    nameDetail("ton-assets", "Known names", nameSources.tonAssetsName),
-    nameDetail("ton-dns", "TON DNS", nameSources.tonDnsName ?? domain),
-  ].filter(
-    (detail): detail is NameDetail =>
-      detail !== undefined && detail.value !== normalizedDisplayName,
-  )
-  const hasNameDetails = nameDetails.length > 0
+  const tonDnsNames = uniqueNames([domain, ...domains, nameSources.tonDnsName])
+  const displayNameText =
+    normalizedDisplayName && includesName(tonDnsNames, normalizedDisplayName)
+      ? formatDnsName(normalizedDisplayName)
+      : displayName
+  const nameDetailGroups = [
+    nameDetailGroup("custom", "Custom", [nameSources.customName], normalizedDisplayName),
+    nameDetailGroup(
+      "ton-assets",
+      "Known names",
+      [nameSources.tonAssetsName],
+      normalizedDisplayName,
+    ),
+    nameDetailGroup(
+      "ton-dns",
+      "TON DNS",
+      tonDnsNames.filter(name => !isTelegramDnsName(name)),
+      normalizedDisplayName,
+      true,
+    ),
+    nameDetailGroup(
+      "telegram",
+      "Telegram",
+      tonDnsNames.filter(isTelegramDnsName),
+      normalizedDisplayName,
+      true,
+    ),
+  ].filter((group): group is NameDetailGroup => group !== undefined)
+  const hasNameDetails = nameDetailGroups.length > 0
 
   const handleStartEdit = () => {
     setEditValue(displayName || "")
@@ -320,17 +347,23 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   )
   const nameDetailsContent = (
     <div className={styles.addressFormats}>
-      {nameDetails.map(detail => (
-        <div key={detail.key} className={styles.addressFormatRow}>
-          <span className={styles.addressFormatLabel}>{detail.label}</span>
-          <div className={styles.addressFormatValueRow}>
-            <code className={styles.addressFormatValue}>{detail.value}</code>
-            <CopyInlineAction
-              size="compact"
-              value={detail.value}
-              label={`Copy ${detail.label} name`}
-              copiedLabel={`${detail.label} name copied`}
-            />
+      {nameDetailGroups.map(group => (
+        <div key={group.key} className={styles.addressFormatRow}>
+          <span className={styles.addressFormatLabel}>{group.label}</span>
+          <div className={styles.nameDetailValues}>
+            {group.values.map(value => (
+              <div key={value} className={styles.addressFormatValueRow}>
+                <code className={styles.addressFormatValue}>
+                  {group.formatDnsNames ? formatDnsName(value) : value}
+                </code>
+                <CopyInlineAction
+                  size="compact"
+                  value={value}
+                  label={`Copy ${group.label} name`}
+                  copiedLabel={`${group.label} name copied`}
+                />
+              </div>
+            ))}
           </div>
         </div>
       ))}
@@ -401,11 +434,11 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                       placement="bottom"
                     >
                       <span className={`${styles.customName} ${styles.nameWithDetails}`}>
-                        {displayName}
+                        {displayNameText}
                       </span>
                     </Popover>
                   ) : (
-                    <span className={styles.customName}>{displayName}</span>
+                    <span className={styles.customName}>{displayNameText}</span>
                   )}
                   <button
                     type="button"
@@ -764,6 +797,26 @@ export const AccountInfo: FC<AccountInfoProps> = ({
       </div>
     </div>
   )
+}
+
+function uniqueNames(names: readonly (string | undefined)[]): readonly string[] {
+  const unique = new Map<string, string>()
+  for (const name of names) {
+    const normalizedName = name?.trim()
+    if (normalizedName) {
+      unique.set(normalizedName.toLowerCase(), normalizedName)
+    }
+  }
+  return [...unique.values()]
+}
+
+function includesName(names: readonly string[], expectedName: string): boolean {
+  const normalizedExpectedName = expectedName.toLowerCase()
+  return names.some(name => name.toLowerCase() === normalizedExpectedName)
+}
+
+function isTelegramDnsName(name: string): boolean {
+  return name.toLowerCase().endsWith(".t.me")
 }
 
 function getContractTypeLabels(

@@ -1,6 +1,7 @@
 import {Buffer} from "node:buffer"
 
 import {Address} from "@ton/core"
+import {toUnicode} from "punycode/"
 
 const HEX_HASH_RE = /^[a-fA-F0-9]{64}$/
 const BASE64_STD_RE = /^[A-Za-z0-9+/]+={0,2}$/
@@ -49,6 +50,15 @@ export function parseAddress(address: string): Address | undefined {
 export function parseTonDnsSearchQuery(value: string): string | undefined {
   const domain = value.trim().toLowerCase()
   return TON_DNS_DOMAIN_RE.test(domain) ? domain : undefined
+}
+
+export function formatDnsName(value: string): string {
+  const domain = value.trim()
+  try {
+    return toUnicode(domain) || domain
+  } catch {
+    return domain
+  }
 }
 
 export interface AddressFormatOptions {

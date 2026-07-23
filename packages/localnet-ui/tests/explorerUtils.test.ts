@@ -2,6 +2,7 @@ import {describe, expect, test} from "bun:test"
 
 import {
   formatAbsoluteTime,
+  formatDnsName,
   formatTimeAgo,
   parseTonDnsSearchQuery,
   shortenIdentifier,
@@ -17,6 +18,16 @@ describe("parseTonDnsSearchQuery", () => {
     expect(parseTonDnsSearchQuery("monk.me")).toBeUndefined()
     expect(parseTonDnsSearchQuery("t.me/monk")).toBeUndefined()
     expect(parseTonDnsSearchQuery("-monk.t.me")).toBeUndefined()
+  })
+})
+
+describe("formatDnsName", () => {
+  test("decodes Punycode labels for display", () => {
+    expect(formatDnsName("xn--037ha7bb.ton")).toBe("🅿🅰🅿🅰.ton")
+  })
+
+  test("keeps regular domain names unchanged", () => {
+    expect(formatDnsName("monk.t.me")).toBe("monk.t.me")
   })
 })
 

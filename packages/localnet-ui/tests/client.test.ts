@@ -32,6 +32,50 @@ test("raw blocks are loaded from the selected TonAPI LiteServer", async () => {
   }
 })
 
+test("wallet DNS lookup returns every domain for the requested address", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  const address = "UQDYzZmfsrGzhObKJUw4gzdeIxEai3jAFbiGKGwxvxHinf4K"
+  const domains = [
+    "monk.t.me",
+    "wolf.t.me",
+    "saint.t.me",
+    "viking.t.me",
+    "durovloh.ton",
+    "puppeteer.ton",
+    "upbanking.t.me",
+    "ton-rooster.ton",
+    "yourtonismy.ton",
+    "dubaigoodbye.ton",
+    "durovscammer.ton",
+    "xn--037ha7bb.ton",
+    "tg-tonloveton.ton",
+    "wetrustinton.t.me",
+  ] as const
+  globalThis.fetch = mock(async input => {
+    requests.push(new URL(input.toString()))
+    return Response.json({
+      records: domains.map(domain => ({domain})),
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    await expect(client.getWalletDnsNames(address)).resolves.toEqual(domains)
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.pathname).toBe("/api/v3/dns/records")
+    expect(requests[0]?.searchParams.get("wallet")).toBe(address)
+    expect(requests[0]?.searchParams.get("limit")).toBe("1000")
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("getShardAccountCell reads the unwrapped V2 response", async () => {
   const originalFetch = globalThis.fetch
   const requests: string[] = []

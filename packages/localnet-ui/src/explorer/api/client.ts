@@ -65,6 +65,7 @@ interface SendExternalMessageResponse {
 
 interface DnsRecordsResponse {
   readonly records: readonly {
+    readonly domain: string
     readonly dns_wallet?: string | null
   }[]
 }
@@ -316,6 +317,17 @@ export class TonClient {
     url.searchParams.append("domain", domain)
     const response = await this.request<DnsRecordsResponse>(url, "Failed to resolve TON DNS name")
     return response.records.find(record => record.dns_wallet)?.dns_wallet ?? undefined
+  }
+
+  async getWalletDnsNames(address: string): Promise<readonly string[]> {
+    const url = this.buildUrl(this.v3BaseUrl, "/dns/records")
+    url.searchParams.append("wallet", address)
+    url.searchParams.append("limit", "1000")
+    const response = await this.request<DnsRecordsResponse>(
+      url,
+      "Failed to load account TON DNS names",
+    )
+    return response.records.map(record => record.domain.trim())
   }
 
   async getAccountStates(addresses: string[], includeBoc = true): Promise<AccountStatesResponse> {

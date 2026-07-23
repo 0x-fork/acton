@@ -76,6 +76,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
   const [accountState, setAccountState] = useState<AddressInformation | undefined>()
   const [accountStateV3, setAccountStateV3] = useState<V3AccountState | undefined>()
   const [accountDomain, setAccountDomain] = useState<string | undefined>()
+  const [accountDomains, setAccountDomains] = useState<readonly string[]>([])
   const [transactions, setTransactions] = useState<V3TransactionListItem[]>([])
   const [historySortOrder, setHistorySortOrder] = useState<AccountHistorySortOrder>(
     readAccountHistorySortOrder,
@@ -114,8 +115,11 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
   const [verifiedSource, setVerifiedSource] = useState<VerificationSourceResponse | undefined>()
   const [verifiedSourceLoading, setVerifiedSourceLoading] = useState(false)
   const [jettonMetadataOpen, setJettonMetadataOpen] = useState(false)
+  const [additionalDataReadyKey, setAdditionalDataReadyKey] = useState<string | undefined>()
   const activeAccountKeyRef = useRef<string | undefined>(undefined)
   const activeHistoryRequestKeyRef = useRef<string | undefined>(undefined)
+  const loadedAccountKeyRef = useRef<string | undefined>(undefined)
+  const dnsRequestedAccountKeyRef = useRef<string | undefined>(undefined)
   const transactionHashesRef = useRef<Set<string>>(new Set())
 
   const formattedAddress = useMemo(
@@ -166,9 +170,13 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
       if (!formattedAddress) {
         activeAccountKeyRef.current = undefined
         activeHistoryRequestKeyRef.current = undefined
+        loadedAccountKeyRef.current = undefined
+        dnsRequestedAccountKeyRef.current = undefined
+        setAdditionalDataReadyKey(undefined)
         setAccountState(undefined)
         setAccountStateV3(undefined)
         setAccountDomain(undefined)
+        setAccountDomains([])
         setTransactions([])
         setActions([])
         setActionMetadata({})
@@ -208,12 +216,16 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
       activeHistoryRequestKeyRef.current = historyRequestKey
 
       if (isAddressChange) {
+        loadedAccountKeyRef.current = undefined
+        dnsRequestedAccountKeyRef.current = undefined
+        setAdditionalDataReadyKey(undefined)
         setAccountLoading(true)
         setTransactionsLoading(true)
         setActionsLoading(supportsAccountActions)
         setAccountState(undefined)
         setAccountStateV3(undefined)
         setAccountDomain(undefined)
+        setAccountDomains([])
         setTransactions([])
         setActions([])
         setActionMetadata({})
@@ -266,16 +278,20 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
           const currentDomain = getAccountDomain(stateV3)
           if (!isActive) return
           if (stateV3) updateDomains(stateV3.address_book)
+          loadedAccountKeyRef.current = accountRequestKey
           setAccountState(state)
           setAccountStateV3(stateV3 ? stateV3.accounts[0] : undefined)
           setAccountDomain(currentDomain)
+          setAccountDomains(currentDomain ? [currentDomain] : [])
           setAccountTokenInfo(currentTokenInfo)
         } catch (error) {
           if (!isActive) return
+          loadedAccountKeyRef.current = undefined
           setAccountError(error instanceof Error ? error.message : "An error occurred")
           setAccountState(undefined)
           setAccountStateV3(undefined)
           setAccountDomain(undefined)
+          setAccountDomains([])
           setTransactions([])
           setActions([])
           setActionMetadata({})
@@ -388,6 +404,47 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
     supportsAccountActions,
     updateDomains,
   ])
+
+  useEffect(() => {
+    if (
+      !formattedAddress ||
+      loadedAccountKeyRef.current !== accountRequestKey ||
+      accountLoading ||
+      transactionsLoading ||
+      actionsLoading
+    ) {
+      return
+    }
+    setAdditionalDataReadyKey(accountRequestKey)
+  }, [accountLoading, accountRequestKey, actionsLoading, formattedAddress, transactionsLoading])
+
+  useEffect(() => {
+    if (
+      !formattedAddress ||
+      additionalDataReadyKey !== accountRequestKey ||
+      dnsRequestedAccountKeyRef.current === accountRequestKey
+    ) {
+      return
+    }
+
+    let isActive = true
+    dnsRequestedAccountKeyRef.current = accountRequestKey
+    void client
+      .getWalletDnsNames(formattedAddress)
+      .then(domains => {
+        if (!isActive) return
+        const nextDomains = mergeAccountDomains(accountDomain, domains)
+        setAccountDomain(nextDomains[0])
+        setAccountDomains(nextDomains)
+      })
+      .catch(() => {
+        // The singular domain from accountStates remains available as a fallback.
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [accountDomain, accountRequestKey, additionalDataReadyKey, client, formattedAddress])
 
   const loadMoreTransactions = async () => {
     if (
@@ -957,6 +1014,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
                 <AccountInfo
                   address={formattedAddress}
                   domain={accountDomain}
+                  domains={accountDomains}
                   state={accountState}
                   extendedContractAbi={extendedContractAbi}
                   contractInterfaces={
@@ -1442,6 +1500,20 @@ function getAccountDomain(stateV3: AccountStatesResponse | void): string | undef
   const currentAccount = stateV3.accounts[0]
   const domain = currentAccount ? stateV3.address_book[currentAccount.address]?.domain : undefined
   return domain?.trim() || undefined
+}
+
+function mergeAccountDomains(
+  primaryDomain: string | undefined,
+  domains: readonly string[],
+): readonly string[] {
+  const uniqueDomains = new Map<string, string>()
+  for (const domain of [primaryDomain, ...domains]) {
+    const normalizedDomain = domain?.trim()
+    if (normalizedDomain) {
+      uniqueDomains.set(normalizedDomain.toLowerCase(), normalizedDomain)
+    }
+  }
+  return [...uniqueDomains.values()]
 }
 
 function tokenInfoString(info: AccountStateTokenInfo | undefined, key: string): string | undefined {

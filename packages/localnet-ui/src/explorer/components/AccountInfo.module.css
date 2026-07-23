@@ -247,6 +247,12 @@
   min-width: 0;
 }
 
+.nameDetailValues {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
 .addressFormatValue {
   flex: 0 1 auto;
   min-width: 0;
