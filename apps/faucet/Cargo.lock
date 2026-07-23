@@ -1077,11 +1077,14 @@ dependencies = [
  "faucet-config",
  "faucet-pow",
  "faucet-valkey",
+ "hex",
  "lazy-limit",
- "moka",
+ "rand 0.9.4",
  "real",
+ "reqwest",
  "serde",
  "serde_json",
+ "sha2",
  "sqlx",
  "tokio",
  "ton",
@@ -1115,6 +1118,7 @@ dependencies = [
  "anyhow",
  "faucet-config",
  "redis",
+ "tokio",
 ]
 
 [[package]]

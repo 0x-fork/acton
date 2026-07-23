@@ -8,9 +8,9 @@ use axum::{
 use faucet_backend::middlewares::require_pow_enabled;
 use faucet_config::{
     AntifraudConfig, ClaimRateLimitConfig, Config, DatabaseConfig, DefaultRateLimitConfig,
-    FaucetConfig, PowClientConfig, PowConfig, RateLimitConfig, SentAmountWindowCheckConfig,
-    ServerConfig, SuccessfulClaimWindowCheckConfig, ToncenterConfig, ValkeyConfig,
-    WalletBalanceCheckConfig, WorkerConfig,
+    FaucetConfig, GitHubAuthConfig, GitHubTierConfig, PowClientConfig, PowConfig, RateLimitConfig,
+    SentAmountWindowCheckConfig, ServerConfig, SuccessfulClaimWindowCheckConfig, ToncenterConfig,
+    ValkeyConfig, WalletBalanceCheckConfig, WorkerConfig,
 };
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -70,6 +70,7 @@ fn config(pow_enabled: bool) -> Config {
         server: ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 3001,
+            trust_proxy_headers: false,
         },
         rate_limit: RateLimitConfig {
             default: DefaultRateLimitConfig {
@@ -126,6 +127,29 @@ fn config(pow_enabled: bool) -> Config {
                 enabled: true,
                 max_requests: 2,
                 window_seconds: 86_400,
+            },
+        },
+        github_auth: GitHubAuthConfig {
+            enabled: false,
+            client_id: None,
+            client_secret: None,
+            callback_url: "http://localhost/auth/github/callback".to_string(),
+            frontend_url: "http://localhost/faucet".to_string(),
+            oauth_max_pending_states: 256,
+            state_ttl_seconds: 600,
+            grant_ttl_seconds: 120,
+            session_ttl_seconds: 604_800,
+            verified: GitHubTierConfig {
+                max_requests: 4,
+                min_account_age_days: 90,
+                min_public_repos: 2,
+                min_followers: 0,
+            },
+            established: GitHubTierConfig {
+                max_requests: 8,
+                min_account_age_days: 365,
+                min_public_repos: 5,
+                min_followers: 5,
             },
         },
     }

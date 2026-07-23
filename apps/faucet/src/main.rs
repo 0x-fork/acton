@@ -3,6 +3,11 @@ use apalis::layers::WorkerBuilderExt;
 use apalis::prelude::json::JsonCodec;
 use apalis::prelude::{Data, WorkerBuilder};
 use apalis_sqlite::{CompactType, Config as SqliteConfig, HookCallbackListener, SqliteStorage};
+use axum::{
+    extract::{ConnectInfo, Request, State},
+    middleware::{self, Next},
+    response::Response,
+};
 use axum_governor::GovernorLayer;
 use faucet_antifraud::Antifraud;
 use faucet_config::{ClaimRateLimitConfig, Config, DefaultRateLimitConfig};
@@ -10,10 +15,10 @@ use faucet_pow::Pow;
 use faucet_valkey::{
     AntifraudModule, SentAmountWindowDecision, SuccessfulClaimWindowDecision, ValkeyStore,
 };
+use github_auth::GitHubAuth;
 use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
-use moka::sync::Cache;
-use real::RealIpLayer;
+use real::RealIp;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -29,6 +34,7 @@ use tower::ServiceBuilder;
 use tracing::{error, info, warn};
 use wallet::Wallet;
 
+mod github_auth;
 mod handlers;
 mod logger;
 mod wallet;
@@ -97,18 +103,17 @@ async fn main() -> anyhow::Result<()> {
         .context("Failed to create Valkey store")?;
     info!("Connected to Valkey");
     let antifraud = Antifraud::new(&config.antifraud);
+    let github_auth = GitHubAuth::new(config.github_auth.clone(), valkey.clone())
+        .context("Failed to create GitHub authentication service")?;
 
     let shared_state = AppState {
         storage: storage.clone(),
         wallet: Arc::new(wallet),
         client: client.clone(),
         pow: Pow::new(config.pow.difficulty),
-        pow_challenges: Cache::builder()
-            .time_to_live(StdDuration::from_secs(config.pow.challenge_ttl_seconds))
-            .max_capacity(config.pow.max_challenges)
-            .build(),
         valkey,
         antifraud,
+        github_auth,
         config: Arc::new(config),
     };
 
@@ -127,14 +132,20 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    let cors = handlers::airdrop_cors_layer(&shared_state.config.github_auth.frontend_url)
+        .context("Failed to configure browser CORS")?;
+    let trust_proxy_headers = shared_state.config.server.trust_proxy_headers;
     let app = handlers::router(shared_state)
         .layer(
             ServiceBuilder::new()
-                .layer(RealIpLayer::default())
+                .layer(middleware::from_fn_with_state(
+                    trust_proxy_headers,
+                    insert_client_ip,
+                ))
                 .layer(GovernorLayer::default()),
         )
         // Preflight requests must not consume the stricter per-claim rate limit.
-        .layer(handlers::airdrop_cors_layer());
+        .layer(cors);
 
     info!("Listening on {}", bind_addr);
     let listener = tokio::net::TcpListener::bind(&bind_addr)
@@ -197,15 +208,57 @@ async fn shutdown_signal() {
     info!("Shutting down gracefully...");
 }
 
+async fn insert_client_ip(
+    State(trust_proxy_headers): State<bool>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    let client_ip = client_ip(&request, trust_proxy_headers);
+    request.extensions_mut().insert(RealIp(client_ip));
+    next.run(request).await
+}
+
+fn client_ip(request: &Request, trust_proxy_headers: bool) -> std::net::IpAddr {
+    let Some(peer_ip) = request
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|connect_info| connect_info.0.ip())
+    else {
+        return std::net::Ipv4Addr::LOCALHOST.into();
+    };
+
+    if trust_proxy_headers
+        && is_trusted_proxy_peer(peer_ip)
+        && let Some(forwarded_ip) = request
+            .headers()
+            .get("x-real-ip")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.trim().parse().ok())
+    {
+        return forwarded_ip;
+    }
+
+    peer_ip
+}
+
+fn is_trusted_proxy_peer(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(ip) => ip.is_loopback() || ip.is_private() || ip.is_link_local(),
+        std::net::IpAddr::V6(ip) => {
+            ip.is_loopback() || ip.is_unique_local() || ip.is_unicast_link_local()
+        }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct AppState {
     pub(crate) storage: SqliteStorage<CreateClaim, JsonCodec<CompactType>, HookCallbackListener>,
     wallet: Arc<Wallet>,
     client: Arc<ToncenterClient>,
     pub(crate) pow: Pow,
-    pub(crate) pow_challenges: Cache<String, u32>,
     pub(crate) valkey: ValkeyStore,
     pub(crate) antifraud: Antifraud,
+    pub(crate) github_auth: GitHubAuth,
     pub(crate) config: Arc<Config>,
 }
 
@@ -236,7 +289,7 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
 
     info!("Processing claim for address: {}", task.address);
 
-    if !can_process_successful_claim_window(&state, &task.address).await? {
+    if !can_process_successful_claim_window(&state, &task).await? {
         return Ok(());
     }
 
@@ -256,7 +309,7 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
 
         match status {
             Ok(_) => {
-                record_successful_claim(&state, &task.address).await;
+                record_successful_claim(&state, &task).await;
                 match state.valkey.add_sent_amount(amount).await {
                     Ok(total_sent_nanograms) => {
                         info!(
@@ -311,17 +364,71 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
 // TODO: вынести куда-то
 async fn can_process_successful_claim_window(
     state: &AppState,
-    address: &str,
+    task: &CreateClaim,
 ) -> anyhow::Result<bool> {
     let Some(window) = state.antifraud.successful_claim_window() else {
         return Ok(true);
     };
 
-    let address_key = normalized_address_key(address)?;
+    let max_requests = if task.max_requests == 0 {
+        window.max_requests
+    } else {
+        task.max_requests
+    };
+    let address_key = normalized_address_key(&task.address)?;
 
+    if !claim_window_allows(
+        state,
+        &address_key,
+        max_requests,
+        window.window_seconds,
+        &task.address,
+    )
+    .await?
+    {
+        return Ok(false);
+    }
+
+    if let Some(github_user_id) = task.github_user_id
+        && !claim_window_allows(
+            state,
+            &handlers::github_claim_window_key(github_user_id),
+            max_requests,
+            window.window_seconds,
+            &task.address,
+        )
+        .await?
+    {
+        return Ok(false);
+    }
+
+    if task.tier == github_auth::FaucetTier::Guest
+        && let Some(client_subject) = task.client_window_subject.as_deref()
+        && !claim_window_allows(
+            state,
+            client_subject,
+            window.max_requests,
+            window.window_seconds,
+            &task.address,
+        )
+        .await?
+    {
+        return Ok(false);
+    }
+
+    Ok(true)
+}
+
+async fn claim_window_allows(
+    state: &AppState,
+    subject: &str,
+    max_requests: u32,
+    window_seconds: u64,
+    address: &str,
+) -> anyhow::Result<bool> {
     match state
         .valkey
-        .check_successful_claim_window(&address_key, window.max_requests, window.window_seconds)
+        .check_successful_claim_window(subject, max_requests, window_seconds)
         .await?
     {
         SuccessfulClaimWindowDecision::Allowed {
@@ -331,6 +438,7 @@ async fn can_process_successful_claim_window(
         } => {
             info!(
                 address = %address,
+                subject,
                 successful_claims = current,
                 max_requests = max,
                 window_seconds,
@@ -349,6 +457,7 @@ async fn can_process_successful_claim_window(
                 .await;
             warn!(
                 address = %address,
+                subject,
                 successful_claims = current,
                 max_requests = max,
                 window_seconds,
@@ -360,16 +469,16 @@ async fn can_process_successful_claim_window(
     }
 }
 
-async fn record_successful_claim(state: &AppState, address: &str) {
+async fn record_successful_claim(state: &AppState, task: &CreateClaim) {
     let Some(window) = state.antifraud.successful_claim_window() else {
         return;
     };
 
-    let address_key = match normalized_address_key(address) {
+    let address_key = match normalized_address_key(&task.address) {
         Ok(address_key) => address_key,
         Err(err) => {
             warn!(
-                address = %address,
+                address = %task.address,
                 error = %err,
                 "Failed to normalize successful claim address"
             );
@@ -377,22 +486,54 @@ async fn record_successful_claim(state: &AppState, address: &str) {
         }
     };
 
+    record_successful_claim_subject(state, &address_key, &task.address, window.window_seconds)
+        .await;
+    if let Some(github_user_id) = task.github_user_id {
+        record_successful_claim_subject(
+            state,
+            &handlers::github_claim_window_key(github_user_id),
+            &task.address,
+            window.window_seconds,
+        )
+        .await;
+    }
+    // Record authenticated sends against the client subject as well. If the user
+    // later drops the bearer token, the stricter guest check still sees them.
+    if let Some(client_subject) = task.client_window_subject.as_deref() {
+        record_successful_claim_subject(
+            state,
+            client_subject,
+            &task.address,
+            window.window_seconds,
+        )
+        .await;
+    }
+}
+
+async fn record_successful_claim_subject(
+    state: &AppState,
+    subject: &str,
+    address: &str,
+    window_seconds: u64,
+) {
     match state
         .valkey
-        .record_successful_claim(&address_key, window.window_seconds)
+        .record_successful_claim(subject, window_seconds)
         .await
     {
         Ok(successful_claims) => {
             info!(
                 address = %address,
+                subject,
                 successful_claims,
-                window_seconds = window.window_seconds,
+                window_seconds,
                 "Recorded successful claim in Valkey"
             );
         }
         Err(err) => {
             warn!(
                 address = %address,
+                subject,
                 error = %err,
                 "Failed to record successful claim in Valkey"
             );
@@ -538,4 +679,53 @@ fn build_message(
     let message = Msg::new(CommonMsgInfo::Int(message_info), message_body);
 
     Ok(message.to_cell()?)
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{
+        body::Body,
+        extract::{ConnectInfo, Request},
+    };
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    use super::client_ip;
+
+    fn request_from(peer_ip: IpAddr, forwarded_ip: &str) -> Request {
+        let mut request = Request::builder()
+            .header("x-real-ip", forwarded_ip)
+            .body(Body::empty())
+            .unwrap();
+        request
+            .extensions_mut()
+            .insert(ConnectInfo(SocketAddr::new(peer_ip, 12345)));
+        request
+    }
+
+    #[test]
+    fn ignores_forwarded_ip_when_proxy_headers_are_disabled() {
+        let peer_ip = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
+        let request = request_from(peer_ip, "198.51.100.20");
+
+        assert_eq!(client_ip(&request, false), peer_ip);
+    }
+
+    #[test]
+    fn ignores_forwarded_ip_from_untrusted_public_peer() {
+        let peer_ip = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
+        let request = request_from(peer_ip, "198.51.100.20");
+
+        assert_eq!(client_ip(&request, true), peer_ip);
+    }
+
+    #[test]
+    fn accepts_forwarded_ip_only_from_configured_private_proxy_path() {
+        let peer_ip = IpAddr::V4(Ipv4Addr::new(172, 18, 0, 1));
+        let request = request_from(peer_ip, "198.51.100.20");
+
+        assert_eq!(
+            client_ip(&request, true),
+            IpAddr::V4(Ipv4Addr::new(198, 51, 100, 20))
+        );
+    }
 }

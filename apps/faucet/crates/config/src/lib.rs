@@ -14,6 +14,7 @@ pub struct Config {
     pub pow: PowConfig,
     pub valkey: ValkeyConfig,
     pub antifraud: AntifraudConfig,
+    pub github_auth: GitHubAuthConfig,
 }
 
 #[derive(Clone, Debug)]
@@ -25,6 +26,7 @@ pub struct DatabaseConfig {
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
+    pub trust_proxy_headers: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -116,8 +118,32 @@ pub struct SuccessfulClaimWindowCheckConfig {
     pub window_seconds: u64,
 }
 
+#[derive(Clone, Debug)]
+pub struct GitHubAuthConfig {
+    pub enabled: bool,
+    pub client_id: Option<String>,
+    pub client_secret: Option<String>,
+    pub callback_url: String,
+    pub frontend_url: String,
+    pub oauth_max_pending_states: u64,
+    pub state_ttl_seconds: u64,
+    pub grant_ttl_seconds: u64,
+    pub session_ttl_seconds: u64,
+    pub verified: GitHubTierConfig,
+    pub established: GitHubTierConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct GitHubTierConfig {
+    pub max_requests: u32,
+    pub min_account_age_days: u64,
+    pub min_public_repos: u32,
+    pub min_followers: u32,
+}
+
 impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
+        let github_auth_enabled = parse_env_bool("GITHUB_AUTH_ENABLED", false);
         let config = Config {
             database: DatabaseConfig {
                 url: std::env::var("DATABASE_URL")
@@ -126,6 +152,7 @@ impl Config {
             server: ServerConfig {
                 host: std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string()),
                 port: parse_env_number("PORT", 3001),
+                trust_proxy_headers: parse_env_bool("SERVER_TRUST_PROXY_HEADERS", false),
             },
             rate_limit: RateLimitConfig {
                 default: DefaultRateLimitConfig {
@@ -212,10 +239,131 @@ impl Config {
                     ),
                 },
             },
+            github_auth: GitHubAuthConfig {
+                enabled: github_auth_enabled,
+                client_id: optional_env("GITHUB_CLIENT_ID"),
+                client_secret: optional_env("GITHUB_CLIENT_SECRET"),
+                callback_url: std::env::var("GITHUB_CALLBACK_URL").unwrap_or_else(|_| {
+                    "https://faucet.acton.monster/auth/github/callback".to_string()
+                }),
+                frontend_url: std::env::var("GITHUB_FRONTEND_URL")
+                    .unwrap_or_else(|_| "https://actonscan.com/faucet".to_string()),
+                oauth_max_pending_states: parse_env_number("GITHUB_OAUTH_MAX_PENDING_STATES", 256),
+                state_ttl_seconds: parse_env_number("GITHUB_STATE_TTL_SECONDS", 600),
+                grant_ttl_seconds: parse_env_number("GITHUB_GRANT_TTL_SECONDS", 120),
+                session_ttl_seconds: parse_env_number("GITHUB_SESSION_TTL_SECONDS", 604_800),
+                verified: GitHubTierConfig {
+                    max_requests: parse_env_number("GITHUB_VERIFIED_MAX_REQUESTS", 4),
+                    min_account_age_days: parse_env_number(
+                        "GITHUB_VERIFIED_MIN_ACCOUNT_AGE_DAYS",
+                        90,
+                    ),
+                    min_public_repos: parse_env_number("GITHUB_VERIFIED_MIN_PUBLIC_REPOS", 2),
+                    min_followers: parse_env_number("GITHUB_VERIFIED_MIN_FOLLOWERS", 0),
+                },
+                established: GitHubTierConfig {
+                    max_requests: parse_env_number("GITHUB_ESTABLISHED_MAX_REQUESTS", 8),
+                    min_account_age_days: parse_env_number(
+                        "GITHUB_ESTABLISHED_MIN_ACCOUNT_AGE_DAYS",
+                        365,
+                    ),
+                    min_public_repos: parse_env_number("GITHUB_ESTABLISHED_MIN_PUBLIC_REPOS", 5),
+                    min_followers: parse_env_number("GITHUB_ESTABLISHED_MIN_FOLLOWERS", 5),
+                },
+            },
         };
 
+        config.validate()?;
         Ok(config)
     }
+
+    fn validate(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.pow.max_challenges > 0,
+            "POW_MAX_CHALLENGES must be positive"
+        );
+        anyhow::ensure!(
+            self.pow.challenge_ttl_seconds > 0,
+            "POW_CHALLENGE_TTL_SECONDS must be positive"
+        );
+        anyhow::ensure!(
+            self.rate_limit.claim.window_seconds > 0,
+            "RATE_LIMIT_CLAIM_WINDOW_SECONDS must be positive"
+        );
+        if self.antifraud.enabled && self.antifraud.successful_claim_window.enabled {
+            anyhow::ensure!(
+                self.antifraud.successful_claim_window.window_seconds > 0,
+                "ANTIFRAUD_SUCCESSFUL_CLAIM_WINDOW_SECONDS must be positive"
+            );
+        }
+
+        if !self.github_auth.enabled {
+            return Ok(());
+        }
+
+        anyhow::ensure!(
+            self.antifraud.enabled && self.antifraud.successful_claim_window.enabled,
+            "GitHub authentication requires the successful claim window"
+        );
+        anyhow::ensure!(
+            self.github_auth.client_id.is_some(),
+            "GITHUB_CLIENT_ID must be set when GitHub authentication is enabled"
+        );
+        anyhow::ensure!(
+            self.github_auth.client_secret.is_some(),
+            "GITHUB_CLIENT_SECRET must be set when GitHub authentication is enabled"
+        );
+        anyhow::ensure!(
+            self.github_auth.oauth_max_pending_states > 0,
+            "GITHUB_OAUTH_MAX_PENDING_STATES must be positive"
+        );
+        anyhow::ensure!(
+            self.github_auth.state_ttl_seconds > 0
+                && self.github_auth.grant_ttl_seconds > 0
+                && self.github_auth.session_ttl_seconds > 0,
+            "GitHub authentication TTLs must be positive"
+        );
+        anyhow::ensure!(
+            self.github_auth.verified.max_requests
+                >= self.antifraud.successful_claim_window.max_requests,
+            "GITHUB_VERIFIED_MAX_REQUESTS must not be below the guest limit"
+        );
+        anyhow::ensure!(
+            self.github_auth.established.max_requests >= self.github_auth.verified.max_requests,
+            "GITHUB_ESTABLISHED_MAX_REQUESTS must not be below the verified limit"
+        );
+        anyhow::ensure!(
+            self.github_auth.established.min_account_age_days
+                >= self.github_auth.verified.min_account_age_days,
+            "GITHUB_ESTABLISHED_MIN_ACCOUNT_AGE_DAYS must not be below the verified threshold"
+        );
+        anyhow::ensure!(
+            self.github_auth.established.min_public_repos
+                >= self.github_auth.verified.min_public_repos,
+            "GITHUB_ESTABLISHED_MIN_PUBLIC_REPOS must not be below the verified threshold"
+        );
+        anyhow::ensure!(
+            self.github_auth.established.min_followers >= self.github_auth.verified.min_followers,
+            "GITHUB_ESTABLISHED_MIN_FOLLOWERS must not be below the verified threshold"
+        );
+        let claim_capacity = u128::from(self.rate_limit.claim.max_requests)
+            * u128::from(self.antifraud.successful_claim_window.window_seconds);
+        let established_capacity = u128::from(self.github_auth.established.max_requests)
+            * u128::from(self.rate_limit.claim.window_seconds);
+        anyhow::ensure!(
+            claim_capacity >= established_capacity,
+            "claim rate limit capacity must not be below the established GitHub limit"
+        );
+
+        Ok(())
+    }
+}
+
+fn optional_env(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn parse_env_number<T>(name: &str, default: T) -> T
@@ -289,7 +437,110 @@ fn parse_bool(value: &str) -> Option<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::{NANOGRAMS_PER_GRAM, parse_bool, parse_nanograms, parse_number};
+    use super::{
+        AntifraudConfig, ClaimRateLimitConfig, Config, DatabaseConfig, DefaultRateLimitConfig,
+        FaucetConfig, GitHubAuthConfig, GitHubTierConfig, NANOGRAMS_PER_GRAM, PowClientConfig,
+        PowConfig, RateLimitConfig, SentAmountWindowCheckConfig, ServerConfig,
+        SuccessfulClaimWindowCheckConfig, ToncenterConfig, ValkeyConfig, WalletBalanceCheckConfig,
+        WorkerConfig, parse_bool, parse_nanograms, parse_number,
+    };
+
+    fn valid_config() -> Config {
+        Config {
+            database: DatabaseConfig {
+                url: "sqlite::memory:".to_string(),
+            },
+            server: ServerConfig {
+                host: "127.0.0.1".to_string(),
+                port: 3001,
+                trust_proxy_headers: false,
+            },
+            rate_limit: RateLimitConfig {
+                default: DefaultRateLimitConfig {
+                    window_seconds: 1,
+                    max_requests: 5,
+                },
+                claim: ClaimRateLimitConfig {
+                    window_seconds: 3_600,
+                    max_requests: 32,
+                },
+            },
+            toncenter: ToncenterConfig {
+                api_key: None,
+                url: "https://testnet.toncenter.com".to_string(),
+                timeout_seconds: 10,
+                connect_timeout_seconds: 5,
+                max_retries: 3,
+                retry_base_delay_ms: 500,
+            },
+            worker: WorkerConfig {
+                max_retries: 2,
+                retry_base_delay_ms: 1_000,
+            },
+            faucet: FaucetConfig {
+                mnemonic: "test mnemonic".to_string(),
+                amount: 1_000_000,
+                message: "Testnet faucet".to_string(),
+            },
+            pow: PowConfig {
+                enabled: true,
+                difficulty: 21,
+                challenge_ttl_seconds: 120,
+                max_challenges: 10_000,
+                client: PowClientConfig {
+                    max_solve_ttl_seconds: 300,
+                    max_nonce_attempts: 1_000_000_000,
+                },
+            },
+            valkey: ValkeyConfig {
+                uri: "redis://127.0.0.1:6379".to_string(),
+            },
+            antifraud: AntifraudConfig {
+                enabled: true,
+                wallet_balance: WalletBalanceCheckConfig {
+                    enabled: true,
+                    max_wallet_balance: 25_000_000_000,
+                },
+                sent_amount_window: SentAmountWindowCheckConfig {
+                    enabled: true,
+                    max_amount: 10_000_000_000,
+                    window_seconds: 60,
+                },
+                successful_claim_window: SuccessfulClaimWindowCheckConfig {
+                    enabled: true,
+                    max_requests: 2,
+                    window_seconds: 3_600,
+                },
+            },
+            github_auth: GitHubAuthConfig {
+                enabled: true,
+                client_id: Some("client-id".to_string()),
+                client_secret: Some("client-secret".to_string()),
+                callback_url: "https://faucet.example/auth/github/callback".to_string(),
+                frontend_url: "https://example.com/faucet".to_string(),
+                oauth_max_pending_states: 256,
+                state_ttl_seconds: 600,
+                grant_ttl_seconds: 120,
+                session_ttl_seconds: 604_800,
+                verified: GitHubTierConfig {
+                    max_requests: 4,
+                    min_account_age_days: 90,
+                    min_public_repos: 2,
+                    min_followers: 0,
+                },
+                established: GitHubTierConfig {
+                    max_requests: 8,
+                    min_account_age_days: 365,
+                    min_public_repos: 5,
+                    min_followers: 5,
+                },
+            },
+        }
+    }
+
+    fn validation_error(config: &Config) -> String {
+        config.validate().unwrap_err().to_string()
+    }
 
     #[test]
     fn parses_numbers_with_underscores() {
@@ -349,5 +600,123 @@ mod tests {
         assert_eq!(parse_bool(" on"), None);
         assert_eq!(parse_bool(" off"), None);
         assert_eq!(parse_bool("maybe"), None);
+    }
+
+    #[test]
+    fn parses_proxy_header_trust_flag() {
+        assert_eq!(parse_bool("true"), Some(true));
+        assert_eq!(parse_bool("false"), Some(false));
+    }
+
+    #[test]
+    fn rejects_zero_pow_challenge_ttl_when_github_auth_is_disabled() {
+        let mut config = valid_config();
+        config.github_auth.enabled = false;
+        config.pow.challenge_ttl_seconds = 0;
+
+        assert_eq!(
+            validation_error(&config),
+            "POW_CHALLENGE_TTL_SECONDS must be positive"
+        );
+    }
+
+    #[test]
+    fn validates_active_claim_windows_when_github_auth_is_disabled() {
+        let mut config = valid_config();
+        config.github_auth.enabled = false;
+        config.rate_limit.claim.window_seconds = 0;
+        assert_eq!(
+            validation_error(&config),
+            "RATE_LIMIT_CLAIM_WINDOW_SECONDS must be positive"
+        );
+
+        let mut config = valid_config();
+        config.github_auth.enabled = false;
+        config.antifraud.successful_claim_window.window_seconds = 0;
+        assert_eq!(
+            validation_error(&config),
+            "ANTIFRAUD_SUCCESSFUL_CLAIM_WINDOW_SECONDS must be positive"
+        );
+    }
+
+    #[test]
+    fn allows_unused_successful_claim_window_values_when_antifraud_is_disabled() {
+        let mut config = valid_config();
+        config.github_auth.enabled = false;
+        config.antifraud.enabled = false;
+        config.antifraud.successful_claim_window.window_seconds = 0;
+
+        config.validate().unwrap();
+    }
+
+    #[test]
+    fn requires_successful_claim_window_for_github_tiers() {
+        let mut config = valid_config();
+        config.antifraud.successful_claim_window.enabled = false;
+
+        assert_eq!(
+            validation_error(&config),
+            "GitHub authentication requires the successful claim window"
+        );
+    }
+
+    #[test]
+    fn rejects_zero_oauth_pending_state_cap() {
+        let mut config = valid_config();
+        config.github_auth.oauth_max_pending_states = 0;
+
+        assert_eq!(
+            validation_error(&config),
+            "GITHUB_OAUTH_MAX_PENDING_STATES must be positive"
+        );
+    }
+
+    #[test]
+    fn rejects_established_tier_thresholds_weaker_than_verified() {
+        type MakeInvalid = fn(&mut Config);
+
+        let cases: &[(MakeInvalid, &str)] = &[
+            (
+                |config| config.github_auth.established.min_account_age_days = 89,
+                "GITHUB_ESTABLISHED_MIN_ACCOUNT_AGE_DAYS must not be below the verified threshold",
+            ),
+            (
+                |config| config.github_auth.established.min_public_repos = 1,
+                "GITHUB_ESTABLISHED_MIN_PUBLIC_REPOS must not be below the verified threshold",
+            ),
+            (
+                |config| config.github_auth.verified.min_followers = 6,
+                "GITHUB_ESTABLISHED_MIN_FOLLOWERS must not be below the verified threshold",
+            ),
+        ];
+
+        for (make_invalid, expected) in cases {
+            let mut config = valid_config();
+            make_invalid(&mut config);
+            assert_eq!(validation_error(&config), *expected);
+        }
+    }
+
+    #[test]
+    fn accepts_claim_rate_limit_with_sufficient_capacity() {
+        let production_config = valid_config();
+        production_config.validate().unwrap();
+
+        let mut equivalent_short_window = valid_config();
+        equivalent_short_window.rate_limit.claim.window_seconds = 1_800;
+        equivalent_short_window.rate_limit.claim.max_requests = 4;
+        equivalent_short_window.validate().unwrap();
+    }
+
+    #[test]
+    fn rejects_claim_rate_limit_with_insufficient_capacity() {
+        let mut config = valid_config();
+        config.rate_limit.claim.window_seconds = 86_400;
+        config.rate_limit.claim.max_requests = 8;
+
+        assert_eq!(
+            validation_error(&config),
+            "claim rate limit capacity must not be below the established GitHub limit"
+        );
     }
 }
