@@ -1,7 +1,11 @@
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 use async_trait::async_trait;
 use thiserror::Error;
+use tokio::sync::Mutex;
 
 use crate::{
     bundle_validation::{StoredBundleValidationError, validate_stored_bundle},
@@ -101,6 +105,10 @@ pub struct AbiContractsReceipt {
 pub struct SourceVerificationRegistry {
     source_storage: SharedSourceStorage,
     verification_index: SharedVerificationIndex,
+    /// Avoids checking the source storage revision on every read after the index is initialized.
+    index_ready: Arc<AtomicBool>,
+    /// Serializes index rebuilds and the complete source-storage-to-index update sequence.
+    index_update_lock: Arc<Mutex<()>>,
 }
 
 impl SourceVerificationRegistry {
@@ -112,7 +120,17 @@ impl SourceVerificationRegistry {
         Self {
             source_storage,
             verification_index,
+            index_ready: Arc::new(AtomicBool::new(false)),
+            index_update_lock: Arc::new(Mutex::new(())),
         }
+    }
+
+    async fn refresh_index(&self) -> Result<(), RegistryError> {
+        self.verification_index
+            .ensure_current(self.source_storage.as_ref())
+            .await?;
+        self.index_ready.store(true, Ordering::Release);
+        Ok(())
     }
 
     async fn load_stored_bundle(
@@ -134,26 +152,47 @@ impl SourceVerificationRegistry {
 #[async_trait]
 impl VerificationRegistry for SourceVerificationRegistry {
     async fn ensure_current(&self) -> Result<(), RegistryError> {
-        self.verification_index
-            .ensure_current(self.source_storage.as_ref())
-            .await?;
-        Ok(())
+        if self.index_ready.load(Ordering::Acquire) {
+            return Ok(());
+        }
+
+        let _guard = self.index_update_lock.lock().await;
+        // Another task may have refreshed the index while this task was waiting.
+        if self.index_ready.load(Ordering::Acquire) {
+            return Ok(());
+        }
+
+        self.refresh_index().await
     }
 
     async fn store_verified_bundle(
         &self,
         request: StoreSourceBundleRequest,
     ) -> Result<StoreVerifiedBundleReceipt, RegistryError> {
-        self.ensure_current().await?;
-        let code_hash = request.code_hash.clone();
-        let storage = self.source_storage.store_bundle(request).await?;
-        let bundle = self.load_stored_bundle(&code_hash).await?;
-        let current_revision = self.source_storage.current_revision().await?;
-        self.verification_index
-            .upsert_bundle(&bundle, current_revision.as_deref())
-            .await?;
+        // Keep the source write and index update in one serialized operation.
+        let _guard = self.index_update_lock.lock().await;
+        if !self.index_ready.load(Ordering::Acquire) {
+            self.refresh_index().await?;
+        }
+        self.index_ready.store(false, Ordering::Release);
 
-        Ok(StoreVerifiedBundleReceipt { storage, bundle })
+        let result = async {
+            let code_hash = request.code_hash.clone();
+            let storage = self.source_storage.store_bundle(request).await?;
+            let bundle = self.load_stored_bundle(&code_hash).await?;
+            let current_revision = self.source_storage.current_revision().await?;
+            self.verification_index
+                .upsert_bundle(&bundle, current_revision.as_deref())
+                .await?;
+
+            Ok(StoreVerifiedBundleReceipt { storage, bundle })
+        }
+        .await;
+
+        if result.is_ok() {
+            self.index_ready.store(true, Ordering::Release);
+        }
+        result
     }
 
     async fn status(

@@ -348,6 +348,13 @@ async fn verification_status_returns_not_found_when_address_has_no_code_hash() {
 #[tokio::test]
 async fn verification_source_returns_verified_bundle_files() {
     let (state, recorded_requests) = recording_source_storage_app_state(&[], CODE_HASH_ONE);
+    let source_path = format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}");
+    let unverified_response = get(state.clone(), &source_path).await;
+    assert_eq!(unverified_response.status(), StatusCode::OK);
+    let unverified = response_json::<VerificationSourceResponse>(unverified_response).await;
+    assert!(!unverified.verified);
+    assert!(unverified.bundle.is_none());
+
     let verify_response = post_verify(
         state.clone(),
         vec![
@@ -366,11 +373,7 @@ async fn verification_source_returns_verified_bundle_files() {
         .source_bundle_hash
         .as_deref()
         .expect("verify response should include source bundle hash");
-    let response = get(
-        state.clone(),
-        &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
-    )
-    .await;
+    let response = get(state.clone(), &source_path).await;
 
     assert_eq!(response.status(), StatusCode::OK);
 
