@@ -24,6 +24,7 @@ pub fn router() -> Result<Router, StateError> {
 pub fn router_with_state(state: AppState) -> Router {
     Router::<AppState>::new()
         .route("/healthz", get(handlers::health::handler))
+        .route("/robots.txt", get(handlers::robots::handler))
         .route("/version", get(handlers::health::version))
         .nest("/api/v1", handlers::api::v1::router())
         .fallback(handlers::frontend::handler)

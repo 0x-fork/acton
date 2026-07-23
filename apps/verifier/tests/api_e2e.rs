@@ -54,6 +54,24 @@ async fn healthz_returns_ok() {
 }
 
 #[tokio::test]
+async fn robots_txt_disallows_crawling() {
+    let response = get(app_state(&[], CODE_HASH_ONE), "/robots.txt").await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers().get(header::CONTENT_TYPE),
+        Some(&header::HeaderValue::from_static(
+            "text/plain; charset=utf-8"
+        ))
+    );
+
+    let body = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("robots.txt response body should be readable");
+    assert_eq!(body.as_ref(), b"User-agent: *\nDisallow: /\n");
+}
+
+#[tokio::test]
 async fn version_returns_long_version() {
     let response = get(app_state(&[], CODE_HASH_ONE), "/version").await;
 
