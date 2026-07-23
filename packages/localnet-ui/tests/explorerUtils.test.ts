@@ -4,6 +4,7 @@ import {
   formatAbsoluteTime,
   formatDnsName,
   formatTimeAgo,
+  mergeAccountDomains,
   parseTonDnsSearchQuery,
   shortenIdentifier,
 } from "../src/explorer/components/utils"
@@ -28,6 +29,27 @@ describe("formatDnsName", () => {
 
   test("keeps regular domain names unchanged", () => {
     expect(formatDnsName("monk.t.me")).toBe("monk.t.me")
+  })
+})
+
+describe("mergeAccountDomains", () => {
+  test("keeps the primary domain first and appends unique aliases", () => {
+    expect(
+      mergeAccountDomains("monk.t.me", ["wolf.t.me", "monk.t.me", "xn--037ha7bb.ton"]),
+    ).toEqual(["monk.t.me", "wolf.t.me", "xn--037ha7bb.ton"])
+  })
+
+  test("trims names, ignores blanks, and deduplicates case-insensitively", () => {
+    expect(
+      mergeAccountDomains("  MONK.T.ME  ", ["monk.t.me", " ", " wolf.t.me ", "WOLF.T.ME"]),
+    ).toEqual(["MONK.T.ME", "wolf.t.me"])
+  })
+
+  test("works without a primary domain", () => {
+    expect(mergeAccountDomains(undefined, ["acton.ton", "mintmachine.ton"])).toEqual([
+      "acton.ton",
+      "mintmachine.ton",
+    ])
   })
 })
 

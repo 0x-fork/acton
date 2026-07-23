@@ -36,7 +36,7 @@ import {
   getImageSources,
   replaceBrokenImageWithFallback,
 } from "../components/imageFallbacks"
-import {normalizeAddress, toRawAddress} from "../components/utils"
+import {mergeAccountDomains, normalizeAddress, toRawAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
@@ -1500,20 +1500,6 @@ function getAccountDomain(stateV3: AccountStatesResponse | void): string | undef
   const currentAccount = stateV3.accounts[0]
   const domain = currentAccount ? stateV3.address_book[currentAccount.address]?.domain : undefined
   return domain?.trim() || undefined
-}
-
-function mergeAccountDomains(
-  primaryDomain: string | undefined,
-  domains: readonly string[],
-): readonly string[] {
-  const uniqueDomains = new Map<string, string>()
-  for (const domain of [primaryDomain, ...domains]) {
-    const normalizedDomain = domain?.trim()
-    if (normalizedDomain) {
-      uniqueDomains.set(normalizedDomain.toLowerCase(), normalizedDomain)
-    }
-  }
-  return [...uniqueDomains.values()]
 }
 
 function tokenInfoString(info: AccountStateTokenInfo | undefined, key: string): string | undefined {

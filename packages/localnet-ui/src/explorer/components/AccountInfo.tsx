@@ -20,7 +20,8 @@ import {
   getPrimaryImageSource,
   replaceBrokenImageWithFallback,
 } from "./imageFallbacks"
-import {formatAddress, formatDnsName, formatNano, normalizeAddress, toRawAddress} from "./utils"
+import {getAccountNameDetails} from "./accountNameDetails"
+import {formatAddress, formatNano, normalizeAddress, toRawAddress} from "./utils"
 
 const TOKEN_PREVIEW_LIMIT = 5
 
@@ -52,26 +53,6 @@ interface CollectiblePreview {
   readonly blurred?: boolean
   readonly collectionName?: string
   readonly name?: string
-}
-
-interface NameDetailGroup {
-  readonly key: string
-  readonly label: string
-  readonly values: readonly string[]
-  readonly formatDnsNames?: boolean
-}
-
-function nameDetailGroup(
-  key: NameDetailGroup["key"],
-  label: string,
-  values: readonly (string | undefined)[],
-  excludedValue: string | undefined,
-  formatDnsNames = false,
-): NameDetailGroup | undefined {
-  const filteredValues = uniqueNames(values).filter(value => value !== excludedValue)
-  return filteredValues.length > 0
-    ? {key, label, values: filteredValues, formatDnsNames}
-    : undefined
 }
 
 export const AccountInfo: FC<AccountInfoProps> = ({
@@ -186,35 +167,14 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   }, [isEditing])
 
   const displayName = customName || domain
-  const normalizedDisplayName = displayName?.trim()
-  const tonDnsNames = uniqueNames([domain, ...domains, nameSources.tonDnsName])
-  const displayNameText =
-    normalizedDisplayName && includesName(tonDnsNames, normalizedDisplayName)
-      ? formatDnsName(normalizedDisplayName)
-      : displayName
-  const nameDetailGroups = [
-    nameDetailGroup("custom", "Custom", [nameSources.customName], normalizedDisplayName),
-    nameDetailGroup(
-      "ton-assets",
-      "Known names",
-      [nameSources.tonAssetsName],
-      normalizedDisplayName,
-    ),
-    nameDetailGroup(
-      "ton-dns",
-      "TON DNS",
-      tonDnsNames.filter(name => !isTelegramDnsName(name)),
-      normalizedDisplayName,
-      true,
-    ),
-    nameDetailGroup(
-      "telegram",
-      "Telegram",
-      tonDnsNames.filter(isTelegramDnsName),
-      normalizedDisplayName,
-      true,
-    ),
-  ].filter((group): group is NameDetailGroup => group !== undefined)
+  const {displayNameText, groups: nameDetailGroups} = getAccountNameDetails({
+    displayName,
+    domain,
+    domains,
+    customName: nameSources.customName,
+    tonAssetsName: nameSources.tonAssetsName,
+    tonDnsName: nameSources.tonDnsName,
+  })
   const hasNameDetails = nameDetailGroups.length > 0
 
   const handleStartEdit = () => {
@@ -352,13 +312,11 @@ export const AccountInfo: FC<AccountInfoProps> = ({
           <span className={styles.addressFormatLabel}>{group.label}</span>
           <div className={styles.nameDetailValues}>
             {group.values.map(value => (
-              <div key={value} className={styles.addressFormatValueRow}>
-                <code className={styles.addressFormatValue}>
-                  {group.formatDnsNames ? formatDnsName(value) : value}
-                </code>
+              <div key={value.copyValue} className={styles.addressFormatValueRow}>
+                <code className={styles.addressFormatValue}>{value.displayValue}</code>
                 <CopyInlineAction
                   size="compact"
-                  value={value}
+                  value={value.copyValue}
                   label={`Copy ${group.label} name`}
                   copiedLabel={`${group.label} name copied`}
                 />
@@ -797,26 +755,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
       </div>
     </div>
   )
-}
-
-function uniqueNames(names: readonly (string | undefined)[]): readonly string[] {
-  const unique = new Map<string, string>()
-  for (const name of names) {
-    const normalizedName = name?.trim()
-    if (normalizedName) {
-      unique.set(normalizedName.toLowerCase(), normalizedName)
-    }
-  }
-  return [...unique.values()]
-}
-
-function includesName(names: readonly string[], expectedName: string): boolean {
-  const normalizedExpectedName = expectedName.toLowerCase()
-  return names.some(name => name.toLowerCase() === normalizedExpectedName)
-}
-
-function isTelegramDnsName(name: string): boolean {
-  return name.toLowerCase().endsWith(".t.me")
 }
 
 function getContractTypeLabels(

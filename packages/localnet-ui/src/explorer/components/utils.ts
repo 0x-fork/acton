@@ -61,6 +61,21 @@ export function formatDnsName(value: string): string {
   }
 }
 
+export function mergeAccountDomains(
+  primaryDomain: string | undefined,
+  domains: readonly string[],
+): readonly string[] {
+  const uniqueDomains = new Map<string, string>()
+  for (const domain of [primaryDomain, ...domains]) {
+    const normalizedDomain = domain?.trim()
+    const domainKey = normalizedDomain?.toLowerCase()
+    if (normalizedDomain && domainKey && !uniqueDomains.has(domainKey)) {
+      uniqueDomains.set(domainKey, normalizedDomain)
+    }
+  }
+  return [...uniqueDomains.values()]
+}
+
 export interface AddressFormatOptions {
   readonly bounceable?: boolean
   readonly testOnly?: boolean
