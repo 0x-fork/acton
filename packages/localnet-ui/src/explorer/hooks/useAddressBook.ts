@@ -15,6 +15,14 @@ import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
 type AddressName = string | undefined
 
+export function resolveAddressName(
+  customName: AddressName,
+  tonAssetsName: AddressName,
+  domainName: AddressName,
+): AddressName {
+  return customName ?? tonAssetsName ?? domainName
+}
+
 interface AddressBookDomainRow {
   readonly domain?: string | null
 }
@@ -81,11 +89,13 @@ export const AddressBookProvider: FC<{
     if (!address) return
     const key = normalizeKey(address)
     if (cacheRef.current.has(key)) {
-      return (
-        cacheRef.current.get(key) ?? domainsRef.current.get(key) ?? tonAssetsRef.current.get(key)
+      return resolveAddressName(
+        cacheRef.current.get(key),
+        tonAssetsRef.current.get(key),
+        domainsRef.current.get(key),
       )
     }
-    return domainsRef.current.get(key) ?? tonAssetsRef.current.get(key)
+    return resolveAddressName(undefined, tonAssetsRef.current.get(key), domainsRef.current.get(key))
   }, [])
 
   const updateNames = useCallback((entries: readonly (readonly [string, AddressName])[]) => {
@@ -193,9 +203,11 @@ export const AddressBookProvider: FC<{
         updateNames(entries)
         for (const request of requests) {
           request.resolve(
-            namesByAddress[request.address] ??
-              domainsRef.current.get(normalizeKey(request.address)) ??
+            resolveAddressName(
+              namesByAddress[request.address],
               tonAssetsRef.current.get(normalizeKey(request.address)),
+              domainsRef.current.get(normalizeKey(request.address)),
+            ),
           )
         }
       })
@@ -205,7 +217,13 @@ export const AddressBookProvider: FC<{
         updateNames(entries)
         for (const request of requests) {
           const key = normalizeKey(request.address)
-          request.resolve(domainsRef.current.get(key) ?? tonAssetsRef.current.get(key))
+          request.resolve(
+            resolveAddressName(
+              undefined,
+              tonAssetsRef.current.get(key),
+              domainsRef.current.get(key),
+            ),
+          )
         }
       })
   }, [metadataRegistry, updateNames])
@@ -223,8 +241,10 @@ export const AddressBookProvider: FC<{
       if (!address) return
       const key = normalizeKey(address)
       if (cacheRef.current.has(key)) {
-        return (
-          cacheRef.current.get(key) ?? domainsRef.current.get(key) ?? tonAssetsRef.current.get(key)
+        return resolveAddressName(
+          cacheRef.current.get(key),
+          tonAssetsRef.current.get(key),
+          domainsRef.current.get(key),
         )
       }
       const pending = pendingRef.current.get(key)
