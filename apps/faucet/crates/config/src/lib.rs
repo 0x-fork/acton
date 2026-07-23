@@ -312,10 +312,7 @@ mod tests {
         assert_eq!(parse_nanograms("0.5GRAM"), Some(500_000_000));
         assert_eq!(parse_nanograms(".25gram"), Some(250_000_000));
         assert_eq!(parse_nanograms("1e-9GRAM"), Some(1));
-        assert_eq!(
-            parse_nanograms("1.000000001GRAM"),
-            Some(1_000_000_001)
-        );
+        assert_eq!(parse_nanograms("1.000000001GRAM"), Some(1_000_000_001));
     }
 
     #[test]
