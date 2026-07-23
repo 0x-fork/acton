@@ -109,7 +109,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
   const activeRunRef = useRef<FaucetRun | undefined>(undefined)
   const activeToastRef = useRef<string | undefined>(undefined)
   const running = isRunningPhase(phase)
-  const requestBlocked = running || usage.limitReached
+  const requestBlocked = !isTestnetSelected || running || usage.limitReached
   const primaryButtonLabel =
     !running && usage.limitReached ? rateLimitButtonLabel(usage) : requestButtonLabel(phase)
   const addressHistoryItems: readonly SearchInputItem[] =
@@ -380,8 +380,12 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
                 variant="primary"
                 size="lg"
                 loading={running}
-                disabled={usage.limitReached}
-                trailingIcon={running || usage.limitReached ? undefined : <ArrowRight size={17} />}
+                disabled={!isTestnetSelected || usage.limitReached}
+                trailingIcon={
+                  running || !isTestnetSelected || usage.limitReached ? undefined : (
+                    <ArrowRight size={17} />
+                  )
+                }
               >
                 {primaryButtonLabel}
               </Button>

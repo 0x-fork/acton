@@ -52,11 +52,13 @@ test.describe("Testnet faucet", () => {
 
     await expect(page.getByText("Mainnet selected")).toBeVisible()
     await expect(page.getByText("Faucet payouts are always sent on Testnet")).toBeVisible()
+    await expect(page.getByRole("button", {name: "Get testnet GRAM"})).toBeDisabled()
     await page.getByRole("button", {name: "Switch to Testnet"}).click()
 
     await expect(page).toHaveURL(/\/faucet\?network=testnet$/)
     await expect(page.getByText("Mainnet selected")).toHaveCount(0)
     await expect(page.getByRole("button", {name: "Testnet", exact: true})).toBeVisible()
+    await expect(page.getByRole("button", {name: "Get testnet GRAM"})).toBeEnabled()
   })
 
   test("disables requests when the local hourly history reaches the limit", async ({page}) => {
