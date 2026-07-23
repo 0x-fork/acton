@@ -168,6 +168,13 @@ mod tests {
     }
 
     #[test]
+    fn matches_actonscan_sha256_test_vector() {
+        let pow = Pow::new(12);
+
+        assert!(pow.verify("actonscan-test-vector", 3_869));
+    }
+
+    #[test]
     fn generated_challenge_is_accepted_at_zero_difficulty() {
         let pow = Pow::new(0);
 

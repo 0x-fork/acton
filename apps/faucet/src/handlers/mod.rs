@@ -1,9 +1,13 @@
 use axum::{
     Router,
+    http::{HeaderValue, Method, header::CONTENT_TYPE},
     middleware::{self, from_fn_with_state},
     routing::{get, post},
 };
-use faucet_backend::middlewares::{require_airdrop_headers, require_pow_enabled};
+use faucet_backend::middlewares::{
+    ACTON_CLIENT_HEADER, DEVICE_UID_HEADER, require_airdrop_headers, require_pow_enabled,
+};
+use tower_http::cors::CorsLayer;
 
 use crate::AppState;
 
@@ -35,4 +39,106 @@ pub(crate) fn router(state: AppState) -> Router {
         .route("/version", get(health::version))
         .merge(airdrop_routes)
         .with_state(state)
+}
+
+pub(crate) fn airdrop_cors_layer() -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin([
+            HeaderValue::from_static("https://actonscan.com"),
+            HeaderValue::from_static("http://localhost:3007"),
+            HeaderValue::from_static("http://127.0.0.1:3007"),
+        ])
+        .allow_methods([Method::POST])
+        .allow_headers([CONTENT_TYPE, DEVICE_UID_HEADER, ACTON_CLIENT_HEADER])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::airdrop_cors_layer;
+    use axum::{
+        Router,
+        body::Body,
+        extract::Request,
+        http::{
+            Method, StatusCode,
+            header::{
+                ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS,
+                ACCESS_CONTROL_ALLOW_ORIGIN, ACCESS_CONTROL_REQUEST_HEADERS,
+                ACCESS_CONTROL_REQUEST_METHOD, ORIGIN,
+            },
+        },
+        middleware::{self, Next},
+        response::{IntoResponse, Response},
+        routing::post,
+    };
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn actonscan_preflight_bypasses_inner_rate_limit() {
+        let app = Router::new()
+            .route("/challenge", post(|| async { "ok" }))
+            .route_layer(middleware::from_fn(always_rate_limited))
+            .layer(airdrop_cors_layer());
+        let request = Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/challenge")
+            .header(ORIGIN, "https://actonscan.com")
+            .header(ACCESS_CONTROL_REQUEST_METHOD, "POST")
+            .header(
+                ACCESS_CONTROL_REQUEST_HEADERS,
+                "content-type,x-device-uid,x-acton-client",
+            )
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(),
+            "https://actonscan.com"
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get(ACCESS_CONTROL_ALLOW_METHODS)
+                .unwrap(),
+            "POST"
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get(ACCESS_CONTROL_ALLOW_HEADERS)
+                .unwrap(),
+            "content-type,x-device-uid,x-acton-client"
+        );
+    }
+
+    async fn always_rate_limited(_request: Request, _next: Next) -> Response {
+        StatusCode::TOO_MANY_REQUESTS.into_response()
+    }
+
+    #[tokio::test]
+    async fn rejects_unknown_browser_origin() {
+        let app = Router::new()
+            .route("/challenge", post(|| async { "ok" }))
+            .layer(airdrop_cors_layer());
+        let request = Request::builder()
+            .method(Method::OPTIONS)
+            .uri("/challenge")
+            .header(ORIGIN, "https://example.com")
+            .header(ACCESS_CONTROL_REQUEST_METHOD, "POST")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(
+            response
+                .headers()
+                .get(ACCESS_CONTROL_ALLOW_ORIGIN)
+                .is_none()
+        );
+    }
 }

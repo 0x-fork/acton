@@ -1086,6 +1086,7 @@ dependencies = [
  "ton",
  "toncenter",
  "tower 0.5.2",
+ "tower-http",
  "tracing",
  "tracing-subscriber",
 ]

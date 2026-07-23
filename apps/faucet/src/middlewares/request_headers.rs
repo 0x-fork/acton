@@ -1,42 +1,54 @@
 use axum::{
     extract::Request,
-    http::{HeaderValue, StatusCode, header::USER_AGENT},
+    http::{HeaderName, HeaderValue, StatusCode, header::USER_AGENT},
     middleware::Next,
     response::{IntoResponse, Response},
 };
 use tracing::debug;
 
 const ALLOWED_USER_AGENT_PREFIX: &str = "acton/";
-const DEVICE_UID_HEADER: &str = "x-device-uid";
+const ALLOWED_BROWSER_CLIENT_PREFIX: &str = "actonscan/";
+pub const ACTON_CLIENT_HEADER: HeaderName = HeaderName::from_static("x-acton-client");
+pub const DEVICE_UID_HEADER: HeaderName = HeaderName::from_static("x-device-uid");
 const DEFAULT_DEVICE_UID: &str = "default";
 
 pub async fn require_airdrop_headers(request: Request, next: Next) -> Response {
     let headers = request.headers();
     let user_agent = headers.get(USER_AGENT);
-    let device_uid = headers.get(DEVICE_UID_HEADER);
-    let is_user_agent_allowed = user_agent.is_some_and(is_allowed_user_agent);
+    let browser_client = headers.get(&ACTON_CLIENT_HEADER);
+    let device_uid = headers.get(&DEVICE_UID_HEADER);
+    let is_client_allowed = user_agent.is_some_and(is_allowed_user_agent)
+        || browser_client.is_some_and(is_allowed_browser_client);
     let is_device_uid_allowed = device_uid.is_some_and(is_allowed_device_uid);
 
-    if is_user_agent_allowed && is_device_uid_allowed {
+    if is_client_allowed && is_device_uid_allowed {
         return next.run(request).await;
     }
 
-    if !is_user_agent_allowed {
+    if !is_client_allowed {
         debug!(
-            header = %USER_AGENT,
-            value = header_value(user_agent),
-            "Airdrop request header failed validation"
+            user_agent = header_value(user_agent),
+            browser_client = header_value(browser_client),
+            "Airdrop client headers failed validation"
         );
     }
     if !is_device_uid_allowed {
         debug!(
-            header = DEVICE_UID_HEADER,
+            header = %DEVICE_UID_HEADER,
             value = header_value(device_uid),
             "Airdrop request header failed validation"
         );
     }
 
     StatusCode::BAD_REQUEST.into_response()
+}
+
+fn is_allowed_browser_client(value: &HeaderValue) -> bool {
+    value.to_str().is_ok_and(|client| {
+        client
+            .strip_prefix(ALLOWED_BROWSER_CLIENT_PREFIX)
+            .is_some_and(|version| !version.trim().is_empty())
+    })
 }
 
 fn is_allowed_user_agent(value: &HeaderValue) -> bool {
@@ -62,7 +74,26 @@ fn header_value(value: Option<&HeaderValue>) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_allowed_device_uid, is_allowed_user_agent};
+    use super::{is_allowed_browser_client, is_allowed_device_uid, is_allowed_user_agent};
+
+    #[test]
+    fn allows_actonscan_version_browser_client() {
+        assert!(is_allowed_browser_client(
+            &"actonscan/1.0.0".parse().unwrap()
+        ));
+        assert!(is_allowed_browser_client(
+            &"actonscan/1.0.0-beta.1".parse().unwrap()
+        ));
+    }
+
+    #[test]
+    fn rejects_missing_or_unknown_browser_client_version() {
+        assert!(!is_allowed_browser_client(&"actonscan/".parse().unwrap()));
+        assert!(!is_allowed_browser_client(&"actonscan/ ".parse().unwrap()));
+        assert!(!is_allowed_browser_client(
+            &"explorer/1.0.0".parse().unwrap()
+        ));
+    }
 
     #[test]
     fn allows_acton_package_version_user_agent() {
