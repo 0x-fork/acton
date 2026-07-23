@@ -9,7 +9,6 @@ Acton.toml
 .acton/
 gen/
 build/*
-!build/Dockerfile
 lcov.info
 libraries.toml
 global.libraries.toml
