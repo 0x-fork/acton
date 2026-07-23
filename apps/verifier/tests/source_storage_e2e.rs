@@ -8,6 +8,7 @@ use std::{
 };
 
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 use verifier::{
     config::Config,
@@ -62,19 +63,13 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
 
     assert_eq!(receipt.revision.len(), 40);
     assert!(receipt.created);
-    assert_eq!(
-        git_output(&fixture.repo_path, ["log", "-1", "--format=%B"])?,
-        format!(
-            "Verify code hash {CODE_HASH}\n\ncode_hash: {CODE_HASH}\nsource_bundle_hash: {SOURCE_BUNDLE_HASH}"
-        )
-    );
 
     let stored_main = fixture.repo_path.join(&bundle_path).join("files/main.tolk");
     let stored_lib = fixture
         .repo_path
         .join(&bundle_path)
         .join("files/imports/lib.tolk");
-    let manifest = fixture.repo_path.join(&bundle_path).join("manifest.json");
+    let manifest_path = fixture.repo_path.join(&bundle_path).join("manifest.json");
 
     assert_eq!(
         fs::read_to_string(stored_main)?,
@@ -82,7 +77,16 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
     );
     assert_eq!(fs::read_to_string(stored_lib)?, "fun helper() {}");
 
-    let manifest = serde_json::from_slice::<serde_json::Value>(&fs::read(manifest)?)?;
+    let manifest_bytes = fs::read(manifest_path)?;
+    let manifest_hash = hex::encode(Sha256::digest(&manifest_bytes));
+    assert_eq!(
+        git_output(&fixture.repo_path, ["log", "-1", "--format=%B"])?,
+        format!(
+            "Verify code hash {CODE_HASH}\n\ncode_hash: {CODE_HASH}\nsource_bundle_hash: {SOURCE_BUNDLE_HASH}\nmanifest_hash: {manifest_hash}"
+        )
+    );
+
+    let manifest = serde_json::from_slice::<serde_json::Value>(&manifest_bytes)?;
     assert_eq!(manifest["code_hash"], CODE_HASH);
     assert_eq!(manifest["source_bundle_hash"], SOURCE_BUNDLE_HASH);
     assert_eq!(manifest["compiler"]["entrypoint"], "main.tolk");

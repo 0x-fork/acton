@@ -160,14 +160,14 @@ impl GitSourceStorage {
             })?;
 
             write_bundle_files(&files_dir, &request.files).await?;
-            write_manifest(&bundle_dir, &request, verified_at).await?;
+            let manifest_hash = write_manifest(&bundle_dir, &request, verified_at).await?;
 
             if self.commit_enabled {
                 git(repo_path, &["add", "--", &bundle_path]).await?;
 
                 let staged = git_has_staged_changes(repo_path, &bundle_path).await?;
                 if staged {
-                    let message = commit_message(&request);
+                    let message = commit_message(&request, &manifest_hash);
                     git_with_author(
                         repo_path,
                         &["commit", "-m", &message, "--", &bundle_path],
@@ -432,7 +432,7 @@ async fn write_manifest(
     bundle_dir: &Path,
     request: &StoreSourceBundleRequest,
     verified_at: u64,
-) -> Result<(), SourceStorageError> {
+) -> Result<String, SourceStorageError> {
     let mut files = request
         .files
         .iter()
@@ -456,10 +456,12 @@ async fn write_manifest(
     };
     let bytes =
         serde_json::to_vec_pretty(&manifest).map_err(SourceStorageError::SerializeManifest)?;
+    let manifest_hash = hex::encode(Sha256::digest(&bytes));
     let path = bundle_dir.join("manifest.json");
-    fs::write(&path, bytes)
+    fs::write(&path, &bytes)
         .await
-        .map_err(|source| SourceStorageError::WriteFile { path, source })
+        .map_err(|source| SourceStorageError::WriteFile { path, source })?;
+    Ok(manifest_hash)
 }
 
 fn current_unix_timestamp() -> Result<u64, SourceStorageError> {
@@ -673,10 +675,10 @@ async fn current_branch(repo_path: &Path) -> Result<String, SourceStorageError> 
     Ok(branch)
 }
 
-fn commit_message(request: &StoreSourceBundleRequest) -> String {
+fn commit_message(request: &StoreSourceBundleRequest, manifest_hash: &str) -> String {
     format!(
-        "Verify code hash {}\n\ncode_hash: {}\nsource_bundle_hash: {}",
-        request.code_hash, request.code_hash, request.source_bundle_hash
+        "Verify code hash {}\n\ncode_hash: {}\nsource_bundle_hash: {}\nmanifest_hash: {}",
+        request.code_hash, request.code_hash, request.source_bundle_hash, manifest_hash
     )
 }
 
