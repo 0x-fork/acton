@@ -84,4 +84,43 @@ test.describe("Verified contracts", () => {
       .poll(async () => Math.abs((await page.evaluate(() => window.scrollY)) - previousScrollY))
       .toBeLessThan(2)
   })
+
+  test("opens a code hash in a new tab with the middle mouse button", async ({context, page}) => {
+    await page.goto("/verified")
+
+    const target = VERIFIED_ITEMS.at(0)
+    if (!target) {
+      throw new Error("Expected a verified contract fixture")
+    }
+    const targetLink = page.getByRole("link", {name: `Open code hash ${target.code_hash}`})
+    const newTabPromise = context.waitForEvent("page")
+    await targetLink.click({button: "middle"})
+    const newTab = await newTabPromise
+
+    await expect(newTab).toHaveURL(`/verified/${target.code_hash}`)
+    await expect(page).toHaveURL("/verified")
+    await newTab.close()
+  })
+
+  test("opens a contract row in a new tab with the middle mouse button", async ({
+    context,
+    page,
+  }) => {
+    await page.goto("/verified")
+
+    const target = VERIFIED_ITEMS.at(0)
+    if (!target) {
+      throw new Error("Expected a verified contract fixture")
+    }
+
+    const newTabPromise = context.waitForEvent("page")
+    await page
+      .getByRole("link", {name: `Open verified contract ${target.code_hash}`})
+      .click({button: "middle"})
+    const newTab = await newTabPromise
+
+    await expect(newTab).toHaveURL(`/verified/${target.code_hash}`)
+    await expect(page).toHaveURL("/verified")
+    await newTab.close()
+  })
 })

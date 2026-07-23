@@ -13,7 +13,7 @@ import {
   Button,
 } from "@acton/ui"
 import {useEffect, useMemo, useRef, useState} from "react"
-import type {KeyboardEvent as ReactKeyboardEvent} from "react"
+import type {MouseEvent as ReactMouseEvent} from "react"
 
 import type {LastVerifiedItem, VerifierApi} from "../lib/api"
 import {shortenMiddle} from "../lib/target"
@@ -73,23 +73,23 @@ function sourceName(item: LastVerifiedItem): string {
   return item.entrypoint || "Unknown"
 }
 
-function handleRowKeyDown(
-  event: ReactKeyboardEvent<HTMLTableRowElement>,
+function handleContractLinkClick(
+  event: ReactMouseEvent<HTMLAnchorElement>,
   item: LastVerifiedItem,
   onOpenContract: (item: LastVerifiedItem) => void,
 ): void {
-  if (event.currentTarget !== event.target) {
+  event.stopPropagation()
+  if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
     return
   }
 
-  if (event.key === "Enter" || event.key === " ") {
-    event.preventDefault()
-    onOpenContract(item)
-  }
+  event.preventDefault()
+  onOpenContract(item)
 }
 
 export interface VerifiedContractsPageProps {
   readonly api: VerifierApi
+  readonly getContractHref: (item: LastVerifiedItem) => string
   readonly onOpenContract: (item: LastVerifiedItem) => void
   readonly page?: number
   readonly onPageChange?: (page: number) => void
@@ -100,6 +100,7 @@ export interface VerifiedContractsPageProps {
 
 export function VerifiedContractsPage({
   api,
+  getContractHref,
   onOpenContract,
   page: controlledPage,
   onPageChange,
@@ -219,20 +220,28 @@ export function VerifiedContractsPage({
               <DataTableEmpty colSpan={5}>No verified contracts indexed yet</DataTableEmpty>
             ) : (
               sortedItems.map(item => (
-                <DataTableRow
-                  key={item.code_hash}
-                  interactive
-                  role="link"
-                  tabIndex={0}
-                  aria-label={`Open code hash ${item.code_hash}`}
-                  onClick={() => onOpenContract(item)}
-                  onKeyDown={event => handleRowKeyDown(event, item, onOpenContract)}
-                >
+                <DataTableRow key={item.code_hash} className={styles.contractRow} interactive>
                   <DataTableCell>
-                    <div className={styles.codeHashCell}>
-                      <span className={styles.codeHash} title={item.code_hash}>
-                        {shortenMiddle(item.code_hash, 18, 12)}
+                    <a
+                      className={styles.rowOverlayLink}
+                      href={getContractHref(item)}
+                      aria-label={`Open verified contract ${item.code_hash}`}
+                      onClick={event => handleContractLinkClick(event, item, onOpenContract)}
+                    >
+                      <span className={styles.visuallyHidden}>
+                        Open verified contract {item.code_hash}
                       </span>
+                    </a>
+                    <div className={styles.codeHashCell}>
+                      <a
+                        className={styles.codeHash}
+                        href={getContractHref(item)}
+                        title={item.code_hash}
+                        aria-label={`Open code hash ${item.code_hash}`}
+                        onClick={event => handleContractLinkClick(event, item, onOpenContract)}
+                      >
+                        {shortenMiddle(item.code_hash, 18, 12)}
+                      </a>
                       <CopyInlineAction
                         className={styles.hashCopyButton}
                         value={item.code_hash}

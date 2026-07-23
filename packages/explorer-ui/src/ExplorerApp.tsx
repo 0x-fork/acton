@@ -994,6 +994,7 @@ const VerifiedContractsRoute: FC = () => {
   return (
     <VerifiedContractsPage
       api={ACTON_VERIFIER_API}
+      getContractHref={item => `/verified/${encodeURIComponent(item.code_hash)}`}
       page={initialPage}
       onPageChange={page => {
         currentPageRef.current = page
