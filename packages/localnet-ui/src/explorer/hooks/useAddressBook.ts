@@ -15,6 +15,12 @@ import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
 type AddressName = string | undefined
 
+export interface AddressNameSources {
+  readonly customName?: string
+  readonly tonAssetsName?: string
+  readonly tonDnsName?: string
+}
+
 export function resolveAddressName(
   customName: AddressName,
   tonAssetsName: AddressName,
@@ -38,6 +44,7 @@ export interface TonAssetsNameMatch {
 }
 
 interface AddressBookContextValue {
+  readonly getNameSources: (address: string) => AddressNameSources
   readonly getCachedName: (address: string) => AddressName | undefined
   readonly fetchName: (address: string) => Promise<AddressName>
   readonly prefetchNames: (addresses: readonly string[]) => Promise<void>
@@ -85,18 +92,23 @@ export const AddressBookProvider: FC<{
   const batchScheduledRef = useRef(false)
   const [version, setVersion] = useState(0)
 
-  const getCachedName = useCallback((address: string) => {
-    if (!address) return
+  const getNameSources = useCallback((address: string): AddressNameSources => {
+    if (!address) return {}
     const key = normalizeKey(address)
-    if (cacheRef.current.has(key)) {
-      return resolveAddressName(
-        cacheRef.current.get(key),
-        tonAssetsRef.current.get(key),
-        domainsRef.current.get(key),
-      )
+    return {
+      customName: cacheRef.current.get(key),
+      tonAssetsName: tonAssetsRef.current.get(key),
+      tonDnsName: domainsRef.current.get(key),
     }
-    return resolveAddressName(undefined, tonAssetsRef.current.get(key), domainsRef.current.get(key))
   }, [])
+
+  const getCachedName = useCallback(
+    (address: string) => {
+      const sources = getNameSources(address)
+      return resolveAddressName(sources.customName, sources.tonAssetsName, sources.tonDnsName)
+    },
+    [getNameSources],
+  )
 
   const updateNames = useCallback((entries: readonly (readonly [string, AddressName])[]) => {
     if (entries.length === 0) return
@@ -301,6 +313,7 @@ export const AddressBookProvider: FC<{
 
   const value = useMemo(
     () => ({
+      getNameSources,
       getCachedName,
       fetchName,
       prefetchNames,
@@ -313,6 +326,7 @@ export const AddressBookProvider: FC<{
     [
       fetchName,
       getCachedName,
+      getNameSources,
       prefetchNames,
       searchTonAssetsNames,
       setAddressName,
@@ -357,6 +371,11 @@ export const useAddressName = (address: string) => {
   }, [address, fetchName, getCachedName])
 
   return name
+}
+
+export const useAddressNameSources = (address: string): AddressNameSources => {
+  const {getNameSources, version} = useAddressBook()
+  return useMemo(() => getNameSources(address), [address, getNameSources, version])
 }
 
 function buildTonAssetsAccounts(

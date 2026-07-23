@@ -214,6 +214,11 @@
   flex: 0 1 auto;
 }
 
+.namePopover {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .addressFormats {
   display: grid;
   gap: 10px;
@@ -274,6 +279,10 @@
   font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   overflow-wrap: anywhere;
+}
+
+.nameWithDetails {
+  cursor: help;
 }
 
 .renamePanel {

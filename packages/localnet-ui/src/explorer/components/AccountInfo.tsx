@@ -8,7 +8,7 @@ import {CopyInlineAction, InfoPopover, Input, Popover} from "@acton/ui"
 import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {TonClient} from "../api/client"
 import type {ContractAbiLink, ExtendedContractABI} from "../api/compilerAbi"
-import {useAddressBook, useAddressName} from "../hooks/useAddressBook"
+import {useAddressBook, useAddressName, useAddressNameSources} from "../hooks/useAddressBook"
 import {useFavoriteAccounts} from "../hooks/useFavoriteAccounts"
 import {useNetworkInfo, type ExplorerNetworkId} from "../hooks/useNetworkInfo"
 
@@ -53,6 +53,21 @@ interface CollectiblePreview {
   readonly name?: string
 }
 
+interface NameDetail {
+  readonly key: "custom" | "ton-assets" | "ton-dns"
+  readonly label: string
+  readonly value: string
+}
+
+function nameDetail(
+  key: NameDetail["key"],
+  label: string,
+  value: string | undefined,
+): NameDetail | undefined {
+  const normalizedValue = value?.trim()
+  return normalizedValue ? {key, label, value: normalizedValue} : undefined
+}
+
 export const AccountInfo: FC<AccountInfoProps> = ({
   address,
   domain,
@@ -81,6 +96,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const {setAddressName} = useAddressBook()
   const {isFavorite, toggleFavorite} = useFavoriteAccounts()
   const resolvedName = useAddressName(address)
+  const nameSources = useAddressNameSources(address)
   const {addressFormat, forkNetwork, network} = useNetworkInfo()
   const displayAddress = normalizeAddress(address, addressFormat)
   const bounceableAddress = normalizeAddress(address, {...addressFormat, bounceable: true})
@@ -163,6 +179,16 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   }, [isEditing])
 
   const displayName = customName || domain
+  const normalizedDisplayName = displayName?.trim()
+  const nameDetails = [
+    nameDetail("custom", "Custom", nameSources.customName),
+    nameDetail("ton-assets", "Known names", nameSources.tonAssetsName),
+    nameDetail("ton-dns", "TON DNS", nameSources.tonDnsName ?? domain),
+  ].filter(
+    (detail): detail is NameDetail =>
+      detail !== undefined && detail.value !== normalizedDisplayName,
+  )
+  const hasNameDetails = nameDetails.length > 0
 
   const handleStartEdit = () => {
     setEditValue(displayName || "")
@@ -292,6 +318,24 @@ export const AccountInfo: FC<AccountInfoProps> = ({
       </div>
     </div>
   )
+  const nameDetailsContent = (
+    <div className={styles.addressFormats}>
+      {nameDetails.map(detail => (
+        <div key={detail.key} className={styles.addressFormatRow}>
+          <span className={styles.addressFormatLabel}>{detail.label}</span>
+          <div className={styles.addressFormatValueRow}>
+            <code className={styles.addressFormatValue}>{detail.value}</code>
+            <CopyInlineAction
+              size="compact"
+              value={detail.value}
+              label={`Copy ${detail.label} name`}
+              copiedLabel={`${detail.label} name copied`}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <div className={cardClassName}>
@@ -346,7 +390,23 @@ export const AccountInfo: FC<AccountInfoProps> = ({
               <div className={styles.infoRow}>
                 <div className={styles.label}>Name</div>
                 <div className={styles.rowValue}>
-                  <span className={styles.customName}>{displayName}</span>
+                  {hasNameDetails ? (
+                    <Popover
+                      aria-label="Show name details"
+                      ariaLabel="Name details"
+                      className={styles.namePopover}
+                      content={nameDetailsContent}
+                      maxWidth="min(36rem, calc(100vw - 32px))"
+                      openDelay={150}
+                      placement="bottom"
+                    >
+                      <span className={`${styles.customName} ${styles.nameWithDetails}`}>
+                        {displayName}
+                      </span>
+                    </Popover>
+                  ) : (
+                    <span className={styles.customName}>{displayName}</span>
+                  )}
                   <button
                     type="button"
                     className={styles.iconButton}
@@ -369,6 +429,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                   className={styles.addressPopover}
                   content={addressFormats}
                   maxWidth="min(36rem, calc(100vw - 32px))"
+                  openDelay={150}
                   placement="bottom"
                 >
                   <span className={styles.addressValue}>{addressRowText}</span>
