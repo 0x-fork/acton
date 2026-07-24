@@ -3,7 +3,7 @@ import {Check, Copy, Edit2, QrCode, Star} from "lucide-react"
 import {QRCodeSVG} from "qrcode.react"
 import {useEffect, useId, useRef, useState} from "react"
 import type {FC} from "react"
-import {CopyInlineAction, InfoPopover, Input, Popover} from "@acton/ui"
+import {CopyInlineAction, InfoPopover, Input, Popover, Tooltip} from "@acton/ui"
 
 import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {TonClient} from "../api/client"
@@ -398,15 +398,16 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                   ) : (
                     <span className={styles.customName}>{displayNameText}</span>
                   )}
-                  <button
-                    type="button"
-                    className={styles.iconButton}
-                    onClick={handleStartEdit}
-                    title="Rename address"
-                    aria-label="Rename address"
-                  >
-                    <Edit2 size={16} />
-                  </button>
+                  <Tooltip content="Rename address">
+                    <button
+                      type="button"
+                      className={styles.iconButton}
+                      onClick={handleStartEdit}
+                      aria-label="Rename address"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             ) : undefined}
@@ -426,36 +427,46 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                   <span className={styles.addressValue}>{addressRowText}</span>
                 </Popover>
                 <span className={styles.addressActions}>
-                  <button
-                    type="button"
-                    className={`${styles.iconButton} ${favorite ? styles.favoriteButtonActive : ""}`}
-                    onClick={handleToggleFavorite}
-                    title={favorite ? "Remove from favorites" : "Add to favorites"}
-                    aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
-                    aria-pressed={favorite}
-                  >
-                    <Star size={16} className={favorite ? styles.favoriteIconActive : undefined} />
-                  </button>
+                  <Tooltip content={favorite ? "Remove from favorites" : "Add to favorites"}>
+                    <button
+                      type="button"
+                      className={`${styles.iconButton} ${favorite ? styles.favoriteButtonActive : ""}`}
+                      onClick={handleToggleFavorite}
+                      aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
+                      aria-pressed={favorite}
+                    >
+                      <Star
+                        size={16}
+                        className={favorite ? styles.favoriteIconActive : undefined}
+                      />
+                    </button>
+                  </Tooltip>
                   {!displayName && !isEditing && (
+                    <Tooltip content="Rename address">
+                      <button
+                        type="button"
+                        className={styles.iconButton}
+                        onClick={handleStartEdit}
+                        aria-label="Rename address"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                    </Tooltip>
+                  )}
+                  <Tooltip content={copied ? "Copied" : "Copy address"}>
                     <button
                       type="button"
                       className={styles.iconButton}
-                      onClick={handleStartEdit}
-                      title="Rename address"
-                      aria-label="Rename address"
+                      onClick={copyToClipboard}
+                      aria-label={copied ? "Copied" : "Copy address"}
                     >
-                      <Edit2 size={16} />
+                      {copied ? (
+                        <Check size={16} className={styles.saveIcon} />
+                      ) : (
+                        <Copy size={16} />
+                      )}
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className={styles.iconButton}
-                    onClick={copyToClipboard}
-                    title={copied ? "Copied" : "Copy address"}
-                    aria-label={copied ? "Copied" : "Copy address"}
-                  >
-                    {copied ? <Check size={16} className={styles.saveIcon} /> : <Copy size={16} />}
-                  </button>
+                  </Tooltip>
                 </span>
               </div>
             </div>
@@ -733,23 +744,22 @@ export const AccountInfo: FC<AccountInfoProps> = ({
           </div>
         </div>
 
-        <Popover
-          key={rawAddress}
-          ariaLabel="Address QR code"
-          content={qrCode}
-          interaction="click"
-          placement="bottom"
-          triggerAsChild
-        >
-          <button
-            type="button"
-            className={styles.qrToggle}
-            title="Show QR code"
-            aria-label="Show QR code"
-          >
-            <QrCode size={16} />
-          </button>
-        </Popover>
+        <Tooltip content="Show QR code">
+          <span className={styles.tooltipTrigger}>
+            <Popover
+              key={rawAddress}
+              ariaLabel="Address QR code"
+              content={qrCode}
+              interaction="click"
+              placement="bottom"
+              triggerAsChild
+            >
+              <button type="button" className={styles.qrToggle} aria-label="Show QR code">
+                <QrCode size={16} />
+              </button>
+            </Popover>
+          </span>
+        </Tooltip>
 
         <div className={styles.qrPanel} aria-label="Address QR code">
           {qrCode}

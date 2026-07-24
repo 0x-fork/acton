@@ -42,6 +42,7 @@
     "./components/theme-provider": "./src/components/Theme/index.ts",
     "./components/theme-switch": "./src/components/ThemeSwitch/index.ts",
     "./components/toast": "./src/components/Toast/index.ts",
+    "./components/tooltip": "./src/components/Tooltip/index.ts",
     "./components/visually-grouped-number": "./src/components/VisuallyGroupedNumber/index.ts",
     "./styles/*": "./src/styles/*"
   },

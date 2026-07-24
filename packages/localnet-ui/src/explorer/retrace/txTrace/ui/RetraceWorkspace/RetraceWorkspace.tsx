@@ -25,7 +25,7 @@ import {
 } from "lucide-react"
 
 import type {ContractData} from "@acton/transaction-ui"
-import {CopyInlineAction, InlineLoader} from "@acton/ui"
+import {CopyInlineAction, InlineLoader, Tooltip} from "@acton/ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {
@@ -348,50 +348,54 @@ function TraceStepToolbar({
         </span>
 
         <div className={styles.sourceDebugNavigation}>
-          <button
-            type="button"
-            className={styles.sourceDebugIconButton}
-            onClick={onFirst}
-            disabled={!canGoPrev}
-            title="Go to first trace step"
-            aria-label="Go to first trace step"
-            data-testid="go-to-first-step-button"
-          >
-            <SkipBack size={15} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={styles.sourceDebugIconButton}
-            onClick={onPrev}
-            disabled={!canGoPrev}
-            title="Previous trace step"
-            aria-label="Previous trace step"
-            data-testid="prev-step-button"
-          >
-            <ChevronLeft size={16} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={styles.sourceDebugIconButton}
-            onClick={onNext}
-            disabled={!canGoNext}
-            title="Next trace step"
-            aria-label="Next trace step"
-            data-testid="next-step-button"
-          >
-            <ChevronRight size={16} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className={styles.sourceDebugIconButton}
-            onClick={onLast}
-            disabled={!canGoNext}
-            title="Go to last trace step"
-            aria-label="Go to last trace step"
-            data-testid="go-to-last-step-button"
-          >
-            <SkipForward size={15} aria-hidden="true" />
-          </button>
+          <Tooltip content="Go to first trace step">
+            <button
+              type="button"
+              className={styles.sourceDebugIconButton}
+              onClick={onFirst}
+              disabled={!canGoPrev}
+              aria-label="Go to first trace step"
+              data-testid="go-to-first-step-button"
+            >
+              <SkipBack size={15} aria-hidden="true" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Previous trace step">
+            <button
+              type="button"
+              className={styles.sourceDebugIconButton}
+              onClick={onPrev}
+              disabled={!canGoPrev}
+              aria-label="Previous trace step"
+              data-testid="prev-step-button"
+            >
+              <ChevronLeft size={16} aria-hidden="true" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Next trace step">
+            <button
+              type="button"
+              className={styles.sourceDebugIconButton}
+              onClick={onNext}
+              disabled={!canGoNext}
+              aria-label="Next trace step"
+              data-testid="next-step-button"
+            >
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Go to last trace step">
+            <button
+              type="button"
+              className={styles.sourceDebugIconButton}
+              onClick={onLast}
+              disabled={!canGoNext}
+              aria-label="Go to last trace step"
+              data-testid="go-to-last-step-button"
+            >
+              <SkipForward size={15} aria-hidden="true" />
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>
@@ -1212,19 +1216,19 @@ function SourceFilesEditor({
     <section className={styles.sourceShell} aria-label="Verified source files">
       <div className={styles.sourceFileTabs} role="tablist" aria-label="Source files">
         {bundle.files.map(file => (
-          <button
-            key={file.path}
-            type="button"
-            className={`${styles.sourceFileTab} ${
-              file.path === activeFile.path ? styles.sourceFileTabActive : ""
-            }`}
-            onClick={() => handleSourceFileSelect(file.path)}
-            title={file.path}
-            role="tab"
-            aria-selected={file.path === activeFile.path}
-          >
-            <span className={styles.sourceFileTabName}>{sourceFileLabel(file.path)}</span>
-          </button>
+          <Tooltip key={file.path} content={file.path}>
+            <button
+              type="button"
+              className={`${styles.sourceFileTab} ${
+                file.path === activeFile.path ? styles.sourceFileTabActive : ""
+              }`}
+              onClick={() => handleSourceFileSelect(file.path)}
+              role="tab"
+              aria-selected={file.path === activeFile.path}
+            >
+              <span className={styles.sourceFileTabName}>{sourceFileLabel(file.path)}</span>
+            </button>
+          </Tooltip>
         ))}
       </div>
 

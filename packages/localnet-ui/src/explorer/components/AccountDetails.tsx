@@ -21,6 +21,7 @@ import {
   DataTableTable,
   NftChip,
   Popover,
+  Tooltip,
 } from "@acton/ui"
 import {
   BadgeDollarSign,
@@ -749,18 +750,18 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                         actionFilterOptions.map(option => {
                           const selected = !hiddenActionKeys.has(option.key)
                           return (
-                            <button
-                              key={option.key}
-                              type="button"
-                              className={`${styles.actionFilterChip} ${
-                                selected ? styles.actionFilterChipSelected : ""
-                              }`}
-                              onClick={() => toggleActionFilter(option.key)}
-                              aria-pressed={selected}
-                              title={`${option.label} (${option.count})`}
-                            >
-                              {option.label}
-                            </button>
+                            <Tooltip key={option.key} content={`${option.label} (${option.count})`}>
+                              <button
+                                type="button"
+                                className={`${styles.actionFilterChip} ${
+                                  selected ? styles.actionFilterChipSelected : ""
+                                }`}
+                                onClick={() => toggleActionFilter(option.key)}
+                                aria-pressed={selected}
+                              >
+                                {option.label}
+                              </button>
+                            </Tooltip>
                           )
                         })
                       )}

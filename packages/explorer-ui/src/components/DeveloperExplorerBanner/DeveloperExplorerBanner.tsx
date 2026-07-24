@@ -1,5 +1,6 @@
 import {Code2, ExternalLink, X} from "lucide-react"
 import {useState} from "react"
+import {Tooltip} from "@acton/ui"
 
 import styles from "./DeveloperExplorerBanner.module.css"
 
@@ -49,15 +50,16 @@ export function DeveloperExplorerBanner() {
             <ExternalLink size={13} aria-hidden="true" />
           </a>
         </p>
-        <button
-          type="button"
-          className={styles.closeButton}
-          aria-label="Dismiss developer explorer notice"
-          title="Dismiss"
-          onClick={dismiss}
-        >
-          <X size={16} aria-hidden="true" />
-        </button>
+        <Tooltip content="Dismiss">
+          <button
+            type="button"
+            className={styles.closeButton}
+            aria-label="Dismiss developer explorer notice"
+            onClick={dismiss}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </Tooltip>
       </div>
     </aside>
   )

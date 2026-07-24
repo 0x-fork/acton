@@ -14,7 +14,7 @@ import {
   decodeStorageShardAccount,
   type ValueFlowItem,
 } from "@acton/transaction-ui"
-import {InlineAction} from "@acton/ui"
+import {InlineAction, Tooltip} from "@acton/ui"
 import {
   AlertCircle,
   ArrowLeft,
@@ -654,25 +654,30 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
 
     return (
       <span className={styles.messageRouteActions}>
-        <button
-          type="button"
-          className={`${styles.retraceInlineButton} ${isRetraceOpen ? styles.retraceInlineButtonActive : ""}`}
-          onClick={() => handleRetrace(txHash)}
-          aria-expanded={isRetraceOpen}
+        <Tooltip
+          content={isRetraceOpen ? "Close transaction debugger" : "Open transaction debugger"}
         >
-          <Bug size={14} />
-          Debug
-        </button>
-        {tx.transaction.inMessage ? (
           <button
             type="button"
-            className={styles.retraceInlineButton}
-            onClick={() => handleEmulate(tx, messageName)}
-            title="Open and edit this message in Emulate"
+            className={`${styles.retraceInlineButton} ${isRetraceOpen ? styles.retraceInlineButtonActive : ""}`}
+            onClick={() => handleRetrace(txHash)}
+            aria-expanded={isRetraceOpen}
           >
-            <FlaskConical size={14} />
-            Edit &amp; emulate
+            <Bug size={14} />
+            Debug
           </button>
+        </Tooltip>
+        {tx.transaction.inMessage ? (
+          <Tooltip content="Open and edit this message in Emulate">
+            <button
+              type="button"
+              className={styles.retraceInlineButton}
+              onClick={() => handleEmulate(tx, messageName)}
+            >
+              <FlaskConical size={14} />
+              Edit &amp; emulate
+            </button>
+          </Tooltip>
         ) : null}
       </span>
     )

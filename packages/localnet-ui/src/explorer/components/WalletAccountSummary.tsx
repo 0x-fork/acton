@@ -1,5 +1,6 @@
 import type {FC} from "react"
 import {formatUnits} from "@ton/walletkit"
+import {Tooltip} from "@acton/ui"
 
 import type {JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
@@ -74,51 +75,52 @@ function WalletTokenPreview({
   const previewTokens = tokens.slice(1, TOKEN_PREVIEW_LIMIT)
 
   return (
-    <button
-      type="button"
-      className={styles.tokenPreviewButton}
-      onClick={event => onOpenTokens(address, event)}
-      title="Open wallet tokens"
-      aria-label="Open wallet tokens"
-    >
-      <img
-        src={firstImage}
-        alt=""
-        className={styles.tokenPreviewIcon}
-        onError={event => replaceBrokenImageWithFallback(event, firstImageSources)}
-      />
-      <span className={styles.tokenPreviewAmount}>
-        {formatTokenAmount(firstToken.balance, firstDecimals)} {firstSymbol}
-      </span>
-      {previewTokens.length > 0 && (
-        <span className={styles.tokenPreviewStack} aria-hidden="true">
-          {previewTokens.map((token, index) => {
-            const imageSources = getImageSources(
-              token.master?.jetton_content,
-              TOKEN_IMAGE_SOURCE_KEYS,
-            )
-            const image = imageSources[0]
-            return image ? (
-              <img
-                key={token.address}
-                src={image}
-                alt=""
-                className={styles.tokenPreviewStackIcon}
-                style={{zIndex: previewTokens.length - index}}
-                onError={event => replaceBrokenImageWithFallback(event, imageSources)}
-              />
-            ) : (
-              <span
-                key={token.address}
-                className={styles.tokenPreviewStackPlaceholder}
-                style={{zIndex: previewTokens.length - index}}
-              />
-            )
-          })}
+    <Tooltip content="Open wallet tokens">
+      <button
+        type="button"
+        className={styles.tokenPreviewButton}
+        onClick={event => onOpenTokens(address, event)}
+        aria-label="Open wallet tokens"
+      >
+        <img
+          src={firstImage}
+          alt=""
+          className={styles.tokenPreviewIcon}
+          onError={event => replaceBrokenImageWithFallback(event, firstImageSources)}
+        />
+        <span className={styles.tokenPreviewAmount}>
+          {formatTokenAmount(firstToken.balance, firstDecimals)} {firstSymbol}
         </span>
-      )}
-      <span className={styles.tokenPreviewAction}>View all</span>
-    </button>
+        {previewTokens.length > 0 && (
+          <span className={styles.tokenPreviewStack} aria-hidden="true">
+            {previewTokens.map((token, index) => {
+              const imageSources = getImageSources(
+                token.master?.jetton_content,
+                TOKEN_IMAGE_SOURCE_KEYS,
+              )
+              const image = imageSources[0]
+              return image ? (
+                <img
+                  key={token.address}
+                  src={image}
+                  alt=""
+                  className={styles.tokenPreviewStackIcon}
+                  style={{zIndex: previewTokens.length - index}}
+                  onError={event => replaceBrokenImageWithFallback(event, imageSources)}
+                />
+              ) : (
+                <span
+                  key={token.address}
+                  className={styles.tokenPreviewStackPlaceholder}
+                  style={{zIndex: previewTokens.length - index}}
+                />
+              )
+            })}
+          </span>
+        )}
+        <span className={styles.tokenPreviewAction}>View all</span>
+      </button>
+    </Tooltip>
   )
 }
 

@@ -16,6 +16,7 @@ import {cx} from "../../lib/cx"
 import {HighlightedCode} from "../HighlightedCode/HighlightedCode"
 import type {HighlightedCodeLanguage} from "../HighlightedCode/types"
 import {CopyInlineAction} from "../InlineActions/InlineActions"
+import {Tooltip} from "../Tooltip"
 import styles from "./CodeViewer.module.css"
 
 export interface CodeViewerFile {
@@ -126,30 +127,32 @@ export function CodeViewer({
     >
       {isDesktopTreeVisible && (
         <aside className={cx(styles.fileTree, styles.desktopFileTree)} aria-label="Source files">
-          <button
-            type="button"
-            className={styles.desktopTreeToggle}
-            title="Hide source files"
-            aria-label="Hide source files"
-            onClick={() => setDesktopTreeVisible(false)}
-          >
-            <PanelLeftClose aria-hidden="true" />
-          </button>
+          <Tooltip content="Hide source files">
+            <button
+              type="button"
+              className={styles.desktopTreeToggle}
+              aria-label="Hide source files"
+              onClick={() => setDesktopTreeVisible(false)}
+            >
+              <PanelLeftClose aria-hidden="true" />
+            </button>
+          </Tooltip>
           {fileTree}
         </aside>
       )}
       <div className={styles.codePane}>
         <div className={styles.codePaneHeader}>
           {!isDesktopTreeVisible && (
-            <button
-              type="button"
-              className={styles.desktopTreeExpand}
-              title="Show source files"
-              aria-label="Show source files"
-              onClick={() => setDesktopTreeVisible(true)}
-            >
-              <PanelLeftOpen aria-hidden="true" />
-            </button>
+            <Tooltip content="Show source files">
+              <button
+                type="button"
+                className={styles.desktopTreeExpand}
+                aria-label="Show source files"
+                onClick={() => setDesktopTreeVisible(true)}
+              >
+                <PanelLeftOpen aria-hidden="true" />
+              </button>
+            </Tooltip>
           )}
           <button
             type="button"
@@ -276,19 +279,20 @@ function FileTreeRows({
         const isActive = node.path === activePath
         return (
           <li key={node.path} className={styles.treeItem}>
-            <button
-              type="button"
-              className={cx(styles.treeRow, isActive && styles.activeRow)}
-              style={depthStyle}
-              title={node.path}
-              aria-current={isActive ? "true" : undefined}
-              onClick={() => node.file && onSelect(node.file.path)}
-            >
-              <span className={styles.disclosurePlaceholder} aria-hidden="true" />
-              <FileCode2 className={styles.rowIcon} aria-hidden="true" />
-              <span>{node.name}</span>
-              {node.path === entrypointPath && <span className={styles.entrypoint}>main</span>}
-            </button>
+            <Tooltip content={node.path}>
+              <button
+                type="button"
+                className={cx(styles.treeRow, isActive && styles.activeRow)}
+                style={depthStyle}
+                aria-current={isActive ? "true" : undefined}
+                onClick={() => node.file && onSelect(node.file.path)}
+              >
+                <span className={styles.disclosurePlaceholder} aria-hidden="true" />
+                <FileCode2 className={styles.rowIcon} aria-hidden="true" />
+                <span>{node.name}</span>
+                {node.path === entrypointPath && <span className={styles.entrypoint}>main</span>}
+              </button>
+            </Tooltip>
           </li>
         )
       })}

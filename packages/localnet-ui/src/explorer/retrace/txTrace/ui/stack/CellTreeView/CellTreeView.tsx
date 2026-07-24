@@ -1,6 +1,7 @@
 import type React from "react"
 import {useState, useMemo} from "react"
 import type {Cell} from "@ton/core"
+import {Tooltip} from "@acton/ui"
 
 import styles from "./CellTreeView.module.css"
 
@@ -144,14 +145,16 @@ const CellTreeView: React.FC<CellTreeViewProps> = ({cell, depth = 0, maxBitsLeng
             refsCount
           )}
         </div>
-        <button
-          type="button"
-          className={`${styles.copyButton} ${copied ? styles.copied : ""}`}
-          onClick={handleCopyToClipboard}
-          title="Copy BoC (Hex)"
-        >
-          {copied ? <CheckIcon /> : <CopyIcon />}
-        </button>
+        <Tooltip content="Copy BoC (Hex)">
+          <button
+            type="button"
+            className={`${styles.copyButton} ${copied ? styles.copied : ""}`}
+            onClick={handleCopyToClipboard}
+            aria-label="Copy BoC (Hex)"
+          >
+            {copied ? <CheckIcon /> : <CopyIcon />}
+          </button>
+        </Tooltip>
       </div>
       {isExpanded && refsCount > 0 && (
         <div className={styles.cellRefs}>

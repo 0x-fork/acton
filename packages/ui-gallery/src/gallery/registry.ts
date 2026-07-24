@@ -36,6 +36,7 @@ import {themeSwitchGallery} from "./themeSwitchGallery"
 import {tlbCellViewerGallery} from "./tlbCellViewerGallery"
 import {toastGallery} from "./toastGallery"
 import {tokensGallery} from "./tokensGallery"
+import {tooltipGallery} from "./tooltipGallery"
 import {visuallyGroupedNumberGallery} from "./visuallyGroupedNumberGallery"
 import type {ComponentGallery} from "./types"
 
@@ -46,6 +47,7 @@ export const galleries = [
   abiViewerGallery,
   blockChipGallery,
   buttonGallery,
+  tooltipGallery,
   inputGallery,
   selectGallery,
   searchInputGallery,

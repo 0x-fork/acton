@@ -1,5 +1,5 @@
 import {BookOpen, Check, Copy, FastForward} from "lucide-react"
-import {Button, Dialog, Input, useToast} from "@acton/ui"
+import {Button, Dialog, Input, Tooltip, useToast} from "@acton/ui"
 import {Link, useNavigate} from "react-router-dom"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent} from "react"
@@ -424,18 +424,19 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                             <span className={styles.nodeInfoValueMeta}>{row.secondaryValue}</span>
                           )}
                         </span>
-                        <button
-                          type="button"
-                          className={styles.nodeInfoTimeButton}
-                          aria-label="Advance node time"
-                          aria-haspopup="dialog"
-                          aria-expanded={isTimeModalOpen}
-                          title="Advance time"
-                          onClick={openTimeAdvanceModal}
-                        >
-                          <FastForward size={14} />
-                          <span>Advance</span>
-                        </button>
+                        <Tooltip content="Advance time">
+                          <button
+                            type="button"
+                            className={styles.nodeInfoTimeButton}
+                            aria-label="Advance node time"
+                            aria-haspopup="dialog"
+                            aria-expanded={isTimeModalOpen}
+                            onClick={openTimeAdvanceModal}
+                          >
+                            <FastForward size={14} />
+                            <span>Advance</span>
+                          </button>
+                        </Tooltip>
                       </div>
                     ) : (
                       <span
@@ -470,26 +471,28 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                     <span className={styles.endpointValueRow}>
                       <span className={styles.endpointValue}>{endpoint.value}</span>
                       <span className={styles.endpointActions}>
-                        <button
-                          type="button"
-                          className={`${styles.endpointButton} ${isCopied ? styles.endpointButtonCopied : ""}`}
-                          aria-label={
-                            isCopied ? "Endpoint copied" : `Copy ${endpoint.label} endpoint`
-                          }
-                          title={isCopied ? "Copied" : "Copy endpoint"}
-                          onClick={() => void copyEndpoint(endpoint.value)}
-                        >
-                          {isCopied ? <Check size={14} /> : <Copy size={14} />}
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.endpointButton}
-                          aria-label={`Open ${endpoint.label} reference`}
-                          title="Open API reference"
-                          onClick={() => void navigate(endpoint.referencePath)}
-                        >
-                          <BookOpen size={14} />
-                        </button>
+                        <Tooltip content={isCopied ? "Copied" : "Copy endpoint"}>
+                          <button
+                            type="button"
+                            className={`${styles.endpointButton} ${isCopied ? styles.endpointButtonCopied : ""}`}
+                            aria-label={
+                              isCopied ? "Endpoint copied" : `Copy ${endpoint.label} endpoint`
+                            }
+                            onClick={() => void copyEndpoint(endpoint.value)}
+                          >
+                            {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                          </button>
+                        </Tooltip>
+                        <Tooltip content="Open API reference">
+                          <button
+                            type="button"
+                            className={styles.endpointButton}
+                            aria-label={`Open ${endpoint.label} reference`}
+                            onClick={() => void navigate(endpoint.referencePath)}
+                          >
+                            <BookOpen size={14} />
+                          </button>
+                        </Tooltip>
                       </span>
                     </span>
                   </div>

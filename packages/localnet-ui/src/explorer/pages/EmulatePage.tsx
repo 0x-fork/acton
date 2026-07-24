@@ -1502,6 +1502,7 @@ export function EmulatePage({client}: EmulatePageProps) {
             leadingIcon={<Play size={16} />}
             loading={isLoading}
             disabled={!canEmulate || isSendingToLocalnet}
+            title="Run transaction emulation"
           >
             Emulate
           </Button>

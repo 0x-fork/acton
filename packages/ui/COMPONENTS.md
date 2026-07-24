@@ -1435,6 +1435,49 @@ content that needs multiple lines, links, small actions, or structured detail.
   popover.
 - Do not reuse the popover shadow on other components.
 
+## Tooltip
+
+Status: ready
+
+Import:
+
+```tsx
+import { Tooltip } from "@acton/ui"
+```
+
+Use Tooltip for short, supplementary button labels that appear on hover or
+keyboard focus. It replaces the browser-native `title` popup while preserving
+the button's own accessible name.
+
+### Composition
+
+```tsx
+<Tooltip content="Open transaction debugger">
+  <button type="button" aria-label="Open transaction debugger">
+    <Bug aria-hidden="true" />
+  </button>
+</Tooltip>
+```
+
+- `content`: short visual-only supporting text.
+- `placement`: preferred side: `top`, `right`, `bottom`, or `left`.
+- `delay` and `closeDelay`: hover/focus timing in milliseconds.
+- `offset`: distance between the trigger and popup.
+- Positioning uses Base UI collision handling and a portal.
+
+### Agent Guidance
+
+- Use Tooltip only as supplementary help; the button still needs visible text
+  or an `aria-label`.
+- Prefer the button's existing `title` prop when using `Button`,
+  `InlineButton`, or `InlineAction`; those components render the shared
+  Tooltip automatically.
+- Keep tooltip copy short and action-oriented.
+- Use Popover instead when the content contains links, controls, or structured
+  detail.
+- Do not attach Tooltip to non-button content until the component adoption
+  scope is intentionally expanded.
+
 ## Dialog
 
 Status: ready

@@ -1,6 +1,7 @@
 import {PanelLeftOpen} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
+import {Tooltip} from "@acton/ui"
 
 import type {TonClient} from "../explorer/api/client"
 
@@ -173,15 +174,16 @@ export const DashboardPage: FC<DashboardPageProps> = ({
       </div>
 
       {isSidebarCollapsed && !isSidebarPreviewOpen && (
-        <button
-          type="button"
-          onClick={expandSidebar}
-          className={styles.sidebarExpandButton}
-          title="Expand navigation"
-          aria-label="Expand navigation"
-        >
-          <PanelLeftOpen size={18} />
-        </button>
+        <Tooltip content="Expand navigation">
+          <button
+            type="button"
+            onClick={expandSidebar}
+            className={styles.sidebarExpandButton}
+            aria-label="Expand navigation"
+          >
+            <PanelLeftOpen size={18} />
+          </button>
+        </Tooltip>
       )}
 
       <section className={styles.contentArea}>

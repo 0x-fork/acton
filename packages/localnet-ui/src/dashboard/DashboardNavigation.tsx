@@ -28,7 +28,7 @@ import {
 } from "lucide-react"
 import type {LucideIcon} from "lucide-react"
 import {useLocation, useNavigate} from "react-router-dom"
-import {ThemeSwitch} from "@acton/ui"
+import {ThemeSwitch, Tooltip} from "@acton/ui"
 
 import type {TonClient} from "../explorer/api/client"
 import {readExplorerLastPath, writeExplorerLastPath} from "../explorer/explorerResume"
@@ -278,57 +278,62 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
 
               <div className={styles.navUtilityRow}>
                 {onToggleSidebar && (
-                  <button
-                    type="button"
-                    className={styles.sidebarToggleButton}
-                    onClick={onToggleSidebar}
-                    title={isSidebarCollapsed ? "Pin navigation" : "Collapse navigation"}
-                    aria-label={isSidebarCollapsed ? "Pin navigation" : "Collapse navigation"}
-                  >
-                    {isSidebarCollapsed ? (
-                      <PanelLeftOpen size={18} />
-                    ) : (
-                      <PanelLeftClose size={18} />
-                    )}
-                  </button>
+                  <Tooltip content={isSidebarCollapsed ? "Pin navigation" : "Collapse navigation"}>
+                    <button
+                      type="button"
+                      className={styles.sidebarToggleButton}
+                      onClick={onToggleSidebar}
+                      aria-label={isSidebarCollapsed ? "Pin navigation" : "Collapse navigation"}
+                    >
+                      {isSidebarCollapsed ? (
+                        <PanelLeftOpen size={18} />
+                      ) : (
+                        <PanelLeftClose size={18} />
+                      )}
+                    </button>
+                  </Tooltip>
                 )}
 
-                <button
-                  type="button"
-                  className={`${styles.sidebarUtilityButton} ${
-                    localnetApiToken ? styles.sidebarUtilityButtonActive : ""
-                  }`}
-                  onClick={() => {
-                    onOpenAuthTokenOverlay()
-                    closeMobileMenu()
-                  }}
-                  title={localnetApiToken ? "Localnet API token set" : "Set localnet API token"}
-                  aria-label={
-                    localnetApiToken ? "Edit localnet API token" : "Set localnet API token"
-                  }
+                <Tooltip
+                  content={localnetApiToken ? "Localnet API token set" : "Set localnet API token"}
                 >
-                  <KeyRound size={18} />
-                  {localnetApiToken ? (
-                    <Check size={12} className={styles.utilityStatusIcon} />
-                  ) : undefined}
-                </button>
+                  <button
+                    type="button"
+                    className={`${styles.sidebarUtilityButton} ${
+                      localnetApiToken ? styles.sidebarUtilityButtonActive : ""
+                    }`}
+                    onClick={() => {
+                      onOpenAuthTokenOverlay()
+                      closeMobileMenu()
+                    }}
+                    aria-label={
+                      localnetApiToken ? "Edit localnet API token" : "Set localnet API token"
+                    }
+                  >
+                    <KeyRound size={18} />
+                    {localnetApiToken ? (
+                      <Check size={12} className={styles.utilityStatusIcon} />
+                    ) : undefined}
+                  </button>
+                </Tooltip>
 
-                <button
-                  type="button"
-                  className={`${styles.sidebarUtilityButton} ${
-                    location.pathname === "/explorer/favorites"
-                      ? styles.sidebarUtilityButtonActive
-                      : ""
-                  }`}
-                  onClick={() => {
-                    void navigate("/explorer/favorites")
-                    closeMobileMenu()
-                  }}
-                  title="Favorites"
-                  aria-label="Favorites"
-                >
-                  <Star size={18} />
-                </button>
+                <Tooltip content="Favorites">
+                  <button
+                    type="button"
+                    className={`${styles.sidebarUtilityButton} ${
+                      location.pathname === "/explorer/favorites"
+                        ? styles.sidebarUtilityButtonActive
+                        : ""
+                    }`}
+                    onClick={() => {
+                      void navigate("/explorer/favorites")
+                      closeMobileMenu()
+                    }}
+                    aria-label="Favorites"
+                  >
+                    <Star size={18} />
+                  </button>
+                </Tooltip>
 
                 <ThemeSwitch />
               </div>

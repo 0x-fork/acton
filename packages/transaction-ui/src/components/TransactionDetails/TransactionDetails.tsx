@@ -14,6 +14,7 @@ import {
   ParsedValueView,
   RawDataBlock,
   SendModeViewer,
+  Tooltip,
 } from "@acton/ui"
 
 import type {BackendContractInfo, SourceLocation} from "../../model/backend"
@@ -924,14 +925,15 @@ export function TransactionDetails({
                   {blockSeqno}
                 </a>
               ) : blockRef && onBlockClick ? (
-                <button
-                  type="button"
-                  className={styles.blockLink}
-                  title={blockTitle}
-                  onClick={event => onBlockClick(blockRef, event)}
-                >
-                  {blockSeqno}
-                </button>
+                <Tooltip content={blockTitle}>
+                  <button
+                    type="button"
+                    className={styles.blockLink}
+                    onClick={event => onBlockClick(blockRef, event)}
+                  >
+                    {blockSeqno}
+                  </button>
+                </Tooltip>
               ) : (
                 <span title={blockTitle}>{blockSeqno}</span>
               )}
