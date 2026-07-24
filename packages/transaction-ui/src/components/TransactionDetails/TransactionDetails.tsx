@@ -69,7 +69,10 @@ export interface TransactionDetailsProps {
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
   readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
-  readonly renderMessageRouteAction?: (tx: TransactionInfo) => React.ReactNode
+  readonly renderMessageRouteAction?: (
+    tx: TransactionInfo,
+    messageName: string | undefined,
+  ) => React.ReactNode
   readonly getBlockPath?: (blockRef: TransactionBlockRef) => string | undefined
   readonly onBlockClick?: (
     blockRef: TransactionBlockRef,
@@ -175,7 +178,6 @@ export function TransactionDetails({
   const computePhase = getTransactionComputePhase(tx.transaction)
   const actionPhase = getTransactionActionPhase(tx.transaction)
   const triggerLabel = getTransactionTriggerLabel(tx.transaction)
-  const messageRouteAction = renderMessageRouteAction?.(tx)
   const blockRef = tx.blockRef
   const blockSeqno = blockRef?.seqno
   const blockPath = blockRef ? getBlockPath?.(blockRef) : undefined
@@ -280,6 +282,7 @@ export function TransactionDetails({
   const opcode = getTransactionOpcode(tx.transaction, parsedBody)
   const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts, parsedBody)
   const opcodeDisplayName = parsedBody && opcode === undefined ? parsedBody.name : opcodeName
+  const messageRouteAction = renderMessageRouteAction?.(tx, opcodeDisplayName)
   const resolvedOutActions = loadedActions?.outActions ?? tx.outActions
   const resolvedExecutorActions = loadedActions?.executorActions ?? tx.executorActions
 

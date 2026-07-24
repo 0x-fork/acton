@@ -96,7 +96,10 @@ interface TransactionTreeProps {
   ) => React.ReactNode
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
   readonly renderSelectedTransactionExtra?: (tx: TransactionInfo) => React.ReactNode
-  readonly renderSelectedTransactionMessageRouteAction?: (tx: TransactionInfo) => React.ReactNode
+  readonly renderSelectedTransactionMessageRouteAction?: (
+    tx: TransactionInfo,
+    messageName: string | undefined,
+  ) => React.ReactNode
   readonly getBlockPath?: (blockRef: TransactionBlockRef) => string | undefined
   readonly onBlockClick?: (
     blockRef: TransactionBlockRef,

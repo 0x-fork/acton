@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   CircleDotDashed,
   Database,
+  FlaskConical,
   GitBranch,
   Info,
   ListChecks,
@@ -51,6 +52,11 @@ import type {ExplorerMetadataRegistry} from "../metadata/types"
 import type {RetraceResultAndCode, RetraceTraceResult} from "../retrace/txTrace/lib/types"
 import TransactionRetracePanel from "../retrace/txTrace/ui/TransactionRetracePanel"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
+import {
+  createEmulateNavigationState,
+  EMULATE_HANDOFF_QUERY_PARAM,
+  saveEmulateNavigationPayload,
+} from "./emulateNavigation"
 import {enrichTraceTransactions} from "./transactionTraceEnrichment"
 
 import styles from "./TransactionPage.module.css"
@@ -357,6 +363,35 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     setRetraceAttempt(currentAttempt => currentAttempt + 1)
   }
 
+  const handleEmulate = (tx: TransactionInfo, messageName: string | undefined) => {
+    const message = tx.transaction.inMessage
+    if (!message) {
+      return
+    }
+
+    const sourceAbi =
+      message.info.type === "internal" ? contracts.get(message.info.src.toString())?.abi : undefined
+    const state = createEmulateNavigationState(
+      message,
+      {destination: tx.contractAbi, source: sourceAbi},
+      traceOverview?.masterchainSeqnoStart,
+      messageName,
+    )
+    const payloadId = saveEmulateNavigationPayload(state.emulatePayload)
+    if (!payloadId) {
+      void navigate(routes.emulatePath, {state})
+      return
+    }
+
+    const emulateUrl = new URL(routes.emulatePath, globalThis.location.origin)
+    emulateUrl.searchParams.set(EMULATE_HANDOFF_QUERY_PARAM, payloadId)
+    const networkParam = new URLSearchParams(globalThis.location.search).get("network")
+    if (networkParam) {
+      emulateUrl.searchParams.set("network", networkParam)
+    }
+    globalThis.open(emulateUrl.toString(), "_blank", "noopener,noreferrer")
+  }
+
   const handleCloseRetrace = () => {
     setExpandedRetraceHash(undefined)
     if (openRetraceOnLoad) {
@@ -611,20 +646,36 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
 
   const traceAddress = traces[0]?.address?.toString() ?? ""
   const traceAddressDisplay = normalizeAddress(traceAddress, addressFormat)
-  const renderSelectedTransactionMessageRouteAction = (tx: TransactionInfo): JSX.Element => {
+  const renderSelectedTransactionMessageRouteAction = (
+    tx: TransactionInfo,
+    messageName: string | undefined,
+  ): JSX.Element => {
     const txHash = transactionHashHex(tx)
     const isRetraceOpen = expandedRetraceHash === txHash
 
     return (
-      <button
-        type="button"
-        className={`${styles.retraceInlineButton} ${isRetraceOpen ? styles.retraceInlineButtonActive : ""}`}
-        onClick={() => handleRetrace(txHash)}
-        aria-expanded={isRetraceOpen}
-      >
-        <Bug size={14} />
-        Debug
-      </button>
+      <span className={styles.messageRouteActions}>
+        <button
+          type="button"
+          className={`${styles.retraceInlineButton} ${isRetraceOpen ? styles.retraceInlineButtonActive : ""}`}
+          onClick={() => handleRetrace(txHash)}
+          aria-expanded={isRetraceOpen}
+        >
+          <Bug size={14} />
+          Debug
+        </button>
+        {tx.transaction.inMessage ? (
+          <button
+            type="button"
+            className={styles.retraceInlineButton}
+            onClick={() => handleEmulate(tx, messageName)}
+            title="Open and edit this message in Emulate"
+          >
+            <FlaskConical size={14} />
+            Edit &amp; emulate
+          </button>
+        ) : null}
+      </span>
     )
   }
 
@@ -736,7 +787,10 @@ export interface TransactionTraceViewProps {
   readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
   readonly resolveVerifiedSourceByCodeHash?: ResolveVerifiedSourceByCodeHash
   readonly renderSelectedTransactionExtra?: (tx: TransactionInfo) => JSX.Element | null
-  readonly renderSelectedTransactionMessageRouteAction?: (tx: TransactionInfo) => JSX.Element
+  readonly renderSelectedTransactionMessageRouteAction?: (
+    tx: TransactionInfo,
+    messageName: string | undefined,
+  ) => JSX.Element
 }
 
 export function TransactionTraceView({

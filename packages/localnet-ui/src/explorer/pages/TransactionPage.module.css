@@ -126,6 +126,12 @@
   margin-top: 12px;
 }
 
+.messageRouteActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .retraceInlineButton {
   display: inline-flex;
   align-items: center;
