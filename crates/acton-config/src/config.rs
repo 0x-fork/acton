@@ -13,6 +13,9 @@ use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 pub use ton_networks::{CustomNetworkUrls, Network};
 
+pub const MAINNET_GLOBAL_ID: i32 = -239;
+pub const TESTNET_GLOBAL_ID: i32 = -3;
+
 static MANIFEST_PATH: OnceLock<PathBuf> = OnceLock::new();
 static PROJECT_ROOT: OnceLock<PathBuf> = OnceLock::new();
 static MANIFEST_PATH_SOURCE: OnceLock<ResolutionSource> = OnceLock::new();
@@ -130,6 +133,11 @@ pub struct CustomNetworkApiConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CustomNetworkConfig {
+    /// TON network global ID used to derive Wallet V5 IDs. Custom networks
+    /// default to the testnet value (`-3`)
+    #[serde(rename = "global-id")]
+    #[schemars(rename = "global-id")]
+    pub global_id: Option<i32>,
     /// Base URL used to build transaction links for this network. Acton appends
     /// `/tx/<hash>` automatically and derives links from `api.v2` when omitted
     pub explorer: Option<String>,
@@ -987,6 +995,20 @@ impl ActonConfig {
     }
 
     #[must_use]
+    pub fn network_global_id(&self, network: &Network) -> i32 {
+        match network {
+            Network::Mainnet => MAINNET_GLOBAL_ID,
+            Network::Testnet | Network::Localnet => TESTNET_GLOBAL_ID,
+            Network::Custom(name) => self
+                .networks
+                .as_ref()
+                .and_then(|networks| networks.get(name.as_ref()))
+                .and_then(|network| network.global_id)
+                .unwrap_or(TESTNET_GLOBAL_ID),
+        }
+    }
+
+    #[must_use]
     pub fn mappings(&self) -> Option<BTreeMap<String, String>> {
         normalize_mappings(&self.mappings, project_root())
     }
@@ -1780,11 +1802,15 @@ name = "test-project"
 description = "Test project"
 version = "0.1.0"
 
+[localnet]
+fork-net = "mainnet"
+
 [networks.localnet]
 api = { v2 = "http://127.0.0.1:3010/api/v2/", v3 = "http://127.0.0.1:3010/api/v3/" }
 explorer = "http://127.0.0.1:3010/explorer/"
 
 [networks.my-custom]
+global-id = -239
 api = { v2 = "https://example.com/api/v2/" }
 "#;
 
@@ -1810,6 +1836,18 @@ api = { v2 = "https://example.com/api/v2/" }
         assert_eq!(custom.v2_url.as_ref(), "https://example.com/api/v2");
         assert_eq!(custom.v3_url, None);
         assert_eq!(custom.explorer_url, None);
+        assert_eq!(
+            config.network_global_id(&Network::Custom(Arc::from("my-custom"))),
+            MAINNET_GLOBAL_ID
+        );
+        assert_eq!(
+            config.network_global_id(&Network::Custom(Arc::from("development"))),
+            TESTNET_GLOBAL_ID
+        );
+        assert_eq!(
+            config.network_global_id(&Network::Localnet),
+            TESTNET_GLOBAL_ID
+        );
     }
 
     #[test]
