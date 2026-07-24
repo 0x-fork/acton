@@ -147,6 +147,12 @@ fn validate_sources(sources: &[SourceMetadata]) -> Result<(), ApiError> {
 
     for source in sources {
         validate_source_path(&source.path)?;
+        if Path::new(&source.path).starts_with("output") {
+            return Err(ApiError::bad_request(format!(
+                "source path uses reserved output directory: {}",
+                source.path
+            )));
+        }
         if !seen_paths.insert(source.path.clone()) {
             return Err(ApiError::bad_request(format!(
                 "duplicate source path: {}",

@@ -1251,6 +1251,27 @@ async fn verify_rejects_invalid_source_path() {
 }
 
 #[tokio::test]
+async fn verify_rejects_source_in_output_directory() {
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part(
+                "sources",
+                r#"[{"path":"output/main.tolk","is_entrypoint":true}]"#,
+            ),
+            file_part("files", "output/main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_contains(response, "reserved output directory").await;
+}
+
+#[tokio::test]
 async fn verify_rejects_backslash_source_path() {
     let response = post_verify(
         app_state(&[], CODE_HASH_ONE),
