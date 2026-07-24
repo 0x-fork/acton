@@ -16,6 +16,7 @@ name = "mainnet"
 [source_repository]
 # path = "source-repo"
 remote = "origin"
+storage_root = "sources"
 # branch = "main"
 commit_enabled = true
 push_enabled = true

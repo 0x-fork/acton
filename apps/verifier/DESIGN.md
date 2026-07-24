@@ -14,7 +14,8 @@ on-chain code hash matches a code hash present in the source registry.
 The registry is off-chain. Git stores the source bundles and manifests, and the
 runtime registry layer serves reads from a SQLite index. The index can be
 rebuilt from the Git repository by scanning
-`sources/{code_hash}/`.
+`{source_repository.storage_root}/{code_hash}/`. The storage root defaults to
+`sources`.
 
 ## Goals
 
@@ -89,7 +90,7 @@ Responsibilities:
 Source storage persists verified bundles in Git:
 
 ```text
-sources/
+<storage_root>/
   <code_hash>/
     manifest.json
     files/

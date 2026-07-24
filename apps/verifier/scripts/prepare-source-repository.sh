@@ -2,7 +2,6 @@
 set -euo pipefail
 
 readonly init_commit_message="Initialize verifier source repository"
-readonly attributes_rule="sources/** -text"
 
 log() {
     printf 'prepare-source-repository: %s\n' "$*"
@@ -34,6 +33,11 @@ if [[ -z "$repo_path" ]]; then
     echo "source_repository.path is missing in verifier config: $config_path" >&2
     exit 1
 fi
+
+storage_root="$(
+    yq -p=toml -o=json -r '.source_repository.storage_root // "sources"' "$config_path"
+)"
+attributes_rule="$storage_root/** -text"
 
 branch="$(yq -p=toml -o=json -r '.source_repository.branch // "master"' "$config_path")"
 if ! git check-ref-format --branch "$branch" >/dev/null 2>&1; then

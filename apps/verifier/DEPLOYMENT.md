@@ -14,7 +14,8 @@ At runtime the service needs:
 - SQLite registry index for fast reads, rebuilt from Git when stale or missing.
 - Git credentials that allow pushing to the source repository.
 
-The verifier stores verified source bundles in Git under:
+The verifier stores verified source bundles in Git under the configured
+`source_repository.storage_root`, which defaults to `sources`:
 
 ```text
 sources/{code_hash}/
@@ -113,6 +114,7 @@ VERIFIER_TONCENTER_BASE_URL=https://toncenter.com
 VERIFIER_TONCENTER_API_KEY=
 
 SOURCE_REPOSITORY_URL=git@github.com:i582/test-verify-repo.git
+SOURCE_REPOSITORY_STORAGE_ROOT=sources
 SOURCE_REPOSITORY_BRANCH=main
 SOURCE_REPOSITORY_AUTHOR_NAME=ton-verifier
 SOURCE_REPOSITORY_AUTHOR_EMAIL=ton-verifier@example.invalid
@@ -374,9 +376,11 @@ The service has no Git storage path configured. Set:
 
 ```bash
 SOURCE_REPOSITORY_PATH=/var/lib/verifier/source-repo
+SOURCE_REPOSITORY_STORAGE_ROOT=sources
 ```
 
-or mount a TOML config with `[source_repository].path`.
+or mount a TOML config with `[source_repository].path` and
+`[source_repository].storage_root`.
 
 ### Git push fails
 

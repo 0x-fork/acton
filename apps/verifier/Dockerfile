@@ -61,6 +61,7 @@ ENV VERIFIER_CONFIG=/etc/verifier/config.toml \
     VERIFIER_NETWORK=mainnet \
     SOURCE_REPOSITORY_PATH=/var/lib/verifier/source-repo \
     SOURCE_REPOSITORY_REMOTE=origin \
+    SOURCE_REPOSITORY_STORAGE_ROOT=sources \
     SOURCE_REPOSITORY_BRANCH=main \
     SOURCE_REPOSITORY_AUTHOR_NAME=ton-verifier \
     SOURCE_REPOSITORY_AUTHOR_EMAIL=ton-verifier@example.invalid \

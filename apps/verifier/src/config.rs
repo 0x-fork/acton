@@ -18,6 +18,7 @@ const DEFAULT_COMPILER_NODE_BIN: &str = "node";
 const DEFAULT_COMPILER_WORKER_PATH: &str = "compiler-worker/compile.mjs";
 const DEFAULT_COMPILER_TIMEOUT_MS: u64 = 5_000;
 const DEFAULT_SOURCE_REPOSITORY_REMOTE: &str = "origin";
+const DEFAULT_SOURCE_REPOSITORY_STORAGE_ROOT: &str = "sources";
 const DEFAULT_SOURCE_REPOSITORY_COMMIT_ENABLED: bool = true;
 const DEFAULT_SOURCE_REPOSITORY_PUSH_ENABLED: bool = true;
 const DEFAULT_SOURCE_REPOSITORY_AUTHOR_NAME: &str = "ton-verifier";
@@ -33,6 +34,7 @@ pub struct Config {
     toncenter_api_key: Option<String>,
     source_repository_path: Option<PathBuf>,
     source_repository_remote: String,
+    source_repository_storage_root: String,
     source_repository_branch: Option<String>,
     source_repository_commit_enabled: bool,
     source_repository_push_enabled: bool,
@@ -115,6 +117,11 @@ impl Config {
     }
 
     #[must_use]
+    pub fn source_repository_storage_root(&self) -> &str {
+        &self.source_repository_storage_root
+    }
+
+    #[must_use]
     pub fn source_repository_branch(&self) -> Option<&str> {
         self.source_repository_branch.as_deref()
     }
@@ -170,6 +177,7 @@ impl Default for Config {
             toncenter_api_key: None,
             source_repository_path: None,
             source_repository_remote: DEFAULT_SOURCE_REPOSITORY_REMOTE.to_owned(),
+            source_repository_storage_root: DEFAULT_SOURCE_REPOSITORY_STORAGE_ROOT.to_owned(),
             source_repository_branch: None,
             source_repository_commit_enabled: DEFAULT_SOURCE_REPOSITORY_COMMIT_ENABLED,
             source_repository_push_enabled: DEFAULT_SOURCE_REPOSITORY_PUSH_ENABLED,
@@ -261,6 +269,10 @@ impl ConfigFile {
                 .source_repository
                 .remote
                 .unwrap_or_else(|| DEFAULT_SOURCE_REPOSITORY_REMOTE.to_owned()),
+            source_repository_storage_root: self
+                .source_repository
+                .storage_root
+                .unwrap_or_else(|| DEFAULT_SOURCE_REPOSITORY_STORAGE_ROOT.to_owned()),
             source_repository_branch: self.source_repository.branch,
             source_repository_commit_enabled: self
                 .source_repository
@@ -324,6 +336,7 @@ struct ToncenterConfig {
 struct SourceRepositoryConfig {
     path: Option<PathBuf>,
     remote: Option<String>,
+    storage_root: Option<String>,
     branch: Option<String>,
     commit_enabled: Option<bool>,
     push_enabled: Option<bool>,

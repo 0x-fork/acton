@@ -82,6 +82,7 @@ write_generated_config() {
         printf '[source_repository]\n'
         write_optional_string path "${SOURCE_REPOSITORY_PATH:-/var/lib/verifier/source-repo}"
         write_optional_string remote "${SOURCE_REPOSITORY_REMOTE:-origin}"
+        write_optional_string storage_root "${SOURCE_REPOSITORY_STORAGE_ROOT:-sources}"
         write_optional_string branch "${SOURCE_REPOSITORY_BRANCH:-main}"
         write_optional_string author_name "${SOURCE_REPOSITORY_AUTHOR_NAME:-ton-verifier}"
         write_optional_string author_email "${SOURCE_REPOSITORY_AUTHOR_EMAIL:-ton-verifier@example.invalid}"

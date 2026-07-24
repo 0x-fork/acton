@@ -23,7 +23,8 @@ git -C source-repo push origin HEAD:main
 
 The preparation script creates the required root commit with the source-storage
 Git attributes. The verifier refuses to start when this commit is missing or
-the current `.gitattributes` no longer contains `sources/** -text`.
+the current `.gitattributes` no longer contains
+`<source_repository.storage_root>/** -text`.
 
 Or use the local build override:
 
@@ -41,6 +42,7 @@ docker run --rm -p 3000:3000 \
   -e VERIFIER_NETWORK=localnet \
   -e VERIFIER_TONCENTER_BASE_URL=http://host.docker.internal:5412 \
   -e SOURCE_REPOSITORY_URL=https://github.com/i582/test-verify-repo \
+  -e SOURCE_REPOSITORY_STORAGE_ROOT=sources \
   -e SOURCE_REPOSITORY_BRANCH=main \
   -v verifier-source-repo:/var/lib/verifier/source-repo \
   -v verifier-registry-index:/var/lib/verifier/registry-index \

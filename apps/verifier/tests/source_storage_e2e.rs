@@ -23,6 +23,50 @@ const SOURCE_BUNDLE_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 const SECOND_BUNDLE_HASH: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
 #[tokio::test]
+async fn git_source_storage_uses_configured_storage_root() -> Result<(), Box<dyn Error>> {
+    let storage_root = "verified/contracts";
+    let fixture = GitFixture::new_with_storage_root(storage_root)?;
+    let config_path = fixture.write_config_with_storage_root(storage_root)?;
+    let config = Config::load_from_path(config_path)?;
+    let storage = GitSourceStorage::from_config(&config);
+
+    assert!(storage.current_revision().await?.is_some());
+    let receipt = storage
+        .store_bundle(StoreSourceBundleRequest {
+            code_hash: CODE_HASH.to_owned(),
+            source_bundle_hash: SOURCE_BUNDLE_HASH.to_owned(),
+            compiler: CompilerMetadata {
+                language: "tolk".to_owned(),
+                version: "1.4.1".to_owned(),
+                entrypoint: "main.tolk".to_owned(),
+                params: json!({"compiler_version": "1.4.1"}),
+            },
+            files: vec![SourceStorageFile {
+                path: "main.tolk".to_owned(),
+                content: "fun main() {}".to_owned(),
+                include_in_command: None,
+                is_stdlib: None,
+                has_include_directives: None,
+            }],
+            source_map: None,
+        })
+        .await?;
+
+    assert!(receipt.created);
+    assert!(
+        fixture
+            .repo_path
+            .join(storage_root)
+            .join(CODE_HASH)
+            .join("manifest.json")
+            .is_file()
+    );
+    assert_eq!(storage.list_code_hashes().await?, vec![CODE_HASH]);
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn git_source_storage_rejects_untracked_files_at_startup() -> Result<(), Box<dyn Error>> {
     let fixture = GitFixture::new()?;
     fs::write(fixture.repo_path.join("pending.txt"), "not committed\n")?;
@@ -449,6 +493,10 @@ struct GitFixture {
 
 impl GitFixture {
     fn new() -> Result<Self, Box<dyn Error>> {
+        Self::new_with_storage_root("sources")
+    }
+
+    fn new_with_storage_root(storage_root: &str) -> Result<Self, Box<dyn Error>> {
         let temp = TempDir::new()?;
         let repo_path = temp.path().join("repo");
         let remote_path = temp.path().join("remote.git");
@@ -477,7 +525,10 @@ impl GitFixture {
             )?,
             "git remote add",
         )?;
-        fs::write(repo_path.join(".gitattributes"), "sources/** -text\n")?;
+        fs::write(
+            repo_path.join(".gitattributes"),
+            format!("{storage_root}/** -text\n"),
+        )?;
         assert_success(
             run_command(&repo_path, "git", ["add", ".gitattributes"])?,
             "git add .gitattributes",
@@ -512,6 +563,13 @@ impl GitFixture {
     }
 
     fn write_config(&self) -> Result<PathBuf, Box<dyn Error>> {
+        self.write_config_with_storage_root("sources")
+    }
+
+    fn write_config_with_storage_root(
+        &self,
+        storage_root: &str,
+    ) -> Result<PathBuf, Box<dyn Error>> {
         let path = self.temp.path().join("verifier.toml");
         fs::write(
             &path,
@@ -520,6 +578,7 @@ impl GitFixture {
 [source_repository]
 path = "{}"
 remote = "origin"
+storage_root = "{storage_root}"
 branch = "main"
 author_name = "Verifier Bot"
 author_email = "verifier@example.com"

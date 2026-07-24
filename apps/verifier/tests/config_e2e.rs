@@ -20,6 +20,7 @@ fn example_config_toml_loads() {
     assert_eq!(config.toncenter_api_key(), None);
     assert_eq!(config.source_repository_path(), None);
     assert_eq!(config.source_repository_remote(), "origin");
+    assert_eq!(config.source_repository_storage_root(), "sources");
     assert_eq!(config.source_repository_branch(), None);
     assert!(config.source_repository_commit_enabled());
     assert!(config.source_repository_push_enabled());
@@ -83,6 +84,7 @@ api_key = "test-key"
 [source_repository]
 path = "/tmp/verifier-sources"
 remote = "github"
+storage_root = "verified/contracts"
 branch = "verified-sources"
 commit_enabled = false
 push_enabled = false
@@ -111,6 +113,10 @@ path = "/tmp/verifier-index.sqlite3"
         Some("/tmp/verifier-sources".into())
     );
     assert_eq!(config.source_repository_remote(), "github");
+    assert_eq!(
+        config.source_repository_storage_root(),
+        "verified/contracts"
+    );
     assert_eq!(config.source_repository_branch(), Some("verified-sources"));
     assert!(!config.source_repository_commit_enabled());
     assert!(!config.source_repository_push_enabled());

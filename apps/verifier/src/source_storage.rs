@@ -18,10 +18,6 @@ use utoipa::ToSchema;
 
 use crate::config::Config;
 
-const STORAGE_ROOT: &str = "sources";
-const SOURCE_ATTRIBUTES_RULE: &str = "sources/** -text";
-const SOURCE_ATTRIBUTES_CHECK_PATH: &str = "sources/.verifier-attributes-check";
-
 #[async_trait]
 pub trait SourceStorage: Send + Sync + 'static {
     async fn store_bundle(
@@ -112,6 +108,7 @@ impl SourceStorage for DisabledSourceStorage {
 pub struct GitSourceStorage {
     repo_path: Option<PathBuf>,
     remote: String,
+    storage_root: String,
     branch: Option<String>,
     commit_enabled: bool,
     push_enabled: bool,
@@ -127,6 +124,7 @@ impl GitSourceStorage {
         Self {
             repo_path: config.source_repository_path().map(ToOwned::to_owned),
             remote: config.source_repository_remote().to_owned(),
+            storage_root: config.source_repository_storage_root().to_owned(),
             branch: config.source_repository_branch().map(ToOwned::to_owned),
             commit_enabled: config.source_repository_commit_enabled(),
             push_enabled: config.source_repository_push_enabled(),
@@ -141,7 +139,7 @@ impl GitSourceStorage {
         self.startup_validated
             .get_or_try_init(|| async {
                 ensure_source_repository_clean(repo_path).await?;
-                ensure_source_repository_initialized(repo_path).await
+                ensure_source_repository_initialized(repo_path, &self.storage_root).await
             })
             .await?;
         Ok(())
@@ -157,7 +155,7 @@ impl GitSourceStorage {
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
         ensure_git_repo(repo_path).await?;
 
-        let bundle_path = bundle_relative_path(&request.code_hash);
+        let bundle_path = bundle_relative_path(&self.storage_root, &request.code_hash);
         let bundle_dir = repo_path.join(&bundle_path);
         let existing_revision = if fs::try_exists(bundle_dir.join("manifest.json"))
             .await
@@ -225,7 +223,7 @@ impl GitSourceStorage {
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
         ensure_git_repo(repo_path).await?;
 
-        let bundle_path = bundle_relative_path(code_hash);
+        let bundle_path = bundle_relative_path(&self.storage_root, code_hash);
         let bundle_dir = repo_path.join(&bundle_path);
         if !fs::try_exists(bundle_dir.join("manifest.json"))
             .await
@@ -246,7 +244,7 @@ impl GitSourceStorage {
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
         ensure_git_repo(repo_path).await?;
 
-        let storage_dir = repo_path.join(STORAGE_ROOT);
+        let storage_dir = repo_path.join(&self.storage_root);
         if !fs::try_exists(&storage_dir)
             .await
             .map_err(|source| SourceStorageError::ReadDir {
@@ -298,7 +296,7 @@ impl GitSourceStorage {
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
         ensure_git_repo(repo_path).await?;
         self.ensure_startup_validated(repo_path).await?;
-        ensure_current_source_attributes(repo_path).await?;
+        ensure_current_source_attributes(repo_path, &self.storage_root).await?;
 
         match git_output(repo_path, &["rev-parse", "--verify", "HEAD"]).await {
             Ok(revision) => Ok(Some(revision)),
@@ -444,7 +442,11 @@ async fn ensure_source_repository_clean(repo_path: &Path) -> Result<(), SourceSt
     })
 }
 
-async fn ensure_source_repository_initialized(repo_path: &Path) -> Result<(), SourceStorageError> {
+async fn ensure_source_repository_initialized(
+    repo_path: &Path,
+    storage_root: &str,
+) -> Result<(), SourceStorageError> {
+    let source_attributes_rule = source_attributes_rule(storage_root);
     let roots = git_output(repo_path, &["rev-list", "--max-parents=0", "HEAD"])
         .await
         .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
@@ -473,39 +475,44 @@ async fn ensure_source_repository_initialized(repo_path: &Path) -> Result<(), So
     let root_attributes = git_output(repo_path, &["show", &root_attributes_object])
         .await
         .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
-    if root_attributes != SOURCE_ATTRIBUTES_RULE {
+    if root_attributes != source_attributes_rule {
         return Err(unprepared_source_repository(
             repo_path,
-            format!("root `.gitattributes` must contain exactly `{SOURCE_ATTRIBUTES_RULE}`"),
+            format!("root `.gitattributes` must contain exactly `{source_attributes_rule}`"),
         ));
     }
 
     Ok(())
 }
 
-async fn ensure_current_source_attributes(repo_path: &Path) -> Result<(), SourceStorageError> {
+async fn ensure_current_source_attributes(
+    repo_path: &Path,
+    storage_root: &str,
+) -> Result<(), SourceStorageError> {
+    let source_attributes_rule = source_attributes_rule(storage_root);
+    let source_attributes_check_path = source_attributes_check_path(storage_root);
     let current_attributes = git_output(repo_path, &["show", "HEAD:.gitattributes"])
         .await
         .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
-    if !has_source_attributes_rule(&current_attributes) {
+    if !has_source_attributes_rule(&current_attributes, &source_attributes_rule) {
         return Err(unprepared_source_repository(
             repo_path,
-            format!("current `.gitattributes` must contain `{SOURCE_ATTRIBUTES_RULE}`"),
+            format!("current `.gitattributes` must contain `{source_attributes_rule}`"),
         ));
     }
 
     let effective_text_attribute = git_output(
         repo_path,
-        &["check-attr", "text", "--", SOURCE_ATTRIBUTES_CHECK_PATH],
+        &["check-attr", "text", "--", &source_attributes_check_path],
     )
     .await
     .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
-    let expected_text_attribute = format!("{SOURCE_ATTRIBUTES_CHECK_PATH}: text: unset");
+    let expected_text_attribute = format!("{source_attributes_check_path}: text: unset");
     if effective_text_attribute != expected_text_attribute {
         return Err(unprepared_source_repository(
             repo_path,
             format!(
-                "`{SOURCE_ATTRIBUTES_RULE}` is not effective for `{SOURCE_ATTRIBUTES_CHECK_PATH}`"
+                "`{source_attributes_rule}` is not effective for `{source_attributes_check_path}`"
             ),
         ));
     }
@@ -513,10 +520,10 @@ async fn ensure_current_source_attributes(repo_path: &Path) -> Result<(), Source
     Ok(())
 }
 
-fn has_source_attributes_rule(attributes: &str) -> bool {
+fn has_source_attributes_rule(attributes: &str, source_attributes_rule: &str) -> bool {
     attributes
         .lines()
-        .any(|line| line.trim() == SOURCE_ATTRIBUTES_RULE)
+        .any(|line| line.trim() == source_attributes_rule)
 }
 
 fn unprepared_source_repository(
@@ -529,8 +536,16 @@ fn unprepared_source_repository(
     }
 }
 
-fn bundle_relative_path(code_hash: &str) -> String {
-    format!("{STORAGE_ROOT}/{code_hash}")
+fn source_attributes_rule(storage_root: &str) -> String {
+    format!("{storage_root}/** -text")
+}
+
+fn source_attributes_check_path(storage_root: &str) -> String {
+    format!("{storage_root}/.verifier-attributes-check")
+}
+
+fn bundle_relative_path(storage_root: &str, code_hash: &str) -> String {
+    format!("{storage_root}/{code_hash}")
 }
 
 async fn write_bundle_files(
