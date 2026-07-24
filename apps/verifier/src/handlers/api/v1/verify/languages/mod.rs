@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 use serde_json::Value;
 
@@ -24,6 +27,7 @@ pub(super) fn prepare(
 ) -> Result<LanguageCompileInput, ApiError> {
     let language = Language::parse(language)?;
     validate_sources(sources)?;
+    validate_source_extensions(language.as_str(), sources)?;
 
     let entrypoint = language.entrypoint(sources, files)?;
     let compiler_version = language.compiler_version(compile_params, sources, files)?;
@@ -95,6 +99,40 @@ impl Language {
             Self::Func | Self::Tact => Ok(BTreeMap::new()),
         }
     }
+}
+
+fn validate_source_extensions(language: &str, sources: &[SourceMetadata]) -> Result<(), ApiError> {
+    let allowed_extensions: &[&str] = match language {
+        func::LANGUAGE => &["fc", "func"],
+        tolk::LANGUAGE => &["tolk"],
+        tact::LANGUAGE => &["pkg", "tact"],
+        _ => {
+            return Err(ApiError::bad_request(format!(
+                "unsupported language: {language}"
+            )));
+        }
+    };
+
+    for source in sources {
+        let extension = Path::new(&source.path)
+            .extension()
+            .and_then(|extension| extension.to_str());
+        if extension.is_some_and(|extension| {
+            allowed_extensions
+                .iter()
+                .any(|allowed| extension.eq_ignore_ascii_case(allowed))
+        }) {
+            continue;
+        }
+
+        return Err(ApiError::bad_request(format!(
+            "source extension does not match language {language}: {}; expected .{}",
+            source.path,
+            allowed_extensions.join(", ."),
+        )));
+    }
+
+    Ok(())
 }
 
 fn validate_sources(sources: &[SourceMetadata]) -> Result<(), ApiError> {

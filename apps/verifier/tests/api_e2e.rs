@@ -710,6 +710,23 @@ async fn verify_accepts_func_and_passes_compile_metadata_to_compiler() {
 }
 
 #[tokio::test]
+async fn verify_accepts_func_source_with_func_extension() {
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "func"),
+            text_part("compile_params", COMPILE_PARAMS_FUNC),
+            text_part("sources", r#"[{"path":"main.func","is_entrypoint":true}]"#),
+            file_part("files", "main.func", "text/plain", "() main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
 async fn verify_accepts_tact_and_reads_compiler_version_from_pkg() {
     let (state, recorded_requests) = recording_app_state(&[], CODE_HASH_ONE);
     let response = post_verify(
@@ -1270,6 +1287,50 @@ async fn verify_rejects_unsupported_language() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     assert_error_contains(response, "unsupported language").await;
+}
+
+#[tokio::test]
+async fn verify_rejects_source_extensions_that_do_not_match_language() {
+    let cases = [
+        (
+            "tolk",
+            COMPILE_PARAMS_TOLK,
+            r#"[{"path":"main.fc","is_entrypoint":true}]"#,
+            "main.fc",
+            ".tolk",
+        ),
+        (
+            "func",
+            COMPILE_PARAMS_FUNC,
+            r#"[{"path":"main.tolk","is_entrypoint":true}]"#,
+            "main.tolk",
+            ".fc, .func",
+        ),
+        (
+            "tact",
+            EMPTY_COMPILE_PARAMS,
+            r#"[{"path":"contract.json","is_entrypoint":true}]"#,
+            "contract.json",
+            ".pkg, .tact",
+        ),
+    ];
+
+    for (language, compile_params, sources, file_name, expected_extensions) in cases {
+        let response = post_verify(
+            app_state(&[], CODE_HASH_ONE),
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", language),
+                text_part("compile_params", compile_params),
+                text_part("sources", sources),
+                file_part("files", file_name, "text/plain", "source"),
+            ],
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_error_contains(response, expected_extensions).await;
+    }
 }
 
 #[tokio::test]
