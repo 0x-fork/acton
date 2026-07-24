@@ -715,7 +715,9 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                 {statusInfo.label}
               </span>
             )}
-            <span className={styles.statusAddress}>{statusAddress}</span>
+            <span className={styles.statusAddress} title={rawAddress}>
+              {statusAddress}
+            </span>
             {tonscanUrl && (
               <>
                 <a
