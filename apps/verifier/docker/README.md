@@ -12,6 +12,19 @@ Local development can build the image:
 docker build -f apps/verifier/Dockerfile -t ton-verifier:local .
 ```
 
+Initialize an empty source repository before deploying the verifier:
+
+```bash
+git clone <source-repository-url> source-repo
+# Set source_repository.path = "source-repo" in config.toml.
+apps/verifier/scripts/prepare-source-repository.sh config.toml
+git -C source-repo push origin HEAD:main
+```
+
+The preparation script creates the required root commit with the source-storage
+Git attributes. The verifier refuses to start when this commit is missing or
+the current `.gitattributes` no longer contains `sources/** -text`.
+
 Or use the local build override:
 
 ```bash

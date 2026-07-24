@@ -13,8 +13,8 @@ use tempfile::TempDir;
 use verifier::{
     config::Config,
     source_storage::{
-        CompilerMetadata, GitSourceStorage, SourceMapData, SourceStorage, SourceStorageFile,
-        StoreSourceBundleRequest,
+        CompilerMetadata, GitSourceStorage, SourceMapData, SourceStorage, SourceStorageError,
+        SourceStorageFile, StoreSourceBundleRequest,
     },
 };
 
@@ -23,11 +23,161 @@ const SOURCE_BUNDLE_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 const SECOND_BUNDLE_HASH: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
 #[tokio::test]
+async fn git_source_storage_accepts_any_root_commit_message() -> Result<(), Box<dyn Error>> {
+    let fixture = GitFixture::new()?;
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            [
+                "-c",
+                "user.name=Verifier Bot",
+                "-c",
+                "user.email=verifier@example.com",
+                "commit",
+                "--amend",
+                "--no-gpg-sign",
+                "-m",
+                "Unexpected root commit",
+            ],
+        )?,
+        "git commit --amend",
+    )?;
+    let config_path = fixture.write_config()?;
+    let config = Config::load_from_path(config_path)?;
+    let storage = GitSourceStorage::from_config(&config);
+
+    assert!(storage.current_revision().await?.is_some());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn git_source_storage_requires_initial_attributes_content() -> Result<(), Box<dyn Error>> {
+    let fixture = GitFixture::new()?;
+    fs::write(
+        fixture.repo_path.join(".gitattributes"),
+        "sources/** text\n",
+    )?;
+    assert_success(
+        run_command(&fixture.repo_path, "git", ["add", ".gitattributes"])?,
+        "git add .gitattributes",
+    )?;
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            [
+                "-c",
+                "user.name=Verifier Bot",
+                "-c",
+                "user.email=verifier@example.com",
+                "commit",
+                "--amend",
+                "--no-gpg-sign",
+                "-m",
+                "Any root commit message",
+            ],
+        )?,
+        "git commit --amend",
+    )?;
+    fs::write(
+        fixture.repo_path.join(".gitattributes"),
+        "sources/** -text\n",
+    )?;
+    assert_success(
+        run_command(&fixture.repo_path, "git", ["add", ".gitattributes"])?,
+        "git add .gitattributes",
+    )?;
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            [
+                "-c",
+                "user.name=Verifier Bot",
+                "-c",
+                "user.email=verifier@example.com",
+                "commit",
+                "--no-gpg-sign",
+                "-m",
+                "Restore source attributes",
+            ],
+        )?,
+        "git commit",
+    )?;
+    let config_path = fixture.write_config()?;
+    let config = Config::load_from_path(config_path)?;
+    let storage = GitSourceStorage::from_config(&config);
+
+    let error = storage
+        .current_revision()
+        .await
+        .expect_err("source repository should require the initial attributes content");
+    assert!(matches!(
+        error,
+        SourceStorageError::UnpreparedSourceRepository { .. }
+    ));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn git_source_storage_requires_current_source_attributes_rule() -> Result<(), Box<dyn Error>>
+{
+    let fixture = GitFixture::new()?;
+    let config_path = fixture.write_config()?;
+    let config = Config::load_from_path(config_path)?;
+    let storage = GitSourceStorage::from_config(&config);
+
+    assert!(storage.current_revision().await?.is_some());
+
+    fs::write(
+        fixture.repo_path.join(".gitattributes"),
+        "sources/** -text\nsources/** text\n",
+    )?;
+    assert_success(
+        run_command(&fixture.repo_path, "git", ["add", ".gitattributes"])?,
+        "git add .gitattributes",
+    )?;
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            [
+                "-c",
+                "user.name=Verifier Bot",
+                "-c",
+                "user.email=verifier@example.com",
+                "commit",
+                "--no-gpg-sign",
+                "-m",
+                "Remove source attributes rule",
+            ],
+        )?,
+        "git commit",
+    )?;
+
+    let error = storage
+        .current_revision()
+        .await
+        .expect_err("source repository should retain sources/** -text");
+    assert!(matches!(
+        error,
+        SourceStorageError::UnpreparedSourceRepository { .. }
+    ));
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<(), Box<dyn Error>> {
     let fixture = GitFixture::new()?;
     let config_path = fixture.write_config()?;
     let config = Config::load_from_path(config_path)?;
     let storage = GitSourceStorage::from_config(&config);
+
+    assert!(storage.current_revision().await?.is_some());
 
     let started_at = unix_timestamp()?;
     let bundle_path = format!("sources/{CODE_HASH}");
@@ -256,6 +406,32 @@ impl GitFixture {
                 ["remote", "add", "origin", path_str(&remote_path)?],
             )?,
             "git remote add",
+        )?;
+        fs::write(repo_path.join(".gitattributes"), "sources/** -text\n")?;
+        assert_success(
+            run_command(&repo_path, "git", ["add", ".gitattributes"])?,
+            "git add .gitattributes",
+        )?;
+        assert_success(
+            run_command(
+                &repo_path,
+                "git",
+                [
+                    "-c",
+                    "user.name=ton-verifier",
+                    "-c",
+                    "user.email=ton-verifier@example.invalid",
+                    "commit",
+                    "--no-gpg-sign",
+                    "-m",
+                    "Initialize verifier source repository",
+                ],
+            )?,
+            "git commit initial attributes",
+        )?;
+        assert_success(
+            run_command(&repo_path, "git", ["push", "-u", "origin", "main"])?,
+            "git push initial attributes",
         )?;
 
         Ok(Self {

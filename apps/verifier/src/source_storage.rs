@@ -9,12 +9,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
-use tokio::{fs, process::Command, sync::Mutex};
+use tokio::{
+    fs,
+    process::Command,
+    sync::{Mutex, OnceCell},
+};
 use utoipa::ToSchema;
 
 use crate::config::Config;
 
 const STORAGE_ROOT: &str = "sources";
+const SOURCE_ATTRIBUTES_RULE: &str = "sources/** -text";
+const SOURCE_ATTRIBUTES_CHECK_PATH: &str = "sources/.verifier-attributes-check";
 
 #[async_trait]
 pub trait SourceStorage: Send + Sync + 'static {
@@ -111,6 +117,7 @@ pub struct GitSourceStorage {
     push_enabled: bool,
     author_name: String,
     author_email: String,
+    root_commit_validated: Arc<OnceCell<()>>,
     lock: Arc<Mutex<()>>,
 }
 
@@ -125,8 +132,19 @@ impl GitSourceStorage {
             push_enabled: config.source_repository_push_enabled(),
             author_name: config.source_repository_author_name().to_owned(),
             author_email: config.source_repository_author_email().to_owned(),
+            root_commit_validated: Arc::new(OnceCell::new()),
             lock: Arc::new(Mutex::new(())),
         }
+    }
+
+    async fn ensure_root_commit_validated(
+        &self,
+        repo_path: &Path,
+    ) -> Result<(), SourceStorageError> {
+        self.root_commit_validated
+            .get_or_try_init(|| ensure_source_repository_initialized(repo_path))
+            .await?;
+        Ok(())
     }
 
     async fn store_bundle_locked(
@@ -279,6 +297,8 @@ impl GitSourceStorage {
             .as_deref()
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
         ensure_git_repo(repo_path).await?;
+        self.ensure_root_commit_validated(repo_path).await?;
+        ensure_current_source_attributes(repo_path).await?;
 
         match git_output(repo_path, &["rev-parse", "--verify", "HEAD"]).await {
             Ok(revision) => Ok(Some(revision)),
@@ -361,6 +381,8 @@ pub enum SourceStorageError {
         expected: String,
         actual: String,
     },
+    #[error("source repository at {path} is not prepared: {message}", path = path.display())]
+    UnpreparedSourceRepository { path: PathBuf, message: String },
     #[error("git command failed: {command}: status={status}, stderr={stderr}")]
     Git {
         command: String,
@@ -400,6 +422,91 @@ async fn ensure_git_repo(repo_path: &Path) -> Result<(), SourceStorageError> {
         path: repo_path.to_path_buf(),
         message: "path is not inside a git work tree".to_owned(),
     })
+}
+
+async fn ensure_source_repository_initialized(repo_path: &Path) -> Result<(), SourceStorageError> {
+    let roots = git_output(repo_path, &["rev-list", "--max-parents=0", "HEAD"])
+        .await
+        .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
+    let roots = roots
+        .lines()
+        .filter(|revision| !revision.is_empty())
+        .collect::<Vec<_>>();
+    let [root_revision] = roots.as_slice() else {
+        return Err(unprepared_source_repository(
+            repo_path,
+            format!("expected exactly one root commit, found {}", roots.len()),
+        ));
+    };
+
+    let root_files = git_output(repo_path, &["ls-tree", "-r", "--name-only", root_revision])
+        .await
+        .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
+    if root_files != ".gitattributes" {
+        return Err(unprepared_source_repository(
+            repo_path,
+            "root commit must contain only `.gitattributes`",
+        ));
+    }
+
+    let root_attributes_object = format!("{root_revision}:.gitattributes");
+    let root_attributes = git_output(repo_path, &["show", &root_attributes_object])
+        .await
+        .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
+    if root_attributes != SOURCE_ATTRIBUTES_RULE {
+        return Err(unprepared_source_repository(
+            repo_path,
+            format!("root `.gitattributes` must contain exactly `{SOURCE_ATTRIBUTES_RULE}`"),
+        ));
+    }
+
+    Ok(())
+}
+
+async fn ensure_current_source_attributes(repo_path: &Path) -> Result<(), SourceStorageError> {
+    let current_attributes = git_output(repo_path, &["show", "HEAD:.gitattributes"])
+        .await
+        .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
+    if !has_source_attributes_rule(&current_attributes) {
+        return Err(unprepared_source_repository(
+            repo_path,
+            format!("current `.gitattributes` must contain `{SOURCE_ATTRIBUTES_RULE}`"),
+        ));
+    }
+
+    let effective_text_attribute = git_output(
+        repo_path,
+        &["check-attr", "text", "--", SOURCE_ATTRIBUTES_CHECK_PATH],
+    )
+    .await
+    .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
+    let expected_text_attribute = format!("{SOURCE_ATTRIBUTES_CHECK_PATH}: text: unset");
+    if effective_text_attribute != expected_text_attribute {
+        return Err(unprepared_source_repository(
+            repo_path,
+            format!(
+                "`{SOURCE_ATTRIBUTES_RULE}` is not effective for `{SOURCE_ATTRIBUTES_CHECK_PATH}`"
+            ),
+        ));
+    }
+
+    Ok(())
+}
+
+fn has_source_attributes_rule(attributes: &str) -> bool {
+    attributes
+        .lines()
+        .any(|line| line.trim() == SOURCE_ATTRIBUTES_RULE)
+}
+
+fn unprepared_source_repository(
+    repo_path: &Path,
+    message: impl Into<String>,
+) -> SourceStorageError {
+    SourceStorageError::UnpreparedSourceRepository {
+        path: repo_path.to_path_buf(),
+        message: message.into(),
+    }
 }
 
 fn bundle_relative_path(code_hash: &str) -> String {
