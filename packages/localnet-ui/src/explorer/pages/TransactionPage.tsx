@@ -12,7 +12,6 @@ import {
   ValueFlowTable,
   decodeTransactionMessageBody,
   decodeStorageShardAccount,
-  getTransactionComputePhase,
   type ValueFlowItem,
 } from "@acton/transaction-ui"
 import {InlineAction} from "@acton/ui"
@@ -34,7 +33,7 @@ import {useNavigate, useParams, useSearchParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
 import type {V3Action, V3Metadata, V3Trace} from "../api/types"
-import {buildTraceTransactionInfos} from "../api/traceTransactions"
+import {buildTraceTransactionInfos, isTraceSuccessful} from "../api/traceTransactions"
 import {ActionHistoryTable} from "../components/AccountDetails"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
@@ -830,16 +829,12 @@ export function TransactionTraceView({
 }: TransactionTraceViewProps): JSX.Element {
   const {flowMetrics: treeFlowMetrics, rootRef: treeSectionRef} =
     useAvailableFlowMetrics<HTMLDivElement>(MAX_TRACE_TREE_FLOW_WIDTH)
-  const firstTrace = traces[0]
-  const firstTraceComputePhase = firstTrace
-    ? getTransactionComputePhase(firstTrace.transaction)
-    : undefined
-  const firstTraceSucceeded =
-    firstTraceComputePhase?.type === "vm" && firstTraceComputePhase.success
-  const traceAddress = firstTrace?.address?.toString() ?? ""
   const rootTraceTransactions = [...traces]
     .filter(tx => !tx.parent)
     .sort(compareTransactionInfoByLt)
+  const firstTrace = rootTraceTransactions[0] ?? traces[0]
+  const traceSucceeded = isTraceSuccessful(traces, traceActions)
+  const traceAddress = firstTrace?.address?.toString() ?? ""
   const selectedTraceTransaction = traces.find(
     tx => transactionHashHex(tx).toLowerCase() === hash.toLowerCase(),
   )
@@ -905,9 +900,9 @@ export function TransactionTraceView({
               <div className={styles.overviewCard}>
                 <div className={styles.overviewHeader}>
                   <div
-                    className={`${styles.status} ${firstTraceSucceeded ? styles.statusSuccess : styles.statusError}`}
+                    className={`${styles.status} ${traceSucceeded ? styles.statusSuccess : styles.statusError}`}
                   >
-                    {firstTraceSucceeded ? (
+                    {traceSucceeded ? (
                       <>
                         <CheckCircle2 size={18} /> {statusLabels.success}
                       </>
