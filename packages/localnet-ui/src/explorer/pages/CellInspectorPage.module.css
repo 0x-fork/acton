@@ -424,7 +424,7 @@
 
 @media (max-width: 720px) {
   .container {
-    padding: 18px 16px 36px;
+    padding: var(--acton-space-5) var(--acton-space-4) 36px;
   }
 
   .workspace {
@@ -447,5 +447,12 @@
 
   .outputTabs {
     overflow-x: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .title {
+    font-size: 26px;
+    line-height: 32px;
   }
 }
