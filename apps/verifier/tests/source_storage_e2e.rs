@@ -23,6 +23,76 @@ const SOURCE_BUNDLE_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 const SECOND_BUNDLE_HASH: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
 #[tokio::test]
+async fn git_source_storage_rejects_untracked_files_at_startup() -> Result<(), Box<dyn Error>> {
+    let fixture = GitFixture::new()?;
+    fs::write(fixture.repo_path.join("pending.txt"), "not committed\n")?;
+    let config_path = fixture.write_config()?;
+    let config = Config::load_from_path(config_path)?;
+    let storage = GitSourceStorage::from_config(&config);
+
+    let error = storage
+        .current_revision()
+        .await
+        .expect_err("source repository should be clean at startup");
+    assert!(matches!(
+        &error,
+        SourceStorageError::DirtySourceRepository { changes, .. }
+            if changes == "?? pending.txt"
+    ));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn git_source_storage_rejects_unstaged_changes_at_startup() -> Result<(), Box<dyn Error>> {
+    let fixture = GitFixture::new()?;
+    fs::write(
+        fixture.repo_path.join(".gitattributes"),
+        "sources/** binary\n",
+    )?;
+    let config_path = fixture.write_config()?;
+    let config = Config::load_from_path(config_path)?;
+    let storage = GitSourceStorage::from_config(&config);
+
+    let error = storage
+        .current_revision()
+        .await
+        .expect_err("source repository should be clean at startup");
+    assert!(matches!(
+        &error,
+        SourceStorageError::DirtySourceRepository { changes, .. }
+            if changes == " M .gitattributes"
+    ));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn git_source_storage_rejects_staged_changes_at_startup() -> Result<(), Box<dyn Error>> {
+    let fixture = GitFixture::new()?;
+    fs::write(fixture.repo_path.join("pending.txt"), "not committed\n")?;
+    assert_success(
+        run_command(&fixture.repo_path, "git", ["add", "pending.txt"])?,
+        "git add pending.txt",
+    )?;
+    let config_path = fixture.write_config()?;
+    let config = Config::load_from_path(config_path)?;
+    let storage = GitSourceStorage::from_config(&config);
+
+    let error = storage
+        .current_revision()
+        .await
+        .expect_err("source repository should be clean at startup");
+    assert!(matches!(
+        &error,
+        SourceStorageError::DirtySourceRepository { changes, .. }
+            if changes == "A  pending.txt"
+    ));
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn git_source_storage_accepts_any_root_commit_message() -> Result<(), Box<dyn Error>> {
     let fixture = GitFixture::new()?;
     assert_success(

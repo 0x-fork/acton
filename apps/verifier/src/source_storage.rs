@@ -117,7 +117,7 @@ pub struct GitSourceStorage {
     push_enabled: bool,
     author_name: String,
     author_email: String,
-    root_commit_validated: Arc<OnceCell<()>>,
+    startup_validated: Arc<OnceCell<()>>,
     lock: Arc<Mutex<()>>,
 }
 
@@ -132,17 +132,17 @@ impl GitSourceStorage {
             push_enabled: config.source_repository_push_enabled(),
             author_name: config.source_repository_author_name().to_owned(),
             author_email: config.source_repository_author_email().to_owned(),
-            root_commit_validated: Arc::new(OnceCell::new()),
+            startup_validated: Arc::new(OnceCell::new()),
             lock: Arc::new(Mutex::new(())),
         }
     }
 
-    async fn ensure_root_commit_validated(
-        &self,
-        repo_path: &Path,
-    ) -> Result<(), SourceStorageError> {
-        self.root_commit_validated
-            .get_or_try_init(|| ensure_source_repository_initialized(repo_path))
+    async fn ensure_startup_validated(&self, repo_path: &Path) -> Result<(), SourceStorageError> {
+        self.startup_validated
+            .get_or_try_init(|| async {
+                ensure_source_repository_clean(repo_path).await?;
+                ensure_source_repository_initialized(repo_path).await
+            })
             .await?;
         Ok(())
     }
@@ -297,7 +297,7 @@ impl GitSourceStorage {
             .as_deref()
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
         ensure_git_repo(repo_path).await?;
-        self.ensure_root_commit_validated(repo_path).await?;
+        self.ensure_startup_validated(repo_path).await?;
         ensure_current_source_attributes(repo_path).await?;
 
         match git_output(repo_path, &["rev-parse", "--verify", "HEAD"]).await {
@@ -383,6 +383,8 @@ pub enum SourceStorageError {
     },
     #[error("source repository at {path} is not prepared: {message}", path = path.display())]
     UnpreparedSourceRepository { path: PathBuf, message: String },
+    #[error("source repository at {path} has uncommitted changes:\n{changes}", path = path.display())]
+    DirtySourceRepository { path: PathBuf, changes: String },
     #[error("git command failed: {command}: status={status}, stderr={stderr}")]
     Git {
         command: String,
@@ -421,6 +423,24 @@ async fn ensure_git_repo(repo_path: &Path) -> Result<(), SourceStorageError> {
     Err(SourceStorageError::InvalidPath {
         path: repo_path.to_path_buf(),
         message: "path is not inside a git work tree".to_owned(),
+    })
+}
+
+async fn ensure_source_repository_clean(repo_path: &Path) -> Result<(), SourceStorageError> {
+    let changes = git_output_untrimmed(
+        repo_path,
+        &["status", "--porcelain=v1", "--untracked-files=all"],
+    )
+    .await?
+    .trim_end_matches(['\r', '\n'])
+    .to_owned();
+    if changes.is_empty() {
+        return Ok(());
+    }
+
+    Err(SourceStorageError::DirtySourceRepository {
+        path: repo_path.to_path_buf(),
+        changes,
     })
 }
 
@@ -701,17 +721,24 @@ async fn git(repo_path: &Path, args: &[&str]) -> Result<(), SourceStorageError> 
 }
 
 async fn git_output(repo_path: &Path, args: &[&str]) -> Result<String, SourceStorageError> {
+    git_output_untrimmed(repo_path, args)
+        .await
+        .map(|output| output.trim().to_owned())
+}
+
+async fn git_output_untrimmed(
+    repo_path: &Path,
+    args: &[&str],
+) -> Result<String, SourceStorageError> {
     let output = git_command(repo_path, args).await?;
     if !output.status.success() {
         return Err(git_error(args, &output));
     }
 
-    String::from_utf8(output.stdout)
-        .map(|output| output.trim().to_owned())
-        .map_err(|source| SourceStorageError::GitOutputUtf8 {
-            command: git_command_string(args),
-            source,
-        })
+    String::from_utf8(output.stdout).map_err(|source| SourceStorageError::GitOutputUtf8 {
+        command: git_command_string(args),
+        source,
+    })
 }
 
 async fn git_has_staged_changes(
