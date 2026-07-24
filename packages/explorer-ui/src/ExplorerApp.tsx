@@ -285,10 +285,11 @@ const serializeCustomExplorerNetwork = (
 const readSelectedExplorerNetwork = (
   networks: readonly SelectableExplorerNetwork[],
 ): SelectableExplorerNetworkId => {
-  if (
-    new URLSearchParams(globalThis.location.search).get(EXPLORER_NETWORK_QUERY_PARAM) === "testnet"
-  ) {
-    return "testnet"
+  const requestedNetwork = new URLSearchParams(globalThis.location.search).get(
+    EXPLORER_NETWORK_QUERY_PARAM,
+  )
+  if (requestedNetwork === "mainnet" || requestedNetwork === "testnet") {
+    return requestedNetwork
   }
 
   const storedNetwork = localStorage.getItem(EXPLORER_NETWORK_STORAGE_KEY)

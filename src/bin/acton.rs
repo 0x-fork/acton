@@ -678,6 +678,7 @@ enum Commands {
         #[arg(
             value_enum,
             long,
+            default_value = "actonscan",
             help = "Explorer to use for transaction links",
             help_heading = "Broadcasting",
             value_name = "NAME"
