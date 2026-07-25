@@ -97,10 +97,7 @@ enum MockCompilerResult {
 #[async_trait]
 impl CompilerService for MockCompilerService {
     async fn compile(&self, request: CompileRequest) -> Result<CompileOutput, CompilerError> {
-        let compiler = (
-            request.language.clone(),
-            request.compiler_version.clone(),
-        );
+        let compiler = (request.language.clone(), request.compiler_version.clone());
         {
             let mut recorded_requests = self
                 .recorded_requests

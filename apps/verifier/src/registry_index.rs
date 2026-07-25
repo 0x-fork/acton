@@ -51,9 +51,7 @@ pub trait VerificationIndex: Send + Sync + 'static {
         offset: usize,
     ) -> Result<IndexedLastVerifiedPage, VerificationIndexError>;
 
-    async fn statistics(
-        &self,
-    ) -> Result<IndexedVerificationStatistics, VerificationIndexError>;
+    async fn statistics(&self) -> Result<IndexedVerificationStatistics, VerificationIndexError>;
 
     async fn abi_contracts(
         &self,
@@ -415,9 +413,7 @@ impl VerificationIndex for SqliteVerificationIndex {
         Ok(IndexedLastVerifiedPage { items, total })
     }
 
-    async fn statistics(
-        &self,
-    ) -> Result<IndexedVerificationStatistics, VerificationIndexError> {
+    async fn statistics(&self) -> Result<IndexedVerificationStatistics, VerificationIndexError> {
         let connection = self.connection()?;
         let total = connection.query_row("select count(*) from verified_bundles", [], |row| {
             row.get::<_, i64>(0)

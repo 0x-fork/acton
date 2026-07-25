@@ -300,90 +300,19 @@ fn prepare_compile_input(
 }
 
 fn validate_source_path(path: &str) -> Result<(), ApiError> {
-    if path.trim().is_empty() {
-        return Err(ApiError::bad_request("source path is empty".to_owned()));
-    }
-    if path.trim() != path {
-        return Err(ApiError::bad_request(
-            "source path has leading or trailing whitespace".to_owned(),
-        ));
-    }
-    if path.chars().any(char::is_control) {
-        return Err(ApiError::bad_request(
-            "source path contains a control character".to_owned(),
-        ));
-    }
-    if path.contains('\\') {
-        return Err(ApiError::bad_request(
-            "source path must use '/' separators".to_owned(),
-        ));
-    }
-    if path.starts_with('~') {
-        return Err(ApiError::bad_request(
-            "source path must not start with '~'".to_owned(),
-        ));
-    }
-    if matches!(
-        path.as_bytes(),
-        [drive, b':', ..] if drive.is_ascii_alphabetic()
-    ) {
-        return Err(ApiError::bad_request(
-            "source path must not use a Windows drive prefix".to_owned(),
-        ));
-    }
-
-    let source_path = Path::new(path);
-    if source_path.is_absolute() {
-        return Err(ApiError::bad_request(
-            "source path must be relative".to_owned(),
-        ));
-    }
-
-    for component in path.split('/') {
-        if component.is_empty() {
-            return Err(ApiError::bad_request(
-                "source path contains an empty component".to_owned(),
-            ));
-        }
-        if component == "." {
-            return Err(ApiError::bad_request(
-                "source path contains an invalid component".to_owned(),
-            ));
-        }
-        if component.eq_ignore_ascii_case(".git") {
-            return Err(ApiError::bad_request(
-                "source path contains reserved '.git' component".to_owned(),
-            ));
-        }
-    }
-
-    for component in source_path.components() {
-        match component {
-            Component::Normal(_) => {}
-            Component::CurDir
-            | Component::ParentDir
-            | Component::RootDir
-            | Component::Prefix(_) => {
-                return Err(ApiError::bad_request(
-                    "source path contains an invalid component".to_owned(),
-                ));
-            }
-        }
-    }
-
-    Ok(())
+    validate_relative_path("source path", path)
 }
 
 fn validate_import_mappings(import_mappings: &BTreeMap<String, String>) -> Result<(), ApiError> {
     for (prefix, target) in import_mappings {
-        validate_import_mapping_component("import mapping prefix", prefix)?;
-        validate_import_mapping_component("import mapping target", target)?;
+        validate_relative_path("import mapping prefix", prefix)?;
+        validate_relative_path("import mapping target", target)?;
     }
 
     Ok(())
 }
 
-fn validate_import_mapping_component(name: &str, value: &str) -> Result<(), ApiError> {
+fn validate_relative_path(name: &str, value: &str) -> Result<(), ApiError> {
     if value.trim().is_empty() {
         return Err(ApiError::bad_request(format!("{name} is empty")));
     }
@@ -701,7 +630,7 @@ impl std::fmt::Display for VerificationResult {
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_import_mapping_component, validate_source_path};
+    use super::{validate_relative_path, validate_source_path};
 
     #[test]
     fn source_path_rejects_control_characters() {
@@ -725,7 +654,7 @@ mod tests {
             "contracts\n",
         ] {
             assert!(
-                validate_import_mapping_component("import mapping target", path).is_err(),
+                validate_relative_path("import mapping target", path).is_err(),
                 "import mapping path should be rejected: {path:?}"
             );
         }

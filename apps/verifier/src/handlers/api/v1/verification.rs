@@ -11,8 +11,8 @@ use crate::{
     blockchain::normalize_code_hash,
     error::ApiError,
     registry::{
-        AbiContractsRequest, LastVerifiedRequest, VerificationStatusReceipt,
-        VerificationStatisticsReceipt, VerificationStatusRequest, VerifiedBundleRequest,
+        AbiContractsRequest, LastVerifiedRequest, VerificationStatisticsReceipt,
+        VerificationStatusReceipt, VerificationStatusRequest, VerifiedBundleRequest,
     },
     registry_index::{
         IndexedAbiContract, IndexedCompilerVersionStatistics, IndexedLanguageStatistics,

@@ -201,9 +201,7 @@ async fn statistics_returns_counts_by_language_and_compiler_version() {
         ("func", "0.4.6", CODE_HASH_THREE),
     ]);
 
-    for (code_hash, compiler_version) in
-        [(CODE_HASH_ONE, "1.4.1"), (CODE_HASH_TWO, "1.5.0")]
-    {
+    for (code_hash, compiler_version) in [(CODE_HASH_ONE, "1.4.1"), (CODE_HASH_TWO, "1.5.0")] {
         let compile_params = json!({"compiler_version": compiler_version}).to_string();
         let response = post_verify(
             state.clone(),
