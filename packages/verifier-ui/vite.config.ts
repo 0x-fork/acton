@@ -7,9 +7,13 @@ import {defineConfig} from "vite"
 
 const backendTarget = process.env.VITE_BACKEND_PROXY_TARGET || "http://127.0.0.1:3000"
 const contractHtml = resolve(import.meta.dirname, "contract.html")
+const statisticsHtml = resolve(import.meta.dirname, "statistics.html")
 const verifiedHtml = resolve(import.meta.dirname, "verified.html")
 
 function routeHtmlPath(pathname: string, production = false) {
+  if (pathname === "/statistics" || pathname === "/statistics/") {
+    return production ? resolve(import.meta.dirname, "dist/statistics.html") : statisticsHtml
+  }
   if (pathname === "/verified" || pathname === "/verified/") {
     return production ? resolve(import.meta.dirname, "dist/verified.html") : verifiedHtml
   }
@@ -84,6 +88,7 @@ export default defineConfig({
       input: {
         index: resolve(import.meta.dirname, "index.html"),
         contract: resolve(import.meta.dirname, "contract.html"),
+        statistics: resolve(import.meta.dirname, "statistics.html"),
         verified: resolve(import.meta.dirname, "verified.html"),
       },
     },

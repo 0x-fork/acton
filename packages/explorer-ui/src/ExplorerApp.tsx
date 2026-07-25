@@ -1,5 +1,10 @@
 import {Checkbox, Input, Popover, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
-import {createVerifierApi, VerifiedContractPage, VerifiedContractsPage} from "@acton/verifier-ui"
+import {
+  createVerifierApi,
+  StatisticsPage,
+  VerifiedContractPage,
+  VerifiedContractsPage,
+} from "@acton/verifier-ui"
 import {
   Check,
   ChevronDown,
@@ -996,6 +1001,8 @@ const VerifiedContractsRoute: FC = () => {
     <VerifiedContractsPage
       api={ACTON_VERIFIER_API}
       getContractHref={item => `/verified/${encodeURIComponent(item.code_hash)}`}
+      statisticsHref="/verified/statistics"
+      onOpenStatistics={() => void navigate("/verified/statistics")}
       page={initialPage}
       onPageChange={page => {
         currentPageRef.current = page
@@ -1422,6 +1429,10 @@ export const ExplorerApp: FC = () => {
                         }
                       />
                       <Route path="/verified" element={<VerifiedContractsRoute />} />
+                      <Route
+                        path="/verified/statistics"
+                        element={<StatisticsPage api={ACTON_VERIFIER_API} />}
+                      />
                       <Route path="/verified/:target" element={<VerifiedContractRoute />} />
                       <Route path="/cell" element={<CellInspectorPage />} />
                       <Route path="/emulate" element={<EmulatePage client={client} />} />

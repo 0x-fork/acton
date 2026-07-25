@@ -12,6 +12,7 @@ import {
   DataTableTable,
   Button,
 } from "@acton/ui"
+import {ChartPie} from "lucide-react"
 import {useEffect, useMemo, useRef, useState} from "react"
 import type {MouseEvent as ReactMouseEvent} from "react"
 
@@ -73,10 +74,9 @@ function sourceName(item: LastVerifiedItem): string {
   return item.entrypoint || "Unknown"
 }
 
-function handleContractLinkClick(
+function handleLinkClick(
   event: ReactMouseEvent<HTMLAnchorElement>,
-  item: LastVerifiedItem,
-  onOpenContract: (item: LastVerifiedItem) => void,
+  onOpen: () => void,
 ): void {
   event.stopPropagation()
   if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
@@ -84,7 +84,7 @@ function handleContractLinkClick(
   }
 
   event.preventDefault()
-  onOpenContract(item)
+  onOpen()
 }
 
 export interface VerifiedContractsPageProps {
@@ -94,6 +94,8 @@ export interface VerifiedContractsPageProps {
   readonly page?: number
   readonly onPageChange?: (page: number) => void
   readonly onContentReady?: () => void
+  readonly statisticsHref?: string
+  readonly onOpenStatistics?: () => void
   readonly limit?: number
   readonly className?: string
 }
@@ -105,6 +107,8 @@ export function VerifiedContractsPage({
   page: controlledPage,
   onPageChange,
   onContentReady,
+  statisticsHref,
+  onOpenStatistics,
   limit = 25,
   className,
 }: VerifiedContractsPageProps) {
@@ -196,7 +200,28 @@ export function VerifiedContractsPage({
         <h1 className={styles.title}>Verified contracts</h1>
       </section>
 
-      <DataTable title="Contracts" minWidth="53.75rem">
+      <DataTable
+        title="Contracts"
+        actions={
+          statisticsHref ? (
+            <a
+              className={styles.statisticsLink}
+              href={statisticsHref}
+              target={statisticsHref.startsWith("http") ? "_blank" : undefined}
+              rel={statisticsHref.startsWith("http") ? "noreferrer" : undefined}
+              onClick={
+                onOpenStatistics
+                  ? event => handleLinkClick(event, onOpenStatistics)
+                  : undefined
+              }
+            >
+              <ChartPie size={16} aria-hidden="true" />
+              Statistics
+            </a>
+          ) : undefined
+        }
+        minWidth="53.75rem"
+      >
         <DataTableTable aria-label="Verified contracts">
           <DataTableHead>
             <DataTableRow>
@@ -226,7 +251,9 @@ export function VerifiedContractsPage({
                       className={styles.rowOverlayLink}
                       href={getContractHref(item)}
                       aria-label={`Open verified contract ${item.code_hash}`}
-                      onClick={event => handleContractLinkClick(event, item, onOpenContract)}
+                      onClick={event =>
+                        handleLinkClick(event, () => onOpenContract(item))
+                      }
                     >
                       <span className={styles.visuallyHidden}>
                         Open verified contract {item.code_hash}
@@ -238,7 +265,9 @@ export function VerifiedContractsPage({
                         href={getContractHref(item)}
                         title={item.code_hash}
                         aria-label={`Open code hash ${item.code_hash}`}
-                        onClick={event => handleContractLinkClick(event, item, onOpenContract)}
+                        onClick={event =>
+                          handleLinkClick(event, () => onOpenContract(item))
+                        }
                       >
                         {shortenMiddle(item.code_hash, 18, 12)}
                       </a>

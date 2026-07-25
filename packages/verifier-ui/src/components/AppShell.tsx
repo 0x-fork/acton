@@ -7,6 +7,11 @@ import tonVerifierIcon from "../assets/ton-verifier-icons/icon.svg"
 import {SearchBox} from "./SearchBox"
 import styles from "./AppShell.module.css"
 
+const PRIMARY_NAV_ITEMS = [
+  {href: "/verified", label: "Verified contracts"},
+  {href: "/statistics", label: "Statistics"},
+] as const
+
 interface AppShellProps {
   readonly children: ReactNode
   readonly headerAccessory?: ReactNode
@@ -58,14 +63,17 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
                 <span>TON Verifier</span>
               </a>
               <nav className={styles.nav} aria-label="TON Verifier navigation">
-                <a
-                  className={`${styles.navLink} ${
-                    pathname === "/verified" ? styles.navLinkActive : ""
-                  }`}
-                  href="/verified"
-                >
-                  Verified contracts
-                </a>
+                {PRIMARY_NAV_ITEMS.map(item => (
+                  <a
+                    key={item.href}
+                    className={`${styles.navLink} ${
+                      pathname === item.href ? styles.navLinkActive : ""
+                    }`}
+                    href={item.href}
+                  >
+                    {item.label}
+                  </a>
+                ))}
               </nav>
             </div>
             {!isHomePage && (
@@ -127,7 +135,11 @@ export function AppShell({children, headerAccessory}: AppShellProps) {
                     className={styles.mobileNavigation}
                     aria-label="Mobile TON Verifier navigation"
                   >
-                    <a href="/verified">Verified contracts</a>
+                    {PRIMARY_NAV_ITEMS.map(item => (
+                      <a key={item.href} href={item.href}>
+                        {item.label}
+                      </a>
+                    ))}
                     <a href="https://github.com/i582/verifier" target="_blank" rel="noreferrer">
                       <span>GitHub</span>
                       <Github size={17} aria-hidden="true" />

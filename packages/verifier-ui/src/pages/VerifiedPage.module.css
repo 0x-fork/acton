@@ -88,6 +88,29 @@
   display: block;
 }
 
+.statisticsLink {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 4px;
+  border-radius: 6px;
+  color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
+  text-decoration: none;
+}
+
+.statisticsLink:hover {
+  color: var(--acton-color-accent-hover);
+  text-decoration: underline;
+}
+
+.statisticsLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
 .hashCopyButton {
   flex: 0 0 auto;
   opacity: 0;

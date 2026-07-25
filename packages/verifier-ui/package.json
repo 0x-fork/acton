@@ -22,7 +22,8 @@
     "@acton/ui": "file:../ui",
     "lucide-react": "^0.474.0",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react-dom": "^19.2.3",
+    "recharts": "^3.10.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.7",

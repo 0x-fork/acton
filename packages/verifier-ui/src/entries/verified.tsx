@@ -15,6 +15,7 @@ function VerifiedContractsEntry() {
         api={api}
         getContractHref={item => lookupPath(item.code_hash)}
         onOpenContract={item => globalThis.location.assign(lookupPath(item.code_hash))}
+        statisticsHref="/statistics"
       />
     </AppShell>
   )

@@ -47,6 +47,22 @@ export interface LastVerifiedItem {
   readonly abi_name: string | null
 }
 
+export interface VerificationStatisticsResponse {
+  readonly total: number
+  readonly languages: readonly VerificationLanguageStatistics[]
+}
+
+export interface VerificationLanguageStatistics {
+  readonly language: string
+  readonly total: number
+  readonly versions: readonly VerificationVersionStatistics[]
+}
+
+export interface VerificationVersionStatistics {
+  readonly version: string
+  readonly total: number
+}
+
 export class ApiRequestError extends Error {
   readonly status: number
 
@@ -59,6 +75,7 @@ export class ApiRequestError extends Error {
 
 export interface VerifierApi {
   readonly fetchLastVerified: (limit?: number, offset?: number) => Promise<LastVerifiedResponse>
+  readonly fetchStatistics: () => Promise<VerificationStatisticsResponse>
   readonly fetchVerificationSource: (target: LookupTarget) => Promise<VerificationSourceResponse>
 }
 
@@ -100,6 +117,9 @@ export function createVerifierApi({
         offset: String(offset),
       })
       return request<LastVerifiedResponse>(`/last_verified?${params.toString()}`)
+    },
+    fetchStatistics() {
+      return request<VerificationStatisticsResponse>("/statistics")
     },
     fetchVerificationSource(target) {
       return request<VerificationSourceResponse>(
