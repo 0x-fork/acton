@@ -192,6 +192,7 @@ impl GitSourceStorage {
                         repo_path,
                         &["commit", "-m", &message, "--", &bundle_path],
                         self,
+                        verified_at,
                     )
                     .await?;
                 }
@@ -783,15 +784,19 @@ async fn git_with_author(
     repo_path: &Path,
     args: &[&str],
     storage: &GitSourceStorage,
+    verified_at: u64,
 ) -> Result<(), SourceStorageError> {
     let command = git_command_string(args);
+    let git_date = format!("{verified_at} +0000");
     let output = Command::new("git")
         .args(args)
         .current_dir(repo_path)
         .env("GIT_AUTHOR_NAME", &storage.author_name)
         .env("GIT_AUTHOR_EMAIL", &storage.author_email)
+        .env("GIT_AUTHOR_DATE", &git_date)
         .env("GIT_COMMITTER_NAME", &storage.author_name)
         .env("GIT_COMMITTER_EMAIL", &storage.author_email)
+        .env("GIT_COMMITTER_DATE", &git_date)
         .output()
         .await
         .map_err(|source| SourceStorageError::GitSpawn {

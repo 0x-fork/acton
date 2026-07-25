@@ -2,6 +2,7 @@
 set -euo pipefail
 
 readonly init_commit_message="Initialize verifier source repository"
+readonly init_commit_date="2022-11-01T00:00:00+00:00"
 
 log() {
     printf 'prepare-source-repository: %s\n' "$*"
@@ -95,6 +96,8 @@ git -C "$repo_path" symbolic-ref HEAD "refs/heads/$branch"
 printf '%s\n' "$attributes_rule" > "$repo_path/.gitattributes"
 git -C "$repo_path" add -- .gitattributes
 
+GIT_AUTHOR_DATE="$init_commit_date" \
+GIT_COMMITTER_DATE="$init_commit_date" \
 git \
     -C "$repo_path" \
     -c "user.name=$author_name" \

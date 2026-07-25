@@ -69,6 +69,13 @@ async fn git_source_storage_uses_configured_storage_root() -> Result<(), Box<dyn
         .await?
         .expect("stored bundle should exist");
     assert_eq!(stored_bundle.manifest.verified_at, ORIGINAL_VERIFIED_AT);
+    assert_eq!(
+        git_output(
+            &fixture.repo_path,
+            ["log", "-1", "--format=%at %ct", "--", storage_root]
+        )?,
+        format!("{ORIGINAL_VERIFIED_AT} {ORIGINAL_VERIFIED_AT}")
+    );
 
     Ok(())
 }
@@ -380,6 +387,13 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
     assert!(
         (started_at..=unix_timestamp()?).contains(&verified_at),
         "verification timestamp should be recorded when the bundle is stored"
+    );
+    assert_eq!(
+        git_output(
+            &fixture.repo_path,
+            ["log", "-1", "--format=%at %ct", "--", &bundle_path]
+        )?,
+        format!("{verified_at} {verified_at}")
     );
 
     let stored_bundle = storage

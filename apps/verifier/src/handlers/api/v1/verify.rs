@@ -619,7 +619,7 @@ pub(super) struct VerifyMultipartRequest {
     // TODO: Remove this field after migrating contracts from the legacy verifier.
     /// Original verification Unix timestamp in milliseconds.
     /// Requires a valid `X-Verifier-Key` header.
-    #[schema(nullable = false, example = 1700000000000_u64)]
+    #[schema(nullable = false, example = 1_700_000_000_000_u64)]
     verified_at: Option<u64>,
     #[schema(
         value_type = String,
