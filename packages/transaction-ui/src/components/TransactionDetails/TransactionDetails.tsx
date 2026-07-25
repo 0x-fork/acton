@@ -3,10 +3,12 @@ import {useEffect, useRef, useState} from "react"
 import {
   buildStorageDiff,
   ContractChip,
+  CopyInlineAction,
   CopyInlineButton,
   DisclosureToggle,
   ExitCodeChip,
   InfoPopover,
+  InlineActions,
   OpcodeChip,
   ParsedBodySection,
   type ParsedCodeCell,
@@ -52,6 +54,7 @@ import {
 import {
   formatCellBocHex,
   formatMessageBocHex,
+  formatMessageHashHex,
   formatOutListBocHex,
   formatShardAccountDataBocHex,
   formatStateInitBocHex,
@@ -242,6 +245,7 @@ export function TransactionDetails({
     })()
   const messageBodyBocHex = inMessage ? formatCellBocHex(inMessage.body) : undefined
   const messageBocHex = inMessage ? formatMessageBocHex(inMessage) : undefined
+  const messageHashHex = inMessage ? formatMessageHashHex(inMessage) : undefined
   const stateInitCode = inMessage?.init?.code ?? undefined
   const stateInitData = inMessage?.init?.data ?? undefined
   const stateInitBocHex = inMessage?.init ? formatStateInitBocHex(inMessage.init) : undefined
@@ -514,6 +518,30 @@ export function TransactionDetails({
                   {inMessage.info.createdLt.toString()}
                 </div>
               </div>
+              {messageHashHex && (
+                <div className={styles.multiColumnItem}>
+                  <div className={styles.multiColumnItemTitle}>Hash</div>
+                  <div className={styles.multiColumnItemValue}>
+                    <InlineActions
+                      visibility="always"
+                      actions={
+                        <CopyInlineAction
+                          value={messageHashHex}
+                          label="Copy message hash"
+                          copiedLabel="Message hash copied"
+                          size="compact"
+                        />
+                      }
+                    >
+                      <Tooltip content={messageHashHex}>
+                        <span>
+                          {messageHashHex.slice(0, 3)}…{messageHashHex.slice(-3)}
+                        </span>
+                      </Tooltip>
+                    </InlineActions>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
