@@ -102,6 +102,73 @@ export const buildTraceTransactionInfos = (
   return txInfos
 }
 
+export const buildPartialTraceRoot = (
+  transactionsMap: Record<string, V3Transaction>,
+  parentByChildHash: ReadonlyMap<string, string>,
+): V3TraceNode | undefined => {
+  const transactionsByHash = new Map(
+    Object.entries(transactionsMap).map(([mapKey, transaction]) => [
+      transactionHashKey(transaction.hash || mapKey),
+      transaction,
+    ]),
+  )
+  if (transactionsByHash.size === 0) {
+    return undefined
+  }
+
+  const childrenByParentHash = new Map<string, string[]>()
+  const childHashes = new Set<string>()
+  for (const [childHash, parentHash] of parentByChildHash) {
+    const childKey = transactionHashKey(childHash)
+    const parentKey = transactionHashKey(parentHash)
+    if (
+      childKey === parentKey ||
+      !transactionsByHash.has(childKey) ||
+      !transactionsByHash.has(parentKey)
+    ) {
+      continue
+    }
+    childrenByParentHash.set(parentKey, [...(childrenByParentHash.get(parentKey) ?? []), childKey])
+    childHashes.add(childKey)
+  }
+
+  const rootEntry = [...transactionsByHash.entries()]
+    .filter(([hash]) => !childHashes.has(hash))
+    .sort(([, left], [, right]) => compareLt(left.lt, right.lt))[0]
+  if (!rootEntry) {
+    return undefined
+  }
+
+  const buildNode = (hash: string, ancestors: ReadonlySet<string>): V3TraceNode => {
+    const transaction = transactionsByHash.get(hash)
+    if (!transaction) {
+      return {tx_hash: hash}
+    }
+
+    const nextAncestors = new Set(ancestors)
+    nextAncestors.add(hash)
+    const children = (childrenByParentHash.get(hash) ?? [])
+      .filter(childHash => !nextAncestors.has(childHash))
+      .sort((leftHash, rightHash) =>
+        compareLt(
+          transactionsByHash.get(leftHash)?.lt ?? "0",
+          transactionsByHash.get(rightHash)?.lt ?? "0",
+        ),
+      )
+      .map(childHash => buildNode(childHash, nextAncestors))
+
+    return {
+      tx_hash: transaction.hash,
+      in_msg_hash: transaction.in_msg?.hash,
+      in_msg: transaction.in_msg,
+      transaction,
+      children,
+    }
+  }
+
+  return buildNode(rootEntry[0], new Set())
+}
+
 const compareLt = (left: string, right: string): number => {
   const leftLt = parseOptionalBigInt(left) ?? 0n
   const rightLt = parseOptionalBigInt(right) ?? 0n

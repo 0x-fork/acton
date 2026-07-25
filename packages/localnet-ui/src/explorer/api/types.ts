@@ -1225,6 +1225,7 @@ export interface V3Transaction {
   readonly hash: string
   readonly lt: string
   readonly now: number
+  readonly trace_id?: string | null
   readonly orig_status: string
   readonly end_status: string
   readonly total_fees: string

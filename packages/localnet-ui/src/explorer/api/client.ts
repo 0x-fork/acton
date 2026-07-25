@@ -523,9 +523,15 @@ export class TonClient {
     return this.request(url, "Failed to fetch transaction")
   }
 
-  async getTransactionsByMessageHash(msgHash: string): Promise<V3TransactionDetailsResponse> {
+  async getTransactionsByMessageHash(
+    msgHash: string,
+    direction?: "in" | "out",
+  ): Promise<V3TransactionDetailsResponse> {
     const url = this.buildUrl(this.v3BaseUrl, "/transactionsByMessage")
     url.searchParams.append("msg_hash", msgHash)
+    if (direction) {
+      url.searchParams.append("direction", direction)
+    }
     url.searchParams.append("limit", "1")
     return this.request(url, "Failed to fetch transaction by message")
   }

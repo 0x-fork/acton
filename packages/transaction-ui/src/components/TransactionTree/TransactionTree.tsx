@@ -1,7 +1,8 @@
 import type {Address} from "@ton/core"
 import type React from "react"
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
-import {buildStorageDiff, type ParsedValueDiff, ParsedValueDiffView} from "@acton/ui"
+import {buildStorageDiff, InlineButton, type ParsedValueDiff, ParsedValueDiffView} from "@acton/ui"
+import {GitBranch, Route} from "lucide-react"
 import {
   type CustomNodeElementProps,
   type RawNodeDatum,
@@ -90,8 +91,12 @@ interface TransactionTreeProps {
   readonly highlightedTransactionIds?: ReadonlySet<string>
   readonly originatingTransaction?: TransactionInfo
   readonly omittedTransactionCount?: number
+  readonly traceGapActionLabel?: string
+  readonly traceGapLoading?: boolean
+  readonly traceGapError?: string
   readonly onContractClick?: (address: string) => void
   readonly onTransactionSelect?: (tx: TransactionInfo) => void
+  readonly onTraceGapLoad?: () => void
   readonly renderAddressChip?: (
     address: string,
     options: {readonly shorten: boolean},
@@ -279,8 +284,12 @@ export function TransactionTree({
   highlightedTransactionIds,
   originatingTransaction,
   omittedTransactionCount,
+  traceGapActionLabel,
+  traceGapLoading = false,
+  traceGapError,
   onContractClick,
   onTransactionSelect,
+  onTraceGapLoad,
   renderAddressChip,
   renderSourceLocation,
   renderSelectedTransactionExtra,
@@ -610,16 +619,53 @@ export function TransactionTree({
     const isOriginAlreadyVisible =
       originatingTransaction !== undefined &&
       transactions.some(transaction => transaction.id === originatingTransaction.id)
-
-    if (!originatingTransaction || isOriginAlreadyVisible) {
-      return currentTraceRoot
-    }
-
-    const originNode = convertTransactionToNode(originatingTransaction)
     const omittedLabel =
       omittedTransactionCount === undefined
         ? "Trace segment unavailable"
         : `${omittedTransactionCount.toLocaleString("en-US")} tx omitted`
+    const createTraceGapNode = (children: RawNodeDatum[] = []): RawNodeDatum => ({
+      name: omittedLabel,
+      attributes: {
+        isTraceGap: true,
+        omittedLabel,
+      },
+      children,
+    })
+
+    if (!originatingTransaction || isOriginAlreadyVisible) {
+      if (omittedTransactionCount === undefined || omittedTransactionCount <= 0) {
+        return currentTraceRoot
+      }
+
+      const traceGapBranch = createTraceGapNode()
+      const currentRootChildren = currentTraceRoot.children ?? []
+      if (currentTraceRoot.attributes?.isRoot === "hidden" && currentRootChildren.length > 0) {
+        const [rootNode, ...otherRoots] = currentRootChildren
+        if (rootNode) {
+          return {
+            ...currentTraceRoot,
+            children: [
+              {
+                ...rootNode,
+                children: [...(rootNode.children ?? []), traceGapBranch],
+              },
+              ...otherRoots,
+            ],
+          } satisfies RawNodeDatum
+        }
+      }
+
+      return {
+        ...currentTraceRoot,
+        children: [...currentRootChildren, traceGapBranch],
+      } satisfies RawNodeDatum
+    }
+
+    if (omittedTransactionCount === 0) {
+      return currentTraceRoot
+    }
+
+    const originNode = convertTransactionToNode(originatingTransaction)
     const continuationRoot = {
       ...currentTraceRoot,
       attributes: {
@@ -638,16 +684,7 @@ export function TransactionTree({
       children: [
         {
           ...originNode,
-          children: [
-            {
-              name: omittedLabel,
-              attributes: {
-                isTraceGap: true,
-                omittedLabel,
-              },
-              children: [continuationRoot],
-            },
-          ],
+          children: [createTraceGapNode([continuationRoot])],
         },
       ],
     } satisfies RawNodeDatum
@@ -799,7 +836,7 @@ export function TransactionTree({
           </g>
           <foreignObject
             width={TREE_EDGE_LABEL.width}
-            height={TREE_EDGE_LABEL.height}
+            height={traceGapError ? 96 : TREE_EDGE_LABEL.height}
             x={TREE_EDGE_LABEL.x}
             y={TREE_EDGE_LABEL.y}
           >
@@ -812,6 +849,39 @@ export function TransactionTree({
                   {omittedLabel}
                 </p>
               </div>
+              {onTraceGapLoad && (
+                <div className={`${styles.bottomText} ${styles.traceGapAction}`}>
+                  <InlineButton
+                    variant="utility"
+                    className={styles.traceGapButton}
+                    leadingIcon={
+                      traceGapActionLabel === "Restore path" ? (
+                        <Route size={11} />
+                      ) : (
+                        <GitBranch size={11} />
+                      )
+                    }
+                    disabled={traceGapLoading}
+                    aria-busy={traceGapLoading || undefined}
+                    title={
+                      traceGapActionLabel === "Restore path"
+                        ? "Restore up to 10 causal transactions from Toncenter"
+                        : "Load up to 10 more transactions from Toncenter"
+                    }
+                    onClick={event => {
+                      event.stopPropagation()
+                      onTraceGapLoad()
+                    }}
+                  >
+                    {traceGapLoading ? "Loading…" : (traceGapActionLabel ?? "Load 10")}
+                  </InlineButton>
+                </div>
+              )}
+              {traceGapError && (
+                <p className={styles.traceGapError} role="alert">
+                  {traceGapError}
+                </p>
+              )}
             </div>
           </foreignObject>
         </g>

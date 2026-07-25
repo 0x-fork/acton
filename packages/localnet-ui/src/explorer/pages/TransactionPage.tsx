@@ -32,8 +32,19 @@ import {
 import {useNavigate, useParams, useSearchParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
+import {
+  createPartialTraceState,
+  loadPartialTraceBranches,
+  partialTraceTransactionsMap,
+  restorePartialTracePath,
+  type PartialTraceState,
+} from "../api/partialTrace"
+import {
+  buildPartialTraceRoot,
+  buildTraceTransactionInfos,
+  isTraceSuccessful,
+} from "../api/traceTransactions"
 import type {V3Action, V3Metadata, V3Trace} from "../api/types"
-import {buildTraceTransactionInfos, isTraceSuccessful} from "../api/traceTransactions"
 import {ActionHistoryTable} from "../components/AccountDetails"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
@@ -314,6 +325,9 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     TransactionInfo | undefined
   >()
   const [omittedTransactionCount, setOmittedTransactionCount] = useState<number | undefined>()
+  const [partialTraceState, setPartialTraceState] = useState<PartialTraceState | undefined>()
+  const [traceGapLoading, setTraceGapLoading] = useState(false)
+  const [traceGapError, setTraceGapError] = useState<string | undefined>()
   const [hoveredAction, setHoveredAction] = useState<V3Action | undefined>()
   const [stateChangesStatus, setStateChangesStatus] = useState<{
     readonly traceHash?: string
@@ -325,6 +339,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const addressFormatRef = useRef(addressFormat)
   const loadedActionsByHashRef = useRef(new Map<string, LoadedTransactionActions>())
   const stateChangesRequestedHashRef = useRef<string | undefined>(undefined)
+  const traceLookupHashRef = useRef(traceLookupHash)
   const showLoadingSkeleton = useDelayedLoadingVisibility(loading, 500)
   const selectedTraceTransaction = useMemo(() => {
     const requestedHash = hash.toLowerCase()
@@ -338,6 +353,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   fetchNameRef.current = fetchName
   // oxlint-disable-next-line react-doctor/no-ref-current-in-render -- keeps async trace loading on the latest address format without restarting it
   addressFormatRef.current = addressFormat
+  traceLookupHashRef.current = traceLookupHash
 
   const handleContractClick = (address: string, event?: ExplorerNavigationClickEvent) => {
     openExplorerPath(navigate, routes.addressPath(address), event)
@@ -523,6 +539,9 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       setTraceWarning(undefined)
       setOriginatingTransaction(undefined)
       setOmittedTransactionCount(undefined)
+      setPartialTraceState(undefined)
+      setTraceGapLoading(false)
+      setTraceGapError(undefined)
       setHoveredAction(undefined)
       try {
         const data = await client.getTraces(traceLookupHash, {
@@ -536,6 +555,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
           let transactionsMap = trace.transactions
           let nextOriginatingTransaction: TransactionInfo | undefined
           let nextOmittedTransactionCount: number | undefined
+          let nextPartialTraceState: PartialTraceState | undefined
           let preferredAddressOrder: string[] | undefined
           if (!transactionsMap || Object.keys(transactionsMap).length === 0) {
             const transactionData = await client.getTransactionByHash(traceLookupHash)
@@ -556,7 +576,10 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
 
             if (trace.external_hash) {
               try {
-                const originData = await client.getTransactionsByMessageHash(trace.external_hash)
+                const originData = await client.getTransactionsByMessageHash(
+                  trace.external_hash,
+                  "in",
+                )
                 if (!isActive) return
 
                 const originTransaction = originData.transactions[0]
@@ -572,6 +595,12 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                     originTransaction.account,
                     ...(transaction.in_msg?.source ? [transaction.in_msg.source] : []),
                   ]
+                  nextPartialTraceState = createPartialTraceState({
+                    traceId: trace.trace_id,
+                    totalTransactionCount: trace.trace_info.transactions,
+                    origin: originTransaction,
+                    selected: transaction,
+                  })
                   updateDomains(originData.address_book)
                 }
               } catch {
@@ -609,6 +638,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
             setTraceOverview(nextTraceOverview)
             setOriginatingTransaction(nextOriginatingTransaction)
             setOmittedTransactionCount(nextOmittedTransactionCount)
+            setPartialTraceState(nextPartialTraceState)
           }
         } else if (isActive) setError("Transaction not found or has no trace yet.")
       } catch (error) {
@@ -625,6 +655,99 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       isActive = false
     }
   }, [client, metadataRegistry, supportsTraceActions, traceLookupHash, updateDomains])
+
+  const applyPartialTraceState = useCallback(
+    async (nextState: PartialTraceState, requestedTraceHash: string): Promise<boolean> => {
+      const transactionsMap = partialTraceTransactionsMap(nextState)
+      const traceRoot = buildPartialTraceRoot(transactionsMap, nextState.parentByChildKey)
+      const processed = buildTraceTransactionInfos(transactionsMap, traceRoot)
+      const enrichment = await enrichTraceTransactions({
+        client,
+        metadataRegistry,
+        transactions: processed,
+        transactionsMap,
+        fetchName: fetchNameRef.current,
+        addressFormat: addressFormatRef.current,
+        preferredAddressOrder: [...contracts.keys()],
+        actions: traceActions,
+        actionMetadata: traceActionMetadata,
+        shouldContinue: () => traceLookupHashRef.current === requestedTraceHash,
+      })
+      if (!enrichment || traceLookupHashRef.current !== requestedTraceHash) {
+        return false
+      }
+
+      const originTransaction = nextState.transactionsByKey.get(nextState.originKey)
+      const nextOriginatingTransaction =
+        !nextState.pathComplete && originTransaction
+          ? buildTraceTransactionInfos({
+              [originTransaction.hash]: originTransaction,
+            })[0]
+          : undefined
+      const displayedTransactionCount =
+        nextState.visibleKeys.size + (nextOriginatingTransaction ? 1 : 0)
+
+      setTraces(enrichment.transactions)
+      setContracts(enrichment.contracts)
+      setCompilerAbisByCodeHash(enrichment.compilerAbisByCodeHash)
+      setVerifiedSourcesByCodeHash(enrichment.verifiedSourcesByCodeHash)
+      setValueFlow(enrichment.valueFlow)
+      setOriginatingTransaction(nextOriginatingTransaction)
+      setOmittedTransactionCount(
+        Math.max(0, nextState.totalTransactionCount - displayedTransactionCount),
+      )
+      setPartialTraceState(nextState)
+      setTraceWarning(currentWarning =>
+        currentWarning?.replace(
+          /Showing the requested transaction only\.?/,
+          "Showing a partially reconstructed trace.",
+        ),
+      )
+      return true
+    },
+    [client, contracts, metadataRegistry, traceActionMetadata, traceActions],
+  )
+
+  const handleTraceGapLoad = useCallback(async () => {
+    if (!partialTraceState || traceGapLoading) {
+      return
+    }
+
+    const requestedTraceHash = traceLookupHashRef.current
+    setTraceGapLoading(true)
+    setTraceGapError(undefined)
+
+    try {
+      const shouldContinue = () => traceLookupHashRef.current === requestedTraceHash
+      const lookup = (messageHash: string, direction: "in" | "out") =>
+        client.getTransactionsByMessageHash(messageHash, direction)
+      const result = partialTraceState.pathComplete
+        ? await loadPartialTraceBranches(partialTraceState, lookup, shouldContinue)
+        : await restorePartialTracePath(partialTraceState, lookup, shouldContinue)
+      if (!shouldContinue()) {
+        return
+      }
+
+      result.addressBooks.forEach(updateDomains)
+      const applied = await applyPartialTraceState(result.state, requestedTraceHash)
+      if (applied && result.failedRequests > 0) {
+        setTraceGapError(
+          `${result.failedRequests} ${result.failedRequests === 1 ? "transaction" : "transactions"} could not be loaded. You can retry.`,
+        )
+      }
+    } catch (loadError) {
+      console.error("Failed to load partial trace:", loadError)
+      if (traceLookupHashRef.current === requestedTraceHash) {
+        setTraceGapError(
+          loadError instanceof Error ? loadError.message : "Failed to load part of the trace.",
+        )
+      }
+    } finally {
+      if (traceLookupHashRef.current === requestedTraceHash) {
+        setTraceGapLoading(false)
+      }
+    }
+  }, [applyPartialTraceState, client, partialTraceState, traceGapLoading, updateDomains])
 
   useEffect(() => {
     const requestedHash = traceLookupHash.toLowerCase()
@@ -780,6 +903,9 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       traceWarning={traceWarning}
       originatingTransaction={originatingTransaction}
       omittedTransactionCount={omittedTransactionCount}
+      traceGapActionLabel={partialTraceState?.pathComplete ? "Load 10 more" : "Restore path"}
+      traceGapLoading={traceGapLoading}
+      traceGapError={traceGapError}
       hoveredAction={hoveredAction}
       nowSeconds={nowSeconds}
       breadcrumbs={[
@@ -805,6 +931,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       onActionHoverChange={setHoveredAction}
       onContractClick={handleContractClick}
       onTransactionSelect={handleTransactionSelect}
+      onTraceGapLoad={partialTraceState ? handleTraceGapLoad : undefined}
       onBlockClick={handleBlockClick}
       onToggleFavorite={selectedTraceTransaction ? handleToggleFavorite : undefined}
       loadActions={loadTransactionActions}
@@ -831,6 +958,9 @@ export interface TransactionTraceViewProps {
   readonly traceWarning?: string
   readonly originatingTransaction?: TransactionInfo
   readonly omittedTransactionCount?: number
+  readonly traceGapActionLabel?: string
+  readonly traceGapLoading?: boolean
+  readonly traceGapError?: string
   readonly statusLabels?: {
     readonly success: string
     readonly error: string
@@ -845,6 +975,7 @@ export interface TransactionTraceViewProps {
   readonly onActionHoverChange?: (action: V3Action | undefined) => void
   readonly onContractClick: (address: string, event?: ExplorerNavigationClickEvent) => void
   readonly onTransactionSelect?: (tx: TransactionInfo) => void
+  readonly onTraceGapLoad?: () => void
   readonly onBlockClick: (
     blockRef: TransactionBlockRef,
     event?: ExplorerNavigationClickEvent,
@@ -876,6 +1007,9 @@ export function TransactionTraceView({
   traceWarning,
   originatingTransaction,
   omittedTransactionCount,
+  traceGapActionLabel,
+  traceGapLoading = false,
+  traceGapError,
   statusLabels = {
     success: "Confirmed transaction",
     error: "Failed transaction",
@@ -890,6 +1024,7 @@ export function TransactionTraceView({
   onActionHoverChange,
   onContractClick,
   onTransactionSelect,
+  onTraceGapLoad,
   onBlockClick,
   onToggleFavorite,
   getBlockPath = blockPath,
@@ -1103,8 +1238,12 @@ export function TransactionTraceView({
                 highlightedTransactionIds={highlightedTransactionIds}
                 originatingTransaction={originatingTransaction}
                 omittedTransactionCount={omittedTransactionCount}
+                traceGapActionLabel={traceGapActionLabel}
+                traceGapLoading={traceGapLoading}
+                traceGapError={traceGapError}
                 onContractClick={onContractClick}
                 onTransactionSelect={onTransactionSelect}
+                onTraceGapLoad={onTraceGapLoad}
                 renderAddressChip={renderTraceAddressChip}
                 renderSelectedTransactionExtra={renderSelectedTransactionExtra}
                 renderSelectedTransactionMessageRouteAction={
