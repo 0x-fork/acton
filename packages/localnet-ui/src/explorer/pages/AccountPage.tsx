@@ -366,7 +366,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
           )
           if (!isActive) return
           updateDomains(response.address_book)
-          setActions([...response.actions])
+          setActions(appendUniqueActions([], response.actions))
           setActionMetadata(response.metadata)
           setActionsOffset(response.actions.length)
           setActionsHasMore(response.actions.length === ACTION_PAGE_SIZE)
@@ -499,7 +499,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
         historySortOrder,
       )
       updateDomains(response.address_book)
-      setActions(current => [...current, ...response.actions])
+      setActions(current => appendUniqueActions(current, response.actions))
       setActionMetadata(current => ({...current, ...response.metadata}))
       setActionsOffset(current => current + response.actions.length)
       setActionsHasMore(response.actions.length === ACTION_PAGE_SIZE)
@@ -1606,6 +1606,18 @@ function appendUniqueTransactions(
       return false
     }
     seen.add(transaction.hash)
+    return true
+  })
+  return [...current, ...uniqueNext]
+}
+
+function appendUniqueActions(current: readonly V3Action[], next: readonly V3Action[]): V3Action[] {
+  const seen = new Set(current.map(action => action.action_id))
+  const uniqueNext = next.filter(action => {
+    if (seen.has(action.action_id)) {
+      return false
+    }
+    seen.add(action.action_id)
     return true
   })
   return [...current, ...uniqueNext]

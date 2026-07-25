@@ -119,7 +119,8 @@
   min-width: 0;
 }
 
-.contextColumn > .jettonInfo {
+.contextColumn > .jettonInfo,
+.contextColumn > .nftPanel:only-child {
   flex: 1;
 }
 
