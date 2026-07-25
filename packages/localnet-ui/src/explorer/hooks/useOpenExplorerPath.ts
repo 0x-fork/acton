@@ -1,6 +1,6 @@
 import {useCallback} from "react"
 import type {MouseEvent} from "react"
-import {type NavigateFunction, useNavigate} from "react-router-dom"
+import {type NavigateFunction, useNavigate} from "react-router"
 
 export type ExplorerNavigationClickEvent = MouseEvent<HTMLElement>
 

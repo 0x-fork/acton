@@ -10,7 +10,7 @@ import {
   Wallet,
 } from "lucide-react"
 import type {LucideIcon} from "lucide-react"
-import {useNavigate} from "react-router-dom"
+import {useNavigate} from "react-router"
 
 import type {TonClient} from "../explorer/api/client"
 import type {JettonMaster, NftItem} from "../explorer/api/types"

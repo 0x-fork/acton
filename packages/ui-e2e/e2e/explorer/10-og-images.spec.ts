@@ -9,6 +9,7 @@ const previews = [
   {key: "abi", route: "/abi"},
   {key: "sources", route: "/sources"},
   {key: "verified", route: "/verified"},
+  {key: "verified-statistics", route: "/verified/statistics"},
   {key: "verified-contract", route: `/verified/${"0".repeat(64)}`},
   {key: "cell", route: "/cell"},
   {key: "emulate", route: "/emulate"},

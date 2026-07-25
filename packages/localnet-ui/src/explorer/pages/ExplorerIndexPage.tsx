@@ -1,5 +1,5 @@
 import {Binary, Droplets, Play} from "lucide-react"
-import {Link} from "react-router-dom"
+import {Link} from "react-router"
 import type {FC} from "react"
 
 import type {TonClient} from "../api/client"

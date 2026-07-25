@@ -1,4 +1,4 @@
-import {useLocation, useNavigate, useParams} from "react-router-dom"
+import {useLocation, useNavigate, useParams} from "react-router"
 import {useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 

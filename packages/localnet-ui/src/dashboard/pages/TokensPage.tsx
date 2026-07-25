@@ -9,7 +9,7 @@ import {
   DataTableSkeletonRows,
   DataTableTable,
 } from "@acton/ui"
-import {useNavigate} from "react-router-dom"
+import {useNavigate} from "react-router"
 import {useEffect, useState} from "react"
 import type {FC} from "react"
 

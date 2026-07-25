@@ -29,7 +29,7 @@ import {
   Star,
   XCircle,
 } from "lucide-react"
-import {useNavigate, useParams, useSearchParams} from "react-router-dom"
+import {useNavigate, useParams, useSearchParams} from "react-router"
 
 import type {TonClient} from "../api/client"
 import {

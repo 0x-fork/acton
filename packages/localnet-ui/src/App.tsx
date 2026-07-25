@@ -1,4 +1,4 @@
-import {BrowserRouter, Navigate, Route, Routes, useLocation} from "react-router-dom"
+import {BrowserRouter, Navigate, Route, Routes, useLocation} from "react-router"
 import {Check, KeyRound, ShieldCheck} from "lucide-react"
 import {Dialog, Input, ToastProvider} from "@acton/ui"
 import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"

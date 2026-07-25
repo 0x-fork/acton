@@ -27,7 +27,7 @@ import {
   X,
 } from "lucide-react"
 import type {LucideIcon} from "lucide-react"
-import {useLocation, useNavigate} from "react-router-dom"
+import {useLocation, useNavigate} from "react-router"
 import {ThemeSwitch, Tooltip} from "@acton/ui"
 
 import type {TonClient} from "../explorer/api/client"

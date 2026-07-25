@@ -14,7 +14,7 @@ import {
 } from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC} from "react"
-import {Link, useSearchParams} from "react-router-dom"
+import {Link, useSearchParams} from "react-router"
 
 import type {TonClient} from "../../../localnet-ui/src/explorer/api/client"
 import {

@@ -1,6 +1,6 @@
 import {ApiReferenceReact, type AnyApiReferenceConfiguration} from "@scalar/api-reference-react"
 import "@scalar/api-reference-react/style.css"
-import {useLocation} from "react-router-dom"
+import {useLocation} from "react-router"
 import {useCallback, useEffect, useMemo, useRef} from "react"
 import type {FC} from "react"
 import {useTheme} from "@acton/ui"

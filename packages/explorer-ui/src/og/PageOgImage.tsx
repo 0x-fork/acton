@@ -8,6 +8,7 @@ export type PageOgKey =
   | "sources"
   | "faucet"
   | "verified"
+  | "verified-statistics"
   | "verified-contract"
   | "cell"
   | "emulate"
@@ -83,6 +84,15 @@ const PAGE_OG_PREVIEWS: Record<PageOgKey, PageOgPreview> = {
     metadataDescription:
       "Browse verified TON smart-contract source bundles, compilers, and code hashes on actonscan.",
   },
+  "verified-statistics": {
+    key: "verified-statistics",
+    title: "Verification stats",
+    badge: "Source registry",
+    description: "Explore verified contracts by language and compiler version",
+    metadataTitle: "TON verification statistics · actonscan",
+    metadataDescription:
+      "Explore verified TON smart contracts by source language and compiler version on actonscan.",
+  },
   "verified-contract": {
     key: "verified-contract",
     title: "Verified contract",
@@ -139,6 +149,7 @@ export function pageOgPreviewForPath(pathname: string): PageOgPreview | undefine
   if (normalizedPath === "/sources") return PAGE_OG_PREVIEWS.sources
   if (normalizedPath === "/faucet") return PAGE_OG_PREVIEWS.faucet
   if (normalizedPath === "/verified") return PAGE_OG_PREVIEWS.verified
+  if (normalizedPath === "/verified/statistics") return PAGE_OG_PREVIEWS["verified-statistics"]
   if (/^\/verified\/[^/]+$/.test(normalizedPath)) return PAGE_OG_PREVIEWS["verified-contract"]
   if (normalizedPath === "/cell") return PAGE_OG_PREVIEWS.cell
   if (normalizedPath === "/emulate") return PAGE_OG_PREVIEWS.emulate

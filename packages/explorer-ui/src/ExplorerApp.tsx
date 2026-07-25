@@ -29,7 +29,7 @@ import {
   useLocation,
   useNavigate,
   useParams,
-} from "react-router-dom"
+} from "react-router"
 
 import {TonClient} from "../../localnet-ui/src/explorer/api/client"
 import {getBundledCompilerAbis} from "../../localnet-ui/src/explorer/api/compilerAbiCatalog"

@@ -50,7 +50,7 @@ import {
   type TransactionInfo,
   type TonAddressSuggestion,
 } from "@acton/transaction-ui"
-import {useLocation, useNavigate, useSearchParams} from "react-router-dom"
+import {useLocation, useNavigate, useSearchParams} from "react-router"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {
   Address,

@@ -4,8 +4,8 @@ import {abiSymbolAnchorId} from "@acton/transaction-ui/abi"
 import {FileCode2, History, Search} from "lucide-react"
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC} from "react"
-import {useNavigate} from "react-router-dom"
-import type {NavigateFunction} from "react-router-dom"
+import {useNavigate} from "react-router"
+import type {NavigateFunction} from "react-router"
 
 import {
   getBundledCompilerAbiCatalog,

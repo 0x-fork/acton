@@ -1,6 +1,6 @@
 import {BookOpen, Check, Copy, FastForward} from "lucide-react"
 import {Button, Dialog, Input, Tooltip, useToast} from "@acton/ui"
-import {Link, useNavigate} from "react-router-dom"
+import {Link, useNavigate} from "react-router"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent} from "react"
 

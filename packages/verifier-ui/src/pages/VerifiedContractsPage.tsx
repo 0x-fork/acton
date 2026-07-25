@@ -74,10 +74,7 @@ function sourceName(item: LastVerifiedItem): string {
   return item.entrypoint || "Unknown"
 }
 
-function handleLinkClick(
-  event: ReactMouseEvent<HTMLAnchorElement>,
-  onOpen: () => void,
-): void {
+function handleLinkClick(event: ReactMouseEvent<HTMLAnchorElement>, onOpen: () => void): void {
   event.stopPropagation()
   if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
     return
@@ -210,9 +207,7 @@ export function VerifiedContractsPage({
               target={statisticsHref.startsWith("http") ? "_blank" : undefined}
               rel={statisticsHref.startsWith("http") ? "noreferrer" : undefined}
               onClick={
-                onOpenStatistics
-                  ? event => handleLinkClick(event, onOpenStatistics)
-                  : undefined
+                onOpenStatistics ? event => handleLinkClick(event, onOpenStatistics) : undefined
               }
             >
               <ChartPie size={16} aria-hidden="true" />
@@ -251,9 +246,7 @@ export function VerifiedContractsPage({
                       className={styles.rowOverlayLink}
                       href={getContractHref(item)}
                       aria-label={`Open verified contract ${item.code_hash}`}
-                      onClick={event =>
-                        handleLinkClick(event, () => onOpenContract(item))
-                      }
+                      onClick={event => handleLinkClick(event, () => onOpenContract(item))}
                     >
                       <span className={styles.visuallyHidden}>
                         Open verified contract {item.code_hash}
@@ -265,9 +258,7 @@ export function VerifiedContractsPage({
                         href={getContractHref(item)}
                         title={item.code_hash}
                         aria-label={`Open code hash ${item.code_hash}`}
-                        onClick={event =>
-                          handleLinkClick(event, () => onOpenContract(item))
-                        }
+                        onClick={event => handleLinkClick(event, () => onOpenContract(item))}
                       >
                         {shortenMiddle(item.code_hash, 18, 12)}
                       </a>

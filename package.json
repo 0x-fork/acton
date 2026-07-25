@@ -23,6 +23,7 @@
   },
   "overrides": {
     "@ton/core": "^0.63.1",
+    "brace-expansion": "5.0.8",
     "fast-uri": "^3.1.4",
     "postcss": "^8.5.15",
     "qs": "^6.15.2",

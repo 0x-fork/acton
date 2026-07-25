@@ -4,7 +4,7 @@ import {AbiPanel, type AbiTab} from "@acton/transaction-ui/abi"
 import {InlineAction, InlineActions, Input, useToast} from "@acton/ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
-import {Link, useParams} from "react-router-dom"
+import {Link, useParams} from "react-router"
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import {

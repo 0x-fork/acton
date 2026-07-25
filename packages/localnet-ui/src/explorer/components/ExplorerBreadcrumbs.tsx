@@ -1,5 +1,5 @@
 import {Breadcrumbs, type BreadcrumbsItem, CopyInlineAction, InlineActions} from "@acton/ui"
-import {Link} from "react-router-dom"
+import {Link} from "react-router"
 import type {FC, ReactNode} from "react"
 
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"

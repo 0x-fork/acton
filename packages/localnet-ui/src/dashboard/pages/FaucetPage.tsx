@@ -2,7 +2,7 @@ import {ArrowUpRight, Check, ChevronDown, Coins, Loader2} from "lucide-react"
 import {Button, Dialog, Input, useToast} from "@acton/ui"
 import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
-import {useSearchParams} from "react-router-dom"
+import {useSearchParams} from "react-router"
 
 import type {JettonMaster, StartupWallet} from "../../explorer/api/types"
 import type {TonClient} from "../../explorer/api/client"

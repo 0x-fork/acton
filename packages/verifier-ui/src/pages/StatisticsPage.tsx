@@ -22,14 +22,11 @@ interface StatisticsPageProps {
   readonly api: VerifierApi
 }
 
-interface LanguageChartItem {
+interface LanguageStatistics {
   readonly fill: string
   readonly label: string
   readonly language: string
   readonly total: number
-}
-
-interface LanguageStatistics extends LanguageChartItem {
   readonly versions: readonly VersionRow[]
 }
 

@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from "react"
 import type {FC} from "react"
-import {Link} from "react-router-dom"
+import {Link} from "react-router"
 import {InlineAction, InlineActions, useToast} from "@acton/ui"
 import {Star, Trash2} from "lucide-react"
 

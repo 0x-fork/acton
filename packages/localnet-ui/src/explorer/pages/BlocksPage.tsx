@@ -7,7 +7,7 @@ import {
   ExternalLink,
   FileJson,
 } from "lucide-react"
-import {useNavigate, useParams} from "react-router-dom"
+import {useNavigate, useParams} from "react-router"
 import {
   BlockChip,
   Button,
