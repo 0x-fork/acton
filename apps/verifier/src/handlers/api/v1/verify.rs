@@ -303,20 +303,61 @@ fn validate_source_path(path: &str) -> Result<(), ApiError> {
     if path.trim().is_empty() {
         return Err(ApiError::bad_request("source path is empty".to_owned()));
     }
+    if path.trim() != path {
+        return Err(ApiError::bad_request(
+            "source path has leading or trailing whitespace".to_owned(),
+        ));
+    }
+    if path.chars().any(char::is_control) {
+        return Err(ApiError::bad_request(
+            "source path contains a control character".to_owned(),
+        ));
+    }
     if path.contains('\\') {
         return Err(ApiError::bad_request(
             "source path must use '/' separators".to_owned(),
         ));
     }
+    if path.starts_with('~') {
+        return Err(ApiError::bad_request(
+            "source path must not start with '~'".to_owned(),
+        ));
+    }
+    if matches!(
+        path.as_bytes(),
+        [drive, b':', ..] if drive.is_ascii_alphabetic()
+    ) {
+        return Err(ApiError::bad_request(
+            "source path must not use a Windows drive prefix".to_owned(),
+        ));
+    }
 
-    let path = Path::new(path);
-    if path.is_absolute() {
+    let source_path = Path::new(path);
+    if source_path.is_absolute() {
         return Err(ApiError::bad_request(
             "source path must be relative".to_owned(),
         ));
     }
 
-    for component in path.components() {
+    for component in path.split('/') {
+        if component.is_empty() {
+            return Err(ApiError::bad_request(
+                "source path contains an empty component".to_owned(),
+            ));
+        }
+        if component == "." {
+            return Err(ApiError::bad_request(
+                "source path contains an invalid component".to_owned(),
+            ));
+        }
+        if component.eq_ignore_ascii_case(".git") {
+            return Err(ApiError::bad_request(
+                "source path contains reserved '.git' component".to_owned(),
+            ));
+        }
+    }
+
+    for component in source_path.components() {
         match component {
             Component::Normal(_) => {}
             Component::CurDir
@@ -346,15 +387,56 @@ fn validate_import_mapping_component(name: &str, value: &str) -> Result<(), ApiE
     if value.trim().is_empty() {
         return Err(ApiError::bad_request(format!("{name} is empty")));
     }
+    if value.trim() != value {
+        return Err(ApiError::bad_request(format!(
+            "{name} has leading or trailing whitespace"
+        )));
+    }
+    if value.chars().any(char::is_control) {
+        return Err(ApiError::bad_request(format!(
+            "{name} contains a control character"
+        )));
+    }
     if value.contains('\\') {
         return Err(ApiError::bad_request(format!(
             "{name} must use '/' separators"
+        )));
+    }
+    if value.starts_with('~') {
+        return Err(ApiError::bad_request(format!(
+            "{name} must not start with '~'"
+        )));
+    }
+    if matches!(
+        value.as_bytes(),
+        [drive, b':', ..] if drive.is_ascii_alphabetic()
+    ) {
+        return Err(ApiError::bad_request(format!(
+            "{name} must not use a Windows drive prefix"
         )));
     }
 
     let path = Path::new(value);
     if path.is_absolute() {
         return Err(ApiError::bad_request(format!("{name} must be relative")));
+    }
+
+    for component in value.split('/') {
+        if component.is_empty() {
+            return Err(ApiError::bad_request(format!(
+                "{name} contains an empty component"
+            )));
+        }
+        if component == "." {
+            return Err(ApiError::bad_request(format!(
+                "{name} contains an invalid component"
+            )));
+        }
+        if component.eq_ignore_ascii_case(".git") {
+            return Err(ApiError::bad_request(format!(
+                "{name} contains reserved '.git' component"
+            )));
+        }
     }
 
     for component in path.components() {
@@ -613,6 +695,44 @@ impl std::fmt::Display for VerificationResult {
             Self::AlreadyVerified => formatter.write_str("already_verified"),
             Self::Match => formatter.write_str("match"),
             Self::Mismatch => formatter.write_str("mismatch"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_import_mapping_component, validate_source_path};
+
+    #[test]
+    fn source_path_rejects_control_characters() {
+        for path in [
+            "main\0.tolk",
+            "main\n.tolk",
+            "main\r.tolk",
+            "main\t.tolk",
+        ] {
+            assert!(
+                validate_source_path(path).is_err(),
+                "path should be rejected: {path:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn import_mapping_rejects_unsafe_paths() {
+        for path in [
+            "../contracts",
+            "~/contracts",
+            "C:/contracts",
+            "contracts/./imports",
+            "contracts//imports",
+            ".git/imports",
+            "contracts\n",
+        ] {
+            assert!(
+                validate_import_mapping_component("import mapping target", path).is_err(),
+                "import mapping path should be rejected: {path:?}"
+            );
         }
     }
 }

@@ -13,7 +13,8 @@ use verifier::source_storage::SourceMapData;
 
 use support::{
     app_state, failing_compiler_app_state, failing_source_storage_app_state, file_part, get,
-    post_verify, recording_app_state, recording_source_storage_app_state,
+    owned_file_part, owned_text_part, post_verify, recording_app_state,
+    recording_source_storage_app_state,
     recording_source_storage_app_state_with_generated_sources,
     recording_source_storage_app_state_with_source_map_data, response_json, text_part,
     unverified_app_state,
@@ -1230,24 +1231,48 @@ async fn verify_rejects_source_metadata_without_uploaded_file() {
 }
 
 #[tokio::test]
-async fn verify_rejects_invalid_source_path() {
-    let response = post_verify(
-        app_state(&[], CODE_HASH_ONE),
-        vec![
-            text_part("code_hash", CODE_HASH_ONE),
-            text_part("language", "tolk"),
-            text_part("compile_params", COMPILE_PARAMS_TOLK),
-            text_part(
-                "sources",
-                r#"[{"path":"../main.tolk","is_entrypoint":true}]"#,
-            ),
-            file_part("files", "../main.tolk", "text/plain", "fun main() {}"),
-        ],
-    )
-    .await;
+async fn verify_rejects_unsafe_source_paths() {
+    let cases = [
+        ("../main.tolk", "invalid component"),
+        ("imports/../../main.tolk", "invalid component"),
+        ("/main.tolk", "must be relative"),
+        ("~/main.tolk", "must not start with '~'"),
+        ("~user/main.tolk", "must not start with '~'"),
+        ("C:/main.tolk", "Windows drive prefix"),
+        ("./main.tolk", "invalid component"),
+        ("imports/./main.tolk", "invalid component"),
+        ("imports//main.tolk", "empty component"),
+        ("imports/main.tolk/", "empty component"),
+        (".git/main.tolk", "reserved '.git' component"),
+        (" main.tolk", "leading or trailing whitespace"),
+        ("main.tolk ", "leading or trailing whitespace"),
+    ];
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    assert_error_contains(response, "invalid component").await;
+    for (path, expected_error) in cases {
+        let sources = serde_json::to_string(&json!([{
+            "path": path,
+            "is_entrypoint": true,
+        }]))
+        .expect("source metadata should serialize");
+        let response = post_verify(
+            app_state(&[], CODE_HASH_ONE),
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", "tolk"),
+                text_part("compile_params", COMPILE_PARAMS_TOLK),
+                owned_text_part("sources", sources),
+                owned_file_part("files", path, "text/plain", "fun main() {}"),
+            ],
+        )
+        .await;
+
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "path should be rejected: {path}"
+        );
+        assert_error_contains(response, expected_error).await;
+    }
 }
 
 #[tokio::test]
