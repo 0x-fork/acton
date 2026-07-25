@@ -25,6 +25,7 @@ export interface TraceTransactionEnrichmentOptions {
   readonly transactionsMap: Record<string, V3Transaction>
   readonly fetchName: (address: string) => Promise<string | undefined>
   readonly addressFormat: AddressFormat
+  readonly preferredAddressOrder?: readonly string[]
   readonly actions?: readonly V3Action[]
   readonly actionMetadata?: V3Metadata
   readonly shouldContinue?: () => boolean
@@ -45,13 +46,19 @@ export async function enrichTraceTransactions({
   transactionsMap,
   fetchName,
   addressFormat,
+  preferredAddressOrder = [],
   actions = [],
   actionMetadata = {},
   shouldContinue = () => true,
 }: TraceTransactionEnrichmentOptions): Promise<TraceTransactionEnrichmentResult | undefined> {
   const processed = [...transactions]
   const transactionsByLt = new Map(Object.values(transactionsMap).map(tx => [tx.lt, tx] as const))
-  const traceAddressOrder = collectTraceAddressOrder(processed)
+  const traceAddressOrder = [
+    ...new Set([
+      ...preferredAddressOrder.map(normalizeTraceAddress),
+      ...collectTraceAddressOrder(processed),
+    ]),
+  ]
   const requestedAddresses = [...traceAddressOrder].sort()
   const additionalCodeHashes = new Set<string>()
 
@@ -146,6 +153,14 @@ export async function enrichTraceTransactions({
       processed,
       buildActionValueFlowMovements(actions, actionMetadata),
     ),
+  }
+}
+
+function normalizeTraceAddress(address: string): string {
+  try {
+    return Address.parse(address).toString()
+  } catch {
+    return address
   }
 }
 

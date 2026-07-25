@@ -100,6 +100,12 @@
   stroke-dasharray: 10;
 }
 
+.edgeStyleTraceGap {
+  stroke: var(--acton-color-warning);
+  stroke-dasharray: 4 5;
+  opacity: 0.72;
+}
+
 .edgeTextTitle {
   font-size: var(--acton-font-size-xs);
   font-weight: bold;
@@ -133,8 +139,37 @@
   cursor: help;
 }
 
+.traceGapContinuationNode {
+  pointer-events: auto;
+  cursor: help;
+}
+
+.traceGapContinuationNode * {
+  cursor: help;
+}
+
 .rootCircle {
   cursor: default;
+}
+
+.traceGapContinuationNode .rootCircle {
+  cursor: help;
+}
+
+.traceGapNode {
+  pointer-events: none;
+}
+
+.traceGapLabel {
+  justify-content: center;
+}
+
+.traceGapTitle {
+  color: var(--acton-color-warning-text);
+}
+
+.traceGapLabel .traceGapCount {
+  color: color-mix(in srgb, var(--acton-color-warning-text) 72%, var(--acton-color-text-muted));
 }
 
 .edgeText * {

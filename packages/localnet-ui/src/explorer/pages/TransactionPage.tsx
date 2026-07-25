@@ -310,6 +310,10 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const [traceActionMetadata, setTraceActionMetadata] = useState<V3Metadata>({})
   const [traceOverview, setTraceOverview] = useState<TraceOverviewData | undefined>()
   const [traceWarning, setTraceWarning] = useState<string | undefined>()
+  const [originatingTransaction, setOriginatingTransaction] = useState<
+    TransactionInfo | undefined
+  >()
+  const [omittedTransactionCount, setOmittedTransactionCount] = useState<number | undefined>()
   const [hoveredAction, setHoveredAction] = useState<V3Action | undefined>()
   const [stateChangesStatus, setStateChangesStatus] = useState<{
     readonly traceHash?: string
@@ -517,6 +521,8 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       setTraceActionMetadata({})
       setTraceOverview(undefined)
       setTraceWarning(undefined)
+      setOriginatingTransaction(undefined)
+      setOmittedTransactionCount(undefined)
       setHoveredAction(undefined)
       try {
         const data = await client.getTraces(traceLookupHash, {
@@ -528,6 +534,9 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
         if (data.traces && data.traces.length > 0) {
           const trace = data.traces[0]
           let transactionsMap = trace.transactions
+          let nextOriginatingTransaction: TransactionInfo | undefined
+          let nextOmittedTransactionCount: number | undefined
+          let preferredAddressOrder: string[] | undefined
           if (!transactionsMap || Object.keys(transactionsMap).length === 0) {
             const transactionData = await client.getTransactionByHash(traceLookupHash)
             if (!isActive) return
@@ -544,6 +553,32 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                 ? `Full trace is unavailable: ${trace.warning}. Showing the requested transaction only.`
                 : "Full trace data is unavailable. Showing the requested transaction only.",
             )
+
+            if (trace.external_hash) {
+              try {
+                const originData = await client.getTransactionsByMessageHash(trace.external_hash)
+                if (!isActive) return
+
+                const originTransaction = originData.transactions[0]
+                if (
+                  originTransaction &&
+                  originTransaction.hash.toLowerCase() !== transaction.hash.toLowerCase()
+                ) {
+                  nextOriginatingTransaction = buildTraceTransactionInfos({
+                    [originTransaction.hash]: originTransaction,
+                  })[0]
+                  nextOmittedTransactionCount = Math.max(0, trace.trace_info.transactions - 2)
+                  preferredAddressOrder = [
+                    originTransaction.account,
+                    ...(transaction.in_msg?.source ? [transaction.in_msg.source] : []),
+                  ]
+                  updateDomains(originData.address_book)
+                }
+              } catch {
+                // Keep the requested transaction available when a compatible API does not
+                // expose transaction lookup by message hash.
+              }
+            }
           }
           const processed = buildTraceTransactionInfos(transactionsMap, trace.trace)
           const actions = trace.actions ?? []
@@ -554,6 +589,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
             transactionsMap,
             fetchName: fetchNameRef.current,
             addressFormat: addressFormatRef.current,
+            preferredAddressOrder,
             actions,
             actionMetadata: data.metadata,
             shouldContinue: () => isActive,
@@ -571,6 +607,8 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
             setTraceActions(actions)
             setTraceActionMetadata(data.metadata)
             setTraceOverview(nextTraceOverview)
+            setOriginatingTransaction(nextOriginatingTransaction)
+            setOmittedTransactionCount(nextOmittedTransactionCount)
           }
         } else if (isActive) setError("Transaction not found or has no trace yet.")
       } catch (error) {
@@ -740,6 +778,8 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       traceActionMetadata={traceActionMetadata}
       traceOverview={traceOverview}
       traceWarning={traceWarning}
+      originatingTransaction={originatingTransaction}
+      omittedTransactionCount={omittedTransactionCount}
       hoveredAction={hoveredAction}
       nowSeconds={nowSeconds}
       breadcrumbs={[
@@ -789,6 +829,8 @@ export interface TransactionTraceViewProps {
   readonly traceActionMetadata?: V3Metadata
   readonly traceOverview?: TraceOverviewData
   readonly traceWarning?: string
+  readonly originatingTransaction?: TransactionInfo
+  readonly omittedTransactionCount?: number
   readonly statusLabels?: {
     readonly success: string
     readonly error: string
@@ -832,6 +874,8 @@ export function TransactionTraceView({
   traceActionMetadata = {},
   traceOverview,
   traceWarning,
+  originatingTransaction,
+  omittedTransactionCount,
   statusLabels = {
     success: "Confirmed transaction",
     error: "Failed transaction",
@@ -1057,6 +1101,8 @@ export function TransactionTraceView({
                 allContracts={[]}
                 selectedTransactionId={selectedTransactionId}
                 highlightedTransactionIds={highlightedTransactionIds}
+                originatingTransaction={originatingTransaction}
+                omittedTransactionCount={omittedTransactionCount}
                 onContractClick={onContractClick}
                 onTransactionSelect={onTransactionSelect}
                 renderAddressChip={renderTraceAddressChip}
