@@ -1,7 +1,9 @@
 import {Checkbox, Input, Popover, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
 import {
   createVerifierApi,
+  readVerifiedContractsPage,
   StatisticsPage,
+  verifiedContractsPageSearch,
   VerifiedContractPage,
   VerifiedContractsPage,
 } from "@acton/verifier-ui"
@@ -975,16 +977,6 @@ function readVerifiedContractsViewState(value: unknown): VerifiedContractsViewSt
   }
 }
 
-function readVerifiedContractsPage(search: string): number {
-  const value = new URLSearchParams(search).get("page")
-  if (value === null) {
-    return 0
-  }
-
-  const page = Number(value)
-  return Number.isInteger(page) && page > 0 ? page - 1 : 0
-}
-
 const VerifiedContractsRoute: FC = () => {
   const location = useLocation()
   const navigate = useNavigate()
@@ -1006,14 +998,7 @@ const VerifiedContractsRoute: FC = () => {
       page={initialPage}
       onPageChange={page => {
         currentPageRef.current = page
-        const search = new URLSearchParams(location.search)
-        if (page === 0) {
-          search.delete("page")
-        } else {
-          search.set("page", String(page + 1))
-        }
-
-        const nextSearch = search.toString()
+        const nextSearch = verifiedContractsPageSearch(location.search, page)
         if (nextSearch !== location.search.slice(1)) {
           void navigate(
             {
