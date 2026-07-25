@@ -187,6 +187,8 @@ test("masterchain shard blocks are resolved from the V2 shard snapshot", async (
     const client = new TonClient({
       v2BaseUrl: "https://toncenter.example/api/v2",
       v3BaseUrl: "https://toncenter.example/api/v3",
+      toncenterProxyV2BaseUrl: "https://actonscan.example/api/toncenter/testnet/v2",
+      toncenterProxyV3BaseUrl: "https://actonscan.example/api/toncenter/testnet/v3",
       addressNameBaseUrl: "https://toncenter.example/api",
     })
 
@@ -194,9 +196,11 @@ test("masterchain shard blocks are resolved from the V2 shard snapshot", async (
       blocks: [shardBlock],
     })
     expect(requests).toHaveLength(2)
-    expect(requests[0]?.pathname).toBe("/api/v2/getShards")
+    expect(requests[0]?.origin).toBe("https://actonscan.example")
+    expect(requests[0]?.pathname).toBe("/api/toncenter/testnet/v2/getShards")
     expect(requests[0]?.searchParams.get("seqno")).toBe("79299165")
-    expect(requests[1]?.pathname).toBe("/api/v3/blocks")
+    expect(requests[1]?.origin).toBe("https://actonscan.example")
+    expect(requests[1]?.pathname).toBe("/api/toncenter/testnet/v3/blocks")
     expect(requests[1]?.searchParams.get("workchain")).toBe("0")
     expect(requests[1]?.searchParams.get("shard")).toBe("8000000000000000")
     expect(requests[1]?.searchParams.get("seqno")).toBe("84021699")
@@ -271,6 +275,113 @@ test("transaction lookup requests one full transaction by hash", async () => {
           ],
         },
       }
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("trace and block lookups can use their same-origin proxies", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: Array<{readonly url: string; readonly apiKey: string | null}> = []
+  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+    requests.push({
+      url: input.toString(),
+      apiKey: new Headers(init?.headers).get("X-API-Key"),
+    })
+    return Response.json({traces: [], address_book: {}, metadata: {}})
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://testnet.toncenter.example/api/v2",
+      v3BaseUrl: "https://testnet.toncenter.example/api/v3",
+      toncenterProxyV3BaseUrl: "https://actonscan.example/api/toncenter/testnet/v3",
+      addressNameBaseUrl: "https://testnet.toncenter.example/api",
+      toncenterApiKey: "browser-api-key",
+    })
+
+    await client.getTraces("a".repeat(64), {includeActions: true})
+    await client.getBlocks({workchain: -1, shard: "8000000000000000", seqno: 42, limit: 1})
+    await client.getBlockTransactions({
+      workchain: -1,
+      shard: "8000000000000000",
+      seqno: 42,
+      limit: 100,
+    })
+
+    expect(requests).toMatchInlineSnapshot(`
+      [
+        {
+          "apiKey": null,
+          "url": "https://actonscan.example/api/toncenter/testnet/v3/traces?tx_hash=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&include_actions=true",
+        },
+        {
+          "apiKey": null,
+          "url": "https://actonscan.example/api/toncenter/testnet/v3/blocks?workchain=-1&shard=8000000000000000&seqno=42&limit=1",
+        },
+        {
+          "apiKey": null,
+          "url": "https://actonscan.example/api/toncenter/testnet/v3/transactions?workchain=-1&shard=8000000000000000&seqno=42&limit=100",
+        },
+      ]
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("custom networks keep trace and block lookups on their configured APIs", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: Array<{readonly url: string; readonly apiKey: string | null}> = []
+  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(input.toString())
+    requests.push({
+      url: url.toString(),
+      apiKey: new Headers(init?.headers).get("X-API-Key"),
+    })
+    return url.pathname.endsWith("/getShards")
+      ? Response.json({ok: true, result: {shards: []}})
+      : Response.json({blocks: [], traces: [], transactions: []})
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://custom-toncenter.example/api/v2",
+      v3BaseUrl: "https://custom-toncenter.example/api/v3",
+      addressNameBaseUrl: "https://custom-toncenter.example/api",
+      toncenterApiCompatible: true,
+      toncenterApiKey: "custom-browser-key",
+    })
+
+    await client.getTraces("a".repeat(64))
+    await client.getBlocks({workchain: -1, shard: "8000000000000000", seqno: 42})
+    await client.getBlockTransactions({
+      workchain: -1,
+      shard: "8000000000000000",
+      seqno: 42,
+    })
+    await client.getMasterchainBlockShards(42)
+
+    expect(requests).toMatchInlineSnapshot(`
+      [
+        {
+          "apiKey": "custom-browser-key",
+          "url": "https://custom-toncenter.example/api/v3/traces?tx_hash=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+        {
+          "apiKey": "custom-browser-key",
+          "url": "https://custom-toncenter.example/api/v3/blocks?workchain=-1&shard=8000000000000000&seqno=42",
+        },
+        {
+          "apiKey": "custom-browser-key",
+          "url": "https://custom-toncenter.example/api/v3/transactions?workchain=-1&shard=8000000000000000&seqno=42&limit=100",
+        },
+        {
+          "apiKey": "custom-browser-key",
+          "url": "https://custom-toncenter.example/api/v2/getShards?seqno=42",
+        },
+      ]
     `)
   } finally {
     globalThis.fetch = originalFetch

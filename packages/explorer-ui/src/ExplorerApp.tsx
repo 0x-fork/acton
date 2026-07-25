@@ -1099,12 +1099,16 @@ export const ExplorerApp: FC = () => {
       new TonClient({
         v2BaseUrl: networkConfig.api.v2BaseUrl,
         v3BaseUrl: networkConfig.api.v3BaseUrl,
+        toncenterProxyV2BaseUrl:
+          networkKind === "custom" ? undefined : `/api/toncenter/${networkKind}/v2`,
+        toncenterProxyV3BaseUrl:
+          networkKind === "custom" ? undefined : `/api/toncenter/${networkKind}/v3`,
         addressNameBaseUrl: "",
         localnetControlEnabled: false,
         toncenterApiCompatible: true,
         toncenterApiKey: networkConfig.api.toncenterApiKey,
       }),
-    [networkConfig],
+    [networkConfig, networkKind],
   )
   const testnetClient = useMemo(
     () =>

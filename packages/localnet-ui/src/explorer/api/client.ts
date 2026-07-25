@@ -34,6 +34,8 @@ import {isNftItemNsfw} from "../nftSafetyRegistry"
 interface TonClientOptions {
   readonly v2BaseUrl: string
   readonly v3BaseUrl: string
+  readonly toncenterProxyV2BaseUrl?: string
+  readonly toncenterProxyV3BaseUrl?: string
   readonly addressNameBaseUrl: string
   readonly localnetControlEnabled?: boolean
   readonly toncenterApiCompatible?: boolean
@@ -278,6 +280,8 @@ function isToncenterApiBaseUrl(baseUrl: string): boolean {
 export class TonClient {
   private readonly v2BaseUrl: string
   private readonly v3BaseUrl: string
+  private readonly toncenterProxyV2BaseUrl: string
+  private readonly toncenterProxyV3BaseUrl: string
   private readonly addressNameBaseUrl: string
   private readonly localnetControlEnabled: boolean
   private readonly toncenterApiCompatible: boolean
@@ -289,6 +293,8 @@ export class TonClient {
   constructor({
     v2BaseUrl,
     v3BaseUrl,
+    toncenterProxyV2BaseUrl,
+    toncenterProxyV3BaseUrl,
     addressNameBaseUrl,
     localnetControlEnabled = true,
     toncenterApiCompatible,
@@ -298,6 +304,8 @@ export class TonClient {
   }: TonClientOptions) {
     this.v2BaseUrl = v2BaseUrl
     this.v3BaseUrl = v3BaseUrl
+    this.toncenterProxyV2BaseUrl = toncenterProxyV2BaseUrl ?? v2BaseUrl
+    this.toncenterProxyV3BaseUrl = toncenterProxyV3BaseUrl ?? v3BaseUrl
     this.addressNameBaseUrl = addressNameBaseUrl
     this.localnetControlEnabled = localnetControlEnabled
     this.toncenterApiCompatible = toncenterApiCompatible ?? isToncenterApiBaseUrl(v3BaseUrl)
@@ -508,7 +516,7 @@ export class TonClient {
   }
 
   async getTraces(hash: string, options: GetTracesOptions = {}): Promise<V3TracesResponse> {
-    const url = this.buildUrl(this.v3BaseUrl, "/traces")
+    const url = this.buildUrl(this.toncenterProxyV3BaseUrl, "/traces")
     url.searchParams.append("tx_hash", hash)
     if (options.includeActions) {
       url.searchParams.append("include_actions", "true")
@@ -565,7 +573,7 @@ export class TonClient {
   }
 
   async getBlocks(options: GetBlocksOptions = {}): Promise<V3BlocksResponse> {
-    const url = this.buildUrl(this.v3BaseUrl, "/blocks")
+    const url = this.buildUrl(this.toncenterProxyV3BaseUrl, "/blocks")
     appendOptionalSearchParam(url, "workchain", options.workchain)
     appendOptionalSearchParam(url, "shard", options.shard)
     appendOptionalSearchParam(url, "seqno", options.seqno)
@@ -594,7 +602,7 @@ export class TonClient {
   }
 
   async getMasterchainBlockShards(seqno: number): Promise<V3BlocksResponse> {
-    const url = this.buildUrl(this.v2BaseUrl, "/getShards")
+    const url = this.buildUrl(this.toncenterProxyV2BaseUrl, "/getShards")
     url.searchParams.append("seqno", seqno.toString())
     const {shards} = await this.request<Shards>(url, "Failed to fetch masterchain block shards")
     const responses = await Promise.all(
@@ -615,7 +623,7 @@ export class TonClient {
   async getBlockTransactions(
     options: GetBlockTransactionsOptions,
   ): Promise<V3TransactionsResponse> {
-    const url = this.buildUrl(this.v3BaseUrl, "/transactions")
+    const url = this.buildUrl(this.toncenterProxyV3BaseUrl, "/transactions")
     url.searchParams.append("workchain", options.workchain.toString())
     url.searchParams.append("shard", options.shard)
     url.searchParams.append("seqno", options.seqno.toString())
