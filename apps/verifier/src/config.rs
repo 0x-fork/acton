@@ -28,6 +28,7 @@ const DEFAULT_REGISTRY_INDEX_PATH: &str = "verifier-index.sqlite3";
 #[derive(Clone, Debug)]
 pub struct Config {
     bind_addr: SocketAddr,
+    api_key: Option<String>,
     logging_level: String,
     network: TonNetwork,
     toncenter_base_url: Option<String>,
@@ -82,6 +83,11 @@ impl Config {
     #[must_use]
     pub const fn bind_addr(&self) -> SocketAddr {
         self.bind_addr
+    }
+
+    #[must_use]
+    pub fn api_key(&self) -> Option<&str> {
+        self.api_key.as_deref()
     }
 
     #[must_use]
@@ -171,6 +177,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             bind_addr: default_bind_addr(),
+            api_key: None,
             logging_level: DEFAULT_LOG_LEVEL.to_owned(),
             network: TonNetwork::Mainnet,
             toncenter_base_url: None,
@@ -257,6 +264,7 @@ impl ConfigFile {
     fn into_config(self) -> Config {
         Config {
             bind_addr: self.server.bind_addr.unwrap_or_else(default_bind_addr),
+            api_key: self.server.api_key.filter(|api_key| !api_key.is_empty()),
             logging_level: self
                 .logging
                 .level
@@ -314,6 +322,7 @@ impl ConfigFile {
 #[derive(Debug, Default, Deserialize)]
 struct ServerConfig {
     bind_addr: Option<SocketAddr>,
+    api_key: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]

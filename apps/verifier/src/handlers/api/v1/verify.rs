@@ -10,6 +10,7 @@ use axum::{
         Multipart as MultipartExtractor, State,
         multipart::{Field, Multipart},
     },
+    http::HeaderMap,
     response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
@@ -32,6 +33,8 @@ use crate::{
 
 mod languages;
 
+const API_KEY_HEADER: &str = "x-verifier-key";
+
 #[utoipa::path(
     post,
     path = "/api/v1/verify",
@@ -43,20 +46,26 @@ mod languages;
     responses(
         (status = 200, description = "Verification completed", body = VerifyResponse),
         (status = 400, description = "Invalid verification request or compilation mismatch input", body = crate::error::ErrorResponse),
+        (status = 401, description = "A valid API key is required to set verified_at", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
         (status = 502, description = "Compiler, blockchain, or source storage failure", body = crate::error::ErrorResponse)
+    ),
+    params(
+        ("X-Verifier-Key" = Option<String>, Header, description = "API key required only when verified_at is provided")
     ),
     tag = "verification"
 )]
 pub async fn handler(
     State(state): State<AppState>,
+    headers: HeaderMap,
     multipart: MultipartExtractor,
 ) -> Result<impl IntoResponse, ApiError> {
-    handle_multipart(&state, multipart).await
+    handle_multipart(&state, &headers, multipart).await
 }
 
 async fn handle_multipart(
     state: &AppState,
+    headers: &HeaderMap,
     mut multipart: Multipart,
 ) -> Result<Json<VerifyResponse>, ApiError> {
     let mut address = None;
@@ -64,6 +73,7 @@ async fn handle_multipart(
     let mut language = None;
     let mut compile_params = json!({});
     let mut sources = None;
+    let mut verified_at = None;
     let mut files = Vec::new();
 
     while let Some(field) = multipart
@@ -116,11 +126,33 @@ async fn handle_multipart(
                     })?,
                 );
             }
+            Some("verified_at") => {
+                let value = field
+                    .text()
+                    .await
+                    .map_err(|err| ApiError::bad_request(err.to_string()))?;
+                let verified_at_millis = value
+                    .parse::<u64>()
+                    .map_err(|err| ApiError::bad_request(format!("invalid verified_at: {err}")))?;
+                verified_at = Some(verified_at_millis / 1_000);
+            }
             Some("files") => {
                 files.push(read_file_part(field).await?);
             }
             _ => {}
         }
+    }
+
+    if verified_at.is_some()
+        && !state.api_key_matches(
+            headers
+                .get(API_KEY_HEADER)
+                .and_then(|value| value.to_str().ok()),
+        )
+    {
+        return Err(ApiError::unauthorized(
+            "a valid API key is required to set verified_at".to_owned(),
+        ));
     }
 
     let target = VerificationTarget {
@@ -204,6 +236,7 @@ async fn handle_multipart(
                 .store_verified_bundle(StoreSourceBundleRequest {
                     code_hash: resolved_target.code_hash.clone(),
                     source_bundle_hash: source_bundle_hash.clone(),
+                    verified_at,
                     compiler: CompilerMetadata {
                         language: compile_input.language.clone(),
                         version: compile_input.compiler_version.clone(),
@@ -583,6 +616,11 @@ pub(super) struct VerifyMultipartRequest {
         example = r#"[{"path":"main.tolk","is_entrypoint":true}]"#
     )]
     sources: String,
+    // TODO: Remove this field after migrating contracts from the legacy verifier.
+    /// Original verification Unix timestamp in milliseconds.
+    /// Requires a valid `X-Verifier-Key` header.
+    #[schema(nullable = false, example = 1700000000000_u64)]
+    verified_at: Option<u64>,
     #[schema(
         value_type = String,
         format = Binary,

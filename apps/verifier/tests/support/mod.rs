@@ -37,6 +37,14 @@ pub fn app_state(code_hashes: &[(&str, &str)], compiled_code_hash: &str) -> AppS
     )
 }
 
+pub fn app_state_with_api_key(
+    code_hashes: &[(&str, &str)],
+    compiled_code_hash: &str,
+    api_key: &str,
+) -> AppState {
+    app_state(code_hashes, compiled_code_hash).with_api_key(Some(api_key))
+}
+
 pub fn real_compiler_app_state(code_hashes: &[(&str, &str)]) -> AppState {
     let source_storage = Arc::new(mock_source_storage::MockSourceStorage::confirmed());
     app_state_from_parts(
@@ -228,14 +236,34 @@ fn app_state_from_parts(
 }
 
 pub async fn post_verify(state: AppState, parts: Vec<MultipartPart>) -> Response {
+    post_verify_with_optional_api_key(state, parts, None).await
+}
+
+pub async fn post_verify_with_api_key(
+    state: AppState,
+    parts: Vec<MultipartPart>,
+    api_key: &str,
+) -> Response {
+    post_verify_with_optional_api_key(state, parts, Some(api_key)).await
+}
+
+async fn post_verify_with_optional_api_key(
+    state: AppState,
+    parts: Vec<MultipartPart>,
+    api_key: Option<&str>,
+) -> Response {
     let body = multipart_body(parts);
-    let request = Request::builder()
+    let mut request = Request::builder()
         .method(Method::POST)
         .uri("/api/v1/verify")
         .header(
             CONTENT_TYPE,
             format!("multipart/form-data; boundary={MULTIPART_BOUNDARY}"),
-        )
+        );
+    if let Some(api_key) = api_key {
+        request = request.header("X-Verifier-Key", api_key);
+    }
+    let request = request
         .body(Body::from(body))
         .expect("POST /api/v1/verify request should be valid");
 

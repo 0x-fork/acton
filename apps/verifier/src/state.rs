@@ -14,6 +14,7 @@ use crate::{
 
 #[derive(Clone)]
 pub struct AppState {
+    api_key: Option<String>,
     compiler_service: Arc<dyn CompilerService>,
     verification_registry: Arc<dyn VerificationRegistry>,
     verification_service: VerificationService,
@@ -38,7 +39,8 @@ impl AppState {
             Arc::new(ToncenterClient::from_config(config)),
             Arc::new(NodeCompilerService::from_config(config)),
             verification_registry,
-        ))
+        )
+        .with_api_key(config.api_key()))
     }
 
     #[must_use]
@@ -48,10 +50,25 @@ impl AppState {
         verification_registry: Arc<dyn VerificationRegistry>,
     ) -> Self {
         Self {
+            api_key: None,
             compiler_service,
             verification_registry,
             verification_service: VerificationService::new(blockchain_client),
         }
+    }
+
+    #[must_use]
+    pub fn with_api_key(mut self, api_key: Option<&str>) -> Self {
+        self.api_key = api_key.map(ToOwned::to_owned);
+        self
+    }
+
+    #[must_use]
+    pub fn api_key_matches(&self, api_key: Option<&str>) -> bool {
+        self.api_key
+            .as_deref()
+            .zip(api_key)
+            .is_some_and(|(expected, actual)| expected == actual)
     }
 
     #[must_use]

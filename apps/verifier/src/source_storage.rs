@@ -40,6 +40,8 @@ pub type SharedSourceStorage = Arc<dyn SourceStorage>;
 pub struct StoreSourceBundleRequest {
     pub code_hash: String,
     pub source_bundle_hash: String,
+    // TODO: Remove this field after migrating contracts from the legacy verifier.
+    pub verified_at: Option<u64>,
     pub compiler: CompilerMetadata,
     pub files: Vec<SourceStorageFile>,
     pub source_map: Option<SourceMapData>,
@@ -166,7 +168,9 @@ impl GitSourceStorage {
             let bundle = read_bundle(repo_path, &bundle_path).await?;
             Some(bundle.storage_revision)
         } else {
-            let verified_at = current_unix_timestamp()?;
+            let verified_at = request
+                .verified_at
+                .map_or_else(current_unix_timestamp, Ok)?;
             let files_dir = bundle_dir.join("files");
             fs::create_dir_all(&files_dir).await.map_err(|source| {
                 SourceStorageError::CreateDir {

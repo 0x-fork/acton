@@ -21,6 +21,7 @@ use verifier::{
 const CODE_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SOURCE_BUNDLE_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const SECOND_BUNDLE_HASH: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const ORIGINAL_VERIFIED_AT: u64 = 1_600_000_000;
 
 #[tokio::test]
 async fn git_source_storage_uses_configured_storage_root() -> Result<(), Box<dyn Error>> {
@@ -35,6 +36,7 @@ async fn git_source_storage_uses_configured_storage_root() -> Result<(), Box<dyn
         .store_bundle(StoreSourceBundleRequest {
             code_hash: CODE_HASH.to_owned(),
             source_bundle_hash: SOURCE_BUNDLE_HASH.to_owned(),
+            verified_at: Some(ORIGINAL_VERIFIED_AT),
             compiler: CompilerMetadata {
                 language: "tolk".to_owned(),
                 version: "1.4.1".to_owned(),
@@ -62,6 +64,11 @@ async fn git_source_storage_uses_configured_storage_root() -> Result<(), Box<dyn
             .is_file()
     );
     assert_eq!(storage.list_code_hashes().await?, vec![CODE_HASH]);
+    let stored_bundle = storage
+        .load_bundle(CODE_HASH)
+        .await?
+        .expect("stored bundle should exist");
+    assert_eq!(stored_bundle.manifest.verified_at, ORIGINAL_VERIFIED_AT);
 
     Ok(())
 }
@@ -299,6 +306,7 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
         .store_bundle(StoreSourceBundleRequest {
             code_hash: CODE_HASH.to_owned(),
             source_bundle_hash: SOURCE_BUNDLE_HASH.to_owned(),
+            verified_at: None,
             compiler: CompilerMetadata {
                 language: "tolk".to_owned(),
                 version: "1.4.1".to_owned(),
@@ -406,6 +414,7 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
         .store_bundle(StoreSourceBundleRequest {
             code_hash: CODE_HASH.to_owned(),
             source_bundle_hash: SECOND_BUNDLE_HASH.to_owned(),
+            verified_at: None,
             compiler: CompilerMetadata {
                 language: "tolk".to_owned(),
                 version: "1.4.2".to_owned(),

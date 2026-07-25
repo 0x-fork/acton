@@ -1,5 +1,6 @@
 [server]
 bind_addr = "127.0.0.1:3000"
+# api_key = "migration-api-key"
 
 [logging]
 # Supported values: trace, debug, info, warn, error.

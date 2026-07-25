@@ -168,7 +168,7 @@ fn stored_bundle_from_request(
         manifest: SourceBundleManifest {
             code_hash: request.code_hash.clone(),
             source_bundle_hash: request.source_bundle_hash.clone(),
-            verified_at: MOCK_VERIFIED_AT,
+            verified_at: request.verified_at.unwrap_or(MOCK_VERIFIED_AT),
             compiler: request.compiler.clone(),
             source_map: request.source_map.clone(),
         },

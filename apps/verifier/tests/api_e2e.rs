@@ -12,8 +12,9 @@ use verifier::compilers::CompileGeneratedSource;
 use verifier::source_storage::SourceMapData;
 
 use support::{
-    app_state, failing_compiler_app_state, failing_source_storage_app_state, file_part, get,
-    mapped_compiler_app_state, owned_file_part, owned_text_part, post_verify, recording_app_state,
+    app_state, app_state_with_api_key, failing_compiler_app_state,
+    failing_source_storage_app_state, file_part, get, mapped_compiler_app_state, owned_file_part,
+    owned_text_part, post_verify, post_verify_with_api_key, recording_app_state,
     recording_source_storage_app_state, recording_source_storage_app_state_with_generated_sources,
     recording_source_storage_app_state_with_source_map_data, response_json, text_part,
     unverified_app_state,
@@ -25,6 +26,8 @@ const CODE_HASH_ONE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 const CODE_HASH_ONE_BASE64: &str = "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=";
 const CODE_HASH_TWO: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const CODE_HASH_THREE: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const API_KEY: &str = "migration-api-key";
+const ORIGINAL_VERIFIED_AT: &str = "1678647600000";
 const COMPILE_PARAMS_TOLK: &str = r#"{"compiler_version":"1.4.1"}"#;
 const COMPILE_PARAMS_TOLK_WITH_IMPORT_MAPPINGS: &str =
     r#"{"compiler_version":"1.4.1","import_mappings":{"@contracts":"contracts"}}"#;
@@ -526,6 +529,61 @@ async fn verification_source_returns_verified_bundle_files() {
     let body = response_json::<LastVerifiedResponse>(response).await;
     assert_eq!(body.items.len(), 1);
     assert_eq!(body.items[0].source_bundle_hash, source_bundle_hash);
+}
+
+#[tokio::test]
+async fn verify_accepts_original_verified_at_with_api_key() {
+    let state = app_state_with_api_key(&[], CODE_HASH_ONE, API_KEY);
+    let response = post_verify_with_api_key(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            text_part("verified_at", ORIGINAL_VERIFIED_AT),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+        API_KEY,
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response = get(
+        state,
+        &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
+    )
+    .await;
+    let body = response_json::<VerificationSourceResponse>(response).await;
+    let bundle = body.bundle.expect("verified bundle should exist");
+    assert_eq!(bundle.verified_at, 1_678_647_600);
+}
+
+#[tokio::test]
+async fn verify_rejects_verified_at_without_valid_api_key() {
+    let state = app_state_with_api_key(&[], CODE_HASH_ONE, API_KEY);
+    let parts = || {
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            text_part("verified_at", ORIGINAL_VERIFIED_AT),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ]
+    };
+
+    let response = post_verify(state.clone(), parts()).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_error_contains(response, "valid API key").await;
+
+    let response = post_verify_with_api_key(state, parts(), "wrong-api-key").await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_error_contains(response, "valid API key").await;
+
+    let response = post_verify_with_api_key(app_state(&[], CODE_HASH_ONE), parts(), API_KEY).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_error_contains(response, "valid API key").await;
 }
 
 #[tokio::test]

@@ -66,7 +66,9 @@ write_generated_config() {
 
     {
         printf '[server]\n'
-        printf 'bind_addr = "%s"\n\n' "$(toml_escape "${VERIFIER_BIND_ADDR:-0.0.0.0:3000}")"
+        printf 'bind_addr = "%s"\n' "$(toml_escape "${VERIFIER_BIND_ADDR:-0.0.0.0:3000}")"
+        write_optional_string api_key "${VERIFIER_API_KEY:-}"
+        printf '\n'
 
         printf '[logging]\n'
         printf 'level = "%s"\n\n' "$(toml_escape "${VERIFIER_LOG_LEVEL:-info}")"
