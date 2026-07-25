@@ -1435,7 +1435,10 @@ export const ExplorerApp: FC = () => {
                       />
                       <Route path="/verified/:target" element={<VerifiedContractRoute />} />
                       <Route path="/cell" element={<CellInspectorPage />} />
-                      <Route path="/emulate" element={<EmulatePage client={client} />} />
+                      <Route
+                        path="/emulate"
+                        element={<EmulatePage client={client} shareApiPath="/api/emulations" />}
+                      />
                       <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />
                       <Route
                         path="/block/last"

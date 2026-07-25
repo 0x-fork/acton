@@ -156,6 +156,35 @@ describe("transaction to emulation navigation", () => {
 
     expect(navigationPayloadSnapshot(state)).toMatchSnapshot()
   })
+
+  test("rejects malformed builder handoff payloads", () => {
+    const message = createInternalMessage(beginCell().storeUint(1, 32).storeInt(7, 32).endCell())
+    const state = createEmulateNavigationState(
+      message,
+      {source: SOURCE_ABI},
+      42,
+      "InternalTransferStep",
+    )
+    const payload = readEmulateNavigationPayload(state)
+    if (payload?.inputMode !== "builder") {
+      throw new Error("Expected a builder payload")
+    }
+
+    expect({
+      invalidArgs: readEmulateNavigationPayload({
+        emulatePayload: {
+          ...payload,
+          builder: {...payload.builder, argsJson: "{"},
+        },
+      }),
+      manualWithoutAbi: readEmulateNavigationPayload({
+        emulatePayload: {
+          ...payload,
+          builder: {...payload.builder, abi: undefined, abiSourceMode: "manual"},
+        },
+      }),
+    }).toMatchSnapshot()
+  })
 })
 
 function createInternalMessage(body: Cell, coins = 250_000_000n): Message {

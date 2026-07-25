@@ -123,6 +123,7 @@ exports[`transaction to emulation navigation uses the sender outgoing ABI when t
       ],
     },
     "abiEndpoint": "source",
+    "abiSourceMode": "auto",
     "args": {
       "$": "InternalTransferStep",
       "value": "7",
@@ -225,6 +226,7 @@ exports[`transaction to emulation navigation uses the named source message inste
       ],
     },
     "abiEndpoint": "source",
+    "abiSourceMode": "auto",
     "args": {
       "$": "InternalTransferStep",
       "value": "7",
@@ -238,5 +240,12 @@ exports[`transaction to emulation navigation uses the named source message inste
   "rawMessage": "b5ee9c724101010100600000bb48000000000000000000000000000000000000000000000000000000000000000001000444444444444444444444444444444444444444444444444444444444444444503b9aca000000000000000000220000002e0000000080000003c092a35ab6",
   "sourceAddress": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
   "targetAddress": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+}
+`;
+
+exports[`transaction to emulation navigation rejects malformed builder handoff payloads 1`] = `
+{
+  "invalidArgs": undefined,
+  "manualWithoutAbi": undefined,
 }
 `;

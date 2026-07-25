@@ -5,46 +5,27 @@ import {
   type ContractABI,
 } from "@acton/transaction-ui"
 import {beginCell, fromNano, storeMessage, type Message} from "@ton/core"
+import {
+  readEmulateNavigationPayload,
+  type EmulateAbiEndpoint,
+  type EmulateNavigationPayload,
+  type EmulateNavigationState,
+} from "./emulateNavigationPayload"
+
+export {
+  readEmulateNavigationPayload,
+  type EmulateAbiEndpoint,
+  type EmulateNavigationPayload,
+  type EmulateNavigationState,
+} from "./emulateNavigationPayload"
 
 export const EMULATE_HANDOFF_QUERY_PARAM = "handoff"
 const EMULATE_HANDOFF_STORAGE_PREFIX = "acton:emulate-handoff:"
 const EMULATE_HANDOFF_TTL_MS = 15 * 60 * 1000
 
-export type EmulateAbiEndpoint = "destination" | "source"
-
 export interface EmulateNavigationAbis {
   readonly destination?: ContractABI
   readonly source?: ContractABI
-}
-
-interface EmulateNavigationCommonPayload {
-  readonly targetAddress: string
-  readonly sourceAddress: string
-  readonly messageValue: string
-  readonly messageTransport: AbiMessageTransport
-  readonly bounce: boolean
-  readonly mcSeqnoInput: string
-  readonly rawMessage: string
-}
-
-export type EmulateNavigationPayload = EmulateNavigationCommonPayload &
-  (
-    | {
-        readonly inputMode: "builder"
-        readonly builder: {
-          readonly abi: ContractABI
-          readonly abiEndpoint: EmulateAbiEndpoint
-          readonly messageName: string
-          readonly argsJson: string
-        }
-      }
-    | {
-        readonly inputMode: "raw"
-      }
-  )
-
-export interface EmulateNavigationState {
-  readonly emulatePayload: EmulateNavigationPayload
 }
 
 export function createEmulateNavigationState(
@@ -125,6 +106,7 @@ export function createEmulateNavigationState(
           ...common,
           builder: {
             abi,
+            abiSourceMode: "auto",
             abiEndpoint: endpoint,
             messageName: builderPayload.option.label,
             argsJson: builderPayload.argsJson,
@@ -140,39 +122,6 @@ export function createEmulateNavigationState(
       ...common,
     },
   }
-}
-
-export function readEmulateNavigationPayload(state: unknown): EmulateNavigationPayload | undefined {
-  if (!isRecord(state) || !isRecord(state.emulatePayload)) {
-    return undefined
-  }
-
-  const payload = state.emulatePayload
-  if (
-    (payload.inputMode !== "builder" && payload.inputMode !== "raw") ||
-    typeof payload.targetAddress !== "string" ||
-    typeof payload.sourceAddress !== "string" ||
-    typeof payload.messageValue !== "string" ||
-    (payload.messageTransport !== "internal" && payload.messageTransport !== "external") ||
-    typeof payload.bounce !== "boolean" ||
-    typeof payload.mcSeqnoInput !== "string" ||
-    typeof payload.rawMessage !== "string"
-  ) {
-    return undefined
-  }
-
-  if (
-    payload.inputMode === "builder" &&
-    (!isRecord(payload.builder) ||
-      !isRecord(payload.builder.abi) ||
-      (payload.builder.abiEndpoint !== "destination" && payload.builder.abiEndpoint !== "source") ||
-      typeof payload.builder.messageName !== "string" ||
-      typeof payload.builder.argsJson !== "string")
-  ) {
-    return undefined
-  }
-
-  return payload as unknown as EmulateNavigationPayload
 }
 
 export function saveEmulateNavigationPayload(

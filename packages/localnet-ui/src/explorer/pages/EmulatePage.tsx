@@ -10,6 +10,7 @@ import {
   RefreshCw,
   RotateCcw,
   Send,
+  Share2,
   SlidersHorizontal,
   TriangleAlert,
   Trash2,
@@ -94,7 +95,15 @@ import {
   readEmulateNavigationPayload,
   readStoredEmulateNavigationPayload,
   type EmulateAbiEndpoint,
+  type EmulateNavigationPayload,
 } from "./emulateNavigation"
+import {
+  createEmulationShare,
+  EMULATION_SHARE_QUERY_PARAM,
+  loadEmulationShare,
+  SHARED_EMULATION_VERSION,
+  type SharedEmulation,
+} from "./emulateSharing"
 import {
   enrichTraceTransactions,
   type TraceTransactionEnrichmentResult,
@@ -189,8 +198,16 @@ type EmulateState =
     }
   | {readonly type: "error"; readonly message: string}
 
+interface CurrentEmulation {
+  readonly input: EmulateNavigationPayload
+  readonly options: SharedEmulation["options"] & {
+    readonly mcSeqno?: number
+  }
+}
+
 interface EmulatePageProps {
   readonly client: TonClient
+  readonly shareApiPath?: string
 }
 
 interface AccountStateOverrideDraft {
@@ -213,7 +230,7 @@ interface AccountStateOverrideDraft {
   readonly lastTransactionHash: string
 }
 
-export function EmulatePage({client}: EmulatePageProps) {
+export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
   const {network, nodeInfo} = useNetworkInfo()
   const addressFormat = useAddressFormat()
   const {fetchName, getCachedName, prefetchNames} = useAddressBook()
@@ -224,17 +241,24 @@ export function EmulatePage({client}: EmulatePageProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const routes = useExplorerRoutePaths()
   const {showToast, updateToast} = useToast()
-  const [navigationPayload] = useState(
-    () =>
-      readEmulateNavigationPayload(location.state) ??
-      readStoredEmulateNavigationPayload(searchParams),
+  const [navigationPayload, setNavigationPayload] = useState<EmulateNavigationPayload | undefined>(
+    () => {
+      if (shareApiPath && searchParams.has(EMULATION_SHARE_QUERY_PARAM)) {
+        return undefined
+      }
+      return (
+        readEmulateNavigationPayload(location.state) ??
+        readStoredEmulateNavigationPayload(searchParams)
+      )
+    },
   )
   const navigationBuilder =
     navigationPayload?.inputMode === "builder" ? navigationPayload.builder : undefined
-  const [initialSearchFields] = useState(() => readEmulateSearchFields(searchParams))
-  const [initialArgsFormValue] = useState<unknown>(() =>
-    navigationBuilder ? parseAbiJson(navigationBuilder.argsJson, {}) : undefined,
+  const navigationBuilderInitialValue = useMemo(
+    () => (navigationBuilder ? parseAbiJson(navigationBuilder.argsJson, {}) : undefined),
+    [navigationBuilder],
   )
+  const [initialSearchFields] = useState(() => readEmulateSearchFields(searchParams))
   const [inputMode, setInputMode] = useState<EmulateInputMode>(
     () => navigationPayload?.inputMode ?? "builder",
   )
@@ -256,11 +280,17 @@ export function EmulatePage({client}: EmulatePageProps) {
   const [bounce, setBounce] = useState(
     () => navigationPayload?.bounce ?? initialSearchFields.bounce,
   )
-  const [abiSourceMode, setAbiSourceMode] = useState<AbiSourceMode>("auto")
-  const [manualAbiJson, setManualAbiJson] = useState("")
+  const [abiSourceMode, setAbiSourceMode] = useState<AbiSourceMode>(
+    () => navigationBuilder?.abiSourceMode ?? "auto",
+  )
+  const [manualAbiJson, setManualAbiJson] = useState(() =>
+    navigationBuilder?.abiSourceMode === "manual" && navigationBuilder.abi
+      ? JSON.stringify(navigationBuilder.abi, null, 2)
+      : "",
+  )
   const [loadedAbi, setLoadedAbi] = useState<ContractABI | undefined>(() => navigationBuilder?.abi)
   const [abiLoadState, setAbiLoadState] = useState<AbiLoadState>(() =>
-    navigationBuilder
+    navigationBuilder?.abi
       ? {type: "ready", label: navigationBuilder.abi.contract_name}
       : {type: "idle"},
   )
@@ -268,7 +298,9 @@ export function EmulatePage({client}: EmulatePageProps) {
     () => navigationBuilder?.messageName ?? "",
   )
   const [argsJson, setArgsJson] = useState(() => navigationBuilder?.argsJson ?? "{}")
-  const [argsFormValue, setArgsFormValue] = useState<unknown>(() => initialArgsFormValue ?? {})
+  const [argsFormValue, setArgsFormValue] = useState<unknown>(
+    () => navigationBuilderInitialValue ?? {},
+  )
   const [rawMessage, setRawMessage] = useState(() => navigationPayload?.rawMessage ?? "")
   const [mcSeqnoInput, setMcSeqnoInput] = useState(
     () => navigationPayload?.mcSeqnoInput ?? initialSearchFields.mcSeqnoInput,
@@ -289,6 +321,7 @@ export function EmulatePage({client}: EmulatePageProps) {
     readonly AccountStateOverrideDraft[]
   >([])
   const stateOverrideEnabled = stateOverrideEntries.length > 0
+  const [isSharing, setIsSharing] = useState(false)
   const [isSendingToLocalnet, setIsSendingToLocalnet] = useState(false)
   const [sendConfirmationOpen, setSendConfirmationOpen] = useState(false)
   const [state, setState] = useState<EmulateState>({type: "idle"})
@@ -300,6 +333,50 @@ export function EmulatePage({client}: EmulatePageProps) {
   const baseBlockUnixTimeQuery = useRef<string | undefined>(undefined)
   const lastSearchFields = useRef(initialSearchFields)
   const isApplyingSearchFields = useRef(false)
+  const loadedShareId = useRef<string | undefined>(undefined)
+  const pendingShareLoad = useRef<
+    {readonly id: string; readonly promise: Promise<SharedEmulation>} | undefined
+  >(undefined)
+
+  const applyEmulateNavigationPayload = useCallback((payload: EmulateNavigationPayload) => {
+    const builder = payload.inputMode === "builder" ? payload.builder : undefined
+    setNavigationPayload(payload)
+    setInputMode(payload.inputMode)
+    setTargetAddress(payload.targetAddress)
+    setSourceAddress(payload.sourceAddress)
+    setMessageValue(payload.messageValue)
+    setMessageTransport(payload.messageTransport)
+    setBounce(payload.bounce)
+    setRawMessage(payload.rawMessage)
+    setMcSeqnoInput(payload.mcSeqnoInput)
+
+    if (builder) {
+      setAbiEndpoint(builder.abiEndpoint)
+      setAbiSourceMode(builder.abiSourceMode)
+      setManualAbiJson(
+        builder.abiSourceMode === "manual" && builder.abi
+          ? JSON.stringify(builder.abi, null, 2)
+          : "",
+      )
+      setLoadedAbi(builder.abi)
+      setAbiLoadState(
+        builder.abi ? {type: "ready", label: builder.abi.contract_name} : {type: "idle"},
+      )
+      setSelectedMessageName(builder.messageName)
+      setArgsJson(builder.argsJson)
+      setArgsFormValue(parseAbiJson(builder.argsJson, {}))
+      return
+    }
+
+    setAbiEndpoint("destination")
+    setAbiSourceMode("auto")
+    setManualAbiJson("")
+    setLoadedAbi(undefined)
+    setAbiLoadState({type: "idle"})
+    setSelectedMessageName("")
+    setArgsJson("{}")
+    setArgsFormValue({})
+  }, [])
 
   useEffect(() => {
     void prefetchNames(favorites.map(favorite => favorite.address))
@@ -759,7 +836,7 @@ export function EmulatePage({client}: EmulatePageProps) {
     }
 
     if (
-      navigationBuilder &&
+      navigationBuilder?.abi &&
       navigationBuilder.abiEndpoint === abiEndpoint &&
       addressKey(navigationBuilderAddress) === addressKey(address)
     ) {
@@ -926,34 +1003,123 @@ export function EmulatePage({client}: EmulatePageProps) {
     [contracts, emulation, expandedDebugHash, handleContractClick],
   )
 
+  const reportEmulationError = useCallback(
+    (error: unknown, title: string) => {
+      const message = error instanceof Error ? error.message : title
+      setState({type: "error", message})
+      showToast({title, description: message, variant: "error"})
+    },
+    [showToast],
+  )
+
+  const createCurrentEmulation = async (mcSeqno: number | undefined): Promise<CurrentEmulation> => {
+    if (!activeRawMessage) {
+      throw new Error("Message BOC is required")
+    }
+    parseRawMessageBoc(activeRawMessage)
+    const accountStateOverrides = buildAccountStateOverrides({
+      enabled: stateOverrideEnabled,
+      entries: stateOverrideEntries,
+      storagePreviews: stateOverrideStoragePreviews,
+    })
+    const now = await resolveEmulationUnixTime({
+      client,
+      mcSeqno,
+      mode: timeOverrideMode,
+      value: timeOverrideInput,
+    })
+    const rawMessage = activeRawMessage.trim()
+    const commonInput = {
+      targetAddress: targetAddress.trim(),
+      sourceAddress: sourceAddress.trim(),
+      messageValue: messageValue.trim() || DEFAULT_MESSAGE_VALUE,
+      messageTransport,
+      bounce,
+      mcSeqnoInput: mcSeqno === undefined ? "" : String(mcSeqno),
+      rawMessage,
+    }
+    const input: EmulateNavigationPayload =
+      inputMode === "builder"
+        ? {
+            ...commonInput,
+            inputMode: "builder",
+            builder: {
+              abi: activeAbi,
+              abiSourceMode,
+              abiEndpoint,
+              messageName: isEmptyMessageSelected ? EMPTY_MESSAGE_ID : selectedMessageName,
+              argsJson,
+            },
+          }
+        : {...commonInput, inputMode: "raw"}
+    return {
+      input,
+      options: {accountStateOverrides, ignoreChksig, mcSeqno, now},
+    }
+  }
+
+  const applySharedEmulation = useCallback(
+    (emulation: SharedEmulation) => {
+      applyEmulateNavigationPayload(emulation.input)
+      setIgnoreChksig(emulation.options.ignoreChksig)
+      setTimeOverrideMode("timestamp")
+      setIncreaseTimeInput("")
+      setUnixTimestampInput(
+        emulation.options.now === undefined ? "" : String(emulation.options.now),
+      )
+      setTimeOverrideOpen(emulation.options.now !== undefined)
+      setBaseBlockUnixTime(undefined)
+      baseBlockUnixTimeQuery.current = undefined
+
+      const entries = accountStateOverrideDraftsFromShare(emulation.options.accountStateOverrides)
+      setStateOverrideEntries(entries)
+      nextStateOverrideId.current = entries.length + 1
+    },
+    [applyEmulateNavigationPayload],
+  )
+
+  const shareId = shareApiPath
+    ? (searchParams.get(EMULATION_SHARE_QUERY_PARAM) ?? undefined)
+    : undefined
+  useEffect(() => {
+    if (!shareApiPath || !shareId || loadedShareId.current === shareId) {
+      return
+    }
+
+    const load =
+      pendingShareLoad.current?.id === shareId
+        ? pendingShareLoad.current
+        : {id: shareId, promise: loadEmulationShare(shareApiPath, shareId)}
+    pendingShareLoad.current = load
+    let active = true
+    setState({type: "loading"})
+    void load.promise
+      .then(emulation => {
+        if (!active) {
+          return
+        }
+        loadedShareId.current = shareId
+        applySharedEmulation(emulation)
+        setState({type: "idle"})
+      })
+      .catch(error => {
+        if (active) {
+          pendingShareLoad.current = undefined
+          reportEmulationError(error, "Failed to load shared emulation")
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [applySharedEmulation, reportEmulationError, shareApiPath, shareId])
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-
+    setState({type: "loading"})
     try {
-      if (!activeRawMessage) {
-        throw new Error("Message BOC is required")
-      }
-      parseRawMessageBoc(activeRawMessage)
-      const mcSeqno = parseMcSeqno(mcSeqnoInput)
-      const accountStateOverrides = buildAccountStateOverrides({
-        enabled: stateOverrideEnabled,
-        entries: stateOverrideEntries,
-        storagePreviews: stateOverrideStoragePreviews,
-      })
-
-      setState({type: "loading"})
-      const now = await resolveEmulationUnixTime({
-        client,
-        mcSeqno,
-        mode: timeOverrideMode,
-        value: timeOverrideInput,
-      })
-      const result = await emulateRawMessageBoc(activeRawMessage, network, {
-        accountStateOverrides,
-        ignoreChksig,
-        mcSeqno,
-        now,
-      })
+      const request = await createCurrentEmulation(parseMcSeqno(mcSeqnoInput))
+      const result = await emulateRawMessageBoc(request.input.rawMessage, network, request.options)
       const enrichment = await enrichTraceTransactions({
         client,
         metadataRegistry,
@@ -965,21 +1131,61 @@ export function EmulatePage({client}: EmulatePageProps) {
       if (!enrichment) {
         throw new Error("Failed to enrich emulated trace")
       }
+
       setSelectedHash(result.result.rootTxHash)
       setExpandedDebugHash(undefined)
       setActiveTab("value-flow")
-      setState({type: "ready", result, enrichment, mcSeqno})
+      setState({
+        type: "ready",
+        result,
+        enrichment,
+        mcSeqno: request.options.mcSeqno,
+      })
       globalThis.requestAnimationFrame(() => {
         globalThis.scrollTo({top: 0, behavior: "smooth"})
       })
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to emulate message"
-      setState({type: "error", message})
+      reportEmulationError(error, "Failed to emulate message")
+    }
+  }
+
+  const handleShare = async () => {
+    if (!shareApiPath) {
+      return
+    }
+
+    setIsSharing(true)
+    try {
+      const requestedMcSeqno = parseMcSeqno(mcSeqnoInput)
+      const mcSeqno = requestedMcSeqno ?? (await loadEmulationBlockInfo(client, undefined)).mcSeqno
+      const request = await createCurrentEmulation(mcSeqno)
+      const emulation: SharedEmulation = {
+        version: SHARED_EMULATION_VERSION,
+        input: request.input,
+        options: {
+          accountStateOverrides: request.options.accountStateOverrides,
+          ignoreChksig: request.options.ignoreChksig,
+          now: request.options.now,
+        },
+      }
+      const {id, expiresAt} = await createEmulationShare(shareApiPath, emulation)
+      const shareUrl = createEmulationShareUrl(routes.emulatePath, id)
+      await navigator.clipboard.writeText(shareUrl)
       showToast({
-        title: "Failed to emulate message",
-        description: message,
+        title: "Share link copied",
+        description: `Anyone with the link can open this emulation until ${new Date(
+          expiresAt,
+        ).toLocaleDateString()}.`,
+        variant: "success",
+      })
+    } catch (error) {
+      showToast({
+        title: "Failed to share emulation",
+        description: error instanceof Error ? error.message : "Failed to create share link",
         variant: "error",
       })
+    } finally {
+      setIsSharing(false)
     }
   }
 
@@ -1048,6 +1254,7 @@ export function EmulatePage({client}: EmulatePageProps) {
   }
 
   const handleReset = () => {
+    setNavigationPayload(undefined)
     setTargetAddress("")
     setSourceAddress("")
     setMessageValue(DEFAULT_MESSAGE_VALUE)
@@ -1495,6 +1702,20 @@ export function EmulatePage({client}: EmulatePageProps) {
               Send to localnet
             </Button>
           )}
+          {shareApiPath && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              leadingIcon={<Share2 size={15} />}
+              loading={isSharing}
+              disabled={!canEmulate || isLoading || isSendingToLocalnet}
+              onClick={() => void handleShare()}
+              title="Create a public emulation link"
+            >
+              Share
+            </Button>
+          )}
           <Button
             type="submit"
             variant="primary"
@@ -1702,7 +1923,7 @@ export function EmulatePage({client}: EmulatePageProps) {
                   value={argsFormValue}
                   initialValue={
                     navigationBuilder && selectedMessageName === navigationBuilder.messageName
-                      ? initialArgsFormValue
+                      ? navigationBuilderInitialValue
                       : undefined
                   }
                   onChange={handleArgsFormChange}
@@ -1873,6 +2094,18 @@ function parseOptionalUint32(value: string): number | undefined {
   return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= MAX_UINT32 ? parsed : undefined
 }
 
+function createEmulationShareUrl(emulatePath: string, id: string): string {
+  const currentUrl = new URL(globalThis.location.href)
+  const shareUrl = new URL(emulatePath, currentUrl.origin)
+  for (const [name, value] of currentUrl.searchParams) {
+    if (name === "network" || name.startsWith("network.")) {
+      shareUrl.searchParams.append(name, value)
+    }
+  }
+  shareUrl.searchParams.set(EMULATION_SHARE_QUERY_PARAM, id)
+  return shareUrl.toString()
+}
+
 async function resolveEmulationUnixTime({
   client,
   mcSeqno,
@@ -1912,6 +2145,13 @@ async function loadEmulationBlockUnixTime(
   client: TonClient,
   mcSeqno: number | undefined,
 ): Promise<number> {
+  return (await loadEmulationBlockInfo(client, mcSeqno)).unixTime
+}
+
+async function loadEmulationBlockInfo(
+  client: TonClient,
+  mcSeqno: number | undefined,
+): Promise<{readonly mcSeqno: number; readonly unixTime: number}> {
   const response = await client.getBlocks({
     workchain: -1,
     seqno: mcSeqno,
@@ -1919,11 +2159,20 @@ async function loadEmulationBlockUnixTime(
     sort: "desc",
   })
   const block = response.blocks[0]
+  const resolvedMcSeqno = block?.seqno
   const unixTime = block ? Number(block.gen_utime) : Number.NaN
-  if (!Number.isSafeInteger(unixTime) || unixTime < 0 || unixTime > MAX_UINT32) {
-    throw new Error("Failed to resolve selected masterchain block time")
+  if (
+    !Number.isSafeInteger(resolvedMcSeqno) ||
+    resolvedMcSeqno === undefined ||
+    resolvedMcSeqno < 0 ||
+    resolvedMcSeqno > MAX_UINT32 ||
+    !Number.isSafeInteger(unixTime) ||
+    unixTime < 0 ||
+    unixTime > MAX_UINT32
+  ) {
+    throw new Error("Failed to resolve selected masterchain block")
   }
-  return unixTime
+  return {mcSeqno: resolvedMcSeqno, unixTime}
 }
 
 function formatEmulationUnixTime(value: number): string {
@@ -1983,6 +2232,33 @@ function createAccountStateOverrideDraft({
     lastTransactionLt: "",
     lastTransactionHash: "",
   }
+}
+
+function accountStateOverrideDraftsFromShare(
+  overrides: RawMessageEmulationOptions["accountStateOverrides"],
+): readonly AccountStateOverrideDraft[] {
+  if (!overrides) {
+    return []
+  }
+
+  return Object.entries(overrides).map(([address, override], index) => {
+    const draft = createAccountStateOverrideDraft({id: `override-${index + 1}`, address})
+    const state = override.state
+    const activeState = state?.type === "active" ? state : undefined
+    return {
+      ...draft,
+      loadState: {type: "ready"},
+      balance: override.balance ? fromNano(override.balance) : "",
+      stateKind: state?.type ?? "keep",
+      codeBoc: activeState?.codeBoc ?? "",
+      storageEnabled: Boolean(activeState?.dataBoc),
+      storageSource: "raw",
+      dataBoc: activeState?.dataBoc ?? "",
+      frozenHash: state?.type === "frozen" ? String(state.stateHash ?? "") : "",
+      lastTransactionLt: String(override.lastTransactionLt ?? ""),
+      lastTransactionHash: String(override.lastTransactionHash ?? ""),
+    }
+  })
 }
 
 function hydrateAccountStateOverrideDraft(
