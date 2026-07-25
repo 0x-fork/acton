@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
     sync::{Arc, Mutex, MutexGuard},
@@ -50,6 +51,10 @@ pub trait VerificationIndex: Send + Sync + 'static {
         offset: usize,
     ) -> Result<IndexedLastVerifiedPage, VerificationIndexError>;
 
+    async fn statistics(
+        &self,
+    ) -> Result<IndexedVerificationStatistics, VerificationIndexError>;
+
     async fn abi_contracts(
         &self,
         query: IndexedAbiContractsQuery,
@@ -80,6 +85,25 @@ pub struct IndexedVerifiedBundleSummary {
     pub file_count: usize,
     pub has_tolk_abi: bool,
     pub abi_name: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct IndexedVerificationStatistics {
+    pub total: usize,
+    pub languages: Vec<IndexedLanguageStatistics>,
+}
+
+#[derive(Clone, Debug)]
+pub struct IndexedLanguageStatistics {
+    pub language: String,
+    pub total: usize,
+    pub versions: Vec<IndexedCompilerVersionStatistics>,
+}
+
+#[derive(Clone, Debug)]
+pub struct IndexedCompilerVersionStatistics {
+    pub version: String,
+    pub total: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -389,6 +413,61 @@ impl VerificationIndex for SqliteVerificationIndex {
         drop(connection);
 
         Ok(IndexedLastVerifiedPage { items, total })
+    }
+
+    async fn statistics(
+        &self,
+    ) -> Result<IndexedVerificationStatistics, VerificationIndexError> {
+        let connection = self.connection()?;
+        let total = connection.query_row("select count(*) from verified_bundles", [], |row| {
+            row.get::<_, i64>(0)
+        })?;
+        let total = i64_to_usize("total", total)?;
+        let mut statement = connection.prepare(
+            r"
+            select
+              json_extract(compiler_json, '$.language') as language,
+              json_extract(compiler_json, '$.version') as version,
+              count(*) as total
+            from verified_bundles
+            group by
+              json_extract(compiler_json, '$.language'),
+              json_extract(compiler_json, '$.version')
+            order by language asc, version asc
+            ",
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+            ))
+        })?;
+
+        let mut languages = BTreeMap::<String, IndexedLanguageStatistics>::new();
+        for row in rows {
+            let (language, version, version_total) = row?;
+            let version_total = i64_to_usize("version_total", version_total)?;
+            let language = languages.entry(language).or_insert_with_key(|language| {
+                IndexedLanguageStatistics {
+                    language: language.clone(),
+                    total: 0,
+                    versions: Vec::new(),
+                }
+            });
+            language.total += version_total;
+            language.versions.push(IndexedCompilerVersionStatistics {
+                version,
+                total: version_total,
+            });
+        }
+        drop(statement);
+        drop(connection);
+
+        Ok(IndexedVerificationStatistics {
+            total,
+            languages: languages.into_values().collect(),
+        })
     }
 
     async fn abi_contracts(

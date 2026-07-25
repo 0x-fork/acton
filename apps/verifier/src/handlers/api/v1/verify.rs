@@ -705,12 +705,7 @@ mod tests {
 
     #[test]
     fn source_path_rejects_control_characters() {
-        for path in [
-            "main\0.tolk",
-            "main\n.tolk",
-            "main\r.tolk",
-            "main\t.tolk",
-        ] {
+        for path in ["main\0.tolk", "main\n.tolk", "main\r.tolk", "main\t.tolk"] {
             assert!(
                 validate_source_path(path).is_err(),
                 "path should be rejected: {path:?}"

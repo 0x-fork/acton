@@ -86,6 +86,14 @@ pub fn recording_app_state(
     )
 }
 
+pub fn mapped_compiler_app_state(compilers: &[(&str, &str, &str)]) -> AppState {
+    app_state_from_parts(
+        Arc::new(mock_blockchain::MockBlockchainClient::new(&[])),
+        Arc::new(mock_compiler::MockCompilerService::by_compiler(compilers)),
+        Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+    )
+}
+
 pub fn recording_source_storage_app_state(
     code_hashes: &[(&str, &str)],
     compiled_code_hash: &str,

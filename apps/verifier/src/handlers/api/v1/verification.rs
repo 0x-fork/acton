@@ -12,9 +12,12 @@ use crate::{
     error::ApiError,
     registry::{
         AbiContractsRequest, LastVerifiedRequest, VerificationStatusReceipt,
-        VerificationStatusRequest, VerifiedBundleRequest,
+        VerificationStatisticsReceipt, VerificationStatusRequest, VerifiedBundleRequest,
     },
-    registry_index::{IndexedAbiContract, IndexedVerifiedBundleSummary},
+    registry_index::{
+        IndexedAbiContract, IndexedCompilerVersionStatistics, IndexedLanguageStatistics,
+        IndexedVerifiedBundleSummary,
+    },
     source_storage::{CompilerMetadata, SourceMapData, StoredSourceBundle, StoredSourceFile},
     state::AppState,
     verification::VerificationTarget,
@@ -130,6 +133,23 @@ pub async fn last_verified_handler(
             .collect(),
         total: receipt.total,
     }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/statistics",
+    responses(
+        (status = 200, description = "Verified source bundle counts grouped by language and compiler version", body = VerificationStatisticsResponse),
+        (status = 502, description = "Registry lookup failure", body = crate::error::ErrorResponse)
+    ),
+    tag = "verification"
+)]
+pub async fn statistics_handler(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ApiError> {
+    let receipt = state.verification_registry().statistics().await?;
+
+    Ok(Json(VerificationStatisticsResponse::from(receipt)))
 }
 
 #[utoipa::path(
@@ -332,6 +352,61 @@ impl From<IndexedVerifiedBundleSummary> for LastVerifiedItemResponse {
             file_count: item.file_count,
             has_tolk_abi: item.has_tolk_abi,
             abi_name: item.abi_name,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct VerificationStatisticsResponse {
+    total: usize,
+    languages: Vec<LanguageStatisticsResponse>,
+}
+
+impl From<VerificationStatisticsReceipt> for VerificationStatisticsResponse {
+    fn from(receipt: VerificationStatisticsReceipt) -> Self {
+        Self {
+            total: receipt.total,
+            languages: receipt
+                .languages
+                .into_iter()
+                .map(LanguageStatisticsResponse::from)
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct LanguageStatisticsResponse {
+    language: String,
+    total: usize,
+    versions: Vec<CompilerVersionStatisticsResponse>,
+}
+
+impl From<IndexedLanguageStatistics> for LanguageStatisticsResponse {
+    fn from(statistics: IndexedLanguageStatistics) -> Self {
+        Self {
+            language: statistics.language,
+            total: statistics.total,
+            versions: statistics
+                .versions
+                .into_iter()
+                .map(CompilerVersionStatisticsResponse::from)
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(super) struct CompilerVersionStatisticsResponse {
+    version: String,
+    total: usize,
+}
+
+impl From<IndexedCompilerVersionStatistics> for CompilerVersionStatisticsResponse {
+    fn from(statistics: IndexedCompilerVersionStatistics) -> Self {
+        Self {
+            version: statistics.version,
+            total: statistics.total,
         }
     }
 }

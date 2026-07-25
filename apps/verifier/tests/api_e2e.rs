@@ -13,9 +13,8 @@ use verifier::source_storage::SourceMapData;
 
 use support::{
     app_state, failing_compiler_app_state, failing_source_storage_app_state, file_part, get,
-    owned_file_part, owned_text_part, post_verify, recording_app_state,
-    recording_source_storage_app_state,
-    recording_source_storage_app_state_with_generated_sources,
+    mapped_compiler_app_state, owned_file_part, owned_text_part, post_verify, recording_app_state,
+    recording_source_storage_app_state, recording_source_storage_app_state_with_generated_sources,
     recording_source_storage_app_state_with_source_map_data, response_json, text_part,
     unverified_app_state,
 };
@@ -25,6 +24,7 @@ const ADDRESS_TWO: &str = "EQD1111111111111111111111111111111111111111111111";
 const CODE_HASH_ONE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const CODE_HASH_ONE_BASE64: &str = "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=";
 const CODE_HASH_TWO: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const CODE_HASH_THREE: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const COMPILE_PARAMS_TOLK: &str = r#"{"compiler_version":"1.4.1"}"#;
 const COMPILE_PARAMS_TOLK_WITH_IMPORT_MAPPINGS: &str =
     r#"{"compiler_version":"1.4.1","import_mappings":{"@contracts":"contracts"}}"#;
@@ -93,11 +93,13 @@ async fn openapi_json_documents_verifier_api() {
     assert_eq!(body["openapi"], "3.1.0");
     assert!(body["paths"]["/api/v1/verify"].is_object());
     assert!(body["paths"]["/api/v1/last_verified"].is_object());
+    assert!(body["paths"]["/api/v1/statistics"].is_object());
     assert!(body["paths"]["/api/v1/abi"].is_object());
     assert!(body["paths"]["/api/v1/verification/status"].is_object());
     assert!(body["paths"]["/api/v1/verification/source"].is_object());
     assert!(body["components"]["schemas"]["VerifyResponse"].is_object());
     assert!(body["components"]["schemas"]["VerificationSourceResponse"].is_object());
+    assert!(body["components"]["schemas"]["VerificationStatisticsResponse"].is_object());
     assert!(body["components"]["schemas"]["SourceFileResponse"].is_object());
 }
 
@@ -189,6 +191,73 @@ async fn last_verified_returns_latest_verified_contracts() {
     let body = response_json::<LastVerifiedResponse>(response).await;
     assert_eq!(body.total, 1);
     assert!(body.items.is_empty());
+}
+
+#[tokio::test]
+async fn statistics_returns_counts_by_language_and_compiler_version() {
+    let state = mapped_compiler_app_state(&[
+        ("tolk", "1.4.1", CODE_HASH_ONE),
+        ("tolk", "1.5.0", CODE_HASH_TWO),
+        ("func", "0.4.6", CODE_HASH_THREE),
+    ]);
+
+    for (code_hash, compiler_version) in
+        [(CODE_HASH_ONE, "1.4.1"), (CODE_HASH_TWO, "1.5.0")]
+    {
+        let compile_params = json!({"compiler_version": compiler_version}).to_string();
+        let response = post_verify(
+            state.clone(),
+            vec![
+                text_part("code_hash", code_hash),
+                text_part("language", "tolk"),
+                owned_text_part("compile_params", compile_params),
+                text_part("sources", SOURCES_MAIN),
+                file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+            ],
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    let response = post_verify(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_THREE),
+            text_part("language", "func"),
+            text_part("compile_params", COMPILE_PARAMS_FUNC),
+            text_part("sources", SOURCES_FUNC_MAIN),
+            file_part("files", "main.fc", "text/plain", "() recv_internal() {}"),
+        ],
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response = get(state, "/api/v1/statistics").await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json::<Value>(response).await;
+    assert_eq!(
+        body,
+        json!({
+            "total": 3,
+            "languages": [
+                {
+                    "language": "func",
+                    "total": 1,
+                    "versions": [
+                        {"version": "0.4.6", "total": 1}
+                    ]
+                },
+                {
+                    "language": "tolk",
+                    "total": 2,
+                    "versions": [
+                        {"version": "1.4.1", "total": 1},
+                        {"version": "1.5.0", "total": 1}
+                    ]
+                }
+            ]
+        })
+    );
 }
 
 #[tokio::test]

@@ -10,8 +10,8 @@ use tokio::sync::Mutex;
 use crate::{
     bundle_validation::{StoredBundleValidationError, validate_stored_bundle},
     registry_index::{
-        IndexedAbiContract, IndexedAbiContractsQuery, IndexedVerifiedBundleSummary,
-        SharedVerificationIndex, VerificationIndexError,
+        IndexedAbiContract, IndexedAbiContractsQuery, IndexedLanguageStatistics,
+        IndexedVerifiedBundleSummary, SharedVerificationIndex, VerificationIndexError,
     },
     source_storage::{
         SharedSourceStorage, SourceStorageError, SourceStorageReceipt, StoreSourceBundleRequest,
@@ -42,6 +42,8 @@ pub trait VerificationRegistry: Send + Sync + 'static {
         &self,
         request: LastVerifiedRequest,
     ) -> Result<LastVerifiedReceipt, RegistryError>;
+
+    async fn statistics(&self) -> Result<VerificationStatisticsReceipt, RegistryError>;
 
     async fn abi_contracts(
         &self,
@@ -94,6 +96,12 @@ pub struct VerifiedBundleReceipt {
 pub struct LastVerifiedReceipt {
     pub items: Vec<IndexedVerifiedBundleSummary>,
     pub total: usize,
+}
+
+#[derive(Clone, Debug)]
+pub struct VerificationStatisticsReceipt {
+    pub total: usize,
+    pub languages: Vec<IndexedLanguageStatistics>,
 }
 
 #[derive(Clone, Debug)]
@@ -230,6 +238,16 @@ impl VerificationRegistry for SourceVerificationRegistry {
         Ok(LastVerifiedReceipt {
             items: page.items,
             total: page.total,
+        })
+    }
+
+    async fn statistics(&self) -> Result<VerificationStatisticsReceipt, RegistryError> {
+        self.ensure_current().await?;
+        let statistics = self.verification_index.statistics().await?;
+
+        Ok(VerificationStatisticsReceipt {
+            total: statistics.total,
+            languages: statistics.languages,
         })
     }
 

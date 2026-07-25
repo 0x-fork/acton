@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
+};
 
 use async_trait::async_trait;
 use verifier::compilers::{
@@ -57,6 +60,23 @@ impl MockCompilerService {
         }
     }
 
+    pub fn by_compiler(compilers: &[(&str, &str, &str)]) -> Self {
+        Self {
+            result: MockCompilerResult::ByCompiler(
+                compilers
+                    .iter()
+                    .map(|(language, version, code_hash)| {
+                        (
+                            ((*language).to_owned(), (*version).to_owned()),
+                            (*code_hash).to_owned(),
+                        )
+                    })
+                    .collect(),
+            ),
+            recorded_requests: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
     pub fn recorded_requests(&self) -> Arc<Mutex<Vec<CompileRequest>>> {
         Arc::clone(&self.recorded_requests)
     }
@@ -71,11 +91,16 @@ enum MockCompilerResult {
     CompileFailed {
         error: String,
     },
+    ByCompiler(BTreeMap<(String, String), String>),
 }
 
 #[async_trait]
 impl CompilerService for MockCompilerService {
     async fn compile(&self, request: CompileRequest) -> Result<CompileOutput, CompilerError> {
+        let compiler = (
+            request.language.clone(),
+            request.compiler_version.clone(),
+        );
         {
             let mut recorded_requests = self
                 .recorded_requests
@@ -96,6 +121,19 @@ impl CompilerService for MockCompilerService {
             }),
             MockCompilerResult::CompileFailed { error } => {
                 Err(CompilerError::CompileFailed(error.clone()))
+            }
+            MockCompilerResult::ByCompiler(code_hashes) => {
+                let code_hash = code_hashes.get(&compiler).ok_or_else(|| {
+                    CompilerError::CompileFailed(format!(
+                        "no mock result for compiler {} {}",
+                        compiler.0, compiler.1
+                    ))
+                })?;
+                Ok(CompileOutput {
+                    code_hash: code_hash.clone(),
+                    generated_sources: Vec::new(),
+                    source_map: None,
+                })
             }
         }
     }
