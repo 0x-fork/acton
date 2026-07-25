@@ -312,6 +312,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   const activeTabRef = useRef<HTMLButtonElement>(null)
   const filterPopoverRef = useRef<HTMLDivElement>(null)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
+  const historyLoadMoreRef = useRef<HTMLDivElement>(null)
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [filterPopoverPosition, setFilterPopoverPosition] = useState<
     FilterPopoverPosition | undefined
@@ -483,6 +484,35 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     !activeHistoryError &&
     activeHistoryHasMore &&
     activeLoadMoreHistory !== undefined
+
+  useEffect(() => {
+    const target = historyLoadMoreRef.current
+    if (
+      activeTab !== "history" ||
+      !showLoadMoreHistory ||
+      activeHistoryLoadingMore ||
+      !activeLoadMoreHistory ||
+      !target ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return
+    }
+
+    let requested = false
+    const observer = new IntersectionObserver(
+      entries => {
+        if (requested || !entries.some(entry => entry.isIntersecting)) {
+          return
+        }
+        requested = true
+        activeLoadMoreHistory()
+      },
+      {rootMargin: "320px 0px"},
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [activeHistoryLoadingMore, activeLoadMoreHistory, activeTab, showLoadMoreHistory])
 
   useEffect(() => {
     try {
@@ -1076,7 +1106,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
             )
           )}
           {showLoadMoreHistory && activeLoadMoreHistory && (
-            <div className={styles.pagination}>
+            <div ref={historyLoadMoreRef} className={styles.pagination}>
               <div className={styles.paginationControls}>
                 <button
                   type="button"
