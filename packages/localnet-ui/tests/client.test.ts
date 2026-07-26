@@ -259,10 +259,16 @@ test("jetton wallet requests forward pagination options", async () => {
     })
 
     await client.getJettonWallets(["EQOwner"], undefined, {limit: 100, offset: 200})
+    await client.getJettonWallets(undefined, ["EQJetton"], {
+      limit: 100,
+      offset: 300,
+      sort: "desc",
+    })
 
-    expect(requests[0]?.toString()).toBe(
+    expect(requests.map(request => request.toString())).toEqual([
       "https://toncenter.example/api/v3/jetton/wallets?owner_address=EQOwner&limit=100&offset=200",
-    )
+      "https://toncenter.example/api/v3/jetton/wallets?jetton_address=EQJetton&limit=100&offset=300&sort=desc",
+    ])
   } finally {
     globalThis.fetch = originalFetch
   }

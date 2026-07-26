@@ -140,6 +140,9 @@ interface AccountDetailsProps {
   readonly tokensLoadMoreError?: string
   readonly nftsLoading?: boolean
   readonly holdersLoading?: boolean
+  readonly holdersHasMore?: boolean
+  readonly holdersLoadingMore?: boolean
+  readonly holdersLoadMoreError?: string
   readonly transactionsLoading?: boolean
   readonly transactionsError?: string
   readonly transactionsHasMore?: boolean
@@ -156,6 +159,7 @@ interface AccountDetailsProps {
   readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
   readonly onLoadMoreTokens?: () => void
+  readonly onLoadMoreHolders?: () => void
   readonly onLoadMoreTransactions?: () => void
   readonly onLoadMoreActions?: () => void
   readonly historySortOrder?: AccountHistorySortOrder
@@ -294,6 +298,9 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   tokensLoadMoreError,
   nftsLoading = false,
   holdersLoading = false,
+  holdersHasMore = false,
+  holdersLoadingMore = false,
+  holdersLoadMoreError,
   transactionsLoading = false,
   transactionsError,
   transactionsHasMore = false,
@@ -310,6 +317,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   onAddressClick,
   onTransactionClick,
   onLoadMoreTokens,
+  onLoadMoreHolders,
   onLoadMoreTransactions,
   onLoadMoreActions,
   historySortOrder,
@@ -323,6 +331,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   const filterButtonRef = useRef<HTMLButtonElement>(null)
   const historyLoadMoreRef = useRef<HTMLDivElement>(null)
   const tokensLoadMoreRef = useRef<HTMLDivElement>(null)
+  const holdersLoadMoreRef = useRef<HTMLDivElement>(null)
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [filterPopoverPosition, setFilterPopoverPosition] = useState<
     FilterPopoverPosition | undefined
@@ -555,6 +564,38 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     observer.observe(target)
     return () => observer.disconnect()
   }, [activeTab, onLoadMoreTokens, showLoadMoreTokens, tokensLoadMoreError, tokensLoadingMore])
+
+  const showLoadMoreHolders = !holdersLoading && holdersHasMore && onLoadMoreHolders !== undefined
+
+  useEffect(() => {
+    const target = holdersLoadMoreRef.current
+    if (
+      activeTab !== "holders" ||
+      !showLoadMoreHolders ||
+      holdersLoadingMore ||
+      holdersLoadMoreError ||
+      !onLoadMoreHolders ||
+      !target ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return
+    }
+
+    let requested = false
+    const observer = new IntersectionObserver(
+      entries => {
+        if (requested || !entries.some(entry => entry.isIntersecting)) {
+          return
+        }
+        requested = true
+        onLoadMoreHolders()
+      },
+      {rootMargin: "240px 0px"},
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [activeTab, holdersLoadMoreError, holdersLoadingMore, onLoadMoreHolders, showLoadMoreHolders])
 
   useEffect(() => {
     try {
@@ -1170,9 +1211,9 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
             <Tokens wallets={jettonWallets} client={client} onAddressClick={onAddressClick} />
           )}
           {showLoadMoreTokens && onLoadMoreTokens && (
-            <div ref={tokensLoadMoreRef} className={styles.tokensLoadMore}>
+            <div ref={tokensLoadMoreRef} className={styles.listLoadMore}>
               {tokensLoadMoreError ? (
-                <span className={styles.tokensLoadMoreError} role="alert">
+                <span className={styles.listLoadMoreError} role="alert">
                   {tokensLoadMoreError}
                 </span>
               ) : null}
@@ -1260,6 +1301,24 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                   )}
                 </tbody>
               </table>
+            </div>
+          )}
+          {showLoadMoreHolders && onLoadMoreHolders && (
+            <div ref={holdersLoadMoreRef} className={styles.listLoadMore}>
+              {holdersLoadMoreError ? (
+                <span className={styles.listLoadMoreError} role="alert">
+                  {holdersLoadMoreError}
+                </span>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onLoadMoreHolders}
+                disabled={holdersLoadingMore}
+              >
+                {holdersLoadingMore ? "Loading..." : holdersLoadMoreError ? "Retry" : "Load more"}
+              </Button>
             </div>
           )}
         </div>

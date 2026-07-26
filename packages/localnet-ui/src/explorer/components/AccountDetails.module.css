@@ -783,7 +783,7 @@ th.valueContainer {
   font-size: var(--acton-font-size-xs);
 }
 
-.tokensLoadMore {
+.listLoadMore {
   min-height: 52px;
   padding: 10px 18px;
   border-top: 1px solid var(--acton-color-border);
@@ -794,7 +794,7 @@ th.valueContainer {
   box-sizing: border-box;
 }
 
-.tokensLoadMoreError {
+.listLoadMoreError {
   color: var(--acton-color-danger-text);
   font-size: var(--acton-font-size-sm);
 }
