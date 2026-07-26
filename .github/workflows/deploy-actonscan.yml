@@ -83,7 +83,9 @@ jobs:
             --branch pages \
             --checkout "${RUNNER_TEMP}/actonscan-pages" \
             --cname "${ACTONSCAN_URL}" \
-            --message "Deploy actonscan from ${DEPLOY_COMMIT}"
+            --message "Deploy actonscan from ${DEPLOY_COMMIT}
+
+          Original commit: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${DEPLOY_COMMIT}"
 
       - name: Save Bun cache
         if: steps.bun-cache.outputs.cache-hit != 'true'
