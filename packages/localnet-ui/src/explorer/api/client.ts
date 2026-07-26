@@ -94,6 +94,7 @@ interface GetBlockTransactionsOptions {
   readonly shard: string
   readonly seqno: number
   readonly limit?: number
+  readonly offset?: number
 }
 
 interface RawBlockResponse {
@@ -628,6 +629,9 @@ export class TonClient {
     url.searchParams.append("shard", options.shard)
     url.searchParams.append("seqno", options.seqno.toString())
     url.searchParams.append("limit", (options.limit ?? 100).toString())
+    if (options.offset !== undefined && options.offset > 0) {
+      url.searchParams.append("offset", options.offset.toString())
+    }
     return this.request(url, "Failed to fetch block transactions")
   }
 

@@ -308,6 +308,7 @@ test("trace and block lookups can use their same-origin proxies", async () => {
       shard: "8000000000000000",
       seqno: 42,
       limit: 100,
+      offset: 100,
     })
 
     expect(requests).toMatchInlineSnapshot(`
@@ -322,7 +323,7 @@ test("trace and block lookups can use their same-origin proxies", async () => {
         },
         {
           "apiKey": null,
-          "url": "https://actonscan.example/api/toncenter/testnet/v3/transactions?workchain=-1&shard=8000000000000000&seqno=42&limit=100",
+          "url": "https://actonscan.example/api/toncenter/testnet/v3/transactions?workchain=-1&shard=8000000000000000&seqno=42&limit=100&offset=100",
         },
       ]
     `)
