@@ -671,43 +671,22 @@ export class TonClient {
     }
 
     if (addresses && addresses.length > 0) {
-      const results = await Promise.all(
-        addresses.map(async addr => {
-          try {
-            return await buildAndFetch("address", addr)
-          } catch (error) {
-            console.error(`Failed to fetch NFT for ${addr}`, error)
-            return []
-          }
-        }),
-      )
+      const results = await Promise.all(addresses.map(async addr => buildAndFetch("address", addr)))
       return this.dedupNftItems(results.flat())
     }
 
     if (ownerAddresses && ownerAddresses.length > 0) {
       const results = await Promise.all(
-        ownerAddresses.map(async owner => {
-          try {
-            return await buildAndFetch("owner_address", owner)
-          } catch (error) {
-            console.error(`Failed to fetch NFTs for owner ${owner}`, error)
-            return []
-          }
-        }),
+        ownerAddresses.map(async owner => buildAndFetch("owner_address", owner)),
       )
       return this.dedupNftItems(results.flat())
     }
 
     if (collectionAddresses && collectionAddresses.length > 0) {
       const results = await Promise.all(
-        collectionAddresses.map(async collection => {
-          try {
-            return await buildAndFetch("collection_address", collection)
-          } catch (error) {
-            console.error(`Failed to fetch NFTs for collection ${collection}`, error)
-            return []
-          }
-        }),
+        collectionAddresses.map(async collection =>
+          buildAndFetch("collection_address", collection),
+        ),
       )
       return this.dedupNftItems(results.flat())
     }

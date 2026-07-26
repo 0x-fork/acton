@@ -139,6 +139,9 @@ interface AccountDetailsProps {
   readonly tokensLoadingMore?: boolean
   readonly tokensLoadMoreError?: string
   readonly nftsLoading?: boolean
+  readonly nftsHasMore?: boolean
+  readonly nftsLoadingMore?: boolean
+  readonly nftsLoadMoreError?: string
   readonly holdersLoading?: boolean
   readonly holdersHasMore?: boolean
   readonly holdersLoadingMore?: boolean
@@ -159,6 +162,7 @@ interface AccountDetailsProps {
   readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
   readonly onLoadMoreTokens?: () => void
+  readonly onLoadMoreNfts?: () => void
   readonly onLoadMoreHolders?: () => void
   readonly onLoadMoreTransactions?: () => void
   readonly onLoadMoreActions?: () => void
@@ -297,6 +301,9 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   tokensLoadingMore = false,
   tokensLoadMoreError,
   nftsLoading = false,
+  nftsHasMore = false,
+  nftsLoadingMore = false,
+  nftsLoadMoreError,
   holdersLoading = false,
   holdersHasMore = false,
   holdersLoadingMore = false,
@@ -317,6 +324,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   onAddressClick,
   onTransactionClick,
   onLoadMoreTokens,
+  onLoadMoreNfts,
   onLoadMoreHolders,
   onLoadMoreTransactions,
   onLoadMoreActions,
@@ -331,6 +339,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   const filterButtonRef = useRef<HTMLButtonElement>(null)
   const historyLoadMoreRef = useRef<HTMLDivElement>(null)
   const tokensLoadMoreRef = useRef<HTMLDivElement>(null)
+  const nftsLoadMoreRef = useRef<HTMLDivElement>(null)
   const holdersLoadMoreRef = useRef<HTMLDivElement>(null)
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [filterPopoverPosition, setFilterPopoverPosition] = useState<
@@ -564,6 +573,38 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     observer.observe(target)
     return () => observer.disconnect()
   }, [activeTab, onLoadMoreTokens, showLoadMoreTokens, tokensLoadMoreError, tokensLoadingMore])
+
+  const showLoadMoreNfts = !nftsLoading && nftsHasMore && onLoadMoreNfts !== undefined
+
+  useEffect(() => {
+    const target = nftsLoadMoreRef.current
+    if (
+      activeTab !== "nfts" ||
+      !showLoadMoreNfts ||
+      nftsLoadingMore ||
+      nftsLoadMoreError ||
+      !onLoadMoreNfts ||
+      !target ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return
+    }
+
+    let requested = false
+    const observer = new IntersectionObserver(
+      entries => {
+        if (requested || !entries.some(entry => entry.isIntersecting)) {
+          return
+        }
+        requested = true
+        onLoadMoreNfts()
+      },
+      {rootMargin: "240px 0px"},
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [activeTab, nftsLoadMoreError, nftsLoadingMore, onLoadMoreNfts, showLoadMoreNfts])
 
   const showLoadMoreHolders = !holdersLoading && holdersHasMore && onLoadMoreHolders !== undefined
 
@@ -1232,6 +1273,24 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
       ) : activeTab === "nfts" && showNftsTab ? (
         <div className={styles.tokensContent}>
           <Nfts items={nftItems} onAddressClick={onAddressClick} />
+          {showLoadMoreNfts && onLoadMoreNfts && (
+            <div ref={nftsLoadMoreRef} className={styles.listLoadMore}>
+              {nftsLoadMoreError ? (
+                <span className={styles.listLoadMoreError} role="alert">
+                  {nftsLoadMoreError}
+                </span>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onLoadMoreNfts}
+                disabled={nftsLoadingMore}
+              >
+                {nftsLoadingMore ? "Loading..." : nftsLoadMoreError ? "Retry" : "Load more"}
+              </Button>
+            </div>
+          )}
         </div>
       ) : activeTab === "holders" ? (
         <div className={styles.historyContent}>

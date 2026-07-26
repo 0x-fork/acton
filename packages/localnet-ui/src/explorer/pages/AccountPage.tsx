@@ -50,6 +50,7 @@ interface AccountPageProps {
   readonly enableJettonMint?: boolean
   readonly tokensLoadMoreLimit?: number
   readonly holdersLoadMoreLimit?: number
+  readonly nftsLoadMoreLimit?: number
 }
 
 const INITIAL_TRANSACTION_LIMIT = 20
@@ -60,6 +61,8 @@ const ACCOUNT_TOKENS_INITIAL_LIMIT = 100
 const ACCOUNT_TOKENS_LOAD_MORE_LIMIT = 100
 const JETTON_HOLDERS_INITIAL_LIMIT = 100
 const JETTON_HOLDERS_LOAD_MORE_LIMIT = 100
+const ACCOUNT_NFTS_INITIAL_LIMIT = 100
+const ACCOUNT_NFTS_LOAD_MORE_LIMIT = 100
 const NEW_TRANSACTION_APPEAR_MS = 1400
 type AccountTab = "history" | "contract" | "get-methods" | "tokens" | "nfts" | "holders"
 
@@ -80,6 +83,14 @@ interface JettonHoldersState {
   readonly loadMoreError?: string
 }
 
+interface AccountNftsState {
+  readonly items: NftItem[]
+  readonly isLoading: boolean
+  readonly isLoadingMore: boolean
+  readonly hasMore: boolean
+  readonly loadMoreError?: string
+}
+
 interface AccountLoadIssue {
   readonly title: string
   readonly description: string
@@ -92,6 +103,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   enableJettonMint = false,
   tokensLoadMoreLimit = ACCOUNT_TOKENS_LOAD_MORE_LIMIT,
   holdersLoadMoreLimit = JETTON_HOLDERS_LOAD_MORE_LIMIT,
+  nftsLoadMoreLimit = ACCOUNT_NFTS_LOAD_MORE_LIMIT,
 }) => {
   const {address = ""} = useParams<{address: string}>()
   const navigate = useNavigate()
@@ -129,7 +141,12 @@ export const AccountPage: FC<AccountPageProps> = ({
   const [accountTokenInfo, setAccountTokenInfo] = useState<readonly AccountStateTokenInfo[]>([])
   const [currentNftItem, setCurrentNftItem] = useState<NftItem | undefined>()
   const [currentNftCollectionItems, setCurrentNftCollectionItems] = useState<NftItem[]>([])
-  const [nftItems, setNftItems] = useState<NftItem[]>([])
+  const [accountNftsState, setAccountNftsState] = useState<AccountNftsState>({
+    items: [],
+    isLoading: false,
+    isLoadingMore: false,
+    hasMore: false,
+  })
   const [jettonHoldersState, setJettonHoldersState] = useState<JettonHoldersState>({
     wallets: [],
     isLoading: false,
@@ -137,7 +154,6 @@ export const AccountPage: FC<AccountPageProps> = ({
     hasMore: false,
   })
   const [jettonWalletLoading, setJettonWalletLoading] = useState(false)
-  const [nftItemsLoading, setNftItemsLoading] = useState(false)
   const [transactionsLoading, setTransactionsLoading] = useState(true)
   const [transactionsError, setTransactionsError] = useState<string | undefined>()
   const [actionsLoading, setActionsLoading] = useState(false)
@@ -158,6 +174,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   const transactionHashesRef = useRef<Set<string>>(new Set())
   const isLoadingMoreJettonWalletsRef = useRef(false)
   const isLoadingMoreJettonHoldersRef = useRef(false)
+  const isLoadingMoreNftItemsRef = useRef(false)
   const jettonWallets = accountTokensState.wallets
   const jettonWalletsLoading = accountTokensState.isLoading
   const jettonWalletsHasMore = accountTokensState.hasMore
@@ -165,6 +182,8 @@ export const AccountPage: FC<AccountPageProps> = ({
   const holders = jettonHoldersState.wallets
   const holdersLoadedAccountKey = jettonHoldersState.loadedAccountKey
   const holdersLoading = jettonHoldersState.isLoading
+  const nftItems = accountNftsState.items
+  const nftItemsLoading = accountNftsState.isLoading
 
   const formattedAddress = useMemo(
     () => normalizeAddress(address, addressFormat),
@@ -243,7 +262,12 @@ export const AccountPage: FC<AccountPageProps> = ({
         setAccountTokenInfo([])
         setCurrentNftItem(undefined)
         setCurrentNftCollectionItems([])
-        setNftItems([])
+        setAccountNftsState({
+          items: [],
+          isLoading: false,
+          isLoadingMore: false,
+          hasMore: false,
+        })
         setJettonHoldersState({
           wallets: [],
           isLoading: false,
@@ -251,7 +275,6 @@ export const AccountPage: FC<AccountPageProps> = ({
           hasMore: false,
         })
         setJettonWalletLoading(false)
-        setNftItemsLoading(false)
         setTransactionsLoading(false)
         setTransactionsError(undefined)
         setActionsLoading(false)
@@ -299,7 +322,12 @@ export const AccountPage: FC<AccountPageProps> = ({
         setAccountTokenInfo([])
         setCurrentNftItem(undefined)
         setCurrentNftCollectionItems([])
-        setNftItems([])
+        setAccountNftsState({
+          items: [],
+          isLoading: false,
+          isLoadingMore: false,
+          hasMore: false,
+        })
         setJettonHoldersState({
           wallets: [],
           isLoading: false,
@@ -307,7 +335,6 @@ export const AccountPage: FC<AccountPageProps> = ({
           hasMore: false,
         })
         setJettonWalletLoading(false)
-        setNftItemsLoading(false)
       } else if (isHistoryChange) {
         setTransactionsLoading(true)
         setActionsLoading(supportsAccountActions)
@@ -365,7 +392,12 @@ export const AccountPage: FC<AccountPageProps> = ({
           setAccountTokenInfo([])
           setCurrentNftItem(undefined)
           setCurrentNftCollectionItems([])
-          setNftItems([])
+          setAccountNftsState({
+            items: [],
+            isLoading: false,
+            isLoadingMore: false,
+            hasMore: false,
+          })
           setJettonHoldersState({
             wallets: [],
             isLoading: false,
@@ -373,7 +405,6 @@ export const AccountPage: FC<AccountPageProps> = ({
             hasMore: false,
           })
           setJettonWalletLoading(false)
-          setNftItemsLoading(false)
           setTransactionsLoading(false)
           setActionsLoading(false)
         } finally {
@@ -940,24 +971,45 @@ export const AccountPage: FC<AccountPageProps> = ({
 
     const loadNftItems = async () => {
       if (!formattedAddress) {
-        setNftItems([])
-        setNftItemsLoading(false)
+        setAccountNftsState({
+          items: [],
+          isLoading: false,
+          isLoadingMore: false,
+          hasMore: false,
+        })
         return
       }
 
-      setNftItemsLoading(true)
+      setAccountNftsState(current => ({
+        ...current,
+        isLoading: true,
+        isLoadingMore: false,
+        hasMore: false,
+        loadMoreError: undefined,
+      }))
       try {
         const nfts = await client.getNftItems({
           owner_address: [formattedAddress],
-          limit: 100,
+          limit: ACCOUNT_NFTS_INITIAL_LIMIT,
           sortByLastTransactionLt: true,
         })
         if (!isActive) return
-        setNftItems(nfts)
+        setAccountNftsState({
+          items: nfts,
+          isLoading: false,
+          isLoadingMore: false,
+          hasMore: nfts.length === ACCOUNT_NFTS_INITIAL_LIMIT,
+        })
       } catch (error) {
         console.error("Failed to fetch account NFTs", error)
-      } finally {
-        if (isActive) setNftItemsLoading(false)
+        if (isActive) {
+          setAccountNftsState({
+            items: [],
+            isLoading: false,
+            isLoadingMore: false,
+            hasMore: false,
+          })
+        }
       }
     }
 
@@ -966,6 +1018,81 @@ export const AccountPage: FC<AccountPageProps> = ({
       isActive = false
     }
   }, [accountAddressKey, client])
+
+  const loadMoreNftItems = useCallback(() => {
+    const offset = accountNftsState.items.length
+    if (
+      !formattedAddress ||
+      accountNftsState.isLoading ||
+      !accountNftsState.hasMore ||
+      isLoadingMoreNftItemsRef.current
+    ) {
+      return
+    }
+
+    const requestAccountKey = accountRequestKey
+    isLoadingMoreNftItemsRef.current = true
+    setAccountNftsState(current => ({
+      ...current,
+      isLoadingMore: true,
+      loadMoreError: undefined,
+    }))
+
+    void client
+      .getNftItems({
+        owner_address: [formattedAddress],
+        limit: nftsLoadMoreLimit,
+        offset,
+        sortByLastTransactionLt: true,
+      })
+      .then(items => {
+        setAccountNftsState(current => {
+          if (
+            activeAccountKeyRef.current !== requestAccountKey ||
+            current.isLoading ||
+            current.items.length !== offset
+          ) {
+            return current
+          }
+
+          return {
+            ...current,
+            items: [...current.items, ...items],
+            isLoadingMore: false,
+            hasMore: items.length === nftsLoadMoreLimit,
+          }
+        })
+      })
+      .catch(error => {
+        setAccountNftsState(current => {
+          if (
+            activeAccountKeyRef.current !== requestAccountKey ||
+            current.isLoading ||
+            current.items.length !== offset
+          ) {
+            return current
+          }
+
+          return {
+            ...current,
+            isLoadingMore: false,
+            loadMoreError:
+              error instanceof Error ? error.message : "Failed to load more account NFTs",
+          }
+        })
+      })
+      .finally(() => {
+        isLoadingMoreNftItemsRef.current = false
+      })
+  }, [
+    accountNftsState.hasMore,
+    accountNftsState.isLoading,
+    accountNftsState.items.length,
+    accountRequestKey,
+    client,
+    formattedAddress,
+    nftsLoadMoreLimit,
+  ])
 
   useEffect(() => {
     let isActive = true
@@ -1480,6 +1607,9 @@ export const AccountPage: FC<AccountPageProps> = ({
             tokensLoadingMore={jettonWalletsLoadingMore}
             tokensLoadMoreError={accountTokensState.loadMoreError}
             nftsLoading={nftItemsLoading}
+            nftsHasMore={accountNftsState.hasMore}
+            nftsLoadingMore={accountNftsState.isLoadingMore}
+            nftsLoadMoreError={accountNftsState.loadMoreError}
             holdersLoading={holdersPending}
             holdersHasMore={jettonHoldersState.hasMore}
             holdersLoadingMore={jettonHoldersState.isLoadingMore}
@@ -1500,6 +1630,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             onAddressClick={handleSearch}
             onTransactionClick={handleTransactionClick}
             onLoadMoreTokens={loadMoreJettonWallets}
+            onLoadMoreNfts={loadMoreNftItems}
             onLoadMoreHolders={loadMoreJettonHolders}
             onLoadMoreTransactions={loadMoreTransactions}
             onLoadMoreActions={loadMoreActions}

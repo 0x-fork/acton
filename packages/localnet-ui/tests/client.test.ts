@@ -274,6 +274,36 @@ test("jetton wallet requests forward pagination options", async () => {
   }
 })
 
+test("NFT item requests forward owner pagination options", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  globalThis.fetch = mock(async input => {
+    requests.push(new URL(input.toString()))
+    return Response.json({nft_items: []})
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    await client.getNftItems({
+      owner_address: ["EQOwner"],
+      limit: 100,
+      offset: 200,
+      sortByLastTransactionLt: true,
+    })
+
+    expect(requests[0]?.toString()).toBe(
+      "https://toncenter.example/api/v3/nft/items?owner_address=EQOwner&limit=100&offset=200&sort_by_last_transaction_lt=true",
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("transaction lookup requests one full transaction by hash", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
