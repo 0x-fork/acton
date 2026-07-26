@@ -948,6 +948,9 @@ export const AccountPage: FC<AccountPageProps> = ({
       }
 
       try {
+        // TODO: Replace this sample-based count when the API exposes a total. Do not scan every
+        // page here: collections may be very large and special collections can have
+        // `next_item_index = -1`.
         const items = await client.getNftItems({
           collection_address: [formattedAddress],
           limit: 100,
