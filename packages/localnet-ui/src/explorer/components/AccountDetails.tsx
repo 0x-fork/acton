@@ -11,6 +11,7 @@ import {
 import type {CSSProperties, FC, JSX, KeyboardEvent as ReactKeyboardEvent, MouseEvent} from "react"
 import {AbiGetMethods, fmt} from "@acton/transaction-ui"
 import {
+  Button,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -134,6 +135,9 @@ interface AccountDetailsProps {
   readonly jettonMaster?: JettonMaster
   readonly holders?: JettonWallet[]
   readonly tokensLoading?: boolean
+  readonly tokensHasMore?: boolean
+  readonly tokensLoadingMore?: boolean
+  readonly tokensLoadMoreError?: string
   readonly nftsLoading?: boolean
   readonly holdersLoading?: boolean
   readonly transactionsLoading?: boolean
@@ -151,6 +155,7 @@ interface AccountDetailsProps {
   readonly client: TonClient
   readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
+  readonly onLoadMoreTokens?: () => void
   readonly onLoadMoreTransactions?: () => void
   readonly onLoadMoreActions?: () => void
   readonly historySortOrder?: AccountHistorySortOrder
@@ -284,6 +289,9 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   jettonMaster,
   holders,
   tokensLoading = false,
+  tokensHasMore = false,
+  tokensLoadingMore = false,
+  tokensLoadMoreError,
   nftsLoading = false,
   holdersLoading = false,
   transactionsLoading = false,
@@ -301,6 +309,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   client,
   onAddressClick,
   onTransactionClick,
+  onLoadMoreTokens,
   onLoadMoreTransactions,
   onLoadMoreActions,
   historySortOrder,
@@ -313,6 +322,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   const filterPopoverRef = useRef<HTMLDivElement>(null)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
   const historyLoadMoreRef = useRef<HTMLDivElement>(null)
+  const tokensLoadMoreRef = useRef<HTMLDivElement>(null)
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [filterPopoverPosition, setFilterPopoverPosition] = useState<
     FilterPopoverPosition | undefined
@@ -513,6 +523,38 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     observer.observe(target)
     return () => observer.disconnect()
   }, [activeHistoryLoadingMore, activeLoadMoreHistory, activeTab, showLoadMoreHistory])
+
+  const showLoadMoreTokens = !tokensLoading && tokensHasMore && onLoadMoreTokens !== undefined
+
+  useEffect(() => {
+    const target = tokensLoadMoreRef.current
+    if (
+      activeTab !== "tokens" ||
+      !showLoadMoreTokens ||
+      tokensLoadingMore ||
+      tokensLoadMoreError ||
+      !onLoadMoreTokens ||
+      !target ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return
+    }
+
+    let requested = false
+    const observer = new IntersectionObserver(
+      entries => {
+        if (requested || !entries.some(entry => entry.isIntersecting)) {
+          return
+        }
+        requested = true
+        onLoadMoreTokens()
+      },
+      {rootMargin: "240px 0px"},
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [activeTab, onLoadMoreTokens, showLoadMoreTokens, tokensLoadMoreError, tokensLoadingMore])
 
   useEffect(() => {
     try {
@@ -1126,6 +1168,24 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
             <TokensSkeleton />
           ) : (
             <Tokens wallets={jettonWallets} client={client} onAddressClick={onAddressClick} />
+          )}
+          {showLoadMoreTokens && onLoadMoreTokens && (
+            <div ref={tokensLoadMoreRef} className={styles.tokensLoadMore}>
+              {tokensLoadMoreError ? (
+                <span className={styles.tokensLoadMoreError} role="alert">
+                  {tokensLoadMoreError}
+                </span>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onLoadMoreTokens}
+                disabled={tokensLoadingMore}
+              >
+                {tokensLoadingMore ? "Loading..." : tokensLoadMoreError ? "Retry" : "Load more"}
+              </Button>
+            </div>
           )}
         </div>
       ) : activeTab === "nfts" && showNftsTab ? (

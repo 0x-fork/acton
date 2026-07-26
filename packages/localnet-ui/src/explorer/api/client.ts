@@ -106,6 +106,8 @@ interface GetTracesOptions {
 }
 
 interface GetJettonWalletsOptions {
+  readonly limit?: number
+  readonly offset?: number
   readonly sort?: "asc" | "desc"
 }
 
@@ -495,21 +497,22 @@ export class TonClient {
       addresses.map(async addr => {
         const url = this.buildUrl(this.v3BaseUrl, "/jetton/wallets")
         url.searchParams.append(paramName, addr)
+        if (options.limit !== undefined) {
+          url.searchParams.append("limit", options.limit.toString())
+        }
+        if (options.offset !== undefined && options.offset > 0) {
+          url.searchParams.append("offset", options.offset.toString())
+        }
         if (options.sort) {
           url.searchParams.append("sort", options.sort)
         }
-        try {
-          const response = await this.request<JettonWalletsResponse>(
-            url,
-            "Failed to fetch jetton wallets",
-          )
-          return response.jetton_wallets.map(wallet =>
-            this.attachJettonWalletMaster(wallet, response.metadata),
-          )
-        } catch (error) {
-          console.error(`Failed to fetch jetton wallets for ${addr}`, error)
-          return []
-        }
+        const response = await this.request<JettonWalletsResponse>(
+          url,
+          "Failed to fetch jetton wallets",
+        )
+        return response.jetton_wallets.map(wallet =>
+          this.attachJettonWalletMaster(wallet, response.metadata),
+        )
       }),
     )
 

@@ -1,5 +1,5 @@
 import {useLocation, useNavigate, useParams} from "react-router"
-import {useEffect, useMemo, useRef, useState} from "react"
+import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 
 import {codeLookupHashHex} from "@acton/transaction-ui"
@@ -48,14 +48,25 @@ import styles from "./AccountPage.module.css"
 interface AccountPageProps {
   readonly client: TonClient
   readonly enableJettonMint?: boolean
+  readonly tokensLoadMoreLimit?: number
 }
 
 const INITIAL_TRANSACTION_LIMIT = 20
 const REMOTE_TRANSACTION_PAGE_SIZE = 20
 const LOCAL_TRANSACTION_PAGE_SIZE = 1000
 const ACTION_PAGE_SIZE = 20
+const ACCOUNT_TOKENS_INITIAL_LIMIT = 100
+const ACCOUNT_TOKENS_LOAD_MORE_LIMIT = 100
 const NEW_TRANSACTION_APPEAR_MS = 1400
 type AccountTab = "history" | "contract" | "get-methods" | "tokens" | "nfts" | "holders"
+
+interface AccountTokensState {
+  readonly wallets: JettonWallet[]
+  readonly isLoading: boolean
+  readonly isLoadingMore: boolean
+  readonly hasMore: boolean
+  readonly loadMoreError?: string
+}
 
 interface AccountLoadIssue {
   readonly title: string
@@ -64,7 +75,11 @@ interface AccountLoadIssue {
   readonly networkLabel: string
 }
 
-export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = false}) => {
+export const AccountPage: FC<AccountPageProps> = ({
+  client,
+  enableJettonMint = false,
+  tokensLoadMoreLimit = ACCOUNT_TOKENS_LOAD_MORE_LIMIT,
+}) => {
   const {address = ""} = useParams<{address: string}>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -92,14 +107,18 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
   const [jettonMaster, setJettonMaster] = useState<JettonMaster | undefined>()
   const [jettonWalletAccount, setJettonWalletAccount] = useState<JettonWallet | undefined>()
   const [jettonWalletMaster, setJettonWalletMaster] = useState<JettonMasterMetadata | undefined>()
-  const [jettonWallets, setJettonWallets] = useState<JettonWallet[]>([])
+  const [accountTokensState, setAccountTokensState] = useState<AccountTokensState>({
+    wallets: [],
+    isLoading: false,
+    isLoadingMore: false,
+    hasMore: false,
+  })
   const [accountTokenInfo, setAccountTokenInfo] = useState<readonly AccountStateTokenInfo[]>([])
   const [currentNftItem, setCurrentNftItem] = useState<NftItem | undefined>()
   const [currentNftCollectionItems, setCurrentNftCollectionItems] = useState<NftItem[]>([])
   const [nftItems, setNftItems] = useState<NftItem[]>([])
   const [holders, setHolders] = useState<JettonWallet[]>([])
   const [holdersLoadedAccountKey, setHoldersLoadedAccountKey] = useState<string | undefined>()
-  const [jettonWalletsLoading, setJettonWalletsLoading] = useState(false)
   const [jettonWalletLoading, setJettonWalletLoading] = useState(false)
   const [nftItemsLoading, setNftItemsLoading] = useState(false)
   const [holdersLoading, setHoldersLoading] = useState(false)
@@ -121,6 +140,11 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
   const loadedAccountKeyRef = useRef<string | undefined>(undefined)
   const dnsRequestedAccountKeyRef = useRef<string | undefined>(undefined)
   const transactionHashesRef = useRef<Set<string>>(new Set())
+  const isLoadingMoreJettonWalletsRef = useRef(false)
+  const jettonWallets = accountTokensState.wallets
+  const jettonWalletsLoading = accountTokensState.isLoading
+  const jettonWalletsHasMore = accountTokensState.hasMore
+  const jettonWalletsLoadingMore = accountTokensState.isLoadingMore
 
   const formattedAddress = useMemo(
     () => normalizeAddress(address, addressFormat),
@@ -190,14 +214,18 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
         setJettonMaster(undefined)
         setJettonWalletAccount(undefined)
         setJettonWalletMaster(undefined)
-        setJettonWallets([])
+        setAccountTokensState({
+          wallets: [],
+          isLoading: false,
+          isLoadingMore: false,
+          hasMore: false,
+        })
         setAccountTokenInfo([])
         setCurrentNftItem(undefined)
         setCurrentNftCollectionItems([])
         setNftItems([])
         setHolders([])
         setHoldersLoadedAccountKey(undefined)
-        setJettonWalletsLoading(false)
         setJettonWalletLoading(false)
         setNftItemsLoading(false)
         setHoldersLoading(false)
@@ -239,14 +267,18 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
         setJettonMaster(undefined)
         setJettonWalletAccount(undefined)
         setJettonWalletMaster(undefined)
-        setJettonWallets([])
+        setAccountTokensState({
+          wallets: [],
+          isLoading: false,
+          isLoadingMore: false,
+          hasMore: false,
+        })
         setAccountTokenInfo([])
         setCurrentNftItem(undefined)
         setCurrentNftCollectionItems([])
         setNftItems([])
         setHolders([])
         setHoldersLoadedAccountKey(undefined)
-        setJettonWalletsLoading(false)
         setJettonWalletLoading(false)
         setNftItemsLoading(false)
         setHoldersLoading(false)
@@ -298,14 +330,18 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
           setJettonMaster(undefined)
           setJettonWalletAccount(undefined)
           setJettonWalletMaster(undefined)
-          setJettonWallets([])
+          setAccountTokensState({
+            wallets: [],
+            isLoading: false,
+            isLoadingMore: false,
+            hasMore: false,
+          })
           setAccountTokenInfo([])
           setCurrentNftItem(undefined)
           setCurrentNftCollectionItems([])
           setNftItems([])
           setHolders([])
           setHoldersLoadedAccountKey(undefined)
-          setJettonWalletsLoading(false)
           setJettonWalletLoading(false)
           setNftItemsLoading(false)
           setHoldersLoading(false)
@@ -705,15 +741,34 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
         return
       }
 
-      setJettonWalletsLoading(true)
+      setAccountTokensState(current => ({
+        ...current,
+        isLoading: true,
+        isLoadingMore: false,
+        hasMore: false,
+        loadMoreError: undefined,
+      }))
       try {
-        const wallets = await client.getJettonWallets([formattedAddress])
+        const wallets = await client.getJettonWallets([formattedAddress], undefined, {
+          limit: ACCOUNT_TOKENS_INITIAL_LIMIT,
+        })
         if (!isActive) return
-        setJettonWallets(sortJettonWalletsByAmount(wallets))
+        setAccountTokensState({
+          wallets: sortJettonWalletsByAmount(wallets),
+          isLoading: false,
+          isLoadingMore: false,
+          hasMore: wallets.length === ACCOUNT_TOKENS_INITIAL_LIMIT,
+        })
       } catch (error) {
         console.error("Failed to fetch account jetton wallets", error)
-      } finally {
-        if (isActive) setJettonWalletsLoading(false)
+        if (isActive) {
+          setAccountTokensState({
+            wallets: [],
+            isLoading: false,
+            isLoadingMore: false,
+            hasMore: false,
+          })
+        }
       }
     }
 
@@ -722,6 +777,79 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
       isActive = false
     }
   }, [accountAddressKey, client])
+
+  const loadMoreJettonWallets = useCallback(() => {
+    const offset = accountTokensState.wallets.length
+    if (
+      !formattedAddress ||
+      accountTokensState.isLoading ||
+      !accountTokensState.hasMore ||
+      isLoadingMoreJettonWalletsRef.current
+    ) {
+      return
+    }
+
+    const requestAccountKey = accountRequestKey
+    isLoadingMoreJettonWalletsRef.current = true
+    setAccountTokensState(current => ({
+      ...current,
+      isLoadingMore: true,
+      loadMoreError: undefined,
+    }))
+
+    void client
+      .getJettonWallets([formattedAddress], undefined, {
+        limit: tokensLoadMoreLimit,
+        offset,
+      })
+      .then(wallets => {
+        setAccountTokensState(current => {
+          if (
+            activeAccountKeyRef.current !== requestAccountKey ||
+            current.isLoading ||
+            current.wallets.length !== offset
+          ) {
+            return current
+          }
+
+          return {
+            ...current,
+            wallets: [...current.wallets, ...wallets],
+            isLoadingMore: false,
+            hasMore: wallets.length === tokensLoadMoreLimit,
+          }
+        })
+      })
+      .catch(error => {
+        setAccountTokensState(current => {
+          if (
+            activeAccountKeyRef.current !== requestAccountKey ||
+            current.isLoading ||
+            current.wallets.length !== offset
+          ) {
+            return current
+          }
+
+          return {
+            ...current,
+            isLoadingMore: false,
+            loadMoreError:
+              error instanceof Error ? error.message : "Failed to load more account tokens",
+          }
+        })
+      })
+      .finally(() => {
+        isLoadingMoreJettonWalletsRef.current = false
+      })
+  }, [
+    accountRequestKey,
+    accountTokensState.hasMore,
+    accountTokensState.isLoading,
+    accountTokensState.wallets.length,
+    client,
+    formattedAddress,
+    tokensLoadMoreLimit,
+  ])
 
   useEffect(() => {
     let isActive = true
@@ -1224,6 +1352,9 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
             jettonMaster={jettonMaster}
             holders={holders}
             tokensLoading={jettonWalletsLoading}
+            tokensHasMore={jettonWalletsHasMore}
+            tokensLoadingMore={jettonWalletsLoadingMore}
+            tokensLoadMoreError={accountTokensState.loadMoreError}
             nftsLoading={nftItemsLoading}
             holdersLoading={holdersPending}
             transactionsLoading={transactionsLoading}
@@ -1241,6 +1372,7 @@ export const AccountPage: FC<AccountPageProps> = ({client, enableJettonMint = fa
             client={client}
             onAddressClick={handleSearch}
             onTransactionClick={handleTransactionClick}
+            onLoadMoreTokens={loadMoreJettonWallets}
             onLoadMoreTransactions={loadMoreTransactions}
             onLoadMoreActions={loadMoreActions}
             historySortOrder={historySortOrder}

@@ -243,6 +243,31 @@ test("account history requests forward the requested sort order", async () => {
   }
 })
 
+test("jetton wallet requests forward pagination options", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  globalThis.fetch = mock(async input => {
+    requests.push(new URL(input.toString()))
+    return Response.json({jetton_wallets: []})
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    await client.getJettonWallets(["EQOwner"], undefined, {limit: 100, offset: 200})
+
+    expect(requests[0]?.toString()).toBe(
+      "https://toncenter.example/api/v3/jetton/wallets?owner_address=EQOwner&limit=100&offset=200",
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("transaction lookup requests one full transaction by hash", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
