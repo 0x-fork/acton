@@ -172,7 +172,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
     domain,
     domains,
     customName: nameSources.customName,
-    tonAssetsName: nameSources.tonAssetsName,
+    registryName: nameSources.registryName,
     tonDnsName: nameSources.tonDnsName,
   })
   const hasNameDetails = nameDetailGroups.length > 0
