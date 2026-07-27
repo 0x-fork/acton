@@ -166,10 +166,10 @@ build-ui:
 check-ui-ci:
     bun run lint
     bun run fmt:check
-    bun run doctor || true
+    bun run doctor
 
 check-ui: fmt-ui
-    bun run doctor || true
+    bun run doctor
     bun run lint:fix
 
 fmt-ui:
