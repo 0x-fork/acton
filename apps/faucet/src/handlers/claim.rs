@@ -1,7 +1,7 @@
 use crate::AppState;
+use crate::address::{AddressValidationError, parse_testnet_address};
 use crate::antifraud_subject;
 use crate::github_auth::FaucetTier;
-use crate::handlers::address::{AddressValidationError, parse_testnet_address};
 use crate::handlers::{auth, challenge};
 use apalis::prelude::TaskSink;
 use axum::{

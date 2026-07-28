@@ -5,15 +5,15 @@ use axum::{
 };
 use faucet_backend::middlewares::ClientContext;
 use faucet_valkey::{AntifraudModule, CappedEphemeralStoreDecision};
-use serde::{Deserialize, Serialize};
 use real::RealIp;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 use crate::AppState;
+use crate::address::{AddressValidationError, parse_testnet_address};
 use crate::antifraud_subject;
 use crate::github_auth::FaucetTier;
-use crate::handlers::address::{AddressValidationError, parse_testnet_address};
 use crate::handlers::auth;
 
 // The shared hash tag keeps the index and challenge values in one Redis Cluster slot.

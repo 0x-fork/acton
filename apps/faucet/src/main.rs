@@ -34,6 +34,7 @@ use tower::ServiceBuilder;
 use tracing::{error, info, warn};
 use wallet::Wallet;
 
+mod address;
 mod antifraud_subject;
 mod blacklist;
 mod github_auth;

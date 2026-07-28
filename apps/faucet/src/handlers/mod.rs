@@ -15,7 +15,6 @@ use tower_http::cors::CorsLayer;
 
 use crate::AppState;
 
-mod address;
 mod auth;
 mod challenge;
 mod claim;
