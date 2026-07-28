@@ -28,6 +28,8 @@ pub(crate) struct CreateClaim {
     pub(crate) max_requests: u32,
     #[serde(default)]
     pub(crate) client_window_subject: Option<String>,
+    #[serde(default)]
+    pub(crate) device_window_subject: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -122,6 +124,7 @@ pub(super) async fn create_claim(
 
     check_successful_claim_window(&state, &address, max_requests).await?;
     let client_window_subject = client_claim_window_key(client_ip.ip());
+    let device_window_subject = device_claim_window_key(&client.device_uid);
     if let Some(github_user_id) = github_user_id {
         check_successful_claim_window(
             &state,
@@ -130,6 +133,7 @@ pub(super) async fn create_claim(
         )
         .await?;
     }
+    check_successful_claim_window(&state, &device_window_subject, max_requests).await?;
     if tier == FaucetTier::Guest {
         check_successful_claim_window(
             &state,
@@ -163,6 +167,7 @@ pub(super) async fn create_claim(
             tier,
             max_requests,
             client_window_subject: Some(client_window_subject),
+            device_window_subject: Some(device_window_subject),
         })
         .await
         .map_err(|_| response_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to queue claim"))?;
@@ -258,6 +263,10 @@ pub(crate) fn client_claim_window_key(ip: IpAddr) -> String {
     format!("client-ip:{ip}")
 }
 
+pub(crate) fn device_claim_window_key(device_uid: &str) -> String {
+    format!("device-uid:{}", device_uid.to_ascii_lowercase())
+}
+
 fn bad_request(error: &'static str) -> (StatusCode, Json<ErrorResponse>) {
     response_error(StatusCode::BAD_REQUEST, error)
 }
@@ -272,7 +281,10 @@ mod tests {
 
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-    use super::{CreateClaim, CreateClaimRequest, FaucetTier, client_claim_window_key};
+    use super::{
+        CreateClaim, CreateClaimRequest, FaucetTier, client_claim_window_key,
+        device_claim_window_key,
+    };
 
     #[test]
     fn deserializes_challenge_version() {
@@ -306,6 +318,7 @@ mod tests {
         assert_eq!(claim.tier, FaucetTier::Guest);
         assert_eq!(claim.max_requests, 0);
         assert_eq!(claim.client_window_subject, None);
+        assert_eq!(claim.device_window_subject, None);
     }
 
     #[test]
@@ -323,6 +336,14 @@ mod tests {
         assert_eq!(
             client_claim_window_key(IpAddr::V6("::ffff:192.0.2.44".parse::<Ipv6Addr>().unwrap())),
             "client-ip:192.0.2.44"
+        );
+    }
+
+    #[test]
+    fn builds_case_normalized_device_window_subject() {
+        assert_eq!(
+            device_claim_window_key("550E8400-E29B-41D4-A716-446655440000"),
+            "device-uid:550e8400-e29b-41d4-a716-446655440000"
         );
     }
 }

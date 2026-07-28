@@ -397,6 +397,19 @@ async fn can_process_successful_claim_window(
         return Ok(false);
     }
 
+    if let Some(device_subject) = task.device_window_subject.as_deref()
+        && !claim_window_allows(
+            state,
+            device_subject,
+            max_requests,
+            window.window_seconds,
+            &task.address,
+        )
+        .await?
+    {
+        return Ok(false);
+    }
+
     if task.tier == github_auth::FaucetTier::Guest
         && let Some(client_subject) = task.client_window_subject.as_deref()
         && !claim_window_allows(
@@ -487,6 +500,15 @@ async fn record_successful_claim(state: &AppState, task: &CreateClaim) {
         record_successful_claim_subject(
             state,
             &handlers::github_claim_window_key(github_user_id),
+            &task.address,
+            window.window_seconds,
+        )
+        .await;
+    }
+    if let Some(device_subject) = task.device_window_subject.as_deref() {
+        record_successful_claim_subject(
+            state,
+            device_subject,
             &task.address,
             window.window_seconds,
         )
