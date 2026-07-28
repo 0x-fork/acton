@@ -23,7 +23,7 @@ mod health;
 mod robots;
 mod stats;
 
-pub(crate) use claim::{CreateClaim, github_claim_window_key};
+pub(crate) use claim::CreateClaim;
 
 pub(crate) fn router(state: AppState) -> Router {
     let airdrop_routes = Router::new()

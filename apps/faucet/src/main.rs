@@ -34,10 +34,14 @@ use tower::ServiceBuilder;
 use tracing::{error, info, warn};
 use wallet::Wallet;
 
+mod antifraud_subject;
+mod blacklist;
 mod github_auth;
 mod handlers;
 mod logger;
 mod wallet;
+
+use blacklist::BlacklistStore;
 
 pub const LONG_VERSION: &str = env!("FAUCET_LONG_VERSION");
 
@@ -91,6 +95,10 @@ async fn main() -> anyhow::Result<()> {
     SqliteStorage::setup(&pool)
         .await
         .context("Failed to setup storage")?;
+    let blacklist = BlacklistStore::setup(pool.clone())
+        .await
+        .context("Failed to setup antifraud blacklist")?;
+    info!("Initialized antifraud blacklist");
     let storage_config = SqliteConfig::new(std::any::type_name::<CreateClaim>());
     let storage = SqliteStorage::new_with_callback(&config.database.url, &storage_config);
     info!("Initialized claim storage");
@@ -120,6 +128,7 @@ async fn main() -> anyhow::Result<()> {
         pow: Pow::new(config.pow.difficulty),
         valkey,
         antifraud,
+        blacklist,
         github_auth,
         config: Arc::new(config),
     };
@@ -253,6 +262,7 @@ pub(crate) struct AppState {
     pub(crate) pow: Pow,
     pub(crate) valkey: ValkeyStore,
     pub(crate) antifraud: Antifraud,
+    pub(crate) blacklist: BlacklistStore,
     pub(crate) github_auth: GitHubAuth,
     pub(crate) config: Arc<Config>,
 }
@@ -387,7 +397,7 @@ async fn can_process_successful_claim_window(
     if let Some(github_user_id) = task.github_user_id
         && !claim_window_allows(
             state,
-            &handlers::github_claim_window_key(github_user_id),
+            &antifraud_subject::github(github_user_id),
             max_requests,
             window.window_seconds,
             &task.address,
@@ -499,7 +509,7 @@ async fn record_successful_claim(state: &AppState, task: &CreateClaim) {
     if let Some(github_user_id) = task.github_user_id {
         record_successful_claim_subject(
             state,
-            &handlers::github_claim_window_key(github_user_id),
+            &antifraud_subject::github(github_user_id),
             &task.address,
             window.window_seconds,
         )

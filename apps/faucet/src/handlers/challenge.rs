@@ -5,12 +5,13 @@ use axum::{
 };
 use faucet_backend::middlewares::ClientContext;
 use faucet_valkey::{AntifraudModule, CappedEphemeralStoreDecision};
-use real::RealIp;
 use serde::{Deserialize, Serialize};
+use real::RealIp;
 use sha2::{Digest, Sha256};
-use tracing::info;
+use tracing::{error, warn};
 
 use crate::AppState;
+use crate::antifraud_subject;
 use crate::github_auth::FaucetTier;
 use crate::handlers::address::{AddressValidationError, parse_testnet_address};
 use crate::handlers::auth;
@@ -98,6 +99,11 @@ pub(super) async fn create_challenge(
         return Err(bad_request("Invalid challenge type"));
     }
 
+    let wallet_subject = antifraud_subject::wallet(&address);
+    let client_subject = antifraud_subject::client_ip(client_ip.ip());
+    let device_subject = antifraud_subject::device_uid(&client.device_uid);
+    check_blacklist(&state, &[&wallet_subject, &client_subject, &device_subject]).await?;
+
     let identity = auth::optional_identity(&state, &headers, &client)
         .await
         .map_err(|(status, _)| response_error(status, "Invalid or expired GitHub session"))?;
@@ -178,6 +184,34 @@ pub(super) async fn create_challenge(
             max_nonce_attempts: state.config.pow.client.max_nonce_attempts,
         }),
     ))
+}
+
+async fn check_blacklist(
+    state: &AppState,
+    subjects: &[&str],
+) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
+    match state.blacklist.check(subjects).await {
+        Ok(Some(entry)) => {
+            warn!(
+                subject = %entry.subject,
+                reason = %entry.reason,
+                expires_at = ?entry.expires_at,
+                "Challenge blocked by antifraud blacklist"
+            );
+            Err(response_error(
+                StatusCode::FORBIDDEN,
+                "Challenge blocked by antifraud policy",
+            ))
+        }
+        Ok(None) => Ok(()),
+        Err(err) => {
+            error!(error = %err, "Failed to check antifraud blacklist");
+            Err(response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to check antifraud policy",
+            ))
+        }
+    }
 }
 
 pub(super) fn challenge_key(challenge: &str) -> String {

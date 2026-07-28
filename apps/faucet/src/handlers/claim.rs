@@ -1,4 +1,5 @@
 use crate::AppState;
+use crate::antifraud_subject;
 use crate::github_auth::FaucetTier;
 use crate::handlers::address::{AddressValidationError, parse_testnet_address};
 use crate::handlers::{auth, challenge};
@@ -12,7 +13,6 @@ use faucet_backend::middlewares::ClientContext;
 use faucet_valkey::{AntifraudModule, SuccessfulClaimWindowDecision};
 use real::RealIp;
 use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, Ipv6Addr};
 use tracing::{error, info, warn};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -130,12 +130,12 @@ pub(super) async fn create_claim(
     }
 
     check_successful_claim_window(&state, &address, max_requests).await?;
-    let client_window_subject = client_claim_window_key(client_ip.ip());
-    let device_window_subject = device_claim_window_key(&client.device_uid);
+    let client_window_subject = antifraud_subject::client_ip(client_ip.ip());
+    let device_window_subject = antifraud_subject::device_uid(&client.device_uid);
     if let Some(github_user_id) = github_user_id {
         check_successful_claim_window(
             &state,
-            &github_claim_window_key(github_user_id),
+            &antifraud_subject::github(github_user_id),
             max_requests,
         )
         .await?;
@@ -252,28 +252,6 @@ async fn check_successful_claim_window(
     }
 }
 
-pub(crate) fn github_claim_window_key(github_user_id: u64) -> String {
-    format!("github:{github_user_id}")
-}
-
-pub(crate) fn client_claim_window_key(ip: IpAddr) -> String {
-    let ip = match ip {
-        IpAddr::V6(ip) if ip.to_ipv4_mapped().is_some() => {
-            IpAddr::V4(ip.to_ipv4_mapped().expect("checked IPv4-mapped address"))
-        }
-        IpAddr::V6(ip) => {
-            let network = u128::from(ip) & (u128::MAX << 64);
-            IpAddr::V6(Ipv6Addr::from(network))
-        }
-        IpAddr::V4(ip) => IpAddr::V4(ip),
-    };
-    format!("client-ip:{ip}")
-}
-
-pub(crate) fn device_claim_window_key(device_uid: &str) -> String {
-    format!("device-uid:{}", device_uid.to_ascii_lowercase())
-}
-
 fn bad_request(error: &'static str) -> (StatusCode, Json<ErrorResponse>) {
     response_error(StatusCode::BAD_REQUEST, error)
 }
@@ -286,12 +264,7 @@ fn response_error(status: StatusCode, error: &'static str) -> (StatusCode, Json<
 mod tests {
     use serde_json::json;
 
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-
-    use super::{
-        CreateClaim, CreateClaimRequest, FaucetTier, client_claim_window_key,
-        device_claim_window_key,
-    };
+    use super::{CreateClaim, CreateClaimRequest, FaucetTier};
 
     #[test]
     fn deserializes_challenge_version() {
@@ -326,31 +299,5 @@ mod tests {
         assert_eq!(claim.max_requests, 0);
         assert_eq!(claim.client_window_subject, None);
         assert_eq!(claim.device_window_subject, None);
-    }
-
-    #[test]
-    fn builds_client_window_subjects_from_peer_ip() {
-        assert_eq!(
-            client_claim_window_key(IpAddr::V4(Ipv4Addr::new(203, 0, 113, 7))),
-            "client-ip:203.0.113.7"
-        );
-        assert_eq!(
-            client_claim_window_key(IpAddr::V6(
-                "2001:db8:1234:5678:abcd::1".parse::<Ipv6Addr>().unwrap()
-            )),
-            "client-ip:2001:db8:1234:5678::"
-        );
-        assert_eq!(
-            client_claim_window_key(IpAddr::V6("::ffff:192.0.2.44".parse::<Ipv6Addr>().unwrap())),
-            "client-ip:192.0.2.44"
-        );
-    }
-
-    #[test]
-    fn builds_case_normalized_device_window_subject() {
-        assert_eq!(
-            device_claim_window_key("550E8400-E29B-41D4-A716-446655440000"),
-            "device-uid:550e8400-e29b-41d4-a716-446655440000"
-        );
     }
 }
