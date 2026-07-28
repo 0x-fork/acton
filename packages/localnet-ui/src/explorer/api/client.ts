@@ -73,6 +73,17 @@ interface DnsRecordsResponse {
   }[]
 }
 
+interface DnsResolvedResponse {
+  readonly entries: readonly {
+    readonly entry: {
+      readonly "@type": string
+      readonly smc_address?: {
+        readonly account_address?: string
+      }
+    }
+  }[]
+}
+
 interface GetBlocksOptions {
   readonly workchain?: number
   readonly shard?: string
@@ -153,6 +164,9 @@ const NFT_CONTENT_KEYS = [
   "collection",
   "collection_name",
 ] as const
+
+const TON_DNS_ROOT_ADDRESS = "-1:e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c"
+const DNS_RESOLVE_TTL = 10
 
 function jettonMasterMetadataFromWalletResponse(
   jettonAddress: string,
@@ -328,7 +342,16 @@ export class TonClient {
     const url = this.buildUrl(this.v3BaseUrl, "/dns/records")
     url.searchParams.append("domain", domain)
     const response = await this.request<DnsRecordsResponse>(url, "Failed to resolve TON DNS name")
-    return response.records.find(record => record.dns_wallet)?.dns_wallet ?? undefined
+    const walletAddress = response.records.find(record => record.dns_wallet)?.dns_wallet
+    if (walletAddress || response.records.length > 0) {
+      return walletAddress ?? undefined
+    }
+
+    const resolved = await this.requestDnsFromChain(domain)
+    return resolved.entries
+      .filter(entry => entry.entry["@type"] === "dns.entryDataSmcAddress")
+      .map(entry => stringValue(entry.entry.smc_address?.account_address))
+      .find(address => address !== undefined)
   }
 
   async getWalletDnsNames(address: string): Promise<readonly string[]> {
@@ -1204,6 +1227,16 @@ export class TonClient {
     }
 
     return raw as T
+  }
+
+  private async requestDnsFromChain(domain: string): Promise<DnsResolvedResponse> {
+    const url = this.buildUrl(this.v2BaseUrl, "/dnsResolve")
+    url.searchParams.append("address", TON_DNS_ROOT_ADDRESS)
+    url.searchParams.append("name", domain)
+    url.searchParams.append("category", "wallet")
+    url.searchParams.append("ttl", DNS_RESOLVE_TTL.toString())
+
+    return this.request<DnsResolvedResponse>(url, "Failed to resolve TON DNS name on-chain")
   }
 
   private async requestBlob(url: URL, errorMessage: string): Promise<Blob> {

@@ -76,6 +76,95 @@ test("wallet DNS lookup returns every domain for the requested address", async (
   }
 })
 
+test("domain DNS lookup uses the indexed V3 wallet record when available", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  const walletAddress = "EQCIndexedWallet"
+  globalThis.fetch = mock(async input => {
+    requests.push(new URL(input.toString()))
+    return Response.json({
+      records: [{domain: "foundation.ton", dns_wallet: walletAddress}],
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    await expect(client.resolveDnsWalletAddress("foundation.ton")).resolves.toBe(walletAddress)
+    expect(requests.map(request => request.toString())).toEqual([
+      "https://toncenter.example/api/v3/dns/records?domain=foundation.ton",
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("domain DNS lookup falls back to Toncenter V2 when V3 has no records", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  const dnsRoot = "e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c"
+  const walletAddress = "EQB8PZ-Cp6UzydbLvjukx1OQL3LmqeYV-tJ3qVMw_mNYgqow"
+  globalThis.fetch = mock(async input => {
+    const url = new URL(input.toString())
+    requests.push(url)
+    if (url.pathname.endsWith("/dns/records")) {
+      return Response.json({records: []})
+    }
+    return Response.json({
+      ok: true,
+      result: {
+        "@type": "dns.resolved",
+        entries: [
+          {
+            "@type": "dns.entry",
+            name: "",
+            category: "wallet-category",
+            entry: {
+              "@type": "dns.entryDataSmcAddress",
+              smc_address: {
+                "@type": "accountAddress",
+                account_address: walletAddress,
+              },
+            },
+          },
+          {
+            "@type": "dns.entry",
+            name: "",
+            category: "site-category",
+            entry: {
+              "@type": "dns.entryDataAdnlAddress",
+              adnl_address: {
+                "@type": "adnlAddress",
+                adnl_address: "site-address",
+              },
+            },
+          },
+        ],
+      },
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    await expect(client.resolveDnsWalletAddress("dev.ton-site.ton")).resolves.toBe(walletAddress)
+    expect(requests.map(request => request.toString())).toEqual([
+      "https://toncenter.example/api/v3/dns/records?domain=dev.ton-site.ton",
+      `https://toncenter.example/api/v2/dnsResolve?address=-1%3A${dnsRoot}&name=dev.ton-site.ton&category=wallet&ttl=10`,
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("getShardAccountCell reads the unwrapped V2 response", async () => {
   const originalFetch = globalThis.fetch
   const requests: string[] = []
