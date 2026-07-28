@@ -349,10 +349,11 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const currentStateChangesStatus =
     stateChangesStatus.traceHash === traceLookupHash.toLowerCase() ? stateChangesStatus : undefined
 
-  // react-doctor-disable-next-line react-doctor/no-ref-current-in-render -- keeps async trace loading on the latest address-book lookup without restarting it
+  // oxlint-disable-next-line react-doctor/no-ref-current-in-render -- keeps async trace loading on the latest address-book lookup without restarting it
   fetchNameRef.current = fetchName
-  // react-doctor-disable-next-line react-doctor/no-ref-current-in-render -- keeps async trace loading on the latest address format without restarting it
+  // oxlint-disable-next-line react-doctor/no-ref-current-in-render -- keeps async trace loading on the latest address format without restarting it
   addressFormatRef.current = addressFormat
+  // oxlint-disable-next-line react-doctor/no-ref-current-in-render -- keeps async trace loading scoped to the latest trace lookup
   traceLookupHashRef.current = traceLookupHash
 
   const handleContractClick = (address: string, event?: ExplorerNavigationClickEvent) => {
