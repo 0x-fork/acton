@@ -1,6 +1,7 @@
 import {describe, expect, test} from "bun:test"
 
 import {readSources} from "../scripts/sources.ts"
+import {ACTON_ADDRESSES} from "../scripts/sources/acton.ts"
 import {ADDRESS_BOOK_URLS} from "../scripts/sources/address-book.ts"
 import {parseSourceAddresses} from "../scripts/sources/shared.ts"
 import {TON_ASSETS_ACCOUNT_URLS} from "../scripts/sources/ton-assets.ts"
@@ -49,7 +50,7 @@ describe("source address validation", () => {
   })
 })
 
-test("readSources reads every allowed upstream YAML file", async () => {
+test("readSources reads every allowed upstream YAML file and the Acton list", async () => {
   const requestedUrls: string[] = []
   const read = (url: string): Promise<string> => {
     requestedUrls.push(url)
@@ -72,6 +73,11 @@ test("readSources reads every allowed upstream YAML file", async () => {
       id: "address-book",
       urls: ADDRESS_BOOK_URLS,
       addresses: ADDRESS_BOOK_URLS.map(name => ({address: RAW_ZERO, name})),
+    },
+    {
+      id: "acton",
+      urls: [],
+      addresses: parseSourceAddresses(ACTON_ADDRESSES, "ACTON_ADDRESSES"),
     },
   ])
 })

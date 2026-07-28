@@ -1,6 +1,6 @@
 import {Address} from "@ton/core"
 
-export type AddressSourceId = "ton-assets" | "address-book"
+export type AddressSourceId = "ton-assets" | "address-book" | "acton"
 
 export interface SourceAddress {
   readonly address: string
