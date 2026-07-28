@@ -62,6 +62,13 @@ pub(super) async fn create_claim(
     headers: HeaderMap,
     Json(payload): Json<CreateClaimRequest>,
 ) -> ClaimResult {
+    info!(
+        address = %payload.address,
+        client_ip = %client_ip.ip(),
+        device_uid = %client.device_uid,
+        "Received faucet claim request"
+    );
+
     let address = match parse_testnet_address(&payload.address) {
         Ok(address) => address.to_hex(),
         Err(AddressValidationError::Invalid) => {

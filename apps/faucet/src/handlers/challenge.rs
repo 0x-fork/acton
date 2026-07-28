@@ -5,8 +5,10 @@ use axum::{
 };
 use faucet_backend::middlewares::ClientContext;
 use faucet_valkey::{AntifraudModule, CappedEphemeralStoreDecision};
+use real::RealIp;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tracing::info;
 
 use crate::AppState;
 use crate::github_auth::FaucetTier;
@@ -71,9 +73,17 @@ type ChallengeResult =
 pub(super) async fn create_challenge(
     State(state): State<AppState>,
     Extension(client): Extension<ClientContext>,
+    Extension(client_ip): Extension<RealIp>,
     headers: HeaderMap,
     Json(payload): Json<ChallengeRequest>,
 ) -> ChallengeResult {
+    info!(
+        address = %payload.address,
+        client_ip = %client_ip.ip(),
+        device_uid = %client.device_uid,
+        "Received PoW challenge request"
+    );
+
     let address = match parse_testnet_address(&payload.address) {
         Ok(address) => address.to_hex(),
         Err(AddressValidationError::Invalid) => {
