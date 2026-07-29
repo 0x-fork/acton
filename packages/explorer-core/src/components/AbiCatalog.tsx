@@ -4,21 +4,20 @@ import {AbiPanel, type AbiTab} from "@acton/transaction-ui/abi"
 import {InlineAction, InlineActions, Input, useToast} from "@acton/ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
-import {Link, useParams} from "react-router"
+import {Link} from "react-router"
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import {
   getBundledCompilerAbiCatalog,
   type BundledCompilerAbiCatalogEntry,
 } from "../api/compilerAbiCatalog"
-import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
-import {JsonUploadField} from "../components/JsonUploadField"
+import {JsonUploadField} from "./JsonUploadField"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {normalizeCodeHash} from "../metadata/codeHash"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import type {RegisteredCompilerAbi} from "../metadata/types"
 
-import styles from "./AbiCatalogPage.module.css"
+import styles from "./AbiCatalog.module.css"
 
 interface AbiCatalogState {
   readonly loading: boolean
@@ -30,14 +29,14 @@ interface RegisteredMetadataState {
   readonly compilerAbis: readonly RegisteredCompilerAbi[]
 }
 
-interface AbiCatalogTableEntry {
+export interface AbiCatalogTableEntry {
   readonly slug: string
   readonly source: "bundled" | "environment"
   readonly abi: ExtendedContractABI
   readonly deleteCodeHash?: string
 }
 
-export const AbiCatalogPage: FC = () => {
+export const AbiCatalog: FC = () => {
   const routes = useExplorerRoutePaths()
   const metadataRegistry = useMetadataRegistry()
   const {showToast} = useToast()
@@ -159,11 +158,11 @@ export const AbiCatalogPage: FC = () => {
   }
 
   return (
-    <section className={styles.container}>
-      <section className={styles.tableFrame}>
-        {tableLoading ? (
-          <AbiCatalogSkeleton />
-        ) : (
+    <section className={styles.tableFrame}>
+      {tableLoading ? (
+        <AbiCatalogSkeleton />
+      ) : (
+        <>
           <div className={styles.tableScroller}>
             <table className={styles.table}>
               <thead>
@@ -323,21 +322,27 @@ export const AbiCatalogPage: FC = () => {
               </tbody>
             </table>
           </div>
-        )}
-      </section>
+        </>
+      )}
     </section>
   )
 }
 
-export const AbiDetailsPage: FC = () => {
-  const {slug = ""} = useParams()
-  const routes = useExplorerRoutePaths()
+export type AbiDetailsState =
+  | {readonly status: "loading"}
+  | {readonly status: "not-found"}
+  | {
+      readonly status: "ready"
+      readonly entry: AbiCatalogTableEntry
+      readonly title: string
+    }
+
+export function useAbiDetails(slug: string): AbiDetailsState {
   const metadataRegistry = useMetadataRegistry()
   const [state, setState] = useState<{
     readonly loading: boolean
     readonly entries: readonly AbiCatalogTableEntry[]
   }>({loading: true, entries: []})
-  const [activeTab, setActiveTab] = useState<AbiTab>("view")
 
   useEffect(() => {
     let isActive = true
@@ -368,47 +373,32 @@ export const AbiDetailsPage: FC = () => {
   const entry = useMemo(() => state.entries.find(item => item.slug === slug), [slug, state.entries])
 
   if (state.loading) {
-    return (
-      <section className={styles.container}>
-        <ExplorerBreadcrumbs
-          ariaLabel="Contract breadcrumb"
-          rootLabel="Contracts"
-          rootPath={routes.contractsPath ?? routes.rootPath}
-          items={[{label: "ABI", path: routes.abiPath}, {label: "Loading"}]}
-        />
-        <AbiDetailsSkeleton />
-      </section>
-    )
+    return {status: "loading"}
   }
 
   if (!entry) {
-    return (
-      <section className={styles.container}>
-        <ExplorerBreadcrumbs
-          ariaLabel="Contract breadcrumb"
-          rootLabel="Contracts"
-          rootPath={routes.contractsPath ?? routes.rootPath}
-          items={[{label: "ABI", path: routes.abiPath}, {label: "Not found"}]}
-        />
-        <div className={styles.emptyPage}>ABI not found</div>
-      </section>
-    )
+    return {status: "not-found"}
   }
 
-  const title = abiTitle(entry.abi)
+  return {status: "ready", entry, title: abiTitle(entry.abi)}
+}
+
+export const AbiDetails: FC<{readonly state: AbiDetailsState}> = ({state}) => {
+  const [activeTab, setActiveTab] = useState<AbiTab>("view")
+
+  if (state.status === "loading") {
+    return <AbiDetailsSkeleton />
+  }
+
+  if (state.status === "not-found") {
+    return <div className={styles.emptyPage}>ABI not found</div>
+  }
 
   return (
-    <section className={styles.container}>
-      <ExplorerBreadcrumbs
-        ariaLabel="Contract breadcrumb"
-        rootLabel="Contracts"
-        rootPath={routes.contractsPath ?? routes.rootPath}
-        items={[{label: "ABI", path: routes.abiPath}, {label: title}]}
-      />
-
-      {entry.abi.links.length > 0 && (
+    <>
+      {state.entry.abi.links.length > 0 && (
         <div className={styles.links}>
-          {entry.abi.links.map(link => (
+          {state.entry.abi.links.map(link => (
             <a key={`${link.kind}:${link.url}`} href={link.url} target="_blank" rel="noreferrer">
               <span>{formatLinkKind(link.kind)}</span>
               {link.title}
@@ -420,11 +410,11 @@ export const AbiDetailsPage: FC = () => {
       <AbiPanel
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        abi={entry.abi.compiler_abi}
+        abi={state.entry.abi.compiler_abi}
         heightMode="content"
         showSymbolAnchors
       />
-    </section>
+    </>
   )
 }
 

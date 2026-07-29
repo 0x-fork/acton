@@ -1,14 +1,5 @@
-.container {
-  width: 100%;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
 .tableFrame {
   box-sizing: border-box;
-  order: 2;
   width: 100%;
   max-width: 100%;
   min-width: 0;
