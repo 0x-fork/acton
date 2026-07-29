@@ -90,6 +90,7 @@ export const Nfts: FC<NftsProps> = ({
           const name = getNftDisplayName(item)
           const collectionName = getCollectionName(item)
           const imageSources = getImageSources(item.content, NFT_CARD_IMAGE_SOURCE_KEYS)
+          const isScam = item.is_scam === true
 
           return (
             <div
@@ -111,11 +112,12 @@ export const Nfts: FC<NftsProps> = ({
                   className={styles.nftImage}
                   blurredClassName={styles.blurredImage}
                   collectionName={collectionName}
-                  blurred={item.is_scam === true}
+                  blurred={isScam}
                   onNsfw={() => {
                     setHiddenAddresses(current => new Set(current).add(item.address))
                   }}
                 />
+                {isScam && <span className={styles.scamLabel}>SCAM</span>}
               </div>
               <div className={styles.nftInfo}>
                 {collectionName && <div className={styles.collectionName}>{collectionName}</div>}

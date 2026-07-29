@@ -151,11 +151,11 @@ export const NftImage: FC<NftImageProps> = ({
         }
       }
 
-      // If the browser cannot inspect an unknown image (for example because of CORS),
-      // render it blurred instead of briefly exposing unverified content.
+      // A cross-origin image may still be renderable even when the browser cannot
+      // download its bytes for verification. Let the native image element load it.
       setImage({
         src: imageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE,
-        blurred: true,
+        blurred: false,
         hidden: false,
         verified: false,
       })
@@ -186,7 +186,7 @@ export const NftImage: FC<NftImageProps> = ({
     const nextSource = imageSources[currentIndex + 1]
     setImage({
       src: nextSource ?? TOKEN_PLACEHOLDER_IMAGE,
-      blurred: nextSource !== undefined && !isGetgemsImage(nextSource),
+      blurred: nextSource !== undefined && blurred,
       hidden: false,
       verified: false,
     })

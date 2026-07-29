@@ -1660,6 +1660,7 @@ export const AccountPage: FC<AccountPageProps> = ({
                             blurred={nftItemIsScam}
                             onNsfw={() => setCurrentNftItem(undefined)}
                           />
+                          {nftItemIsScam && <span className={styles.nftScamLabel}>SCAM</span>}
                         </div>
                       </div>
                     </div>
@@ -1698,6 +1699,7 @@ export const AccountPage: FC<AccountPageProps> = ({
                             collectionName={nftCollectionName}
                             blurred={nftCollectionIsScam}
                           />
+                          {nftCollectionIsScam && <span className={styles.nftScamLabel}>SCAM</span>}
                         </div>
                       </div>
                     </div>
