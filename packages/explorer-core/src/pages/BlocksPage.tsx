@@ -780,7 +780,6 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
 
             <BlockTransactionsTable
               transactions={state.transactions}
-              totalCount={state.block.tx_count}
               hasMore={state.hasMoreTransactions}
               isLoadingMore={state.isLoadingMoreTransactions}
               loadMoreError={state.loadMoreTransactionsError}
@@ -1025,7 +1024,6 @@ const BlockTableSection: FC<{
 
 const BlockTransactionsTable: FC<{
   readonly transactions: readonly V3TransactionListItem[]
-  readonly totalCount: number
   readonly hasMore: boolean
   readonly isLoadingMore: boolean
   readonly loadMoreError?: string
@@ -1034,7 +1032,6 @@ const BlockTransactionsTable: FC<{
   readonly onOpenTransaction: (hash: string, event?: ExplorerNavigationClickEvent) => void
 }> = ({
   transactions,
-  totalCount,
   hasMore,
   isLoadingMore,
   loadMoreError,
@@ -1078,9 +1075,7 @@ const BlockTransactionsTable: FC<{
 
   return (
     <section className={styles.blocksTableFrame} aria-label="Transactions">
-      <header className={styles.blocksTableTitle}>
-        Transactions ({transactions.length.toLocaleString()} of {totalCount.toLocaleString()})
-      </header>
+      <header className={styles.blocksTableTitle}>Transactions</header>
       <div className={styles.blocksTableScroller}>
         <table className={`${styles.blocksTable} ${styles.blockTransactionsTable}`}>
           <thead>
