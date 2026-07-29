@@ -27,6 +27,7 @@ import {AccountInfo} from "../components/AccountInfo"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {AccountDetails, readAccountHistorySortOrder} from "../components/AccountDetails"
+import {LockerOverview} from "../components/LockerOverview"
 import {NftImage} from "../components/NftImage"
 import {
   NFT_CARD_IMAGE_SOURCE_KEYS,
@@ -37,6 +38,7 @@ import {
   getImageSources,
   replaceBrokenImageWithFallback,
 } from "../components/imageFallbacks"
+import {isLockerCodeHash} from "../components/lockerSchedule"
 import {mergeAccountDomains, normalizeAddress, toRawAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
@@ -1483,11 +1485,15 @@ export const AccountPage: FC<AccountPageProps> = ({
   const accountUnavailable =
     accountLoadIssue !== undefined && !accountLoading && accountState === undefined
   const showAccountHeader = accountLoading || Boolean(accountState) || accountUnavailable
+  const isLockerAccount = Boolean(accountState && isLockerCodeHash(accountCodeLookupHash))
   const hasHeaderContextCard = Boolean(
-    accountState && (tokenInfo || currentNftItem || (nftCollectionName && !currentNftItem)),
+    accountState &&
+      (tokenInfo || currentNftItem || (nftCollectionName && !currentNftItem) || isLockerAccount),
   )
   const topSectionClassName = hasHeaderContextCard
-    ? styles.topSection
+    ? isLockerAccount
+      ? `${styles.topSection} ${styles.topSectionEqual}`
+      : styles.topSection
     : `${styles.topSection} ${styles.topSectionSingle}`
 
   return (
@@ -1539,6 +1545,7 @@ export const AccountPage: FC<AccountPageProps> = ({
               )}
               {hasHeaderContextCard && (
                 <div className={styles.contextColumn}>
+                  {isLockerAccount && <LockerOverview address={formattedAddress} client={client} />}
                   {accountState && tokenInfo && (
                     <div
                       className={`${styles.jettonInfo} ${jettonMaster ? styles.jettonMasterInfo : ""}`}
