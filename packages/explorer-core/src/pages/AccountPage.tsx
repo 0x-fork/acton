@@ -29,7 +29,8 @@ import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {AccountDetails, readAccountHistorySortOrder} from "../components/AccountDetails"
 import {NftImage} from "../components/NftImage"
 import {
-  NFT_COLLECTION_IMAGE_SOURCE_KEYS,
+  NFT_CARD_IMAGE_SOURCE_KEYS,
+  NFT_COLLECTION_CARD_IMAGE_SOURCE_KEYS,
   NFT_IMAGE_SOURCE_KEYS,
   TOKEN_IMAGE_SOURCE_KEYS,
   TOKEN_PLACEHOLDER_IMAGE,
@@ -1450,8 +1451,8 @@ export const AccountPage: FC<AccountPageProps> = ({
     tokenInfoString(nftCollectionTokenInfo, "description") ||
     contentString(collectionSample?.content, "collection_description")
   const nftCollectionImageSources = [
-    ...getImageSources(nftCollectionTokenInfo, NFT_IMAGE_SOURCE_KEYS),
-    ...getImageSources(collectionSample?.content, NFT_COLLECTION_IMAGE_SOURCE_KEYS),
+    ...getImageSources(nftCollectionTokenInfo, NFT_CARD_IMAGE_SOURCE_KEYS),
+    ...getImageSources(collectionSample?.content, NFT_COLLECTION_CARD_IMAGE_SOURCE_KEYS),
   ]
   const nftCollectionIsNsfw = nftCollectionTokenInfo?.is_nsfw === true
   const nftCollectionIsScam = nftCollectionTokenInfo?.is_scam === true

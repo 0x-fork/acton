@@ -8,7 +8,7 @@ import {isNftItemNsfw} from "../nftSafetyRegistry"
 
 import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import {NftImage} from "./NftImage"
-import {NFT_IMAGE_SOURCE_KEYS, getImageSources} from "./imageFallbacks"
+import {NFT_CARD_IMAGE_SOURCE_KEYS, getImageSources} from "./imageFallbacks"
 import styles from "./Nfts.module.css"
 
 interface NftsProps {
@@ -89,7 +89,7 @@ export const Nfts: FC<NftsProps> = ({
         {visibleItems.map(item => {
           const name = getNftDisplayName(item)
           const collectionName = getCollectionName(item)
-          const imageSources = getImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
+          const imageSources = getImageSources(item.content, NFT_CARD_IMAGE_SOURCE_KEYS)
 
           return (
             <div
