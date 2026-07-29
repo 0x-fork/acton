@@ -692,6 +692,7 @@
 .technicalLabelPopoverContent {
   display: block;
   overflow-wrap: anywhere;
+  user-select: text;
   white-space: pre-wrap;
 }
 
