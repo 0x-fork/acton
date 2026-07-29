@@ -92,7 +92,7 @@
 }
 
 .table td {
-  height: 62px;
+  height: 2.875rem;
   border-top: 1px solid var(--acton-color-border);
   font-size: 0.82rem;
 }
