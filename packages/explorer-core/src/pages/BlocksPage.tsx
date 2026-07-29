@@ -683,33 +683,32 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
             {state.block && blockActions ? (
               <div className={styles.blockHeaderActions} aria-label="Block actions">
                 {publicBlockNetwork && blockActions.downloadUrl ? (
-                  <a
-                    className={styles.blockActionLink}
-                    href={blockActions.downloadUrl}
-                    target="_blank"
-                    rel="noreferrer"
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    leadingIcon={<Download size={14} />}
+                    onClick={() =>
+                      globalThis.open(blockActions.downloadUrl, "_blank", "noopener,noreferrer")
+                    }
                   >
-                    <Download size={15} aria-hidden="true" />
                     Download
-                  </a>
+                  </Button>
                 ) : null}
                 {publicBlockNetwork ? (
-                  blockActions.configUrl ? (
-                    <a
-                      className={styles.blockActionLink}
-                      href={blockActions.configUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <FileJson size={15} aria-hidden="true" />
-                      Config
-                    </a>
-                  ) : (
-                    <span className={`${styles.blockActionLink} ${styles.blockActionLinkDisabled}`}>
-                      <FileJson size={15} aria-hidden="true" />
-                      Config
-                    </span>
-                  )
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    leadingIcon={<FileJson size={14} />}
+                    disabled={!blockActions.configUrl}
+                    onClick={() =>
+                      blockActions.configUrl &&
+                      globalThis.open(blockActions.configUrl, "_blank", "noopener,noreferrer")
+                    }
+                  >
+                    Config
+                  </Button>
                 ) : null}
                 <CopyButton
                   value={blockActions.extendedBlockId}
@@ -718,6 +717,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
                   copiedChildren="Copied ID"
                   variant="outline"
                   size="sm"
+                  className={styles.blockCopyButton}
                 >
                   Copy block ID
                 </CopyButton>
@@ -1700,8 +1700,6 @@ function getBlockActions(
   const blockId = formatToncenterBlockId(block)
   const tonapiOrigin =
     rawBlockNetwork === "testnet" ? "https://testnet.tonapi.io" : "https://tonapi.io"
-  const tonviewerOrigin =
-    rawBlockNetwork === "testnet" ? "https://testnet.tonviewer.com" : "https://tonviewer.com"
   const tonscanOrigin =
     rawBlockNetwork === "testnet" ? "https://testnet.tonscan.org" : "https://tonscan.org"
   const toncoinOrigin =
@@ -1712,10 +1710,7 @@ function getBlockActions(
     downloadUrl: rawBlockNetwork
       ? `${tonapiOrigin}/v2/blockchain/blocks/${encodeURIComponent(blockId)}/boc`
       : undefined,
-    configUrl:
-      rawBlockNetwork && block.prev_key_block_seqno && block.prev_key_block_seqno > 0
-        ? `${tonviewerOrigin}/config/${block.prev_key_block_seqno}`
-        : undefined,
+    configUrl: rawBlockNetwork ? `${tonscanOrigin}/config` : undefined,
     tonscanUrl: `${tonscanOrigin}/block/${block.workchain}:${block.shard}:${block.seqno}`,
     toncoinUrl: `${toncoinOrigin}/search?workchain=${block.workchain}&shard=${encodeURIComponent(block.shard)}&seqno=${block.seqno}`,
     extendedBlockId: getExtendedBlockId(block),

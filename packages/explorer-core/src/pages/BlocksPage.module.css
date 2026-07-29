@@ -339,7 +339,6 @@
   fill: currentColor;
 }
 
-.blockActionLink,
 .blockExplorerLink {
   display: inline-flex;
   align-items: center;
@@ -358,39 +357,19 @@
     color 120ms ease;
 }
 
-.blockActionLink {
-  height: 2rem;
-  padding: 0 var(--acton-space-3);
-  border: 1px solid var(--acton-color-border-control);
-  border-radius: var(--acton-radius-control-sm);
-  background: var(--acton-color-surface);
-}
-
-.blockActionLink:hover {
-  color: var(--acton-color-accent);
-  background: var(--acton-color-surface-hover);
-}
-
 .blockExplorerLink:hover {
   color: var(--acton-color-accent);
   background: transparent;
 }
 
-.blockActionLink:focus-visible,
 .blockExplorerLink:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
-.blockActionLinkDisabled {
-  color: var(--acton-color-text-subtle);
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.blockActionLinkDisabled:hover {
-  color: var(--acton-color-text-subtle);
-  background: var(--acton-color-surface);
+.blockCopyButton svg {
+  width: 14px;
+  height: 14px;
 }
 
 .blockExplorerLink {
