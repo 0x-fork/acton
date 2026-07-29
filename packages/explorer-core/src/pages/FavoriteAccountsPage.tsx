@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 import {Link} from "react-router"
-import {InlineAction, InlineActions, useToast} from "@acton/ui"
+import {InlineAction, InlineActions, Pagination, useClientPagination, useToast} from "@acton/ui"
 import {Star, Trash2} from "lucide-react"
 
 import type {TonClient} from "../api/client"
@@ -40,16 +40,18 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
   const [tokensByAddress, setTokensByAddress] = useState<TokensByAddress>({})
   const [tokensLoading, setTokensLoading] = useState(false)
   const accountDataRequestRef = useRef(0)
+  const accountPagination = useClientPagination(favorites)
+  const transactionPagination = useClientPagination(favoriteTransactions)
 
   useEffect(() => {
-    void prefetchNames(favorites.map(favorite => favorite.address))
-  }, [favorites, prefetchNames])
+    void prefetchNames(accountPagination.currentItems.map(favorite => favorite.address))
+  }, [accountPagination.currentItems, prefetchNames])
 
   useEffect(() => {
     const requestId = accountDataRequestRef.current + 1
     accountDataRequestRef.current = requestId
 
-    if (favorites.length === 0) {
+    if (accountPagination.currentItems.length === 0) {
       setBalancesByAddress({})
       setTokensByAddress({})
       setTokensLoading(false)
@@ -57,7 +59,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
     }
 
     const ownerByRawAddress = new Map<string, string>()
-    const ownerAddresses = favorites.map(favorite => {
+    const ownerAddresses = accountPagination.currentItems.map(favorite => {
       const address = normalizeAddress(favorite.address, addressFormat)
       ownerByRawAddress.set(toRawAddress(address), favorite.address)
       return address
@@ -65,7 +67,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
 
     setBalancesByAddress(current => {
       const nextBalances: Record<string, AccountBalanceState> = {}
-      for (const favorite of favorites) {
+      for (const favorite of accountPagination.currentItems) {
         const previousBalance = current[favorite.address]
         nextBalances[favorite.address] = previousBalance?.value
           ? {...previousBalance, isLoading: true, error: undefined}
@@ -75,7 +77,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
     })
     setTokensByAddress(current => {
       const nextTokens: Record<string, readonly JettonWallet[]> = {}
-      for (const favorite of favorites) {
+      for (const favorite of accountPagination.currentItems) {
         nextTokens[favorite.address] = current[favorite.address] ?? []
       }
       return nextTokens
@@ -100,7 +102,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
           ]),
         )
         const nextBalances: Record<string, AccountBalanceState> = {}
-        for (const favorite of favorites) {
+        for (const favorite of accountPagination.currentItems) {
           const account = accountsByRawAddress.get(
             toRawAddress(normalizeAddress(favorite.address, addressFormat)),
           )
@@ -112,7 +114,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
       } else {
         console.error("Failed to fetch favorite account balances", accountStatesResult.reason)
         const nextBalances: Record<string, AccountBalanceState> = {}
-        for (const favorite of favorites) {
+        for (const favorite of accountPagination.currentItems) {
           nextBalances[favorite.address] = {isLoading: false, error: "Balance unavailable"}
         }
         setBalancesByAddress(nextBalances)
@@ -120,7 +122,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
 
       if (tokenWalletsResult.status === "fulfilled") {
         const nextTokensByAddress: Record<string, JettonWallet[]> = {}
-        for (const favorite of favorites) {
+        for (const favorite of accountPagination.currentItems) {
           nextTokensByAddress[favorite.address] = []
         }
         for (const tokenWallet of tokenWalletsResult.value) {
@@ -141,7 +143,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
     }
 
     void loadFavoriteAccountData()
-  }, [addressFormat, client, favorites])
+  }, [accountPagination.currentItems, addressFormat, client])
 
   const handleRemoveAccount = (favorite: FavoriteAccount) => {
     setFavorite(favorite.address, false)
@@ -205,7 +207,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                 </tr>
               </thead>
               <tbody>
-                {favorites.map(favorite => (
+                {accountPagination.currentItems.map(favorite => (
                   <tr key={favorite.address} className={styles.tableRow}>
                     <td className={styles.accountCell}>
                       <InlineActions
@@ -251,6 +253,13 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={accountPagination.currentPage}
+            totalItems={accountPagination.totalItems}
+            pageSize={accountPagination.pageSize}
+            onPageChange={accountPagination.setCurrentPage}
+            label="Favorite accounts pagination"
+          />
         </section>
       )}
 
@@ -271,7 +280,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                 </tr>
               </thead>
               <tbody>
-                {favoriteTransactions.map(favorite => (
+                {transactionPagination.currentItems.map(favorite => (
                   <tr key={favorite.hash} className={styles.tableRow}>
                     <td className={styles.hashCell}>
                       <InlineActions
@@ -320,6 +329,13 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={transactionPagination.currentPage}
+            totalItems={transactionPagination.totalItems}
+            pageSize={transactionPagination.pageSize}
+            onPageChange={transactionPagination.setCurrentPage}
+            label="Favorite transactions pagination"
+          />
         </section>
       )}
     </section>

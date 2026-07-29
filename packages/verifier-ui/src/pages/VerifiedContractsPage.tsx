@@ -10,7 +10,7 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
-  Button,
+  Pagination,
 } from "@acton/ui"
 import {ChartPie} from "lucide-react"
 import {useEffect, useMemo, useRef, useState} from "react"
@@ -19,34 +19,6 @@ import type {MouseEvent as ReactMouseEvent} from "react"
 import type {LastVerifiedItem, VerifierApi} from "../lib/api"
 import {shortenMiddle} from "../lib/target"
 import styles from "./VerifiedPage.module.css"
-
-type PaginationItem = number | "ellipsis-start" | "ellipsis-end"
-
-const PAGINATION_BUTTON_COUNT = 7
-
-function paginationItems(currentPage: number, totalPages: number): readonly PaginationItem[] {
-  if (totalPages <= PAGINATION_BUTTON_COUNT) {
-    return Array.from({length: totalPages}, (_, index) => index)
-  }
-
-  const lastPage = totalPages - 1
-  if (currentPage <= 3) {
-    return [0, 1, 2, 3, 4, "ellipsis-end", lastPage]
-  }
-  if (currentPage >= lastPage - 3) {
-    return [0, "ellipsis-start", lastPage - 4, lastPage - 3, lastPage - 2, lastPage - 1, lastPage]
-  }
-
-  return [
-    0,
-    "ellipsis-start",
-    currentPage - 1,
-    currentPage,
-    currentPage + 1,
-    "ellipsis-end",
-    lastPage,
-  ]
-}
 
 function formatVerifiedAt(timestamp: number): string {
   if (!Number.isFinite(timestamp) || timestamp <= 0) {
@@ -182,7 +154,6 @@ export function VerifiedContractsPage({
     [items],
   )
   const totalPages = Math.ceil(total / pageSize)
-  const visiblePages = useMemo(() => paginationItems(page, totalPages), [page, totalPages])
   const changePage = (nextPage: number) => {
     const normalizedPage = Math.max(0, Math.trunc(nextPage))
     if (!isPageControlled) {
@@ -288,54 +259,15 @@ export function VerifiedContractsPage({
             <DataTableFooter>
               <DataTableRow>
                 <DataTableCell className={styles.paginationCell} colSpan={5}>
-                  <div className={styles.pagination}>
-                    <div className={styles.paginationActions}>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={isLoading || page === 0}
-                        onClick={() => changePage(page - 1)}
-                      >
-                        Previous
-                      </Button>
-                      {totalPages > 0 && (
-                        <nav className={styles.paginationNumbers} aria-label="Pagination">
-                          {visiblePages.map(item =>
-                            typeof item === "string" ? (
-                              <span
-                                key={item}
-                                className={styles.paginationEllipsis}
-                                aria-hidden="true"
-                              >
-                                …
-                              </span>
-                            ) : (
-                              <Button
-                                key={item}
-                                className={styles.paginationNumber}
-                                size="sm"
-                                variant={item === page ? "secondary" : "ghost"}
-                                disabled={isLoading}
-                                aria-current={item === page ? "page" : undefined}
-                                aria-label={`Go to page ${item + 1}`}
-                                onClick={() => changePage(item)}
-                              >
-                                {item + 1}
-                              </Button>
-                            ),
-                          )}
-                        </nav>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={isLoading || Boolean(error) || page + 1 >= totalPages}
-                        onClick={() => changePage(page + 1)}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
+                  <Pagination
+                    bordered={false}
+                    currentPage={page + 1}
+                    totalItems={total}
+                    pageSize={pageSize}
+                    disabled={isLoading || Boolean(error)}
+                    onPageChange={nextPage => changePage(nextPage - 1)}
+                    label="Verified contracts pagination"
+                  />
                 </DataTableCell>
               </DataTableRow>
             </DataTableFooter>

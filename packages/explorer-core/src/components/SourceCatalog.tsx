@@ -1,6 +1,13 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
-import {CopyInlineAction, InlineAction, InlineActions, useToast} from "@acton/ui"
+import {
+  CopyInlineAction,
+  InlineAction,
+  InlineActions,
+  Pagination,
+  useClientPagination,
+  useToast,
+} from "@acton/ui"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 
 import type {TonClient} from "../api/client"
@@ -115,6 +122,7 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
   }
 
   const tableEntries = useMemo(() => state.sources.map(sourceToTableEntry), [state.sources])
+  const pagination = useClientPagination(tableEntries)
   const canSubmit = metadataRegistry.canWriteSources && sourceJson.trim().length > 0
   const toggleSourceForm = () => setSourceFormExpanded(expanded => !expanded)
 
@@ -182,7 +190,7 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
                     </td>
                   </tr>
                 ) : (
-                  tableEntries.map(entry => (
+                  pagination.currentItems.map(entry => (
                     <tr key={entry.artifactId} className={styles.tableRow}>
                       <td>
                         <InlineActions
@@ -242,6 +250,13 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalItems={pagination.totalItems}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setCurrentPage}
+            label="Source catalog pagination"
+          />
         </>
       )}
     </section>

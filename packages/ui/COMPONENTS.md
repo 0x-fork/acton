@@ -1882,6 +1882,41 @@ loading rows.
 - Keep row click behavior in the caller. DataTable only provides visual row
   states and table semantics.
 
+## Pagination
+
+Status: ready
+
+Import:
+
+```tsx
+import {Pagination, useClientPagination} from "@acton/ui"
+```
+
+Use `Pagination` below a table or list when the full result set is already
+available in the browser. `useClientPagination` clamps the current page when
+items are removed and returns the visible slice.
+
+```tsx
+const pagination = useClientPagination(items)
+
+<>
+  <DataTable>{pagination.currentItems.map(renderRow)}</DataTable>
+  <Pagination
+    currentPage={pagination.currentPage}
+    totalItems={pagination.totalItems}
+    pageSize={pagination.pageSize}
+    onPageChange={pagination.setCurrentPage}
+    label="Contracts pagination"
+  />
+</>
+```
+
+- Keep API-backed pagination in the feature so it can request the correct
+  `limit` and `offset`; use `Pagination` only for its controls.
+- Do not paginate compact previews such as “Last transactions”.
+- Place the control outside a horizontal table scroller so it remains usable
+  on narrow screens.
+
 ## Skeleton
 
 Status: ready

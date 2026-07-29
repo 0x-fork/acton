@@ -21,6 +21,7 @@ import {
   DataTableRow,
   DataTableTable,
   NftChip,
+  Pagination,
   Popover,
   Tooltip,
 } from "@acton/ui"
@@ -31,7 +32,6 @@ import {
   Bell,
   Braces,
   CalendarDays,
-  ChevronLeft,
   ChevronRight,
   CircleDot,
   CircleX,
@@ -51,7 +51,6 @@ import {
   Landmark,
   Layers,
   LockKeyhole,
-  MoreHorizontal,
   MoveDownLeft,
   MoveUpRight,
   Network,
@@ -182,7 +181,6 @@ interface AccountDetailsProps {
 const ITEMS_PER_PAGE = 10
 const TRANSACTION_SKELETON_ROWS = 5
 const TRANSACTION_FILTERS_STORAGE_KEY = "acton.account.transactionFilters.v1"
-type PaginationItem = number | "ellipsis-left" | "ellipsis-right"
 type AccountHistoryMode = "actions" | "transactions"
 export type AccountTimeFormat = "relative" | "smart" | "absolute"
 type HistoryValueTone = "positive" | "negative" | "empty" | "neutral"
@@ -520,10 +518,6 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   const activeLoadMoreHistory =
     effectiveHistoryMode === "actions" ? onLoadMoreActions : onLoadMoreTransactions
   const historySubject = effectiveHistoryMode === "actions" ? "actions" : "transactions"
-  const paginationItems = useMemo(
-    () => getPaginationItems(safeCurrentPage, totalPages),
-    [safeCurrentPage, totalPages],
-  )
   const showLoadMoreHistory =
     !activeHistoryLoading &&
     !activeHistoryError &&
@@ -1251,51 +1245,14 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
             </div>
           ) : (
             !activeHistoryError &&
-            currentHistoryPaginated &&
-            totalPages > 1 && (
-              <div className={styles.pagination}>
-                <div className={styles.paginationControls}>
-                  <button
-                    type="button"
-                    className={styles.paginationButton}
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={safeCurrentPage === 1}
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeft size={16} />
-                    Previous
-                  </button>
-                  {paginationItems.map(item =>
-                    typeof item === "number" ? (
-                      <button
-                        key={item}
-                        type="button"
-                        className={`${styles.paginationPage} ${
-                          item === safeCurrentPage ? styles.paginationPageActive : ""
-                        }`}
-                        onClick={() => setCurrentPage(item)}
-                        aria-current={item === safeCurrentPage ? "page" : undefined}
-                      >
-                        {item}
-                      </button>
-                    ) : (
-                      <span key={item} className={styles.paginationEllipsis} aria-hidden="true">
-                        <MoreHorizontal size={16} />
-                      </span>
-                    ),
-                  )}
-                  <button
-                    type="button"
-                    className={styles.paginationButton}
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={safeCurrentPage === totalPages}
-                    aria-label="Next page"
-                  >
-                    Next
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
+            currentHistoryPaginated && (
+              <Pagination
+                currentPage={safeCurrentPage}
+                totalItems={visibleTransactionRows.length}
+                pageSize={ITEMS_PER_PAGE}
+                onPageChange={setCurrentPage}
+                label="Account transaction pagination"
+              />
             )
           )}
           {showLoadMoreHistory && activeLoadMoreHistory && (
@@ -1553,38 +1510,6 @@ function ContractCodeSkeleton(): JSX.Element {
       <div className={`${styles.skeleton} ${styles.contractSkeletonBlock}`} />
     </div>
   )
-}
-
-function getPaginationItems(currentPage: number, totalPages: number): PaginationItem[] {
-  if (totalPages <= 7) {
-    return Array.from({length: totalPages}, (_, index) => index + 1)
-  }
-
-  if (currentPage <= 4) {
-    return [1, 2, 3, 4, 5, "ellipsis-right", totalPages]
-  }
-
-  if (currentPage >= totalPages - 3) {
-    return [
-      1,
-      "ellipsis-left",
-      totalPages - 4,
-      totalPages - 3,
-      totalPages - 2,
-      totalPages - 1,
-      totalPages,
-    ]
-  }
-
-  return [
-    1,
-    "ellipsis-left",
-    currentPage - 1,
-    currentPage,
-    currentPage + 1,
-    "ellipsis-right",
-    totalPages,
-  ]
 }
 
 function readTransactionFilters(): AccountTransactionFilters {

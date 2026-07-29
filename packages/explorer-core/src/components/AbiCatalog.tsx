@@ -1,7 +1,14 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
 import {AbiPanel, type AbiTab} from "@acton/transaction-ui/abi"
-import {InlineAction, InlineActions, Input, useToast} from "@acton/ui"
+import {
+  InlineAction,
+  InlineActions,
+  Input,
+  Pagination,
+  useClientPagination,
+  useToast,
+} from "@acton/ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 import {Link} from "react-router"
@@ -144,6 +151,7 @@ export const AbiCatalog: FC = () => {
     () => buildAbiTableEntries(registeredState.compilerAbis, state.entries),
     [registeredState.compilerAbis, state.entries],
   )
+  const pagination = useClientPagination(tableEntries)
   const tableLoading = state.loading || registeredState.loading
   const hasAbiCodeHash = abiCodeHashes.some(codeHash => codeHash.trim().length > 0)
   const toggleAbiForm = () => setAbiFormExpanded(expanded => !expanded)
@@ -268,7 +276,7 @@ export const AbiCatalog: FC = () => {
                     </td>
                   </tr>
                 )}
-                {tableEntries.map(entry => {
+                {pagination.currentItems.map(entry => {
                   const stats = abiStats(entry.abi)
                   const title = abiTitle(entry.abi)
                   const contractName = entry.abi.compiler_abi.contract_name
@@ -322,6 +330,13 @@ export const AbiCatalog: FC = () => {
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalItems={pagination.totalItems}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setCurrentPage}
+            label="ABI catalog pagination"
+          />
         </>
       )}
     </section>

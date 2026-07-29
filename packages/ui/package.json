@@ -32,6 +32,7 @@
     "./components/mode-viewer": "./src/components/ModeViewer/index.ts",
     "./components/multi-value-input": "./src/components/MultiValueInput/index.ts",
     "./components/nft-chip": "./src/components/NftChip/index.ts",
+    "./components/pagination": "./src/components/Pagination/index.ts",
     "./components/pill-tabs": "./src/components/PillTabs/index.ts",
     "./components/popover": "./src/components/Popover/index.ts",
     "./components/parsed-body-section": "./src/components/ParsedBodySection/index.ts",
