@@ -49,8 +49,6 @@ import type {
   ExplorerNetworkInfo,
 } from "@acton/explorer-core/hooks/useNetworkInfo"
 import {BlockDetailsPage, BlocksPage} from "@acton/explorer-core/pages/BlocksPage"
-import {CellInspectorPage} from "@acton/explorer-core/pages/CellInspectorPage"
-import {EmulatePage} from "@acton/explorer-core/pages/EmulatePage"
 import {AccountPage} from "@acton/explorer-core/pages/AccountPage"
 import {ExplorerSearch} from "@acton/explorer-core/components/ExplorerSearch"
 import {ExplorerDocumentTitle} from "@acton/explorer-core/components/ExplorerDocumentTitle"
@@ -66,6 +64,7 @@ import {DeveloperExplorerBanner} from "./components/DeveloperExplorerBanner"
 import {FaucetPage} from "./faucet/FaucetPage"
 import {AbiCatalogPage, AbiDetailsPage} from "./pages/abi-pages"
 import {SourceCatalogPage} from "./pages/SourceCatalogPage"
+import {CellInspectorExplorerPage, EmulateExplorerPage} from "./pages/explorer-tool-pages"
 import styles from "./ExplorerApp.module.css"
 
 type BuiltinSelectableExplorerNetworkId = "mainnet" | "testnet"
@@ -1419,11 +1418,8 @@ export const ExplorerApp: FC = () => {
                         element={<StatisticsPage api={ACTON_VERIFIER_API} />}
                       />
                       <Route path="/verified/:target" element={<VerifiedContractRoute />} />
-                      <Route path="/cell" element={<CellInspectorPage />} />
-                      <Route
-                        path="/emulate"
-                        element={<EmulatePage client={client} shareApiPath="/api/emulations" />}
-                      />
+                      <Route path="/cell" element={<CellInspectorExplorerPage />} />
+                      <Route path="/emulate" element={<EmulateExplorerPage client={client} />} />
                       <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />
                       <Route
                         path="/block/last"
