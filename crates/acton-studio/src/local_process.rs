@@ -722,6 +722,7 @@ impl EnvironmentDriver {
                 validators,
             } => FullTonNetworkDriver::materialize(
                 data_dir,
+                workspace_root,
                 environment_id,
                 *api_v2_port,
                 *api_v3_port,

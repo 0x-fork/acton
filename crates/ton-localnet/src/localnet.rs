@@ -90,6 +90,29 @@ impl LocalnetBlockId {
     }
 }
 
+fn localnet_block_id_from_v2(
+    block: &ton_api::toncenter::v2::TonBlockIdExt,
+) -> anyhow::Result<LocalnetBlockId> {
+    let shard = block.shard.trim();
+    let shard = if shard.starts_with('-') {
+        shard.parse::<i64>()?
+    } else {
+        let hex = shard
+            .strip_prefix("0x")
+            .or_else(|| shard.strip_prefix("0X"))
+            .unwrap_or(shard);
+        u64::from_str_radix(hex, 16)? as i64
+    };
+    Ok(LocalnetBlockId {
+        workchain: block.workchain,
+        shard,
+        seqno: Seqno::try_from(block.seqno)
+            .context("Remote block seqno does not fit localnet block numbering")?,
+        root_hash: block.root_hash.parse()?,
+        file_hash: block.file_hash.parse()?,
+    })
+}
+
 impl From<LocalnetBlockId> for PrevBlockId {
     fn from(block_id: LocalnetBlockId) -> Self {
         Self {
@@ -1196,6 +1219,47 @@ impl Localnet {
             .map(Some)
     }
 
+    pub async fn get_unpinned_historical_transactions_v3(
+        &self,
+        raw_query: String,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v3::TransactionsResponse>> {
+        let StateSource::Remote(provider) = self.state_source().await? else {
+            return Ok(None);
+        };
+        if provider.fork_block_number.is_none() {
+            return Ok(None);
+        }
+        fetch_remote_transactions_v3(&provider, raw_query)
+            .await
+            .map(Some)
+    }
+
+    pub async fn get_fork_masterchain_block_v2(
+        &self,
+    ) -> anyhow::Result<Option<ton_api::toncenter::v2::BlockHeader>> {
+        let StateSource::Remote(provider) = self.state_source().await? else {
+            return Ok(None);
+        };
+        let Some(seqno) = provider
+            .fork_block_number
+            .map(u32::try_from)
+            .transpose()
+            .context("Fork block seqno does not fit TonCenter v2 request")?
+        else {
+            return Ok(None);
+        };
+        let request = ton_api::toncenter::v2::BlockHeaderRequest {
+            workchain: (-1).into(),
+            shard: ton_api::toncenter::v2::StringOrNumber::String(i64::MIN.to_string()),
+            seqno: seqno.into(),
+            root_hash: None,
+            file_hash: None,
+        };
+        fetch_remote_block_header_v2(&provider, request)
+            .await
+            .map(Some)
+    }
+
     pub async fn get_pending_transactions(&self) -> anyhow::Result<Vec<LocalnetTransaction>> {
         let (resp, rx) = oneshot::channel();
         self.tx
@@ -1374,7 +1438,16 @@ impl Localnet {
     pub async fn get_masterchain_info(&self) -> anyhow::Result<LocalnetMasterchainInfo> {
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::GetMasterchainInfo { resp }).await?;
-        rx.await?
+        let mut info = rx.await??;
+        if info.last.root_hash == Hash256::default()
+            && info.last.file_hash == Hash256::default()
+            && let Some(header) = self.get_fork_masterchain_block_v2().await?
+        {
+            let block_id = localnet_block_id_from_v2(&header.id)?;
+            info.last = block_id.clone();
+            info.init = block_id;
+        }
+        Ok(info)
     }
 
     pub async fn get_consensus_block(&self) -> anyhow::Result<LocalnetConsensusBlock> {

@@ -45,6 +45,8 @@ pub(crate) struct NodeStateSnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SnapshotGlobals {
     pub origin_seqno: Seqno,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fork_seqno: Option<Seqno>,
     pub head_seqno: Seqno,
     pub global_lt: Lt,
     pub lt_step: Lt,
@@ -136,9 +138,18 @@ impl Node {
 
         let cas_entries = self.export_cas_entries()?;
 
+        let fork_seqno = match &self.state_source {
+            StateSource::Local => None,
+            StateSource::Remote(provider) => provider
+                .fork_block_number
+                .map(Seqno::try_from)
+                .transpose()
+                .context("Fork block seqno does not fit snapshot block numbering")?,
+        };
         let snapshot = NodeStateSnapshot {
             globals: SnapshotGlobals {
                 origin_seqno: self.globals.origin_seqno,
+                fork_seqno,
                 head_seqno: self.globals.head_seqno,
                 global_lt: self.globals.global_lt,
                 lt_step: self.globals.lt_step,
@@ -246,7 +257,12 @@ impl Node {
             checkpoint_every: snapshot.globals.checkpoint_every,
         };
         if let StateSource::Remote(provider) = &mut self.state_source {
-            provider.fork_block_number = Some(u64::from(self.globals.origin_seqno));
+            provider.fork_block_number = Some(u64::from(
+                snapshot
+                    .globals
+                    .fork_seqno
+                    .unwrap_or(self.globals.origin_seqno),
+            ));
         }
         self.config_cell = config_cell;
         self.latest_masterchain_state = None;

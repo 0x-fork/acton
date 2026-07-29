@@ -8,6 +8,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tokio::process::{Child, Command};
 use tokio::time::timeout;
+use xxhash_rust::xxh3::xxh3_64;
 
 use crate::EnvironmentRuntimeError;
 
@@ -56,6 +57,7 @@ pub(crate) struct IsolatedPullTarget {
 impl FullTonNetworkDriver {
     pub(crate) async fn materialize(
         data_dir: &Path,
+        workspace_root: &Path,
         environment_id: &str,
         api_v2_port: u16,
         api_v3_port: u16,
@@ -116,7 +118,7 @@ impl FullTonNetworkDriver {
             docker_target,
             isolated_docker_config_dir,
             image,
-            project_name: compose_project_name(environment_id),
+            project_name: compose_project_name(workspace_root, environment_id),
             startup_log_file: data_dir.join(STARTUP_LOG_FILE),
         })
     }
@@ -554,8 +556,9 @@ fn render_compose(image: &str, api_v2_port: u16, api_v3_port: u16, validators: u
         .replace("__MYLOCALACTON_VALIDATORS__", &validators.to_string())
 }
 
-fn compose_project_name(environment_id: &str) -> String {
-    format!("acton-studio-{environment_id}")
+fn compose_project_name(workspace_root: &Path, environment_id: &str) -> String {
+    let workspace_hash = xxh3_64(workspace_root.as_os_str().as_encoded_bytes());
+    format!("acton-studio-{workspace_hash:016x}-{environment_id}")
 }
 
 fn validate_image_reference(image: &str) -> Result<(), EnvironmentRuntimeError> {
@@ -577,7 +580,7 @@ fn validate_image_reference(image: &str) -> Result<(), EnvironmentRuntimeError> 
 mod tests {
     use expect_test::expect;
 
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     use super::{
         DEFAULT_MYLOCALACTON_IMAGE, DockerTarget, FullTonNetworkDriver, IsolatedPullTarget,
@@ -599,10 +602,14 @@ mod tests {
             .join("\n");
         let actual = format!(
             "project: {}\n{selected_lines}",
-            compose_project_name("environment-7")
+            normalize_project_name(
+                &compose_project_name(Path::new("/workspace"), "environment-7"),
+                Path::new("/workspace"),
+                "environment-7",
+            )
         );
 
-        expect![[r#"project: acton-studio-environment-7
+        expect![[r#"project: acton-studio-<workspace>-environment-7
     image: "registry.example/ton:build-42"
       - "3"
       - "127.0.0.1:18180:18080"
@@ -613,6 +620,17 @@ mod tests {
     image: "registry.example/ton:build-42""#]]
         .assert_eq(&actual);
         assert!(!compose.contains("platform:"));
+    }
+
+    #[test]
+    fn compose_project_names_are_stable_and_isolated_by_workspace() {
+        let first = compose_project_name(Path::new("/workspace/first"), "environment-1");
+        let repeated = compose_project_name(Path::new("/workspace/first"), "environment-1");
+        let second = compose_project_name(Path::new("/workspace/second"), "environment-1");
+
+        assert_eq!(first, repeated);
+        assert_ne!(first, second);
+        assert!(first.ends_with("-environment-1"));
     }
 
     #[test]
@@ -674,10 +692,16 @@ mod tests {
             .await
             .unwrap();
 
-        let driver =
-            FullTonNetworkDriver::materialize(data_dir.path(), "environment-17", 19180, 19181, 5)
-                .await
-                .unwrap();
+        let driver = FullTonNetworkDriver::materialize(
+            data_dir.path(),
+            Path::new("/workspace"),
+            "environment-17",
+            19180,
+            19181,
+            5,
+        )
+        .await
+        .unwrap();
         let descriptor = tokio::fs::read_to_string(runtime_file).await.unwrap();
         let compose = tokio::fs::read_to_string(&driver.compose_file)
             .await
@@ -691,8 +715,12 @@ mod tests {
             })
             .collect::<Vec<_>>()
             .join("\n");
-        let command = command_args(&driver.compose_command())
-            .replace(&data_dir.path().display().to_string(), "<environment-data>");
+        let command = normalize_project_name(
+            &command_args(&driver.compose_command())
+                .replace(&data_dir.path().display().to_string(), "<environment-data>"),
+            Path::new("/workspace"),
+            "environment-17",
+        );
         let actual = format!(
             "RUNTIME\n{}\n\nCOMMAND\n{}\n\nCOMPOSE\n{compose_values}",
             descriptor.trim_end(),
@@ -715,7 +743,7 @@ mod tests {
             unix:///persisted/docker.sock
             compose
             -p
-            acton-studio-environment-17
+            acton-studio-<workspace>-environment-17
             -f
             <environment-data>/compose.yaml
 
@@ -745,6 +773,7 @@ mod tests {
 
         let error = FullTonNetworkDriver::materialize(
             data_dir.path(),
+            Path::new("/workspace"),
             "environment-invalid",
             18180,
             18181,
@@ -762,13 +791,17 @@ mod tests {
     fn lifecycle_commands_pin_the_environment_docker_context() {
         let driver = test_driver(DEFAULT_MYLOCALACTON_IMAGE, true);
         let command = driver.compose_command();
-        let actual = command_args(&command);
+        let actual = normalize_project_name(
+            &command_args(&command),
+            Path::new("/workspace"),
+            "environment-1",
+        );
 
         expect![[r"--context
 desktop-linux
 compose
 -p
-acton-studio-environment-1
+acton-studio-<workspace>-environment-1
 -f
 /workspace/.studio/environment-1/compose.yaml"]]
         .assert_eq(&actual);
@@ -830,7 +863,7 @@ CUSTOM ISOLATED: false"]]
             isolated_docker_config_dir: supports_isolated_pull
                 .then(|| PathBuf::from("/workspace/.studio/environment-1/docker-pull-config")),
             image: image.to_owned(),
-            project_name: "acton-studio-environment-1".to_owned(),
+            project_name: compose_project_name(Path::new("/workspace"), "environment-1"),
             startup_log_file: PathBuf::from("/workspace/.studio/environment-1/startup.log"),
         }
     }
@@ -842,5 +875,12 @@ CUSTOM ISOLATED: false"]]
             .map(|argument| argument.to_string_lossy())
             .collect::<Vec<_>>()
             .join("\n")
+    }
+
+    fn normalize_project_name(value: &str, workspace_root: &Path, environment_id: &str) -> String {
+        value.replace(
+            &compose_project_name(workspace_root, environment_id),
+            &format!("acton-studio-<workspace>-{environment_id}"),
+        )
     }
 }

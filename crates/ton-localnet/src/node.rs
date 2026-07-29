@@ -195,39 +195,47 @@ impl Node {
         mut state_source: StateSource,
         db_path: Option<P>,
     ) -> anyhow::Result<Self> {
-        let configured_origin_seqno = match &state_source {
-            StateSource::Local => 0,
+        let configured_fork_seqno = match &state_source {
+            StateSource::Local => None,
             StateSource::Remote(provider) => provider
                 .fork_block_number
                 .map(Seqno::try_from)
                 .transpose()
-                .context("Fork block seqno does not fit localnet block numbering")?
-                .unwrap_or_default(),
+                .context("Fork block seqno does not fit localnet block numbering")?,
         };
+        let configured_origin_seqno = configured_fork_seqno.unwrap_or_default();
         let initial_config_cell =
             Boc::decode(&config_boc).context("Failed to decode blockchain config BOC")?;
         let initial_config_hash = Hash256::from(initial_config_cell.repr_hash());
 
         let persistence = db_path.map(NodePersistence::open).transpose()?;
-        let (mut latest, mut history, indexes, persisted_origin_seqno, head_seqno) =
-            if let Some(persistence) = &persistence {
-                let persisted = persistence.load()?;
-                (
-                    persisted.latest,
-                    persisted.history,
-                    persisted.indexes,
-                    persisted.origin_seqno,
-                    persisted.head_seqno,
-                )
-            } else {
-                (
-                    LatestState::new(),
-                    History::new(),
-                    Indexes::new(),
-                    None,
-                    Seqno::default(),
-                )
-            };
+        let (
+            mut latest,
+            mut history,
+            indexes,
+            persisted_origin_seqno,
+            persisted_fork_seqno,
+            head_seqno,
+        ) = if let Some(persistence) = &persistence {
+            let persisted = persistence.load()?;
+            (
+                persisted.latest,
+                persisted.history,
+                persisted.indexes,
+                persisted.origin_seqno,
+                persisted.fork_seqno,
+                persisted.head_seqno,
+            )
+        } else {
+            (
+                LatestState::new(),
+                History::new(),
+                Indexes::new(),
+                None,
+                None,
+                Seqno::default(),
+            )
+        };
         for block in &mut history.masterchain_blocks {
             if block.config_boc_hash == Hash256::default() {
                 block.config_boc_hash = initial_config_hash;
@@ -285,11 +293,22 @@ impl Node {
         let origin_seqno = persisted_origin_seqno
             .or(history_origin_seqno)
             .unwrap_or(configured_origin_seqno);
+        let fork_seqno = matches!(&state_source, StateSource::Remote(_)).then(|| {
+            persisted_fork_seqno
+                // Before fork metadata existed, a zero origin could describe local block
+                // numbering rather than the configured remote fork boundary.
+                .or_else(|| persisted_origin_seqno.filter(|origin| *origin > 0))
+                .or_else(|| history_origin_seqno.filter(|origin| *origin > 0))
+                .or(configured_fork_seqno)
+                .or(persisted_origin_seqno)
+                .or(history_origin_seqno)
+                .unwrap_or(origin_seqno)
+        });
         if let Some(persistence) = &persistence {
-            persistence.set_origin_seqno(origin_seqno)?;
+            persistence.set_chain_origins(origin_seqno, fork_seqno)?;
         }
-        if let StateSource::Remote(provider) = &mut state_source {
-            provider.fork_block_number = Some(u64::from(origin_seqno));
+        if let (StateSource::Remote(provider), Some(fork_seqno)) = (&mut state_source, fork_seqno) {
+            provider.fork_block_number = Some(u64::from(fork_seqno));
         }
         let effective_head_seqno = history
             .blocks
@@ -3391,6 +3410,91 @@ mod tests {
 
         drop(restored);
         std::fs::remove_file(&db_path).expect("must remove test database");
+    }
+
+    #[test]
+    fn legacy_database_keeps_configured_remote_fork_separate_from_local_origin() {
+        const FORK_SEQNO: Seqno = 81_000_000;
+        let directory =
+            tempfile::tempdir_in("/tmp").expect("temporary database directory must be created");
+        let db_path = directory.path().join("legacy.sqlite");
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+
+        {
+            let mut node = Node::with_db_path(
+                Box::new(NoopExecutor),
+                config_boc.clone(),
+                StateSource::Local,
+                Some(&db_path),
+            )
+            .expect("legacy local node must be created");
+            node.mine_block().expect("legacy block must be persisted");
+        }
+        {
+            let connection =
+                rusqlite::Connection::open(&db_path).expect("legacy database must open");
+            connection
+                .execute(
+                    "DELETE FROM node_metadata WHERE key IN ('origin_seqno', 'fork_seqno')",
+                    [],
+                )
+                .expect("origin metadata must be removed to emulate a legacy database");
+        }
+
+        {
+            let restored = Node::with_db_path(
+                Box::new(NoopExecutor),
+                config_boc.clone(),
+                StateSource::Remote(RemoteProvider {
+                    network: Network::Mainnet,
+                    fork_block_number: Some(u64::from(FORK_SEQNO)),
+                }),
+                Some(&db_path),
+            )
+            .expect("legacy database must open in fork mode");
+            assert_eq!(restored.globals.origin_seqno, 0);
+            assert_eq!(restored.globals.head_seqno, 1);
+            assert!(matches!(
+                restored.state_source,
+                StateSource::Remote(RemoteProvider {
+                    fork_block_number: Some(block),
+                    ..
+                }) if block == u64::from(FORK_SEQNO)
+            ));
+        }
+
+        let restored = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Remote(RemoteProvider {
+                network: Network::Mainnet,
+                fork_block_number: Some(u64::from(FORK_SEQNO + 1_000)),
+            }),
+            Some(&db_path),
+        )
+        .expect("persisted legacy fork boundary must be restored");
+        assert!(matches!(
+            restored.state_source,
+            StateSource::Remote(RemoteProvider {
+                fork_block_number: Some(block),
+                ..
+            }) if block == u64::from(FORK_SEQNO)
+        ));
+        let snapshot = restored
+            .build_snapshot()
+            .expect("legacy fork snapshot must build");
+        let mut snapshot_restored = make_forked_test_node(FORK_SEQNO + 2_000);
+        snapshot_restored
+            .apply_snapshot(snapshot)
+            .expect("legacy fork snapshot must restore");
+        assert_eq!(snapshot_restored.globals.origin_seqno, 0);
+        assert!(matches!(
+            snapshot_restored.state_source,
+            StateSource::Remote(RemoteProvider {
+                fork_block_number: Some(block),
+                ..
+            }) if block == u64::from(FORK_SEQNO)
+        ));
     }
 
     fn block_meta(seqno: Seqno) -> BlockMeta {

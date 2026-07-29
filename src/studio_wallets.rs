@@ -40,10 +40,6 @@ impl ProjectWalletRuntime {
         })
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.localnet_wallets.is_empty()
-    }
-
     const fn wallets_for(&self, environment: &StudioEnvironment) -> &BTreeMap<String, Wallet> {
         match &environment.config {
             EnvironmentConfig::ActonLocalnet { .. }

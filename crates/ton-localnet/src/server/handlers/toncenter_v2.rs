@@ -429,18 +429,19 @@ pub async fn get_shards(
     Query(payload): Query<SeqnoRequest>,
 ) -> Response {
     let seqno = parse!(parse_required_seqno(&payload.seqno));
-    handle_result(
-        async move {
-            if let Some(shards) = node.get_historical_shards_v2(seqno).await? {
-                return Ok(shards);
-            }
-            node.get_shards(seqno)
-                .await
-                .map(|shards| v2::map_shards(&shards))
-        },
-        Clone::clone,
-    )
-    .await
+    handle_result(resolve_shards(&node, seqno), Clone::clone).await
+}
+
+pub(super) async fn resolve_shards(
+    node: &Localnet,
+    seqno: u32,
+) -> anyhow::Result<ton_api::toncenter::v2::Shards> {
+    if let Some(shards) = node.get_historical_shards_v2(seqno).await? {
+        return Ok(shards);
+    }
+    node.get_shards(seqno)
+        .await
+        .map(|shards| v2::map_shards(&shards))
 }
 
 pub async fn lookup_block(

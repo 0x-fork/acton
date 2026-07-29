@@ -4,7 +4,7 @@ use super::toncenter_v2::{
     parse_seqno, parse_transactions_request, parse_transactions_std_request,
     parse_try_locate_tx_request, resolve_block_header, resolve_block_transactions,
     resolve_block_transactions_ext, resolve_extended_address_information, resolve_lookup_block,
-    resolve_token_data, resolve_wallet_information,
+    resolve_shards, resolve_token_data, resolve_wallet_information,
 };
 use super::utils::{ToncenterHttpError, error_status, get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
@@ -303,9 +303,7 @@ async fn json_rpc_router(
         "getShards" => {
             let req: SeqnoRequest = parse_params(params, method)?;
             let seqno = validate!(parse_required_seqno(&req.seqno));
-            wire::JsonRpcResult::Shards(Box::new(
-                node.get_shards(seqno).await.map(|r| v2::map_shards(&r))?,
-            ))
+            wire::JsonRpcResult::Shards(Box::new(resolve_shards(&node, seqno).await?))
         }
         "lookupBlock" => {
             let req: LookupBlockRequest = parse_params(params, method)?;

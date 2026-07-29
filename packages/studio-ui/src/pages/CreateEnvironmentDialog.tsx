@@ -70,6 +70,22 @@ export function CreateEnvironmentDialog({
     })
   }
 
+  const updateForkNetwork = (forkNetwork: string) => {
+    setForm(current => ({
+      ...current,
+      forkNetwork,
+      forkBlockNumber: forkNetwork ? current.forkBlockNumber : "",
+    }))
+  }
+
+  const updateNoMining = (noMining: boolean) => {
+    setForm(current => ({
+      ...current,
+      noMining,
+      mineEmptyBlocks: noMining ? false : current.mineEmptyBlocks,
+    }))
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -83,13 +99,15 @@ export function CreateEnvironmentDialog({
                 kind: "actonLocalnet",
                 port: optionalPositiveInteger(form.port, "Local port"),
                 forkNetwork: form.forkNetwork || undefined,
-                forkBlockNumber: optionalPositiveInteger(form.forkBlockNumber, "Fork block"),
+                forkBlockNumber: form.forkNetwork
+                  ? optionalPositiveInteger(form.forkBlockNumber, "Fork block")
+                  : undefined,
                 accounts: form.accounts,
                 rateLimit: optionalPositiveInteger(form.rateLimit, "Rate limit"),
                 responseDelayMs: optionalPositiveInteger(form.responseDelayMs, "Response delay"),
                 blockIntervalMs: optionalPositiveInteger(form.blockIntervalMs, "Block interval"),
                 noMining: form.noMining,
-                mineEmptyBlocks: form.mineEmptyBlocks,
+                mineEmptyBlocks: form.noMining ? false : form.mineEmptyBlocks,
               }
             : {
                 kind: "fullTonNetwork",
@@ -179,7 +197,7 @@ export function CreateEnvironmentDialog({
                 label="Initial state"
                 description="Start clean or fork an existing TON network"
                 value={form.forkNetwork}
-                onChange={event => updateForm("forkNetwork", event.target.value)}
+                onChange={event => updateForkNetwork(event.target.value)}
               >
                 <option value="">Clean network</option>
                 <option value="mainnet">Fork mainnet</option>
@@ -241,7 +259,7 @@ export function CreateEnvironmentDialog({
                   label="Manual mining"
                   description="Create blocks only when requested"
                   checked={form.noMining}
-                  onChange={event => updateForm("noMining", event.target.checked)}
+                  onChange={event => updateNoMining(event.target.checked)}
                 />
                 <Checkbox
                   label="Mine empty blocks"

@@ -351,13 +351,15 @@ impl TestRunRuntime for LocalProcessTestRunRuntime {
                 });
             }
             match &envelope.event {
-                TestRunEvent::RunStarted { run } | TestRunEvent::RunFinished { run }
-                    if run.id != envelope.run_id =>
-                {
-                    return Err(TestRunRuntimeError::InvalidRequest {
-                        code: "test_run_id_mismatch",
-                        message: "The event payload run ID does not match its envelope".to_owned(),
-                    });
+                TestRunEvent::RunStarted { run } | TestRunEvent::RunFinished { run } => {
+                    if run.id != envelope.run_id {
+                        return Err(TestRunRuntimeError::InvalidRequest {
+                            code: "test_run_id_mismatch",
+                            message: "The event payload run ID does not match its envelope"
+                                .to_owned(),
+                        });
+                    }
+                    validate_reporter_run_paths(run, &self.inner.project_root, &envelope.run_id)?;
                 }
                 _ => {}
             }
@@ -454,6 +456,46 @@ impl TestRunRuntime for LocalProcessTestRunRuntime {
             Ok(())
         })
     }
+}
+
+fn validate_reporter_run_paths(
+    run: &TestRunRecord,
+    project_root: &Path,
+    run_id: &str,
+) -> Result<(), TestRunRuntimeError> {
+    let trusted_project_root =
+        dunce::canonicalize(project_root).unwrap_or_else(|_| project_root.to_path_buf());
+    let reported_project_root = dunce::canonicalize(&run.project_root).map_err(|_| {
+        TestRunRuntimeError::InvalidRequest {
+            code: "test_run_project_root_invalid",
+            message: "The reported test project root does not exist".to_owned(),
+        }
+    })?;
+    if reported_project_root != trusted_project_root {
+        return Err(TestRunRuntimeError::InvalidRequest {
+            code: "test_run_project_root_mismatch",
+            message: "The reported test project root does not match the Studio workspace"
+                .to_owned(),
+        });
+    }
+
+    let Some(trace_dir) = &run.trace_dir else {
+        return Ok(());
+    };
+    let expected_trace_dir = test_trace_dir(&trusted_project_root, run_id);
+    let reported_trace_dir =
+        dunce::canonicalize(trace_dir).map_err(|_| TestRunRuntimeError::InvalidRequest {
+            code: "test_run_trace_dir_invalid",
+            message: "The reported test trace directory does not exist".to_owned(),
+        })?;
+    let expected_trace_dir = dunce::canonicalize(&expected_trace_dir).unwrap_or(expected_trace_dir);
+    if reported_trace_dir != expected_trace_dir {
+        return Err(TestRunRuntimeError::InvalidRequest {
+            code: "test_run_trace_dir_mismatch",
+            message: "The reported test trace directory is outside the Studio test run".to_owned(),
+        });
+    }
+    Ok(())
 }
 
 fn validate_request(request: &StartTestRunRequest) -> Result<(), TestRunRuntimeError> {

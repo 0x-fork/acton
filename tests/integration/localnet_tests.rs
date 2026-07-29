@@ -1004,6 +1004,16 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
     let transaction_seqno = transaction_block["seqno"]
         .as_u64()
         .expect("transaction block must expose seqno");
+    let transaction_account = source_transaction["account"]
+        .as_str()
+        .expect("source transaction must expose account");
+    let transaction_hash = source_transaction["hash"]
+        .as_str()
+        .expect("source transaction must expose hash");
+    let transaction_hash_hex = transaction_hash
+        .parse::<Hash256>()
+        .expect("source transaction hash must parse")
+        .to_hex();
     let historical_transactions_path = format!(
         "/api/v3/transactions?workchain={transaction_workchain}&shard={transaction_shard}&seqno={transaction_seqno}&limit=100"
     );
@@ -1019,6 +1029,30 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
     let forked_historical_transactions = forked_node.get_json(&historical_transactions_path);
     let source_historical_shards = source_node.get_json(&historical_shards_path);
     let forked_historical_shards = forked_node.get_json(&historical_shards_path);
+    let source_historical_shards_rpc: v2_responses::JsonRpcResponse<v2_responses::Shards> =
+        source_node.post_v2_json_rpc(
+            "/api/v2/jsonRPC",
+            StringOrNumber::String("source-shards".to_owned()),
+            "getShards",
+            v2_requests::SeqnoRequest {
+                seqno: StringOrNumber::String(historical_seqno.to_string()),
+            },
+        );
+    let forked_historical_shards_rpc: v2_responses::JsonRpcResponse<v2_responses::Shards> =
+        forked_node.post_v2_json_rpc(
+            "/api/v2/jsonRPC",
+            StringOrNumber::String("forked-shards".to_owned()),
+            "getShards",
+            v2_requests::SeqnoRequest {
+                seqno: StringOrNumber::String(historical_seqno.to_string()),
+            },
+        );
+    let forked_unpinned_account = forked_node.get_json(&format!(
+        "/api/v3/transactions?account={transaction_account}&limit=100&sort=desc"
+    ));
+    let forked_unpinned_hash = forked_node.get_json(&format!(
+        "/api/v3/transactions?hash={transaction_hash_hex}&limit=100"
+    ));
 
     let startup_accounts = forked_node.get_json("/acton_getStartupAccounts");
     let startup_accounts_payload = response_payload(&startup_accounts);
@@ -1083,6 +1117,23 @@ fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
                         .is_some_and(|transactions| !transactions.is_empty()),
             "shards_match_source":
                 forked_historical_shards["result"] == source_historical_shards["result"],
+            "json_rpc_shards_match_source":
+                serde_json::to_value(&forked_historical_shards_rpc.response.result)
+                    .expect("forked shards must serialize")
+                    == serde_json::to_value(&source_historical_shards_rpc.response.result)
+                        .expect("source shards must serialize"),
+            "unpinned_account_includes_remote_transaction":
+                forked_unpinned_account["transactions"]
+                    .as_array()
+                    .is_some_and(|transactions| transactions.iter().any(
+                        |transaction| transaction["hash"].as_str() == Some(transaction_hash)
+                    )),
+            "unpinned_hash_includes_remote_transaction":
+                forked_unpinned_hash["transactions"]
+                    .as_array()
+                    .is_some_and(|transactions| transactions.iter().any(
+                        |transaction| transaction["hash"].as_str() == Some(transaction_hash)
+                    )),
             "first_local_block_is_local": forked_local_block["blocks"]
                 .as_array()
                 .is_some_and(|blocks| !blocks.is_empty())
@@ -1186,6 +1237,8 @@ fn localnet_v2_block_history_stays_on_the_correct_side_of_the_fork() {
         .arg("--no-mining")
         .arg("--mine-empty-blocks")
         .start();
+    let source_initial_masterchain_info = source_node.get_json("/api/v2/getMasterchainInfo");
+    let forked_initial_masterchain_info = forked_node.get_json("/api/v2/getMasterchainInfo");
     forked_node.post_json("/acton_increaseTime", &json!({ "seconds": 60 }));
     forked_node.post_json("/acton_mine", &json!({}));
     source_node.post_json("/acton_mine", &json!({}));
@@ -1265,6 +1318,21 @@ fn localnet_v2_block_history_stays_on_the_correct_side_of_the_fork() {
     let forked_local_time_lookup = forked_node.get_json(&lookup_time_path(local_time));
 
     let snapshot = json!({
+        "initial_masterchain_info": {
+            "fork_boundary_matches_remote":
+                forked_initial_masterchain_info["result"]["last"]
+                    == source_initial_masterchain_info["result"]["last"],
+            "root_hash_is_nonzero":
+                forked_initial_masterchain_info["result"]["last"]["root_hash"]
+                    .as_str()
+                    .and_then(|hash| hash.parse::<Hash256>().ok())
+                    .is_some_and(|hash| !hash.is_zero()),
+            "file_hash_is_nonzero":
+                forked_initial_masterchain_info["result"]["last"]["file_hash"]
+                    .as_str()
+                    .and_then(|hash| hash.parse::<Hash256>().ok())
+                    .is_some_and(|hash| !hash.is_zero()),
+        },
         "get_block_header": {
             "pre_fork_matches_remote":
                 forked_historical_header["result"] == source_historical_header["result"],

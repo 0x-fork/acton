@@ -3,9 +3,12 @@
     "blocks_match_source": true,
     "first_local_block_is_local": true,
     "fork_block_matches_source": true,
+    "json_rpc_shards_match_source": true,
     "requested_before_fork": true,
     "shards_match_source": true,
-    "transactions_match_source": true
+    "transactions_match_source": true,
+    "unpinned_account_includes_remote_transaction": true,
+    "unpinned_hash_includes_remote_transaction": true
   },
   "manual_mining": {
     "manual_block_follows_head": true,

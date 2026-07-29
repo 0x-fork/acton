@@ -156,6 +156,71 @@ final status: Cancelled"]]
 }
 
 #[tokio::test]
+async fn reporter_events_cannot_redirect_studio_to_external_run_paths() {
+    let workspace = tempfile::tempdir().expect("temporary Studio workspace must be created");
+    let outside = tempfile::tempdir().expect("temporary outside directory must be created");
+    let executable = workspace.path().join("slow-acton");
+    std::fs::write(&executable, "#!/bin/sh\nsleep 1\n")
+        .expect("fake Acton executable must be written");
+    let mut permissions = std::fs::metadata(&executable)
+        .expect("fake Acton metadata must be available")
+        .permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&executable, permissions)
+        .expect("fake Acton executable must be executable");
+
+    let runtime =
+        LocalProcessTestRunRuntime::new(&executable, workspace.path(), "http://127.0.0.1:3016");
+    let started = runtime
+        .start(StartTestRunRequest {
+            save_traces: true,
+            ..StartTestRunRequest::default()
+        })
+        .await
+        .expect("test process must start");
+
+    let mut external_project = started.clone();
+    external_project.project_root = outside.path().to_path_buf();
+    let project_error = runtime
+        .ingest(TestRunEventEnvelope {
+            format_version: STUDIO_TEST_RUN_FORMAT_VERSION,
+            run_id: started.id.clone(),
+            sequence: 1,
+            event: TestRunEvent::RunStarted {
+                run: external_project,
+            },
+        })
+        .await
+        .expect_err("external reporter project root must be rejected");
+
+    let mut external_trace = started.clone();
+    external_trace.trace_dir = Some(outside.path().to_path_buf());
+    let trace_error = runtime
+        .ingest(TestRunEventEnvelope {
+            format_version: STUDIO_TEST_RUN_FORMAT_VERSION,
+            run_id: started.id.clone(),
+            sequence: 1,
+            event: TestRunEvent::RunStarted {
+                run: external_trace,
+            },
+        })
+        .await
+        .expect_err("external reporter trace directory must be rejected");
+
+    runtime
+        .cancel(&started.id)
+        .await
+        .expect("test process must be cancellable");
+    wait_for_finished(&runtime, &started.id).await;
+
+    expect![[
+        r"The reported test project root does not match the Studio workspace
+The reported test trace directory is outside the Studio test run"
+    ]]
+    .assert_eq(&format!("{project_error}\n{trace_error}"));
+}
+
+#[tokio::test]
 async fn runtime_recovers_studio_runs_interrupted_by_a_restart() {
     let workspace = tempfile::tempdir().expect("temporary Studio workspace must be created");
     let run = TestRunRecord::new(

@@ -1,4 +1,5 @@
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::fs::{File, OpenOptions};
+use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 
 use acton_config::color::OwoColorize;
@@ -9,23 +10,20 @@ use acton_studio::{
     ContractRegistryStore, LocalProcessEnvironmentRuntime, LocalProcessTestRunRuntime,
     PUBLIC_TON_ENVIRONMENT_IDS, STUDIO_API_VERSION, StudioDaemonDescriptor, StudioServer,
     StudioServerConfig, StudioWorkspace, persist_studio_daemon_descriptor,
-    remove_studio_daemon_descriptor,
+    remove_studio_daemon_descriptor, studio_daemon_descriptor_path,
 };
 use anyhow::Context;
+use fs2::FileExt;
 
 use crate::studio_wallets::ProjectWalletRuntime;
 
 pub async fn studio_start_cmd(host: IpAddr, port: u16, open_browser: bool) -> anyhow::Result<()> {
-    let configured_project = configured_project()?;
-    if !host.is_loopback()
-        && configured_project
-            .as_ref()
-            .is_some_and(|(_, wallet_runtime)| !wallet_runtime.is_empty())
-    {
+    if !host.is_loopback() {
         anyhow::bail!(
-            "Project wallet signing requires a loopback Studio host until remote authentication is configured"
+            "Acton Studio requires a loopback host until remote authentication is configured"
         );
     }
+    let configured_project = configured_project()?;
 
     let address = SocketAddr::new(host, port);
     let listener = tokio::net::TcpListener::bind(address)
@@ -83,21 +81,39 @@ pub async fn studio_start_cmd(host: IpAddr, port: u16, open_browser: bool) -> an
 }
 
 fn local_reporter_url(address: SocketAddr) -> String {
-    let ip = match address.ip() {
-        IpAddr::V4(ip) if ip.is_unspecified() => IpAddr::V4(Ipv4Addr::LOCALHOST),
-        IpAddr::V6(ip) if ip.is_unspecified() => IpAddr::V6(Ipv6Addr::LOCALHOST),
-        ip => ip,
-    };
-    format!("http://{}", SocketAddr::new(ip, address.port()))
+    format!("http://{address}")
 }
 
+#[derive(Debug)]
 struct StudioDaemonGuard {
     project_root: PathBuf,
     pid: u32,
+    _lock_file: File,
 }
 
 impl StudioDaemonGuard {
     fn register(project_root: &Path, url: String) -> anyhow::Result<Self> {
+        let descriptor_path = studio_daemon_descriptor_path(project_root);
+        let descriptor_directory = descriptor_path
+            .parent()
+            .context("Studio daemon path has no parent directory")?;
+        std::fs::create_dir_all(descriptor_directory)
+            .context("Failed to create the Studio daemon directory")?;
+        let lock_path = descriptor_path.with_extension("lock");
+        let lock_file = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(&lock_path)
+            .with_context(|| format!("Failed to open Studio lock at {}", lock_path.display()))?;
+        FileExt::try_lock_exclusive(&lock_file).with_context(|| {
+            format!(
+                "Another Acton Studio instance is already running for {}",
+                project_root.display()
+            )
+        })?;
+
         let pid = std::process::id();
         persist_studio_daemon_descriptor(
             project_root,
@@ -111,6 +127,7 @@ impl StudioDaemonGuard {
         Ok(Self {
             project_root: project_root.to_path_buf(),
             pid,
+            _lock_file: lock_file,
         })
     }
 }
@@ -158,4 +175,27 @@ async fn shutdown_signal() {
     }
 
     let _ = ctrl_c.await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StudioDaemonGuard;
+
+    #[test]
+    fn studio_daemon_registration_is_exclusive_per_project() {
+        let project = tempfile::tempdir().expect("temporary Studio project must be created");
+        let first = StudioDaemonGuard::register(project.path(), "http://127.0.0.1:3015".to_owned())
+            .expect("first Studio instance must acquire the project lock");
+        let error = StudioDaemonGuard::register(project.path(), "http://127.0.0.1:3016".to_owned())
+            .expect_err("second Studio instance must not replace the daemon descriptor");
+        assert!(
+            error
+                .to_string()
+                .contains("Another Acton Studio instance is already running")
+        );
+
+        drop(first);
+        StudioDaemonGuard::register(project.path(), "http://127.0.0.1:3016".to_owned())
+            .expect("the project lock must be released with the Studio instance");
+    }
 }

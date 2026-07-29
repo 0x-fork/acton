@@ -79,10 +79,11 @@ pub(crate) async fn load_environments(
         let bytes = match fs::read(&metadata_path).await {
             Ok(bytes) => bytes,
             Err(error) if error.kind() == ErrorKind::NotFound => {
-                return Err(invalid_metadata(format!(
-                    "Environment metadata is missing at {}",
+                tracing::warn!(
+                    "Ignoring incomplete Studio environment without metadata at {}",
                     metadata_path.display()
-                )));
+                );
+                continue;
             }
             Err(error) => return Err(read_error("read", &metadata_path, error)),
         };
@@ -359,16 +360,26 @@ files=environment.json"#]]
     }
 
     #[tokio::test]
-    async fn environment_directory_without_metadata_is_rejected() {
+    async fn environment_directory_without_metadata_is_ignored_and_reserves_its_id() {
         let workspace = tempfile::tempdir_in("/tmp").unwrap();
         fs::create_dir_all(workspace.path().join(".studio/environments/environment-7"))
             .await
             .unwrap();
 
-        let error = load_environments(workspace.path()).await.unwrap_err();
+        let loaded = load_environments(workspace.path()).await.unwrap();
 
-        expect![[r"environment_store_invalid_metadata: Environment metadata is missing at <workspace>/.studio/environments/environment-7/environment.json"]]
-            .assert_eq(&describe_error(error, workspace.path()));
+        expect![[r"records=0
+next_id=8
+incomplete_directory_preserved=true"]]
+        .assert_eq(&format!(
+            "records={}\nnext_id={}\nincomplete_directory_preserved={}",
+            loaded.records.len(),
+            loaded.next_id,
+            workspace
+                .path()
+                .join(".studio/environments/environment-7")
+                .is_dir()
+        ));
     }
 
     #[tokio::test]

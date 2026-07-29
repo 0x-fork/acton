@@ -20,6 +20,7 @@ pub(crate) struct PersistedNodeState {
     pub history: History,
     pub indexes: Indexes,
     pub origin_seqno: Option<Seqno>,
+    pub fork_seqno: Option<Seqno>,
     pub head_seqno: Seqno,
 }
 
@@ -54,6 +55,13 @@ impl NodePersistence {
         let origin_seqno = conn
             .query_row(
                 "SELECT value FROM node_metadata WHERE key = 'origin_seqno'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let fork_seqno = conn
+            .query_row(
+                "SELECT value FROM node_metadata WHERE key = 'fork_seqno'",
                 [],
                 |row| row.get(0),
             )
@@ -227,18 +235,32 @@ impl NodePersistence {
             history,
             indexes,
             origin_seqno,
+            fork_seqno,
             head_seqno,
         })
     }
 
-    pub(crate) fn set_origin_seqno(&self, origin_seqno: Seqno) -> anyhow::Result<()> {
-        self.conn
-            .lock()
-            .expect("Failed to lock DB connection")
-            .execute(
-                "INSERT OR REPLACE INTO node_metadata (key, value) VALUES ('origin_seqno', ?1)",
-                params![origin_seqno],
+    pub(crate) fn set_chain_origins(
+        &self,
+        origin_seqno: Seqno,
+        fork_seqno: Option<Seqno>,
+    ) -> anyhow::Result<()> {
+        let mut conn = self.conn.lock().expect("Failed to lock DB connection");
+        let tx = conn.transaction()?;
+        tx.execute(
+            "INSERT OR REPLACE INTO node_metadata (key, value) VALUES ('origin_seqno', ?1)",
+            params![origin_seqno],
+        )?;
+        if let Some(fork_seqno) = fork_seqno {
+            tx.execute(
+                "INSERT OR REPLACE INTO node_metadata (key, value) VALUES ('fork_seqno', ?1)",
+                params![fork_seqno],
             )?;
+        } else {
+            tx.execute("DELETE FROM node_metadata WHERE key = 'fork_seqno'", [])?;
+        }
+        tx.commit()?;
+        drop(conn);
         Ok(())
     }
 
@@ -380,6 +402,14 @@ impl NodePersistence {
             "INSERT OR REPLACE INTO node_metadata (key, value) VALUES ('origin_seqno', ?1)",
             params![snapshot.globals.origin_seqno],
         )?;
+        if let Some(fork_seqno) = snapshot.globals.fork_seqno {
+            tx.execute(
+                "INSERT OR REPLACE INTO node_metadata (key, value) VALUES ('fork_seqno', ?1)",
+                params![fork_seqno],
+            )?;
+        } else {
+            tx.execute("DELETE FROM node_metadata WHERE key = 'fork_seqno'", [])?;
+        }
 
         for (hash, boc) in &snapshot.cas_entries {
             tx.execute(
