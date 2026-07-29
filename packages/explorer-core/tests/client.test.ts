@@ -76,6 +76,38 @@ test("wallet DNS lookup returns every domain for the requested address", async (
   }
 })
 
+test("multisig requests preserve every address and opt into nested data", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  globalThis.fetch = mock(async input => {
+    const url = new URL(input.toString())
+    requests.push(url)
+    return Response.json(
+      url.pathname.endsWith("/wallets")
+        ? {multisigs: [], address_book: {}}
+        : {orders: [], address_book: {}},
+    )
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    await client.getMultisigWallets(["EQWalletOne", "EQWalletTwo"], true)
+    await client.getMultisigOrders(["EQOrderOne", "EQOrderTwo"], true)
+
+    expect(requests.map(request => request.toString())).toEqual([
+      "https://toncenter.example/api/v3/multisig/wallets?address=EQWalletOne&address=EQWalletTwo&include_orders=true",
+      "https://toncenter.example/api/v3/multisig/orders?address=EQOrderOne&address=EQOrderTwo&parse_actions=true",
+    ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("domain DNS lookup uses the indexed V3 wallet record when available", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []

@@ -25,6 +25,8 @@ import type {
   SourceTraceResponse,
   V3ActionsResponse,
   V3BlocksResponse,
+  V3MultisigOrdersResponse,
+  V3MultisigWalletsResponse,
   V3RunGetMethodResponse,
   V3RunGetMethodStackEntry,
   V3TransactionDetailsResponse,
@@ -475,6 +477,34 @@ export class TonClient {
   async getJettonWalletsByAddress(address: string[]): Promise<JettonWallet[]> {
     if (address.length === 0) return []
     return this.fetchJettonWallets("address", address)
+  }
+
+  async getMultisigWallets(
+    addresses: readonly string[],
+    includeOrders = false,
+  ): Promise<V3MultisigWalletsResponse> {
+    const url = this.buildUrl(this.v3BaseUrl, "/multisig/wallets")
+    for (const address of addresses) {
+      url.searchParams.append("address", address)
+    }
+    if (includeOrders) {
+      url.searchParams.set("include_orders", "true")
+    }
+    return this.request(url, "Failed to fetch multisig wallets")
+  }
+
+  async getMultisigOrders(
+    addresses: readonly string[],
+    parseActions = false,
+  ): Promise<V3MultisigOrdersResponse> {
+    const url = this.buildUrl(this.v3BaseUrl, "/multisig/orders")
+    for (const address of addresses) {
+      url.searchParams.append("address", address)
+    }
+    if (parseActions) {
+      url.searchParams.set("parse_actions", "true")
+    }
+    return this.request(url, "Failed to fetch multisig orders")
   }
 
   async runGetMethod(

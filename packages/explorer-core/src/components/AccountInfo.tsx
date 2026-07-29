@@ -839,6 +839,12 @@ function getInterfaceLabel(value: string): string | undefined {
     case "nft_collection": {
       return "NFT collection interface"
     }
+    case "multisig_v2": {
+      return "Multisig wallet v2"
+    }
+    case "multisig_order_v2": {
+      return "Multisig order v2"
+    }
     default: {
       return normalizedInterface.replaceAll("_", " ")
     }

@@ -8,7 +8,14 @@ import {
   useRef,
   useState,
 } from "react"
-import type {CSSProperties, FC, JSX, KeyboardEvent as ReactKeyboardEvent, MouseEvent} from "react"
+import type {
+  CSSProperties,
+  FC,
+  JSX,
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent,
+  ReactNode,
+} from "react"
 import {AbiGetMethods, fmt} from "@acton/transaction-ui"
 import {
   Button,
@@ -117,6 +124,13 @@ import {
 
 type Tabs = "history" | "contract" | "get-methods" | "tokens" | "nfts" | "items" | "holders"
 
+export interface AccountDetailsTab {
+  readonly id: string
+  readonly label: string
+  readonly icon: ReactNode
+  readonly content: ReactNode
+}
+
 interface AccountDetailsProps {
   readonly transactions: V3TransactionListItem[]
   readonly actions?: V3Action[]
@@ -163,6 +177,7 @@ interface AccountDetailsProps {
   readonly accountLoading?: boolean
   readonly showHoldersTab?: boolean
   readonly showItemsTab?: boolean
+  readonly customTabs?: readonly AccountDetailsTab[]
   readonly client: TonClient
   readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
@@ -175,7 +190,7 @@ interface AccountDetailsProps {
   readonly historySortOrder?: AccountHistorySortOrder
   readonly onHistorySortOrderChange?: (sortOrder: AccountHistorySortOrder) => void
   readonly activeTabHash?: string
-  readonly onTabChange?: (tab: Tabs) => void
+  readonly onTabChange?: (tab: string) => void
 }
 
 const ITEMS_PER_PAGE = 10
@@ -331,6 +346,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   accountLoading = false,
   showHoldersTab = false,
   showItemsTab = false,
+  customTabs = [],
   client,
   onAddressClick,
   onTransactionClick,
@@ -345,7 +361,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   activeTabHash,
   onTabChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<Tabs>("history")
+  const [activeTab, setActiveTab] = useState<string>("history")
   const activeTabRef = useRef<HTMLButtonElement>(null)
   const filterPopoverRef = useRef<HTMLDivElement>(null)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
@@ -362,6 +378,8 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     useState<AccountTransactionFilters>(readTransactionFilters)
   const effectiveSortOrder = historySortOrder ?? transactionFilters.sortOrder
   const showNftsTab = !nftsLoading && nftItems.length > 0
+  const activeCustomTab = customTabs.find(tab => tab.id === activeTab)
+  const hasCustomTab = (id: string) => customTabs.some(tab => tab.id === id)
   const effectiveHistoryMode: AccountHistoryMode =
     actionsSupported && transactionFilters.historyMode === "actions" ? "actions" : "transactions"
   const activeHistorySourceCount =
@@ -370,32 +388,46 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   useEffect(() => {
     if (
       activeTabHash &&
-      (activeTabHash === "history" ||
+      (accountLoading ||
+        activeTabHash === "history" ||
         activeTabHash === "contract" ||
         (activeTabHash === "get-methods" && compilerAbi !== undefined) ||
         activeTabHash === "tokens" ||
         (activeTabHash === "nfts" && showNftsTab) ||
         (activeTabHash === "items" && showItemsTab) ||
-        activeTabHash === "holders")
+        activeTabHash === "holders" ||
+        hasCustomTab(activeTabHash))
     ) {
-      setActiveTab(activeTabHash as Tabs)
+      setActiveTab(activeTabHash)
     }
-  }, [activeTabHash, compilerAbi, showItemsTab, showNftsTab])
+  }, [accountLoading, activeTabHash, compilerAbi, customTabs, showItemsTab, showNftsTab])
 
   useEffect(() => {
+    if (accountLoading) {
+      return
+    }
     const unavailable =
       (activeTab === "nfts" && !showNftsTab) ||
       (activeTab === "items" && !showItemsTab) ||
-      (activeTab === "get-methods" && compilerAbi === undefined)
+      (activeTab === "get-methods" && compilerAbi === undefined) ||
+      (!isBuiltInTab(activeTab) && !activeCustomTab)
     if (!unavailable) {
       return
     }
 
     setActiveTab("history")
     onTabChange?.("history")
-  }, [activeTab, compilerAbi, onTabChange, showItemsTab, showNftsTab])
+  }, [
+    accountLoading,
+    activeCustomTab,
+    activeTab,
+    compilerAbi,
+    onTabChange,
+    showItemsTab,
+    showNftsTab,
+  ])
 
-  const handleTabClick = (tab: Tabs) => {
+  const handleTabClick = (tab: string) => {
     setActiveTab(tab)
     onTabChange?.(tab)
   }
@@ -824,6 +856,20 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
             </span>
             History
           </button>
+          {customTabs.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              ref={activeTab === tab.id ? activeTabRef : undefined}
+              className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ""}`}
+              onClick={() => handleTabClick(tab.id)}
+            >
+              <span className={styles.tabIcon} aria-hidden="true">
+                {tab.icon}
+              </span>
+              {tab.label}
+            </button>
+          ))}
           <button
             type="button"
             ref={activeTab === "tokens" ? activeTabRef : undefined}
@@ -1270,6 +1316,8 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
             </div>
           )}
         </div>
+      ) : activeCustomTab ? (
+        activeCustomTab.content
       ) : activeTab === "tokens" ? (
         <div className={styles.tokensContent}>
           {tokensLoading ? (
@@ -1469,6 +1517,18 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
         </div>
       )}
     </section>
+  )
+}
+
+function isBuiltInTab(value: string): value is Tabs {
+  return (
+    value === "history" ||
+    value === "contract" ||
+    value === "get-methods" ||
+    value === "tokens" ||
+    value === "nfts" ||
+    value === "items" ||
+    value === "holders"
   )
 }
 

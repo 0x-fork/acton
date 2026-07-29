@@ -83,6 +83,56 @@ export interface AccountStatesResponse {
   >
 }
 
+export interface V3MultisigOrderAction {
+  readonly destination: string | null
+  readonly value: string | null
+  readonly body_raw: unknown
+  readonly parsed: boolean
+  readonly error: string | null
+  readonly parsed_body: Record<string, unknown> | null
+  readonly parsed_body_type: string
+  readonly send_mode: number
+}
+
+export interface V3MultisigOrder {
+  readonly address: string
+  readonly multisig_address: string
+  readonly order_seqno: string | null
+  readonly threshold: number | null
+  readonly sent_for_execution: boolean | null
+  readonly approvals_mask: string | null
+  readonly approvals_num: number | null
+  readonly expiration_date: number | null
+  readonly order_boc: string | null
+  readonly signers: readonly string[]
+  readonly last_transaction_lt: string
+  readonly code_hash: string | null
+  readonly data_hash: string | null
+  readonly actions: readonly V3MultisigOrderAction[] | null
+}
+
+export interface V3Multisig {
+  readonly address: string
+  readonly next_order_seqno: string | null
+  readonly threshold: number | null
+  readonly signers: readonly string[]
+  readonly proposers: readonly string[]
+  readonly last_transaction_lt: string
+  readonly code_hash: string | null
+  readonly data_hash: string | null
+  readonly orders: readonly V3MultisigOrder[]
+}
+
+export interface V3MultisigWalletsResponse {
+  readonly multisigs: readonly V3Multisig[]
+  readonly address_book: Record<string, V3AddressBookRow>
+}
+
+export interface V3MultisigOrdersResponse {
+  readonly orders: readonly V3MultisigOrder[]
+  readonly address_book: Record<string, V3AddressBookRow>
+}
+
 export interface V3TracesResponse {
   readonly address_book: Record<string, V3AddressBookRow>
   readonly metadata: V3Metadata

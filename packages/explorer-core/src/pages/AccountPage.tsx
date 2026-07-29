@@ -4,6 +4,7 @@ import type {FC, ReactNode} from "react"
 
 import {codeLookupHashHex} from "@acton/transaction-ui"
 import {Button, Dialog, HighlightedCode, RawDataBlock} from "@acton/ui"
+import {ListChecks, ScrollText, UsersRound} from "lucide-react"
 import {Cell} from "@ton/core"
 
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
@@ -19,6 +20,8 @@ import type {
   V3AccountState,
   V3Action,
   V3Metadata,
+  V3Multisig,
+  V3MultisigOrder,
   V3Transaction,
   V3TransactionListItem,
   VerificationSourceResponse,
@@ -26,8 +29,19 @@ import type {
 import {AccountInfo} from "../components/AccountInfo"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
-import {AccountDetails, readAccountHistorySortOrder} from "../components/AccountDetails"
+import {
+  AccountDetails,
+  readAccountHistorySortOrder,
+  type AccountDetailsTab,
+} from "../components/AccountDetails"
 import {LockerOverview} from "../components/LockerOverview"
+import {
+  MultisigOrderActionsTab,
+  MultisigOrdersTab,
+  MultisigOverview,
+  MultisigSignersTab,
+  type MultisigDetailsState,
+} from "../components/multisig-details"
 import {NftImage} from "../components/NftImage"
 import {VestingOverview} from "../components/VestingOverview"
 import {
@@ -69,7 +83,17 @@ const JETTON_HOLDERS_LOAD_MORE_LIMIT = 100
 // The account NFT grid spans one through six columns across its supported widths.
 const NFT_CARD_GRID_BATCH_SIZE = 60
 const NEW_TRANSACTION_APPEAR_MS = 1400
-type AccountTab = "history" | "contract" | "get-methods" | "tokens" | "nfts" | "items" | "holders"
+type AccountTab =
+  | "history"
+  | "contract"
+  | "get-methods"
+  | "tokens"
+  | "nfts"
+  | "items"
+  | "holders"
+  | "signers"
+  | "orders"
+  | "actions"
 
 interface AccountTokensState {
   readonly wallets: JettonWallet[]
@@ -122,6 +146,8 @@ export const AccountPage: FC<AccountPageProps> = ({
   const [accountState, setAccountState] = useState<AddressInformation | undefined>()
   const [accountStateV3, setAccountStateV3] = useState<V3AccountState | undefined>()
   const [vestingData, setVestingData] = useState<VestingData | undefined>()
+  const [multisigDetails, setMultisigDetails] = useState<MultisigDetailsState>({status: "idle"})
+  const [multisigReloadKey, setMultisigReloadKey] = useState(0)
   const [accountDomain, setAccountDomain] = useState<string | undefined>()
   const [accountDomains, setAccountDomains] = useState<readonly string[]>([])
   const [transactions, setTransactions] = useState<V3TransactionListItem[]>([])
@@ -231,6 +257,9 @@ export const AccountPage: FC<AccountPageProps> = ({
   const isJettonWalletAccount = hasAccountInterface(accountInterfaces, "jetton_wallet")
   const isNftItemAccount = hasAccountInterface(accountInterfaces, "nft_item")
   const isNftCollectionAccount = hasAccountInterface(accountInterfaces, "nft_collection")
+  const isMultisigWalletAccount = hasAccountInterface(accountInterfaces, "multisig_v2")
+  const isMultisigOrderAccount = hasAccountInterface(accountInterfaces, "multisig_order_v2")
+  const isMultisigAccount = isMultisigWalletAccount || isMultisigOrderAccount
   const usesToncenterApi = client.usesToncenterApiEndpoint()
   const supportsAccountActions = usesToncenterApi && network.supportsActions
   const useTransactionPagination = !usesToncenterApi
@@ -240,6 +269,75 @@ export const AccountPage: FC<AccountPageProps> = ({
   const transactionPageSize = usesToncenterApi
     ? REMOTE_TRANSACTION_PAGE_SIZE
     : LOCAL_TRANSACTION_PAGE_SIZE
+
+  useEffect(() => {
+    const kind = isMultisigWalletAccount ? "wallet" : isMultisigOrderAccount ? "order" : undefined
+    if (!kind || !formattedAddress) {
+      setMultisigDetails({status: "idle"})
+      return
+    }
+
+    let active = true
+    setMultisigDetails({status: "loading", address: formattedAddress, kind})
+
+    const load = async () => {
+      try {
+        if (kind === "wallet") {
+          const response = await client.getMultisigWallets([formattedAddress], true)
+          const wallet: V3Multisig | undefined = response.multisigs[0]
+          if (!wallet) {
+            throw new Error("Toncenter did not return this multisig wallet.")
+          }
+          if (active) {
+            updateDomains(response.address_book)
+            setMultisigDetails({
+              status: "success",
+              address: formattedAddress,
+              kind,
+              wallet,
+            })
+          }
+          return
+        }
+
+        const response = await client.getMultisigOrders([formattedAddress], true)
+        const order: V3MultisigOrder | undefined = response.orders[0]
+        if (!order) {
+          throw new Error("Toncenter did not return this multisig order.")
+        }
+        if (active) {
+          updateDomains(response.address_book)
+          setMultisigDetails({
+            status: "success",
+            address: formattedAddress,
+            kind,
+            order,
+          })
+        }
+      } catch (error) {
+        if (active) {
+          setMultisigDetails({
+            status: "error",
+            address: formattedAddress,
+            kind,
+            message: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+    }
+
+    void load()
+    return () => {
+      active = false
+    }
+  }, [
+    client,
+    formattedAddress,
+    isMultisigOrderAccount,
+    isMultisigWalletAccount,
+    multisigReloadKey,
+    updateDomains,
+  ])
 
   useEffect(() => {
     let isActive = true
@@ -1364,9 +1462,18 @@ export const AccountPage: FC<AccountPageProps> = ({
     (activeTab === "holders" &&
       (accountLoading || (isJettonMasterAccount && holdersLoadedAccountKey !== accountRequestKey)))
 
-  const handleSearch = (addr: string, event?: ExplorerNavigationClickEvent) => {
-    openPath(addr ? routes.addressPath(addr) : routes.rootPath, event)
-  }
+  const handleSearch = useCallback(
+    (addr: string, event?: ExplorerNavigationClickEvent) => {
+      openPath(addr ? routes.addressPath(addr) : routes.rootPath, event)
+    },
+    [openPath, routes],
+  )
+  const handleMultisigOrderClick = useCallback(
+    (addr: string, event?: ExplorerNavigationClickEvent) => {
+      openPath(`${routes.addressPath(addr)}#actions`, event)
+    },
+    [openPath, routes],
+  )
 
   const handleTabChange = (tab: string) => {
     if (tab === "holders" && holdersLoadedAccountKey !== accountRequestKey) {
@@ -1376,6 +1483,12 @@ export const AccountPage: FC<AccountPageProps> = ({
     const hash = tab === "contract" ? "contract-storage" : tab
     void navigate(`${location.pathname}#${hash}`, {replace: true})
   }
+
+  useEffect(() => {
+    if (isMultisigOrderAccount && !location.hash) {
+      void navigate(`${location.pathname}#actions`, {replace: true})
+    }
+  }, [isMultisigOrderAccount, location.hash, location.pathname, navigate])
 
   const tokenInfo = jettonMaster ?? jettonWalletMaster
   const tokenSymbol = tokenInfo?.jetton_content.symbol
@@ -1491,12 +1604,28 @@ export const AccountPage: FC<AccountPageProps> = ({
   const isLockerAccount = Boolean(accountState && isLockerCodeHash(accountCodeLookupHash))
   const isVestingAccount = Boolean(accountState && isVestingCodeHash(accountCodeLookupHash))
   const isScheduleAccount = isLockerAccount || isVestingAccount
+  const currentMultisigDetails: MultisigDetailsState =
+    multisigDetails.status !== "idle" && multisigDetails.address !== formattedAddress
+      ? {
+          status: "loading",
+          address: formattedAddress,
+          kind: isMultisigOrderAccount ? "order" : "wallet",
+        }
+      : multisigDetails
+  const multisigOrder =
+    currentMultisigDetails.status === "success" && currentMultisigDetails.kind === "order"
+      ? currentMultisigDetails.order
+      : undefined
   const hasHeaderContextCard = Boolean(
     accountState &&
-      (tokenInfo || currentNftItem || (nftCollectionName && !currentNftItem) || isScheduleAccount),
+      (tokenInfo ||
+        currentNftItem ||
+        (nftCollectionName && !currentNftItem) ||
+        isScheduleAccount ||
+        isMultisigAccount),
   )
   const topSectionClassName = hasHeaderContextCard
-    ? isScheduleAccount
+    ? isScheduleAccount || isMultisigAccount
       ? `${styles.topSection} ${styles.topSectionEqual}`
       : styles.topSection
     : `${styles.topSection} ${styles.topSectionSingle}`
@@ -1526,7 +1655,74 @@ export const AccountPage: FC<AccountPageProps> = ({
             ),
           },
         ]
-      : undefined
+      : multisigOrder
+        ? [
+            {
+              key: "multisig-wallet",
+              label: "Multisig wallet",
+              value: (
+                <ExplorerAddressChip
+                  address={multisigOrder.multisig_address}
+                  onAddressClick={handleSearch}
+                  variant="plain"
+                />
+              ),
+            },
+          ]
+        : undefined
+  const multisigTabs = useMemo<readonly AccountDetailsTab[]>(() => {
+    if (isMultisigWalletAccount) {
+      return [
+        {
+          id: "signers",
+          label: "Signers",
+          icon: <UsersRound size={18} />,
+          content: (
+            <MultisigSignersTab state={currentMultisigDetails} onAddressClick={handleSearch} />
+          ),
+        },
+        {
+          id: "orders",
+          label: "Orders",
+          icon: <ScrollText size={18} />,
+          content: (
+            <MultisigOrdersTab
+              state={currentMultisigDetails}
+              onAddressClick={handleSearch}
+              onOrderClick={handleMultisigOrderClick}
+            />
+          ),
+        },
+      ]
+    }
+    if (isMultisigOrderAccount) {
+      return [
+        {
+          id: "signers",
+          label: "Signers",
+          icon: <UsersRound size={18} />,
+          content: (
+            <MultisigSignersTab state={currentMultisigDetails} onAddressClick={handleSearch} />
+          ),
+        },
+        {
+          id: "actions",
+          label: "Actions",
+          icon: <ListChecks size={18} />,
+          content: (
+            <MultisigOrderActionsTab state={currentMultisigDetails} onAddressClick={handleSearch} />
+          ),
+        },
+      ]
+    }
+    return []
+  }, [
+    currentMultisigDetails,
+    handleMultisigOrderClick,
+    handleSearch,
+    isMultisigOrderAccount,
+    isMultisigWalletAccount,
+  ])
 
   return (
     <div className={styles.container}>
@@ -1584,6 +1780,12 @@ export const AccountPage: FC<AccountPageProps> = ({
                       address={formattedAddress}
                       client={client}
                       onDataChange={setVestingData}
+                    />
+                  )}
+                  {isMultisigAccount && (
+                    <MultisigOverview
+                      state={currentMultisigDetails}
+                      onRetry={() => setMultisigReloadKey(key => key + 1)}
                     />
                   )}
                   {accountState && tokenInfo && (
@@ -1801,6 +2003,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             accountLoading={accountLoading}
             showHoldersTab={isJettonMasterAccount}
             showItemsTab={isNftCollectionAccount}
+            customTabs={multisigTabs}
             client={client}
             onAddressClick={handleSearch}
             onTransactionClick={handleTransactionClick}
@@ -2132,7 +2335,10 @@ function isAccountTab(value: string): value is AccountTab {
     value === "tokens" ||
     value === "nfts" ||
     value === "items" ||
-    value === "holders"
+    value === "holders" ||
+    value === "signers" ||
+    value === "orders" ||
+    value === "actions"
   )
 }
 
