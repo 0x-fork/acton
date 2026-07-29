@@ -24,6 +24,18 @@ interface ResolvedNftImage {
 const toHex = (value: ArrayBuffer): string =>
   Array.from(new Uint8Array(value), byte => byte.toString(16).padStart(2, "0")).join("")
 
+const isGetgemsImage = (source: string): boolean => {
+  try {
+    const url = new URL(source)
+    return (
+      url.protocol === "https:" &&
+      (url.hostname === "getgems.io" || url.hostname.endsWith(".getgems.io"))
+    )
+  } catch {
+    return false
+  }
+}
+
 const getInitialImage = (
   sources: readonly string[],
   blurred: boolean,
@@ -40,6 +52,9 @@ const getInitialImage = (
   }
   if (blurred) {
     return {src: primarySource, blurred: true, hidden: false, verified: false}
+  }
+  if (isGetgemsImage(primarySource)) {
+    return {src: primarySource, blurred: false, hidden: false, verified: false}
   }
 
   return {src: TOKEN_PLACEHOLDER_IMAGE, blurred: false, hidden: false, verified: true}
@@ -86,8 +101,16 @@ export const NftImage: FC<NftImageProps> = ({
 
     void (async () => {
       for (const source of imageSources) {
+        if (isGetgemsImage(source)) {
+          setImage({src: source, blurred: false, hidden: false, verified: false})
+          return
+        }
+
         try {
-          const response = await fetch(source, {signal: controller.signal})
+          const response = await fetch(source, {
+            signal: controller.signal,
+            cache: "force-cache",
+          })
           if (!response.ok) {
             continue
           }
@@ -163,7 +186,7 @@ export const NftImage: FC<NftImageProps> = ({
     const nextSource = imageSources[currentIndex + 1]
     setImage({
       src: nextSource ?? TOKEN_PLACEHOLDER_IMAGE,
-      blurred: nextSource !== undefined,
+      blurred: nextSource !== undefined && !isGetgemsImage(nextSource),
       hidden: false,
       verified: false,
     })
