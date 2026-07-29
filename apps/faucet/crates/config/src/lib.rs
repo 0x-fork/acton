@@ -104,6 +104,7 @@ pub struct AntifraudConfig {
     pub enabled: bool,
     pub wallet_balance: WalletBalanceCheckConfig,
     pub sent_amount_window: SentAmountWindowCheckConfig,
+    pub subnet_amount_window: SubnetAmountWindowCheckConfig,
     pub successful_claim_window: SuccessfulClaimWindowCheckConfig,
 }
 
@@ -117,6 +118,14 @@ pub struct WalletBalanceCheckConfig {
 pub struct SentAmountWindowCheckConfig {
     pub enabled: bool,
     pub max_amount: u64,
+    pub window_seconds: u64,
+}
+
+#[derive(Clone, Debug)]
+pub struct SubnetAmountWindowCheckConfig {
+    pub enabled: bool,
+    pub max_amount: u64,
+    pub ipv4_prefix_length: u32,
     pub window_seconds: u64,
 }
 
@@ -244,6 +253,22 @@ impl Config {
                     ),
                     window_seconds: parse_env_number("ANTIFRAUD_SENT_AMOUNT_WINDOW_SECONDS", 60),
                 },
+                subnet_amount_window: SubnetAmountWindowCheckConfig {
+                    enabled: parse_env_bool("ANTIFRAUD_SUBNET_AMOUNT_WINDOW_ENABLED", true),
+                    max_amount: parse_env_nanograms(
+                        "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_MAX_NANOGRAMS",
+                        "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_MAX_NANOTONS",
+                        32_000_000_000,
+                    ),
+                    ipv4_prefix_length: parse_env_number(
+                        "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_IPV4_PREFIX_LENGTH",
+                        24,
+                    ),
+                    window_seconds: parse_env_number(
+                        "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_SECONDS",
+                        86_400,
+                    ),
+                },
                 successful_claim_window: SuccessfulClaimWindowCheckConfig {
                     enabled: parse_env_bool("ANTIFRAUD_SUCCESSFUL_CLAIM_WINDOW_ENABLED", true),
                     max_requests: parse_env_number(
@@ -315,6 +340,16 @@ impl Config {
             anyhow::ensure!(
                 self.antifraud.successful_claim_window.window_seconds > 0,
                 "ANTIFRAUD_SUCCESSFUL_CLAIM_WINDOW_SECONDS must be positive"
+            );
+        }
+        if self.antifraud.enabled && self.antifraud.subnet_amount_window.enabled {
+            anyhow::ensure!(
+                self.antifraud.subnet_amount_window.ipv4_prefix_length <= 32,
+                "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_IPV4_PREFIX_LENGTH must be between 0 and 32"
+            );
+            anyhow::ensure!(
+                self.antifraud.subnet_amount_window.window_seconds > 0,
+                "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_SECONDS must be positive"
             );
         }
 
@@ -476,8 +511,9 @@ mod tests {
         AntifraudConfig, ClaimRateLimitConfig, Config, DatabaseConfig, DefaultRateLimitConfig,
         FaucetConfig, GitHubAuthConfig, GitHubTierConfig, NANOGRAMS_PER_GRAM, PowClientConfig,
         PowConfig, ProxyConfig, RateLimitConfig, SentAmountWindowCheckConfig, ServerConfig,
-        SuccessfulClaimWindowCheckConfig, ToncenterConfig, ValkeyConfig, WalletBalanceCheckConfig,
-        WorkerConfig, parse_bool, parse_ip_list, parse_nanograms, parse_number,
+        SubnetAmountWindowCheckConfig, SuccessfulClaimWindowCheckConfig, ToncenterConfig,
+        ValkeyConfig, WalletBalanceCheckConfig, WorkerConfig, parse_bool, parse_ip_list,
+        parse_nanograms, parse_number,
     };
     use ipnet::IpNet;
 
@@ -545,6 +581,12 @@ mod tests {
                     enabled: true,
                     max_amount: 10_000_000_000,
                     window_seconds: 60,
+                },
+                subnet_amount_window: SubnetAmountWindowCheckConfig {
+                    enabled: true,
+                    max_amount: 10_000_000_000,
+                    ipv4_prefix_length: 24,
+                    window_seconds: 86_400,
                 },
                 successful_claim_window: SuccessfulClaimWindowCheckConfig {
                     enabled: true,
@@ -703,6 +745,30 @@ mod tests {
             validation_error(&config),
             "ANTIFRAUD_SUCCESSFUL_CLAIM_WINDOW_SECONDS must be positive"
         );
+
+        let mut config = valid_config();
+        config.github_auth.enabled = false;
+        config.antifraud.subnet_amount_window.window_seconds = 0;
+        assert_eq!(
+            validation_error(&config),
+            "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_SECONDS must be positive"
+        );
+    }
+
+    #[test]
+    fn validates_ipv4_subnet_prefix_length() {
+        for prefix_length in 0..=32 {
+            let mut config = valid_config();
+            config.antifraud.subnet_amount_window.ipv4_prefix_length = prefix_length;
+            config.validate().unwrap();
+        }
+
+        let mut config = valid_config();
+        config.antifraud.subnet_amount_window.ipv4_prefix_length = 33;
+        assert_eq!(
+            validation_error(&config),
+            "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_IPV4_PREFIX_LENGTH must be between 0 and 32"
+        );
     }
 
     #[test]
@@ -711,6 +777,8 @@ mod tests {
         config.github_auth.enabled = false;
         config.antifraud.enabled = false;
         config.antifraud.successful_claim_window.window_seconds = 0;
+        config.antifraud.subnet_amount_window.ipv4_prefix_length = 33;
+        config.antifraud.subnet_amount_window.window_seconds = 0;
 
         config.validate().unwrap();
     }

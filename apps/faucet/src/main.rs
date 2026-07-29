@@ -13,7 +13,8 @@ use faucet_antifraud::Antifraud;
 use faucet_config::{ClaimRateLimitConfig, Config, DefaultRateLimitConfig, ProxyConfig};
 use faucet_pow::Pow;
 use faucet_valkey::{
-    AntifraudModule, SentAmountWindowDecision, SuccessfulClaimWindowDecision, ValkeyStore,
+    AmountWindowDecision, AntifraudModule, SentAmountWindowDecision, SuccessfulClaimWindowDecision,
+    ValkeyStore,
 };
 use github_auth::GitHubAuth;
 use handlers::CreateClaim;
@@ -299,6 +300,10 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
         return Ok(());
     }
 
+    if !can_process_subnet_amount_window(&state, &task, amount).await? {
+        return Ok(());
+    }
+
     wait_for_sent_amount_window(&state, &task.address, amount).await?;
 
     let max_retries = state.config.worker.max_retries;
@@ -316,6 +321,7 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
         match status {
             Ok(_) => {
                 record_successful_claim(&state, &task).await;
+                record_sent_subnet_amount(&state, &task, amount).await;
                 match state.valkey.add_sent_amount(amount).await {
                     Ok(total_sent_nanograms) => {
                         info!(
@@ -365,6 +371,115 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
     }
 
     unreachable!("send_claim loop should always return");
+}
+
+async fn can_process_subnet_amount_window(
+    state: &AppState,
+    task: &CreateClaim,
+    amount: u64,
+) -> anyhow::Result<bool> {
+    let Some(window) = state.antifraud.subnet_amount_window() else {
+        return Ok(true);
+    };
+    let Some(subject) = task.subnet_amount_window_subject.as_deref() else {
+        return Ok(true);
+    };
+
+    if let Err(err) = state.antifraud.check_subnet_amount_window_transfer(amount) {
+        state
+            .record_antifraud_trigger(AntifraudModule::SubnetAmountWindow)
+            .await;
+        error!(
+            address = %task.address,
+            subject,
+            amount,
+            max_amount = window.max_amount,
+            error = ?err,
+            "Claim amount exceeds subnet amount window limit"
+        );
+        return Ok(false);
+    }
+
+    match state
+        .valkey
+        .check_subnet_amount_window(subject, amount, window.max_amount, window.window_seconds)
+        .await?
+    {
+        AmountWindowDecision::Allowed {
+            current,
+            attempted,
+            max,
+            window_seconds,
+        } => {
+            info!(
+                address = %task.address,
+                subject,
+                current_sent_nanograms = current,
+                attempted_amount = attempted,
+                max_amount = max,
+                window_seconds,
+                "Subnet amount sliding window allows send"
+            );
+            Ok(true)
+        }
+        AmountWindowDecision::Limited {
+            current,
+            attempted,
+            max,
+            window_seconds,
+            retry_after_ms,
+        } => {
+            state
+                .record_antifraud_trigger(AntifraudModule::SubnetAmountWindow)
+                .await;
+            warn!(
+                address = %task.address,
+                subject,
+                current_sent_nanograms = current,
+                attempted_amount = attempted,
+                max_amount = max,
+                window_seconds,
+                retry_after_ms,
+                "Subnet amount sliding window limit reached, skipping queued claim"
+            );
+            Ok(false)
+        }
+    }
+}
+
+async fn record_sent_subnet_amount(state: &AppState, task: &CreateClaim, amount: u64) {
+    let Some(window) = state.antifraud.subnet_amount_window() else {
+        return;
+    };
+    let Some(subject) = task.subnet_amount_window_subject.as_deref() else {
+        return;
+    };
+
+    match state
+        .valkey
+        .record_subnet_amount_window(subject, amount, window.window_seconds)
+        .await
+    {
+        Ok(total) => {
+            info!(
+                address = %task.address,
+                subject,
+                amount,
+                sent_in_window_nanograms = total,
+                window_seconds = window.window_seconds,
+                "Recorded sent amount for subnet in Valkey"
+            );
+        }
+        Err(err) => {
+            warn!(
+                address = %task.address,
+                subject,
+                amount,
+                error = %err,
+                "Failed to record sent amount for subnet in Valkey"
+            );
+        }
+    }
 }
 
 // TODO: вынести куда-то

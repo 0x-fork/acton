@@ -10,7 +10,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 use faucet_backend::middlewares::ClientContext;
-use faucet_valkey::{AntifraudModule, SuccessfulClaimWindowDecision};
+use faucet_valkey::{AmountWindowDecision, AntifraudModule, SuccessfulClaimWindowDecision};
 use real::RealIp;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
@@ -30,6 +30,8 @@ pub(crate) struct CreateClaim {
     pub(crate) client_window_subject: Option<String>,
     #[serde(default)]
     pub(crate) device_window_subject: Option<String>,
+    #[serde(default)]
+    pub(crate) subnet_amount_window_subject: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -150,6 +152,8 @@ pub(super) async fn create_claim(
         .await?;
     }
 
+    let subnet_amount_window_subject = check_subnet_amount_window(&state, client_ip.ip()).await?;
+
     let consumed_context = state
         .valkey
         .take_capped_ephemeral(challenge::POW_CHALLENGE_INDEX_KEY, &challenge_key)
@@ -175,6 +179,7 @@ pub(super) async fn create_claim(
             max_requests,
             client_window_subject: Some(client_window_subject),
             device_window_subject: Some(device_window_subject),
+            subnet_amount_window_subject,
         })
         .await
         .map_err(|_| response_error(StatusCode::INTERNAL_SERVER_ERROR, "Failed to queue claim"))?;
@@ -185,6 +190,92 @@ pub(super) async fn create_claim(
             message: "Your claim has been queued. It will be processed soon.",
         }),
     ))
+}
+
+async fn check_subnet_amount_window(
+    state: &AppState,
+    client_ip: std::net::IpAddr,
+) -> Result<Option<String>, (StatusCode, Json<ErrorResponse>)> {
+    let Some(window) = state.antifraud.subnet_amount_window() else {
+        return Ok(None);
+    };
+    let amount = state.config.faucet.amount;
+    let subject = antifraud_subject::client_subnet(client_ip, window.ipv4_prefix_length);
+
+    if let Err(err) = state.antifraud.check_subnet_amount_window_transfer(amount) {
+        state
+            .record_antifraud_trigger(AntifraudModule::SubnetAmountWindow)
+            .await;
+        error!(
+            subject,
+            amount,
+            max_amount = window.max_amount,
+            error = ?err,
+            "Claim amount exceeds subnet amount window limit"
+        );
+        return Err(response_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Subnet amount limit exceeded",
+        ));
+    }
+
+    match state
+        .valkey
+        .check_subnet_amount_window(&subject, amount, window.max_amount, window.window_seconds)
+        .await
+    {
+        Ok(AmountWindowDecision::Allowed {
+            current,
+            attempted,
+            max,
+            window_seconds,
+        }) => {
+            info!(
+                subject,
+                current_sent_nanograms = current,
+                attempted_amount = attempted,
+                max_amount = max,
+                window_seconds,
+                "Subnet amount sliding window checked"
+            );
+            Ok(Some(subject))
+        }
+        Ok(AmountWindowDecision::Limited {
+            current,
+            attempted,
+            max,
+            window_seconds,
+            retry_after_ms,
+        }) => {
+            state
+                .record_antifraud_trigger(AntifraudModule::SubnetAmountWindow)
+                .await;
+            warn!(
+                subject,
+                current_sent_nanograms = current,
+                attempted_amount = attempted,
+                max_amount = max,
+                window_seconds,
+                retry_after_ms,
+                "Subnet amount sliding window limit reached"
+            );
+            Err(response_error(
+                StatusCode::TOO_MANY_REQUESTS,
+                "Subnet amount limit exceeded",
+            ))
+        }
+        Err(err) => {
+            error!(
+                subject,
+                error = %err,
+                "Failed to check subnet amount window"
+            );
+            Err(response_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to check subnet amount limit",
+            ))
+        }
+    }
 }
 
 // TODO: сделать по другому
@@ -299,5 +390,6 @@ mod tests {
         assert_eq!(claim.max_requests, 0);
         assert_eq!(claim.client_window_subject, None);
         assert_eq!(claim.device_window_subject, None);
+        assert_eq!(claim.subnet_amount_window_subject, None);
     }
 }
