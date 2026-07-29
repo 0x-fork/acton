@@ -191,7 +191,7 @@ export function MultisigOrdersTab({state, onAddressClick, onOrderClick}: Multisi
 
   return (
     <div className={styles.tabContent}>
-      <DataTable className={styles.flushTable} minWidth="41rem">
+      <DataTable className={styles.flushTable} minWidth="44rem">
         <DataTableTable aria-label="Multisig orders">
           <DataTableHead>
             <DataTableRow>
@@ -200,7 +200,7 @@ export function MultisigOrdersTab({state, onAddressClick, onOrderClick}: Multisi
               <DataTableHeaderCell align="right" columnWidth="8rem">
                 Approvals
               </DataTableHeaderCell>
-              <DataTableHeaderCell columnWidth="10rem">Expires</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="13rem">Expires</DataTableHeaderCell>
             </DataTableRow>
           </DataTableHead>
           <DataTableBody>
@@ -599,6 +599,9 @@ function formatTimestamp(timestamp: number | null): string {
     day: "2-digit",
     month: "short",
     year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
   }).format(new Date(timestamp * 1000))
 }
 
