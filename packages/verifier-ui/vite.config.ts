@@ -5,6 +5,8 @@ import process from "node:process"
 import react from "@vitejs/plugin-react"
 import {defineConfig} from "vite"
 
+import {themeBootstrap} from "../ui/vite/themeBootstrap"
+
 const backendTarget = process.env.VITE_BACKEND_PROXY_TARGET || "http://127.0.0.1:3000"
 const contractHtml = resolve(import.meta.dirname, "contract.html")
 const statisticsHtml = resolve(import.meta.dirname, "statistics.html")
@@ -77,7 +79,7 @@ function contractRouteFallback() {
 }
 
 export default defineConfig({
-  plugins: [react(), contractRouteFallback()],
+  plugins: [themeBootstrap({storageKey: "ton-verifier-theme"}), react(), contractRouteFallback()],
   resolve: {
     dedupe: ["react", "react-dom"],
   },
