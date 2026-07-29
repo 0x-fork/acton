@@ -46,6 +46,7 @@ axum-governor = "1"
 lazy-limit = "1"
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors"] }
+utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
 real = { version = "0.1", features = ["axum"] }
 apalis = { version = "1.0.0-beta.2" }
 apalis-sqlite = "1.0.0-beta.4"

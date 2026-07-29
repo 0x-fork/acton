@@ -9,6 +9,7 @@ use real::RealIp;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tracing::{error, info, warn};
+use utoipa::ToSchema;
 
 use crate::AppState;
 use crate::address::{AddressValidationError, parse_testnet_address};
@@ -20,14 +21,14 @@ use crate::handlers::auth;
 const POW_CHALLENGE_KEY_PREFIX: &str = "faucet:pow:{challenges}:challenge";
 pub(super) const POW_CHALLENGE_INDEX_KEY: &str = "faucet:pow:{challenges}:active";
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub(super) struct ChallengeRequest {
     address: String,
     #[serde(rename = "type")]
     token_type: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub(super) struct ChallengeResponse {
     version: u32,
     challenge: String,
@@ -71,6 +72,26 @@ impl ChallengeContext {
 type ChallengeResult =
     Result<(StatusCode, Json<ChallengeResponse>), (StatusCode, Json<ErrorResponse>)>;
 
+#[utoipa::path(
+    post,
+    path = "/challenge",
+    params(
+        ("Authorization" = Option<String>, Header, description = "Optional GitHub session token as Bearer <token>"),
+        ("x-device-uid" = String, Header, description = "Stable client device identifier"),
+        ("x-acton-client" = Option<String>, Header, description = "Actonscan client version; required unless User-Agent starts with acton/")
+    ),
+    request_body = ChallengeRequest,
+    responses(
+        (status = 200, description = "Proof-of-work challenge bound to the address and client", body = ChallengeResponse),
+        (status = 400, description = "Invalid request, TON address, or client headers", body = auth::ErrorResponse),
+        (status = 401, description = "Invalid or expired GitHub session", body = auth::ErrorResponse),
+        (status = 403, description = "Request blocked by antifraud policy", body = auth::ErrorResponse),
+        (status = 429, description = "Too many active challenges", body = auth::ErrorResponse),
+        (status = 500, description = "Failed to create a challenge", body = auth::ErrorResponse),
+        (status = 503, description = "PoW is disabled or a dependency is unavailable", body = auth::ErrorResponse)
+    ),
+    tag = "faucet"
+)]
 pub(super) async fn create_challenge(
     State(state): State<AppState>,
     Extension(client): Extension<ClientContext>,

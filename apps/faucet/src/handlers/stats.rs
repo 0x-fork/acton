@@ -2,17 +2,18 @@ use axum::{Json, extract::State, http::StatusCode};
 use faucet_valkey::FaucetStats;
 use serde::Serialize;
 use tracing::error;
+use utoipa::ToSchema;
 
 use crate::AppState;
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
+#[derive(Debug, Eq, PartialEq, Serialize, ToSchema)]
 pub(super) struct StatsResponse {
     total_sent_nanograms: u64,
     antifraud: AntifraudStatsResponse,
 }
 
-#[derive(Debug, Eq, PartialEq, Serialize)]
-struct AntifraudStatsResponse {
+#[derive(Debug, Eq, PartialEq, Serialize, ToSchema)]
+pub(super) struct AntifraudStatsResponse {
     wallet_balance: u64,
     sent_amount_window: u64,
     subnet_amount_window: u64,
@@ -26,6 +27,15 @@ pub(super) struct ErrorResponse {
 
 type StatsResult = Result<Json<StatsResponse>, (StatusCode, Json<ErrorResponse>)>;
 
+#[utoipa::path(
+    get,
+    path = "/stats",
+    responses(
+        (status = 200, description = "Aggregate amount sent and antifraud trigger counts", body = StatsResponse),
+        (status = 500, description = "Failed to load faucet statistics", body = crate::handlers::auth::ErrorResponse)
+    ),
+    tag = "statistics"
+)]
 pub(super) async fn get_stats(State(state): State<AppState>) -> StatsResult {
     let stats = state.valkey.get_stats().await.map_err(|err| {
         error!(error = %err, "Failed to get faucet stats");

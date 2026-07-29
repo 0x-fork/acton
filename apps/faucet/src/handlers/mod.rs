@@ -1,5 +1,5 @@
 use axum::{
-    Router,
+    Json, Router,
     http::{
         HeaderValue, Method,
         header::{AUTHORIZATION, CONTENT_TYPE},
@@ -12,6 +12,7 @@ use faucet_backend::middlewares::{
 };
 use reqwest::Url;
 use tower_http::cors::CorsLayer;
+use utoipa::OpenApi;
 
 use crate::AppState;
 
@@ -45,6 +46,7 @@ pub(crate) fn router(state: AppState) -> Router {
 
     Router::new()
         .route("/", get(health::root))
+        .route("/openapi.json", get(openapi_handler))
         .route("/robots.txt", get(robots::robots_txt))
         .route("/ready", get(health::ok))
         .route("/health", get(health::ok))
@@ -57,6 +59,53 @@ pub(crate) fn router(state: AppState) -> Router {
         .merge(airdrop_routes)
         .with_state(state)
 }
+
+async fn openapi_handler() -> Json<utoipa::openapi::OpenApi> {
+    Json(openapi())
+}
+
+fn openapi() -> utoipa::openapi::OpenApi {
+    ApiDoc::openapi()
+}
+
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "TON Testnet Faucet API",
+        version = "0.1.0",
+        description = "API for requesting testnet TON from the Acton faucet."
+    ),
+    paths(
+        auth::status,
+        auth::github_start,
+        auth::github_callback,
+        auth::exchange_grant,
+        auth::get_session,
+        auth::delete_session,
+        challenge::create_challenge,
+        claim::create_claim,
+        stats::get_stats
+    ),
+    components(schemas(
+        auth::GrantExchangeRequest,
+        auth::AuthStatusResponse,
+        auth::SessionResponse,
+        auth::ErrorResponse,
+        challenge::ChallengeRequest,
+        challenge::ChallengeResponse,
+        claim::CreateClaimRequest,
+        claim::ClaimResponse,
+        stats::StatsResponse,
+        stats::AntifraudStatsResponse,
+        crate::github_auth::FaucetTier
+    )),
+    tags(
+        (name = "faucet", description = "Proof-of-work challenge and testnet TON claim endpoints"),
+        (name = "authentication", description = "Optional GitHub authentication for higher faucet limits"),
+        (name = "statistics", description = "Aggregate faucet usage statistics")
+    )
+)]
+struct ApiDoc;
 
 pub(crate) fn airdrop_cors_layer(frontend_url: &str) -> anyhow::Result<CorsLayer> {
     let frontend_url = Url::parse(frontend_url)
@@ -85,7 +134,7 @@ pub(crate) fn airdrop_cors_layer(frontend_url: &str) -> anyhow::Result<CorsLayer
 
 #[cfg(test)]
 mod tests {
-    use super::airdrop_cors_layer;
+    use super::{airdrop_cors_layer, openapi};
     use axum::{
         Router,
         body::Body,
@@ -103,6 +152,43 @@ mod tests {
         routing::post,
     };
     use tower::ServiceExt;
+
+    #[test]
+    fn openapi_json_documents_faucet_api() {
+        let document = serde_json::to_value(openapi()).expect("OpenAPI document should serialize");
+
+        assert_eq!(document["openapi"], "3.1.0");
+        for path in [
+            "/auth/status",
+            "/auth/github/start",
+            "/auth/github/callback",
+            "/auth/exchange",
+            "/auth/session",
+            "/challenge",
+            "/claim",
+            "/stats",
+        ] {
+            assert!(
+                document["paths"][path].is_object(),
+                "OpenAPI document is missing {path}"
+            );
+        }
+        for schema in [
+            "AuthStatusResponse",
+            "SessionResponse",
+            "ChallengeRequest",
+            "ChallengeResponse",
+            "CreateClaimRequest",
+            "ClaimResponse",
+            "StatsResponse",
+            "FaucetTier",
+        ] {
+            assert!(
+                document["components"]["schemas"][schema].is_object(),
+                "OpenAPI document is missing {schema}"
+            );
+        }
+    }
 
     #[tokio::test]
     async fn actonscan_preflight_bypasses_inner_rate_limit() {

@@ -7,6 +7,7 @@ use axum::{
 use faucet_backend::middlewares::{ClientContext, is_allowed_device_uid};
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
+use utoipa::ToSchema;
 
 use crate::{
     AppState,
@@ -25,12 +26,12 @@ pub(super) struct GitHubCallbackQuery {
     error: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub(super) struct GrantExchangeRequest {
     grant: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct AuthStatusResponse {
     enabled: bool,
@@ -40,7 +41,7 @@ pub(super) struct AuthStatusResponse {
     window_seconds: u64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct SessionResponse {
     authenticated: bool,
@@ -55,13 +56,21 @@ pub(super) struct SessionResponse {
     token: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub(super) struct ErrorResponse {
     error: &'static str,
 }
 
 pub(super) type AuthHttpError = (StatusCode, Json<ErrorResponse>);
 
+#[utoipa::path(
+    get,
+    path = "/auth/status",
+    responses(
+        (status = 200, description = "GitHub authentication availability and request limits", body = AuthStatusResponse)
+    ),
+    tag = "authentication"
+)]
 pub(super) async fn status(State(state): State<AppState>) -> Json<AuthStatusResponse> {
     let window = &state.config.antifraud.successful_claim_window;
     Json(AuthStatusResponse {
@@ -73,6 +82,21 @@ pub(super) async fn status(State(state): State<AppState>) -> Json<AuthStatusResp
     })
 }
 
+#[utoipa::path(
+    get,
+    path = "/auth/github/start",
+    params(
+        ("device_uid" = String, Query, description = "Stable client device identifier")
+    ),
+    responses(
+        (status = 307, description = "Temporary redirect to GitHub authorization"),
+        (status = 400, description = "Invalid device identifier", body = ErrorResponse),
+        (status = 429, description = "Too many pending authorization attempts", body = ErrorResponse),
+        (status = 500, description = "Authentication service failure", body = ErrorResponse),
+        (status = 503, description = "GitHub authentication is disabled", body = ErrorResponse)
+    ),
+    tag = "authentication"
+)]
 pub(super) async fn github_start(
     State(state): State<AppState>,
     Query(query): Query<GitHubStartQuery>,
@@ -92,6 +116,20 @@ pub(super) async fn github_start(
     Ok(Redirect::temporary(&url))
 }
 
+#[utoipa::path(
+    get,
+    path = "/auth/github/callback",
+    params(
+        ("code" = Option<String>, Query, description = "GitHub OAuth authorization code"),
+        ("state" = Option<String>, Query, description = "GitHub OAuth state value"),
+        ("error" = Option<String>, Query, description = "GitHub OAuth error code")
+    ),
+    responses(
+        (status = 307, description = "Temporary redirect back to the faucet frontend"),
+        (status = 500, description = "Authentication service failure", body = ErrorResponse)
+    ),
+    tag = "authentication"
+)]
 pub(super) async fn github_callback(
     State(state): State<AppState>,
     Query(query): Query<GitHubCallbackQuery>,
@@ -124,6 +162,23 @@ pub(super) async fn github_callback(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/auth/exchange",
+    params(
+        ("x-device-uid" = String, Header, description = "Stable client device identifier"),
+        ("x-acton-client" = Option<String>, Header, description = "Actonscan client version; required unless User-Agent starts with acton/")
+    ),
+    request_body = GrantExchangeRequest,
+    responses(
+        (status = 200, description = "Authenticated GitHub session", body = SessionResponse),
+        (status = 400, description = "Invalid request or client headers", body = ErrorResponse),
+        (status = 401, description = "Invalid or expired authorization grant", body = ErrorResponse),
+        (status = 500, description = "Authentication service failure", body = ErrorResponse),
+        (status = 503, description = "GitHub authentication is disabled", body = ErrorResponse)
+    ),
+    tag = "authentication"
+)]
 pub(super) async fn exchange_grant(
     State(state): State<AppState>,
     Extension(client): Extension<ClientContext>,
@@ -150,6 +205,23 @@ pub(super) async fn exchange_grant(
     )))
 }
 
+#[utoipa::path(
+    get,
+    path = "/auth/session",
+    params(
+        ("Authorization" = String, Header, description = "GitHub session token as Bearer <token>"),
+        ("x-device-uid" = String, Header, description = "Stable client device identifier"),
+        ("x-acton-client" = Option<String>, Header, description = "Actonscan client version; required unless User-Agent starts with acton/")
+    ),
+    responses(
+        (status = 200, description = "Current authenticated GitHub session", body = SessionResponse),
+        (status = 400, description = "Invalid client headers", body = ErrorResponse),
+        (status = 401, description = "Invalid or expired GitHub session", body = ErrorResponse),
+        (status = 500, description = "Authentication service failure", body = ErrorResponse),
+        (status = 503, description = "GitHub authentication is disabled", body = ErrorResponse)
+    ),
+    tag = "authentication"
+)]
 pub(super) async fn get_session(
     State(state): State<AppState>,
     Extension(client): Extension<ClientContext>,
@@ -165,6 +237,23 @@ pub(super) async fn get_session(
     Ok(Json(session_response(identity, max_requests, None, None)))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/auth/session",
+    params(
+        ("Authorization" = String, Header, description = "GitHub session token as Bearer <token>"),
+        ("x-device-uid" = String, Header, description = "Stable client device identifier"),
+        ("x-acton-client" = Option<String>, Header, description = "Actonscan client version; required unless User-Agent starts with acton/")
+    ),
+    responses(
+        (status = 204, description = "GitHub session deleted"),
+        (status = 400, description = "Invalid client headers", body = ErrorResponse),
+        (status = 401, description = "Invalid or expired GitHub session", body = ErrorResponse),
+        (status = 500, description = "Authentication service failure", body = ErrorResponse),
+        (status = 503, description = "GitHub authentication is disabled", body = ErrorResponse)
+    ),
+    tag = "authentication"
+)]
 pub(super) async fn delete_session(
     State(state): State<AppState>,
     Extension(_client): Extension<ClientContext>,

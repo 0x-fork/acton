@@ -14,6 +14,7 @@ use faucet_valkey::{AmountWindowDecision, AntifraudModule, SuccessfulClaimWindow
 use real::RealIp;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
+use utoipa::ToSchema;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct CreateClaim {
@@ -34,7 +35,7 @@ pub(crate) struct CreateClaim {
     pub(crate) subnet_amount_window_subject: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub(super) struct CreateClaimRequest {
     address: String,
     challenge: String,
@@ -42,7 +43,7 @@ pub(super) struct CreateClaimRequest {
     version: u32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub(super) struct ClaimResponse {
     message: &'static str,
 }
@@ -57,6 +58,25 @@ type ClaimLimitResult = Result<(), (StatusCode, Json<ErrorResponse>)>;
 
 //noinspection RsLiveness
 #[axum::debug_handler]
+#[utoipa::path(
+    post,
+    path = "/claim",
+    params(
+        ("Authorization" = Option<String>, Header, description = "Optional GitHub session token as Bearer <token>"),
+        ("x-device-uid" = String, Header, description = "Stable client device identifier"),
+        ("x-acton-client" = Option<String>, Header, description = "Actonscan client version; required unless User-Agent starts with acton/")
+    ),
+    request_body = CreateClaimRequest,
+    responses(
+        (status = 200, description = "Claim accepted for asynchronous processing", body = ClaimResponse),
+        (status = 400, description = "Invalid request, challenge, proof-of-work solution, or client headers", body = auth::ErrorResponse),
+        (status = 401, description = "Invalid or expired GitHub session", body = auth::ErrorResponse),
+        (status = 429, description = "Faucet request or amount limit exceeded", body = auth::ErrorResponse),
+        (status = 500, description = "Failed to validate or queue the claim", body = auth::ErrorResponse),
+        (status = 503, description = "PoW is disabled or a dependency is unavailable", body = auth::ErrorResponse)
+    ),
+    tag = "faucet"
+)]
 pub(super) async fn create_claim(
     State(mut state): State<AppState>,
     Extension(client): Extension<ClientContext>,
