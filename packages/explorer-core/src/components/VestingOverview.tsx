@@ -15,12 +15,6 @@ import {
 } from "@acton/ui"
 
 import type {TonClient} from "../api/client"
-import {
-  buildLockerSchedule,
-  parseLockerData,
-  type LockerData,
-  type LockerPayment,
-} from "./lockerSchedule"
 import styles from "./LockerOverview.module.css"
 import {
   capitalize,
@@ -28,21 +22,27 @@ import {
   formatScheduleDate,
   formatSchedulePeriod,
   formatTimeUntil,
-  SECONDS_PER_DAY,
 } from "./scheduleFormatting"
+import {
+  buildVestingSchedule,
+  parseVestingData,
+  type VestingData,
+  type VestingPeriod,
+} from "./vestingSchedule"
 
-interface LockerOverviewProps {
+interface VestingOverviewProps {
   readonly address: string
   readonly client: TonClient
+  readonly onDataChange?: (data: VestingData | undefined) => void
 }
 
-type LockerLoadState =
+type VestingLoadState =
   | {readonly status: "loading"}
-  | {readonly status: "success"; readonly data: LockerData}
+  | {readonly status: "success"; readonly data: VestingData}
   | {readonly status: "error"; readonly message: string}
 
-export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
-  const [loadState, setLoadState] = useState<LockerLoadState>({status: "loading"})
+export const VestingOverview: FC<VestingOverviewProps> = ({address, client, onDataChange}) => {
+  const [loadState, setLoadState] = useState<VestingLoadState>({status: "loading"})
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
@@ -59,13 +59,15 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
     let active = true
     const load = async () => {
       setLoadState({status: "loading"})
+      onDataChange?.(undefined)
       try {
-        const response = await client.runGetMethod(address, "get_locker_data")
-        const data = parseLockerData(response)
-        buildLockerSchedule(data, Math.floor(Date.now() / 1000))
+        const response = await client.runGetMethod(address, "get_vesting_data")
+        const data = parseVestingData(response)
+        buildVestingSchedule(data, Math.floor(Date.now() / 1000))
 
         if (active) {
           setLoadState({status: "success", data})
+          onDataChange?.(data)
         }
       } catch (error) {
         if (active) {
@@ -81,18 +83,18 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
     return () => {
       active = false
     }
-  }, [address, client, reloadKey])
+  }, [address, client, onDataChange, reloadKey])
 
   if (loadState.status === "loading") {
-    return <LockerOverviewSkeleton />
+    return <VestingOverviewSkeleton />
   }
 
   if (loadState.status === "error") {
     return (
-      <section className={styles.card} aria-label="Locker schedule">
+      <section className={styles.card} aria-label="Vesting schedule">
         <div className={styles.error}>
           <div>
-            <div className={styles.errorTitle}>Locker details are unavailable</div>
+            <div className={styles.errorTitle}>Vesting details are unavailable</div>
             <div className={styles.errorMessage}>{loadState.message}</div>
           </div>
           <Button
@@ -109,18 +111,16 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
   }
 
   const {data} = loadState
-  const schedule = buildLockerSchedule(data, nowSeconds)
-  const firstPayment = schedule.payments[0]
-  const finalPayment = schedule.payments.at(-1)
-  const paymentLabel =
-    data.unlockPeriod === 30 * SECONDS_PER_DAY ? "Monthly payment" : "Payment amount"
+  const schedule = buildVestingSchedule(data, nowSeconds)
+  const cliffEndTime = data.vestingStartTime + data.cliffDuration
+  const vestingEndTime = data.vestingStartTime + data.vestingTotalDuration
 
   return (
     <>
-      <section className={styles.card} aria-labelledby="locker-overview-title">
+      <section className={styles.card} aria-labelledby="vesting-overview-title">
         <div className={styles.header}>
-          <h2 id="locker-overview-title" className={styles.title}>
-            Unlock schedule
+          <h2 id="vesting-overview-title" className={styles.title}>
+            Vesting schedule
           </h2>
           <InlineButton
             variant="accent"
@@ -130,40 +130,31 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
             Payment schedule
           </InlineButton>
           <p className={styles.description}>
-            {schedule.totalPeriods} payments every {formatSchedulePeriod(data.unlockPeriod)}, from{" "}
-            {firstPayment ? formatScheduleDate(firstPayment.unlockTime) : "—"} to{" "}
-            {finalPayment ? formatScheduleDate(finalPayment.unlockTime) : "—"}
+            {schedule.totalPeriods} periods over {formatSchedulePeriod(data.vestingTotalDuration)},
+            from {formatScheduleDate(data.vestingStartTime)} to {formatScheduleDate(vestingEndTime)}
+            {"; cliff ends "}
+            {formatScheduleDate(cliffEndTime)}.
           </p>
         </div>
 
         <div className={styles.metrics}>
-          <LockerMetric label="Deposit" value={formatGramAmount(data.totalCoinsLocked)} />
-          <LockerMetric label="Reward" value={formatGramAmount(data.totalReward)} />
-          <LockerMetric
-            label={paymentLabel}
-            value={firstPayment ? formatGramAmount(firstPayment.amount) : "—"}
-          />
-          <LockerMetric
-            label="Next payment"
-            value={
-              schedule.nextPayment
-                ? formatScheduleDate(schedule.nextPayment.unlockTime)
-                : "Completed"
-            }
-          />
+          <VestingMetric label="Total vested" value={formatGramAmount(data.vestingTotalAmount)} />
+          <VestingMetric label="Unlocked" value={formatGramAmount(schedule.unlockedAmount)} />
+          <VestingMetric label="Cliff period" value={formatSchedulePeriod(data.cliffDuration)} />
+          <VestingMetric label="Unlock period" value={formatSchedulePeriod(data.unlockPeriod)} />
         </div>
 
         <div className={styles.progressSection}>
           <div className={styles.progressHeader}>
             <span className={styles.progressLabel}>Unlocked</span>
             <span className={styles.progressValue}>
-              {schedule.unlockedPeriods} of {schedule.totalPeriods} payments
+              {schedule.unlockedPeriods} of {schedule.totalPeriods} periods
             </span>
           </div>
           <div
             className={styles.progressSegments}
             role="progressbar"
-            aria-label="Unlocked locker payments"
+            aria-label="Unlocked vesting periods"
             aria-valuemin={0}
             aria-valuemax={schedule.totalPeriods}
             aria-valuenow={schedule.unlockedPeriods}
@@ -171,11 +162,11 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
               gridTemplateColumns: `repeat(${schedule.totalPeriods}, minmax(0, 1fr))`,
             }}
           >
-            {schedule.payments.map(payment => (
+            {schedule.periods.map(period => (
               <span
-                key={payment.number}
-                className={`${styles.progressSegment} ${styles[`progressSegment${capitalize(payment.status)}`]}`}
-                title={`Payment ${payment.number}: ${capitalize(payment.status)}`}
+                key={period.number}
+                className={`${styles.progressSegment} ${styles[`progressSegment${capitalize(period.status)}`]}`}
+                title={`Period ${period.number}: ${capitalize(period.status)}`}
                 aria-hidden="true"
               />
             ))}
@@ -183,9 +174,9 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
           <div className={styles.progressMeta}>
             <span>{formatGramAmount(schedule.unlockedAmount)} unlocked</span>
             <span>
-              {schedule.nextPayment
-                ? `Next payment ${formatTimeUntil(schedule.nextPayment.unlockTime, nowSeconds)}`
-                : "All payments unlocked"}
+              {schedule.nextPayoutTime
+                ? `Next unlock ${formatTimeUntil(schedule.nextPayoutTime, nowSeconds)}`
+                : "All funds unlocked"}
             </span>
           </div>
         </div>
@@ -195,25 +186,26 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
         open={scheduleOpen}
         onOpenChange={setScheduleOpen}
         title="Payment schedule"
-        description={`${schedule.totalPeriods} scheduled unlocks`}
+        description={`${schedule.totalPeriods} vesting periods`}
         closeLabel="Close payment schedule"
-        maxWidth="58rem"
+        maxWidth="64rem"
         contentClassName={styles.dialogContent}
       >
-        <DataTable minWidth="44rem">
-          <DataTableTable aria-label="Locker payment schedule">
+        <DataTable minWidth="52rem">
+          <DataTableTable aria-label="Vesting payment schedule">
             <DataTableHead>
               <DataTableRow>
                 <DataTableHeaderCell columnWidth="4rem">#</DataTableHeaderCell>
-                <DataTableHeaderCell>Unlock date</DataTableHeaderCell>
-                <DataTableHeaderCell align="right">Payment</DataTableHeaderCell>
+                <DataTableHeaderCell>Accrual starts</DataTableHeaderCell>
+                <DataTableHeaderCell>Available</DataTableHeaderCell>
+                <DataTableHeaderCell align="right">Amount</DataTableHeaderCell>
                 <DataTableHeaderCell align="right">Cumulative</DataTableHeaderCell>
                 <DataTableHeaderCell columnWidth="6rem">Status</DataTableHeaderCell>
               </DataTableRow>
             </DataTableHead>
             <DataTableBody>
-              {schedule.payments.map(payment => (
-                <LockerPaymentRow key={payment.number} payment={payment} />
+              {schedule.periods.map(period => (
+                <VestingPeriodRow key={period.number} period={period} />
               ))}
             </DataTableBody>
           </DataTableTable>
@@ -223,7 +215,7 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
   )
 }
 
-function LockerMetric({label, value}: {readonly label: string; readonly value: string}) {
+function VestingMetric({label, value}: {readonly label: string; readonly value: string}) {
   return (
     <div className={styles.metric}>
       <div className={styles.metricLabel}>{label}</div>
@@ -232,27 +224,28 @@ function LockerMetric({label, value}: {readonly label: string; readonly value: s
   )
 }
 
-function LockerPaymentRow({payment}: {readonly payment: LockerPayment}) {
+function VestingPeriodRow({period}: {readonly period: VestingPeriod}) {
   return (
-    <DataTableRow selected={payment.status === "next"}>
-      <DataTableCell tone="muted">{payment.number}</DataTableCell>
-      <DataTableCell>{formatScheduleDate(payment.unlockTime)}</DataTableCell>
+    <DataTableRow selected={period.status === "next"}>
+      <DataTableCell tone="muted">{period.number}</DataTableCell>
+      <DataTableCell>{formatScheduleDate(period.startTime)}</DataTableCell>
+      <DataTableCell>{formatScheduleDate(period.payoutTime)}</DataTableCell>
       <DataTableCell align="right" tone="strong">
-        {formatGramAmount(payment.amount)}
+        {formatGramAmount(period.amount)}
       </DataTableCell>
-      <DataTableCell align="right">{formatGramAmount(payment.cumulativeAmount)}</DataTableCell>
+      <DataTableCell align="right">{formatGramAmount(period.cumulativeAmount)}</DataTableCell>
       <DataTableCell>
-        <span className={`${styles.status} ${styles[`status${capitalize(payment.status)}`]}`}>
-          {capitalize(payment.status)}
+        <span className={`${styles.status} ${styles[`status${capitalize(period.status)}`]}`}>
+          {capitalize(period.status)}
         </span>
       </DataTableCell>
     </DataTableRow>
   )
 }
 
-function LockerOverviewSkeleton() {
+function VestingOverviewSkeleton() {
   return (
-    <section className={styles.card} aria-label="Loading locker schedule" aria-busy="true">
+    <section className={styles.card} aria-label="Loading vesting schedule" aria-busy="true">
       <div className={styles.header}>
         <Skeleton width="9rem" />
         <Skeleton width="8.5rem" height="2rem" radius="md" />

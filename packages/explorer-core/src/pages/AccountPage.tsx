@@ -29,6 +29,7 @@ import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {AccountDetails, readAccountHistorySortOrder} from "../components/AccountDetails"
 import {LockerOverview} from "../components/LockerOverview"
 import {NftImage} from "../components/NftImage"
+import {VestingOverview} from "../components/VestingOverview"
 import {
   NFT_CARD_IMAGE_SOURCE_KEYS,
   NFT_COLLECTION_CARD_IMAGE_SOURCE_KEYS,
@@ -40,6 +41,7 @@ import {
 } from "../components/imageFallbacks"
 import {isLockerCodeHash} from "../components/lockerSchedule"
 import {mergeAccountDomains, normalizeAddress, toRawAddress} from "../components/utils"
+import {isVestingCodeHash, type VestingData} from "../components/vestingSchedule"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
@@ -119,6 +121,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   const {updateDomains} = useAddressBook()
   const [accountState, setAccountState] = useState<AddressInformation | undefined>()
   const [accountStateV3, setAccountStateV3] = useState<V3AccountState | undefined>()
+  const [vestingData, setVestingData] = useState<VestingData | undefined>()
   const [accountDomain, setAccountDomain] = useState<string | undefined>()
   const [accountDomains, setAccountDomains] = useState<readonly string[]>([])
   const [transactions, setTransactions] = useState<V3TransactionListItem[]>([])
@@ -1486,15 +1489,44 @@ export const AccountPage: FC<AccountPageProps> = ({
     accountLoadIssue !== undefined && !accountLoading && accountState === undefined
   const showAccountHeader = accountLoading || Boolean(accountState) || accountUnavailable
   const isLockerAccount = Boolean(accountState && isLockerCodeHash(accountCodeLookupHash))
+  const isVestingAccount = Boolean(accountState && isVestingCodeHash(accountCodeLookupHash))
+  const isScheduleAccount = isLockerAccount || isVestingAccount
   const hasHeaderContextCard = Boolean(
     accountState &&
-      (tokenInfo || currentNftItem || (nftCollectionName && !currentNftItem) || isLockerAccount),
+      (tokenInfo || currentNftItem || (nftCollectionName && !currentNftItem) || isScheduleAccount),
   )
   const topSectionClassName = hasHeaderContextCard
-    ? isLockerAccount
+    ? isScheduleAccount
       ? `${styles.topSection} ${styles.topSectionEqual}`
       : styles.topSection
     : `${styles.topSection} ${styles.topSectionSingle}`
+  const accountInfoDetails =
+    isVestingAccount && vestingData
+      ? [
+          {
+            key: "vesting-owner",
+            label: "Owner",
+            value: (
+              <ExplorerAddressChip
+                address={vestingData.ownerAddress}
+                onAddressClick={handleSearch}
+                variant="plain"
+              />
+            ),
+          },
+          {
+            key: "vesting-sender",
+            label: "Sender",
+            value: (
+              <ExplorerAddressChip
+                address={vestingData.vestingSenderAddress}
+                onAddressClick={handleSearch}
+                variant="plain"
+              />
+            ),
+          },
+        ]
+      : undefined
 
   return (
     <div className={styles.container}>
@@ -1534,6 +1566,7 @@ export const AccountPage: FC<AccountPageProps> = ({
                   assetsLoading={accountLoading || jettonWalletsLoading}
                   amount={jettonWalletAmountLabel}
                   amountLoading={isJettonWalletAccount && jettonWalletLoading}
+                  details={accountInfoDetails}
                   client={client}
                   onMoreAssetsClick={() => handleTabChange("tokens")}
                   collectiblesCount={nftItems.length}
@@ -1546,6 +1579,13 @@ export const AccountPage: FC<AccountPageProps> = ({
               {hasHeaderContextCard && (
                 <div className={styles.contextColumn}>
                   {isLockerAccount && <LockerOverview address={formattedAddress} client={client} />}
+                  {isVestingAccount && (
+                    <VestingOverview
+                      address={formattedAddress}
+                      client={client}
+                      onDataChange={setVestingData}
+                    />
+                  )}
                   {accountState && tokenInfo && (
                     <div
                       className={`${styles.jettonInfo} ${jettonMaster ? styles.jettonMasterInfo : ""}`}

@@ -2,7 +2,7 @@ import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {Check, Copy, Edit2, QrCode, Star} from "lucide-react"
 import {QRCodeSVG} from "qrcode.react"
 import {useEffect, useId, useRef, useState} from "react"
-import type {FC} from "react"
+import type {FC, ReactNode} from "react"
 import {CopyInlineAction, InfoPopover, Input, Popover, Tooltip} from "@acton/ui"
 
 import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../api/types"
@@ -31,6 +31,12 @@ import {
 
 const TOKEN_PREVIEW_LIMIT = 5
 
+interface AccountInfoDetail {
+  readonly key: string
+  readonly label: string
+  readonly value: ReactNode
+}
+
 interface AccountInfoProps {
   readonly address: string
   readonly domain?: string
@@ -43,6 +49,7 @@ interface AccountInfoProps {
   readonly assetsLoading?: boolean
   readonly amount?: string
   readonly amountLoading?: boolean
+  readonly details?: readonly AccountInfoDetail[]
   readonly client: TonClient
   readonly onMoreAssetsClick?: () => void
   readonly collectiblesCount?: number
@@ -73,6 +80,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   assetsLoading = false,
   amount,
   amountLoading = false,
+  details = [],
   client,
   onMoreAssetsClick,
   collectiblesCount = 0,
@@ -503,6 +511,13 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                 </div>
               </div>
             )}
+
+            {details.map(detail => (
+              <div className={styles.infoRow} key={detail.key}>
+                <div className={styles.label}>{detail.label}</div>
+                <div className={styles.rowValue}>{detail.value}</div>
+              </div>
+            ))}
 
             {(showAssetsSkeleton || jettonWallets.length > 0) && (
               <div className={styles.infoRow}>
