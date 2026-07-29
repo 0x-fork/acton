@@ -23,10 +23,12 @@ export function openExplorerPath(
   path: string,
   event?: ExplorerNavigationClickEvent,
 ): void {
-  if (event && shouldOpenInNewTab(event)) {
+  if (event) {
     event.preventDefault()
-    globalThis.open(new URL(path, globalThis.location.href).href, "_blank", "noopener,noreferrer")
-    return
+    if (shouldOpenInNewTab(event)) {
+      globalThis.open(new URL(path, globalThis.location.href).href, "_blank", "noopener,noreferrer")
+      return
+    }
   }
 
   void navigate(path)
