@@ -51,8 +51,6 @@ interface AccountPageProps {
   readonly jettonMintPath?: string
   readonly tokensLoadMoreLimit?: number
   readonly holdersLoadMoreLimit?: number
-  readonly nftsLoadMoreLimit?: number
-  readonly collectionItemsLoadMoreLimit?: number
 }
 
 const INITIAL_TRANSACTION_LIMIT = 20
@@ -63,10 +61,8 @@ const ACCOUNT_TOKENS_INITIAL_LIMIT = 100
 const ACCOUNT_TOKENS_LOAD_MORE_LIMIT = 100
 const JETTON_HOLDERS_INITIAL_LIMIT = 100
 const JETTON_HOLDERS_LOAD_MORE_LIMIT = 100
-const ACCOUNT_NFTS_INITIAL_LIMIT = 100
-const ACCOUNT_NFTS_LOAD_MORE_LIMIT = 100
-const NFT_COLLECTION_ITEMS_INITIAL_LIMIT = 100
-const NFT_COLLECTION_ITEMS_LOAD_MORE_LIMIT = 100
+// The account NFT grid spans one through six columns across its supported widths.
+const NFT_CARD_GRID_BATCH_SIZE = 60
 const NEW_TRANSACTION_APPEAR_MS = 1400
 type AccountTab = "history" | "contract" | "get-methods" | "tokens" | "nfts" | "items" | "holders"
 
@@ -109,8 +105,6 @@ export const AccountPage: FC<AccountPageProps> = ({
   jettonMintPath,
   tokensLoadMoreLimit = ACCOUNT_TOKENS_LOAD_MORE_LIMIT,
   holdersLoadMoreLimit = JETTON_HOLDERS_LOAD_MORE_LIMIT,
-  nftsLoadMoreLimit = ACCOUNT_NFTS_LOAD_MORE_LIMIT,
-  collectionItemsLoadMoreLimit = NFT_COLLECTION_ITEMS_LOAD_MORE_LIMIT,
 }) => {
   const {address = ""} = useParams<{address: string}>()
   const navigate = useNavigate()
@@ -991,7 +985,7 @@ export const AccountPage: FC<AccountPageProps> = ({
       try {
         const items = await client.getNftItems({
           collection_address: [formattedAddress],
-          limit: NFT_COLLECTION_ITEMS_INITIAL_LIMIT,
+          limit: NFT_CARD_GRID_BATCH_SIZE,
           sortByLastTransactionLt: true,
         })
         if (!isActive) return
@@ -999,7 +993,7 @@ export const AccountPage: FC<AccountPageProps> = ({
           items,
           isLoading: false,
           isLoadingMore: false,
-          hasMore: items.length === NFT_COLLECTION_ITEMS_INITIAL_LIMIT,
+          hasMore: items.length === NFT_CARD_GRID_BATCH_SIZE,
         })
       } catch (error) {
         console.error("Failed to fetch NFT collection items", error)
@@ -1042,7 +1036,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     void client
       .getNftItems({
         collection_address: [formattedAddress],
-        limit: collectionItemsLoadMoreLimit,
+        limit: NFT_CARD_GRID_BATCH_SIZE,
         offset,
         sortByLastTransactionLt: true,
       })
@@ -1060,7 +1054,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             ...current,
             items: [...current.items, ...items],
             isLoadingMore: false,
-            hasMore: items.length === collectionItemsLoadMoreLimit,
+            hasMore: items.length === NFT_CARD_GRID_BATCH_SIZE,
           }
         })
       })
@@ -1088,7 +1082,6 @@ export const AccountPage: FC<AccountPageProps> = ({
   }, [
     accountRequestKey,
     client,
-    collectionItemsLoadMoreLimit,
     formattedAddress,
     nftCollectionItemsState.hasMore,
     nftCollectionItemsState.isLoading,
@@ -1119,7 +1112,7 @@ export const AccountPage: FC<AccountPageProps> = ({
       try {
         const nfts = await client.getNftItems({
           owner_address: [formattedAddress],
-          limit: ACCOUNT_NFTS_INITIAL_LIMIT,
+          limit: NFT_CARD_GRID_BATCH_SIZE,
           sortByLastTransactionLt: true,
         })
         if (!isActive) return
@@ -1127,7 +1120,7 @@ export const AccountPage: FC<AccountPageProps> = ({
           items: nfts,
           isLoading: false,
           isLoadingMore: false,
-          hasMore: nfts.length === ACCOUNT_NFTS_INITIAL_LIMIT,
+          hasMore: nfts.length === NFT_CARD_GRID_BATCH_SIZE,
         })
       } catch (error) {
         console.error("Failed to fetch account NFTs", error)
@@ -1170,7 +1163,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     void client
       .getNftItems({
         owner_address: [formattedAddress],
-        limit: nftsLoadMoreLimit,
+        limit: NFT_CARD_GRID_BATCH_SIZE,
         offset,
         sortByLastTransactionLt: true,
       })
@@ -1188,7 +1181,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             ...current,
             items: [...current.items, ...items],
             isLoadingMore: false,
-            hasMore: items.length === nftsLoadMoreLimit,
+            hasMore: items.length === NFT_CARD_GRID_BATCH_SIZE,
           }
         })
       })
@@ -1220,7 +1213,6 @@ export const AccountPage: FC<AccountPageProps> = ({
     accountRequestKey,
     client,
     formattedAddress,
-    nftsLoadMoreLimit,
   ])
 
   useEffect(() => {
