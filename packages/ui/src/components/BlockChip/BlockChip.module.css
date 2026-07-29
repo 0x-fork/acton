@@ -1,8 +1,7 @@
-.blockCluster {
+.blockCluster.blockCluster {
   max-width: 100%;
   margin-inline-start: -6px;
-  border-radius: 7px;
-  transition: background-color var(--acton-duration-fast) var(--acton-ease-standard);
+  gap: 3px;
 }
 
 .blockChip {
@@ -31,8 +30,8 @@
   text-overflow: ellipsis;
 }
 
-.blockCluster:hover,
-.blockCluster:focus-within {
+.blockCluster:hover .blockChip,
+.blockCluster:focus-within .blockChip {
   background: color-mix(in srgb, var(--acton-color-accent) 12%, transparent);
 }
 

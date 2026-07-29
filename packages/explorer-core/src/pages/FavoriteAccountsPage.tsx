@@ -1,7 +1,14 @@
 import {useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 import {Link} from "react-router"
-import {InlineAction, InlineActions, Pagination, useClientPagination, useToast} from "@acton/ui"
+import {
+  BlockChip,
+  InlineAction,
+  InlineActions,
+  Pagination,
+  useClientPagination,
+  useToast,
+} from "@acton/ui"
 import {Star, Trash2} from "lucide-react"
 
 import type {TonClient} from "../api/client"
@@ -14,6 +21,7 @@ import {normalizeAddress, shortenIdentifier, toRawAddress} from "../components/u
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useFavoriteAccounts, type FavoriteAccount} from "../hooks/useFavoriteAccounts"
+import {useFavoriteBlocks, type FavoriteBlock} from "../hooks/useFavoriteBlocks"
 import {useFavoriteTransactions, type FavoriteTransaction} from "../hooks/useFavoriteTransactions"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
@@ -32,6 +40,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
   const addressFormat = useAddressFormat()
   const openPath = useOpenExplorerPath()
   const {favorites, setFavorite} = useFavoriteAccounts()
+  const {favorites: favoriteBlocks, setFavorite: setFavoriteBlock} = useFavoriteBlocks()
   const {favorites: favoriteTransactions, setFavorite: setFavoriteTransaction} =
     useFavoriteTransactions()
   const {prefetchNames} = useAddressBook()
@@ -41,6 +50,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
   const [tokensLoading, setTokensLoading] = useState(false)
   const accountDataRequestRef = useRef(0)
   const accountPagination = useClientPagination(favorites)
+  const blockPagination = useClientPagination(favoriteBlocks)
   const transactionPagination = useClientPagination(favoriteTransactions)
 
   useEffect(() => {
@@ -153,6 +163,14 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
     })
   }
 
+  const handleRemoveBlock = (favorite: FavoriteBlock) => {
+    setFavoriteBlock(favorite, false)
+    showToast({
+      title: "Block removed from favorites",
+      variant: "success",
+    })
+  }
+
   const handleRemoveTransaction = (favorite: FavoriteTransaction) => {
     setFavoriteTransaction(favorite, false)
     showToast({
@@ -161,7 +179,8 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
     })
   }
 
-  const hasFavorites = favorites.length > 0 || favoriteTransactions.length > 0
+  const hasFavorites =
+    favorites.length > 0 || favoriteBlocks.length > 0 || favoriteTransactions.length > 0
 
   return (
     <section className={styles.container}>
@@ -182,7 +201,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
             <Star size={26} className={styles.emptyIcon} />
             <div className={styles.emptyText}>No favorites yet</div>
             <div className={styles.emptyHint}>
-              Use the star on an account or transaction page to save it here.
+              Use the star on an account, block, or transaction page to save it here.
             </div>
             <Link className={styles.emptyLink} to={routes.rootPath}>
               Explore TON
@@ -259,6 +278,77 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
             pageSize={accountPagination.pageSize}
             onPageChange={accountPagination.setCurrentPage}
             label="Favorite accounts pagination"
+          />
+        </section>
+      )}
+
+      {favoriteBlocks.length > 0 && (
+        <section className={styles.tableFrame} aria-label="Favorite blocks">
+          <header className={styles.tableTitle}>
+            <Star size={16} className={styles.titleIcon} />
+            <span>Blocks</span>
+          </header>
+          <div className={styles.tableScroller}>
+            <table className={`${styles.table} ${styles.blockTable}`}>
+              <thead>
+                <tr>
+                  <th className={styles.blockHeader}>Block</th>
+                  <th className={styles.blockTimeHeader}>Generated at</th>
+                  <th className={styles.blockTimeHeader}>Saved at</th>
+                </tr>
+              </thead>
+              <tbody>
+                {blockPagination.currentItems.map(favorite => {
+                  const path = routes.blockPath(favorite.workchain, favorite.shard, favorite.seqno)
+                  return (
+                    <tr
+                      key={`${favorite.workchain}:${favorite.shard}:${favorite.seqno}`}
+                      className={styles.tableRow}
+                    >
+                      <td className={styles.blockCell}>
+                        <div className={styles.blockCellContent}>
+                          <BlockChip
+                            workchain={favorite.workchain}
+                            shard={favorite.shard}
+                            seqno={favorite.seqno}
+                            copyable={false}
+                            display="full"
+                            href={path}
+                            onClick={event => openPath(path, event)}
+                          />
+                          <InlineAction
+                            label="Remove from favorites"
+                            icon={<Trash2 />}
+                            onClick={() => handleRemoveBlock(favorite)}
+                          />
+                        </div>
+                      </td>
+                      <td
+                        className={styles.blockTimeCell}
+                        data-visual-dynamic="time"
+                        data-visual-placeholder="<time>"
+                      >
+                        {formatBlockGeneratedAt(favorite.generatedAt)}
+                      </td>
+                      <td
+                        className={styles.blockTimeCell}
+                        data-visual-dynamic="time"
+                        data-visual-placeholder="<time>"
+                      >
+                        {formatSavedAt(favorite.savedAt)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <Pagination
+            currentPage={blockPagination.currentPage}
+            totalItems={blockPagination.totalItems}
+            pageSize={blockPagination.pageSize}
+            onPageChange={blockPagination.setCurrentPage}
+            label="Favorite blocks pagination"
           />
         </section>
       )}
@@ -340,6 +430,16 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
       )}
     </section>
   )
+}
+
+function formatBlockGeneratedAt(generatedAt: number | undefined): string {
+  if (!generatedAt) {
+    return "Unknown"
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(generatedAt * 1000))
 }
 
 function formatSavedAt(savedAt: number): string {

@@ -10,6 +10,7 @@ import type {ToncenterBlockId} from "./blockId"
 
 export interface BlockChipProps extends ToncenterBlockId {
   readonly className?: string
+  readonly copyable?: boolean
   readonly display?: "seqno" | "full"
   readonly highlighted?: boolean
   readonly href?: string
@@ -23,6 +24,7 @@ export function BlockChip({
   shard,
   seqno,
   className,
+  copyable = true,
   display = "seqno",
   highlighted = false,
   href,
@@ -40,6 +42,20 @@ export function BlockChip({
   )
   const chipTitle = title ?? (display === "full" ? toncenterBlockId : `Block ${seqno}`)
 
+  const chip = href ? (
+    <a className={chipClassName} href={href} onClick={onClick} title={chipTitle}>
+      {content}
+    </a>
+  ) : (
+    <span className={chipClassName} title={chipTitle}>
+      {content}
+    </span>
+  )
+
+  if (!copyable) {
+    return chip
+  }
+
   return (
     <InlineActions
       className={styles.blockCluster}
@@ -52,15 +68,7 @@ export function BlockChip({
         />
       }
     >
-      {href ? (
-        <a className={chipClassName} href={href} onClick={onClick} title={chipTitle}>
-          {content}
-        </a>
-      ) : (
-        <span className={chipClassName} title={chipTitle}>
-          {content}
-        </span>
-      )}
+      {chip}
     </InlineActions>
   )
 }

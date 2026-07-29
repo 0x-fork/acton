@@ -13,6 +13,25 @@ exports[`favorites persistence keeps the existing account favorites format compa
 ]
 `;
 
+exports[`favorites persistence normalizes and validates saved block metadata 1`] = `
+[
+  {
+    "generatedAt": undefined,
+    "savedAt": 1800000000000,
+    "seqno": 456,
+    "shard": "abcdef0000000000",
+    "workchain": 0,
+  },
+  {
+    "generatedAt": 1700000000,
+    "savedAt": 1700000000000,
+    "seqno": 123,
+    "shard": "8000000000000000",
+    "workchain": -1,
+  },
+]
+`;
+
 exports[`favorites persistence normalizes and validates saved transaction metadata 1`] = `
 [
   {

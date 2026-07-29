@@ -6,6 +6,7 @@ import {
   Download,
   ExternalLink,
   FileJson,
+  Star,
 } from "lucide-react"
 import {useNavigate, useParams} from "react-router"
 import {
@@ -13,6 +14,7 @@ import {
   Button,
   CopyButton,
   CopyInlineAction,
+  InlineAction,
   InlineActions,
   Input,
   ModeViewer,
@@ -35,6 +37,7 @@ import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {formatNano, formatRelativeTime, hashToHex} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
+import {useFavoriteBlocks} from "../hooks/useFavoriteBlocks"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 import {useTransactionMessageNames} from "../hooks/useTransactionMessageNames"
@@ -311,6 +314,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
   }>()
   const navigate = useNavigate()
   const {network, nodeInfo} = useNetworkInfo()
+  const {isFavorite: isFavoriteBlock, toggleFavorite: toggleFavoriteBlock} = useFavoriteBlocks()
   const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
   const {prefetchNames, updateDomains} = useAddressBook()
@@ -582,6 +586,15 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
     [state.transactions],
   )
   const blockActions = state.block ? getBlockActions(state.block, publicBlockNetwork) : undefined
+  const favoriteBlock = state.block
+    ? {
+        workchain: state.block.workchain,
+        shard: state.block.shard,
+        seqno: state.block.seqno,
+        generatedAt: blockUnixTime(state.block),
+      }
+    : undefined
+  const blockIsFavorite = favoriteBlock ? isFavoriteBlock(favoriteBlock) : false
 
   useEffect(() => {
     void prefetchNames(transactionAddresses)
@@ -605,8 +618,17 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
         ]}
       />
       <section className={styles.hero}>
-        <div>
+        <div className={styles.titleRow}>
           <h1 className={styles.title}>{title}</h1>
+          {favoriteBlock ? (
+            <InlineAction
+              className={blockIsFavorite ? styles.favoriteActionActive : undefined}
+              label={blockIsFavorite ? "Remove block from favorites" : "Add block to favorites"}
+              icon={<Star className={blockIsFavorite ? styles.favoriteIconActive : undefined} />}
+              aria-pressed={blockIsFavorite}
+              onClick={() => toggleFavoriteBlock(favoriteBlock)}
+            />
+          ) : null}
         </div>
       </section>
 

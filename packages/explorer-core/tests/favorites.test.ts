@@ -3,6 +3,7 @@ import {Buffer} from "node:buffer"
 import {describe, expect, test} from "bun:test"
 
 import {parseFavoriteAccounts} from "../src/hooks/useFavoriteAccounts"
+import {parseFavoriteBlocks} from "../src/hooks/useFavoriteBlocks"
 import {parseFavoriteTransactions} from "../src/hooks/useFavoriteTransactions"
 
 describe("favorites persistence", () => {
@@ -23,6 +24,36 @@ describe("favorites persistence", () => {
             savedAt: 1_800_000_000_000,
           },
           {address: 42, savedAt: 1},
+        ]),
+      ),
+    ).toMatchSnapshot()
+  })
+
+  test("normalizes and validates saved block metadata", () => {
+    expect(
+      parseFavoriteBlocks(
+        JSON.stringify([
+          {
+            workchain: -1,
+            shard: "8000000000000000",
+            seqno: 123,
+            generatedAt: 1_700_000_000,
+            savedAt: 1_700_000_000_000,
+          },
+          {
+            workchain: 0,
+            shard: "ABCDEF0000000000",
+            seqno: 456,
+            savedAt: 1_800_000_000_000,
+          },
+          {
+            workchain: -1,
+            shard: "8000000000000000",
+            seqno: 123,
+            savedAt: 1_900_000_000_000,
+          },
+          {workchain: 0, shard: "1", seqno: -1, savedAt: 1},
+          {workchain: 0, shard: "1", seqno: 1, generatedAt: "now", savedAt: 1},
         ]),
       ),
     ).toMatchSnapshot()

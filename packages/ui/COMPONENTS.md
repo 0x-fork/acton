@@ -648,6 +648,8 @@ coordinated highlight state.
 - `workchain`, `shard`, and `seqno`: identify the block; only seqno is displayed.
 - `display="full"`: displays `(workchain,shard,seqno)` instead of only the seqno.
 - `href`: renders a native link; without it the chip is read-only.
+- `copyable={false}`: hides the copy action when the surrounding surface already
+  provides its own row actions.
 - `label`: optional display content when the caller needs more context than the
   raw seqno.
 - `highlighted`: applies the coordinated accent highlight used by AddressChip.

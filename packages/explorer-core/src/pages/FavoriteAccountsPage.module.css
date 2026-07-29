@@ -123,6 +123,27 @@
   min-width: 0;
 }
 
+.blockTable {
+  min-width: 720px;
+}
+
+.blockHeader,
+.blockCell {
+  width: 58%;
+}
+
+.blockTimeHeader,
+.blockTimeCell {
+  width: 21%;
+}
+
+.blockCellContent {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .transactionTable {
   min-width: 860px;
 }
