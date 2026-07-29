@@ -161,7 +161,8 @@ coverage-clean:
 build-ui:
     bun ci
     cd packages/test-ui && bun ci && bun run build
-    cd packages/localnet-ui && bun ci && bun run build
+    cd packages/explorer-core && bun ci && bun run build
+    cd packages/studio-ui && bun ci && bun run build
 
 check-ui-ci:
     bun run lint
@@ -186,6 +187,7 @@ precommit: fmt fmt-ui build build-ui check check-ui
 clean:
     cargo clean
     rm -rf packages/test-ui/dist
+    rm -rf packages/studio-ui/dist
 
 generate-schema:
     cargo run -p xtask -- schema --schema acton-toml

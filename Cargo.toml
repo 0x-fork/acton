@@ -39,6 +39,7 @@ acton-config = { path = "crates/acton-config" }
 acton-abi-catalog = { path = "crates/acton-abi-catalog" }
 acton-debug = { path = "crates/acton-debug", default-features = false }
 acton-source-trace = { path = "crates/acton-source-trace" }
+acton-studio = { path = "crates/acton-studio" }
 acton-mdman = { path = "crates/acton-mdman" }
 ton-objs = { path = "crates/ton-objs" }
 tolk-compiler = { path = "crates/tolk-compiler" }
@@ -80,6 +81,7 @@ tree-sitter-toml-ng = "0.7.0"
 handlebars = { version = "6.4.0", features = ["dir_source"] }
 pulldown-cmark = { version = "0.13.1", default-features = false, features = ["html"] }
 url = "2.5.7"
+uuid = { version = "1.18", features = ["serde", "v4"] }
 
 # remote crates
 rusqlite = { version = "0.31", features = ["bundled"] }
@@ -225,6 +227,7 @@ cc = "1.2"
 acton-config = { workspace = true }
 acton-abi-catalog = { workspace = true }
 acton-debug = { workspace = true, features = ["dap-server"] }
+acton-studio = { workspace = true }
 acton-mdman = { workspace = true }
 tolk-compiler = { workspace = true }
 tolk-source-map = { workspace = true }
@@ -241,6 +244,7 @@ tvm-ffi = { workspace = true }
 tvm-logs = { workspace = true }
 tasm-core = { workspace = true }
 ton-api = { workspace = true }
+ton-networks = { workspace = true }
 ton-retrace = { workspace = true }
 toncenter-keys = { workspace = true }
 tolk-fmt = { workspace = true }

@@ -38,6 +38,7 @@ use acton_config::test::{
     BacktraceMode, CoverageFormat, GasProfileFormat, MutationDiffMode, MutationLevel, ReportFormat,
     TestConfig,
 };
+use acton_studio::DEFAULT_STUDIO_PORT;
 use clap::ArgAction;
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{StyledStr, Styles};
@@ -52,6 +53,7 @@ use dotenvy::{dotenv, from_path};
 use human_panic::{Metadata, setup_panic};
 use std::fmt::Write as _;
 use std::fs::OpenOptions;
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
@@ -946,6 +948,11 @@ enum Commands {
         #[command(subcommand)]
         command: LocalnetCommand,
     },
+    #[command(about = "Manage Acton Studio")]
+    Studio {
+        #[command(subcommand)]
+        command: StudioCommand,
+    },
     #[command(
         about = "Format project Tolk source files",
         after_help = detailed_help_pointer("fmt")
@@ -1297,6 +1304,30 @@ pub enum LocalnetCommand {
     Checkpoint {
         #[command(subcommand)]
         command: LocalnetCheckpointCommand,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum StudioCommand {
+    #[command(about = "Start Acton Studio")]
+    Start {
+        #[arg(
+            long,
+            value_name = "IP",
+            default_value = "127.0.0.1",
+            help = "Address for the Studio server to listen on"
+        )]
+        host: IpAddr,
+        #[arg(
+            long,
+            value_name = "PORT",
+            default_value_t = DEFAULT_STUDIO_PORT,
+            value_parser = clap::value_parser!(u16).range(1..),
+            help = "Studio server port"
+        )]
+        port: u16,
+        #[arg(long, help = "Do not open Studio in the default browser")]
+        no_open: bool,
     },
 }
 
@@ -1747,6 +1778,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
         // ("localnet", "<COMMAND>"),
+        // ("studio", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
     ];
     let tooling_commands = vec![
@@ -2058,6 +2090,13 @@ fn resolve_project_root(project_root: Option<PathBuf>) -> anyhow::Result<Resolve
                 resolved_project_root.display()
             );
         }
+        let resolved_project_root =
+            dunce::canonicalize(&resolved_project_root).map_err(|error| {
+                anyhow::anyhow!(
+                    "Failed to resolve project root {}: {error}",
+                    resolved_project_root.display()
+                )
+            })?;
 
         return Ok(ResolvedProjectRoot {
             path: resolved_project_root,
@@ -2103,6 +2142,22 @@ fn load_project_dotenv(project_roots_configured: bool) {
     }
 
     dotenv().ok();
+}
+
+fn configure_studio_public_network_routing(command: &Commands, project_roots_configured: bool) {
+    if !project_roots_configured
+        || matches!(command, Commands::Studio { .. })
+        || !configured_manifest_path().is_file()
+    {
+        return;
+    }
+    let Ok(config) = ActonConfig::load_manifest() else {
+        return;
+    };
+    let _ = acton::studio_discovery::activate_studio_public_network_gateways(
+        configured_project_root(),
+        &config.package.name,
+    );
 }
 
 fn main() {
@@ -2157,6 +2212,8 @@ fn main() {
         // previously we print error here, but it is too annoying for LLM agents
         // we need some better way
     }
+
+    configure_studio_public_network_routing(&command, configure_roots);
 
     let result = match command {
         Commands::Init {
@@ -2644,6 +2701,19 @@ fn main() {
             rt.block_on(ls_cmd(port, stdio, log_file, no_log))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
+        Commands::Studio { command } => match command {
+            StudioCommand::Start {
+                host,
+                port,
+                no_open,
+            } => {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to initialize tokio runtime for Studio");
+                rt.block_on(commands::studio::studio_start_cmd(host, port, !no_open))
+            }
+        },
         Commands::Localnet { command } => match command {
             LocalnetCommand::Start {
                 port,
@@ -2937,7 +3007,10 @@ const fn command_checks_toolchain_version(command: &Commands) -> bool {
     command_configures_project_roots(command)
         && !matches!(
             command,
-            Commands::Up { .. } | Commands::Completions { .. } | Commands::Doctor
+            Commands::Up { .. }
+                | Commands::Completions { .. }
+                | Commands::Doctor
+                | Commands::Studio { .. }
         )
 }
 

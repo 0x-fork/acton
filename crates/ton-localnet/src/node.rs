@@ -30,7 +30,6 @@ use anyhow::Context;
 use core::cmp;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -193,31 +192,42 @@ impl Node {
     pub fn with_db_path<P: AsRef<std::path::Path>>(
         executor: Box<dyn TvmExecutor>,
         config_boc: BocBytes,
-        state_source: StateSource,
+        mut state_source: StateSource,
         db_path: Option<P>,
     ) -> anyhow::Result<Self> {
+        let configured_origin_seqno = match &state_source {
+            StateSource::Local => 0,
+            StateSource::Remote(provider) => provider
+                .fork_block_number
+                .map(Seqno::try_from)
+                .transpose()
+                .context("Fork block seqno does not fit localnet block numbering")?
+                .unwrap_or_default(),
+        };
         let initial_config_cell =
             Boc::decode(&config_boc).context("Failed to decode blockchain config BOC")?;
         let initial_config_hash = Hash256::from(initial_config_cell.repr_hash());
 
         let persistence = db_path.map(NodePersistence::open).transpose()?;
-        let (mut latest, mut history, indexes, head_seqno) = if let Some(persistence) = &persistence
-        {
-            let persisted = persistence.load()?;
-            (
-                persisted.latest,
-                persisted.history,
-                persisted.indexes,
-                persisted.head_seqno,
-            )
-        } else {
-            (
-                LatestState::new(),
-                History::new(),
-                Indexes::new(),
-                Seqno::default(),
-            )
-        };
+        let (mut latest, mut history, indexes, persisted_origin_seqno, head_seqno) =
+            if let Some(persistence) = &persistence {
+                let persisted = persistence.load()?;
+                (
+                    persisted.latest,
+                    persisted.history,
+                    persisted.indexes,
+                    persisted.origin_seqno,
+                    persisted.head_seqno,
+                )
+            } else {
+                (
+                    LatestState::new(),
+                    History::new(),
+                    Indexes::new(),
+                    None,
+                    Seqno::default(),
+                )
+            };
         for block in &mut history.masterchain_blocks {
             if block.config_boc_hash == Hash256::default() {
                 block.config_boc_hash = initial_config_hash;
@@ -256,8 +266,45 @@ impl Node {
                 frozen_hash: None,
             });
 
+        let history_origin_seqno = history
+            .blocks
+            .first()
+            .map(|block| {
+                block
+                    .seqno
+                    .checked_sub(1)
+                    .context("Persisted block history cannot start at seqno zero")
+            })
+            .transpose()?;
+        if let (Some(persisted), Some(history)) = (persisted_origin_seqno, history_origin_seqno) {
+            anyhow::ensure!(
+                persisted == history,
+                "Persisted origin seqno {persisted} does not match block history origin {history}"
+            );
+        }
+        let origin_seqno = persisted_origin_seqno
+            .or(history_origin_seqno)
+            .unwrap_or(configured_origin_seqno);
+        if let Some(persistence) = &persistence {
+            persistence.set_origin_seqno(origin_seqno)?;
+        }
+        if let StateSource::Remote(provider) = &mut state_source {
+            provider.fork_block_number = Some(u64::from(origin_seqno));
+        }
+        let effective_head_seqno = history
+            .blocks
+            .last()
+            .map_or(origin_seqno, |block| block.seqno);
+        if !history.blocks.is_empty() {
+            anyhow::ensure!(
+                head_seqno == effective_head_seqno,
+                "Persisted head seqno {head_seqno} does not match latest block {effective_head_seqno}"
+            );
+        }
+
         let mut globals = Globals::new(config_hash);
-        globals.head_seqno = head_seqno;
+        globals.origin_seqno = origin_seqno;
+        globals.head_seqno = effective_head_seqno;
         // Approximation of global LT
         globals.global_lt = history.blocks.last().map_or(0, |b| b.end_lt);
         let clock = VirtualClock::from_blocks(&history.blocks)?;
@@ -287,6 +334,42 @@ impl Node {
             node.build_snapshot().context("Invalid SQLite state")?;
         }
         Ok(node)
+    }
+
+    fn history_index(&self, seqno: Seqno, history_len: usize) -> Option<usize> {
+        let index = seqno
+            .checked_sub(self.globals.origin_seqno)?
+            .checked_sub(1)?;
+        let index = usize::try_from(index).ok()?;
+        (index < history_len).then_some(index)
+    }
+
+    fn origin_block_meta(&self) -> Option<BlockMeta> {
+        (self.globals.origin_seqno > 0).then(|| BlockMeta {
+            seqno: self.globals.origin_seqno,
+            prev_seqno: None,
+            gen_utime: 0,
+            start_lt: 0,
+            end_lt: 0,
+            tx_hashes: Vec::new(),
+            block_hash: Hash256::default(),
+            file_hash: Hash256::default(),
+        })
+    }
+
+    fn origin_masterchain_block_meta(&self) -> Option<MasterchainBlockMeta> {
+        (self.globals.origin_seqno > 0).then(|| MasterchainBlockMeta {
+            seqno: self.globals.origin_seqno,
+            prev_seqno: None,
+            gen_utime: 0,
+            start_lt: 0,
+            end_lt: 0,
+            shard_block: LocalnetBlockId::basechain_anchor(self.globals.origin_seqno),
+            config_boc_hash: self.globals.config_boc_hash,
+            state_root_hash: Hash256::default(),
+            block_hash: Hash256::default(),
+            file_hash: Hash256::default(),
+        })
     }
 
     pub fn send_boc(&mut self, boc: BocBytes) -> anyhow::Result<Hash256> {
@@ -527,7 +610,21 @@ impl Node {
             .iter()
             .map(|commit| commit.block_tx.clone())
             .collect::<Vec<_>>();
-        let prev_masterchain_block = self.history.masterchain_blocks.last().cloned();
+        let previous_local_block = self.history.blocks.last().cloned();
+        let origin_block = previous_local_block
+            .is_none()
+            .then(|| self.origin_block_meta())
+            .flatten();
+        let previous_block = previous_local_block.as_ref().or(origin_block.as_ref());
+
+        let previous_local_masterchain_block = self.history.masterchain_blocks.last().cloned();
+        let origin_masterchain_block = previous_local_masterchain_block
+            .is_none()
+            .then(|| self.origin_masterchain_block_meta())
+            .flatten();
+        let previous_masterchain_block = previous_local_masterchain_block
+            .as_ref()
+            .or(origin_masterchain_block.as_ref());
         let prev_masterchain_blocks = self
             .history
             .masterchain_blocks
@@ -536,7 +633,7 @@ impl Node {
             .take(MASTERCHAIN_PREV_BLOCKS_LIMIT)
             .cloned()
             .collect::<Vec<_>>();
-        let prev_masterchain_state = if let Some(block) = &prev_masterchain_block {
+        let prev_masterchain_state = if let Some(block) = &previous_local_masterchain_block {
             if let Some(state) = &self.latest_masterchain_state
                 && Hash256::from(state.repr_hash()) == block.state_root_hash
             {
@@ -553,8 +650,8 @@ impl Node {
             gen_utime,
             start_lt,
             end_lt,
-            prev_block: self.history.blocks.last(),
-            master_ref: prev_masterchain_block.as_ref(),
+            prev_block: previous_block,
+            master_ref: previous_masterchain_block,
             prev_state: prev_shard_state.as_ref(),
             accounts_after: &self.latest.accounts,
             transactions: &block_transactions,
@@ -567,7 +664,7 @@ impl Node {
 
         let block_meta = BlockMeta {
             seqno,
-            prev_seqno: if seqno > 1 { Some(seqno - 1) } else { None },
+            prev_seqno: previous_block.map(|block| block.seqno),
             gen_utime,
             start_lt,
             end_lt,
@@ -586,7 +683,7 @@ impl Node {
             gen_utime,
             start_lt,
             end_lt,
-            prev_block: prev_masterchain_block.as_ref(),
+            prev_block: previous_masterchain_block,
             prev_state: prev_masterchain_state,
             shard_block: &block_meta,
             config_cell: &self.config_cell,
@@ -599,7 +696,7 @@ impl Node {
         let next_masterchain_state = masterchain_block.state_cell;
         let masterchain_block_meta = MasterchainBlockMeta {
             seqno,
-            prev_seqno: if seqno > 1 { Some(seqno - 1) } else { None },
+            prev_seqno: previous_masterchain_block.map(|block| block.seqno),
             gen_utime,
             start_lt,
             end_lt,
@@ -640,7 +737,8 @@ impl Node {
 
     #[must_use]
     pub fn prev_blocks_info_at(&self, seqno: Seqno) -> PrevBlocksInfo {
-        let zero_block = PrevBlockId::from(LocalnetBlockId::first());
+        let origin_block =
+            PrevBlockId::from(LocalnetBlockId::basechain_anchor(self.globals.origin_seqno));
         let mut last_mc_blocks = self
             .history
             .blocks
@@ -652,7 +750,7 @@ impl Node {
             .collect::<Vec<_>>();
 
         if last_mc_blocks.len() < MASTERCHAIN_PREV_BLOCKS_LIMIT {
-            last_mc_blocks.push(zero_block.clone());
+            last_mc_blocks.push(origin_block.clone());
         }
 
         // Localnet does not model key blocks, so use the latest known MC-like block.
@@ -668,7 +766,7 @@ impl Node {
             .collect::<Vec<_>>();
 
         if last_mc_blocks_100.len() < MASTERCHAIN_PREV_BLOCKS_LIMIT {
-            last_mc_blocks_100.push(zero_block);
+            last_mc_blocks_100.push(origin_block);
         }
 
         PrevBlocksInfo::new(last_mc_blocks, prev_key_block, last_mc_blocks_100)
@@ -1339,6 +1437,13 @@ impl Node {
             pending.tx_metas.len()
         );
 
+        let seqno = pending.block_meta.seqno;
+        anyhow::ensure!(
+            seqno == self.globals.head_seqno.saturating_add(1),
+            "Block seqno {seqno} does not continue head {}",
+            self.globals.head_seqno
+        );
+
         if let Some(persistence) = &self.persistence {
             persistence.persist_commit(&pending, &self.history, &self.latest)?;
         }
@@ -1358,23 +1463,14 @@ impl Node {
             self.history.masterchain_blocks.push(masterchain_block_meta);
         }
 
-        let seqno = pending.block_meta.seqno;
-        if self.history.deltas_by_seqno.len() < seqno as usize {
-            self.history
-                .deltas_by_seqno
-                .resize(seqno as usize, Vec::new());
+        for delta in &pending.deltas {
+            self.indexes
+                .account_deltas_by_addr
+                .entry(delta.addr)
+                .or_default()
+                .insert(seqno, delta.clone());
         }
-        // seqno is 1-based, index is seqno-1
-        if seqno > 0 {
-            for delta in &pending.deltas {
-                self.indexes
-                    .account_deltas_by_addr
-                    .entry(delta.addr)
-                    .or_default()
-                    .insert(seqno, delta.clone());
-            }
-            self.history.deltas_by_seqno[seqno as usize - 1].extend(pending.deltas);
-        }
+        self.history.deltas_by_seqno.push(pending.deltas);
 
         for tx_meta in &pending.tx_metas {
             self.history
@@ -1428,18 +1524,25 @@ impl Node {
     }
 
     pub fn get_address_information(&mut self, addr: &Addr) -> Option<AccountMeta> {
+        self.hydrate_address_information(addr).ok().flatten()
+    }
+
+    pub(crate) fn hydrate_address_information(
+        &mut self,
+        addr: &Addr,
+    ) -> anyhow::Result<Option<AccountMeta>> {
         if let Some(meta) = self.latest.accounts.get(addr) {
-            return Some(meta.clone());
+            return Ok(Some(meta.clone()));
         }
 
         if let StateSource::Remote(provider) = &self.state_source {
             let provider = provider.clone();
-            if let Ok(Some(_)) = self.fetch_remote_shard_account(addr, &provider) {
-                return self.latest.accounts.get(addr).cloned();
+            if self.fetch_remote_shard_account(addr, &provider)?.is_some() {
+                return Ok(self.latest.accounts.get(addr).cloned());
             }
         }
 
-        None
+        Ok(None)
     }
 
     pub fn get_address_information_at_block(
@@ -1505,20 +1608,14 @@ impl Node {
 
     #[must_use]
     pub fn get_block_header(&self, seqno: Seqno) -> Option<BlockMeta> {
-        if seqno == 0 || seqno as usize > self.history.blocks.len() {
-            None
-        } else {
-            Some(self.history.blocks[seqno as usize - 1].clone())
-        }
+        self.history_index(seqno, self.history.blocks.len())
+            .map(|index| self.history.blocks[index].clone())
     }
 
     #[must_use]
     pub fn get_masterchain_block_header(&self, seqno: Seqno) -> Option<MasterchainBlockMeta> {
-        if seqno == 0 || seqno as usize > self.history.masterchain_blocks.len() {
-            None
-        } else {
-            Some(self.history.masterchain_blocks[seqno as usize - 1].clone())
-        }
+        self.history_index(seqno, self.history.masterchain_blocks.len())
+            .map(|index| self.history.masterchain_blocks[index].clone())
     }
 
     /// Returns the serialized TON block `BoC` for a mined localnet block.
@@ -1564,11 +1661,15 @@ impl Node {
             return accounts;
         }
 
+        let applied_local_blocks = seqno
+            .saturating_sub(self.globals.origin_seqno)
+            .try_into()
+            .unwrap_or(usize::MAX);
         for deltas in self
             .history
             .deltas_by_seqno
             .iter()
-            .skip(seqno as usize)
+            .skip(applied_local_blocks)
             .rev()
         {
             for delta in deltas.iter().rev() {
@@ -1619,9 +1720,14 @@ impl Node {
         let shard_block = self
             .get_block_header(seqno)
             .ok_or(LocalnetError::BlockNotFound { seqno })?;
-        let prev_block = block
-            .prev_seqno
-            .and_then(|prev_seqno| self.get_masterchain_block_header(prev_seqno));
+        let origin_block = self.origin_masterchain_block_meta();
+        let prev_block = block.prev_seqno.and_then(|prev_seqno| {
+            self.get_masterchain_block_header(prev_seqno).or_else(|| {
+                (prev_seqno == self.globals.origin_seqno)
+                    .then(|| origin_block.clone())
+                    .flatten()
+            })
+        });
         let prev_blocks = self
             .history
             .masterchain_blocks
@@ -2251,56 +2357,6 @@ impl Node {
         &self.history
     }
 
-    pub fn set_address_name(&mut self, address: Addr, name: String) {
-        self.history.address_names.insert(address, name);
-    }
-
-    #[must_use]
-    pub fn get_address_name(&self, address: &Addr) -> Option<String> {
-        self.history.address_names.get(address).cloned()
-    }
-
-    pub fn set_compiler_abi(
-        &mut self,
-        code_hash: Hash256,
-        compiler_abi: Value,
-    ) -> anyhow::Result<()> {
-        let stale_keys = self
-            .history
-            .compiler_abi_stale_keys(code_hash, &compiler_abi);
-        if let Some(persistence) = &self.persistence {
-            persistence.set_compiler_abi(code_hash, &compiler_abi, &stale_keys)?;
-        }
-        self.history
-            .set_compiler_abi_with_stale_keys(code_hash, compiler_abi, &stale_keys);
-        Ok(())
-    }
-
-    pub fn delete_compiler_abi(&mut self, code_hash: &Hash256) -> anyhow::Result<()> {
-        let delete_key = self.history.compiler_abi_delete_key(code_hash);
-        if let Some(persistence) = &self.persistence {
-            persistence.delete_compiler_abi(delete_key)?;
-        }
-        self.history.delete_compiler_abi_by_key(&delete_key);
-        Ok(())
-    }
-
-    pub fn set_verified_source(&mut self, code_hash: Hash256, source: Value) -> anyhow::Result<()> {
-        if let Some(persistence) = &self.persistence {
-            persistence.set_verified_source(code_hash, &source)?;
-        }
-        self.history.set_verified_source(code_hash, source);
-        Ok(())
-    }
-
-    pub fn delete_verified_source(&mut self, code_hash: &Hash256) -> anyhow::Result<()> {
-        if let Some(persistence) = &self.persistence {
-            persistence.delete_verified_source(*code_hash)?;
-        }
-        self.history.delete_verified_source(code_hash);
-        Ok(())
-    }
-
     pub fn get_shard_account_at_block(
         &mut self,
         addr: &Addr,
@@ -2560,7 +2616,7 @@ impl Node {
 
     fn emulation_context(&self, mc_block_seqno: Option<Seqno>) -> anyhow::Result<(Lt, u32, Seqno)> {
         if let Some(seqno) = mc_block_seqno {
-            if seqno == 0 {
+            if seqno == 0 || seqno == self.globals.origin_seqno {
                 return Ok((
                     self.globals.global_lt.saturating_add(self.globals.lt_step),
                     self.now_unix()?,
@@ -3081,10 +3137,12 @@ mod tests {
     use super::*;
     use crate::executor::{ExecContext, ExecResult, TvmExecutor};
     use crate::node::StateSource;
-    use serde_json::json;
+    use crate::remote::RemoteProvider;
+    use serde_json::{Value, json};
     use std::sync::{Arc, Mutex};
     use std::time::{SystemTime, UNIX_EPOCH};
     use ton_executor::DEFAULT_CONFIG;
+    use ton_networks::Network;
     use tycho_types::cell::{Cell, CellBuilder, Lazy, Store};
     use tycho_types::dict::Dict;
     use tycho_types::models::block::Block;
@@ -3211,6 +3269,130 @@ mod tests {
         Node::new(executor, config_boc, StateSource::Local).expect("must create test node")
     }
 
+    fn make_forked_test_node(origin_seqno: Seqno) -> Node {
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        Node::new(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Remote(RemoteProvider {
+                network: Network::Mainnet,
+                fork_block_number: Some(u64::from(origin_seqno)),
+            }),
+        )
+        .expect("must create forked test node")
+    }
+
+    #[test]
+    fn forked_history_continues_from_origin_and_survives_snapshot_restore() {
+        const ORIGIN_SEQNO: Seqno = 81_000_000;
+        let mut node = make_forked_test_node(ORIGIN_SEQNO);
+
+        assert_eq!(node.globals.origin_seqno, ORIGIN_SEQNO);
+        assert_eq!(node.globals.head_seqno, ORIGIN_SEQNO);
+        assert!(node.history.blocks.is_empty());
+
+        let first = node.mine_block().expect("first forked block must be mined");
+        assert_eq!(first.seqno, ORIGIN_SEQNO + 1);
+        assert_eq!(first.prev_seqno, Some(ORIGIN_SEQNO));
+        assert_eq!(node.history.blocks.len(), 1);
+        assert_eq!(node.history.deltas_by_seqno.len(), 1);
+        assert_eq!(
+            node.get_block_header(ORIGIN_SEQNO + 1)
+                .expect("first forked block must be queryable")
+                .seqno,
+            ORIGIN_SEQNO + 1
+        );
+
+        let snapshot = node.build_snapshot().expect("forked snapshot must build");
+        let mut restored = make_test_node(Box::new(NoopExecutor));
+        restored
+            .apply_snapshot(snapshot)
+            .expect("forked snapshot must restore");
+        assert_eq!(restored.globals.origin_seqno, ORIGIN_SEQNO);
+        assert_eq!(restored.globals.head_seqno, ORIGIN_SEQNO + 1);
+        assert_eq!(restored.history.blocks.len(), 1);
+
+        let second = restored
+            .mine_block()
+            .expect("restored forked node must continue mining");
+        assert_eq!(second.seqno, ORIGIN_SEQNO + 2);
+        assert_eq!(second.prev_seqno, Some(ORIGIN_SEQNO + 1));
+        assert_eq!(restored.history.blocks.len(), 2);
+        assert_eq!(restored.history.deltas_by_seqno.len(), 2);
+    }
+
+    #[test]
+    fn persisted_forked_history_keeps_compact_origin_offset() {
+        const ORIGIN_SEQNO: Seqno = 81_000_000;
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let db_path = std::env::temp_dir().join(format!(
+            "ton-localnet-fork-origin-test-{}-{unique}.db",
+            std::process::id()
+        ));
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+
+        {
+            let node = Node::with_db_path(
+                Box::new(NoopExecutor),
+                config_boc.clone(),
+                StateSource::Remote(RemoteProvider {
+                    network: Network::Mainnet,
+                    fork_block_number: Some(u64::from(ORIGIN_SEQNO)),
+                }),
+                Some(&db_path),
+            )
+            .expect("must create persistent forked node");
+            assert_eq!(node.globals.origin_seqno, ORIGIN_SEQNO);
+            assert_eq!(node.globals.head_seqno, ORIGIN_SEQNO);
+            assert!(node.history.blocks.is_empty());
+        }
+
+        {
+            let mut node = Node::with_db_path(
+                Box::new(NoopExecutor),
+                config_boc.clone(),
+                StateSource::Remote(RemoteProvider {
+                    network: Network::Mainnet,
+                    fork_block_number: Some(u64::from(ORIGIN_SEQNO + 1_000)),
+                }),
+                Some(&db_path),
+            )
+            .expect("must restore empty persistent forked node");
+            assert_eq!(node.globals.origin_seqno, ORIGIN_SEQNO);
+            assert_eq!(node.globals.head_seqno, ORIGIN_SEQNO);
+            assert!(node.history.blocks.is_empty());
+            node.mine_block().expect("forked block must be persisted");
+        }
+
+        let restored = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Remote(RemoteProvider {
+                network: Network::Mainnet,
+                fork_block_number: Some(u64::from(ORIGIN_SEQNO + 2_000)),
+            }),
+            Some(&db_path),
+        )
+        .expect("must restore persistent forked node");
+        assert_eq!(restored.globals.origin_seqno, ORIGIN_SEQNO);
+        assert_eq!(restored.globals.head_seqno, ORIGIN_SEQNO + 1);
+        assert!(matches!(
+            restored.state_source,
+            StateSource::Remote(RemoteProvider {
+                fork_block_number: Some(block),
+                ..
+            }) if block == u64::from(ORIGIN_SEQNO)
+        ));
+        assert_eq!(restored.history.blocks.len(), 1);
+        assert_eq!(restored.history.deltas_by_seqno.len(), 1);
+
+        drop(restored);
+        std::fs::remove_file(&db_path).expect("must remove test database");
+    }
+
     fn block_meta(seqno: Seqno) -> BlockMeta {
         BlockMeta {
             seqno,
@@ -3316,119 +3498,6 @@ mod tests {
 
         assert_eq!(reopened.globals.config_boc_hash, config_hash);
         assert_eq!(Hash256::from(reopened.config_cell.repr_hash()), config_hash);
-
-        drop(reopened);
-        let _ = std::fs::remove_dir_all(temp_root);
-    }
-
-    #[test]
-    fn compiler_abi_registry_persists_across_db_reopen() {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time must be after unix epoch")
-            .as_nanos();
-        let temp_root = std::env::temp_dir().join(format!(
-            "ton-localnet-compiler-abi-test-{}-{unique}",
-            std::process::id()
-        ));
-        let db_path = temp_root.join("localnet.db");
-
-        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
-        let mut node = Node::with_db_path(
-            Box::new(NoopExecutor),
-            config_boc.clone(),
-            StateSource::Local,
-            Some(&db_path),
-        )
-        .expect("must create sqlite-backed test node");
-
-        let code_hash = Hash256([0x42; 32]);
-        let compiler_abi = json!({
-            "compiler_name": "tolk",
-            "contract_name": "Counter",
-            "get_methods": [
-                { "name": "currentCounter" }
-            ]
-        });
-
-        node.set_compiler_abi(code_hash, compiler_abi.clone())
-            .expect("must persist compiler ABI");
-        drop(node);
-
-        let reopened = Node::with_db_path(
-            Box::new(NoopExecutor),
-            config_boc,
-            StateSource::Local,
-            Some(&db_path),
-        )
-        .expect("must reopen sqlite-backed test node");
-
-        assert_eq!(
-            reopened.history.get_compiler_abi(&code_hash),
-            Some(compiler_abi),
-            "compiler ABI registry must survive node restart"
-        );
-
-        drop(reopened);
-        let _ = std::fs::remove_dir_all(temp_root);
-    }
-
-    #[test]
-    fn verified_source_registry_persists_across_db_reopen() {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time must be after unix epoch")
-            .as_nanos();
-        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
-            "ton-localnet-verified-source-test-{}-{unique}",
-            std::process::id()
-        ));
-        let db_path = temp_root.join("localnet.db");
-
-        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
-        let mut node = Node::with_db_path(
-            Box::new(NoopExecutor),
-            config_boc.clone(),
-            StateSource::Local,
-            Some(&db_path),
-        )
-        .expect("must create sqlite-backed test node");
-
-        let code_hash = Hash256([0x24; 32]);
-        let source = json!({
-            "code_hash": code_hash.to_hex(),
-            "verified": true,
-            "bundle": {
-                "source_bundle_hash": "source-bundle",
-                "verified_at": 0,
-                "storage_revision": "local",
-                "entrypoint": "contracts/main.tolk",
-                "compiler": {
-                    "language": "tolk",
-                    "version": "1.4.0",
-                    "params": {}
-                },
-                "files": []
-            }
-        });
-
-        node.set_verified_source(code_hash, source.clone())
-            .expect("must persist verified source");
-        drop(node);
-
-        let reopened = Node::with_db_path(
-            Box::new(NoopExecutor),
-            config_boc,
-            StateSource::Local,
-            Some(&db_path),
-        )
-        .expect("must reopen sqlite-backed test node");
-
-        assert_eq!(
-            reopened.history.get_verified_source(&code_hash),
-            Some(source),
-            "verified source registry must survive node restart"
-        );
 
         drop(reopened);
         let _ = std::fs::remove_dir_all(temp_root);

@@ -20,6 +20,7 @@ dependencies = [
  "acton-config",
  "acton-debug",
  "acton-mdman",
+ "acton-studio",
  "anyhow",
  "axum",
  "base64",
@@ -98,6 +99,7 @@ dependencies = [
  "ton-indexer",
  "ton-localnet",
  "ton-ls",
+ "ton-networks",
  "ton-retrace",
  "toncenter-keys",
  "tower-http",
@@ -196,6 +198,36 @@ dependencies = [
  "getrandom 0.3.4",
  "serde-wasm-bindgen",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "acton-studio"
+version = "1.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "expect-test",
+ "fs2",
+ "futures",
+ "hex",
+ "include_dir",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "ton",
+ "ton-api",
+ "toncenter-keys",
+ "tower 0.5.2",
+ "tower-http",
+ "tracing",
+ "url",
+ "urlencoding",
+ "uuid",
+ "xxhash-rust",
 ]
 
 [[package]]
@@ -3894,12 +3926,14 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tokio-native-tls",
+ "tokio-util",
  "tower 0.5.2",
  "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
 ]
 
@@ -5358,6 +5392,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "ton",
  "ton-networks",
  "toncenter-keys",
  "tungstenite",
@@ -5458,7 +5493,6 @@ dependencies = [
 name = "ton-localnet"
 version = "1.1.0"
 dependencies = [
- "acton-abi-catalog",
  "acton-config",
  "acton-source-trace",
  "anyhow",
@@ -5468,7 +5502,6 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "dunce",
  "hex",
- "include_dir",
  "indexmap 2.12.0",
  "num-bigint",
  "reqwest",
@@ -6123,6 +6156,7 @@ checksum = "2f87b8aa10b915a06587d0dec516c282ff295b475d94abf425d62b57710070a2"
 dependencies = [
  "getrandom 0.3.4",
  "js-sys",
+ "serde",
  "wasm-bindgen",
 ]
 
@@ -6293,6 +6327,19 @@ dependencies = [
  "indexmap 2.12.0",
  "wasm-encoder",
  "wasmparser",
+]
+
+[[package]]
+name = "wasm-streams"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15053d8d85c7eccdbefef60f06769760a563c7f0a9d6902a13d35c7800b0ad65"
+dependencies = [
+ "futures-util",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
