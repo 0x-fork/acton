@@ -1,14 +1,7 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
 import {AbiPanel, type AbiTab} from "@acton/transaction-ui/abi"
-import {
-  InlineAction,
-  InlineActions,
-  Input,
-  Pagination,
-  useClientPagination,
-  useToast,
-} from "@acton/ui"
+import {InlineAction, InlineActions, Input, Pagination, useToast} from "@acton/ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 import {Link} from "react-router"
@@ -20,6 +13,7 @@ import {
 } from "../api/compilerAbiCatalog"
 import {JsonUploadField} from "./JsonUploadField"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
+import {useSearchParamPagination} from "../hooks/useSearchParamPagination"
 import {normalizeCodeHash} from "../metadata/codeHash"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import type {RegisteredCompilerAbi} from "../metadata/types"
@@ -151,8 +145,8 @@ export const AbiCatalog: FC = () => {
     () => buildAbiTableEntries(registeredState.compilerAbis, state.entries),
     [registeredState.compilerAbis, state.entries],
   )
-  const pagination = useClientPagination(tableEntries)
   const tableLoading = state.loading || registeredState.loading
+  const pagination = useSearchParamPagination(tableEntries, {ready: !tableLoading})
   const hasAbiCodeHash = abiCodeHashes.some(codeHash => codeHash.trim().length > 0)
   const toggleAbiForm = () => setAbiFormExpanded(expanded => !expanded)
   const updateAbiCodeHash = (index: number, value: string) => {

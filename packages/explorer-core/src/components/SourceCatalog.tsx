@@ -1,13 +1,6 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
-import {
-  CopyInlineAction,
-  InlineAction,
-  InlineActions,
-  Pagination,
-  useClientPagination,
-  useToast,
-} from "@acton/ui"
+import {CopyInlineAction, InlineAction, InlineActions, Pagination, useToast} from "@acton/ui"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 
 import type {TonClient} from "../api/client"
@@ -18,6 +11,7 @@ import type {
   VerificationSourceResponse,
 } from "../api/types"
 import {JsonUploadField} from "./JsonUploadField"
+import {useSearchParamPagination} from "../hooks/useSearchParamPagination"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import {normalizeCodeHash} from "../metadata/codeHash"
 import {sourceRegistrationFromResponse} from "../metadata/sourceRegistration"
@@ -122,7 +116,7 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
   }
 
   const tableEntries = useMemo(() => state.sources.map(sourceToTableEntry), [state.sources])
-  const pagination = useClientPagination(tableEntries)
+  const pagination = useSearchParamPagination(tableEntries, {ready: !state.loading})
   const canSubmit = metadataRegistry.canWriteSources && sourceJson.trim().length > 0
   const toggleSourceForm = () => setSourceFormExpanded(expanded => !expanded)
 
