@@ -237,6 +237,8 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const addressRowText = hasContextCard ? shortAddress : displayAddress
   const statusAddress = formatRawAddress(displayAddress)
   const tonscanUrl = getTonscanUrl(displayAddress, network.id, forkNetwork)
+  const unfreezerUrl =
+    state?.status === "frozen" ? getUnfreezerUrl(bounceableAddress, network.id) : undefined
   const isNameUnchanged = editValue.trim() === (displayName || "")
   const stateLoading = accountLoading
   const showContractType = stateLoading || state?.status === "active"
@@ -755,16 +757,19 @@ export const AccountInfo: FC<AccountInfoProps> = ({
               {statusAddress}
             </span>
             {tonscanUrl && (
-              <>
-                <a
-                  className={styles.externalLink}
-                  href={tonscanUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  tonscan.org
-                </a>
-              </>
+              <a className={styles.externalLink} href={tonscanUrl} target="_blank" rel="noreferrer">
+                tonscan.org
+              </a>
+            )}
+            {unfreezerUrl && (
+              <a
+                className={styles.externalLink}
+                href={unfreezerUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                unfreezer.ton.org
+              </a>
             )}
           </div>
         </div>
@@ -955,6 +960,18 @@ function getTonscanUrl(
   }
 
   return `https://tonscan.org/address/${encodedAddress}`
+}
+
+function getUnfreezerUrl(address: string, networkId: ExplorerNetworkId): string | undefined {
+  if (networkId !== "mainnet" && networkId !== "testnet") {
+    return undefined
+  }
+
+  const parameters = new URLSearchParams({address})
+  if (networkId === "testnet") {
+    parameters.set("testnet", "true")
+  }
+  return `https://unfreezer.ton.org/?${parameters.toString()}`
 }
 
 function normalizeForkNetwork(forkNetwork?: string): "mainnet" | "testnet" | undefined {
