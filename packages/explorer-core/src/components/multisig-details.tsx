@@ -3,6 +3,7 @@ import type {MouseEvent, ReactNode} from "react"
 
 import {
   Button,
+  CopyInlineAction,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -15,10 +16,10 @@ import {
   ParsedBodySection,
   type ParsedTransactionBody,
   type ParsedValue,
+  Popover,
   RawDataBlock,
   SendModeViewer,
   Skeleton,
-  Tooltip,
 } from "@acton/ui"
 import {decodeCellWithAbi} from "@acton/transaction-ui"
 import {Check} from "lucide-react"
@@ -26,7 +27,7 @@ import {Address, Cell} from "@ton/core"
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import {getBundledCompilerAbiCatalog} from "../api/compilerAbiCatalog"
-import type {V3Multisig, V3MultisigOrder, V3MultisigOrderAction} from "../api/types"
+import type {V3Action, V3Multisig, V3MultisigOrder, V3MultisigOrderAction} from "../api/types"
 import {inferAbiByOpcode} from "../cell-inspector/abiInference"
 import {useAddressName} from "../hooks/useAddressBook"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
@@ -34,6 +35,12 @@ import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import overviewStyles from "./LockerOverview.module.css"
 import styles from "./MultisigDetails.module.css"
+import {
+  collectMultisigApprovalTimes,
+  compareMultisigApprovalTimes,
+  isMultisigSignerApproved,
+  multisigAddressKey,
+} from "./multisigApprovals"
 import {capitalize, formatGramAmount} from "./scheduleFormatting"
 import {formatAddress} from "./utils"
 
@@ -66,12 +73,14 @@ export type MultisigDetailsState =
 interface MultisigOverviewProps {
   readonly state: MultisigDetailsState
   readonly onRetry: () => void
+  readonly approvalActions?: readonly V3Action[]
   readonly hoveredSignerAddress?: string
   readonly onSignerHoverChange?: (address: string | undefined) => void
 }
 
 interface MultisigTabProps {
   readonly state: MultisigDetailsState
+  readonly approvalActions?: readonly V3Action[]
   readonly onAddressClick?: (address: string, event?: MouseEvent<HTMLElement>) => void
   readonly hoveredSignerAddress?: string
   readonly onSignerHoverChange?: (address: string | undefined) => void
@@ -86,6 +95,7 @@ const MULTISIG_ORDERS_BATCH_SIZE = 25
 export function MultisigOverview({
   state,
   onRetry,
+  approvalActions = [],
   hoveredSignerAddress,
   onSignerHoverChange,
 }: MultisigOverviewProps) {
@@ -114,6 +124,7 @@ export function MultisigOverview({
   ) : (
     <MultisigOrderOverview
       order={state.order}
+      approvalActions={approvalActions}
       hoveredSignerAddress={hoveredSignerAddress}
       onSignerHoverChange={onSignerHoverChange}
     />
@@ -122,6 +133,7 @@ export function MultisigOverview({
 
 export function MultisigSignersTab({
   state,
+  approvalActions = [],
   onAddressClick,
   hoveredSignerAddress,
   onSignerHoverChange,
@@ -136,12 +148,33 @@ export function MultisigSignersTab({
   const hoveredSignerKey = hoveredSignerAddress ? addressKey(hoveredSignerAddress) : undefined
   const proposerKeys =
     state.kind === "wallet" ? new Set(state.wallet.proposers.map(addressKey)) : undefined
+  const approvalTimes =
+    state.kind === "order" ? collectMultisigApprovalTimes(state.order, approvalActions) : undefined
+  const signerRows = signers.map((signer, index) => {
+    const signerKey = addressKey(signer)
+    const approved = state.kind === "order" && isMultisigSignerApproved(state.order, index)
+    return {
+      signer,
+      signerKey,
+      index,
+      approved,
+      approvedAt: approved ? approvalTimes?.get(signerKey) : undefined,
+    }
+  })
+  const sortedSignerRows =
+    state.kind === "order"
+      ? [...signerRows].sort(
+          (left, right) =>
+            compareMultisigApprovalTimes(left.approvedAt, right.approvedAt) ||
+            left.index - right.index,
+        )
+      : signerRows
 
   return (
     <div className={styles.tabContent}>
       <DataTable
         className={styles.flushTable}
-        minWidth={state.kind === "order" ? "38rem" : "32rem"}
+        minWidth={state.kind === "order" ? "46rem" : "32rem"}
       >
         <DataTableTable aria-label="Multisig signers">
           <DataTableHead>
@@ -152,16 +185,13 @@ export function MultisigSignersTab({
               ) : (
                 <>
                   <DataTableHeaderCell columnWidth="8rem">Approval</DataTableHeaderCell>
-                  <DataTableHeaderCell align="right" columnWidth="6rem">
-                    #
-                  </DataTableHeaderCell>
+                  <DataTableHeaderCell columnWidth="14rem">Approved at</DataTableHeaderCell>
                 </>
               )}
             </DataTableRow>
           </DataTableHead>
           <DataTableBody>
-            {signers.map((signer, index) => {
-              const signerKey = addressKey(signer)
+            {sortedSignerRows.map(({approved, approvedAt, signer, signerKey}) => {
               const highlighted = signerKey === hoveredSignerKey
               return (
                 <DataTableRow
@@ -184,13 +214,11 @@ export function MultisigSignersTab({
                     </DataTableCell>
                   ) : (
                     <>
-                      <DataTableCell
-                        tone={isSignerApproved(state.order, index) ? "strong" : "muted"}
-                      >
-                        {isSignerApproved(state.order, index) ? "Approved" : "Not approved"}
+                      <DataTableCell tone={approved ? "strong" : "muted"}>
+                        {approved ? "Approved" : "Not approved"}
                       </DataTableCell>
-                      <DataTableCell align="right" tone="muted">
-                        {index + 1}
+                      <DataTableCell tone="muted">
+                        {formatTimestamp(approvedAt ?? null)}
                       </DataTableCell>
                     </>
                   )}
@@ -424,10 +452,12 @@ function MultisigWalletOverview({wallet}: {readonly wallet: V3Multisig}) {
 
 function MultisigOrderOverview({
   order,
+  approvalActions,
   hoveredSignerAddress,
   onSignerHoverChange,
 }: {
   readonly order: V3MultisigOrder
+  readonly approvalActions: readonly V3Action[]
   readonly hoveredSignerAddress?: string
   readonly onSignerHoverChange?: (address: string | undefined) => void
 }) {
@@ -435,9 +465,14 @@ function MultisigOrderOverview({
   const approvals = order.approvals_num ?? 0
   const threshold = order.threshold ?? 0
   const actionCount = order.actions?.length ?? 0
+  const approvalTimes = collectMultisigApprovalTimes(order, approvalActions)
   const approvedSigners = order.signers
-    .map((address, index) => ({address, index}))
-    .filter(signer => isSignerApproved(order, signer.index))
+    .map((address, index) => ({
+      address,
+      index,
+      approvedAt: approvalTimes.get(addressKey(address)),
+    }))
+    .filter(signer => isMultisigSignerApproved(order, signer.index))
 
   return (
     <section className={overviewStyles.card} aria-labelledby="multisig-order-overview-title">
@@ -543,9 +578,17 @@ function ApprovalProgress({
             />
           )
           return signer ? (
-            <Tooltip key={index} content={<ApprovedSignerTooltip signer={signer} />} delay={200}>
+            <Popover
+              key={index}
+              content={<ApprovedSignerTooltip signer={signer} />}
+              interaction="hover"
+              maxWidth="32rem"
+              openDelay={200}
+              placement="top"
+              triggerAsChild
+            >
               {segment}
-            </Tooltip>
+            </Popover>
           ) : (
             segment
           )
@@ -558,6 +601,7 @@ function ApprovalProgress({
 interface ApprovedSigner {
   readonly address: string
   readonly index: number
+  readonly approvedAt?: number
 }
 
 function ApprovedSignerTooltip({signer}: {readonly signer: ApprovedSigner}) {
@@ -569,7 +613,20 @@ function ApprovedSignerTooltip({signer}: {readonly signer: ApprovedSigner}) {
       <span className={overviewStyles.approvalTooltipTitle}>
         {name ? `${name} · signer #${signer.index + 1}` : `Signer #${signer.index + 1}`}
       </span>
-      <span className={overviewStyles.approvalTooltipAddress}>{address}</span>
+      <span className={overviewStyles.approvalTooltipAddressValueRow}>
+        <code className={overviewStyles.approvalTooltipAddressValue}>{address}</code>
+        <CopyInlineAction
+          size="compact"
+          value={address}
+          label="Copy address"
+          copiedLabel="Address copied"
+        />
+      </span>
+      {signer.approvedAt !== undefined && (
+        <span className={overviewStyles.approvalTooltipAddress}>
+          Approved {formatTimestamp(signer.approvedAt)}
+        </span>
+      )}
     </span>
   )
 }
@@ -714,17 +771,6 @@ function getOrderStatus(order: V3MultisigOrder): "executed" | "expired" | "pendi
     return "expired"
   }
   return "pending"
-}
-
-function isSignerApproved(order: V3MultisigOrder, index: number): boolean {
-  if (order.approvals_mask === null || index < 0) {
-    return false
-  }
-  try {
-    return (BigInt(order.approvals_mask) & (1n << BigInt(index))) !== 0n
-  } catch {
-    return false
-  }
 }
 
 function compareOrdersDescending(left: V3MultisigOrder, right: V3MultisigOrder): number {
@@ -885,5 +931,5 @@ function uniqueAbiCandidates(
 }
 
 function addressKey(address: string): string {
-  return address.trim().toLowerCase()
+  return multisigAddressKey(address)
 }

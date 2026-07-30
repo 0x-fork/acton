@@ -171,6 +171,27 @@
   overflow-wrap: anywhere;
 }
 
+.approvalTooltipAddressValueRow {
+  display: inline-flex;
+  align-items: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  gap: 4px;
+}
+
+.approvalTooltipAddressValue {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
 .progressMeta {
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);

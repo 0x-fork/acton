@@ -1686,6 +1686,7 @@ export const AccountPage: FC<AccountPageProps> = ({
           content: (
             <MultisigSignersTab
               state={currentMultisigDetails}
+              approvalActions={actions}
               onAddressClick={handleSearch}
               hoveredSignerAddress={hoveredMultisigSignerAddress}
               onSignerHoverChange={setHoveredMultisigSignerAddress}
@@ -1715,6 +1716,7 @@ export const AccountPage: FC<AccountPageProps> = ({
           content: (
             <MultisigSignersTab
               state={currentMultisigDetails}
+              approvalActions={actions}
               onAddressClick={handleSearch}
               hoveredSignerAddress={hoveredMultisigSignerAddress}
               onSignerHoverChange={setHoveredMultisigSignerAddress}
@@ -1734,6 +1736,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     return []
   }, [
     currentMultisigDetails,
+    actions,
     handleMultisigOrderClick,
     handleSearch,
     hoveredMultisigSignerAddress,
@@ -1802,6 +1805,7 @@ export const AccountPage: FC<AccountPageProps> = ({
                   {isMultisigAccount && (
                     <MultisigOverview
                       state={currentMultisigDetails}
+                      approvalActions={actions}
                       onRetry={() => setMultisigReloadKey(key => key + 1)}
                       hoveredSignerAddress={hoveredMultisigSignerAddress}
                       onSignerHoverChange={setHoveredMultisigSignerAddress}
