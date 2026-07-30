@@ -127,6 +127,10 @@
   height: 16px;
   background: var(--acton-color-surface-hover);
   border-radius: 4px;
+  transition:
+    background-color var(--acton-duration-fast) var(--acton-ease-standard),
+    box-shadow var(--acton-duration-fast) var(--acton-ease-standard),
+    transform var(--acton-duration-fast) var(--acton-ease-standard);
 }
 
 .progressSegmentLocked {
@@ -137,8 +141,34 @@
   background: var(--acton-color-accent);
 }
 
+.progressSegmentInteractive {
+  cursor: help;
+}
+
+.progressSegmentHighlighted {
+  box-shadow:
+    0 0 0 2px var(--acton-color-surface-raised),
+    0 0 0 4px var(--acton-color-accent);
+  transform: translateY(-1px);
+}
+
 .progressSegmentNext {
   background: color-mix(in srgb, var(--acton-color-accent) 48%, var(--acton-color-surface-hover));
+}
+
+.approvalTooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.approvalTooltipTitle {
+  font-weight: var(--acton-font-weight-emphasis);
+}
+
+.approvalTooltipAddress {
+  color: var(--acton-color-text-muted);
+  overflow-wrap: anywhere;
 }
 
 .progressMeta {

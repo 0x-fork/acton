@@ -18,6 +18,7 @@ import {
   RawDataBlock,
   SendModeViewer,
   Skeleton,
+  Tooltip,
 } from "@acton/ui"
 import {decodeCellWithAbi} from "@acton/transaction-ui"
 import {Check} from "lucide-react"
@@ -27,11 +28,14 @@ import type {ExtendedContractABI} from "../api/compilerAbi"
 import {getBundledCompilerAbiCatalog} from "../api/compilerAbiCatalog"
 import type {V3Multisig, V3MultisigOrder, V3MultisigOrderAction} from "../api/types"
 import {inferAbiByOpcode} from "../cell-inspector/abiInference"
+import {useAddressName} from "../hooks/useAddressBook"
+import {useAddressFormat} from "../hooks/useNetworkInfo"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import overviewStyles from "./LockerOverview.module.css"
 import styles from "./MultisigDetails.module.css"
 import {capitalize, formatGramAmount} from "./scheduleFormatting"
+import {formatAddress} from "./utils"
 
 export type MultisigDetailsState =
   | {readonly status: "idle"}
@@ -62,18 +66,27 @@ export type MultisigDetailsState =
 interface MultisigOverviewProps {
   readonly state: MultisigDetailsState
   readonly onRetry: () => void
+  readonly hoveredSignerAddress?: string
+  readonly onSignerHoverChange?: (address: string | undefined) => void
 }
 
 interface MultisigTabProps {
   readonly state: MultisigDetailsState
   readonly onAddressClick?: (address: string, event?: MouseEvent<HTMLElement>) => void
+  readonly hoveredSignerAddress?: string
+  readonly onSignerHoverChange?: (address: string | undefined) => void
 }
 
 interface MultisigOrdersTabProps extends MultisigTabProps {
   readonly onOrderClick?: (address: string, event?: MouseEvent<HTMLElement>) => void
 }
 
-export function MultisigOverview({state, onRetry}: MultisigOverviewProps) {
+export function MultisigOverview({
+  state,
+  onRetry,
+  hoveredSignerAddress,
+  onSignerHoverChange,
+}: MultisigOverviewProps) {
   if (state.status === "idle" || state.status === "loading") {
     return <MultisigOverviewSkeleton />
   }
@@ -97,11 +110,20 @@ export function MultisigOverview({state, onRetry}: MultisigOverviewProps) {
   return state.kind === "wallet" ? (
     <MultisigWalletOverview wallet={state.wallet} />
   ) : (
-    <MultisigOrderOverview order={state.order} />
+    <MultisigOrderOverview
+      order={state.order}
+      hoveredSignerAddress={hoveredSignerAddress}
+      onSignerHoverChange={onSignerHoverChange}
+    />
   )
 }
 
-export function MultisigSignersTab({state, onAddressClick}: MultisigTabProps) {
+export function MultisigSignersTab({
+  state,
+  onAddressClick,
+  hoveredSignerAddress,
+  onSignerHoverChange,
+}: MultisigTabProps) {
   if (state.status !== "success") {
     return (
       <MultisigTabSkeleton columns={state.status !== "idle" && state.kind === "order" ? 3 : 2} />
@@ -109,6 +131,7 @@ export function MultisigSignersTab({state, onAddressClick}: MultisigTabProps) {
   }
 
   const signers = state.kind === "wallet" ? state.wallet.signers : state.order.signers
+  const hoveredSignerKey = hoveredSignerAddress ? addressKey(hoveredSignerAddress) : undefined
   const proposerKeys =
     state.kind === "wallet" ? new Set(state.wallet.proposers.map(addressKey)) : undefined
 
@@ -135,27 +158,43 @@ export function MultisigSignersTab({state, onAddressClick}: MultisigTabProps) {
             </DataTableRow>
           </DataTableHead>
           <DataTableBody>
-            {signers.map((signer, index) => (
-              <DataTableRow key={addressKey(signer)} hover>
-                <DataTableCell>
-                  <ExplorerAddressChip address={signer} onAddressClick={onAddressClick} />
-                </DataTableCell>
-                {state.kind === "wallet" ? (
-                  <DataTableCell tone="muted">
-                    {proposerKeys?.has(addressKey(signer)) ? "Signer · proposer" : "Signer"}
+            {signers.map((signer, index) => {
+              const signerKey = addressKey(signer)
+              const highlighted = signerKey === hoveredSignerKey
+              return (
+                <DataTableRow
+                  key={signerKey}
+                  hover
+                  selected={highlighted}
+                  onMouseEnter={() => onSignerHoverChange?.(signer)}
+                  onMouseLeave={() => onSignerHoverChange?.(undefined)}
+                >
+                  <DataTableCell>
+                    <ExplorerAddressChip
+                      address={signer}
+                      highlighted={highlighted}
+                      onAddressClick={onAddressClick}
+                    />
                   </DataTableCell>
-                ) : (
-                  <>
-                    <DataTableCell tone={isSignerApproved(state.order, index) ? "strong" : "muted"}>
-                      {isSignerApproved(state.order, index) ? "Approved" : "Not approved"}
+                  {state.kind === "wallet" ? (
+                    <DataTableCell tone="muted">
+                      {proposerKeys?.has(signerKey) ? "Signer · proposer" : "Signer"}
                     </DataTableCell>
-                    <DataTableCell align="right" tone="muted">
-                      {index + 1}
-                    </DataTableCell>
-                  </>
-                )}
-              </DataTableRow>
-            ))}
+                  ) : (
+                    <>
+                      <DataTableCell
+                        tone={isSignerApproved(state.order, index) ? "strong" : "muted"}
+                      >
+                        {isSignerApproved(state.order, index) ? "Approved" : "Not approved"}
+                      </DataTableCell>
+                      <DataTableCell align="right" tone="muted">
+                        {index + 1}
+                      </DataTableCell>
+                    </>
+                  )}
+                </DataTableRow>
+              )
+            })}
             {state.kind === "wallet" &&
               state.wallet.proposers
                 .filter(
@@ -324,11 +363,22 @@ function MultisigWalletOverview({wallet}: {readonly wallet: V3Multisig}) {
   )
 }
 
-function MultisigOrderOverview({order}: {readonly order: V3MultisigOrder}) {
+function MultisigOrderOverview({
+  order,
+  hoveredSignerAddress,
+  onSignerHoverChange,
+}: {
+  readonly order: V3MultisigOrder
+  readonly hoveredSignerAddress?: string
+  readonly onSignerHoverChange?: (address: string | undefined) => void
+}) {
   const status = getOrderStatus(order)
   const approvals = order.approvals_num ?? 0
   const threshold = order.threshold ?? 0
   const actionCount = order.actions?.length ?? 0
+  const approvedSigners = order.signers
+    .map((address, index) => ({address, index}))
+    .filter(signer => isSignerApproved(order, signer.index))
 
   return (
     <section className={overviewStyles.card} aria-labelledby="multisig-order-overview-title">
@@ -353,6 +403,9 @@ function MultisigOrderOverview({order}: {readonly order: V3MultisigOrder}) {
         total={threshold}
         label="Approvals"
         description={`${approvals} of ${threshold} collected`}
+        approvedSigners={approvedSigners}
+        hoveredSignerAddress={hoveredSignerAddress}
+        onSignerHoverChange={onSignerHoverChange}
       />
     </section>
   )
@@ -381,14 +434,21 @@ function ApprovalProgress({
   total,
   label,
   description,
+  approvedSigners = [],
+  hoveredSignerAddress,
+  onSignerHoverChange,
 }: {
   readonly approved: number
   readonly total: number
   readonly label: string
   readonly description: string
+  readonly approvedSigners?: readonly ApprovedSigner[]
+  readonly hoveredSignerAddress?: string
+  readonly onSignerHoverChange?: (address: string | undefined) => void
 }) {
   const safeTotal = Math.max(0, total)
   const safeApproved = Math.min(safeTotal, Math.max(0, approved))
+  const hoveredSignerKey = hoveredSignerAddress ? addressKey(hoveredSignerAddress) : undefined
   return (
     <div className={overviewStyles.progressSection}>
       <div className={overviewStyles.progressHeader}>
@@ -404,19 +464,54 @@ function ApprovalProgress({
         aria-valuenow={safeApproved}
         style={{gridTemplateColumns: `repeat(${Math.max(1, safeTotal)}, minmax(0, 1fr))`}}
       >
-        {Array.from({length: Math.max(1, safeTotal)}, (_, index) => (
-          <span
-            key={index}
-            className={`${overviewStyles.progressSegment} ${
-              index < safeApproved
-                ? overviewStyles.progressSegmentUnlocked
-                : overviewStyles.progressSegmentLocked
-            }`}
-            aria-hidden="true"
-          />
-        ))}
+        {Array.from({length: Math.max(1, safeTotal)}, (_, index) => {
+          const signer = index < safeApproved ? approvedSigners[index] : undefined
+          const highlighted =
+            signer !== undefined && addressKey(signer.address) === hoveredSignerKey
+          const segment = (
+            <span
+              key={index}
+              className={`${overviewStyles.progressSegment} ${
+                index < safeApproved
+                  ? overviewStyles.progressSegmentUnlocked
+                  : overviewStyles.progressSegmentLocked
+              } ${signer ? overviewStyles.progressSegmentInteractive : ""} ${
+                highlighted ? overviewStyles.progressSegmentHighlighted : ""
+              }`}
+              aria-hidden="true"
+              onMouseEnter={() => onSignerHoverChange?.(signer?.address)}
+              onMouseLeave={() => onSignerHoverChange?.(undefined)}
+            />
+          )
+          return signer ? (
+            <Tooltip key={index} content={<ApprovedSignerTooltip signer={signer} />} delay={200}>
+              {segment}
+            </Tooltip>
+          ) : (
+            segment
+          )
+        })}
       </div>
     </div>
+  )
+}
+
+interface ApprovedSigner {
+  readonly address: string
+  readonly index: number
+}
+
+function ApprovedSignerTooltip({signer}: {readonly signer: ApprovedSigner}) {
+  const addressFormat = useAddressFormat()
+  const name = useAddressName(signer.address)
+  const address = formatAddress(signer.address, false, addressFormat)
+  return (
+    <span className={overviewStyles.approvalTooltip}>
+      <span className={overviewStyles.approvalTooltipTitle}>
+        {name ? `${name} · signer #${signer.index + 1}` : `Signer #${signer.index + 1}`}
+      </span>
+      <span className={overviewStyles.approvalTooltipAddress}>{address}</span>
+    </span>
   )
 }
 

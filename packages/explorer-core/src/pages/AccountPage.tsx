@@ -148,6 +148,9 @@ export const AccountPage: FC<AccountPageProps> = ({
   const [vestingData, setVestingData] = useState<VestingData | undefined>()
   const [multisigDetails, setMultisigDetails] = useState<MultisigDetailsState>({status: "idle"})
   const [multisigReloadKey, setMultisigReloadKey] = useState(0)
+  const [hoveredMultisigSignerAddress, setHoveredMultisigSignerAddress] = useState<
+    string | undefined
+  >()
   const [accountDomain, setAccountDomain] = useState<string | undefined>()
   const [accountDomains, setAccountDomains] = useState<readonly string[]>([])
   const [transactions, setTransactions] = useState<V3TransactionListItem[]>([])
@@ -234,6 +237,9 @@ export const AccountPage: FC<AccountPageProps> = ({
     () => `${network.id}:${accountAddressKey}`,
     [accountAddressKey, network.id],
   )
+  useEffect(() => {
+    setHoveredMultisigSignerAddress(undefined)
+  }, [accountRequestKey])
   const historyRequestKey = `${accountRequestKey}:${historySortOrder}`
   const activeTab = useMemo<AccountTab>(() => {
     const tab = location.hash.replace("#", "")
@@ -1678,7 +1684,12 @@ export const AccountPage: FC<AccountPageProps> = ({
           label: "Signers",
           icon: <UsersRound size={18} />,
           content: (
-            <MultisigSignersTab state={currentMultisigDetails} onAddressClick={handleSearch} />
+            <MultisigSignersTab
+              state={currentMultisigDetails}
+              onAddressClick={handleSearch}
+              hoveredSignerAddress={hoveredMultisigSignerAddress}
+              onSignerHoverChange={setHoveredMultisigSignerAddress}
+            />
           ),
         },
         {
@@ -1702,7 +1713,12 @@ export const AccountPage: FC<AccountPageProps> = ({
           label: "Signers",
           icon: <UsersRound size={18} />,
           content: (
-            <MultisigSignersTab state={currentMultisigDetails} onAddressClick={handleSearch} />
+            <MultisigSignersTab
+              state={currentMultisigDetails}
+              onAddressClick={handleSearch}
+              hoveredSignerAddress={hoveredMultisigSignerAddress}
+              onSignerHoverChange={setHoveredMultisigSignerAddress}
+            />
           ),
         },
         {
@@ -1720,6 +1736,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     currentMultisigDetails,
     handleMultisigOrderClick,
     handleSearch,
+    hoveredMultisigSignerAddress,
     isMultisigOrderAccount,
     isMultisigWalletAccount,
   ])
@@ -1786,6 +1803,8 @@ export const AccountPage: FC<AccountPageProps> = ({
                     <MultisigOverview
                       state={currentMultisigDetails}
                       onRetry={() => setMultisigReloadKey(key => key + 1)}
+                      hoveredSignerAddress={hoveredMultisigSignerAddress}
+                      onSignerHoverChange={setHoveredMultisigSignerAddress}
                     />
                   )}
                   {accountState && tokenInfo && (
