@@ -23,6 +23,7 @@ import {CellInspectorPage} from "@acton/explorer-core/pages/CellInspectorPage"
 import {EmulatePage} from "@acton/explorer-core/pages/EmulatePage"
 import {ExplorerIndexPage} from "@acton/explorer-core/pages/ExplorerIndexPage"
 import {FavoriteAccountsPage} from "@acton/explorer-core/pages/FavoriteAccountsPage"
+import {SuspendedAddressesPage} from "@acton/explorer-core/pages/SuspendedAddressesPage"
 import {TransactionPage} from "@acton/explorer-core/pages/TransactionPage"
 import {AddressBookProvider} from "@acton/explorer-core/hooks/useAddressBook"
 import {MetadataRegistryProvider} from "@acton/explorer-core/metadata/MetadataRegistryProvider"
@@ -64,6 +65,7 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/contracts/abi": "ABI",
   "/explorer/tokens": "Tokens",
   "/explorer/nfts": "NFTs",
+  "/explorer/suspended": "Suspended addresses",
   "/settings": "Settings",
   "/integrate": "Integrate",
   "/api-reference/v2": "API Reference v2",
@@ -83,6 +85,7 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/contracts/abi": "Manage ABI used to decode contract state and messages",
   "/explorer/tokens": "Jettons detected on this network",
   "/explorer/nfts": "NFT items indexed from this network",
+  "/explorer/suspended": "Addresses restricted by the network configuration",
   "/settings": "Manage environment identity, network behavior and mining",
   "/integrate": "Connect Acton projects, applications and TON-compatible tools to this network",
   "/api-reference/v2": "Explore the v2 API",
@@ -523,6 +526,15 @@ const AppContent: FC<AppContentProps> = ({
                 "explorer",
                 <DashboardPage embedded>
                   <FavoriteAccountsPage client={client} />
+                </DashboardPage>,
+              )}
+            />
+            <Route
+              path={path("/explorer/suspended")}
+              element={withCapability(
+                "explorer",
+                <DashboardPage embedded>
+                  <SuspendedAddressesPage client={client} />
                 </DashboardPage>,
               )}
             />

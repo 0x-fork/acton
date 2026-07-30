@@ -28,6 +28,7 @@ export const SuspendedAccountOverview: FC<SuspendedAccountOverviewProps> = ({sus
   }, [])
 
   const countdown = suspensionCountdown(suspendedUntil, nowSeconds)
+  if (suspendedUntil <= nowSeconds) return null
 
   return (
     <section className={styles.card} aria-labelledby={titleId}>
@@ -40,7 +41,11 @@ export const SuspendedAccountOverview: FC<SuspendedAccountOverviewProps> = ({sus
             This address has been suspended through validators&apos; voting
           </p>
         </div>
-        <Link className={styles.listLink} to={routes.suspendedAddressesPath}>
+        <Link
+          aria-label="View all suspended addresses"
+          className={styles.listLink}
+          to={routes.suspendedAddressesPath}
+        >
           View all
         </Link>
       </div>
@@ -50,20 +55,23 @@ export const SuspendedAccountOverview: FC<SuspendedAccountOverviewProps> = ({sus
       </div>
 
       <dl className={styles.countdown}>
-        <CountdownValue label="years" value={countdown.years} />
-        <CountdownValue label="months" value={countdown.months} />
-        <CountdownValue label="days" value={countdown.days} />
-        <CountdownValue label="hours" value={countdown.hours} />
-        <CountdownValue label="minutes" value={countdown.minutes} />
+        <CountdownValue unit="year" value={countdown.years} />
+        <CountdownValue unit="month" value={countdown.months} />
+        <CountdownValue unit="day" value={countdown.days} />
+        <CountdownValue unit="hour" value={countdown.hours} />
+        <CountdownValue unit="minute" value={countdown.minutes} />
       </dl>
     </section>
   )
 }
 
-function CountdownValue({label, value}: {readonly label: string; readonly value: number}) {
+function CountdownValue({unit, value}: {readonly unit: string; readonly value: number}) {
   return (
     <div className={styles.countdownValue}>
-      <dt>{label}</dt>
+      <dt>
+        {unit}
+        {value === 1 ? "" : "s"}
+      </dt>
       <dd>{value}</dd>
     </div>
   )

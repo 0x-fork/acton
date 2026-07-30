@@ -19,6 +19,7 @@ import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {formatNano, toRawAddress} from "../components/utils"
 import {useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
+import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import styles from "./SuspendedAddressesPage.module.css"
 
 interface SuspendedAddressesPageProps {
@@ -41,8 +42,9 @@ type SuspendedAccountsLoadState =
   | {readonly status: "error"; readonly message: string}
 
 const ACCOUNT_STATE_BATCH_SIZE = 50
+const SUSPENSION_STATUS_REFRESH_MS = 60_000
 const SUSPENDED_ACCOUNTS_VOTE_URL = "https://t.me/tonblockchain/182"
-const UNLOCK_DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
+const UNLOCK_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
   month: "long",
   year: "numeric",
@@ -52,7 +54,17 @@ const UNLOCK_DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
 export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}) => {
   const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
+  const {isMainnetFork} = useNetworkInfo()
   const [loadState, setLoadState] = useState<SuspendedAccountsLoadState>({status: "loading"})
+  const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
+
+  useEffect(() => {
+    const interval = globalThis.setInterval(
+      () => setNowSeconds(Math.floor(Date.now() / 1000)),
+      SUSPENSION_STATUS_REFRESH_MS,
+    )
+    return () => globalThis.clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -63,40 +75,35 @@ export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}
         const config = await client.getSuspendedAccountsConfig()
         if (!active) return
 
+        const suspensionActive = config.suspendedUntil > Math.floor(Date.now() / 1000)
         setLoadState({
           status: "success",
           config,
           balances: new Map(),
-          balancesStatus: "loading",
+          balancesStatus: suspensionActive ? "loading" : "success",
         })
+        if (!suspensionActive) return
 
-        try {
-          const batches = chunk(config.rawAddresses, ACCOUNT_STATE_BATCH_SIZE)
-          const responses = await Promise.all(
-            batches.map(addresses => client.getAccountStates(addresses, false)),
-          )
-          if (!active) return
+        const batches = chunk(config.rawAddresses, ACCOUNT_STATE_BATCH_SIZE)
+        const responses = await Promise.allSettled(
+          batches.map(addresses => client.getAccountStates(addresses, false)),
+        )
+        if (!active) return
 
-          setLoadState({
-            status: "success",
-            config,
-            balances: new Map(
-              responses.flatMap(response =>
-                response.accounts.map(account => [toRawAddress(account.address), account.balance]),
-              ),
-            ),
-            balancesStatus: "success",
-          })
-        } catch (error) {
-          console.error("Failed to fetch suspended account balances", error)
-          if (!active) return
-          setLoadState({
-            status: "success",
-            config,
-            balances: new Map(),
-            balancesStatus: "error",
-          })
+        const balances = new Map<string, string>()
+        let balancesStatus: "error" | "success" = "success"
+        for (const response of responses) {
+          if (response.status === "rejected") {
+            balancesStatus = "error"
+            console.error("Failed to fetch suspended account balances", response.reason)
+            continue
+          }
+          for (const account of response.value.accounts) {
+            balances.set(toRawAddress(account.address), account.balance)
+          }
         }
+
+        setLoadState({status: "success", config, balances, balancesStatus})
       } catch (error) {
         if (active) {
           setLoadState({
@@ -113,8 +120,10 @@ export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}
     }
   }, [client])
 
+  const config = loadState.status === "success" ? loadState.config : undefined
+  const suspensionActive = config ? config.suspendedUntil > nowSeconds : false
   const rows = useMemo<readonly SuspendedAccountRow[]>(() => {
-    if (loadState.status !== "success") return []
+    if (loadState.status !== "success" || !suspensionActive) return []
 
     return loadState.config.rawAddresses
       .map(rawAddress => ({
@@ -122,9 +131,8 @@ export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}
         balance: loadState.balances.get(rawAddress),
       }))
       .sort(compareSuspendedAccounts)
-  }, [loadState])
+  }, [loadState, suspensionActive])
   const totalBalance = rows.reduce((total, row) => total + BigInt(row.balance ?? 0), 0n)
-  const config = loadState.status === "success" ? loadState.config : undefined
 
   return (
     <section className={styles.container}>
@@ -134,19 +142,25 @@ export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}
         <div className={styles.heading}>
           <h1 className={styles.title}>Suspended addresses</h1>
           <p className={styles.description}>
-            {config ? (
+            {config && suspensionActive ? (
               <>
                 {config.rawAddresses.length} addresses are suspended through{" "}
-                <a
-                  className={styles.descriptionLink}
-                  href={SUSPENDED_ACCOUNTS_VOTE_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  validators&apos; voting
-                </a>{" "}
+                {isMainnetFork ? (
+                  <a
+                    className={styles.descriptionLink}
+                    href={SUSPENDED_ACCOUNTS_VOTE_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    validators&apos; voting
+                  </a>
+                ) : (
+                  "validators' voting"
+                )}{" "}
                 until {formatUnlockDate(config.suspendedUntil)}
               </>
+            ) : config ? (
+              "No addresses are currently suspended by the network configuration"
             ) : (
               "Addresses temporarily restricted by the current network configuration"
             )}
@@ -161,7 +175,13 @@ export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}
         </section>
       ) : (
         <DataTable minWidth="48rem">
-          <DataTableTable aria-label="Suspended addresses">
+          <DataTableTable
+            aria-busy={
+              loadState.status === "loading" ||
+              (loadState.status === "success" && loadState.balancesStatus === "loading")
+            }
+            aria-label="Suspended addresses"
+          >
             <DataTableHead>
               <DataTableRow>
                 <DataTableHeaderCell columnWidth="3.75rem">#</DataTableHeaderCell>
@@ -208,10 +228,15 @@ export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}
                 })
               )}
             </DataTableBody>
-            {loadState.status === "success" && (
+            {loadState.status === "success" && suspensionActive && (
               <DataTableFooter>
                 <DataTableRow>
-                  <DataTableCell className={styles.totalCell} colSpan={2} tone="strong">
+                  <DataTableCell
+                    className={styles.totalCell}
+                    colSpan={2}
+                    role="rowheader"
+                    tone="strong"
+                  >
                     Total balance
                   </DataTableCell>
                   <DataTableCell className={styles.totalCell} align="right" tone="strong">
