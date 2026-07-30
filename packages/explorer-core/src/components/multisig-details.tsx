@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from "react"
+import {useEffect, useMemo, useRef, useState} from "react"
 import type {MouseEvent, ReactNode} from "react"
 
 import {
@@ -80,6 +80,8 @@ interface MultisigTabProps {
 interface MultisigOrdersTabProps extends MultisigTabProps {
   readonly onOrderClick?: (address: string, event?: MouseEvent<HTMLElement>) => void
 }
+
+const MULTISIG_ORDERS_BATCH_SIZE = 25
 
 export function MultisigOverview({
   state,
@@ -222,11 +224,49 @@ export function MultisigSignersTab({
 }
 
 export function MultisigOrdersTab({state, onAddressClick, onOrderClick}: MultisigOrdersTabProps) {
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const [visibleOrderCount, setVisibleOrderCount] = useState(MULTISIG_ORDERS_BATCH_SIZE)
+  const orders = useMemo(
+    () =>
+      state.status === "success" && state.kind === "wallet"
+        ? [...state.wallet.orders].sort(compareOrdersDescending)
+        : [],
+    [state],
+  )
+  const walletAddress =
+    state.status === "success" && state.kind === "wallet" ? state.address : undefined
+  const visibleOrders = orders.slice(0, visibleOrderCount)
+  const hasMoreOrders = visibleOrderCount < orders.length
+
+  useEffect(() => {
+    setVisibleOrderCount(MULTISIG_ORDERS_BATCH_SIZE)
+  }, [walletAddress])
+
+  useEffect(() => {
+    const target = loadMoreRef.current
+    if (!hasMoreOrders || !target || typeof IntersectionObserver === "undefined") {
+      return
+    }
+
+    let requested = false
+    const observer = new IntersectionObserver(
+      entries => {
+        if (requested || !entries.some(entry => entry.isIntersecting)) {
+          return
+        }
+        requested = true
+        setVisibleOrderCount(count => Math.min(count + MULTISIG_ORDERS_BATCH_SIZE, orders.length))
+      },
+      {rootMargin: "320px 0px"},
+    )
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [hasMoreOrders, orders.length, visibleOrderCount])
+
   if (state.status !== "success" || state.kind !== "wallet") {
     return <MultisigTabSkeleton columns={4} />
   }
-
-  const orders = [...state.wallet.orders].sort(compareOrdersDescending)
 
   return (
     <div className={styles.tabContent}>
@@ -243,7 +283,7 @@ export function MultisigOrdersTab({state, onAddressClick, onOrderClick}: Multisi
             </DataTableRow>
           </DataTableHead>
           <DataTableBody>
-            {orders.map(order => {
+            {visibleOrders.map(order => {
               const status = getOrderStatus(order)
               return (
                 <DataTableRow
@@ -286,6 +326,25 @@ export function MultisigOrdersTab({state, onAddressClick, onOrderClick}: Multisi
             )}
           </DataTableBody>
         </DataTableTable>
+        {hasMoreOrders && (
+          <div ref={loadMoreRef} className={styles.ordersLoadMore}>
+            <span className={styles.ordersLoadMoreSummary}>
+              Showing {visibleOrders.length.toLocaleString()} of {orders.length.toLocaleString()}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                setVisibleOrderCount(count =>
+                  Math.min(count + MULTISIG_ORDERS_BATCH_SIZE, orders.length),
+                )
+              }
+            >
+              Load more
+            </Button>
+          </div>
+        )}
       </DataTable>
     </div>
   )
