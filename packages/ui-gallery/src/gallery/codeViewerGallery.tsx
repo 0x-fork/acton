@@ -46,7 +46,7 @@ const sourceFiles = [
     content: commonScriptSource,
   },
   {
-    path: "output/JettonWallet.gen.tolk",
+    path: "gen/JettonWallet.gen.tolk",
     content: jettonWalletWrapperSource,
   },
 ] satisfies readonly CodeViewerFile[]
@@ -76,7 +76,7 @@ export const codeViewerGallery = {
       id: "code-viewer-tree",
       title: "Nested Source Tree",
       description:
-        "The real Jetton project checks long-file scrolling. Folders expand independently, generated output is highlighted, and row hover changes both label and icon color.",
+        "The real Jetton project checks long-file scrolling. Folders expand independently, generated artifacts are highlighted and sorted last, and row hover changes both label and icon color.",
       content: (
         <CodeViewer
           files={sourceFiles}

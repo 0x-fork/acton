@@ -243,7 +243,7 @@ function FileTreeRows({
                 className={cx(
                   styles.treeRow,
                   styles.folderRow,
-                  node.name === "output" && styles.outputFolderRow,
+                  isGeneratedArtifactsFolder(node) && styles.generatedFolderRow,
                 )}
                 style={depthStyle}
                 aria-expanded={expanded}
@@ -346,9 +346,16 @@ function freezeTree(node: FileTreeDraftNode): FileTreeNode {
 
 function sortTree(nodes: readonly FileTreeNode[]): FileTreeNode[] {
   return nodes.toSorted((left, right) => {
+    const leftIsGenerated = isGeneratedArtifactsFolder(left)
+    const rightIsGenerated = isGeneratedArtifactsFolder(right)
+    if (leftIsGenerated !== rightIsGenerated) return leftIsGenerated ? 1 : -1
     if (left.kind !== right.kind) return left.kind === "folder" ? -1 : 1
     return left.name.localeCompare(right.name)
   })
+}
+
+function isGeneratedArtifactsFolder(node: Pick<FileTreeNode, "kind" | "name">): boolean {
+  return node.kind === "folder" && (node.name === "gen" || node.name === "output")
 }
 
 function normalizeFilePath(path: string): string {

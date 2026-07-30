@@ -159,13 +159,13 @@
   font-weight: var(--acton-font-weight-medium);
 }
 
-.outputFolderRow {
+.generatedFolderRow {
   background: color-mix(in srgb, var(--acton-color-warning) 8%, transparent);
   color: var(--acton-color-warning-text);
 }
 
-.outputFolderRow:hover,
-.outputFolderRow:focus-visible {
+.generatedFolderRow:hover,
+.generatedFolderRow:focus-visible {
   background: color-mix(in srgb, var(--acton-color-warning) 14%, transparent);
   color: var(--acton-color-warning-text-hover);
 }
