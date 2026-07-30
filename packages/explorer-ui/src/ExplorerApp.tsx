@@ -63,6 +63,7 @@ import actonScanCustomLogo from "./assets/acton-scan-custom-logo-dark.svg"
 import actonScanLogo from "./assets/acton-scan-logo-dark.svg"
 import actonScanTestnetLogo from "./assets/acton-scan-testnet-logo-dark.svg"
 import {DeveloperExplorerBanner} from "./components/DeveloperExplorerBanner"
+import {EXPLORER_NETWORK_QUERY_PARAM, explorerNetworkSearch} from "./explorerNetworkUrl"
 import {FaucetPage} from "./faucet/FaucetPage"
 import {AbiCatalogPage, AbiDetailsPage} from "./pages/abi-pages"
 import {SourceCatalogPage} from "./pages/SourceCatalogPage"
@@ -92,7 +93,6 @@ const EXPLORER_CUSTOM_NETWORKS_STORAGE_KEY = "explorerCustomNetworks"
 const ACTON_VERIFIER_API = createVerifierApi({
   baseUrl: "https://verifier.acton.monster/api/v1",
 })
-const EXPLORER_NETWORK_QUERY_PARAM = "network"
 const DEFAULT_CUSTOM_NETWORK_NAME = "Devnet"
 const SHARED_NETWORK_NAME_QUERY_PARAM = "network.name"
 const SHARED_NETWORK_V2_QUERY_PARAM = "network.v2"
@@ -837,23 +837,13 @@ const ExplorerNetworkUrlSync: FC<{
   const navigate = useNavigate()
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search)
-    if (networkId === "testnet") {
-      if (searchParams.get(EXPLORER_NETWORK_QUERY_PARAM) === networkId) {
-        return
-      }
-      searchParams.set(EXPLORER_NETWORK_QUERY_PARAM, networkId)
-    } else {
-      if (!searchParams.has(EXPLORER_NETWORK_QUERY_PARAM)) {
-        return
-      }
-      searchParams.delete(EXPLORER_NETWORK_QUERY_PARAM)
-    }
+    const search = explorerNetworkSearch(location.search, networkId)
+    if (search === new URLSearchParams(location.search).toString()) return
 
     void navigate(
       {
         pathname: location.pathname,
-        search: searchParams.toString(),
+        search,
         hash: location.hash,
       },
       {replace: true},
