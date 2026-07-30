@@ -6,6 +6,40 @@ build: build-ui
 build-dev:
     cargo build --locked
 
+build-ci: build
+
+fmt:
+    cargo fmt --all
+
+fmt-check:
+    cargo fmt --all --check
+
+check-deps:
+    cargo shear --deny-warnings
+
+clippy:
+    cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+check-deny:
+    cargo deny check
+
+test: install-compiler-worker
+    cd compiler-worker && npm test
+    cargo test --locked
+
+check-ci: fmt-check check-deps clippy check-deny
+
+check: check-ci test
+
+precommit: fmt build check
+
+run: build-ui
+    cargo run --locked
+
+clean:
+    cargo clean
+    rm -rf ../../packages/verifier-ui/dist
+
 install: install-ui install-compiler-worker
 
 install-ui:
@@ -19,27 +53,3 @@ build-ui: install-ui
 
 generate-registry:
     cd compiler-worker && npm run generate-registry
-
-test: install-compiler-worker
-    cd compiler-worker && npm test
-    cargo test --locked
-
-fmt:
-    cargo fmt --all
-
-fmt-check:
-    cargo fmt --all --check
-
-clippy:
-    cargo clippy --all-targets --locked -- -D warnings
-
-check: fmt-check clippy test
-
-precommit: fmt build check
-
-run: build-ui
-    cargo run --locked
-
-clean:
-    cargo clean
-    rm -rf ../../packages/verifier-ui/dist

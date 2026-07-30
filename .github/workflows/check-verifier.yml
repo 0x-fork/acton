@@ -60,7 +60,7 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Build verifier
-        run: just build
+        run: just build-ci
 
   check:
     name: Check verifier
@@ -90,10 +90,10 @@ jobs:
       - name: Install Rust
         run: rustup toolchain install
 
-      - name: Install just
+      - name: Install check tools
         uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.52.0
+          tool: just@1.52.0,cargo-shear@1.13.1,cargo-deny@0.19.8
           fallback: none
 
       - name: Set up Node.js
@@ -103,5 +103,8 @@ jobs:
           cache-dependency-path: apps/verifier/compiler-worker/package-lock.json
           node-version: 22
 
+      - name: Test verifier
+        run: just test
+
       - name: Check verifier
-        run: just check
+        run: just check-ci

@@ -11,7 +11,7 @@ RUN npm ci
 COPY packages/verifier-ui ./
 RUN npm run build
 
-FROM rust:1.95-slim-bookworm AS rust-builder
+FROM rust:1.96.1-slim-bookworm AS rust-builder
 
 WORKDIR /build/apps/verifier
 

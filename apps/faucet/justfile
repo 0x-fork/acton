@@ -1,11 +1,12 @@
+all: precommit
+
 build:
-    cargo build --release
+    cargo build --release --locked
 
 build-dev:
-    cargo build
+    cargo build --locked
 
-build-ci:
-    cargo build --release --locked --bin faucet-backend
+build-ci: build
 
 fmt:
     cargo fmt --all
@@ -28,3 +29,11 @@ test:
 check-ci: fmt-check check-deps clippy check-deny
 
 check: check-ci test
+
+precommit: fmt build check
+
+run:
+    cargo run --locked
+
+clean:
+    cargo clean
