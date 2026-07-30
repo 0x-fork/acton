@@ -55,6 +55,7 @@ import {ExplorerSearch} from "@acton/explorer-core/components/ExplorerSearch"
 import {ExplorerDocumentTitle} from "@acton/explorer-core/components/ExplorerDocumentTitle"
 import {ExplorerIndexPage} from "@acton/explorer-core/pages/ExplorerIndexPage"
 import {FavoriteAccountsPage} from "@acton/explorer-core/pages/FavoriteAccountsPage"
+import {SuspendedAddressesPage} from "@acton/explorer-core/pages/SuspendedAddressesPage"
 import {TransactionPage} from "@acton/explorer-core/pages/TransactionPage"
 import "@acton/ui/styles/tokens.css"
 import "@acton/explorer-core/styles.css"
@@ -1354,6 +1355,11 @@ export const ExplorerApp: FC = () => {
                               <Link to="/tokens" onClick={closeMobileHeaderPanels}>
                                 Tokens
                               </Link>
+                              {networkId === "mainnet" && (
+                                <Link to="/suspended" onClick={closeMobileHeaderPanels}>
+                                  Suspended addresses
+                                </Link>
+                              )}
                               <Link to="/abi" onClick={closeMobileHeaderPanels}>
                                 ABI
                               </Link>
@@ -1432,6 +1438,10 @@ export const ExplorerApp: FC = () => {
                       <Route path="/cell" element={<CellInspectorExplorerPage />} />
                       <Route path="/emulate" element={<EmulateExplorerPage client={client} />} />
                       <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />
+                      <Route
+                        path="/suspended"
+                        element={<SuspendedAddressesPage client={client} />}
+                      />
                       <Route
                         path="/block/last"
                         element={<BlockDetailsPage client={client} latest />}

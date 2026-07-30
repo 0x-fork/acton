@@ -9,6 +9,7 @@ import {Cell} from "@ton/core"
 
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
+import {isAddressSuspended} from "../api/suspendedAccounts"
 import type {
   AddressInformation,
   AccountStatesResponse,
@@ -43,6 +44,7 @@ import {
   type MultisigDetailsState,
 } from "../components/multisig-details"
 import {NftImage} from "../components/NftImage"
+import {SuspendedAccountOverview} from "../components/SuspendedAccountOverview"
 import {VestingOverview} from "../components/VestingOverview"
 import {
   NFT_CARD_IMAGE_SOURCE_KEYS,
@@ -145,6 +147,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   const {updateDomains} = useAddressBook()
   const [accountState, setAccountState] = useState<AddressInformation | undefined>()
   const [accountStateV3, setAccountStateV3] = useState<V3AccountState | undefined>()
+  const [accountSuspendedUntil, setAccountSuspendedUntil] = useState<number | undefined>()
   const [vestingData, setVestingData] = useState<VestingData | undefined>()
   const [multisigDetails, setMultisigDetails] = useState<MultisigDetailsState>({status: "idle"})
   const [multisigReloadKey, setMultisigReloadKey] = useState(0)
@@ -275,6 +278,31 @@ export const AccountPage: FC<AccountPageProps> = ({
   const transactionPageSize = usesToncenterApi
     ? REMOTE_TRANSACTION_PAGE_SIZE
     : LOCAL_TRANSACTION_PAGE_SIZE
+
+  useEffect(() => {
+    let active = true
+    setAccountSuspendedUntil(undefined)
+
+    if (!formattedAddress) return
+
+    const load = async () => {
+      try {
+        const config = await client.getSuspendedAccountsConfig()
+        if (!active) return
+
+        setAccountSuspendedUntil(
+          isAddressSuspended(config, formattedAddress) ? config.suspendedUntil : undefined,
+        )
+      } catch (error) {
+        console.error("Failed to fetch suspended accounts config", error)
+      }
+    }
+
+    void load()
+    return () => {
+      active = false
+    }
+  }, [client, formattedAddress])
 
   useEffect(() => {
     const kind = isMultisigWalletAccount ? "wallet" : isMultisigOrderAccount ? "order" : undefined
@@ -1610,6 +1638,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   const isLockerAccount = Boolean(accountState && isLockerCodeHash(accountCodeLookupHash))
   const isVestingAccount = Boolean(accountState && isVestingCodeHash(accountCodeLookupHash))
   const isScheduleAccount = isLockerAccount || isVestingAccount
+  const accountSuspended = accountSuspendedUntil !== undefined
   const currentMultisigDetails: MultisigDetailsState =
     multisigDetails.status !== "idle" && multisigDetails.address !== formattedAddress
       ? {
@@ -1628,10 +1657,11 @@ export const AccountPage: FC<AccountPageProps> = ({
         currentNftItem ||
         (nftCollectionName && !currentNftItem) ||
         isScheduleAccount ||
-        isMultisigAccount),
+        isMultisigAccount ||
+        accountSuspended),
   )
   const topSectionClassName = hasHeaderContextCard
-    ? isScheduleAccount || isMultisigAccount
+    ? isScheduleAccount || isMultisigAccount || accountSuspended
       ? `${styles.topSection} ${styles.topSectionEqual}`
       : styles.topSection
     : `${styles.topSection} ${styles.topSectionSingle}`
@@ -1794,6 +1824,9 @@ export const AccountPage: FC<AccountPageProps> = ({
               )}
               {hasHeaderContextCard && (
                 <div className={styles.contextColumn}>
+                  {accountSuspendedUntil !== undefined && (
+                    <SuspendedAccountOverview suspendedUntil={accountSuspendedUntil} />
+                  )}
                   {isLockerAccount && <LockerOverview address={formattedAddress} client={client} />}
                   {isVestingAccount && (
                     <VestingOverview

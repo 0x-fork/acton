@@ -25,6 +25,8 @@
   gap: 12px;
   align-self: stretch;
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .rows {
@@ -32,6 +34,7 @@
   flex-direction: column;
   gap: 12px;
   justify-content: flex-start;
+  min-width: 0;
 }
 
 .infoRow {
@@ -279,12 +282,17 @@
 }
 
 .customName {
+  display: block;
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   color: var(--acton-color-text);
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nameWithDetails {

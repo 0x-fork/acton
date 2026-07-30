@@ -11,6 +11,7 @@ export interface ExplorerRoutes {
   readonly emulatePath: string
   readonly sourcesPath: string
   readonly favoritesPath: string
+  readonly suspendedAddressesPath: string
   readonly abiDetailsPath: (slug: string) => string
   readonly addressPath: (address: string) => string
   readonly blockPath: (workchain: number, shard: string, seqno: number) => string
@@ -47,6 +48,7 @@ export const createExplorerRoutes = (
     emulatePath: overrides.emulatePath ?? path("/emulate"),
     sourcesPath: overrides.sourcesPath ?? path("/sources"),
     favoritesPath: path("/favorites"),
+    suspendedAddressesPath: path("/suspended"),
     abiDetailsPath: slug => `${abiPath}/${encodeURIComponent(slug)}`,
     addressPath: address =>
       path(`/address/${encodeURIComponent(normalizeAddress(address, addressFormat))}`),

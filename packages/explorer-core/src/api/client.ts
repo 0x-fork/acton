@@ -1,6 +1,12 @@
 import {Cell} from "@ton/core"
 
 import type {ExtendedContractABI} from "./compilerAbi"
+import {
+  parseSuspendedAccountsConfig,
+  readSuspendedAccountsConfigCache,
+  type SuspendedAccountsConfig,
+  writeSuspendedAccountsConfigCache,
+} from "./suspendedAccounts"
 import type {
   AddressInformation,
   AccountStateTokenInfo,
@@ -155,6 +161,12 @@ interface JettonTransfersResponse {
 interface NftItemsResponse {
   readonly nft_items: NftItem[]
   readonly metadata?: JettonWalletMetadata
+}
+
+interface V2ConfigInfo {
+  readonly config: {
+    readonly bytes: string
+  }
 }
 
 const IMAGE_CONTENT_KEYS = ["_image_small", "_image_medium", "_image_big", "image"] as const
@@ -349,6 +361,21 @@ export class TonClient {
     url.searchParams.append("address", address)
     url.searchParams.append("include_boc", "true")
     return this.request(url, "Failed to fetch address information")
+  }
+
+  async getSuspendedAccountsConfig(): Promise<SuspendedAccountsConfig> {
+    const cached = readSuspendedAccountsConfigCache(this.v2BaseUrl)
+    if (cached) return cached
+
+    const url = this.buildUrl(this.v2BaseUrl, "/getConfigParam")
+    url.searchParams.append("config_id", "44")
+    const response = await this.request<V2ConfigInfo>(
+      url,
+      "Failed to fetch suspended accounts config",
+    )
+    const config = parseSuspendedAccountsConfig(response.config.bytes)
+    writeSuspendedAccountsConfigCache(this.v2BaseUrl, config)
+    return config
   }
 
   async resolveDnsWalletAddress(domain: string): Promise<string | undefined> {

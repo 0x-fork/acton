@@ -48,6 +48,7 @@
     "./pages/EmulatePage": "./src/pages/EmulatePage.tsx",
     "./pages/ExplorerIndexPage": "./src/pages/ExplorerIndexPage.tsx",
     "./pages/FavoriteAccountsPage": "./src/pages/FavoriteAccountsPage.tsx",
+    "./pages/SuspendedAddressesPage": "./src/pages/SuspendedAddressesPage.tsx",
     "./pages/TransactionPage": "./src/pages/TransactionPage.tsx",
     "./pages/emulateSharing": "./src/pages/emulateSharing.ts",
     "./styles.css": "./styles.css"
