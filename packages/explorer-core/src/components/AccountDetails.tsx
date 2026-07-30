@@ -77,6 +77,7 @@ import {
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {
+  AccountStateTokenInfo,
   AddressInformation,
   JettonMaster,
   JettonWallet,
@@ -2499,7 +2500,7 @@ function getHistoryActionDisplay(
         action.details.source,
         action.details.asset,
         context.ownerAddress,
-        () => EMPTY_VALUE_LINES,
+        () => valueLines(dnsNftValueLine(action.details.asset, context.metadata)),
         "DNS",
       )
     case "dns_purchase":
@@ -3394,15 +3395,29 @@ function textValueLine(
   return {kind: "text", label: value, tone}
 }
 
+interface NftValueLineOptions {
+  readonly getName?: (tokenInfo: AccountStateTokenInfo | undefined) => string | undefined
+}
+
+function dnsNftValueLine(
+  itemAddress: string | null | undefined,
+  metadata: V3Metadata,
+): HistoryNftValueLine | undefined {
+  return nftValueLine(itemAddress, null, metadata, {
+    getName: tokenInfo => metadataTokenString(tokenInfo, "domain"),
+  })
+}
+
 function nftValueLine(
   itemAddress: string | null | undefined,
   itemIndex: string | null | undefined,
   metadata: V3Metadata,
+  options: NftValueLineOptions = {},
 ): HistoryNftValueLine | undefined {
   const tokenInfo = itemAddress
     ? getMetadataTokenInfo(metadata, itemAddress, "nft_items")
     : undefined
-  const name = metadataTokenString(tokenInfo, "name")
+  const name = options.getName?.(tokenInfo) ?? metadataTokenString(tokenInfo, "name")
   const fullLabel = name ?? (isNonEmptyString(itemIndex) ? `NFT #${itemIndex}` : undefined)
   if (!fullLabel && !itemAddress) return undefined
   const label =
