@@ -77,7 +77,6 @@ import {
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {
-  AccountStateTokenInfo,
   AddressInformation,
   JettonMaster,
   JettonWallet,
@@ -2500,7 +2499,7 @@ function getHistoryActionDisplay(
         action.details.source,
         action.details.asset,
         context.ownerAddress,
-        () => valueLines(dnsNftValueLine(action.details.asset, context.metadata)),
+        () => valueLines(actionNftValueLine(action.details.asset, null, context.metadata)),
         "DNS",
       )
     case "dns_purchase":
@@ -2610,7 +2609,11 @@ function getHistoryActionDisplay(
         true,
         "NFT",
         valueLines(
-          nftValueLine(action.details.nft_item, action.details.nft_item_index, context.metadata),
+          actionNftValueLine(
+            action.details.nft_item,
+            action.details.nft_item_index,
+            context.metadata,
+          ),
         ),
       )
     case "nft_transfer":
@@ -2623,14 +2626,14 @@ function getHistoryActionDisplay(
           action.type === "nft_purchase"
             ? valueLines(
                 tonValueLine(action.details.price ?? null, isIncoming ? "negative" : "positive"),
-                nftValueLine(
+                actionNftValueLine(
                   action.details.nft_item,
                   action.details.nft_item_index,
                   context.metadata,
                 ),
               )
             : valueLines(
-                nftValueLine(
+                actionNftValueLine(
                   action.details.nft_item,
                   action.details.nft_item_index,
                   context.metadata,
@@ -2669,7 +2672,7 @@ function getHistoryActionDisplay(
         "sale",
         false,
         "Sale",
-        valueLines(nftValueLine(action.details.nft_item, null, context.metadata)),
+        valueLines(actionNftValueLine(action.details.nft_item, null, context.metadata)),
       )
     case "nft_cancel_auction":
     case "teleitem_cancel_auction":
@@ -2679,7 +2682,7 @@ function getHistoryActionDisplay(
         "auction",
         false,
         "Auction",
-        valueLines(nftValueLine(action.details.nft_item, null, context.metadata)),
+        valueLines(actionNftValueLine(action.details.nft_item, null, context.metadata)),
       )
     case "nft_update_sale":
       return addressAction(
@@ -2696,7 +2699,11 @@ function getHistoryActionDisplay(
         true,
         "NFT",
         valueLines(
-          nftValueLine(action.details.nft_item, action.details.nft_item_index, context.metadata),
+          actionNftValueLine(
+            action.details.nft_item,
+            action.details.nft_item_index,
+            context.metadata,
+          ),
         ),
       )
     case "tick_tock":
@@ -3395,29 +3402,15 @@ function textValueLine(
   return {kind: "text", label: value, tone}
 }
 
-interface NftValueLineOptions {
-  readonly getName?: (tokenInfo: AccountStateTokenInfo | undefined) => string | undefined
-}
-
-function dnsNftValueLine(
-  itemAddress: string | null | undefined,
-  metadata: V3Metadata,
-): HistoryNftValueLine | undefined {
-  return nftValueLine(itemAddress, null, metadata, {
-    getName: tokenInfo => metadataTokenString(tokenInfo, "domain"),
-  })
-}
-
-function nftValueLine(
+function actionNftValueLine(
   itemAddress: string | null | undefined,
   itemIndex: string | null | undefined,
   metadata: V3Metadata,
-  options: NftValueLineOptions = {},
 ): HistoryNftValueLine | undefined {
   const tokenInfo = itemAddress
     ? getMetadataTokenInfo(metadata, itemAddress, "nft_items")
     : undefined
-  const name = options.getName?.(tokenInfo) ?? metadataTokenString(tokenInfo, "name")
+  const name = metadataTokenString(tokenInfo, "domain") ?? metadataTokenString(tokenInfo, "name")
   const fullLabel = name ?? (isNonEmptyString(itemIndex) ? `NFT #${itemIndex}` : undefined)
   if (!fullLabel && !itemAddress) return undefined
   const label =
@@ -3442,7 +3435,7 @@ function tonToNftValueLine(
   metadata: V3Metadata,
 ): HistoryValueLine | undefined {
   const ton = tonValueLine(amount, amountTone)
-  const nft = nftValueLine(itemAddress, itemIndex, metadata)
+  const nft = actionNftValueLine(itemAddress, itemIndex, metadata)
 
   if (ton && nft) {
     return {
