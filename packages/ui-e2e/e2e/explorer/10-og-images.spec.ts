@@ -14,6 +14,7 @@ const previews = [
   {key: "cell", route: "/cell"},
   {key: "emulate", route: "/emulate"},
   {key: "favorites", route: "/favorites"},
+  {key: "suspended", route: "/suspended"},
   {key: "transaction", route: `/tx/${"0".repeat(64)}`},
 ] as const
 

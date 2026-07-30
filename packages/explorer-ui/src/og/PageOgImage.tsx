@@ -13,6 +13,7 @@ export type PageOgKey =
   | "cell"
   | "emulate"
   | "favorites"
+  | "suspended"
   | "transaction"
 
 export type PageOgPreview = {
@@ -126,6 +127,15 @@ const PAGE_OG_PREVIEWS: Record<PageOgKey, PageOgPreview> = {
     metadataTitle: "TON favorites · actonscan",
     metadataDescription: "Open your saved TON accounts and transactions on actonscan.",
   },
+  suspended: {
+    key: "suspended",
+    title: "Suspended addresses",
+    badge: "Validators' voting",
+    description: "Review TON addresses suspended through validators' voting and their balances",
+    metadataTitle: "Suspended TON addresses · actonscan",
+    metadataDescription:
+      "Browse TON addresses suspended through validators' voting and check when restrictions expire on actonscan.",
+  },
   transaction: {
     key: "transaction",
     title: "Transaction",
@@ -154,6 +164,7 @@ export function pageOgPreviewForPath(pathname: string): PageOgPreview | undefine
   if (normalizedPath === "/cell") return PAGE_OG_PREVIEWS.cell
   if (normalizedPath === "/emulate") return PAGE_OG_PREVIEWS.emulate
   if (normalizedPath === "/favorites") return PAGE_OG_PREVIEWS.favorites
+  if (normalizedPath === "/suspended") return PAGE_OG_PREVIEWS.suspended
   if (/^\/block\/-?\d+\/[^/]+\/\d+$/.test(normalizedPath)) return PAGE_OG_PREVIEWS.block
   if (/^\/tx\/[^/]+(?:\/trace)?$/.test(normalizedPath)) return PAGE_OG_PREVIEWS.transaction
   return undefined
