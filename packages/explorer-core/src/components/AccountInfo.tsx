@@ -239,6 +239,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const tonscanUrl = getTonscanUrl(displayAddress, network.id, forkNetwork)
   const isNameUnchanged = editValue.trim() === (displayName || "")
   const stateLoading = accountLoading
+  const showContractType = stateLoading || state?.status === "active"
   const firstWallet = jettonWallets[0]
   const canOpenTokens = Boolean(onMoreAssetsClick)
   const canOpenCollectibles = Boolean(onCollectiblesClick)
@@ -669,75 +670,77 @@ export const AccountInfo: FC<AccountInfoProps> = ({
               </div>
             )}
 
-            <div className={styles.infoRow}>
-              <div className={styles.label}>Contract type</div>
-              <div className={styles.rowValue}>
-                {stateLoading ? (
-                  <div className={`${styles.skeleton} ${styles.skeletonTagWide}`} />
-                ) : (
-                  <span className={styles.contractTypeValue}>
-                    {contractTypeLabels.map((label, index) => (
-                      <span key={`${label}-${index}`} className={styles.contractTypeItem}>
-                        <span className={styles.primaryValue}>{label}</span>
-                        {index === 0 && hasContractDescriptionPopover && (
-                          <InfoPopover
-                            id={contractDescriptionId}
-                            ariaLabel="Show contract description"
-                          >
-                            <>
-                              <span className={styles.contractDescriptionTitle}>
-                                {contractDescriptionTitle}
-                              </span>
-                              {contractDescription && (
-                                <>
-                                  {contractDescriptionUrl ? (
-                                    <a
-                                      className={styles.contractDescriptionLink}
-                                      href={contractDescriptionUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      {contractDescription}
-                                    </a>
-                                  ) : (
-                                    <span className={styles.contractDescriptionText}>
-                                      {contractDescription}
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                              {contractLinks.length > 0 && (
-                                <span className={styles.contractDescriptionLinks}>
-                                  {contractLinks.map(link => (
-                                    <a
-                                      key={`${link.kind ?? "link"}-${link.url}`}
-                                      className={styles.contractDescriptionLinkItem}
-                                      href={link.url}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      <span className={styles.contractDescriptionLinkKind}>
-                                        {formatContractLinkKind(link.kind)}
-                                      </span>
-                                      <span className={styles.contractDescriptionLinkTitle}>
-                                        {link.url}
-                                      </span>
-                                    </a>
-                                  ))}
+            {showContractType && (
+              <div className={styles.infoRow}>
+                <div className={styles.label}>Contract type</div>
+                <div className={styles.rowValue}>
+                  {stateLoading ? (
+                    <div className={`${styles.skeleton} ${styles.skeletonTagWide}`} />
+                  ) : (
+                    <span className={styles.contractTypeValue}>
+                      {contractTypeLabels.map((label, index) => (
+                        <span key={`${label}-${index}`} className={styles.contractTypeItem}>
+                          <span className={styles.primaryValue}>{label}</span>
+                          {index === 0 && hasContractDescriptionPopover && (
+                            <InfoPopover
+                              id={contractDescriptionId}
+                              ariaLabel="Show contract description"
+                            >
+                              <>
+                                <span className={styles.contractDescriptionTitle}>
+                                  {contractDescriptionTitle}
                                 </span>
-                              )}
-                            </>
-                          </InfoPopover>
-                        )}
-                        {index < contractTypeLabels.length - 1 && (
-                          <span className={styles.contractTypeSeparator}>,</span>
-                        )}
-                      </span>
-                    ))}
-                  </span>
-                )}
+                                {contractDescription && (
+                                  <>
+                                    {contractDescriptionUrl ? (
+                                      <a
+                                        className={styles.contractDescriptionLink}
+                                        href={contractDescriptionUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        {contractDescription}
+                                      </a>
+                                    ) : (
+                                      <span className={styles.contractDescriptionText}>
+                                        {contractDescription}
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                                {contractLinks.length > 0 && (
+                                  <span className={styles.contractDescriptionLinks}>
+                                    {contractLinks.map(link => (
+                                      <a
+                                        key={`${link.kind ?? "link"}-${link.url}`}
+                                        className={styles.contractDescriptionLinkItem}
+                                        href={link.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                      >
+                                        <span className={styles.contractDescriptionLinkKind}>
+                                          {formatContractLinkKind(link.kind)}
+                                        </span>
+                                        <span className={styles.contractDescriptionLinkTitle}>
+                                          {link.url}
+                                        </span>
+                                      </a>
+                                    ))}
+                                  </span>
+                                )}
+                              </>
+                            </InfoPopover>
+                          )}
+                          {index < contractTypeLabels.length - 1 && (
+                            <span className={styles.contractTypeSeparator}>,</span>
+                          )}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className={styles.statusBar}>
