@@ -196,6 +196,7 @@ interface AccountDetailsProps {
 const ITEMS_PER_PAGE = 10
 const TRANSACTION_SKELETON_ROWS = 5
 const TRANSACTION_FILTERS_STORAGE_KEY = "acton.account.transactionFilters.v1"
+const SHOW_HISTORY_CALENDAR_TAB = false
 type AccountHistoryMode = "actions" | "transactions"
 export type AccountTimeFormat = "relative" | "smart" | "absolute"
 type HistoryValueTone = "positive" | "negative" | "empty" | "neutral"
@@ -947,11 +948,13 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
         </div>
         {activeTab === "history" && (
           <div className={styles.tabActions}>
-            <div className={`${styles.tab} ${styles.calendarTab}`}>
-              <span className={styles.tabIcon} aria-hidden="true">
-                <CalendarDays size={17} />
-              </span>
-            </div>
+            {SHOW_HISTORY_CALENDAR_TAB && (
+              <div className={`${styles.tab} ${styles.calendarTab}`}>
+                <span className={styles.tabIcon} aria-hidden="true">
+                  <CalendarDays size={17} />
+                </span>
+              </div>
+            )}
             <div className={styles.filterPopoverRoot} ref={filterPopoverRef}>
               <button
                 ref={filterButtonRef}
