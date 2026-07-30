@@ -209,8 +209,18 @@
   font-weight: var(--acton-font-weight-normal);
   line-height: 20px;
   overflow: hidden;
+}
+
+.addressValueDesktop,
+.addressValueMobile {
+  display: block;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.addressValueMobile {
+  display: none;
 }
 
 .addressPopover {
@@ -841,16 +851,19 @@
   }
 
   .addressInfoRow .rowValue {
-    display: grid;
+    display: flex;
     flex: 1 1 auto;
-    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    column-gap: 8px;
+    flex-wrap: nowrap;
+    gap: 8px;
   }
 
-  .addressValue {
-    flex: 1 1 auto;
-    width: 100%;
+  .addressValueDesktop {
+    display: none;
+  }
+
+  .addressValueMobile {
+    display: block;
   }
 
   .addressActions {

@@ -442,7 +442,10 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                   openDelay={150}
                   placement="bottom"
                 >
-                  <span className={styles.addressValue}>{addressRowText}</span>
+                  <span className={styles.addressValue}>
+                    <span className={styles.addressValueDesktop}>{addressRowText}</span>
+                    <span className={styles.addressValueMobile}>{shortAddress}</span>
+                  </span>
                 </Popover>
                 <span className={styles.addressActions}>
                   <Tooltip content={favorite ? "Remove from favorites" : "Add to favorites"}>
