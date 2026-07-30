@@ -1,4 +1,4 @@
-import type {JettonMaster, V3TransactionListItem} from "@acton/explorer-core/api/types"
+import type {V3TransactionListItem} from "@acton/explorer-core/api/types"
 
 export function parseGramAmount(value: string): number | undefined {
   const trimmed = value.trim()
@@ -22,11 +22,6 @@ export function contentString(
 ): string | undefined {
   const value = content?.[key]
   return typeof value === "string" && value.length > 0 ? value : undefined
-}
-
-export function formatTokenSupply(token: JettonMaster): string {
-  const decimals = Number(token.jetton_content.decimals || 9)
-  return (Number(token.total_supply) / 10 ** decimals).toLocaleString()
 }
 
 export function shortHash(hash: string): string {

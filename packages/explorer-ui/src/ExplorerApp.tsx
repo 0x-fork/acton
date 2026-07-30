@@ -48,6 +48,7 @@ import type {
   ExplorerApiConfig,
   ExplorerNetworkInfo,
 } from "@acton/explorer-core/hooks/useNetworkInfo"
+import {TokenCatalogPage} from "@acton/explorer-core/pages/TokenCatalogPage"
 import {BlockDetailsPage, BlocksPage} from "@acton/explorer-core/pages/BlocksPage"
 import {AccountPage} from "@acton/explorer-core/pages/AccountPage"
 import {ExplorerSearch} from "@acton/explorer-core/components/ExplorerSearch"
@@ -900,6 +901,12 @@ const DesktopMoreMenu: FC = () => {
       contentClassName={styles.desktopMorePopover}
       content={
         <nav className={styles.desktopMoreMenu} aria-label="More explorer navigation">
+          <Link className={styles.desktopMoreItem} to="/tokens" onClick={closeMenu}>
+            <span className={styles.desktopMoreItemCopy}>
+              <span className={styles.desktopMoreItemTitle}>Tokens</span>
+              <span className={styles.desktopMoreItemDescription}>Discover active tokens</span>
+            </span>
+          </Link>
           <Link className={styles.desktopMoreItem} to="/faucet" onClick={closeMenu}>
             <span className={styles.desktopMoreItemCopy}>
               <span className={styles.desktopMoreItemTitle}>Faucet</span>
@@ -1344,6 +1351,9 @@ export const ExplorerApp: FC = () => {
                               <Link to="/blocks" onClick={closeMobileHeaderPanels}>
                                 Blocks
                               </Link>
+                              <Link to="/tokens" onClick={closeMobileHeaderPanels}>
+                                Tokens
+                              </Link>
                               <Link to="/abi" onClick={closeMobileHeaderPanels}>
                                 ABI
                               </Link>
@@ -1398,6 +1408,7 @@ export const ExplorerApp: FC = () => {
                         }
                       />
                       <Route path="/blocks" element={<BlocksPage client={client} />} />
+                      <Route path="/tokens" element={<TokenCatalogPage client={client} />} />
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />
                       <Route path="/sources" element={<SourceCatalogPage client={client} />} />

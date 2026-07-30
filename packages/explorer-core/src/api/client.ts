@@ -10,6 +10,7 @@ import type {
   BuildSourceTraceRequest,
   JettonMaster,
   JettonMasterMetadata,
+  JettonTransfer,
   JettonWallet,
   JettonWalletData,
   LocalnetCheckpoint,
@@ -145,6 +146,10 @@ interface JettonWalletsResponse {
 interface JettonMastersResponse {
   readonly jetton_masters: JettonMaster[]
   readonly metadata?: JettonWalletMetadata
+}
+
+interface JettonTransfersResponse {
+  readonly jetton_transfers: JettonTransfer[]
 }
 
 interface NftItemsResponse {
@@ -424,25 +429,18 @@ export class TonClient {
 
   async getJettonMasters(address?: string[], limit = 100, offset = 0): Promise<JettonMaster[]> {
     if (address && address.length > 0) {
-      const results = await Promise.all(
-        address.map(async addr => {
-          const singleUrl = this.buildUrl(this.v3BaseUrl, "/jetton/masters")
-          singleUrl.searchParams.append("address", addr)
-          try {
-            const response = await this.request<JettonMastersResponse>(
-              singleUrl,
-              "Failed to fetch jetton master",
-            )
-            return response.jetton_masters.map(master =>
-              attachJettonMasterMetadata(master, response.metadata),
-            )
-          } catch (error) {
-            console.error(`Failed to fetch jetton master for ${addr}`, error)
-            return []
-          }
-        }),
+      const url = this.buildUrl(this.v3BaseUrl, "/jetton/masters")
+      for (const addr of address) {
+        url.searchParams.append("address", addr)
+      }
+      url.searchParams.append("limit", Math.min(address.length, 1000).toString())
+      const response = await this.request<JettonMastersResponse>(
+        url,
+        "Failed to fetch jetton masters",
       )
-      return results.flat()
+      return response.jetton_masters.map(master =>
+        attachJettonMasterMetadata(master, response.metadata),
+      )
     }
 
     const url = this.buildUrl(this.v3BaseUrl, "/jetton/masters")
@@ -455,6 +453,24 @@ export class TonClient {
     return response.jetton_masters.map(master =>
       attachJettonMasterMetadata(master, response.metadata),
     )
+  }
+
+  async getJettonTransfers(
+    limit = 100,
+    offset = 0,
+    sort: AccountHistorySortOrder = "desc",
+  ): Promise<JettonTransfer[]> {
+    const url = this.buildUrl(this.v3BaseUrl, "/jetton/transfers")
+    url.searchParams.append("limit", limit.toString())
+    if (offset > 0) {
+      url.searchParams.append("offset", offset.toString())
+    }
+    url.searchParams.append("sort", sort)
+    const response = await this.request<JettonTransfersResponse>(
+      url,
+      "Failed to fetch jetton transfers",
+    )
+    return response.jetton_transfers
   }
 
   async getJettonWallets(

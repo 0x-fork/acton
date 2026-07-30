@@ -42,6 +42,7 @@
     "./metadata/types": "./src/metadata/types.ts",
     "./metadata/verifierRegistry": "./src/metadata/verifierRegistry.ts",
     "./pages/AccountPage": "./src/pages/AccountPage.tsx",
+    "./pages/TokenCatalogPage": "./src/pages/TokenCatalogPage.tsx",
     "./pages/BlocksPage": "./src/pages/BlocksPage.tsx",
     "./pages/CellInspectorPage": "./src/pages/CellInspectorPage.tsx",
     "./pages/EmulatePage": "./src/pages/EmulatePage.tsx",

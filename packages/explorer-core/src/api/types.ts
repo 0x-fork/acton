@@ -1396,6 +1396,13 @@ export interface JettonMaster extends JettonMasterMetadata {
   readonly total_supply: string
 }
 
+export interface JettonTransfer {
+  readonly jetton_master: string
+  readonly transaction_aborted: boolean
+  readonly transaction_lt: string
+  readonly transaction_now: number
+}
+
 export interface JettonWallet {
   readonly address: string
   readonly balance: string

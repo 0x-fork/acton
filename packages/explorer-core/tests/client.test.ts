@@ -108,6 +108,58 @@ test("multisig requests preserve every address and opt into nested data", async 
   }
 })
 
+test("recent Jetton requests use transfer ordering and batch master lookup", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  globalThis.fetch = mock(async input => {
+    const url = new URL(input.toString())
+    requests.push(url)
+    return Response.json(
+      url.pathname.endsWith("/transfers")
+        ? {
+            jetton_transfers: [
+              {
+                jetton_master: "0:master-one",
+                transaction_aborted: false,
+                transaction_lt: "42",
+                transaction_now: 1_753_800_000,
+              },
+            ],
+          }
+        : {jetton_masters: [], metadata: {}},
+    )
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    await expect(client.getJettonTransfers(500, 1000)).resolves.toMatchInlineSnapshot(`
+      [
+        {
+          "jetton_master": "0:master-one",
+          "transaction_aborted": false,
+          "transaction_lt": "42",
+          "transaction_now": 1753800000,
+        },
+      ]
+    `)
+    await client.getJettonMasters(["0:master-one", "0:master-two"])
+
+    expect(requests.map(request => request.toString())).toMatchInlineSnapshot(`
+      [
+        "https://toncenter.example/api/v3/jetton/transfers?limit=500&offset=1000&sort=desc",
+        "https://toncenter.example/api/v3/jetton/masters?address=0%3Amaster-one&address=0%3Amaster-two&limit=2",
+      ]
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("domain DNS lookup uses the indexed V3 wallet record when available", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
