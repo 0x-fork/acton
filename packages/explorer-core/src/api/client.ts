@@ -62,6 +62,12 @@ const STUDIO_UI_REQUEST_SOURCE = "studio-ui"
 export type AccountHistorySortOrder = "asc" | "desc"
 export type RawBlockNetwork = "mainnet" | "testnet"
 
+export interface GetAccountActionsOptions {
+  readonly traceId?: string
+  readonly startLt?: string
+  readonly endLt?: string
+}
+
 export interface GetNftItemsOptions {
   readonly address?: string[]
   readonly owner_address?: string[]
@@ -669,9 +675,19 @@ export class TonClient {
     limit = 20,
     offset = 0,
     sort: AccountHistorySortOrder = "desc",
+    options: GetAccountActionsOptions = {},
   ): Promise<V3ActionsResponse> {
     const url = this.buildUrl(this.v3BaseUrl, "/actions")
     url.searchParams.append("account", address)
+    if (options.traceId) {
+      url.searchParams.append("trace_id", options.traceId)
+    }
+    if (options.startLt) {
+      url.searchParams.append("start_lt", options.startLt)
+    }
+    if (options.endLt) {
+      url.searchParams.append("end_lt", options.endLt)
+    }
     url.searchParams.append("limit", limit.toString())
     if (offset > 0) {
       url.searchParams.append("offset", offset.toString())

@@ -33,6 +33,7 @@ import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {
   AccountDetails,
   readAccountHistorySortOrder,
+  type ActionTraceLoadMoreState,
   type AccountDetailsTab,
 } from "../components/AccountDetails"
 import {LockerOverview} from "../components/LockerOverview"
@@ -63,6 +64,11 @@ import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
+import {
+  countActionsForTrace,
+  mergeAutomaticActionPage,
+  type AccountActionPageCursor,
+} from "./accountActionPagination"
 import styles from "./AccountPage.module.css"
 
 interface AccountPageProps {
@@ -78,6 +84,7 @@ const INITIAL_TRANSACTION_LIMIT = 20
 const REMOTE_TRANSACTION_PAGE_SIZE = 20
 const LOCAL_TRANSACTION_PAGE_SIZE = 1000
 const ACTION_PAGE_SIZE = 20
+const ACTION_TRACE_LOAD_MORE_PAGE_SIZE = 20
 const ACCOUNT_TOKENS_INITIAL_LIMIT = 100
 const ACCOUNT_TOKENS_LOAD_MORE_LIMIT = 100
 const JETTON_HOLDERS_INITIAL_LIMIT = 100
@@ -166,9 +173,12 @@ export const AccountPage: FC<AccountPageProps> = ({
   const [highlightedTransactionHashes, setHighlightedTransactionHashes] = useState<string[]>([])
   const [transactionsHasMore, setTransactionsHasMore] = useState(false)
   const [transactionsLoadingMore, setTransactionsLoadingMore] = useState(false)
-  const [actionsOffset, setActionsOffset] = useState(0)
+  const [actionsCursor, setActionsCursor] = useState<AccountActionPageCursor>({offset: 0})
   const [actionsHasMore, setActionsHasMore] = useState(false)
   const [actionsLoadingMore, setActionsLoadingMore] = useState(false)
+  const [actionTracesLoadMore, setActionTracesLoadMore] = useState<
+    Record<string, ActionTraceLoadMoreState>
+  >({})
   const [jettonMaster, setJettonMaster] = useState<JettonMaster | undefined>()
   const [jettonWalletAccount, setJettonWalletAccount] = useState<JettonWallet | undefined>()
   const [jettonWalletMaster, setJettonWalletMaster] = useState<JettonMasterMetadata | undefined>()
@@ -233,6 +243,10 @@ export const AccountPage: FC<AccountPageProps> = ({
   const nftItems = accountNftsState.items
   const nftItemsLoading = accountNftsState.isLoading
   const currentNftCollectionItems = nftCollectionItemsState.items
+  const actionTracesLoadMoreWithRemaining = useMemo(
+    () => attachRemainingActionCounts(actionTracesLoadMore, transactions),
+    [actionTracesLoadMore, transactions],
+  )
 
   const formattedAddress = useMemo(
     () => normalizeAddress(address, addressFormat),
@@ -396,9 +410,10 @@ export const AccountPage: FC<AccountPageProps> = ({
         transactionHashesRef.current = new Set()
         setTransactionsHasMore(false)
         setTransactionsLoadingMore(false)
-        setActionsOffset(0)
+        setActionsCursor({offset: 0})
         setActionsHasMore(false)
         setActionsLoadingMore(false)
+        setActionTracesLoadMore({})
         setJettonMaster(undefined)
         setJettonWalletAccount(undefined)
         setJettonWalletMaster(undefined)
@@ -463,9 +478,10 @@ export const AccountPage: FC<AccountPageProps> = ({
         transactionHashesRef.current = new Set()
         setTransactionsHasMore(false)
         setTransactionsLoadingMore(false)
-        setActionsOffset(0)
+        setActionsCursor({offset: 0})
         setActionsHasMore(false)
         setActionsLoadingMore(false)
+        setActionTracesLoadMore({})
         setJettonMaster(undefined)
         setJettonWalletAccount(undefined)
         setJettonWalletMaster(undefined)
@@ -508,9 +524,10 @@ export const AccountPage: FC<AccountPageProps> = ({
         transactionHashesRef.current = new Set()
         setTransactionsHasMore(false)
         setTransactionsLoadingMore(false)
-        setActionsOffset(0)
+        setActionsCursor({offset: 0})
         setActionsHasMore(false)
         setActionsLoadingMore(false)
+        setActionTracesLoadMore({})
       }
       setAccountError(undefined)
       setTransactionsError(undefined)
@@ -615,9 +632,10 @@ export const AccountPage: FC<AccountPageProps> = ({
         if (!supportsAccountActions) {
           setActions([])
           setActionMetadata({})
-          setActionsOffset(0)
+          setActionsCursor({offset: 0})
           setActionsHasMore(false)
           setActionsLoadingMore(false)
+          setActionTracesLoadMore({})
           setActionsLoading(false)
           setActionsError(undefined)
           return
@@ -632,18 +650,29 @@ export const AccountPage: FC<AccountPageProps> = ({
           )
           if (!isActive) return
           updateDomains(response.address_book)
-          setActions(appendUniqueActions([], response.actions))
+          const merged = mergeAutomaticActionPage(
+            [],
+            response.actions,
+            {offset: 0},
+            historySortOrder,
+            ACTION_PAGE_SIZE,
+          )
+          setActions(merged.actions)
           setActionMetadata(response.metadata)
-          setActionsOffset(response.actions.length)
-          setActionsHasMore(response.actions.length === ACTION_PAGE_SIZE)
+          setActionsCursor(merged.cursor)
+          setActionsHasMore(merged.hasMore)
+          setActionTracesLoadMore(current =>
+            markCollapsedActionTraces(current, merged.collapsedTraceIds, merged.actions),
+          )
           setActionsError(undefined)
         } catch (error) {
           if (!isActive) return
           console.error("Failed to fetch account actions", error)
           setActions([])
           setActionMetadata({})
-          setActionsOffset(0)
+          setActionsCursor({offset: 0})
           setActionsHasMore(false)
+          setActionTracesLoadMore({})
           setActionsError(error instanceof Error ? error.message : "Failed to load actions")
         } finally {
           if (isActive) setActionsLoading(false)
@@ -749,31 +778,98 @@ export const AccountPage: FC<AccountPageProps> = ({
       !supportsAccountActions ||
       actionsLoadingMore ||
       actionsLoading ||
+      Object.values(actionTracesLoadMore).some(trace => trace.loading) ||
       !actionsHasMore
     ) {
       return
     }
 
-    const offset = actionsOffset
+    const cursor = actionsCursor
     setActionsLoadingMore(true)
     setActionsError(undefined)
     try {
       const response = await client.getAccountActions(
         formattedAddress,
         ACTION_PAGE_SIZE,
-        offset,
+        cursor.offset,
         historySortOrder,
+        {startLt: cursor.startLt, endLt: cursor.endLt},
       )
       updateDomains(response.address_book)
-      setActions(current => appendUniqueActions(current, response.actions))
+      const merged = mergeAutomaticActionPage(
+        actions,
+        response.actions,
+        cursor,
+        historySortOrder,
+        ACTION_PAGE_SIZE,
+      )
+      setActions(merged.actions)
       setActionMetadata(current => ({...current, ...response.metadata}))
-      setActionsOffset(current => current + response.actions.length)
-      setActionsHasMore(response.actions.length === ACTION_PAGE_SIZE)
+      setActionsCursor(merged.cursor)
+      setActionsHasMore(merged.hasMore)
+      setActionTracesLoadMore(current =>
+        markCollapsedActionTraces(current, merged.collapsedTraceIds, merged.actions),
+      )
     } catch (error) {
       console.error("Failed to load more account actions", error)
       setActionsError(error instanceof Error ? error.message : "Failed to load actions")
     } finally {
       setActionsLoadingMore(false)
+    }
+  }
+
+  const loadMoreActionTrace = async (traceId: string) => {
+    if (!formattedAddress || !supportsAccountActions || actionsLoading || actionsLoadingMore) {
+      return
+    }
+
+    const traceState = actionTracesLoadMore[traceId]
+    if (!traceState?.hasMore || traceState.loading) {
+      return
+    }
+
+    const offset = countActionsForTrace(actions, traceId)
+    const requestKey = historyRequestKey
+    setActionTracesLoadMore(current => ({
+      ...current,
+      [traceId]: {...traceState, loading: true, error: undefined},
+    }))
+
+    try {
+      const response = await client.getAccountActions(
+        formattedAddress,
+        ACTION_TRACE_LOAD_MORE_PAGE_SIZE + 1,
+        offset,
+        historySortOrder,
+        {traceId},
+      )
+      if (activeHistoryRequestKeyRef.current !== requestKey) return
+
+      updateDomains(response.address_book)
+      const page = response.actions.slice(0, ACTION_TRACE_LOAD_MORE_PAGE_SIZE)
+      const nextActions = appendUniqueActions(actions, page)
+      setActions(nextActions)
+      setActionMetadata(current => ({...current, ...response.metadata}))
+      setActionTracesLoadMore(current => ({
+        ...current,
+        [traceId]: {
+          loadedCount: countActionsForTrace(nextActions, traceId),
+          loadCount: ACTION_TRACE_LOAD_MORE_PAGE_SIZE,
+          hasMore: response.actions.length > ACTION_TRACE_LOAD_MORE_PAGE_SIZE,
+          loading: false,
+        },
+      }))
+    } catch (error) {
+      if (activeHistoryRequestKeyRef.current !== requestKey) return
+      console.error("Failed to load more actions for transaction", error)
+      setActionTracesLoadMore(current => ({
+        ...current,
+        [traceId]: {
+          ...(current[traceId] ?? traceState),
+          loading: false,
+          error: error instanceof Error ? error.message : "Failed to load actions",
+        },
+      }))
     }
   }
 
@@ -2073,6 +2169,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             actionsError={accountUnavailable ? undefined : actionsError}
             actionsHasMore={actionsHasMore}
             actionsLoadingMore={actionsLoadingMore}
+            actionTracesLoadMore={actionTracesLoadMoreWithRemaining}
             accountLoading={accountLoading}
             showHoldersTab={isJettonMasterAccount}
             showItemsTab={isNftCollectionAccount}
@@ -2086,6 +2183,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             onLoadMoreHolders={loadMoreJettonHolders}
             onLoadMoreTransactions={loadMoreTransactions}
             onLoadMoreActions={loadMoreActions}
+            onLoadMoreActionTrace={loadMoreActionTrace}
             historySortOrder={historySortOrder}
             onHistorySortOrderChange={setHistorySortOrder}
             activeTabHash={activeTab}
@@ -2468,6 +2566,62 @@ function appendUniqueActions(current: readonly V3Action[], next: readonly V3Acti
     return true
   })
   return [...current, ...uniqueNext]
+}
+
+function markCollapsedActionTraces(
+  current: Readonly<Record<string, ActionTraceLoadMoreState>>,
+  traceIds: readonly string[],
+  actions: readonly V3Action[],
+): Record<string, ActionTraceLoadMoreState> {
+  if (traceIds.length === 0) {
+    return {...current}
+  }
+
+  const next = {...current}
+  for (const traceId of traceIds) {
+    const existing = current[traceId]
+    next[traceId] = {
+      loadedCount: countActionsForTrace(actions, traceId),
+      loadCount: ACTION_TRACE_LOAD_MORE_PAGE_SIZE,
+      hasMore: true,
+      loading: existing?.loading ?? false,
+      error: existing?.error,
+    }
+  }
+  return next
+}
+
+function attachRemainingActionCounts(
+  states: Readonly<Record<string, ActionTraceLoadMoreState>>,
+  transactions: readonly V3TransactionListItem[],
+): Record<string, ActionTraceLoadMoreState> {
+  const totalActionsByTrace = new Map<string, number>()
+  for (const transaction of transactions) {
+    const traceId = transaction.trace_id?.trim() || transaction.hash?.trim()
+    const totalActions = transaction.description.action?.tot_actions
+    if (traceId && totalActions !== undefined && totalActions >= 0) {
+      totalActionsByTrace.set(traceId, totalActions)
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(states).map(([traceId, state]) => {
+      const totalActions = totalActionsByTrace.get(traceId)
+      const remainingCount =
+        totalActions === undefined ? undefined : Math.max(0, totalActions - state.loadedCount)
+      return [
+        traceId,
+        {
+          ...state,
+          remainingCount,
+          loadCount:
+            remainingCount === undefined
+              ? ACTION_TRACE_LOAD_MORE_PAGE_SIZE
+              : Math.min(ACTION_TRACE_LOAD_MORE_PAGE_SIZE, remainingCount),
+        },
+      ]
+    }),
+  )
 }
 
 function prependUniqueTransactions(

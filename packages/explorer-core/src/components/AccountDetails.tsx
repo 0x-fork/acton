@@ -1,4 +1,5 @@
 import {
+  Fragment,
   Suspense,
   lazy,
   useCallback,
@@ -39,6 +40,7 @@ import {
   Bell,
   Braces,
   CalendarDays,
+  ChevronDown,
   ChevronRight,
   CircleDot,
   CircleX,
@@ -131,6 +133,15 @@ export interface AccountDetailsTab {
   readonly content: ReactNode
 }
 
+export interface ActionTraceLoadMoreState {
+  readonly loadedCount: number
+  readonly remainingCount?: number
+  readonly loadCount: number
+  readonly hasMore: boolean
+  readonly loading: boolean
+  readonly error?: string
+}
+
 interface AccountDetailsProps {
   readonly transactions: V3TransactionListItem[]
   readonly actions?: V3Action[]
@@ -174,6 +185,7 @@ interface AccountDetailsProps {
   readonly actionsError?: string
   readonly actionsHasMore?: boolean
   readonly actionsLoadingMore?: boolean
+  readonly actionTracesLoadMore?: Readonly<Record<string, ActionTraceLoadMoreState>>
   readonly accountLoading?: boolean
   readonly showHoldersTab?: boolean
   readonly showItemsTab?: boolean
@@ -187,6 +199,7 @@ interface AccountDetailsProps {
   readonly onLoadMoreHolders?: () => void
   readonly onLoadMoreTransactions?: () => void
   readonly onLoadMoreActions?: () => void
+  readonly onLoadMoreActionTrace?: (traceId: string) => void
   readonly historySortOrder?: AccountHistorySortOrder
   readonly onHistorySortOrderChange?: (sortOrder: AccountHistorySortOrder) => void
   readonly activeTabHash?: string
@@ -344,6 +357,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   actionsError,
   actionsHasMore = false,
   actionsLoadingMore = false,
+  actionTracesLoadMore = {},
   accountLoading = false,
   showHoldersTab = false,
   showItemsTab = false,
@@ -357,6 +371,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   onLoadMoreHolders,
   onLoadMoreTransactions,
   onLoadMoreActions,
+  onLoadMoreActionTrace,
   historySortOrder,
   onHistorySortOrderChange,
   activeTabHash,
@@ -1154,7 +1169,9 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                     nowSeconds={nowSeconds}
                     timeFormat={transactionFilters.timeFormat}
                     highlightedTransactionHashSet={highlightedTransactionHashSet}
+                    actionTracesLoadMore={actionTracesLoadMore}
                     onAddressClick={onAddressClick}
+                    onLoadMoreActionTrace={onLoadMoreActionTrace}
                     onTransactionClick={onTransactionClick}
                   />
                 ) : (
@@ -1738,11 +1755,13 @@ interface ActionHistoryRowsProps {
   readonly nowSeconds: number
   readonly timeFormat: AccountTimeFormat
   readonly highlightedTransactionHashSet?: ReadonlySet<string>
+  readonly actionTracesLoadMore?: Readonly<Record<string, ActionTraceLoadMoreState>>
   readonly showTimeColumn?: boolean
   readonly interactiveRows?: boolean
   readonly standardTable?: boolean
   readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
   readonly onActionHoverChange?: (action: V3Action | undefined) => void
+  readonly onLoadMoreActionTrace?: (traceId: string) => void
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
 }
 
@@ -1751,11 +1770,13 @@ export function ActionHistoryRows({
   nowSeconds,
   timeFormat,
   highlightedTransactionHashSet,
+  actionTracesLoadMore = {},
   showTimeColumn = true,
   interactiveRows = true,
   standardTable = false,
   onAddressClick,
   onActionHoverChange,
+  onLoadMoreActionTrace,
   onTransactionClick,
 }: ActionHistoryRowsProps): JSX.Element {
   const [hoveredAddress, setHoveredAddress] = useState<string | undefined>()
@@ -1865,7 +1886,7 @@ export function ActionHistoryRows({
           onMouseLeave: onActionHoverChange ? () => onActionHoverChange(undefined) : undefined,
         }
 
-        return standardTable ? (
+        const actionRow = standardTable ? (
           <DataTableRow key={info.rowKey} interactive={canOpenTransaction} {...rowProps}>
             {rowContent}
           </DataTableRow>
@@ -1874,9 +1895,65 @@ export function ActionHistoryRows({
             {rowContent}
           </tr>
         )
+
+        const traceId = action.trace_id?.trim()
+        const traceLoadMore =
+          !standardTable && !continuesTrace && traceId ? actionTracesLoadMore[traceId] : undefined
+        if (!traceId || !traceLoadMore?.hasMore || !onLoadMoreActionTrace) {
+          return actionRow
+        }
+
+        return (
+          <Fragment key={info.rowKey}>
+            {actionRow}
+            <tr className={styles.actionTraceLoadMoreRow}>
+              <td colSpan={showTimeColumn ? 5 : 4}>
+                <div className={styles.actionTraceLoadMore}>
+                  {traceLoadMore.error ? (
+                    <span className={styles.actionTraceLoadMoreError} role="alert">
+                      {traceLoadMore.error}
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={styles.actionTraceLoadMoreText}
+                    disabled={traceLoadMore.loading}
+                    onClick={event => {
+                      event.stopPropagation()
+                      onLoadMoreActionTrace(traceId)
+                    }}
+                  >
+                    {traceLoadMore.loading
+                      ? "Loading actions..."
+                      : traceLoadMore.error
+                        ? "Retry loading actions"
+                        : getActionTraceLoadMoreLabel(traceLoadMore)}
+                    {!traceLoadMore.loading && !traceLoadMore.error ? (
+                      <ChevronDown size={14} aria-hidden="true" />
+                    ) : null}
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </Fragment>
+        )
       })}
     </>
   )
+}
+
+function getActionTraceLoadMoreLabel(state: ActionTraceLoadMoreState): string {
+  const remainingCount = state.remainingCount
+  if (remainingCount === undefined) {
+    return `Load ${state.loadCount} more`
+  }
+  if (remainingCount === 1) {
+    return "Load the last action"
+  }
+  if (remainingCount <= state.loadCount) {
+    return `Load all ${remainingCount} remaining`
+  }
+  return `Load ${state.loadCount} more out of ${remainingCount}`
 }
 
 interface ActionHistoryTableProps {

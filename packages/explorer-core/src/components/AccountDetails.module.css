@@ -434,6 +434,60 @@
   border-top-color: transparent !important;
 }
 
+.historyContent tbody > tr.actionTraceLoadMoreRow {
+  border-top-color: transparent !important;
+}
+
+.actionTraceLoadMoreRow > td {
+  padding-top: 4px !important;
+  padding-bottom: 12px !important;
+}
+
+.actionTraceLoadMore {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.actionTraceLoadMoreError {
+  color: var(--acton-color-danger-text);
+  font-size: var(--acton-font-size-xs);
+  line-height: 18px;
+}
+
+.actionTraceLoadMoreText {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 0;
+  color: var(--acton-color-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 18px;
+}
+
+.actionTraceLoadMoreText:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.actionTraceLoadMoreText:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.actionTraceLoadMoreText:disabled {
+  color: var(--acton-color-text-muted);
+  cursor: default;
+}
+
 .row:hover {
   background-color: var(--acton-color-surface-row) !important;
 }

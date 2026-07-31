@@ -406,10 +406,16 @@ test("account history requests forward the requested sort order", async () => {
 
     await client.getAccountTransactions("EQAddress", 25, 10, "asc")
     await client.getAccountActions("EQAddress", 15, 5, "asc")
+    await client.getAccountActions("EQAddress", 21, 10, "desc", {
+      traceId: "trace-id",
+      startLt: "101",
+      endLt: "200",
+    })
 
     expect(requests).toEqual([
       "https://toncenter.example/api/v3/transactions?account=EQAddress&limit=25&offset=10&sort=asc",
       "https://toncenter.example/api/v3/actions?account=EQAddress&limit=15&offset=5&sort=asc",
+      "https://toncenter.example/api/v3/actions?account=EQAddress&trace_id=trace-id&start_lt=101&end_lt=200&limit=21&offset=10&sort=desc",
     ])
   } finally {
     globalThis.fetch = originalFetch

@@ -112,9 +112,16 @@ export function collectTransactionListAddresses(
   for (const transaction of transactions) {
     addresses.add(transaction.account)
     collectMessageAddresses(addresses, transaction.in_msg)
-    for (const message of transaction.out_msgs) {
-      collectMessageAddresses(addresses, message)
-    }
+
+    // Account history renders one representative outgoing message per
+    // transaction. Resolving every recipient of a bulk send would build an
+    // enormous accountStates query for addresses that never appear in the
+    // row (wallets can create hundreds of messages in one transaction).
+    const displayedOutgoingMessage =
+      transaction.out_msgs.find(message => message.destination) ??
+      transaction.out_msgs.find(message => message.opcode) ??
+      transaction.out_msgs[0]
+    collectMessageAddresses(addresses, displayedOutgoingMessage)
   }
 
   return [...addresses]

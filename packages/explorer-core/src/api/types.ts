@@ -1150,6 +1150,7 @@ export interface V3TransactionDescription {
 export interface V3TransactionListItem {
   readonly account: string
   readonly hash: string
+  readonly trace_id?: string | null
   readonly lt: string
   readonly now: number
   readonly total_fees: string
