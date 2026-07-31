@@ -774,18 +774,8 @@ function getOrderStatus(order: V3MultisigOrder): "executed" | "expired" | "pendi
   return "pending"
 }
 
-function compareOrdersDescending(left: V3MultisigOrder, right: V3MultisigOrder): number {
-  return compareIntegerStrings(right.order_seqno, left.order_seqno)
-}
-
-function compareIntegerStrings(left: string | null, right: string | null): number {
-  try {
-    const leftValue = BigInt(left ?? "-1")
-    const rightValue = BigInt(right ?? "-1")
-    return leftValue < rightValue ? -1 : leftValue > rightValue ? 1 : 0
-  } catch {
-    return (left ?? "").localeCompare(right ?? "")
-  }
+export function compareOrdersDescending(left: V3MultisigOrder, right: V3MultisigOrder): number {
+  return (right.expiration_date ?? 0) - (left.expiration_date ?? 0)
 }
 
 function formatApprovals(order: V3MultisigOrder): string {
