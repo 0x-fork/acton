@@ -62,6 +62,20 @@ const STUDIO_UI_REQUEST_SOURCE = "studio-ui"
 export type AccountHistorySortOrder = "asc" | "desc"
 export type RawBlockNetwork = "mainnet" | "testnet"
 
+export interface GetNftItemsOptions {
+  readonly address?: string[]
+  readonly owner_address?: string[]
+  readonly collection_address?: string[]
+  readonly sortByLastTransactionLt?: boolean
+  readonly limit?: number
+  readonly offset?: number
+}
+
+export interface NftItemsPage {
+  readonly items: NftItem[]
+  readonly rawItemCount: number
+}
+
 export type CompilerAbiLoader = (
   codeHashes: readonly string[],
 ) => Promise<Record<string, ExtendedContractABI | null>>
@@ -740,14 +754,12 @@ export class TonClient {
     return this.request(url, "Failed to fetch block transactions")
   }
 
-  async getNftItems(options?: {
-    readonly address?: string[]
-    readonly owner_address?: string[]
-    readonly collection_address?: string[]
-    readonly sortByLastTransactionLt?: boolean
-    readonly limit?: number
-    readonly offset?: number
-  }): Promise<NftItem[]> {
+  async getNftItems(options?: GetNftItemsOptions): Promise<NftItem[]> {
+    const page = await this.getNftItemsPage(options)
+    return page.items
+  }
+
+  async getNftItemsPage(options?: GetNftItemsOptions): Promise<NftItemsPage> {
     const addresses = options?.address
     const ownerAddresses = options?.owner_address
     const collectionAddresses = options?.collection_address
@@ -755,7 +767,7 @@ export class TonClient {
     const limit = options?.limit ?? 100
     const offset = options?.offset ?? 0
 
-    const buildAndFetch = async (paramName?: string, value?: string): Promise<NftItem[]> => {
+    const buildAndFetch = async (paramName?: string, value?: string): Promise<NftItemsPage> => {
       const url = this.buildUrl(this.v3BaseUrl, "/nft/items")
       if (paramName && value) {
         url.searchParams.append(paramName, value)
@@ -767,21 +779,31 @@ export class TonClient {
       }
 
       const response = await this.request<NftItemsResponse>(url, "Failed to fetch NFTs")
-      return response.nft_items
-        .map(item => attachNftItemMetadata(item, response.metadata))
-        .filter(item => !isNftItemNsfw(item))
+      return {
+        items: response.nft_items
+          .map(item => attachNftItemMetadata(item, response.metadata))
+          .filter(item => !isNftItemNsfw(item)),
+        rawItemCount: response.nft_items.length,
+      }
+    }
+
+    const mergePages = (pages: readonly NftItemsPage[]): NftItemsPage => {
+      return {
+        items: this.dedupNftItems(pages.flatMap(page => page.items)),
+        rawItemCount: pages.reduce((count, page) => count + page.rawItemCount, 0),
+      }
     }
 
     if (addresses && addresses.length > 0) {
       const results = await Promise.all(addresses.map(async addr => buildAndFetch("address", addr)))
-      return this.dedupNftItems(results.flat())
+      return mergePages(results)
     }
 
     if (ownerAddresses && ownerAddresses.length > 0) {
       const results = await Promise.all(
         ownerAddresses.map(async owner => buildAndFetch("owner_address", owner)),
       )
-      return this.dedupNftItems(results.flat())
+      return mergePages(results)
     }
 
     if (collectionAddresses && collectionAddresses.length > 0) {
@@ -790,7 +812,7 @@ export class TonClient {
           buildAndFetch("collection_address", collection),
         ),
       )
-      return this.dedupNftItems(results.flat())
+      return mergePages(results)
     }
 
     return buildAndFetch()

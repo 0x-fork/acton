@@ -116,6 +116,7 @@ interface JettonHoldersState {
 
 interface NftItemsState {
   readonly items: NftItem[]
+  readonly nextOffset: number
   readonly isLoading: boolean
   readonly isLoadingMore: boolean
   readonly hasMore: boolean
@@ -181,12 +182,14 @@ export const AccountPage: FC<AccountPageProps> = ({
   const [currentNftItem, setCurrentNftItem] = useState<NftItem | undefined>()
   const [nftCollectionItemsState, setNftCollectionItemsState] = useState<NftItemsState>({
     items: [],
+    nextOffset: 0,
     isLoading: false,
     isLoadingMore: false,
     hasMore: false,
   })
   const [accountNftsState, setAccountNftsState] = useState<NftItemsState>({
     items: [],
+    nextOffset: 0,
     isLoading: false,
     isLoadingMore: false,
     hasMore: false,
@@ -409,12 +412,14 @@ export const AccountPage: FC<AccountPageProps> = ({
         setCurrentNftItem(undefined)
         setNftCollectionItemsState({
           items: [],
+          nextOffset: 0,
           isLoading: false,
           isLoadingMore: false,
           hasMore: false,
         })
         setAccountNftsState({
           items: [],
+          nextOffset: 0,
           isLoading: false,
           isLoadingMore: false,
           hasMore: false,
@@ -474,12 +479,14 @@ export const AccountPage: FC<AccountPageProps> = ({
         setCurrentNftItem(undefined)
         setNftCollectionItemsState({
           items: [],
+          nextOffset: 0,
           isLoading: false,
           isLoadingMore: false,
           hasMore: false,
         })
         setAccountNftsState({
           items: [],
+          nextOffset: 0,
           isLoading: false,
           isLoadingMore: false,
           hasMore: false,
@@ -549,12 +556,14 @@ export const AccountPage: FC<AccountPageProps> = ({
           setCurrentNftItem(undefined)
           setNftCollectionItemsState({
             items: [],
+            nextOffset: 0,
             isLoading: false,
             isLoadingMore: false,
             hasMore: false,
           })
           setAccountNftsState({
             items: [],
+            nextOffset: 0,
             isLoading: false,
             isLoadingMore: false,
             hasMore: false,
@@ -1106,6 +1115,7 @@ export const AccountPage: FC<AccountPageProps> = ({
       if (!formattedAddress || !isNftCollectionAccount) {
         setNftCollectionItemsState({
           items: [],
+          nextOffset: 0,
           isLoading: false,
           isLoadingMore: false,
           hasMore: false,
@@ -1121,23 +1131,25 @@ export const AccountPage: FC<AccountPageProps> = ({
         loadMoreError: undefined,
       }))
       try {
-        const items = await client.getNftItems({
+        const page = await client.getNftItemsPage({
           collection_address: [formattedAddress],
           limit: NFT_CARD_GRID_BATCH_SIZE,
           sortByLastTransactionLt: true,
         })
         if (!isActive) return
         setNftCollectionItemsState({
-          items,
+          items: page.items,
+          nextOffset: page.rawItemCount,
           isLoading: false,
           isLoadingMore: false,
-          hasMore: items.length === NFT_CARD_GRID_BATCH_SIZE,
+          hasMore: page.rawItemCount === NFT_CARD_GRID_BATCH_SIZE,
         })
       } catch (error) {
         console.error("Failed to fetch NFT collection items", error)
         if (isActive) {
           setNftCollectionItemsState({
             items: [],
+            nextOffset: 0,
             isLoading: false,
             isLoadingMore: false,
             hasMore: false,
@@ -1153,7 +1165,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   }, [accountAddressKey, client, isNftCollectionAccount])
 
   const loadMoreNftCollectionItems = useCallback(() => {
-    const offset = nftCollectionItemsState.items.length
+    const offset = nftCollectionItemsState.nextOffset
     if (
       !formattedAddress ||
       nftCollectionItemsState.isLoading ||
@@ -1172,27 +1184,28 @@ export const AccountPage: FC<AccountPageProps> = ({
     }))
 
     void client
-      .getNftItems({
+      .getNftItemsPage({
         collection_address: [formattedAddress],
         limit: NFT_CARD_GRID_BATCH_SIZE,
         offset,
         sortByLastTransactionLt: true,
       })
-      .then(items => {
+      .then(page => {
         setNftCollectionItemsState(current => {
           if (
             activeAccountKeyRef.current !== requestAccountKey ||
             current.isLoading ||
-            current.items.length !== offset
+            current.nextOffset !== offset
           ) {
             return current
           }
 
           return {
             ...current,
-            items: [...current.items, ...items],
+            items: [...current.items, ...page.items],
+            nextOffset: offset + page.rawItemCount,
             isLoadingMore: false,
-            hasMore: items.length === NFT_CARD_GRID_BATCH_SIZE,
+            hasMore: page.rawItemCount === NFT_CARD_GRID_BATCH_SIZE,
           }
         })
       })
@@ -1201,7 +1214,7 @@ export const AccountPage: FC<AccountPageProps> = ({
           if (
             activeAccountKeyRef.current !== requestAccountKey ||
             current.isLoading ||
-            current.items.length !== offset
+            current.nextOffset !== offset
           ) {
             return current
           }
@@ -1223,7 +1236,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     formattedAddress,
     nftCollectionItemsState.hasMore,
     nftCollectionItemsState.isLoading,
-    nftCollectionItemsState.items.length,
+    nftCollectionItemsState.nextOffset,
   ])
 
   useEffect(() => {
@@ -1233,6 +1246,7 @@ export const AccountPage: FC<AccountPageProps> = ({
       if (!formattedAddress) {
         setAccountNftsState({
           items: [],
+          nextOffset: 0,
           isLoading: false,
           isLoadingMore: false,
           hasMore: false,
@@ -1248,23 +1262,25 @@ export const AccountPage: FC<AccountPageProps> = ({
         loadMoreError: undefined,
       }))
       try {
-        const nfts = await client.getNftItems({
+        const page = await client.getNftItemsPage({
           owner_address: [formattedAddress],
           limit: NFT_CARD_GRID_BATCH_SIZE,
           sortByLastTransactionLt: true,
         })
         if (!isActive) return
         setAccountNftsState({
-          items: nfts,
+          items: page.items,
+          nextOffset: page.rawItemCount,
           isLoading: false,
           isLoadingMore: false,
-          hasMore: nfts.length === NFT_CARD_GRID_BATCH_SIZE,
+          hasMore: page.rawItemCount === NFT_CARD_GRID_BATCH_SIZE,
         })
       } catch (error) {
         console.error("Failed to fetch account NFTs", error)
         if (isActive) {
           setAccountNftsState({
             items: [],
+            nextOffset: 0,
             isLoading: false,
             isLoadingMore: false,
             hasMore: false,
@@ -1280,7 +1296,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   }, [accountAddressKey, client])
 
   const loadMoreNftItems = useCallback(() => {
-    const offset = accountNftsState.items.length
+    const offset = accountNftsState.nextOffset
     if (
       !formattedAddress ||
       accountNftsState.isLoading ||
@@ -1299,27 +1315,28 @@ export const AccountPage: FC<AccountPageProps> = ({
     }))
 
     void client
-      .getNftItems({
+      .getNftItemsPage({
         owner_address: [formattedAddress],
         limit: NFT_CARD_GRID_BATCH_SIZE,
         offset,
         sortByLastTransactionLt: true,
       })
-      .then(items => {
+      .then(page => {
         setAccountNftsState(current => {
           if (
             activeAccountKeyRef.current !== requestAccountKey ||
             current.isLoading ||
-            current.items.length !== offset
+            current.nextOffset !== offset
           ) {
             return current
           }
 
           return {
             ...current,
-            items: [...current.items, ...items],
+            items: [...current.items, ...page.items],
+            nextOffset: offset + page.rawItemCount,
             isLoadingMore: false,
-            hasMore: items.length === NFT_CARD_GRID_BATCH_SIZE,
+            hasMore: page.rawItemCount === NFT_CARD_GRID_BATCH_SIZE,
           }
         })
       })
@@ -1328,7 +1345,7 @@ export const AccountPage: FC<AccountPageProps> = ({
           if (
             activeAccountKeyRef.current !== requestAccountKey ||
             current.isLoading ||
-            current.items.length !== offset
+            current.nextOffset !== offset
           ) {
             return current
           }
@@ -1347,7 +1364,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   }, [
     accountNftsState.hasMore,
     accountNftsState.isLoading,
-    accountNftsState.items.length,
+    accountNftsState.nextOffset,
     accountRequestKey,
     client,
     formattedAddress,

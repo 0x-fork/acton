@@ -648,7 +648,7 @@ test("message transaction lookup forwards the causal direction", async () => {
   }
 })
 
-test("NFT metadata preserves scam flags and excludes flagged or registered NSFW items", async () => {
+test("NFT pages preserve their raw size while excluding flagged or registered NSFW items", async () => {
   const originalFetch = globalThis.fetch
   globalThis.fetch = mock(async () =>
     Response.json({
@@ -719,23 +719,26 @@ test("NFT metadata preserves scam flags and excludes flagged or registered NSFW 
       addressNameBaseUrl: "https://toncenter.example/api",
     })
 
-    expect(await client.getNftItems({address: ["0:nft"]})).toMatchInlineSnapshot(`
-      [
-        {
-          "address": "0:nft",
-          "code_hash": "code-hash",
-          "content": {
-            "name": "Flagged NFT",
+    expect(await client.getNftItemsPage({address: ["0:nft"]})).toMatchInlineSnapshot(`
+      {
+        "items": [
+          {
+            "address": "0:nft",
+            "code_hash": "code-hash",
+            "content": {
+              "name": "Flagged NFT",
+            },
+            "data_hash": "data-hash",
+            "index": "3",
+            "init": true,
+            "is_nsfw": false,
+            "is_scam": true,
+            "last_transaction_lt": "42",
+            "on_sale": false,
           },
-          "data_hash": "data-hash",
-          "index": "3",
-          "init": true,
-          "is_nsfw": false,
-          "is_scam": true,
-          "last_transaction_lt": "42",
-          "on_sale": false,
-        },
-      ]
+        ],
+        "rawItemCount": 3,
+      }
     `)
   } finally {
     globalThis.fetch = originalFetch
