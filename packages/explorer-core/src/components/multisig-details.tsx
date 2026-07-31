@@ -22,7 +22,7 @@ import {
   Skeleton,
 } from "@acton/ui"
 import {decodeCellWithAbi} from "@acton/transaction-ui"
-import {Check, X} from "lucide-react"
+import {Check, Clock3, X} from "lucide-react"
 import {Address, Cell} from "@ton/core"
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
@@ -519,6 +519,7 @@ function OrderStatus({status}: {readonly status: ReturnType<typeof getOrderStatu
     <span className={`${styles.status} ${styles[`status${capitalize(status)}`]}`}>
       {status === "executed" && <Check size={14} aria-hidden="true" />}
       {status === "expired" && <X size={14} aria-hidden="true" />}
+      {status === "pending" && <Clock3 size={14} aria-hidden="true" />}
       {capitalize(status)}
     </span>
   )
