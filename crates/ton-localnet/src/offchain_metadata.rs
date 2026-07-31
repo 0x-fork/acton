@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::task::JoinSet;
 use ton_api::OffchainJsonResolver;
+use ton_indexer_contracts::jettons;
 
 pub(crate) async fn enrich_jetton_masters(
     resolver: &OffchainJsonResolver,
@@ -38,7 +39,7 @@ pub(crate) async fn enrich_jetton_master_map(
 }
 
 pub(crate) fn jetton_content_uri(content: &serde_json::Value) -> Option<String> {
-    ton_indexer::jettons::jetton_content_uri(content).map(str::to_owned)
+    jettons::jetton_content_uri(content).map(str::to_owned)
 }
 
 pub(crate) async fn resolve_jetton_metadata(
@@ -79,11 +80,11 @@ pub(crate) fn merge_resolved_metadata(
     content: &mut serde_json::Value,
     remote_by_uri: &HashMap<String, Arc<serde_json::Value>>,
 ) {
-    let Some(uri) = ton_indexer::jettons::jetton_content_uri(content) else {
+    let Some(uri) = jettons::jetton_content_uri(content) else {
         return;
     };
     let Some(remote) = remote_by_uri.get(uri) else {
         return;
     };
-    ton_indexer::jettons::merge_jetton_content(content, remote);
+    jettons::merge_jetton_content(content, remote);
 }

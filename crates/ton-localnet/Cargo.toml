@@ -42,7 +42,7 @@ tower = { workspace = true }
 tower_governor = { workspace = true }
 tracing = { workspace = true }
 rusqlite = { workspace = true }
-ton-indexer = { workspace = true }
+ton-indexer-contracts = { workspace = true }
 url = { workspace = true }
 rustc-hash = { workspace = true }
 thiserror = { workspace = true }

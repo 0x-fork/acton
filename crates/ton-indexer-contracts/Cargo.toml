@@ -1,5 +1,6 @@
 [package]
-name = "ton-indexer"
+name = "ton-indexer-contracts"
+description = "TON smart-contract detection and data decoding"
 version = { workspace = true }
 publish = false
 authors = { workspace = true }

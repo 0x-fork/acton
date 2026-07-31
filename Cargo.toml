@@ -71,7 +71,7 @@ tolk-fmt = { path = "crates/tolk-fmt" }
 ton-networks = { path = "crates/ton-networks" }
 ton-localnet = { path = "crates/ton-localnet" }
 ton-ls = { path = "crates/ton-ls" }
-ton-indexer = { path = "crates/ton-indexer" }
+ton-indexer-contracts = { path = "crates/ton-indexer-contracts" }
 tree-sitter-tolk = { path = "crates/tree-sitter-tolk" }
 tree-sitter-tasm = { path = "crates/tree-sitter-tasm" }
 tree-sitter-fift = { path = "crates/tree-sitter-fift" }
@@ -250,7 +250,7 @@ ton-retrace = { workspace = true }
 toncenter-keys = { workspace = true }
 tolk-fmt = { workspace = true }
 ton-localnet = { workspace = true }
-ton-indexer = { workspace = true }
+ton-indexer-contracts = { workspace = true }
 
 # remote crates
 # base TON libraries

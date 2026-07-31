@@ -3161,6 +3161,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::time::{SystemTime, UNIX_EPOCH};
     use ton_executor::DEFAULT_CONFIG;
+    use ton_indexer_contracts::jettons;
     use ton_networks::Network;
     use tycho_types::cell::{Cell, CellBuilder, Lazy, Store};
     use tycho_types::dict::Dict;
@@ -4041,7 +4042,7 @@ mod tests {
             "decimals": 9
         });
 
-        ton_indexer::jettons::merge_jetton_content(&mut content, &remote_content);
+        jettons::merge_jetton_content(&mut content, &remote_content);
 
         assert_eq!(content["uri"], "https://example.test/jetton.json");
         assert_eq!(content["name"], "Tether USD");

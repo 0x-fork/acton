@@ -2,6 +2,7 @@ use crate::localnet::{LocalnetAddressInfo, LocalnetContractData};
 use crate::node::Node;
 use crate::storage::{self, AccountMeta, AccountStatus, JettonMasterMeta, NftItemMeta};
 use crate::types::{Addr, BocBytes, Hash256};
+use ton_indexer_contracts::{contracts, jettons, multisigs, nfts};
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 
@@ -19,7 +20,7 @@ fn detect_dns_record(
     nft_item_owner: Option<Addr>,
     state: &ActiveContractState,
 ) -> Option<storage::DnsRecordMeta> {
-    ton_indexer::contracts::get_dns_data(
+    contracts::get_dns_data(
         addr.to_string(),
         state.code.clone(),
         state.data.clone(),
@@ -41,7 +42,7 @@ fn detect_nft_collection(
     state: &ActiveContractState,
     first_transaction_lt: u64,
 ) -> Option<storage::NftCollectionMeta> {
-    ton_indexer::nfts::get_nft_collection_data(
+    nfts::get_nft_collection_data(
         addr.to_string(),
         state.code.clone(),
         state.data.clone(),
@@ -53,7 +54,7 @@ fn detect_nft_collection(
         first_transaction_lt,
         last_transaction_lt: state.last_transaction_lt,
         next_item_index: collection.next_item_index.to_string(),
-        collection_content: ton_indexer::nfts::parse_nft_content(collection.collection_content),
+        collection_content: nfts::parse_nft_content(collection.collection_content),
         data_hash: state.data_hash,
         code_hash: state.code_hash,
     })
@@ -88,7 +89,7 @@ impl Node {
         } = state;
         let address = addr.to_string();
 
-        let nft_sale = ton_indexer::contracts::get_fixed_price_sale_v4_data(
+        let nft_sale = contracts::get_fixed_price_sale_v4_data(
             address.clone(),
             code.clone(),
             data.clone(),
@@ -118,7 +119,7 @@ impl Node {
             ],
         })
         .or_else(|| {
-            ton_indexer::contracts::get_fixed_price_sale_data(
+            contracts::get_fixed_price_sale_data(
                 address.clone(),
                 code.clone(),
                 data.clone(),
@@ -149,7 +150,7 @@ impl Node {
             })
         })
         .or_else(|| {
-            ton_indexer::contracts::get_auction_data(
+            contracts::get_auction_data(
                 address.clone(),
                 code.clone(),
                 data.clone(),
@@ -198,7 +199,7 @@ impl Node {
             })
         })
         .or_else(|| {
-            ton_indexer::contracts::get_telemint_data(
+            contracts::get_telemint_data(
                 address.clone(),
                 code.clone(),
                 data.clone(),
@@ -245,7 +246,7 @@ impl Node {
             })
         });
 
-        let multisig = ton_indexer::multisigs::get_multisig_data(
+        let multisig = multisigs::get_multisig_data(
             address.clone(),
             code.clone(),
             data.clone(),
@@ -273,7 +274,7 @@ impl Node {
             data_hash,
         });
 
-        let multisig_order = ton_indexer::multisigs::get_multisig_order_data(
+        let multisig_order = multisigs::get_multisig_order_data(
             address.clone(),
             code.clone(),
             data.clone(),
@@ -305,38 +306,35 @@ impl Node {
             data_hash,
         });
 
-        let vesting =
-            ton_indexer::contracts::get_vesting_data(address, code, data, libs.as_deref())
-                .map(|vesting| {
-                    let whitelist = ton_indexer::contracts::parse_vesting_whitelist(
-                        vesting.whitelist.as_ref(),
-                    )?;
-                    Ok::<_, anyhow::Error>(storage::VestingMeta {
-                        address: *addr,
-                        first_transaction_lt,
-                        start_time: vesting.start_time.to_string().parse().unwrap_or_default(),
-                        total_duration: vesting
-                            .total_duration
-                            .to_string()
-                            .parse()
-                            .unwrap_or_default(),
-                        unlock_period: vesting
-                            .unlock_period
-                            .to_string()
-                            .parse()
-                            .unwrap_or_default(),
-                        cliff_duration: vesting
-                            .cliff_duration
-                            .to_string()
-                            .parse()
-                            .unwrap_or_default(),
-                        sender_address: Addr::from(&vesting.sender_address),
-                        owner_address: Addr::from(&vesting.owner_address),
-                        total_amount: vesting.total_amount.to_string(),
-                        whitelist: whitelist.iter().map(Addr::from).collect(),
-                    })
+        let vesting = contracts::get_vesting_data(address, code, data, libs.as_deref())
+            .map(|vesting| {
+                let whitelist = contracts::parse_vesting_whitelist(vesting.whitelist.as_ref())?;
+                Ok::<_, anyhow::Error>(storage::VestingMeta {
+                    address: *addr,
+                    first_transaction_lt,
+                    start_time: vesting.start_time.to_string().parse().unwrap_or_default(),
+                    total_duration: vesting
+                        .total_duration
+                        .to_string()
+                        .parse()
+                        .unwrap_or_default(),
+                    unlock_period: vesting
+                        .unlock_period
+                        .to_string()
+                        .parse()
+                        .unwrap_or_default(),
+                    cliff_duration: vesting
+                        .cliff_duration
+                        .to_string()
+                        .parse()
+                        .unwrap_or_default(),
+                    sender_address: Addr::from(&vesting.sender_address),
+                    owner_address: Addr::from(&vesting.owner_address),
+                    total_amount: vesting.total_amount.to_string(),
+                    whitelist: whitelist.iter().map(Addr::from).collect(),
                 })
-                .transpose()?;
+            })
+            .transpose()?;
 
         Ok(LocalnetContractData {
             dns,
@@ -408,7 +406,7 @@ impl Node {
         };
 
         let address = addr.to_string();
-        if let Some(jetton_data) = ton_indexer::jettons::get_jetton_data(
+        if let Some(jetton_data) = jettons::get_jetton_data(
             address.clone(),
             state.code.clone(),
             state.data.clone(),
@@ -420,9 +418,7 @@ impl Node {
                 admin_address: jetton_data.admin_address.as_ref().map(Addr::from),
                 code_hash: state.code_hash,
                 data_hash: state.data_hash,
-                jetton_content: ton_indexer::jettons::parse_jetton_content(
-                    jetton_data.jetton_content,
-                ),
+                jetton_content: jettons::parse_jetton_content(jetton_data.jetton_content),
                 jetton_wallet_code_hash: wallet_code_hash,
                 last_transaction_lt: state.last_transaction_lt,
                 mintable: jetton_data.mintable,
@@ -434,13 +430,13 @@ impl Node {
             });
         }
 
-        if let Some(wallet_data) = ton_indexer::jettons::get_jetton_wallet_data(
+        if let Some(wallet_data) = jettons::get_jetton_wallet_data(
             address.clone(),
             state.code.clone(),
             state.data.clone(),
             state.libs.as_deref(),
         ) {
-            let mintless_is_claimed = ton_indexer::jettons::get_mintless_is_claimed(
+            let mintless_is_claimed = jettons::get_mintless_is_claimed(
                 address.clone(),
                 state.code.clone(),
                 state.data.clone(),
@@ -465,7 +461,7 @@ impl Node {
         }
 
         if let Some(nft_data) =
-            ton_indexer::nfts::get_nft_item_data(address, state.code.clone(), state.data.clone())
+            nfts::get_nft_item_data(address, state.code.clone(), state.data.clone())
         {
             info.nft_item = Some(NftItemMeta {
                 address: *addr,
@@ -473,7 +469,7 @@ impl Node {
                 data_hash: state.data_hash,
                 collection_address: nft_data.collection_address.as_ref().map(Addr::from),
                 owner_address: nft_data.owner_address.as_ref().map(Addr::from),
-                content: ton_indexer::nfts::parse_nft_content(nft_data.individual_content),
+                content: nfts::parse_nft_content(nft_data.individual_content),
                 index: nft_data.index.to_str_radix(10),
                 init: nft_data.init,
                 last_transaction_lt: state.last_transaction_lt,

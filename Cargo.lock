@@ -96,7 +96,7 @@ dependencies = [
  "ton-api",
  "ton-emulator",
  "ton-executor",
- "ton-indexer",
+ "ton-indexer-contracts",
  "ton-localnet",
  "ton-ls",
  "ton-networks",
@@ -5470,7 +5470,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ton-indexer"
+name = "ton-indexer-contracts"
 version = "1.1.0"
 dependencies = [
  "anyhow",
@@ -5576,7 +5576,7 @@ dependencies = [
  "ton-api",
  "ton-emulator",
  "ton-executor",
- "ton-indexer",
+ "ton-indexer-contracts",
  "ton-liteapi",
  "ton-networks",
  "tower 0.5.2",
