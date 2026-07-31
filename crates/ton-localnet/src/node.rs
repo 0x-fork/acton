@@ -4140,6 +4140,43 @@ mod tests {
         shard_account_boc(OptionalAccount(Some(account)))
     }
 
+    fn insert_active_contract_state(
+        node: &mut Node,
+        addr: Addr,
+        code: Cell,
+        data: Cell,
+        balance: u128,
+        last_transaction_lt: u64,
+    ) {
+        let code_hash = Hash256::from(code.repr_hash());
+        node.cas.put(Boc::encode(code.clone()).into(), code_hash);
+        let data_hash = Hash256::from(data.repr_hash());
+        node.cas.put(Boc::encode(data.clone()).into(), data_hash);
+        let account_boc = make_active_shard_account_boc_with_state(
+            addr,
+            Some(code),
+            Some(data),
+            Dict::new(),
+            balance,
+        );
+        let account_hash = account_boc.hash().expect("account BOC must hash");
+        node.cas.put(account_boc, account_hash);
+        node.latest.accounts.insert(
+            addr,
+            AccountMeta {
+                account_hash,
+                status: AccountStatus::Active,
+                balance,
+                extra_currencies: Vec::new(),
+                last_trans_lt: Some(last_transaction_lt),
+                last_trans_hash: None,
+                code_hash: Some(code_hash),
+                data_hash: Some(data_hash),
+                frozen_hash: None,
+            },
+        );
+    }
+
     fn make_uninit_shard_account_boc(addr: Addr) -> BocBytes {
         let account = Account {
             address: IntAddr::Std(StdAddr::new(addr.workchain as i8, HashBytes(addr.addr))),
@@ -5288,10 +5325,12 @@ mod tests {
     }
 
     #[test]
-    fn jetton_wallet_detection_uses_global_libraries_for_library_reference_code() {
+    fn jetton_wallet_detection_uses_libraries_and_verifies_master() {
         const USDT_WALLET_CODE_REF_B64: &str =
             "te6ccgEBAQEAIwAIQgKPRS16Tf10BmtoI2UXclntBXNENb52tf1L1divK3w9aA==";
         const USDT_WALLET_DATA_B64: &str = "te6ccgEBAQEASQAAjQMfVDaAEMMwjOj71Lak4LOU/ILddUHU9Jsd9EI9CQzS2z/InxmQAsROplLUCShZxn2kTkyjrdZWWw4ol9ZAosUb+zcNiHf6";
+        const USDT_MASTER_CODE_B64: &str = "te6ccgECGAEABbsAART/APSkE/S88sgLAQIBYgIDAgLLBAUCASAUFQLz0MtDTAwFxsI47MIAg1yHTHwGCEBeNRRm6kTDhgEDXIfoAMO1E0PoA+kD6QNTU0VBFoUE0yFAF+gJQA88WAc8WzMzJ7VTg+kD6QDH6ADH0AfoAMfoAATFw+DoC0x8BAdM/ARLtRND6APpA+kDU1NEmghBkK30HuuMCJoGBwAdojhkZYOA54tkgUGD+gvAAZY1NVFhxwXy4EkE+kAh+kQwwADy4U36ANTRINDTHwGCEBeNRRm68uBIgEDXIfoA+kAx+kAx+gAg1wsAmtdLwAEBwAGw8rGRMOJUQxsIA/qCEHvdl966juc2OAX6APpA+ChUEgpwVGAEExUDyMsDWPoCAc8WAc8WySHIywET9AAS9ADLAMn5AHB0yMsCygfL/8nQUAjHBfLgShKhRBRQZgPIUAX6AlADzxYBzxbMzMntVPpA0SDXCwHAALORW+MN4CaCECx2uXO64wI1JQoLDAGOIZFykXHi+DkgbpOBJCeRIOIhbpQxgShzkQHiUCOoE6BzgQOjcPg8oAJw+DYSoAFw+Dagc4EECYIQCWYBgHD4N6C88rAlWX8JAOyCEDuaygBw+wL4KEUEcFRgBBMVA8jLA1j6AgHPFgHPFskhyMsBE/QAEvQAywDJIPkAcHTIywLKB8v/ydDIgBgBywUBzxZY+gICmFh3UAPLa8zMlzABcVjLasziyYAR+wBQBaBDFMhQBfoCUAPPFgHPFszMye1UAETIgBABywUBzxZw+gJwActqghDVMnbbAcsfAQHLP8mAQvsAAfwUXwQyNAH6QNIAAQHRlcghzxbJkW3iyIAQAcsFUATPFnD6AnABy2qCENFzVAAByx9QBAHLPyP6RDDAAI41+ChEBHBUYAQTFQPIywNY+gIBzxYBzxbJIcjLARP0ABL0AMsAyfkAcHTIywLKB8v/ydASzxaXMWwScAHLAeL0AMkNBPiCEGUB81S6jiIxNDZRRccF8uBJAvpA0RA0AshQBfoCUAPPFgHPFszMye1U4CWCEPuI4Rm6jiEyNDYD0VExxwXy4EmLAlUSyFAF+gJQA88WAc8WzMzJ7VTgNCSCECNcr1K64wI3I4IQy4YpArrjAjZbIIIQJQjWarrjAmwxDg8QEQAIgFD7AALsMDEyUDPHBfLgSfpA+gDU0SDQ0x8BAYBA1yEhghAPin6luo5NNiCCEFlfB7y6jiwwBPoAMfpAMfQB0SD4OSBulDCBFp/ecYEC8nD4OAFw+DaggRp3cPg2oLzysI4TghDu0jbTupUE0wMx0ZQ08sBI4uLjDVADcBITAEQzUULHBfLgSchQA88WyRNEQMhQBfoCUAPPFgHPFszMye1UAB4wAscF8uBJ1NTRAe1U+wQAGIIQ03IVjLrchA/y8ADOMfoAMfpAMfpAMfQB+gAg1wsAmtdLwAEBwAGw8rGRMOJUQhYhkXKRceL4OSBuk4EkJ5Eg4iFulDGBKHORAeJQI6gToHOBA6Nw+DygAnD4NhKgAXD4NqBzgQQJghAJZgGAcPg3oLzysADAghA7msoAcPsC+ChFBHBUYAQTFQPIywNY+gIBzxYBzxbJIcjLARP0ABL0AMsAySD5AHB0yMsCygfL/8nQyIAYAcsFAc8WWPoCAphYd1ADy2vMzJcwAXFYy2rM4smAEfsAACW9mt9qJofQB9IH0gampoiBIvgkAgJxFhcAha289qJofQB9IH0gampoii+CfBQAuCowAgmKgeRlgax9AQDniwDni2SQ5GWAifoACXoAZYBk/IA4OmRlgWUD5f/k6EAAz68W9qJofQB9IH0gampov5noNsF4OHLr21FNnJfCg7fwrlF5Ap4rYRnDlGJxnk9G7Y90E+YseApBeHdAfpePAaQHEUEbGst3Opa92T+oO7XKhDUBPIxLOskfRYm0eAo4ZGWD+gBkoYBA";
+        const USDT_MASTER_DATA_B64: &str = "te6ccgEBBAEAdQACU3BRSOO6q8sIAMiB/HjSggcHLHKKLniWIo834XNprhIcsO73tLA4XzMwQAECCEICj0Utek39dAZraCNlF3JZ7QVzRDW+drX9S9XYryt8PWgBAAMAPmh0dHBzOi8vdGV0aGVyLnRvL3VzZHQtdG9uLmpzb24=";
         const USDT_WALLET_LIBRARY_B64: &str = "te6ccgECDwEAA9EAART/APSkE/S88sgLAQIBYgUCAgEgBAMAIbxQj2omhpgf0AfSB9IGivgcACe/2BdqJoaYH9AH0gfSBomfwVIJhAL40AHQ0wMBcbCOSBNfA4Ag1yHtRNDTA/oA+kD6QNEE0x8BhA8hghAXjUUZugKCEHvdl966ErHy9IBA1yH6ADASoEATA8jLA1j6AgHPFgHPFsntVOD6QPpAMfoAMfQB+gAx+gABMXD4OgLTHwEgghAPin6luo6FMDRZ2zzgMwwGAtAighAXjUUZuo6EMlrbPOA0IYIQWV8HvLqOhDEB2zzgMiCCEO7SNtO6ji8wAYBA1yHTA9HtRNDTA/oA+kD6QNEzUULHBfLgSkAzA8jLA1j6AgHPFgHPFsntVOBsIYIQ03IVjLrchA/y8AgHAfLtRNDTA/oA+kD6QNEG0z8BAfoA+kD0AdFRQaFSiMcF8uBJJsL/8q/IghB73ZfeAcsfWAHLPwH6AiHPFljPFsnIgBgBywUmzxZw+gIBcVjLaszJA/g5IG6UMIEWn95xgQLycPg4AXD4NqCBGndw+DagvPKwAoBQ+wADCQP07UTQ0wP6APpA+kDRI3KwwALybQfTPwEB+gBRQaAE+kD6QFO6xwX4KlRk4HBUYAQTFQPIywNY+gIBzxYBzxbJIcjLARP0ABL0AMsAyfkAcHTIywLKB8v/ydBQDMcFG7Hy4EoJ+gAhkl8E4w0m1wsBwACzkzBsM+MNVQILCgkAIAPIywNY+gIBzxYBzxbJ7VQAelBUofgvoHOBBAmCEAlmAYBw+De2CXL7AsiAEAHLBVAFzxZw+gJwActqghDVMnbbAcsfWAHLP8mBAIL7AFkAYMiCEHNi0JwByx8lAcs/UAT6AljPFljPFsnIgBABywUkzxZY+gIBcVjLaszJgBH7AAHyA9M/AQH6APpAIfpEMMAA8uFN7UTQ0wP6APpA+kDRUwnHBSRxsMAAIbHyrVIrxwVQCrHy4ElRFaEgwv/yr/gqVCWQcFRgBBMVA8jLA1j6AgHPFgHPFskhyMsBE/QAEvQAywDJIPkAcHTIywLKB8v/ydAE+kD0AfoAIA0BmCDXCwCa10vAAQHAAbDysZEw4siCEBeNRRkByx9QCgHLP1AI+gIjzxYBzxYm+gJQB88WyciAGAHLBVAEzxZw+gJAY3dQA8trzMzJRTcOALQhkXKRceL4OSBuk4EkJ5Eg4iFulDGBKHORAeJQI6gToHOBA6Nw+DygAnD4NhKgAXD4NqBzgQQJghAJZgGAcPg3oLzysASAUPsAWAPIywNY+gIBzxYBzxbJ7VQ=";
 
         let mut node = make_test_node(Box::new(NoopExecutor));
@@ -5302,6 +5341,10 @@ mod tests {
         let code = Boc::decode_base64(USDT_WALLET_CODE_REF_B64)
             .expect("USDT wallet code reference must decode");
         let data = Boc::decode_base64(USDT_WALLET_DATA_B64).expect("USDT wallet data must decode");
+        let master_code =
+            Boc::decode_base64(USDT_MASTER_CODE_B64).expect("USDT master code must decode");
+        let master_data =
+            Boc::decode_base64(USDT_MASTER_DATA_B64).expect("USDT master data must decode");
         let library =
             Boc::decode_base64(USDT_WALLET_LIBRARY_B64).expect("USDT wallet library must decode");
 
@@ -5321,33 +5364,15 @@ mod tests {
             },
         );
 
-        let code_hash = Hash256::from(code.repr_hash());
-        node.cas.put(Boc::encode(code.clone()).into(), code_hash);
-        let data_hash = Hash256::from(data.repr_hash());
-        node.cas.put(Boc::encode(data.clone()).into(), data_hash);
-        let account_boc = make_active_shard_account_boc_with_state(
-            wallet_address,
-            Some(code),
-            Some(data),
-            Dict::new(),
-            974_433,
+        insert_active_contract_state(
+            &mut node,
+            jetton_address,
+            master_code,
+            master_data,
+            1_000_000_000,
+            41,
         );
-        let account_hash = account_boc.hash().expect("account BOC must hash");
-        node.cas.put(account_boc, account_hash);
-        node.latest.accounts.insert(
-            wallet_address,
-            AccountMeta {
-                account_hash,
-                status: AccountStatus::Active,
-                balance: 974_433,
-                extra_currencies: Vec::new(),
-                last_trans_lt: Some(42),
-                last_trans_hash: None,
-                code_hash: Some(code_hash),
-                data_hash: Some(data_hash),
-                frozen_hash: None,
-            },
-        );
+        insert_active_contract_state(&mut node, wallet_address, code, data, 974_433, 42);
 
         node.detect_assets(&wallet_address)
             .expect("library-backed jetton wallet must be detected");
@@ -5361,6 +5386,42 @@ mod tests {
         assert_eq!(wallet.owner_address, owner_address);
         assert_eq!(wallet.jetton_address, jetton_address);
         assert_eq!(wallet.last_transaction_lt, 42);
+
+        let fake_wallet_address = test_addr(0x42);
+        insert_active_contract_state(
+            &mut node,
+            fake_wallet_address,
+            Boc::decode_base64(USDT_WALLET_CODE_REF_B64)
+                .expect("USDT wallet code reference must decode"),
+            Boc::decode_base64(USDT_WALLET_DATA_B64).expect("USDT wallet data must decode"),
+            974_433,
+            43,
+        );
+        node.detect_assets(&fake_wallet_address)
+            .expect("wallet address mismatch must be handled");
+        assert!(
+            !node
+                .history
+                .jetton_wallets
+                .contains_key(&fake_wallet_address),
+            "wallet must match the address derived by its master"
+        );
+
+        let master_meta = node
+            .latest
+            .accounts
+            .remove(&jetton_address)
+            .expect("USDT master account metadata must exist");
+        node.detect_assets(&wallet_address)
+            .expect("missing master state must be handled");
+        assert!(
+            !node.history.jetton_wallets.contains_key(&wallet_address),
+            "wallet without its master state must not be indexed"
+        );
+        node.latest.accounts.insert(jetton_address, master_meta);
+        node.detect_assets(&wallet_address)
+            .expect("verified wallet must be detected again");
+        assert!(node.history.jetton_wallets.contains_key(&wallet_address));
 
         let meta = node
             .latest

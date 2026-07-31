@@ -279,8 +279,28 @@ impl Node {
             code.clone(),
             data.clone(),
             libs.as_deref(),
-        )
-        .map(|order| storage::MultisigOrderMeta {
+        );
+        let multisig_order = if let Some(order) = multisig_order {
+            let multisig_address = Addr::from(&order.multisig_address);
+            let valid = if let Some(multisig_state) =
+                self.load_active_contract_state_for_address(&multisig_address)?
+            {
+                multisigs::get_multisig_order_address(
+                    multisig_address.to_string(),
+                    multisig_state.code,
+                    multisig_state.data,
+                    multisig_state.libs.as_deref(),
+                    order.order_seqno.clone(),
+                )
+                .is_ok_and(|order_address| Addr::from(&order_address) == *addr)
+            } else {
+                false
+            };
+            valid.then_some(order)
+        } else {
+            None
+        };
+        let multisig_order = multisig_order.map(|order| storage::MultisigOrderMeta {
             address: *addr,
             multisig_address: Addr::from(&order.multisig_address),
             first_transaction_lt,
@@ -436,44 +456,98 @@ impl Node {
             state.data.clone(),
             state.libs.as_deref(),
         ) {
-            let mintless_is_claimed = jettons::get_mintless_is_claimed(
-                address.clone(),
-                state.code.clone(),
-                state.data.clone(),
-                state.libs.as_deref(),
-            );
-            let wallet_code_hash = self.cas.put_cell(wallet_data.jetton_wallet_code);
-            info.jetton_wallet = Some(storage::JettonWalletMeta {
-                address: *addr,
-                balance: wallet_data
-                    .balance
-                    .to_str_radix(10)
-                    .parse()
-                    .unwrap_or_default(),
-                code_hash: state.code_hash,
-                data_hash: state.data_hash,
-                jetton_address: Addr::from(&wallet_data.jetton_master_address),
-                jetton_wallet_code_hash: wallet_code_hash,
-                last_transaction_lt: state.last_transaction_lt,
-                mintless_is_claimed,
-                owner_address: Addr::from(&wallet_data.owner_address),
-            });
+            let jetton_address = Addr::from(&wallet_data.jetton_master_address);
+            let valid = if let Some(master_state) =
+                self.load_active_contract_state_for_address(&jetton_address)?
+            {
+                jettons::get_jetton_wallet_address(
+                    jetton_address.to_string(),
+                    master_state.code,
+                    master_state.data,
+                    master_state.libs.as_deref(),
+                    &wallet_data.owner_address,
+                )
+                .is_ok_and(|wallet_address| Addr::from(&wallet_address) == *addr)
+            } else {
+                false
+            };
+            if valid {
+                let mintless_is_claimed = jettons::get_mintless_is_claimed(
+                    address.clone(),
+                    state.code.clone(),
+                    state.data.clone(),
+                    state.libs.as_deref(),
+                );
+                let wallet_code_hash = self.cas.put_cell(wallet_data.jetton_wallet_code);
+                info.jetton_wallet = Some(storage::JettonWalletMeta {
+                    address: *addr,
+                    balance: wallet_data
+                        .balance
+                        .to_str_radix(10)
+                        .parse()
+                        .unwrap_or_default(),
+                    code_hash: state.code_hash,
+                    data_hash: state.data_hash,
+                    jetton_address,
+                    jetton_wallet_code_hash: wallet_code_hash,
+                    last_transaction_lt: state.last_transaction_lt,
+                    mintless_is_claimed,
+                    owner_address: Addr::from(&wallet_data.owner_address),
+                });
+            }
         }
 
-        if let Some(nft_data) =
-            nfts::get_nft_item_data(address, state.code.clone(), state.data.clone())
-        {
-            info.nft_item = Some(NftItemMeta {
-                address: *addr,
-                code_hash: state.code_hash,
-                data_hash: state.data_hash,
-                collection_address: nft_data.collection_address.as_ref().map(Addr::from),
-                owner_address: nft_data.owner_address.as_ref().map(Addr::from),
-                content: nfts::parse_nft_content(nft_data.individual_content),
-                index: nft_data.index.to_str_radix(10),
-                init: nft_data.init,
-                last_transaction_lt: state.last_transaction_lt,
-            });
+        if let Some(nft_data) = nfts::get_nft_item_data(
+            address,
+            state.code.clone(),
+            state.data.clone(),
+            state.libs.as_deref(),
+        ) {
+            let content = if let Some(collection_address) = &nft_data.collection_address {
+                let collection_address = Addr::from(collection_address);
+                if let Some(collection_state) =
+                    self.load_active_contract_state_for_address(&collection_address)?
+                {
+                    let belongs_to_collection = nfts::get_nft_address_by_index(
+                        collection_address.to_string(),
+                        collection_state.code.clone(),
+                        collection_state.data.clone(),
+                        collection_state.libs.as_deref(),
+                        nft_data.index.clone(),
+                    )
+                    .is_ok_and(|item_address| Addr::from(&item_address) == *addr);
+                    if belongs_to_collection {
+                        nfts::get_nft_content(
+                            collection_address.to_string(),
+                            collection_state.code,
+                            collection_state.data,
+                            collection_state.libs.as_deref(),
+                            nft_data.index.clone(),
+                            nft_data.individual_content.clone(),
+                        )
+                        .ok()
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                Some(nft_data.individual_content.clone())
+            };
+            if let Some(content) = content {
+                info.nft_item = Some(NftItemMeta {
+                    address: *addr,
+                    code_hash: state.code_hash,
+                    data_hash: state.data_hash,
+                    collection_address: nft_data.collection_address.as_ref().map(Addr::from),
+                    owner_address: nft_data.owner_address.as_ref().map(Addr::from),
+                    content: nfts::parse_nft_content(content),
+                    index: nft_data.index.to_str_radix(10),
+                    init: nft_data.init,
+                    last_transaction_lt: state.last_transaction_lt,
+                });
+            }
         }
 
         let first_transaction_lt =
@@ -519,5 +593,13 @@ impl Node {
             libs: self.build_vm_global_libs_boc()?.map(|boc| boc.to_base64()),
             last_transaction_lt: meta.last_trans_lt.unwrap_or_default(),
         }))
+    }
+
+    fn load_active_contract_state_for_address(
+        &mut self,
+        addr: &Addr,
+    ) -> anyhow::Result<Option<ActiveContractState>> {
+        let meta = self.hydrate_address_information(addr)?;
+        self.load_active_contract_state(meta.as_ref())
     }
 }

@@ -1,6 +1,7 @@
-use crate::common::run_get_method;
+use crate::common::{run_get_method, run_get_method_with_stack};
 use crate::types::Map;
 use num_bigint::BigInt;
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::Cell;
 use tycho_types::models::IntAddr;
 
@@ -23,6 +24,11 @@ pub struct MultisigOrderData {
     pub approvals_num: BigInt,
     pub expiration_date: BigInt,
     pub order: Cell,
+}
+
+#[derive(tvm_ffi::FromStackTuple)]
+struct MultisigOrderAddress {
+    address: IntAddr,
 }
 
 #[must_use]
@@ -52,4 +58,17 @@ pub fn get_multisig_order_data(
     libs: Option<&str>,
 ) -> Option<MultisigOrderData> {
     run_get_method(address, code, data, libs, "get_order_data").ok()
+}
+
+pub fn get_multisig_order_address(
+    address: String,
+    code: Cell,
+    data: Cell,
+    libs: Option<&str>,
+    order_seqno: BigInt,
+) -> anyhow::Result<IntAddr> {
+    let stack = Tuple(vec![TupleItem::Int(order_seqno)]);
+    let result: MultisigOrderAddress =
+        run_get_method_with_stack(address, code, data, libs, "get_order_address", stack)?;
+    Ok(result.address)
 }

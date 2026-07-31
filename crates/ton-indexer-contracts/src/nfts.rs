@@ -1,7 +1,8 @@
-use crate::common::run_get_method;
+use crate::common::{run_get_method, run_get_method_with_stack};
 use crate::content::parse_token_content;
 use num_bigint::BigInt;
 use serde_json::Value;
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::Cell;
 use tycho_types::models::IntAddr;
 
@@ -35,9 +36,24 @@ pub struct NftCollectionData {
     pub owner_address: Option<IntAddr>,
 }
 
+#[derive(tvm_ffi::FromStackTuple)]
+struct NftAddress {
+    address: IntAddr,
+}
+
+#[derive(tvm_ffi::FromStackTuple)]
+struct NftContent {
+    content: Cell,
+}
+
 #[must_use]
-pub fn get_nft_item_data(address: String, code: Cell, data: Cell) -> Option<NftItemData> {
-    run_get_method(address, code, data, None, "get_nft_data").ok()
+pub fn get_nft_item_data(
+    address: String,
+    code: Cell,
+    data: Cell,
+    libs: Option<&str>,
+) -> Option<NftItemData> {
+    run_get_method(address, code, data, libs, "get_nft_data").ok()
 }
 
 #[must_use]
@@ -48,6 +64,36 @@ pub fn get_nft_collection_data(
     libs: Option<&str>,
 ) -> Option<NftCollectionData> {
     run_get_method(address, code, data, libs, "get_collection_data").ok()
+}
+
+pub fn get_nft_address_by_index(
+    address: String,
+    code: Cell,
+    data: Cell,
+    libs: Option<&str>,
+    index: BigInt,
+) -> anyhow::Result<IntAddr> {
+    let stack = Tuple(vec![TupleItem::Int(index)]);
+    let result: NftAddress =
+        run_get_method_with_stack(address, code, data, libs, "get_nft_address_by_index", stack)?;
+    Ok(result.address)
+}
+
+pub fn get_nft_content(
+    address: String,
+    code: Cell,
+    data: Cell,
+    libs: Option<&str>,
+    index: BigInt,
+    individual_content: Cell,
+) -> anyhow::Result<Cell> {
+    let stack = Tuple(vec![
+        TupleItem::Int(index),
+        TupleItem::Cell(individual_content),
+    ]);
+    let result: NftContent =
+        run_get_method_with_stack(address, code, data, libs, "get_nft_content", stack)?;
+    Ok(result.content)
 }
 
 #[must_use]

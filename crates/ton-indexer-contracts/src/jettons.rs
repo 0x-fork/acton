@@ -1,8 +1,9 @@
-use crate::common::run_get_method;
+use crate::common::{run_get_method, run_get_method_with_stack};
 use crate::content::{merge_token_content, parse_token_content, token_content_uri};
 use num_bigint::BigInt;
 use serde_json::Value;
-use tycho_types::cell::Cell;
+use tvm_ffi::stack::{Tuple, TupleItem};
+use tycho_types::cell::{Cell, CellBuilder};
 use tycho_types::models::IntAddr;
 
 const JETTON_CONTENT_KEYS: &[&str] = &[
@@ -39,6 +40,11 @@ struct MintlessClaimData {
     is_claimed: bool,
 }
 
+#[derive(tvm_ffi::FromStackTuple)]
+struct JettonWalletAddress {
+    address: IntAddr,
+}
+
 #[must_use]
 pub fn get_jetton_data(
     address: String,
@@ -57,6 +63,21 @@ pub fn get_jetton_wallet_data(
     libs: Option<&str>,
 ) -> Option<JettonWalletData> {
     run_get_method(address, code, data, libs, "get_wallet_data").ok()
+}
+
+pub fn get_jetton_wallet_address(
+    address: String,
+    code: Cell,
+    data: Cell,
+    libs: Option<&str>,
+    owner_address: &IntAddr,
+) -> anyhow::Result<IntAddr> {
+    let stack = Tuple(vec![TupleItem::Slice(CellBuilder::build_from(
+        owner_address,
+    )?)]);
+    let result: JettonWalletAddress =
+        run_get_method_with_stack(address, code, data, libs, "get_wallet_address", stack)?;
+    Ok(result.address)
 }
 
 #[must_use]
