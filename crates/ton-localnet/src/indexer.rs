@@ -1,10 +1,12 @@
 use crate::localnet::{LocalnetAddressInfo, LocalnetContractData};
-use crate::node::Node;
+use crate::node::{Node, StateSource};
 use crate::storage::{self, AccountMeta, AccountStatus, JettonMasterMeta, NftItemMeta};
 use crate::types::{Addr, BocBytes, Hash256};
 use ton_indexer_contracts::{contracts, jettons, multisigs, nfts};
+use ton_networks::Network;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
+use tycho_types::models::StdAddr;
 
 struct ActiveContractState {
     code_hash: Hash256,
@@ -16,10 +18,16 @@ struct ActiveContractState {
 }
 
 fn detect_dns_record(
+    state_source: &StateSource,
     addr: &Addr,
-    nft_item_owner: Option<Addr>,
+    nft_item: Option<&NftItemMeta>,
     state: &ActiveContractState,
 ) -> Option<storage::DnsRecordMeta> {
+    let nft_item = nft_item?;
+    let collection_address = nft_item.collection_address.as_ref()?;
+    let network = dns_network(state_source)?;
+    contracts::dns_root(network, &StdAddr::from(collection_address))?;
+
     contracts::get_dns_data(
         addr.to_string(),
         state.code.clone(),
@@ -28,13 +36,25 @@ fn detect_dns_record(
     )
     .map(|dns| storage::DnsRecordMeta {
         nft_item_address: *addr,
-        nft_item_owner,
+        nft_item_owner: nft_item.owner_address,
         domain: dns.domain,
         next_resolver: dns.next_resolver.as_ref().map(Addr::from),
         wallet: dns.wallet.as_ref().map(Addr::from),
         site_adnl: dns.site_adnl.map(Hash256::from),
         storage_bag_id: dns.storage_bag_id.map(Hash256::from),
     })
+}
+
+const fn dns_network(state_source: &StateSource) -> Option<contracts::DnsNetwork> {
+    let StateSource::Remote(provider) = state_source else {
+        return None;
+    };
+
+    match &provider.network {
+        Network::Mainnet => Some(contracts::DnsNetwork::Mainnet),
+        Network::Testnet => Some(contracts::DnsNetwork::Testnet),
+        Network::Localnet | Network::Custom(_) => None,
+    }
 }
 
 fn detect_nft_collection(
@@ -65,19 +85,19 @@ impl Node {
         &mut self,
         addr: &Addr,
     ) -> anyhow::Result<LocalnetContractData> {
-        let _ = self.get_address_information(addr);
+        self.ensure_detected_assets_for_address(addr)?;
         let meta = self.latest.accounts.get(addr).cloned();
         let Some(state) = self.load_active_contract_state(meta.as_ref())? else {
             return Ok(LocalnetContractData::default());
         };
-        let nft_item_owner = self
-            .history
-            .nft_items
-            .get(addr)
-            .and_then(|item| item.owner_address);
         let first_transaction_lt =
             self.account_first_transaction_lt(addr, state.last_transaction_lt);
-        let dns = detect_dns_record(addr, nft_item_owner, &state);
+        let dns = detect_dns_record(
+            &self.state_source,
+            addr,
+            self.history.nft_items.get(addr),
+            &state,
+        );
         let nft_collection = detect_nft_collection(addr, &state, first_transaction_lt);
         let ActiveContractState {
             code_hash,
@@ -553,11 +573,7 @@ impl Node {
         let first_transaction_lt =
             self.account_first_transaction_lt(addr, state.last_transaction_lt);
         info.nft_collection = detect_nft_collection(addr, &state, first_transaction_lt);
-        info.dns = detect_dns_record(
-            addr,
-            info.nft_item.as_ref().and_then(|item| item.owner_address),
-            &state,
-        );
+        info.dns = detect_dns_record(&self.state_source, addr, info.nft_item.as_ref(), &state);
 
         Ok(info)
     }
@@ -601,5 +617,79 @@ impl Node {
     ) -> anyhow::Result<Option<ActiveContractState>> {
         let meta = self.hydrate_address_information(addr)?;
         self.load_active_contract_state(meta.as_ref())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::remote::RemoteProvider;
+
+    fn remote_source(network: Network) -> StateSource {
+        StateSource::Remote(RemoteProvider {
+            network,
+            fork_block_number: Some(1),
+        })
+    }
+
+    #[test]
+    fn dns_root_constants_match_canonical_addresses() {
+        assert_eq!(
+            Addr::parse(contracts::DOT_TON_DNS_ROOT_MAINNET).unwrap(),
+            Addr::parse("0:B774D95EB20543F186C06B371AB88AD704F7E256130CAF96189368A7D0CB6CCF")
+                .unwrap()
+        );
+        assert_eq!(
+            Addr::parse(contracts::DOT_TON_DNS_ROOT_TESTNET).unwrap(),
+            Addr::parse("0:E33ED33A42EB2032059F97D90C706F8400BB256D32139CA707F1564AD699C7DD")
+                .unwrap()
+        );
+        assert_eq!(
+            Addr::parse(contracts::DOT_T_ME_DNS_ROOT_MAINNET).unwrap(),
+            Addr::parse("0:80D78A35F955A14B679FAA887FF4CD5BFC0F43B4A4EEA2A7E6927F3701B273C2")
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn dns_roots_are_scoped_to_the_source_network() {
+        let mainnet = remote_source(Network::Mainnet);
+        assert_eq!(dns_network(&mainnet), Some(contracts::DnsNetwork::Mainnet));
+
+        let testnet = remote_source(Network::Testnet);
+        assert_eq!(dns_network(&testnet), Some(contracts::DnsNetwork::Testnet));
+
+        assert_eq!(dns_network(&StateSource::Local), None);
+        assert_eq!(
+            dns_network(&remote_source(Network::Custom("custom".into()))),
+            None
+        );
+
+        let dot_ton_mainnet =
+            StdAddr::from(Addr::parse(contracts::DOT_TON_DNS_ROOT_MAINNET).unwrap());
+        let dot_ton_testnet =
+            StdAddr::from(Addr::parse(contracts::DOT_TON_DNS_ROOT_TESTNET).unwrap());
+        let dot_t_me_mainnet =
+            StdAddr::from(Addr::parse(contracts::DOT_T_ME_DNS_ROOT_MAINNET).unwrap());
+        assert_eq!(
+            contracts::dns_root(contracts::DnsNetwork::Mainnet, &dot_ton_mainnet),
+            Some(contracts::DnsRoot::DotTon)
+        );
+        assert_eq!(
+            contracts::dns_root(contracts::DnsNetwork::Mainnet, &dot_t_me_mainnet),
+            Some(contracts::DnsRoot::DotTMe)
+        );
+        assert_eq!(
+            contracts::dns_root(contracts::DnsNetwork::Testnet, &dot_ton_testnet),
+            Some(contracts::DnsRoot::DotTon)
+        );
+        assert_eq!(
+            contracts::dns_root(contracts::DnsNetwork::Mainnet, &dot_ton_testnet),
+            None
+        );
+        assert_eq!(
+            contracts::dns_root(contracts::DnsNetwork::Testnet, &dot_ton_mainnet),
+            None
+        );
     }
 }

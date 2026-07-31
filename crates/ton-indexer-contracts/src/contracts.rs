@@ -1,10 +1,57 @@
+use std::sync::LazyLock;
+
 use crate::common::{run_get_method, run_get_method_with_stack};
 use num_bigint::BigInt;
 use sha2::{Digest, Sha256};
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, CellBuilder, CellDataBuilder, HashBytes, Load};
 use tycho_types::dict::{Dict, DictKey, LoadDictKey};
-use tycho_types::models::IntAddr;
+use tycho_types::models::{IntAddr, StdAddr, StdAddrFormat};
+
+pub const DOT_TON_DNS_ROOT_MAINNET: &str = "EQC3dNlesgVD8YbAazcauIrXBPfiVhMMr5YYk2in0Mtsz0Bz";
+pub const DOT_TON_DNS_ROOT_TESTNET: &str = "kQDjPtM6QusgMgWfl9kMcG-EALslbTITnKcH8VZK1pnH3f3K";
+pub const DOT_T_ME_DNS_ROOT_MAINNET: &str = "EQCA14o1-VWhS2efqoh_9M1b_A9DtKTuoqfmkn83AbJzwnPi";
+
+static DOT_TON_DNS_ROOT_MAINNET_ADDRESS: LazyLock<StdAddr> =
+    LazyLock::new(|| parse_dns_root(DOT_TON_DNS_ROOT_MAINNET));
+static DOT_TON_DNS_ROOT_TESTNET_ADDRESS: LazyLock<StdAddr> =
+    LazyLock::new(|| parse_dns_root(DOT_TON_DNS_ROOT_TESTNET));
+static DOT_T_ME_DNS_ROOT_MAINNET_ADDRESS: LazyLock<StdAddr> =
+    LazyLock::new(|| parse_dns_root(DOT_T_ME_DNS_ROOT_MAINNET));
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DnsNetwork {
+    Mainnet,
+    Testnet,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DnsRoot {
+    DotTon,
+    DotTMe,
+}
+
+#[must_use]
+pub fn dns_root(network: DnsNetwork, collection_address: &StdAddr) -> Option<DnsRoot> {
+    match network {
+        DnsNetwork::Mainnet if collection_address == &*DOT_TON_DNS_ROOT_MAINNET_ADDRESS => {
+            Some(DnsRoot::DotTon)
+        }
+        DnsNetwork::Mainnet if collection_address == &*DOT_T_ME_DNS_ROOT_MAINNET_ADDRESS => {
+            Some(DnsRoot::DotTMe)
+        }
+        DnsNetwork::Testnet if collection_address == &*DOT_TON_DNS_ROOT_TESTNET_ADDRESS => {
+            Some(DnsRoot::DotTon)
+        }
+        DnsNetwork::Mainnet | DnsNetwork::Testnet => None,
+    }
+}
+
+fn parse_dns_root(address: &str) -> StdAddr {
+    StdAddr::from_str_ext(address, StdAddrFormat::any())
+        .expect("hard-coded DNS root address must be valid")
+        .0
+}
 
 #[derive(Debug, Clone)]
 pub struct DnsData {
@@ -530,7 +577,7 @@ pub fn parse_vesting_whitelist(cell: Option<&Cell>) -> anyhow::Result<Vec<IntAdd
     for entry in dict.iter() {
         let (key, ()) = entry?;
         let workchain = key.0[0] as i8;
-        result.push(IntAddr::Std(tycho_types::models::StdAddr::new(
+        result.push(IntAddr::Std(StdAddr::new(
             workchain,
             HashBytes(key.0[1..].try_into().expect("fixed address size")),
         )));
