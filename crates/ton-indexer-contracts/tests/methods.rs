@@ -1,6 +1,9 @@
 use std::fmt::Write;
 
 use expect_test::expect;
+use ton_indexer_contracts::known_get_methods::{
+    KNOWN_GET_METHODS, known_get_method_name, known_get_method_names,
+};
 use ton_indexer_contracts::methods::parse_contract_methods;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder};
@@ -87,5 +90,30 @@ fn parses_method_dictionary_and_rejects_other_dispatchers() {
         error: contract code does not start with SETCP0
         error: SETCP0 is not followed by DICTPUSHCONST
     "]]
+    .assert_eq(&actual);
+}
+
+#[test]
+fn looks_up_known_get_method_names() {
+    let sorted = KNOWN_GET_METHODS.windows(2).all(|pair| pair[0] <= pair[1]);
+    let actual = format!(
+        "entries: {}\nsorted: {sorted}\nfirst: {:?}\nlast: {:?}\ncollision: {:?}\nsingle: {:?}\nunknown: {:?}\n",
+        KNOWN_GET_METHODS.len(),
+        KNOWN_GET_METHODS.first(),
+        KNOWN_GET_METHODS.last(),
+        known_get_method_names(76_407),
+        known_get_method_name(103_289),
+        known_get_method_name(65_536),
+    );
+
+    expect![[r#"
+        entries: 405
+        sorted: true
+        first: Some((65842, "get_governance_contract"))
+        last: Some((131036, "get_loan_state"))
+        collision: [(76407, "is_plugin_installed"), (76407, "version")]
+        single: Some("get_wallet_address")
+        unknown: None
+    "#]]
     .assert_eq(&actual);
 }
