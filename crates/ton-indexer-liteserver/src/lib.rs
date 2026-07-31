@@ -11,11 +11,12 @@ use std::{
 };
 
 use async_trait::async_trait;
+use futures::{StreamExt, future::join_all, stream::FuturesUnordered};
 use thiserror::Error;
 use ton_indexer_core::{Batch, BlockData, BlockId, BlockSource, Error as IndexerError, Hash256};
 use tonutils::{
     liteclient::client::LiteClient,
-    network_config::ConfigGlobal,
+    network_config::{ConfigGlobal, ConfigLiteServer},
     tl::common::{BlockId as LiteBlockId, BlockIdExt as LiteBlockIdExt, Int256},
 };
 
@@ -142,6 +143,19 @@ pub trait BlockGraphClient: Send {
         self.load_block(id.into()).await
     }
 
+    /// Downloads multiple blocks whose full ids are already known.
+    ///
+    /// The default implementation is sequential. Network clients may override
+    /// it to issue independent requests concurrently while preserving input
+    /// order in the returned blocks.
+    async fn load_blocks_exact(&mut self, ids: &[BlockId]) -> Result<Vec<RawBlock>, SourceError> {
+        let mut blocks = Vec::with_capacity(ids.len());
+        for &id in ids {
+            blocks.push(self.load_block_exact(id).await?);
+        }
+        Ok(blocks)
+    }
+
     /// Reads the shard frontier committed by a masterchain block.
     async fn shard_frontier(&mut self, mc_block: &RawBlock) -> Result<Vec<BlockId>, SourceError>;
 
@@ -207,21 +221,41 @@ impl LiteRequestStats {
 /// Direct ADNL/LiteAPI client backed by `tonutils`.
 pub struct TonutilsLiteClient {
     inner: LiteClient,
+    exact_clients: Vec<LiteClient>,
     decoded: HashMap<BlockId, BlockData>,
     request_stats: LiteRequestStats,
 }
 
 impl TonutilsLiteClient {
     const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+    const WORKER_CONNECT_TIMEOUT: Duration = Duration::from_secs(1);
     const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
+    const DEFAULT_PARALLEL_CLIENTS: usize = 4;
+    const MAX_PARALLEL_CLIENTS: usize = 16;
 
-    /// Connects to the first responsive liteserver from a parsed global config.
+    /// Connects to a responsive liteserver pool from a parsed global config.
     ///
     /// # Errors
     ///
     /// Returns an error when the config has no liteservers or none of them
     /// accepts an ADNL connection and answers a `getMasterchainInfo` probe.
     pub async fn connect(config: &ConfigGlobal) -> Result<Self, SourceError> {
+        Self::connect_with_parallelism(config, Self::DEFAULT_PARALLEL_CLIENTS).await
+    }
+
+    /// Connects with a bounded number of clients for concurrent exact block loads.
+    ///
+    /// Values above 16 are capped to protect public liteservers. Zero is treated
+    /// as one client.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the config has no liteservers or none of them
+    /// accepts an ADNL connection and answers a `getMasterchainInfo` probe.
+    pub async fn connect_with_parallelism(
+        config: &ConfigGlobal,
+        parallelism: usize,
+    ) -> Result<Self, SourceError> {
         if config.liteservers.is_empty() {
             return Err(SourceError::GlobalConfig(
                 "network config has no liteservers".into(),
@@ -230,32 +264,45 @@ impl TonutilsLiteClient {
 
         let mut failures = Vec::with_capacity(config.liteservers.len());
         let mut request_stats = LiteRequestStats::default();
+        let mut attempts = FuturesUnordered::new();
         for (index, liteserver) in config.liteservers.iter().enumerate() {
-            let connection = LiteClient::connect_with_timeout(
-                liteserver.socket_addr(),
-                liteserver.public_key(),
-                Self::CONNECT_TIMEOUT,
-            )
-            .await;
-            let mut client = match connection {
-                Ok(client) => client.with_request_timeout(Self::REQUEST_TIMEOUT),
-                Err(error) => {
-                    failures.push(format!("#{index}: connect failed: {error}"));
-                    continue;
-                }
-            };
+            attempts.push(async move {
+                let (probed, result) = connect_liteserver(liteserver, Self::CONNECT_TIMEOUT).await;
+                (index, liteserver.clone(), probed, result)
+            });
+        }
 
-            request_stats.get_masterchain_info += 1;
-            match client.get_masterchain_info().await {
-                Ok(_) => {
-                    return Ok(Self {
-                        inner: client,
-                        decoded: HashMap::new(),
-                        request_stats,
-                    });
+        let mut selected = None;
+        while let Some((index, liteserver, probed, result)) = attempts.next().await {
+            request_stats.get_masterchain_info += u64::from(probed);
+            match result {
+                Ok(client) => {
+                    selected = Some((liteserver, client));
+                    break;
                 }
-                Err(error) => failures.push(format!("#{index}: probe failed: {error}")),
+                Err(error) => failures.push(format!("#{index}: {error}")),
             }
+        }
+        drop(attempts);
+
+        if let Some((liteserver, inner)) = selected {
+            let parallelism = parallelism.clamp(1, Self::MAX_PARALLEL_CLIENTS);
+            let worker_attempts = (1..parallelism).map(|_| async {
+                connect_liteserver(&liteserver, Self::WORKER_CONNECT_TIMEOUT).await
+            });
+            let mut exact_clients = Vec::with_capacity(parallelism - 1);
+            for (probed, result) in join_all(worker_attempts).await {
+                request_stats.get_masterchain_info += u64::from(probed);
+                if let Ok(client) = result {
+                    exact_clients.push(client);
+                }
+            }
+            return Ok(Self {
+                inner,
+                exact_clients,
+                decoded: HashMap::new(),
+                request_stats,
+            });
         }
 
         Err(SourceError::LiteApi(format!(
@@ -272,6 +319,19 @@ impl TonutilsLiteClient {
     /// Returns an error when the file cannot be read or parsed, or when the
     /// ADNL connection cannot be established.
     pub async fn connect_path(path: impl AsRef<Path>) -> Result<Self, SourceError> {
+        Self::connect_path_with_parallelism(path, Self::DEFAULT_PARALLEL_CLIENTS).await
+    }
+
+    /// Reads a global config and connects with configurable exact-load parallelism.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the file cannot be read or parsed, or when the
+    /// ADNL connection cannot be established.
+    pub async fn connect_path_with_parallelism(
+        path: impl AsRef<Path>,
+        parallelism: usize,
+    ) -> Result<Self, SourceError> {
         let path = path.as_ref();
         let source = tokio::fs::read_to_string(path).await.map_err(|error| {
             SourceError::GlobalConfig(format!("failed to read {}: {error}", path.display()))
@@ -279,7 +339,7 @@ impl TonutilsLiteClient {
         let config = source.parse::<ConfigGlobal>().map_err(|error| {
             SourceError::GlobalConfig(format!("failed to parse {}: {error}", path.display()))
         })?;
-        Self::connect(&config).await
+        Self::connect_with_parallelism(&config, parallelism).await
     }
 
     /// Returns the latest masterchain id without constructing a source.
@@ -297,6 +357,12 @@ impl TonutilsLiteClient {
         self.request_stats
     }
 
+    /// Returns the maximum number of exact block downloads issued concurrently.
+    #[must_use]
+    pub const fn exact_block_parallelism(&self) -> usize {
+        1 + self.exact_clients.len()
+    }
+
     fn decode_cached(&mut self, raw: &RawBlock) -> Result<&BlockData, SourceError> {
         Ok(match self.decoded.entry(raw.id) {
             std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
@@ -304,6 +370,27 @@ impl TonutilsLiteClient {
                 entry.insert(BlockData::decode(raw.id, &raw.boc)?)
             }
         })
+    }
+}
+
+async fn connect_liteserver(
+    liteserver: &ConfigLiteServer,
+    connect_timeout: Duration,
+) -> (bool, Result<LiteClient, String>) {
+    let connection = LiteClient::connect_with_timeout(
+        liteserver.socket_addr(),
+        liteserver.public_key(),
+        connect_timeout,
+    )
+    .await;
+    let mut client = match connection {
+        Ok(client) => client.with_request_timeout(TonutilsLiteClient::REQUEST_TIMEOUT),
+        Err(error) => return (false, Err(format!("connect failed: {error}"))),
+    };
+
+    match client.get_masterchain_info().await {
+        Ok(_) => (true, Ok(client)),
+        Err(error) => (true, Err(format!("probe failed: {error}"))),
     }
 }
 
@@ -349,19 +436,41 @@ impl BlockGraphClient for TonutilsLiteClient {
     }
 
     async fn load_block_exact(&mut self, id: BlockId) -> Result<RawBlock, SourceError> {
-        let lite_id = to_lite_block_id_ext(id)?;
-        self.request_stats.get_block += 1;
-        let boc = self
-            .inner
-            .get_block(lite_id)
-            .await
-            .map_err(|error| SourceError::LiteApi(error.to_string()))?;
+        self.load_blocks_exact(&[id])
+            .await?
+            .pop()
+            .ok_or_else(|| SourceError::InvalidBatch("exact block load returned no block".into()))
+    }
 
-        // `tonutils::get_block` returns only the response payload. Decode it now
-        // to verify the file hash, root hash, workchain, shard, and seqno against
-        // the requested full id; the cached value avoids decoding it again later.
-        self.decoded.insert(id, BlockData::decode(id, &boc)?);
-        Ok(RawBlock::new(id, boc))
+    async fn load_blocks_exact(&mut self, ids: &[BlockId]) -> Result<Vec<RawBlock>, SourceError> {
+        let request_count = u64::try_from(ids.len()).unwrap_or(u64::MAX);
+        self.request_stats.get_block = self.request_stats.get_block.saturating_add(request_count);
+
+        let mut blocks = Vec::with_capacity(ids.len());
+        let parallelism = 1 + self.exact_clients.len();
+        for ids in ids.chunks(parallelism) {
+            let Some((&first, rest)) = ids.split_first() else {
+                continue;
+            };
+            let mut requests = Vec::with_capacity(ids.len());
+            requests.push(download_exact_block(&mut self.inner, first));
+            requests.extend(
+                self.exact_clients
+                    .iter_mut()
+                    .zip(rest)
+                    .map(|(client, &id)| download_exact_block(client, id)),
+            );
+
+            for result in join_all(requests).await {
+                let (id, boc) = result?;
+                // `tonutils::get_block` returns only the response payload. Decode
+                // it now to verify both hashes and all block coordinates. Caching
+                // also prevents a second decode during traversal.
+                self.decoded.insert(id, BlockData::decode(id, &boc)?);
+                blocks.push(RawBlock::new(id, boc));
+            }
+        }
+        Ok(blocks)
     }
 
     async fn shard_frontier(&mut self, mc_block: &RawBlock) -> Result<Vec<BlockId>, SourceError> {
@@ -495,7 +604,7 @@ where
         };
 
         if let (Some(checkpoint), Some(previous)) = (after, previous.as_ref()) {
-            Self::verify_checkpoint_block(checkpoint, previous.id)?;
+            Self::verify_block_id(checkpoint, previous.id)?;
         }
         if let Some(previous) = previous.as_ref() {
             self.verify_masterchain_link(previous.id, &mc_block).await?;
@@ -562,11 +671,11 @@ where
         Ok(block)
     }
 
-    fn verify_checkpoint_block(checkpoint: &BlockId, block: BlockId) -> Result<(), SourceError> {
-        if block != *checkpoint {
+    fn verify_block_id(expected: &BlockId, actual: BlockId) -> Result<(), SourceError> {
+        if actual != *expected {
             return Err(SourceError::UnexpectedBlock {
-                expected: Box::new(*checkpoint),
-                actual: Box::new(block),
+                expected: Box::new(*expected),
+                actual: Box::new(actual),
             });
         }
         Ok(())
@@ -602,44 +711,60 @@ where
                     limit: self.max_shard_blocks,
                 });
             }
-            let mut blocks = Vec::with_capacity(current_frontier.len());
-            for id in current_frontier {
-                blocks.push(self.load_exact(id).await?);
+            let blocks = self.client.load_blocks_exact(&current_frontier).await?;
+            if blocks.len() != current_frontier.len() {
+                return Err(SourceError::InvalidBatch(format!(
+                    "requested {} exact shard blocks, transport returned {}",
+                    current_frontier.len(),
+                    blocks.len()
+                )));
+            }
+            for (&expected, block) in current_frontier.iter().zip(&blocks) {
+                Self::verify_block_id(&expected, block.id)?;
             }
             return Ok(blocks);
         }
 
-        let mut frames = current_frontier
-            .into_iter()
-            .rev()
-            .map(TraversalFrame::Enter)
-            .collect::<Vec<_>>();
+        let roots = current_frontier.clone();
+        let mut pending = current_frontier;
         let mut discovered = HashSet::new();
         let mut reached = HashSet::new();
-        let mut blocks = Vec::new();
+        let mut loaded = HashMap::<BlockId, (RawBlock, Vec<BlockId>)>::new();
 
-        while let Some(frame) = frames.pop() {
-            match frame {
-                TraversalFrame::Enter(id) if stop.contains(&id) => {
+        while !pending.is_empty() {
+            pending.sort_unstable();
+            pending.dedup();
+            let mut wave = Vec::with_capacity(pending.len());
+            for id in std::mem::take(&mut pending) {
+                if stop.contains(&id) {
                     reached.insert(id);
+                } else if discovered.insert(id) {
+                    wave.push(id);
                 }
-                TraversalFrame::Enter(id) => {
-                    if !discovered.insert(id) {
-                        continue;
-                    }
-                    if discovered.len() > self.max_shard_blocks {
-                        return Err(SourceError::TraversalLimit {
-                            limit: self.max_shard_blocks,
-                        });
-                    }
+            }
+            if discovered.len() > self.max_shard_blocks {
+                return Err(SourceError::TraversalLimit {
+                    limit: self.max_shard_blocks,
+                });
+            }
+            if wave.is_empty() {
+                break;
+            }
 
-                    let block = self.load_exact(id).await?;
-                    let mut predecessors = self.client.predecessors(&block).await?;
-                    predecessors.sort_unstable();
-                    frames.push(TraversalFrame::Exit(block));
-                    frames.extend(predecessors.into_iter().rev().map(TraversalFrame::Enter));
-                }
-                TraversalFrame::Exit(block) => blocks.push(block),
+            let blocks = self.client.load_blocks_exact(&wave).await?;
+            if blocks.len() != wave.len() {
+                return Err(SourceError::InvalidBatch(format!(
+                    "requested {} exact shard blocks, transport returned {}",
+                    wave.len(),
+                    blocks.len()
+                )));
+            }
+            for (&expected, block) in wave.iter().zip(blocks) {
+                Self::verify_block_id(&expected, block.id)?;
+                let mut predecessors = self.client.predecessors(&block).await?;
+                predecessors.sort_unstable();
+                pending.extend(predecessors.iter().copied());
+                loaded.insert(expected, (block, predecessors));
             }
         }
 
@@ -648,18 +773,47 @@ where
             missing.sort_unstable();
             return Err(SourceError::DisconnectedFrontier { missing });
         }
-        Ok(blocks)
-    }
 
-    async fn load_exact(&mut self, id: BlockId) -> Result<RawBlock, SourceError> {
-        let block = self.client.load_block_exact(id).await?;
-        if block.id != id {
-            return Err(SourceError::UnexpectedBlock {
-                expected: Box::new(id),
-                actual: Box::new(block.id),
-            });
+        // Network discovery runs breadth-first to expose parallel requests. Build
+        // the result afterwards in the same deterministic predecessor-first order
+        // as the former depth-first traversal.
+        let mut frames = roots
+            .into_iter()
+            .rev()
+            .map(TraversalFrame::Enter)
+            .collect::<Vec<_>>();
+        let mut ordered = HashSet::new();
+        let mut blocks = Vec::with_capacity(loaded.len());
+        while let Some(frame) = frames.pop() {
+            match frame {
+                TraversalFrame::Enter(id) if stop.contains(&id) => {}
+                TraversalFrame::Enter(id) if !ordered.insert(id) => {}
+                TraversalFrame::Enter(id) => {
+                    let (_, predecessors) = loaded.get(&id).ok_or_else(|| {
+                        SourceError::InvalidBatch(format!(
+                            "shard traversal did not load discovered block {id}"
+                        ))
+                    })?;
+                    frames.push(TraversalFrame::Exit(id));
+                    frames.extend(
+                        predecessors
+                            .iter()
+                            .rev()
+                            .copied()
+                            .map(TraversalFrame::Enter),
+                    );
+                }
+                TraversalFrame::Exit(id) => {
+                    let (block, _) = loaded.remove(&id).ok_or_else(|| {
+                        SourceError::InvalidBatch(format!(
+                            "shard traversal emitted missing block {id}"
+                        ))
+                    })?;
+                    blocks.push(block);
+                }
+            }
         }
-        Ok(block)
+        Ok(blocks)
     }
 }
 
@@ -721,6 +875,17 @@ fn to_lite_block_id_ext(id: BlockId) -> Result<LiteBlockIdExt, SourceError> {
     })
 }
 
+async fn download_exact_block(
+    client: &mut LiteClient,
+    id: BlockId,
+) -> Result<(BlockId, Vec<u8>), SourceError> {
+    let boc = client
+        .get_block(to_lite_block_id_ext(id)?)
+        .await
+        .map_err(|error| SourceError::LiteApi(error.to_string()))?;
+    Ok((id, boc))
+}
+
 fn from_lite_block_id(id: &LiteBlockIdExt) -> Result<BlockId, SourceError> {
     Ok(BlockId {
         workchain: id.workchain,
@@ -734,7 +899,7 @@ fn from_lite_block_id(id: &LiteBlockIdExt) -> Result<BlockId, SourceError> {
 
 enum TraversalFrame {
     Enter(BlockId),
-    Exit(RawBlock),
+    Exit(BlockId),
 }
 
 #[derive(Clone)]
@@ -756,6 +921,7 @@ mod tests {
         blocks: HashMap<BlockIdShort, RawBlock>,
         load_calls: HashMap<BlockIdShort, usize>,
         exact_load_calls: HashMap<BlockId, usize>,
+        exact_load_batches: Vec<Vec<BlockId>>,
         frontiers: HashMap<BlockId, Vec<BlockId>>,
         predecessors: HashMap<BlockId, Vec<BlockId>>,
     }
@@ -785,6 +951,18 @@ mod tests {
         async fn load_block_exact(&mut self, id: BlockId) -> Result<RawBlock, SourceError> {
             *self.exact_load_calls.entry(id).or_default() += 1;
             self.load_block(id.into()).await
+        }
+
+        async fn load_blocks_exact(
+            &mut self,
+            ids: &[BlockId],
+        ) -> Result<Vec<RawBlock>, SourceError> {
+            self.exact_load_batches.push(ids.to_vec());
+            let mut blocks = Vec::with_capacity(ids.len());
+            for &id in ids {
+                blocks.push(self.load_block_exact(id).await?);
+            }
+            Ok(blocks)
         }
 
         async fn shard_frontier(
@@ -935,6 +1113,10 @@ mod tests {
             source.client().exact_load_calls,
             HashMap::from([(two, 1), (three, 1)])
         );
+        assert_eq!(
+            source.client().exact_load_batches,
+            vec![vec![three], vec![two]]
+        );
     }
 
     #[tokio::test]
@@ -956,17 +1138,15 @@ mod tests {
         graph.predecessors.insert(left, vec![parent]);
         graph.predecessors.insert(right, vec![parent]);
 
-        let batch = CanonicalBlockSource::new(graph, 10)
-            .next_raw_batch(None)
-            .await
-            .unwrap()
-            .unwrap();
+        let mut source = CanonicalBlockSource::new(graph, 10);
+        let batch = source.next_raw_batch(None).await.unwrap().unwrap();
         let ids = batch
             .shards
             .iter()
             .map(|block| block.id)
             .collect::<HashSet<_>>();
         assert_eq!(ids, HashSet::from([left, right]));
+        assert_eq!(source.client().exact_load_batches, vec![vec![left, right]]);
     }
 
     #[tokio::test]

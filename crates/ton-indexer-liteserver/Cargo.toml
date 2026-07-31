@@ -11,6 +11,7 @@ publish = false
 
 [dependencies]
 async-trait.workspace = true
+futures.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 ton-indexer-core = { path = "../ton-indexer-core" }

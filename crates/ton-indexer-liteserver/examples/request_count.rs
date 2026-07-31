@@ -1,7 +1,7 @@
 //! Measures the `LiteServer` requests needed to build canonical batches.
 //!
 //! Run with:
-//! `cargo run -p ton-indexer-liteserver --example request_count -- [BATCHES] [END_SEQNO]`
+//! `cargo run -p ton-indexer-liteserver --example request_count -- [BATCHES] [END_SEQNO] [PARALLELISM]`
 
 use std::{env, error::Error, time::Instant};
 
@@ -21,8 +21,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .transpose()?
         .unwrap_or(2);
     let requested_end_seqno = args.next().map(|value| value.parse::<u32>()).transpose()?;
+    let parallelism = args
+        .next()
+        .map(|value| value.parse::<usize>())
+        .transpose()?
+        .unwrap_or(4);
     if args.next().is_some() {
-        return Err("usage: request_count [BATCHES] [END_SEQNO]".into());
+        return Err("usage: request_count [BATCHES] [END_SEQNO] [PARALLELISM]".into());
     }
     if batch_count == 0 {
         return Err("batch count must be greater than zero".into());
@@ -31,11 +36,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("config: {MAINNET_CONFIG}");
     println!("connecting to the first responsive configured liteserver...");
     let connect_started = Instant::now();
-    let mut client = TonutilsLiteClient::connect_path(MAINNET_CONFIG).await?;
+    let mut client =
+        TonutilsLiteClient::connect_path_with_parallelism(MAINNET_CONFIG, parallelism).await?;
     print_stats(
         "connect probe",
         client.request_stats(),
         connect_started.elapsed(),
+    );
+    println!(
+        "exact block parallelism: {}",
+        client.exact_block_parallelism()
     );
 
     let before_tip = client.request_stats();
