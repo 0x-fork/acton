@@ -1,7 +1,7 @@
 //! Measures the `LiteServer` requests needed to build canonical batches.
 //!
 //! Run with:
-//! `cargo run -p ton-indexer-liteserver --example request_count -- [BATCHES] [END_SEQNO] [PARALLELISM]`
+//! `cargo run -p ton-indexer-liteserver --example request_count -- [BATCHES] [END_SEQNO] [PARALLELISM] [CONFIG]`
 
 use std::{env, error::Error, time::Instant};
 
@@ -26,18 +26,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .map(|value| value.parse::<usize>())
         .transpose()?
         .unwrap_or(4);
+    let config = args.next().unwrap_or_else(|| MAINNET_CONFIG.to_owned());
     if args.next().is_some() {
-        return Err("usage: request_count [BATCHES] [END_SEQNO] [PARALLELISM]".into());
+        return Err("usage: request_count [BATCHES] [END_SEQNO] [PARALLELISM] [CONFIG]".into());
     }
     if batch_count == 0 {
         return Err("batch count must be greater than zero".into());
     }
 
-    println!("config: {MAINNET_CONFIG}");
+    println!("config: {config}");
     println!("connecting to the first responsive configured liteserver...");
     let connect_started = Instant::now();
     let mut client =
-        TonutilsLiteClient::connect_path_with_parallelism(MAINNET_CONFIG, parallelism).await?;
+        TonutilsLiteClient::connect_path_with_parallelism(&config, parallelism).await?;
     print_stats(
         "connect probe",
         client.request_stats(),

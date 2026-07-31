@@ -27,6 +27,7 @@ import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
 
 import type {RawBlockNetwork, TonClient} from "../api/client"
+import type {LoadNetworkTps} from "../api/networkStats"
 import type {V3Block, V3BlockId, V3TransactionListItem} from "../api/types"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {
@@ -34,6 +35,7 @@ import {
   DeveloperTransactionListSkeleton,
 } from "../components/DeveloperTransactionList"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
+import {NetworkTpsPanel} from "../components/NetworkTpsPanel"
 import {formatNano, formatRelativeTime, hashToHex} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
@@ -131,6 +133,7 @@ const parseGlobalCapabilities: ModeParser = mode => {
 
 interface BlocksPageProps {
   readonly client: TonClient
+  readonly loadNetworkTps?: LoadNetworkTps
 }
 
 interface BlockDetailsPageProps extends BlocksPageProps {
@@ -158,7 +161,7 @@ interface BlockDetailsState {
   readonly error?: string
 }
 
-export const BlocksPage: FC<BlocksPageProps> = ({client}) => {
+export const BlocksPage: FC<BlocksPageProps> = ({client, loadNetworkTps}) => {
   const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
   const {prefetchNames, updateDomains} = useAddressBook()
@@ -251,6 +254,8 @@ export const BlocksPage: FC<BlocksPageProps> = ({client}) => {
           <h1 className={styles.title}>Blocks</h1>
         </div>
       </section>
+
+      {loadNetworkTps ? <NetworkTpsPanel loadNetworkTps={loadNetworkTps} /> : null}
 
       <section className={styles.blocksLayout}>
         {state.error ? (

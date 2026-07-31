@@ -68,6 +68,7 @@ import {FaucetPage} from "./faucet/FaucetPage"
 import {AbiCatalogPage, AbiDetailsPage} from "./pages/abi-pages"
 import {SourceCatalogPage} from "./pages/SourceCatalogPage"
 import {CellInspectorExplorerPage, EmulateExplorerPage} from "./pages/explorer-tool-pages"
+import {loadNetworkTps} from "./actonscanBackend"
 import styles from "./ExplorerApp.module.css"
 
 type BuiltinSelectableExplorerNetworkId = "mainnet" | "testnet"
@@ -1403,7 +1404,15 @@ export const ExplorerApp: FC = () => {
                           />
                         }
                       />
-                      <Route path="/blocks" element={<BlocksPage client={client} />} />
+                      <Route
+                        path="/blocks"
+                        element={
+                          <BlocksPage
+                            client={client}
+                            loadNetworkTps={networkId === "mainnet" ? loadNetworkTps : undefined}
+                          />
+                        }
+                      />
                       <Route path="/tokens" element={<TokenCatalogPage client={client} />} />
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />

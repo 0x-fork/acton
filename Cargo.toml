@@ -14,7 +14,7 @@ license = { workspace = true }
 dist = true
 
 [workspace]
-members = ["crates/*", "xtask"]
+members = ["apps/actonscan-backend", "crates/*", "xtask"]
 
 exclude = [
   "apps/verifier",
@@ -217,6 +217,7 @@ winnow = "0.7.13"
 dunce = "1.0.5"
 path-absolutize = "3.1.1"
 tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 function_name = "0.3.0"
 parking_lot = "0.12.5"
 wasm-bindgen = "0.2.105"

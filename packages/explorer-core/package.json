@@ -10,6 +10,7 @@
     "./api/compilerAbi": "./src/api/compilerAbi.ts",
     "./api/compilerAbiCatalog": "./src/api/compilerAbiCatalog.ts",
     "./api/jettonWallets": "./src/api/jettonWallets.ts",
+    "./api/networkStats": "./src/api/networkStats.ts",
     "./api/types": "./src/api/types.ts",
     "./api/waitForTraceTransactionHash": "./src/api/waitForTraceTransactionHash.ts",
     "./components/DeveloperAccountList": "./src/components/DeveloperAccountList.tsx",
