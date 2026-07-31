@@ -420,8 +420,8 @@ impl Node {
                 admin_address: jetton_data.admin_address.as_ref().map(Addr::from),
                 code_hash: state.code_hash,
                 data_hash: state.data_hash,
-                jetton_content: ton_indexer::jettons::resolve_jetton_content(
-                    ton_indexer::jettons::parse_jetton_content(jetton_data.jetton_content),
+                jetton_content: ton_indexer::jettons::parse_jetton_content(
+                    jetton_data.jetton_content,
                 ),
                 jetton_wallet_code_hash: wallet_code_hash,
                 last_transaction_lt: state.last_transaction_lt,

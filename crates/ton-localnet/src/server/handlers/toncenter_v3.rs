@@ -9,6 +9,7 @@ use crate::localnet::{
     Localnet, LocalnetBlock, LocalnetContractData, LocalnetJettonWalletsQuery,
     LocalnetNftItemsOrder, LocalnetNftItemsQuery, LocalnetSortOrder, LocalnetTransaction,
 };
+use crate::offchain_metadata::{enrich_jetton_master_map, enrich_jetton_masters};
 use crate::storage::{
     AccountStatus, DnsRecordMeta, JettonMasterMeta, JettonWalletMeta, MultisigMeta,
     MultisigOrderMeta, NftCollectionMeta, NftItemMeta, NftSaleMeta, TraceNode,
@@ -27,7 +28,6 @@ use serde_json::json;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::future::Future;
 use std::sync::Arc;
-use ton_api::toncenter::v3 as v3_types;
 use ton_api::toncenter::v3::requests::{
     AccountStatesQuery, AddressInformationQuery, AddressesQuery, AdjacentTransactionsQuery,
     BlocksQuery, DnsRecordsQuery, EstimateFeeRequest, JettonBurnsQuery, JettonMastersQuery,
@@ -39,6 +39,7 @@ use ton_api::toncenter::v3::requests::{
     TransactionsByMessageQuery, TransactionsQuery, VestingQuery, WalletInformationQuery,
     WalletStatesQuery,
 };
+use ton_api::{OffchainJsonResolver, toncenter::v3 as v3_types};
 use toncenter_v3 as v3;
 
 const BLOCK_WORKCHAIN: i32 = 0;
@@ -436,6 +437,7 @@ pub async fn get_address_book_v3(
 
 pub async fn get_metadata_v3(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<AddressesQuery>(raw_query.as_deref()));
@@ -444,7 +446,7 @@ pub async fn get_metadata_v3(
         .into_iter()
         .filter_map(|(_, address)| address)
         .collect();
-    match build_metadata_for_addresses(node.as_ref(), addresses).await {
+    match build_metadata_for_addresses(node.as_ref(), &metadata_resolver, addresses).await {
         Ok(metadata) => (StatusCode::OK, Json(metadata)).into_response(),
         Err(e) => request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
@@ -666,6 +668,7 @@ pub async fn get_transactions_by_masterchain_block_v3(
 
 pub async fn get_messages_v3(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<MessagesQuery>(raw_query.as_deref()));
@@ -675,11 +678,18 @@ pub async fn get_messages_v3(
         Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
     let (messages, addresses) = collect_messages_v3(&transactions, &parsed);
-    let (address_book, metadata) =
-        match build_extra_data_for_addresses(node.as_ref(), addresses, true, true).await {
-            Ok(extra) => extra,
-            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-        };
+    let (address_book, metadata) = match build_extra_data_for_addresses(
+        node.as_ref(),
+        &metadata_resolver,
+        addresses,
+        true,
+        true,
+    )
+    .await
+    {
+        Ok(extra) => extra,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
 
     (
         StatusCode::OK,
@@ -716,6 +726,7 @@ pub async fn get_adjacent_transactions_v3(
 
 pub async fn get_wallet_states_v3(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<WalletStatesQuery>(raw_query.as_deref()));
@@ -741,11 +752,18 @@ pub async fn get_wallet_states_v3(
         ));
     }
 
-    let (address_book, metadata) =
-        match build_extra_data_for_addresses(node.as_ref(), existing_addresses, true, true).await {
-            Ok(extra) => extra,
-            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-        };
+    let (address_book, metadata) = match build_extra_data_for_addresses(
+        node.as_ref(),
+        &metadata_resolver,
+        existing_addresses,
+        true,
+        true,
+    )
+    .await
+    {
+        Ok(extra) => extra,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
 
     (
         StatusCode::OK,
@@ -779,24 +797,32 @@ pub async fn get_pending_transactions_v3(
 
 pub async fn get_jetton_masters(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<JettonMastersQuery>(raw_query.as_deref()));
     let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
-    handle_v3_result(
-        node.get_jetton_masters(
+    let mut masters = match node
+        .get_jetton_masters(
             payload.address,
             payload.admin_address,
             Some(limit),
             Some(offset),
-        ),
-        |masters| v3::map_jetton_masters(masters),
-    )
-    .await
+        )
+        .await
+    {
+        Ok(masters) => masters,
+        Err(error) => {
+            return request_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
+        }
+    };
+    enrich_jetton_masters(&metadata_resolver, &mut masters).await;
+    (StatusCode::OK, Json(v3::map_jetton_masters(&masters))).into_response()
 }
 
 pub async fn get_jetton_wallets(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<JettonWalletsQuery>(raw_query.as_deref()));
@@ -842,6 +868,7 @@ pub async fn get_jetton_wallets(
             masters_by_jetton.insert(jetton_address, master);
         }
     }
+    enrich_jetton_master_map(&metadata_resolver, &mut masters_by_jetton).await;
 
     (
         StatusCode::OK,
@@ -995,6 +1022,7 @@ fn sort_dns_records(records: &mut [DnsRecordMeta]) {
 
 pub async fn get_jetton_transfers(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<JettonTransfersQuery>(raw_query.as_deref()));
@@ -1030,10 +1058,11 @@ pub async fn get_jetton_transfers(
         Ok(transactions) => transactions,
         Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
-    let (wallets, masters) = match load_jetton_event_context(node.as_ref(), &transactions).await {
-        Ok(context) => context,
-        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    };
+    let (wallets, masters) =
+        match load_jetton_event_context(node.as_ref(), &metadata_resolver, &transactions).await {
+            Ok(context) => context,
+            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        };
     let wallets_by_address = wallets
         .iter()
         .map(|wallet| (wallet.address, wallet))
@@ -1083,6 +1112,7 @@ pub async fn get_jetton_transfers(
 
 pub async fn get_jetton_burns(
     State(node): State<Arc<Localnet>>,
+    State(metadata_resolver): State<OffchainJsonResolver>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<JettonBurnsQuery>(raw_query.as_deref()));
@@ -1113,10 +1143,11 @@ pub async fn get_jetton_burns(
         Ok(transactions) => transactions,
         Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
-    let (wallets, masters) = match load_jetton_event_context(node.as_ref(), &transactions).await {
-        Ok(context) => context,
-        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    };
+    let (wallets, masters) =
+        match load_jetton_event_context(node.as_ref(), &metadata_resolver, &transactions).await {
+            Ok(context) => context,
+            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        };
     let wallets_by_address = wallets
         .iter()
         .map(|wallet| (wallet.address, wallet))
@@ -1667,6 +1698,7 @@ async fn discover_contract_data(
 
 async fn load_jetton_event_context(
     node: &Localnet,
+    metadata_resolver: &OffchainJsonResolver,
     transactions: &[LocalnetTransaction],
 ) -> anyhow::Result<(Vec<JettonWalletMeta>, HashMap<Addr, JettonMasterMeta>)> {
     let addresses = transactions
@@ -1700,6 +1732,7 @@ async fn load_jetton_event_context(
             masters.insert(jetton, master);
         }
     }
+    enrich_jetton_master_map(metadata_resolver, &mut masters).await;
     Ok((wallets, masters))
 }
 

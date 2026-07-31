@@ -1,5 +1,5 @@
 use crate::common::run_get_method;
-use crate::content::{merge_token_content, parse_token_content, resolve_offchain_token_content};
+use crate::content::{merge_token_content, parse_token_content, token_content_uri};
 use num_bigint::BigInt;
 use serde_json::Value;
 use tycho_types::cell::Cell;
@@ -77,8 +77,8 @@ pub fn parse_jetton_content(content_cell: Cell) -> Value {
 }
 
 #[must_use]
-pub fn resolve_jetton_content(content: Value) -> Value {
-    resolve_offchain_token_content(content, JETTON_CONTENT_KEYS)
+pub fn jetton_content_uri(content: &Value) -> Option<&str> {
+    token_content_uri(content)
 }
 
 pub fn merge_jetton_content(content: &mut Value, remote_content: &Value) {

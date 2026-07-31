@@ -9,6 +9,7 @@ mod localnet;
 pub mod node;
 mod node_persistence;
 mod node_snapshot;
+mod offchain_metadata;
 pub mod remote;
 pub mod server;
 pub mod storage;

@@ -16,6 +16,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast;
+use ton_api::OffchainJsonResolver;
 
 const MAX_EXTERNAL_API_CALLS: usize = 1_000;
 const MAX_STUDIO_UI_API_CALLS: usize = 200;
@@ -32,6 +33,7 @@ pub struct StartupAccount {
 #[derive(Clone)]
 pub struct ServerState {
     pub node: Arc<Localnet>,
+    pub offchain_metadata: OffchainJsonResolver,
     pub startup_accounts: Arc<Vec<StartupAccount>>,
     pub shutdown: ShutdownSignal,
     pub network_conditions: NetworkConditions,
@@ -340,6 +342,12 @@ impl FromRef<ServerState> for Arc<Localnet> {
     }
 }
 
+impl FromRef<ServerState> for OffchainJsonResolver {
+    fn from_ref(state: &ServerState) -> Self {
+        state.offchain_metadata.clone()
+    }
+}
+
 impl FromRef<ServerState> for Arc<Vec<StartupAccount>> {
     fn from_ref(state: &ServerState) -> Self {
         state.startup_accounts.clone()
@@ -387,6 +395,8 @@ pub enum ServerError {
     LiteApiBind { address: String, source: io::Error },
     #[error("localnet server stopped with an error")]
     Serve { source: io::Error },
+    #[error("failed to initialize the off-chain metadata HTTP client")]
+    OffchainMetadataClient { source: reqwest::Error },
 }
 
 pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), ServerError> {
@@ -408,8 +418,11 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> Result<(), Ser
     let api_calls = ApiCallLog::new();
 
     let shutdown = ShutdownSignal::new();
+    let offchain_metadata = OffchainJsonResolver::new()
+        .map_err(|source| ServerError::OffchainMetadataClient { source })?;
     let app = router::create_router(ServerState {
         node: Arc::clone(&node),
+        offchain_metadata,
         startup_accounts: Arc::new(startup_accounts),
         shutdown: shutdown.clone(),
         network_conditions: network_conditions.clone(),

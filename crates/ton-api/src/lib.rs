@@ -16,9 +16,11 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
 
 mod deployment;
+mod offchain;
 pub mod toncenter;
 
 pub use deployment::{DeploymentCandidate, extract_deployment_candidates};
+pub use offchain::OffchainJsonResolver;
 
 const HTTP_RETRY_ATTEMPTS: usize = 3;
 const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [1000, 2000, 3000];
@@ -38,6 +40,15 @@ const fn user_agent() -> &'static str {
 
 fn http_client_builder() -> reqwest::blocking::ClientBuilder {
     let builder = reqwest::blocking::Client::builder().user_agent(user_agent());
+    if proxy_enabled() {
+        builder
+    } else {
+        builder.no_proxy()
+    }
+}
+
+fn async_http_client_builder() -> reqwest::ClientBuilder {
+    let builder = reqwest::Client::builder().user_agent(user_agent());
     if proxy_enabled() {
         builder
     } else {
