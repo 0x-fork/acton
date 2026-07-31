@@ -53,7 +53,9 @@ export const NetworkTpsPanel: FC<NetworkTpsPanelProps> = ({loadNetworkTps}) => {
     }
   }, [loadNetworkTps])
 
-  if (!snapshot && failed) return null
+  if ((!snapshot && failed) || (snapshot && snapshot.latest_masterchain_seqno === undefined)) {
+    return null
+  }
 
   return (
     <section className={styles.frame} aria-label="Network TPS">

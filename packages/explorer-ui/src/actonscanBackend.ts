@@ -5,7 +5,7 @@ import type {
 } from "@acton/explorer-core/api/networkStats"
 
 const TPS_PATH = "api/v1/stats/tps"
-const DEFAULT_ACTONSCAN_BACKEND_URL = "http://scan.acton.monster"
+const DEFAULT_ACTONSCAN_BACKEND_URL = "https://api.actonscan.com/"
 const REQUEST_TIMEOUT_MS = 4000
 
 export const loadNetworkTps: LoadNetworkTps = async signal => {
