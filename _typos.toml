@@ -20,6 +20,7 @@ extend-exclude = [
   "crates/acton-abi-catalog/data/data-abis.json",
   "*.csv",
   "crates/ton-liteapi/src/tl/schemas/**",
+  "crates/ton-indexer-liteserver/fixtures/mainnet-global.config.json",
   "packages/explorer-core/src/cell-inspector/block.tlb.generated.ts",
   "packages/address-registry/src/addresses.json",
 ]
@@ -37,5 +38,6 @@ extend-ignore-re = [
   "readed",
   "authentificate",
   "authentification",
-  "ba"
+  "ba",
+  "lazer",
 ]
