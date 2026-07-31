@@ -16,7 +16,7 @@ use ton_indexer_core::{Batch, BlockData, BlockId, BlockSource, Error as IndexerE
 use tonutils::{
     liteclient::client::LiteClient,
     network_config::ConfigGlobal,
-    tl::common::{BlockId as LiteBlockId, BlockIdExt as LiteBlockIdExt},
+    tl::common::{BlockId as LiteBlockId, BlockIdExt as LiteBlockIdExt, Int256},
 };
 
 /// Errors produced by the `LiteAPI` source and canonical traversal.
@@ -134,6 +134,14 @@ pub trait BlockGraphClient: Send {
     /// Resolves a short id and downloads the exact block `BoC`.
     async fn load_block(&mut self, id: BlockIdShort) -> Result<RawBlock, SourceError>;
 
+    /// Downloads a block whose full id is already known.
+    ///
+    /// Clients may override this to avoid resolving the short id. The fallback
+    /// preserves compatibility with transports that only support short lookups.
+    async fn load_block_exact(&mut self, id: BlockId) -> Result<RawBlock, SourceError> {
+        self.load_block(id.into()).await
+    }
+
     /// Reads the shard frontier committed by a masterchain block.
     async fn shard_frontier(&mut self, mc_block: &RawBlock) -> Result<Vec<BlockId>, SourceError>;
 
@@ -146,10 +154,61 @@ pub trait BlockGraphClient: Send {
     }
 }
 
+/// Counts `LiteServer` TL requests issued by [`TonutilsLiteClient`].
+///
+/// The counters are incremented immediately before a request is sent, so failed
+/// requests are included. Establishing the ADNL connection itself is a transport
+/// operation and is not included.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct LiteRequestStats {
+    get_masterchain_info: u64,
+    lookup_block: u64,
+    get_block: u64,
+}
+
+impl LiteRequestStats {
+    /// Returns the number of `liteServer.getMasterchainInfo` requests.
+    #[must_use]
+    pub const fn get_masterchain_info(self) -> u64 {
+        self.get_masterchain_info
+    }
+
+    /// Returns the number of `liteServer.lookupBlock` requests.
+    #[must_use]
+    pub const fn lookup_block(self) -> u64 {
+        self.lookup_block
+    }
+
+    /// Returns the number of `liteServer.getBlock` requests.
+    #[must_use]
+    pub const fn get_block(self) -> u64 {
+        self.get_block
+    }
+
+    /// Returns the total number of counted `LiteServer` requests.
+    #[must_use]
+    pub const fn total(self) -> u64 {
+        self.get_masterchain_info + self.lookup_block + self.get_block
+    }
+
+    /// Returns requests made since an earlier snapshot.
+    #[must_use]
+    pub const fn since(self, earlier: Self) -> Self {
+        Self {
+            get_masterchain_info: self
+                .get_masterchain_info
+                .saturating_sub(earlier.get_masterchain_info),
+            lookup_block: self.lookup_block.saturating_sub(earlier.lookup_block),
+            get_block: self.get_block.saturating_sub(earlier.get_block),
+        }
+    }
+}
+
 /// Direct ADNL/LiteAPI client backed by `tonutils`.
 pub struct TonutilsLiteClient {
     inner: LiteClient,
     decoded: HashMap<BlockId, BlockData>,
+    request_stats: LiteRequestStats,
 }
 
 impl TonutilsLiteClient {
@@ -170,6 +229,7 @@ impl TonutilsLiteClient {
         }
 
         let mut failures = Vec::with_capacity(config.liteservers.len());
+        let mut request_stats = LiteRequestStats::default();
         for (index, liteserver) in config.liteservers.iter().enumerate() {
             let connection = LiteClient::connect_with_timeout(
                 liteserver.socket_addr(),
@@ -185,11 +245,13 @@ impl TonutilsLiteClient {
                 }
             };
 
+            request_stats.get_masterchain_info += 1;
             match client.get_masterchain_info().await {
                 Ok(_) => {
                     return Ok(Self {
                         inner: client,
                         decoded: HashMap::new(),
+                        request_stats,
                     });
                 }
                 Err(error) => failures.push(format!("#{index}: probe failed: {error}")),
@@ -229,6 +291,12 @@ impl TonutilsLiteClient {
         self.latest_masterchain_block().await
     }
 
+    /// Returns a snapshot of the requests issued by this client.
+    #[must_use]
+    pub const fn request_stats(&self) -> LiteRequestStats {
+        self.request_stats
+    }
+
     fn decode_cached(&mut self, raw: &RawBlock) -> Result<&BlockData, SourceError> {
         Ok(match self.decoded.entry(raw.id) {
             std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
@@ -242,6 +310,7 @@ impl TonutilsLiteClient {
 #[async_trait]
 impl BlockGraphClient for TonutilsLiteClient {
     async fn latest_masterchain_block(&mut self) -> Result<BlockId, SourceError> {
+        self.request_stats.get_masterchain_info += 1;
         let info = self
             .inner
             .get_masterchain_info()
@@ -252,6 +321,7 @@ impl BlockGraphClient for TonutilsLiteClient {
 
     async fn load_block(&mut self, id: BlockIdShort) -> Result<RawBlock, SourceError> {
         let lite_id = to_lite_short_id(id)?;
+        self.request_stats.lookup_block += 1;
         let header = self
             .inner
             .lookup_block(
@@ -269,12 +339,29 @@ impl BlockGraphClient for TonutilsLiteClient {
             .await
             .map_err(|error| SourceError::LiteApi(error.to_string()))?;
         let full_id = from_lite_block_id(&header.id)?;
+        self.request_stats.get_block += 1;
         let boc = self
             .inner
             .get_block(header.id)
             .await
             .map_err(|error| SourceError::LiteApi(error.to_string()))?;
         Ok(RawBlock::new(full_id, boc))
+    }
+
+    async fn load_block_exact(&mut self, id: BlockId) -> Result<RawBlock, SourceError> {
+        let lite_id = to_lite_block_id_ext(id)?;
+        self.request_stats.get_block += 1;
+        let boc = self
+            .inner
+            .get_block(lite_id)
+            .await
+            .map_err(|error| SourceError::LiteApi(error.to_string()))?;
+
+        // `tonutils::get_block` returns only the response payload. Decode it now
+        // to verify the file hash, root hash, workchain, shard, and seqno against
+        // the requested full id; the cached value avoids decoding it again later.
+        self.decoded.insert(id, BlockData::decode(id, &boc)?);
+        Ok(RawBlock::new(id, boc))
     }
 
     async fn shard_frontier(&mut self, mc_block: &RawBlock) -> Result<Vec<BlockId>, SourceError> {
@@ -565,7 +652,7 @@ where
     }
 
     async fn load_exact(&mut self, id: BlockId) -> Result<RawBlock, SourceError> {
-        let block = self.client.load_block(id.into()).await?;
+        let block = self.client.load_block_exact(id).await?;
         if block.id != id {
             return Err(SourceError::UnexpectedBlock {
                 expected: Box::new(id),
@@ -623,6 +710,17 @@ fn to_lite_short_id(id: BlockIdShort) -> Result<LiteBlockId, SourceError> {
     })
 }
 
+fn to_lite_block_id_ext(id: BlockId) -> Result<LiteBlockIdExt, SourceError> {
+    let short = to_lite_short_id(id.into())?;
+    Ok(LiteBlockIdExt {
+        workchain: short.workchain,
+        shard: short.shard,
+        seqno: short.seqno,
+        root_hash: Int256(id.root_hash.into_bytes()),
+        file_hash: Int256(id.file_hash.into_bytes()),
+    })
+}
+
 fn from_lite_block_id(id: &LiteBlockIdExt) -> Result<BlockId, SourceError> {
     Ok(BlockId {
         workchain: id.workchain,
@@ -657,6 +755,7 @@ mod tests {
         latest_calls: usize,
         blocks: HashMap<BlockIdShort, RawBlock>,
         load_calls: HashMap<BlockIdShort, usize>,
+        exact_load_calls: HashMap<BlockId, usize>,
         frontiers: HashMap<BlockId, Vec<BlockId>>,
         predecessors: HashMap<BlockId, Vec<BlockId>>,
     }
@@ -681,6 +780,11 @@ mod tests {
                 .get(&id)
                 .cloned()
                 .ok_or_else(|| SourceError::LiteApi(format!("fake block {id:?} is missing")))
+        }
+
+        async fn load_block_exact(&mut self, id: BlockId) -> Result<RawBlock, SourceError> {
+            *self.exact_load_calls.entry(id).or_default() += 1;
+            self.load_block(id.into()).await
         }
 
         async fn shard_frontier(
@@ -817,11 +921,8 @@ mod tests {
         graph.predecessors.insert(two, vec![one]);
         graph.predecessors.insert(three, vec![two]);
 
-        let batch = CanonicalBlockSource::new(graph, 10)
-            .next_raw_batch(None)
-            .await
-            .unwrap()
-            .unwrap();
+        let mut source = CanonicalBlockSource::new(graph, 10);
+        let batch = source.next_raw_batch(None).await.unwrap().unwrap();
         assert_eq!(
             batch
                 .shards
@@ -829,6 +930,10 @@ mod tests {
                 .map(|block| block.id)
                 .collect::<Vec<_>>(),
             vec![two, three]
+        );
+        assert_eq!(
+            source.client().exact_load_calls,
+            HashMap::from([(two, 1), (three, 1)])
         );
     }
 
