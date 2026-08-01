@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "generate-registry": "node scripts/generate-registry.mjs",
-    "postinstall": "node scripts/postinstall.mjs",
+    "apply-patches": "node scripts/apply-patches.mjs",
     "test": "node --test languages/*.test.mjs"
   },
   "dependencies": {

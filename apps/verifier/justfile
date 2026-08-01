@@ -47,6 +47,7 @@ install-ui:
 
 install-compiler-worker:
     cd compiler-worker && npm ci
+    cd compiler-worker && npm run apply-patches
 
 build-ui: install-ui
     cd ../../packages/verifier-ui && bun run build
