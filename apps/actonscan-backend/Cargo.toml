@@ -20,7 +20,7 @@ ton-indexer-core = { path = "../../crates/ton-indexer-core" }
 ton-indexer-liteserver = { path = "../../crates/ton-indexer-liteserver" }
 tower-http = { workspace = true, features = ["compression-br", "compression-gzip", "cors"] }
 tracing.workspace = true
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 toml.workspace = true
 utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
 
