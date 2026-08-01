@@ -9,13 +9,14 @@ export interface ContractAbiLink {
   readonly kind: string
   readonly title: string
   readonly url: string
-  readonly scope: string
 }
 
 export interface ExtendedContractABI {
   readonly compiler_abi: ContractABI
   readonly display_name?: string
   readonly code_hashes: readonly string[]
+  readonly catalog_id?: string
+  readonly known_addresses?: readonly string[]
   readonly links: readonly ContractAbiLink[]
 }
 

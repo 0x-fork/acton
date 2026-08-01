@@ -5,12 +5,15 @@ import dataAbisUrl from "../../../../crates/acton-abi-catalog/data/data-abis.jso
 import type {ContractAbiLink, ExtendedContractABI} from "./compilerAbi"
 
 interface CatalogBundle {
+  readonly schemaVersion: number
   readonly contracts: readonly CatalogContract[]
 }
 
 interface CatalogContract {
+  readonly id: string
   readonly displayName: string
   readonly hashes: readonly string[]
+  readonly knownAddresses: readonly string[]
   readonly compilerAbi: ContractABI
   readonly links?: readonly ContractAbiLink[]
 }
@@ -49,12 +52,20 @@ export async function getBundledCompilerAbiCatalog(): Promise<
 }
 
 async function loadCatalogBundle(): Promise<CatalogBundle> {
-  catalogBundlePromise ??= fetch(dataAbisUrl).then(response => {
-    if (!response.ok) {
-      throw new Error(`Failed to fetch bundled ABI catalog: ${response.status}`)
-    }
-    return response.json() as Promise<CatalogBundle>
-  })
+  catalogBundlePromise ??= fetch(dataAbisUrl)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Failed to fetch bundled ABI catalog: ${response.status}`)
+      }
+      return response.json() as Promise<CatalogBundle>
+    })
+    .then(bundle => {
+      if (bundle.schemaVersion !== 1) {
+        throw new Error(`Unsupported bundled ABI catalog schema version: ${bundle.schemaVersion}`)
+      }
+
+      return bundle
+    })
 
   return catalogBundlePromise
 }
@@ -78,6 +89,8 @@ function buildCatalogByCodeHash(bundle: CatalogBundle): ReadonlyMap<string, Exte
       compiler_abi: contract.compilerAbi,
       display_name: contract.displayName,
       code_hashes: codeHashes,
+      catalog_id: contract.id,
+      known_addresses: contract.knownAddresses,
       links: contract.links ?? [],
     }
 
@@ -111,6 +124,8 @@ function buildCatalogEntries(bundle: CatalogBundle): readonly BundledCompilerAbi
       compiler_abi: contract.compilerAbi,
       display_name: contract.displayName,
       code_hashes: codeHashes,
+      catalog_id: contract.id,
+      known_addresses: contract.knownAddresses,
       links: contract.links ?? [],
     }
   })

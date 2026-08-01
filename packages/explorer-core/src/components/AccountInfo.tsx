@@ -886,13 +886,11 @@ function normalizeContractAbiLink(link: ContractAbiLink): ContractAbiLink | unde
 
   const title = link.title.trim()
   const kind = link.kind.trim()
-  const scope = link.scope.trim()
 
   return {
     title: title || url,
     url,
     kind: kind || "link",
-    scope,
   }
 }
 
