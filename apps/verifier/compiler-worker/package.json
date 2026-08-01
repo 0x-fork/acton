@@ -70,5 +70,8 @@
     "tolk-1.4.0": "npm:@ton/tolk-js@1.4.0",
     "tolk-1.4.1": "npm:@ton/tolk-js@1.4.1",
     "tolk-1.4.2": "npm:@ton/tolk-js@1.4.2"
+  },
+  "overrides": {
+    "protobufjs": "7.6.5"
   }
 }
