@@ -33,6 +33,8 @@ USER actonscan
 
 ENV ACTONSCAN_CONFIG=/etc/actonscan/config.toml
 
+VOLUME ["/var/lib/actonscan"]
+
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \

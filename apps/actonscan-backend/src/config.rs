@@ -10,6 +10,7 @@ use thiserror::Error;
 
 const CONFIG_PATH_ENV: &str = "ACTONSCAN_CONFIG";
 const DEFAULT_CONFIG_PATH: &str = "config.toml";
+const DEFAULT_DATABASE_PATH: &str = "actonscan.sqlite3";
 const DEFAULT_BACKFILL_BATCHES: u32 = 1_024;
 const DEFAULT_BIND_ADDR: &str = "127.0.0.1:3008";
 const DEFAULT_LITESERVER_PARALLELISM: usize = 4;
@@ -21,6 +22,7 @@ const DEFAULT_POLL_INTERVAL_MS: u64 = 100;
 pub struct Config {
     bind_addr: SocketAddr,
     logging_level: String,
+    database_path: PathBuf,
     indexer: IndexerConfig,
 }
 
@@ -106,6 +108,10 @@ impl Config {
                 .logging
                 .level
                 .unwrap_or_else(|| DEFAULT_LOG_LEVEL.to_owned()),
+            database_path: file
+                .storage
+                .database_path
+                .unwrap_or_else(|| PathBuf::from(DEFAULT_DATABASE_PATH)),
             indexer: IndexerConfig {
                 global_config_path,
                 parallelism,
@@ -125,6 +131,12 @@ impl Config {
     #[must_use]
     pub fn logging_level(&self) -> &str {
         &self.logging_level
+    }
+
+    /// Returns the path to the `SQLite` database.
+    #[must_use]
+    pub fn database_path(&self) -> &Path {
+        &self.database_path
     }
 
     /// Returns the indexer settings.
@@ -160,6 +172,8 @@ struct ConfigFile {
     #[serde(default)]
     logging: LoggingConfig,
     #[serde(default)]
+    storage: StorageConfig,
+    #[serde(default)]
     indexer: IndexerFileConfig,
 }
 
@@ -174,9 +188,37 @@ struct LoggingConfig {
 }
 
 #[derive(Debug, Default, Deserialize)]
+struct StorageConfig {
+    database_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Default, Deserialize)]
 struct IndexerFileConfig {
     global_config_path: Option<PathBuf>,
     liteserver_parallelism: Option<usize>,
     tps_backfill_batches: Option<u32>,
     poll_interval_ms: Option<u64>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loads_database_path() {
+        let directory = tempfile::tempdir().unwrap();
+        let config_path = directory.path().join("config.toml");
+        fs::write(
+            &config_path,
+            r#"
+                [storage]
+                database_path = "data/actonscan.sqlite3"
+            "#,
+        )
+        .unwrap();
+
+        let config = Config::load_from_path(config_path).unwrap();
+
+        assert_eq!(config.database_path(), Path::new("data/actonscan.sqlite3"));
+    }
 }

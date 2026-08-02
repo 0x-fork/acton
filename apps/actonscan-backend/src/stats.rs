@@ -7,7 +7,7 @@ use utoipa::ToSchema;
 
 /// Rolling TPS windows exposed by the public API.
 pub const TPS_WINDOWS_SECONDS: [u64; 3] = [60, 300, 900];
-const SAMPLE_RETENTION_SECONDS: u64 = TPS_WINDOWS_SECONDS[2] + 60;
+pub(crate) const SAMPLE_RETENTION_SECONDS: u64 = TPS_WINDOWS_SECONDS[2] + 60;
 
 /// Shared in-memory TPS accumulator.
 #[derive(Clone, Default)]
@@ -53,11 +53,11 @@ pub struct TpsSnapshot {
     pub windows: Vec<TpsWindow>,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct TpsSample {
-    masterchain_seqno: u32,
-    timestamp: u64,
-    transactions: u64,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct TpsSample {
+    pub(crate) masterchain_seqno: u32,
+    pub(crate) timestamp: u64,
+    pub(crate) transactions: u64,
 }
 
 #[derive(Default)]
@@ -67,6 +67,16 @@ struct TpsAccumulator {
 }
 
 impl TpsStats {
+    pub(crate) fn from_samples(samples: impl IntoIterator<Item = TpsSample>) -> Self {
+        let mut inner = TpsAccumulator::default();
+        for sample in samples {
+            inner.record(sample);
+        }
+        Self {
+            inner: Arc::new(RwLock::new(inner)),
+        }
+    }
+
     pub(crate) async fn set_startup_tip(&self, seqno: u32) {
         let mut inner = self.inner.write().await;
         inner.startup_tip_seqno = Some(
@@ -76,44 +86,22 @@ impl TpsStats {
         );
     }
 
-    pub(crate) async fn record_batch(&self, batch: &Batch) {
+    pub(crate) fn sample_from_batch(batch: &Batch) -> TpsSample {
         let transactions = batch
             .blocks()
             .map(|block| u64::try_from(block.transactions().len()).unwrap_or(u64::MAX))
             .sum();
         let masterchain = batch.masterchain();
-        self.record(
-            masterchain.id().seqno,
-            u64::from(masterchain.info().gen_utime),
+        TpsSample {
+            masterchain_seqno: masterchain.id().seqno,
+            timestamp: u64::from(masterchain.info().gen_utime),
             transactions,
-        )
-        .await;
+        }
     }
 
-    async fn record(&self, masterchain_seqno: u32, timestamp: u64, transactions: u64) {
+    pub(crate) async fn record_sample(&self, sample: TpsSample) {
         let mut inner = self.inner.write().await;
-        if inner
-            .samples
-            .back()
-            .is_some_and(|sample| masterchain_seqno <= sample.masterchain_seqno)
-        {
-            return;
-        }
-
-        inner.samples.push_back(TpsSample {
-            masterchain_seqno,
-            timestamp,
-            transactions,
-        });
-        let cutoff = timestamp.saturating_sub(SAMPLE_RETENTION_SECONDS);
-        while inner
-            .samples
-            .front()
-            .is_some_and(|sample| sample.timestamp < cutoff)
-        {
-            inner.samples.pop_front();
-        }
-        drop(inner);
+        inner.record(sample);
     }
 
     /// Returns the current public TPS snapshot.
@@ -123,6 +111,26 @@ impl TpsStats {
 }
 
 impl TpsAccumulator {
+    fn record(&mut self, sample: TpsSample) {
+        if self
+            .samples
+            .back()
+            .is_some_and(|latest| sample.masterchain_seqno <= latest.masterchain_seqno)
+        {
+            return;
+        }
+
+        self.samples.push_back(sample);
+        let cutoff = sample.timestamp.saturating_sub(SAMPLE_RETENTION_SECONDS);
+        while self
+            .samples
+            .front()
+            .is_some_and(|sample| sample.timestamp < cutoff)
+        {
+            self.samples.pop_front();
+        }
+    }
+
     fn snapshot(&self) -> TpsSnapshot {
         let latest = self.samples.back().copied();
         let oldest_timestamp = self.samples.front().map(|sample| sample.timestamp);
@@ -199,7 +207,13 @@ mod tests {
         let stats = TpsStats::default();
         stats.set_startup_tip(90).await;
         for seqno in 0..=90 {
-            stats.record(seqno, u64::from(seqno) * 10, 10).await;
+            stats
+                .record_sample(TpsSample {
+                    masterchain_seqno: seqno,
+                    timestamp: u64::from(seqno) * 10,
+                    transactions: 10,
+                })
+                .await;
         }
 
         let snapshot = stats.snapshot().await;
@@ -217,8 +231,20 @@ mod tests {
     async fn reports_partial_coverage_during_backfill() {
         let stats = TpsStats::default();
         stats.set_startup_tip(20).await;
-        stats.record(10, 100, 12).await;
-        stats.record(11, 110, 8).await;
+        stats
+            .record_sample(TpsSample {
+                masterchain_seqno: 10,
+                timestamp: 100,
+                transactions: 12,
+            })
+            .await;
+        stats
+            .record_sample(TpsSample {
+                masterchain_seqno: 11,
+                timestamp: 110,
+                transactions: 8,
+            })
+            .await;
 
         let snapshot = stats.snapshot().await;
         assert_eq!(snapshot.status, TpsStatus::Syncing);

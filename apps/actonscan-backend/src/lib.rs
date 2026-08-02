@@ -3,6 +3,7 @@
 pub mod config;
 mod indexer;
 pub mod stats;
+mod storage;
 
 use axum::{
     Json, Router,
@@ -21,6 +22,7 @@ use crate::{
 
 pub use config::Config;
 pub use stats::TpsStats;
+pub use storage::SqliteStorage;
 
 #[derive(OpenApi)]
 #[openapi(paths(tps), components(schemas(TpsSnapshot, TpsStatus, TpsWindow)))]
@@ -43,10 +45,14 @@ pub fn app(stats: TpsStats) -> Router {
         .layer(CompressionLayer::new())
 }
 
-/// Starts the LiteServer-backed TPS indexer in the current Tokio runtime.
+/// Starts the LiteServer-backed statistics indexer in the current Tokio runtime.
 #[must_use]
-pub fn spawn_indexer(config: IndexerConfig, stats: TpsStats) -> tokio::task::JoinHandle<()> {
-    indexer::spawn(config, stats)
+pub fn spawn_indexer(
+    config: IndexerConfig,
+    stats: TpsStats,
+    storage: SqliteStorage,
+) -> tokio::task::JoinHandle<()> {
+    indexer::spawn(config, stats, storage)
 }
 
 async fn health() -> StatusCode {
