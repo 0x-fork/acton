@@ -4,7 +4,7 @@ import {
   type TransactionBlockRef,
   type TransactionInfo,
 } from "@acton/transaction-ui"
-import {useLayoutEffect, useRef} from "react"
+import {useLayoutEffect, useRef, useState} from "react"
 import type {FC, MouseEvent, ReactNode} from "react"
 
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
@@ -103,6 +103,7 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
     : -1
   const shardFlowRef = useRef<HTMLDivElement>(null)
   const currentShardFlowStepRef = useRef<HTMLDivElement>(null)
+  const [hoveredShardKey, setHoveredShardKey] = useState<string>()
 
   useLayoutEffect(() => {
     const flow = shardFlowRef.current
@@ -269,11 +270,6 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
                   className={styles.shardFlowStepGroup}
                   key={`${segment.workchain}:${segment.shard}:${index}`}
                 >
-                  {index > 0 ? (
-                    <span className={styles.shardFlowArrow} aria-hidden="true">
-                      →
-                    </span>
-                  ) : undefined}
                   <div
                     ref={
                       index === currentShardFlowSegmentIndex ? currentShardFlowStepRef : undefined
@@ -284,12 +280,26 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
                     }`}
                     className={`${styles.shardFlowStep} ${
                       index === currentShardFlowSegmentIndex ? styles.shardFlowStepCurrent : ""
-                    } ${onShardHoverChange ? styles.shardFlowStepInteractive : ""}`}
-                    onMouseEnter={() => onShardHoverChange?.(segment.transactionIds)}
-                    onMouseLeave={() => onShardHoverChange?.(undefined)}
+                    } ${
+                      hoveredShardKey === `${segment.workchain}:${segment.shard}`
+                        ? styles.shardFlowStepRelated
+                        : ""
+                    } ${
+                      hoveredShardKey !== undefined &&
+                      hoveredShardKey !== `${segment.workchain}:${segment.shard}`
+                        ? styles.shardFlowStepMuted
+                        : ""
+                    } ${styles.shardFlowStepInteractive}`}
+                    onMouseEnter={() => {
+                      setHoveredShardKey(`${segment.workchain}:${segment.shard}`)
+                      onShardHoverChange?.(segment.transactionIds)
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredShardKey(undefined)
+                      onShardHoverChange?.(undefined)
+                    }}
                   >
                     <div className={styles.shardFlowShard}>
-                      <span className={styles.shardFlowDot} aria-hidden="true" />
                       <span title={`Workchain ${segment.workchain}, shard ${segment.shard}`}>
                         {segment.workchain}:{segment.shard}
                       </span>
@@ -302,7 +312,7 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
                     </div>
                     <div className={styles.shardFlowBlocks}>
                       <span className={styles.shardFlowBlocksLabel}>
-                        {segment.blocks.length === 1 ? "Block" : "Blocks"}
+                        {segment.blocks.length === 1 ? "Block:" : "Blocks:"}
                       </span>
                       {segment.blocks.map(block => {
                         const isCurrentBlock =
@@ -311,6 +321,8 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
                         return (
                           <BlockChip
                             key={`${block.workchain}:${block.shard}:${block.seqno}`}
+                            className={styles.shardFlowBlockChip}
+                            copyable={segment.blocks.length === 1}
                             workchain={block.workchain}
                             shard={block.shard}
                             seqno={block.seqno}
@@ -331,6 +343,11 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
                       })}
                     </div>
                   </div>
+                  {index < shardFlow.segments.length - 1 ? (
+                    <span className={styles.shardFlowArrow} aria-hidden="true">
+                      →
+                    </span>
+                  ) : undefined}
                 </div>
               ))}
             </div>
