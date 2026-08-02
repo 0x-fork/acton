@@ -19,6 +19,10 @@ These addresses are not fixtures and their balances or recent history can change
 | [`EQBazGjn2UgiOom47yy_fGdRoxU1tWNBNqWnkil5T9fP-xuK`](https://actonscan.com/address/EQBazGjn2UgiOom47yy_fGdRoxU1tWNBNqWnkil5T9fP-xuK?network=mainnet) | Contract with very large code, useful for checking that the account page and Code tab load without errors | 2026-08-02 |
 | [`EQCeTFSYKmcPZIQ-0Hvi98bXvXygrxru56LzUllC-Jup2727`](https://actonscan.com/address/EQCeTFSYKmcPZIQ-0Hvi98bXvXygrxru56LzUllC-Jup2727?network=mainnet) | Multisig orders with expired entries, useful for checking the red Expired status and cross icon | 2026-07-31 |
 | [`kQB1tqrLMLJZk0YnmU_1UKr-r90QBnUubm0So09b39LPk3rZ`](https://actonscan.com/address/kQB1tqrLMLJZk0YnmU_1UKr-r90QBnUubm0So09b39LPk3rZ?network=mainnet) | Multisig with 1,487 orders, useful for checking incremental loading while scrolling the Orders table | 2026-07-31 |
+| [`EQDKHZ7e70CzqdvZCC83Z4WVR8POC_ZB0J1Y4zo88G-zCXmC`](https://actonscan.com/address/EQDKHZ7e70CzqdvZCC83Z4WVR8POC_ZB0J1Y4zo88G-zCXmC?network=mainnet) | Binance account with many jetton balances, useful for checking token metadata, balances, and incremental loading in the Tokens tab | 2026-08-02 |
+| [`EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs`](https://actonscan.com/address/EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs?network=mainnet) | USD₮ jetton master with many holders, useful for checking sorting and incremental loading in the Holders tab | 2026-08-02 |
+| [`EQDgR7jZy9D88IBC3dK4qEJjb9D8WmfCbL9v-4Fjsjzm7cpq`](https://actonscan.com/address/EQDgR7jZy9D88IBC3dK4qEJjb9D8WmfCbL9v-4Fjsjzm7cpq?network=mainnet) | Account with more than 400 NFTs, useful for checking uninterrupted incremental loading in the NFTs tab | 2026-08-02 |
+| [`EQCA14o1-VWhS2efqoh_9M1b_A9DtKTuoqfmkn83AbJzwnPi`](https://actonscan.com/address/EQCA14o1-VWhS2efqoh_9M1b_A9DtKTuoqfmkn83AbJzwnPi?network=mainnet) | NFT collection with more than 800 items, useful for checking collection metadata and uninterrupted incremental item loading | 2026-08-02 |
 
 ## Mainnet transactions
 
