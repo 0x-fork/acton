@@ -1,7 +1,7 @@
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {Check, Copy, Edit2, QrCode, Star} from "lucide-react"
 import {QRCodeSVG} from "qrcode.react"
-import {useEffect, useId, useRef, useState} from "react"
+import {memo, useEffect, useId, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {CopyInlineAction, InfoPopover, Input, Popover, Tooltip} from "@acton/ui"
 
@@ -30,6 +30,19 @@ import {
 } from "./utils"
 
 const TOKEN_PREVIEW_LIMIT = 5
+
+const AddressQrCode = memo<{readonly value: string}>(({value}) => (
+  <QRCodeSVG
+    value={value}
+    size={132}
+    level="M"
+    marginSize={3}
+    bgColor="var(--acton-color-surface-raised)"
+    fgColor="var(--acton-color-text)"
+    title={`QR code for ${value}`}
+    className={styles.qrSvg}
+  />
+))
 
 interface AccountInfoDetail {
   readonly key: string
@@ -271,17 +284,10 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   )
   const cardClassName = hasContextCard ? `${styles.card} ${styles.cardCompactQr}` : styles.card
 
-  const qrCode = (
-    <QRCodeSVG
-      value={qrAddress}
-      size={132}
-      level="M"
-      marginSize={3}
-      bgColor="var(--acton-color-surface-raised)"
-      fgColor="var(--acton-color-text)"
-      title={`QR code for ${qrAddress}`}
-      className={styles.qrSvg}
-    />
+  const qrCode = stateLoading ? (
+    <div className={`${styles.skeleton} ${styles.qrSkeleton}`} aria-hidden="true" />
+  ) : (
+    <AddressQrCode value={qrAddress} />
   )
   const addressFormats = (
     <div className={styles.addressFormats}>
@@ -777,24 +783,26 @@ export const AccountInfo: FC<AccountInfoProps> = ({
           </div>
         </div>
 
-        <Tooltip content="Show QR code">
-          <span className={styles.tooltipTrigger}>
-            <Popover
-              key={rawAddress}
-              ariaLabel="Address QR code"
-              content={qrCode}
-              interaction="click"
-              placement="bottom"
-              triggerAsChild
-            >
-              <button type="button" className={styles.qrToggle} aria-label="Show QR code">
-                <QrCode size={16} />
-              </button>
-            </Popover>
-          </span>
-        </Tooltip>
+        {!stateLoading && (
+          <Tooltip content="Show QR code">
+            <span className={styles.tooltipTrigger}>
+              <Popover
+                key={rawAddress}
+                ariaLabel="Address QR code"
+                content={qrCode}
+                interaction="click"
+                placement="bottom"
+                triggerAsChild
+              >
+                <button type="button" className={styles.qrToggle} aria-label="Show QR code">
+                  <QrCode size={16} />
+                </button>
+              </Popover>
+            </span>
+          </Tooltip>
+        )}
 
-        <div className={styles.qrPanel} aria-label="Address QR code">
+        <div className={styles.qrPanel} aria-label="Address QR code" aria-busy={stateLoading}>
           {qrCode}
         </div>
       </div>

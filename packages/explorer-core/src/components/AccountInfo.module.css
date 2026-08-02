@@ -715,6 +715,12 @@
   color: var(--acton-color-text);
 }
 
+.qrSkeleton {
+  width: 132px;
+  height: 132px;
+  border-radius: 8px;
+}
+
 .skeleton {
   display: block;
   background: linear-gradient(
