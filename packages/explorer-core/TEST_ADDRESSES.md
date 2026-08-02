@@ -16,8 +16,15 @@ These addresses are not fixtures and their balances or recent history can change
 | [`EQDXgkYbrxDpRZD6PUZd0jwdjZmYYQd7l5YOE2UeXunLD8Wm`](https://actonscan.com/address/EQDXgkYbrxDpRZD6PUZd0jwdjZmYYQd7l5YOE2UeXunLD8Wm?network=mainnet) | Wallet with many Renew DNS actions, useful for checking that domains such as `bybit.ton` are rendered as NFT chips | 2026-07-31 |
 | [`EQDoxOcDo0EkHBNVL6tFfH5K-BAWI9PSO44zlgWdOwgeqw7m`](https://actonscan.com/address/EQDoxOcDo0EkHBNVL6tFfH5K-BAWI9PSO44zlgWdOwgeqw7m?network=mainnet) | Wallet with repeated 250-action bulk sends, useful for checking the initial ten-action preview, remaining-action count, incremental expansion, and uninterrupted loading of later transactions | 2026-08-01 |
 | [`EQDYzZmfsrGzhObKJUw4gzdeIxEai3jAFbiGKGwxvxHinaPP`](https://actonscan.com/address/EQDYzZmfsrGzhObKJUw4gzdeIxEai3jAFbiGKGwxvxHinaPP?network=mainnet) | Wallet with more than 1,000 NFTs and safety-filtered items in early batches, useful for checking uninterrupted incremental loading in the NFTs tab | 2026-07-31 |
+| [`EQBazGjn2UgiOom47yy_fGdRoxU1tWNBNqWnkil5T9fP-xuK`](https://actonscan.com/address/EQBazGjn2UgiOom47yy_fGdRoxU1tWNBNqWnkil5T9fP-xuK?network=mainnet) | Contract with very large code, useful for checking that the account page and Code tab load without errors | 2026-08-02 |
 | [`EQCeTFSYKmcPZIQ-0Hvi98bXvXygrxru56LzUllC-Jup2727`](https://actonscan.com/address/EQCeTFSYKmcPZIQ-0Hvi98bXvXygrxru56LzUllC-Jup2727?network=mainnet) | Multisig orders with expired entries, useful for checking the red Expired status and cross icon | 2026-07-31 |
 | [`kQB1tqrLMLJZk0YnmU_1UKr-r90QBnUubm0So09b39LPk3rZ`](https://actonscan.com/address/kQB1tqrLMLJZk0YnmU_1UKr-r90QBnUubm0So09b39LPk3rZ?network=mainnet) | Multisig with 1,487 orders, useful for checking incremental loading while scrolling the Orders table | 2026-07-31 |
+
+## Mainnet transactions
+
+| Transaction | What to verify | Last checked |
+| --- | --- | --- |
+| [`1d0aac90eae0914432710b859d6d4c6bb42aa36141f29fe00165cc240cc17a87`](https://actonscan.com/tx/1d0aac90eae0914432710b859d6d4c6bb42aa36141f29fe00165cc240cc17a87?network=mainnet) | Opening Actions in the transaction details reproduces `Cannot parse stack:` | 2026-08-02 |
 
 ## Testnet
 
