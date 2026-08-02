@@ -26,11 +26,12 @@ const requireNonEmptyString = (value: unknown, path: string): string => {
   return value
 }
 
-const requireRawAddress = (value: unknown, path: string): string => {
-  const address = requireNonEmptyString(value, path)
+const requireAddress = (value: unknown, path: string): string => {
+  const source = requireNonEmptyString(value, path)
 
   try {
-    return Address.parse(address).toRawString()
+    Address.parse(source)
+    return source
   } catch (error) {
     throw new TypeError(`${path} must be a valid TON address`, {cause: error})
   }
@@ -51,7 +52,7 @@ export const parseSourceAddresses = (
     }
 
     return {
-      address: requireRawAddress(row.address, `${path}.address`),
+      address: requireAddress(row.address, `${path}.address`),
       name: requireNonEmptyString(row.name, `${path}.name`),
     }
   })

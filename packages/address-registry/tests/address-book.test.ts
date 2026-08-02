@@ -2,7 +2,6 @@ import {expect, test} from "bun:test"
 
 import {ADDRESS_BOOK_URLS, parseAddressBook} from "../scripts/sources/address-book.ts"
 
-const RAW_ZERO = `0:${"0".repeat(64)}`
 const RAW_ONES = `0:${"1".repeat(64)}`
 const BOUNCEABLE_ZERO = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"
 
@@ -15,7 +14,7 @@ test("matches upstream recovery for reserved plain name scalars", () => {
 `,
       "example.yaml",
     ),
-  ).toEqual([{address: RAW_ZERO, name: "@wallet in Telegram"}])
+  ).toEqual([{address: BOUNCEABLE_ZERO, name: "@wallet in Telegram"}])
 })
 
 test("matches upstream convention for disabled indented entries", () => {
@@ -31,7 +30,7 @@ test("matches upstream convention for disabled indented entries", () => {
 `,
       "example.yaml",
     ),
-  ).toEqual([{address: RAW_ZERO, name: "Active"}])
+  ).toEqual([{address: BOUNCEABLE_ZERO, name: "Active"}])
 })
 
 test("excludes the upstream scam file", () => {

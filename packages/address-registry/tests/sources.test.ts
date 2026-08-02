@@ -12,7 +12,7 @@ const BOUNCEABLE_ZERO = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"
 const NON_BOUNCEABLE_ZERO = "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ"
 
 describe("source address validation", () => {
-  test("normalizes addresses and reads names from every entry", () => {
+  test("validates addresses and reads names from every entry", () => {
     expect(
       parseSourceAddresses(
         [
@@ -22,12 +22,12 @@ describe("source address validation", () => {
         "example.yaml",
       ),
     ).toEqual([
-      {address: RAW_ZERO, name: "Alpha"},
+      {address: BOUNCEABLE_ZERO, name: "Alpha"},
       {address: RAW_ONES, name: "Beta"},
     ])
   })
 
-  test("normalizes friendly variants to the same raw address", () => {
+  test("accepts friendly address variants", () => {
     const addresses = parseSourceAddresses(
       [
         {address: BOUNCEABLE_ZERO, name: "Bounceable"},
@@ -36,7 +36,19 @@ describe("source address validation", () => {
       "example.yaml",
     )
 
-    expect(addresses.map(({address}) => address)).toEqual([RAW_ZERO, RAW_ZERO])
+    expect(addresses).toEqual([
+      {address: BOUNCEABLE_ZERO, name: "Bounceable"},
+      {address: NON_BOUNCEABLE_ZERO, name: "Non-bounceable"},
+    ])
+  })
+
+  test("accepts testnet friendly addresses without explicit metadata", () => {
+    expect(parseSourceAddresses([ACTON_ADDRESSES[0]], "ACTON_ADDRESSES")).toEqual([
+      {
+        address: ACTON_ADDRESSES[0].address,
+        name: "Testgiver TON Bot",
+      },
+    ])
   })
 
   test("rejects malformed entries", () => {
@@ -67,12 +79,12 @@ test("readSources reads every allowed upstream YAML file and the Acton list", as
     {
       id: "ton-assets",
       urls: TON_ASSETS_ACCOUNT_URLS,
-      addresses: TON_ASSETS_ACCOUNT_URLS.map(name => ({address: RAW_ZERO, name})),
+      addresses: TON_ASSETS_ACCOUNT_URLS.map(name => ({address: BOUNCEABLE_ZERO, name})),
     },
     {
       id: "address-book",
       urls: ADDRESS_BOOK_URLS,
-      addresses: ADDRESS_BOOK_URLS.map(name => ({address: RAW_ZERO, name})),
+      addresses: ADDRESS_BOOK_URLS.map(name => ({address: BOUNCEABLE_ZERO, name})),
     },
     {
       id: "acton",

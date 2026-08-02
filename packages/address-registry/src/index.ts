@@ -1,2 +1,2 @@
-export {addresses} from "./addresses"
+export {addresses, getMainnetAddresses, getTestnetAddresses} from "./addresses"
 export type {AddressRegistryEntry} from "./addresses"

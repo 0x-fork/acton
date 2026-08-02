@@ -2,7 +2,6 @@ import {expect, test} from "bun:test"
 
 import {TON_ASSETS_ACCOUNT_URLS, parseTonAssets} from "../scripts/sources/ton-assets.ts"
 
-const RAW_ZERO = `0:${"0".repeat(64)}`
 const BOUNCEABLE_ZERO = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"
 
 test("parses ton-assets YAML", () => {
@@ -14,7 +13,7 @@ test("parses ton-assets YAML", () => {
 `,
       "example.yaml",
     ),
-  ).toEqual([{address: RAW_ZERO, name: "Alpha"}])
+  ).toEqual([{address: BOUNCEABLE_ZERO, name: "Alpha"}])
 })
 
 test("does not apply address-book recovery to ton-assets", () => {

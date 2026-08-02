@@ -7,7 +7,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./addresses.json": "./src/addresses.json"
+    "./mainnet.json": "./src/mainnet.json",
+    "./testnet.json": "./src/testnet.json"
   },
   "scripts": {
     "fmt": "biome format --write .",

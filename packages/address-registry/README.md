@@ -20,10 +20,11 @@ export const ACTON_ADDRESSES = [
 ```
 
 The generator downloads the account YAML files from both upstream repositories,
-validates all three sources, normalizes addresses to raw form, merges equal
-entries, and applies manual conflict resolutions. It fails if any name conflict
-does not have a resolution, then writes `src/addresses.json`. The stable
-TypeScript binding lives in `src/addresses.ts`:
+validates all three sources, splits friendly addresses by network, normalizes
+them to raw form, merges equal entries, and applies manual conflict resolutions.
+Raw addresses, which do not encode a network, default to mainnet. It fails if
+any name conflict does not have a resolution, then writes `src/mainnet.json` and
+`src/testnet.json`. The stable TypeScript binding lives in `src/addresses.ts`:
 
 ```sh
 bun run generate

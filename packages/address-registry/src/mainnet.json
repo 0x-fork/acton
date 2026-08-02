@@ -1596,6 +1596,10 @@
     "name": "Rapira Exchange 1"
   },
   {
+    "address": "0:3d7ee4917dc75c195b975a17b8fb7d367978fdc30bd9649200aa1255a93a3e57",
+    "name": "Changelly 2"
+  },
+  {
     "address": "0:3da40403e1e387c49e1370f47cc83aed6b5d16911495942788c6eff94ceec39d",
     "name": "TONAPI gas proxy"
   },
@@ -2302,10 +2306,6 @@
   {
     "address": "0:91d73056e035232f09aaf8242a1d51eea98b6a5bebbf8ac0c9e521d02a1a4bdb",
     "name": "Morgenshtern"
-  },
-  {
-    "address": "0:92112d13658a9c56482882e8486fc88c128e1cbda130988ad4e6a6d082737c7e",
-    "name": "Testgiver TON Bot"
   },
   {
     "address": "0:9220c181a6cfeacd11b7b8f62138df1bb9cc82b6ed2661d2f5faee204b3efb20",
@@ -3330,9 +3330,5 @@
   {
     "address": "0:fe7cd8da44a49cea675e8141b7707abb2c9df6712ff6d70379d630a20db18e2c",
     "name": "DegenPhone"
-  },
-  {
-    "address": "0:ff3b559e33e89c318f092281b383248443c8afbe84a9812a20954b1ab9ae980c",
-    "name": "Acton Faucet"
   }
 ]
