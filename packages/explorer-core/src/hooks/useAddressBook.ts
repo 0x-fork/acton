@@ -1,4 +1,4 @@
-import {addresses as registryAddresses} from "@acton/address-registry"
+import {getMainnetAddresses, getTestnetAddresses} from "@acton/address-registry"
 import {Address} from "@ton/core"
 import {
   createContext,
@@ -13,6 +13,7 @@ import {
 import type {FC, ReactNode} from "react"
 
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
+import {useNetworkInfo} from "./useNetworkInfo"
 
 type AddressName = string | undefined
 
@@ -52,7 +53,6 @@ interface AddressBookContextValue {
 }
 
 const AddressBookContext = createContext<AddressBookContextValue | undefined>(undefined)
-const REGISTRY_NAMES = new Map(registryAddresses.map(({address, name}) => [address, name]))
 
 const normalizeKey = (address: string) => {
   try {
@@ -71,6 +71,12 @@ export const AddressBookProvider: FC<{
   children: ReactNode
 }> = ({children}) => {
   const metadataRegistry = useMetadataRegistry()
+  const {network} = useNetworkInfo()
+  const registryAddresses = network.testOnly ? getTestnetAddresses() : getMainnetAddresses()
+  const registryNames = useMemo(
+    () => new Map(registryAddresses.map(({address, name}) => [address, name])),
+    [registryAddresses],
+  )
   const cacheRef = useRef(new Map<string, AddressName>())
   const domainsRef = useRef(new Map<string, string>())
   const pendingRef = useRef(new Map<string, Promise<AddressName>>())
@@ -78,15 +84,18 @@ export const AddressBookProvider: FC<{
   const batchScheduledRef = useRef(false)
   const [version, setVersion] = useState(0)
 
-  const getNameSources = useCallback((address: string): AddressNameSources => {
-    if (!address) return {}
-    const key = normalizeKey(address)
-    return {
-      customName: cacheRef.current.get(key),
-      registryName: REGISTRY_NAMES.get(key),
-      tonDnsName: domainsRef.current.get(key),
-    }
-  }, [])
+  const getNameSources = useCallback(
+    (address: string): AddressNameSources => {
+      if (!address) return {}
+      const key = normalizeKey(address)
+      return {
+        customName: cacheRef.current.get(key),
+        registryName: registryNames.get(key),
+        tonDnsName: domainsRef.current.get(key),
+      }
+    },
+    [registryNames],
+  )
 
   const getCachedName = useCallback(
     (address: string) => {
@@ -153,7 +162,7 @@ export const AddressBookProvider: FC<{
           request.resolve(
             resolveAddressName(
               namesByAddress[request.address],
-              REGISTRY_NAMES.get(normalizeKey(request.address)),
+              registryNames.get(normalizeKey(request.address)),
               domainsRef.current.get(normalizeKey(request.address)),
             ),
           )
@@ -166,11 +175,11 @@ export const AddressBookProvider: FC<{
         for (const request of requests) {
           const key = normalizeKey(request.address)
           request.resolve(
-            resolveAddressName(undefined, REGISTRY_NAMES.get(key), domainsRef.current.get(key)),
+            resolveAddressName(undefined, registryNames.get(key), domainsRef.current.get(key)),
           )
         }
       })
-  }, [metadataRegistry, updateNames])
+  }, [metadataRegistry, registryNames, updateNames])
 
   const setAddressName = useCallback(
     async (address: string, name: string) => {
@@ -187,7 +196,7 @@ export const AddressBookProvider: FC<{
       if (cacheRef.current.has(key)) {
         return resolveAddressName(
           cacheRef.current.get(key),
-          REGISTRY_NAMES.get(key),
+          registryNames.get(key),
           domainsRef.current.get(key),
         )
       }
@@ -207,7 +216,7 @@ export const AddressBookProvider: FC<{
       pendingRef.current.set(key, request)
       return request
     },
-    [flushPendingBatch],
+    [flushPendingBatch, registryNames],
   )
 
   const prefetchNames = useCallback(
@@ -217,31 +226,34 @@ export const AddressBookProvider: FC<{
     [fetchName],
   )
 
-  const searchRegistryNames = useCallback((query: string, limit = 6) => {
-    const normalizedQuery = normalizeNameQuery(query)
-    if (normalizedQuery.length < 2 || limit <= 0) {
-      return []
-    }
+  const searchRegistryNames = useCallback(
+    (query: string, limit = 6) => {
+      const normalizedQuery = normalizeNameQuery(query)
+      if (normalizedQuery.length < 2 || limit <= 0) {
+        return []
+      }
 
-    return registryAddresses
-      .map(account => {
-        const normalizedName = normalizeNameQuery(account.name)
-        if (!normalizedName.includes(normalizedQuery)) {
-          return undefined
-        }
+      return registryAddresses
+        .map(account => {
+          const normalizedName = normalizeNameQuery(account.name)
+          if (!normalizedName.includes(normalizedQuery)) {
+            return undefined
+          }
 
-        return {
-          account,
-          score: getNameMatchScore(normalizedName, normalizedQuery),
-        }
-      })
-      .filter((entry): entry is {readonly account: RegistryNameMatch; readonly score: number} =>
-        Boolean(entry),
-      )
-      .sort((a, b) => a.score - b.score || a.account.name.localeCompare(b.account.name))
-      .slice(0, limit)
-      .map(entry => entry.account)
-  }, [])
+          return {
+            account,
+            score: getNameMatchScore(normalizedName, normalizedQuery),
+          }
+        })
+        .filter((entry): entry is {readonly account: RegistryNameMatch; readonly score: number} =>
+          Boolean(entry),
+        )
+        .sort((a, b) => a.score - b.score || a.account.name.localeCompare(b.account.name))
+        .slice(0, limit)
+        .map(entry => entry.account)
+    },
+    [registryAddresses],
+  )
 
   const value = useMemo(
     () => ({
