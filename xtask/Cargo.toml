@@ -14,6 +14,7 @@ license = { workspace = true }
 workspace = true
 
 [dependencies]
+acton-abi-catalog = { workspace = true }
 acton-config = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }
