@@ -1034,6 +1034,9 @@ export function TransactionTraceView({
   renderSelectedTransactionExtra,
   renderSelectedTransactionMessageRouteAction,
 }: TransactionTraceViewProps): JSX.Element {
+  const [hoveredShardTransactionIds, setHoveredShardTransactionIds] = useState<
+    ReadonlySet<string> | undefined
+  >()
   const {flowMetrics: treeFlowMetrics, rootRef: treeSectionRef} =
     useAvailableFlowMetrics<HTMLDivElement>(MAX_TRACE_TREE_FLOW_WIDTH)
   const rootTraceTransactions = [...traces]
@@ -1056,7 +1059,7 @@ export function TransactionTraceView({
     }
     return names
   }, [compilerAbisByCodeHash, contracts, traces])
-  const highlightedTransactionIds = useMemo(() => {
+  const actionHighlightedTransactionIds = useMemo(() => {
     if (!hoveredAction) {
       return undefined
     }
@@ -1073,6 +1076,21 @@ export function TransactionTraceView({
 
     return highlightedIds.size > 0 ? highlightedIds : undefined
   }, [hoveredAction, traces])
+  const highlightedTransactionIds = useMemo(() => {
+    if (!actionHighlightedTransactionIds) {
+      return hoveredShardTransactionIds
+    }
+    if (!hoveredShardTransactionIds) {
+      return actionHighlightedTransactionIds
+    }
+    return new Set([...actionHighlightedTransactionIds, ...hoveredShardTransactionIds])
+  }, [actionHighlightedTransactionIds, hoveredShardTransactionIds])
+
+  useEffect(() => {
+    if (activeTab !== "details") {
+      setHoveredShardTransactionIds(undefined)
+    }
+  }, [activeTab])
   const isWideTraceTree = traces.length > WIDE_TRACE_TREE_TRANSACTION_THRESHOLD
   const treeSectionStyle = useMemo<CSSProperties | undefined>(() => {
     if (!isWideTraceTree) {
@@ -1216,8 +1234,14 @@ export function TransactionTraceView({
                     <TraceOverviewTable
                       data={traceOverview}
                       transactions={traces}
+                      currentTransaction={selectedTraceTransaction}
                       actionCount={supportsTraceActions ? traceActions.length : undefined}
                       onBlockClick={onBlockClick}
+                      onShardHoverChange={transactionIds =>
+                        setHoveredShardTransactionIds(
+                          transactionIds ? new Set(transactionIds) : undefined,
+                        )
+                      }
                     />
                   )}
                 </div>

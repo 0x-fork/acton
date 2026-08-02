@@ -4,10 +4,12 @@ import {
   type TransactionBlockRef,
   type TransactionInfo,
 } from "@acton/transaction-ui"
+import {useLayoutEffect, useRef} from "react"
 import type {FC, MouseEvent, ReactNode} from "react"
 
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {formatNano, hashToHex} from "./utils"
+import {buildTraceShardFlow} from "./traceShardFlow"
 
 import styles from "./TraceOverviewTable.module.css"
 
@@ -30,8 +32,10 @@ export interface TraceOverviewData {
 interface TraceOverviewTableProps {
   readonly data: TraceOverviewData
   readonly transactions: readonly TransactionInfo[]
+  readonly currentTransaction?: TransactionInfo
   readonly actionCount?: number
   readonly onBlockClick?: (block: TransactionBlockRef, event: MouseEvent<HTMLElement>) => void
+  readonly onShardHoverChange?: (transactionIds: readonly string[] | undefined) => void
 }
 
 const MASTERCHAIN_BLOCK_SHARD = "8000000000000000"
@@ -59,6 +63,9 @@ const formatDuration = (seconds: number): string => {
   return remainingSeconds === 0 ? `${minutes} min` : `${minutes} min ${remainingSeconds} sec`
 }
 
+const isSameBlock = (left: TransactionBlockRef | undefined, right: TransactionBlockRef): boolean =>
+  left?.workchain === right.workchain && left.shard === right.shard && left.seqno === right.seqno
+
 const isTransactionAborted = (transactionInfo: TransactionInfo): boolean => {
   const {description} = transactionInfo.transaction
   return "aborted" in description && description.aborted
@@ -67,8 +74,10 @@ const isTransactionAborted = (transactionInfo: TransactionInfo): boolean => {
 export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
   data,
   transactions,
+  currentTransaction,
   actionCount,
   onBlockClick,
+  onShardHoverChange,
 }) => {
   const routes = useExplorerRoutePaths()
   const masterchainBlockPath = (seqno: string) =>
@@ -86,6 +95,45 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
   const skippedComputeCount = transactions.filter(
     transaction => getTransactionComputePhase(transaction.transaction)?.type === "skipped",
   ).length
+  const shardFlow = buildTraceShardFlow(transactions)
+  const currentShardFlowSegmentIndex = currentTransaction
+    ? shardFlow.segments.findIndex(segment =>
+        segment.transactionIds.includes(currentTransaction.id),
+      )
+    : -1
+  const shardFlowRef = useRef<HTMLDivElement>(null)
+  const currentShardFlowStepRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const flow = shardFlowRef.current
+    const currentStep = currentShardFlowStepRef.current
+    if (!flow || !currentStep || currentShardFlowSegmentIndex < 0) {
+      return
+    }
+
+    const maxScrollLeft = Math.max(0, flow.scrollWidth - flow.clientWidth)
+    if (currentShardFlowSegmentIndex === shardFlow.segments.length - 1) {
+      flow.scrollTo({left: maxScrollLeft, behavior: "smooth"})
+      return
+    }
+
+    const flowRect = flow.getBoundingClientRect()
+    const stepRect = currentStep.getBoundingClientRect()
+    const stepLeft = flow.scrollLeft + stepRect.left - flowRect.left
+    const stepRight = stepLeft + stepRect.width
+    const visibleLeft = flow.scrollLeft
+    const visibleRight = visibleLeft + flow.clientWidth
+    const inlinePadding = 8
+
+    if (stepLeft < visibleLeft) {
+      flow.scrollTo({left: Math.max(0, stepLeft - inlinePadding), behavior: "smooth"})
+    } else if (stepRight > visibleRight) {
+      flow.scrollTo({
+        left: Math.min(maxScrollLeft, stepRight - flow.clientWidth + inlinePadding),
+        behavior: "smooth",
+      })
+    }
+  }, [currentShardFlowSegmentIndex, currentTransaction?.id, shardFlow.segments.length])
   const duration = Math.max(0, data.endUtime - data.startUtime)
   const traceId = hashToHex(data.traceId) ?? data.traceId
   const externalHash = data.externalHash
@@ -201,6 +249,94 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
           </div>
         </div>
       </div>
+
+      {shardFlow.segments.length > 0 ? (
+        <div className={styles.sectionRow}>
+          <div className={styles.sectionTitle}>Shard Flow</div>
+          <div className={`${styles.sectionContent} ${styles.shardFlowContent}`}>
+            <div className={styles.shardFlowSummary}>
+              Logical-time order · {shardFlow.shardCount}{" "}
+              {shardFlow.shardCount === 1 ? "shard" : "shards"} · {shardFlow.transactionCount}{" "}
+              {shardFlow.transactionCount === 1 ? "transaction" : "transactions"}
+            </div>
+            <div
+              ref={shardFlowRef}
+              className={styles.shardFlow}
+              aria-label="Transactions grouped by shard"
+            >
+              {shardFlow.segments.map((segment, index) => (
+                <div
+                  className={styles.shardFlowStepGroup}
+                  key={`${segment.workchain}:${segment.shard}:${index}`}
+                >
+                  {index > 0 ? (
+                    <span className={styles.shardFlowArrow} aria-hidden="true">
+                      →
+                    </span>
+                  ) : undefined}
+                  <div
+                    ref={
+                      index === currentShardFlowSegmentIndex ? currentShardFlowStepRef : undefined
+                    }
+                    role="group"
+                    aria-label={`${segment.workchain}:${segment.shard}, ${segment.transactionCount} ${
+                      segment.transactionCount === 1 ? "transaction" : "transactions"
+                    }`}
+                    className={`${styles.shardFlowStep} ${
+                      index === currentShardFlowSegmentIndex ? styles.shardFlowStepCurrent : ""
+                    } ${onShardHoverChange ? styles.shardFlowStepInteractive : ""}`}
+                    onMouseEnter={() => onShardHoverChange?.(segment.transactionIds)}
+                    onMouseLeave={() => onShardHoverChange?.(undefined)}
+                  >
+                    <div className={styles.shardFlowShard}>
+                      <span className={styles.shardFlowDot} aria-hidden="true" />
+                      <span title={`Workchain ${segment.workchain}, shard ${segment.shard}`}>
+                        {segment.workchain}:{segment.shard}
+                      </span>
+                    </div>
+                    <div className={styles.shardFlowMeta}>
+                      <span>
+                        {segment.transactionCount}{" "}
+                        {segment.transactionCount === 1 ? "transaction" : "transactions"}
+                      </span>
+                    </div>
+                    <div className={styles.shardFlowBlocks}>
+                      <span className={styles.shardFlowBlocksLabel}>
+                        {segment.blocks.length === 1 ? "Block" : "Blocks"}
+                      </span>
+                      {segment.blocks.map(block => {
+                        const isCurrentBlock =
+                          index === currentShardFlowSegmentIndex &&
+                          isSameBlock(currentTransaction?.blockRef, block)
+                        return (
+                          <BlockChip
+                            key={`${block.workchain}:${block.shard}:${block.seqno}`}
+                            workchain={block.workchain}
+                            shard={block.shard}
+                            seqno={block.seqno}
+                            highlighted={isCurrentBlock}
+                            href={routes.blockPath(block.workchain, block.shard, block.seqno)}
+                            title={
+                              isCurrentBlock
+                                ? `Current transaction block · ${block.workchain}:${block.shard}:${block.seqno}`
+                                : undefined
+                            }
+                            onClick={event => {
+                              if (!onBlockClick) return
+                              event.preventDefault()
+                              onBlockClick(block, event)
+                            }}
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : undefined}
 
       <div className={styles.sectionRow}>
         <div className={styles.sectionTitle}>Identifiers</div>

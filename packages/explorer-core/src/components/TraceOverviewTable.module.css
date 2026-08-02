@@ -90,6 +90,114 @@
   max-width: 100%;
 }
 
+.shardFlowContent {
+  overflow: hidden;
+}
+
+.shardFlowSummary {
+  margin-bottom: var(--acton-space-2);
+  color: var(--acton-color-text-subtle);
+  font-size: 0.6875rem;
+}
+
+.shardFlow {
+  display: flex;
+  align-items: stretch;
+  gap: var(--acton-space-2);
+  overflow-x: auto;
+  padding: 2px 2px var(--acton-space-2);
+  scrollbar-width: thin;
+}
+
+.shardFlowStepGroup {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--acton-space-2);
+}
+
+.shardFlowArrow {
+  color: var(--acton-color-text-subtle);
+  font-size: 1rem;
+}
+
+.shardFlowStep {
+  display: flex;
+  min-width: 190px;
+  max-width: 260px;
+  flex-direction: column;
+  gap: var(--acton-space-1);
+  padding: var(--acton-space-2);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+  background: color-mix(in srgb, var(--acton-color-accent) 5%, var(--acton-color-surface-raised));
+  box-sizing: border-box;
+}
+
+.shardFlowStepCurrent {
+  border-color: color-mix(in srgb, var(--acton-color-accent) 55%, var(--acton-color-border));
+  background: color-mix(in srgb, var(--acton-color-accent) 10%, var(--acton-color-surface-raised));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--acton-color-accent) 8%, transparent);
+}
+
+.shardFlowStepInteractive {
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.shardFlowStepInteractive:hover {
+  border-color: var(--acton-color-accent);
+  background: color-mix(in srgb, var(--acton-color-accent) 12%, var(--acton-color-surface-raised));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--acton-color-accent) 12%, transparent);
+}
+
+.shardFlowShard {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--acton-space-1);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: 0.75rem;
+  font-weight: var(--acton-font-weight-emphasis);
+  white-space: nowrap;
+}
+
+.shardFlowDot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--acton-color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acton-color-accent) 14%, transparent);
+}
+
+.shardFlowMeta,
+.shardFlowBlocksLabel {
+  color: var(--acton-color-text-subtle);
+  font-size: 0.6875rem;
+}
+
+.shardFlowMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+}
+
+.shardFlowBlocks {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--acton-space-1);
+}
+
+.shardFlowBlocksLabel {
+  margin-right: 2px;
+}
+
 @media (max-width: 720px) {
   .sectionRow {
     flex-direction: column;
@@ -100,5 +208,9 @@
     width: 100%;
     border-right: 0;
     border-bottom: 1px solid var(--acton-color-border);
+  }
+
+  .shardFlowStep {
+    min-width: 176px;
   }
 }
