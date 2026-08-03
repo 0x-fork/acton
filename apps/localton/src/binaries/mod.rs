@@ -32,12 +32,12 @@ pub struct TonBinaries {
 impl TonBinaries {
     pub async fn resolve(layout: &Layout, override_dir: Option<PathBuf>) -> Result<Self> {
         let root = if let Some(path) = override_dir {
-            path.canonicalize().with_context(|| {
+            dunce::canonicalize(&path).with_context(|| {
                 format!("TON binary directory {} does not exist", path.display())
             })?
         } else if layout.manifest.is_file() {
             if let Some(path) = Manifest::load(&layout.manifest)?.ton_bin_dir {
-                path.canonicalize().with_context(|| {
+                dunce::canonicalize(&path).with_context(|| {
                     format!(
                         "persisted TON binary directory {} does not exist; pass --ton-bin-dir",
                         path.display()

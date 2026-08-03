@@ -365,7 +365,7 @@ pub async fn status(args: StatusArgs) -> Result<()> {
 }
 
 fn print_connection_details(manifest: &Manifest) -> Result<()> {
-    let global = manifest.global_config.canonicalize().with_context(|| {
+    let global = dunce::canonicalize(&manifest.global_config).with_context(|| {
         format!(
             "global config is missing: {}",
             manifest.global_config.display()

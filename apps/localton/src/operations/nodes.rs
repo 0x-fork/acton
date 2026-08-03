@@ -78,9 +78,7 @@ pub async fn execute(command: NodeCommand) -> Result<()> {
             settings.node_mut(&name)?.enabled = false;
             settings.save_atomic(&layout.settings)?;
             if delete_state {
-                let node_root = layout
-                    .nodes
-                    .canonicalize()
+                let node_root = dunce::canonicalize(&layout.nodes)
                     .unwrap_or_else(|_| layout.nodes.clone())
                     .join(&name);
                 ensure!(
