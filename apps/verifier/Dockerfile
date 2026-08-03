@@ -1,15 +1,13 @@
 # syntax=docker/dockerfile:1
 
-FROM node:22-bookworm-slim AS frontend-builder
+FROM oven/bun:1.3.5-slim AS frontend-builder
 
-WORKDIR /workspace/packages/verifier-ui
+WORKDIR /workspace
 
-COPY packages/verifier-ui/package.json packages/verifier-ui/package-lock.json packages/verifier-ui/.npmrc ./
-COPY packages/ui /workspace/packages/ui
-RUN npm ci
-
-COPY packages/verifier-ui ./
-RUN npm run build
+COPY package.json bun.lock ./
+COPY packages ./packages
+RUN bun install --frozen-lockfile --filter @acton/verifier-ui \
+    && bun --filter @acton/verifier-ui build
 
 FROM rust:1.96.1-slim-bookworm AS rust-builder
 

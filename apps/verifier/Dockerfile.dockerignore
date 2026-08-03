@@ -1,5 +1,8 @@
 *
 
+!package.json
+!bun.lock
+
 !apps/
 apps/*
 !apps/verifier/
@@ -17,8 +20,11 @@ apps/verifier/docker/*
 
 !packages/
 packages/*
-!packages/ui/
+!packages/*/
+packages/*/*
+!packages/*/package.json
+!packages/ui/**
 packages/ui/node_modules/
-!packages/verifier-ui/
+!packages/verifier-ui/**
 packages/verifier-ui/node_modules/
 packages/verifier-ui/dist/
