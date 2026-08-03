@@ -13,9 +13,26 @@ import {
 } from "@acton/ui"
 import {CircleAlert, RefreshCw} from "lucide-react"
 import {useCallback, useEffect, useMemo, useState} from "react"
-import {Pie, PieChart, ResponsiveContainer, Tooltip} from "recharts"
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts"
 
-import type {VerificationStatisticsResponse, VerifierApi} from "../lib/api"
+import type {
+  VerificationStatisticsHistoryItem,
+  VerificationStatisticsHistoryResponse,
+  VerificationStatisticsResponse,
+  VerifierApi,
+} from "../lib/api"
 import styles from "./StatisticsPage.module.css"
 
 interface StatisticsPageProps {
@@ -35,6 +52,23 @@ interface VersionRow {
   readonly version: string
 }
 
+interface HistoryLanguage {
+  readonly color: string
+  readonly key: string
+  readonly label: string
+}
+
+interface HistorySeries {
+  readonly cumulative: readonly HistoryPoint[]
+  readonly languages: readonly HistoryLanguage[]
+  readonly monthly: readonly HistoryPoint[]
+}
+
+interface HistoryPoint {
+  [key: string]: number
+  timestamp: number
+}
+
 const LANGUAGE_COLORS: Readonly<Record<string, string>> = {
   func: "var(--acton-color-warning)",
   tact: "var(--acton-color-accent)",
@@ -47,6 +81,22 @@ const LANGUAGE_LABELS: Readonly<Record<string, string>> = {
 }
 const FALLBACK_LANGUAGE_COLOR = "var(--acton-color-text-subtle)"
 const LEGEND_SKELETON_KEYS = ["first", "second", "third"] as const
+const MONTH_TICK_FORMATTER = new Intl.DateTimeFormat("en", {
+  month: "short",
+  timeZone: "UTC",
+  year: "2-digit",
+})
+const MONTH_TOOLTIP_FORMATTER = new Intl.DateTimeFormat("en", {
+  month: "long",
+  timeZone: "UTC",
+  year: "numeric",
+})
+const CHART_TOOLTIP_STYLE = {
+  background: "var(--acton-color-surface-raised)",
+  border: "1px solid var(--acton-color-border)",
+  borderRadius: "10px",
+  color: "var(--acton-color-text)",
+}
 
 function normalizedCount(value: number): number {
   return Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0
@@ -74,8 +124,80 @@ function formatShare(value: number, total: number): string {
   return `${share >= 10 ? share.toFixed(0) : share.toFixed(1)}%`
 }
 
+function monthStart(timestamp: number): number {
+  const date = new Date(timestamp * 1000)
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)
+}
+
+function nextMonth(timestamp: number): number {
+  const date = new Date(timestamp)
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)
+}
+
+function formatMonthTick(timestamp: number): string {
+  return MONTH_TICK_FORMATTER.format(timestamp)
+}
+
+function formatMonthTooltip(timestamp: number): string {
+  return MONTH_TOOLTIP_FORMATTER.format(timestamp)
+}
+
+function buildHistorySeries(items: readonly VerificationStatisticsHistoryItem[]): HistorySeries {
+  const monthlyCounts = new Map<number, Map<string, number>>()
+  const languageTotals = new Map<string, number>()
+
+  for (const item of items) {
+    if (!Number.isFinite(item.timestamp) || item.timestamp < 0) continue
+
+    const language = item.compiler.trim().toLowerCase() || "unknown"
+    const month = monthStart(item.timestamp)
+    const monthCounts = monthlyCounts.get(month) ?? new Map<string, number>()
+    monthCounts.set(language, (monthCounts.get(language) ?? 0) + 1)
+    monthlyCounts.set(month, monthCounts)
+    languageTotals.set(language, (languageTotals.get(language) ?? 0) + 1)
+  }
+
+  const months = [...monthlyCounts.keys()].sort((left, right) => left - right)
+  const languages = [...languageTotals.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .map(([key]) => ({
+      color: languageColor(key),
+      key,
+      label: languageLabel(key),
+    }))
+  const [firstMonth] = months
+  const lastMonth = months.at(-1)
+  if (firstMonth === undefined || lastMonth === undefined) {
+    return {cumulative: [], languages, monthly: []}
+  }
+
+  const cumulative: HistoryPoint[] = []
+  const monthly: HistoryPoint[] = []
+  const runningTotals = new Map<string, number>()
+
+  for (let timestamp = firstMonth; timestamp <= lastMonth; timestamp = nextMonth(timestamp)) {
+    const monthCounts = monthlyCounts.get(timestamp)
+    const monthlyPoint: HistoryPoint = {timestamp}
+    const cumulativePoint: HistoryPoint = {timestamp}
+
+    for (const language of languages) {
+      const count = monthCounts?.get(language.key) ?? 0
+      const cumulativeCount = (runningTotals.get(language.key) ?? 0) + count
+      runningTotals.set(language.key, cumulativeCount)
+      monthlyPoint[language.key] = count
+      cumulativePoint[language.key] = cumulativeCount
+    }
+
+    monthly.push(monthlyPoint)
+    cumulative.push(cumulativePoint)
+  }
+
+  return {cumulative, languages, monthly}
+}
+
 export function StatisticsPage({api}: StatisticsPageProps) {
   const [statistics, setStatistics] = useState<VerificationStatisticsResponse>()
+  const [history, setHistory] = useState<VerificationStatisticsHistoryResponse>()
   const [error, setError] = useState<string>()
   const [isLoading, setIsLoading] = useState(true)
 
@@ -83,13 +205,14 @@ export function StatisticsPage({api}: StatisticsPageProps) {
     setIsLoading(true)
     setError(undefined)
 
-    api
-      .fetchStatistics()
-      .then(response => {
-        setStatistics(response)
+    Promise.all([api.fetchStatistics(), api.fetchStatisticsHistory()])
+      .then(([statisticsResponse, historyResponse]) => {
+        setStatistics(statisticsResponse)
+        setHistory(historyResponse)
       })
       .catch(error => {
         setStatistics(undefined)
+        setHistory(undefined)
         setError(error instanceof Error ? error.message : String(error))
       })
       .finally(() => {
@@ -124,6 +247,7 @@ export function StatisticsPage({api}: StatisticsPageProps) {
     [statistics],
   )
   const versionCount = languages.reduce((count, language) => count + language.versions.length, 0)
+  const historySeries = useMemo(() => buildHistorySeries(history?.items ?? []), [history])
   const compilerLanguages = [...languages].sort(
     (left, right) =>
       Number(right.language.toLowerCase() === "tolk") -
@@ -203,12 +327,7 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                             isAnimationActive={false}
                           />
                           <Tooltip
-                            contentStyle={{
-                              background: "var(--acton-color-surface-raised)",
-                              border: "1px solid var(--acton-color-border)",
-                              borderRadius: "10px",
-                              color: "var(--acton-color-text)",
-                            }}
+                            contentStyle={CHART_TOOLTIP_STYLE}
                             itemStyle={{color: "var(--acton-color-text)"}}
                             formatter={value => [
                               formatCount(typeof value === "number" ? value : Number(value)),
@@ -253,6 +372,145 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                       ))}
                 </div>
               </div>
+            </div>
+          </section>
+
+          <section className={styles.historySection}>
+            <header className={styles.historyHeading}>
+              <div>
+                <h2>Verification history</h2>
+                <p>Registry growth and monthly verification activity.</p>
+              </div>
+              <span>
+                {isLoading ? "Loading" : `${formatCount(history?.items.length ?? 0)} records`}
+              </span>
+            </header>
+
+            <div className={styles.historyGrid} aria-busy={isLoading}>
+              <article className={styles.historyPanel}>
+                <header className={styles.historyPanelHeading}>
+                  <span className={styles.summaryLabel}>Registry growth</span>
+                  <h3>Cumulative verified contracts</h3>
+                </header>
+                <div className={styles.historyChart}>
+                  {isLoading ? (
+                    <Skeleton width="100%" height="100%" radius="md" />
+                  ) : historySeries.cumulative.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart
+                        accessibilityLayer
+                        data={historySeries.cumulative}
+                        margin={{top: 10, right: 8, bottom: 0, left: 0}}
+                      >
+                        <CartesianGrid
+                          vertical={false}
+                          stroke="var(--acton-color-border)"
+                          strokeDasharray="3 3"
+                        />
+                        <XAxis
+                          axisLine={false}
+                          dataKey="timestamp"
+                          minTickGap={32}
+                          tick={{fill: "var(--acton-color-text-muted)", fontSize: 12}}
+                          tickFormatter={formatMonthTick}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          allowDecimals={false}
+                          axisLine={false}
+                          tick={{fill: "var(--acton-color-text-muted)", fontSize: 12}}
+                          tickFormatter={formatCount}
+                          tickLine={false}
+                          width={46}
+                        />
+                        <Tooltip
+                          contentStyle={CHART_TOOLTIP_STYLE}
+                          itemStyle={{color: "var(--acton-color-text)"}}
+                          labelFormatter={value => formatMonthTooltip(Number(value))}
+                          formatter={(value, name) => [formatCount(Number(value)), name]}
+                        />
+                        {historySeries.languages.map(language => (
+                          <Area
+                            key={language.key}
+                            dataKey={language.key}
+                            fill={language.color}
+                            fillOpacity={0.16}
+                            isAnimationActive={false}
+                            name={language.label}
+                            stackId="contracts"
+                            stroke={language.color}
+                            strokeWidth={2}
+                            type="monotone"
+                          />
+                        ))}
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <span className={styles.historyEmpty}>No verification history indexed yet</span>
+                  )}
+                </div>
+              </article>
+
+              <article className={styles.historyPanel}>
+                <header className={styles.historyPanelHeading}>
+                  <span className={styles.summaryLabel}>Monthly activity</span>
+                  <h3>Verifications by month</h3>
+                </header>
+                <div className={styles.historyChart}>
+                  {isLoading ? (
+                    <Skeleton width="100%" height="100%" radius="md" />
+                  ) : historySeries.monthly.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        accessibilityLayer
+                        data={historySeries.monthly}
+                        margin={{top: 10, right: 8, bottom: 0, left: 0}}
+                      >
+                        <CartesianGrid
+                          vertical={false}
+                          stroke="var(--acton-color-border)"
+                          strokeDasharray="3 3"
+                        />
+                        <XAxis
+                          axisLine={false}
+                          dataKey="timestamp"
+                          minTickGap={32}
+                          tick={{fill: "var(--acton-color-text-muted)", fontSize: 12}}
+                          tickFormatter={formatMonthTick}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          allowDecimals={false}
+                          axisLine={false}
+                          tick={{fill: "var(--acton-color-text-muted)", fontSize: 12}}
+                          tickFormatter={formatCount}
+                          tickLine={false}
+                          width={46}
+                        />
+                        <Tooltip
+                          contentStyle={CHART_TOOLTIP_STYLE}
+                          cursor={{fill: "var(--acton-color-surface-hover)"}}
+                          itemStyle={{color: "var(--acton-color-text)"}}
+                          labelFormatter={value => formatMonthTooltip(Number(value))}
+                          formatter={(value, name) => [formatCount(Number(value)), name]}
+                        />
+                        {historySeries.languages.map(language => (
+                          <Bar
+                            key={language.key}
+                            dataKey={language.key}
+                            fill={language.color}
+                            isAnimationActive={false}
+                            name={language.label}
+                            stackId="contracts"
+                          />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <span className={styles.historyEmpty}>No verification history indexed yet</span>
+                  )}
+                </div>
+              </article>
             </div>
           </section>
 

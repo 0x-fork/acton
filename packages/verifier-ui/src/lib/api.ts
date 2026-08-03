@@ -63,6 +63,16 @@ export interface VerificationVersionStatistics {
   readonly total: number
 }
 
+export interface VerificationStatisticsHistoryResponse {
+  readonly items: readonly VerificationStatisticsHistoryItem[]
+}
+
+export interface VerificationStatisticsHistoryItem {
+  readonly timestamp: number
+  readonly compiler: string
+  readonly version: string
+}
+
 export class ApiRequestError extends Error {
   readonly status: number
 
@@ -76,6 +86,7 @@ export class ApiRequestError extends Error {
 export interface VerifierApi {
   readonly fetchLastVerified: (limit?: number, offset?: number) => Promise<LastVerifiedResponse>
   readonly fetchStatistics: () => Promise<VerificationStatisticsResponse>
+  readonly fetchStatisticsHistory: () => Promise<VerificationStatisticsHistoryResponse>
   readonly fetchVerificationSource: (target: LookupTarget) => Promise<VerificationSourceResponse>
 }
 
@@ -120,6 +131,9 @@ export function createVerifierApi({
     },
     fetchStatistics() {
       return request<VerificationStatisticsResponse>("/statistics")
+    },
+    fetchStatisticsHistory() {
+      return request<VerificationStatisticsHistoryResponse>("/statistics/history")
     },
     fetchVerificationSource(target) {
       return request<VerificationSourceResponse>(

@@ -168,6 +168,80 @@
   gap: 14px;
 }
 
+.historySection {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.historyHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 6px 2px 0;
+}
+
+.historyHeading h2,
+.historyPanelHeading h3 {
+  margin: 0;
+  color: var(--acton-color-text);
+}
+
+.historyHeading h2 {
+  font-size: 1.25rem;
+  font-weight: var(--acton-font-weight-bold);
+  line-height: 28px;
+}
+
+.historyHeading p {
+  margin: 3px 0 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  line-height: 20px;
+}
+
+.historyHeading > span {
+  padding-bottom: 3px;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.historyGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.historyPanel {
+  min-width: 0;
+  padding: 22px 22px 18px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 14px;
+  background: var(--acton-color-surface-raised);
+}
+
+.historyPanelHeading h3 {
+  margin-top: 3px;
+  font-size: var(--acton-font-size-md);
+  font-weight: var(--acton-font-weight-bold);
+  line-height: 24px;
+}
+
+.historyChart {
+  display: grid;
+  height: 280px;
+  margin-top: 16px;
+  place-items: center;
+}
+
+.historyEmpty {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-sm);
+}
+
 .compilerHeading {
   display: flex;
   align-items: flex-end;
@@ -264,6 +338,10 @@
     border-right: 0;
     border-bottom: 1px solid var(--acton-color-border);
   }
+
+  .historyGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -309,5 +387,19 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 2px;
+  }
+
+  .historyHeading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .historyPanel {
+    padding: 20px 16px 16px;
+  }
+
+  .historyChart {
+    height: 240px;
   }
 }
