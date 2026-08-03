@@ -7,8 +7,9 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 use crate::{
-    compilers::CompilerError, registry::RegistryError, source_bundle::SourceBundleError,
-    source_storage::SourceStorageError, verification::VerificationError,
+    compilers::CompilerError, registry::RegistryError, registry_index::VerificationIndexError,
+    source_bundle::SourceBundleError, source_storage::SourceStorageError,
+    verification::VerificationError,
 };
 
 const INTERNAL_ERROR_MESSAGE: &str = "internal verifier error";
@@ -85,7 +86,13 @@ impl From<CompilerError> for ApiError {
 
 impl From<RegistryError> for ApiError {
     fn from(err: RegistryError) -> Self {
-        Self::bad_gateway(err.to_string())
+        match err {
+            RegistryError::SourceStorage(err)
+            | RegistryError::VerificationIndex(VerificationIndexError::SourceStorage(err)) => {
+                Self::from(err)
+            }
+            err => Self::bad_gateway(err.to_string()),
+        }
     }
 }
 
@@ -169,6 +176,28 @@ mod tests {
                 command: format!("git show https://user:{secret}@example.com/repository.git"),
                 source: invalid_utf8,
             },
+        ];
+
+        for error in errors {
+            let response = ApiError::from(error).into_response();
+            assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+            let body = response_body(response).await;
+            assert_eq!(body, r#"{"error":"internal verifier error"}"#);
+            assert!(!body.contains(secret));
+        }
+    }
+
+    #[tokio::test]
+    async fn wrapped_git_error_details_are_not_returned_to_client() {
+        let secret = "secret-token";
+        let git_error = || SourceStorageError::Git {
+            command: format!("git push https://user:{secret}@example.com/repository.git main"),
+            status: "exit status: 1".to_owned(),
+            stderr: "authentication failed".to_owned(),
+        };
+        let errors = [
+            RegistryError::SourceStorage(git_error()),
+            RegistryError::VerificationIndex(VerificationIndexError::SourceStorage(git_error())),
         ];
 
         for error in errors {
