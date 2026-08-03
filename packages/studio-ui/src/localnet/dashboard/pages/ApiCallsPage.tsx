@@ -18,13 +18,17 @@ import {
 import {Fragment, useCallback, useEffect, useMemo, useState} from "react"
 import type {FC} from "react"
 
-import type {TonClient} from "@acton/explorer-core/api/client"
-import type {ApiCallRecord, ApiCallStatus, ApiCallType} from "@acton/explorer-core/api/types"
+import {
+  fetchStudioApiCalls,
+  type ApiCallRecord,
+  type ApiCallStatus,
+  type ApiCallType,
+} from "../../../studioApi"
 
 import styles from "../DashboardPage.module.css"
 
 interface ApiCallsPageProps {
-  readonly client: TonClient
+  readonly environmentId: string
 }
 
 type StatusFilter = Readonly<Record<ApiCallStatus, boolean>>
@@ -46,7 +50,7 @@ const CALLS_PER_PAGE_STORAGE_KEY = "acton-studio.api-calls-per-page"
 const NANOSECONDS_PER_MICROSECOND = 1000
 const NANOSECONDS_PER_MILLISECOND = NANOSECONDS_PER_MICROSECOND * 1000
 
-export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
+export const ApiCallsPage: FC<ApiCallsPageProps> = ({environmentId}) => {
   const [calls, setCalls] = useState<readonly ApiCallRecord[]>([])
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(DEFAULT_STATUS_FILTER)
   const [callTypeFilter, setCallTypeFilter] = useState<CallTypeFilter>(DEFAULT_CALL_TYPE_FILTER)
@@ -69,7 +73,7 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
       setError(undefined)
 
       try {
-        const response = await client.getApiCalls()
+        const response = await fetchStudioApiCalls(environmentId)
         setCalls(response.calls)
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Failed to load API calls")
@@ -78,7 +82,7 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
         setIsRefreshing(false)
       }
     },
-    [client],
+    [environmentId],
   )
 
   useEffect(() => {
@@ -263,8 +267,14 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
                     paginatedCalls.map(call => {
                       const expanded = expandedCalls.has(call.sequence)
                       const queryParams = formatRequestData(call.query_params)
-                      const requestBody = formatRequestData(call.request_body)
-                      const responseBody = formatRequestData(call.response_body)
+                      const requestBody = formatRequestData(
+                        call.request_body,
+                        call.request_body_truncated,
+                      )
+                      const responseBody = formatRequestData(
+                        call.response_body,
+                        call.response_body_truncated,
+                      )
                       return (
                         <Fragment key={call.sequence}>
                           <DataTableRow
@@ -514,9 +524,13 @@ function formatDurationValue(value: number): string {
   })
 }
 
-function formatRequestData(data: unknown | null): string | undefined {
+function formatRequestData(data: unknown | null, truncated = false): string | undefined {
   if (data === null || data === undefined) {
     return undefined
+  }
+
+  if (truncated && typeof data === "string") {
+    return data
   }
 
   return JSON.stringify(data, null, 2)

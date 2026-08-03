@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex as StdMutex};
 
 use axum::Router;
 use axum::body::Body;
-use axum::extract::{Path as AxumPath, Request, State};
+use axum::extract::{Path as AxumPath, Query, Request, State};
 #[cfg(not(debug_assertions))]
 use axum::http::Uri;
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
@@ -21,6 +21,7 @@ use ton::ton_core::types::TonAddress;
 #[cfg(debug_assertions)]
 use tower_http::services::{ServeDir, ServeFile};
 
+mod api_calls;
 mod contract_facade;
 mod contract_registry;
 mod contract_source_artifact;
@@ -37,6 +38,9 @@ mod test_run;
 mod test_runtime;
 mod wallet;
 
+pub use api_calls::{
+    ApiCallFamily, ApiCallLogSnapshot, ApiCallRecord, ApiCallSource, ApiCallStatus, ApiCallType,
+};
 pub use contract_registry::ContractRegistryStore;
 pub use contract_source_artifact::{
     CONTRACT_SOURCE_HISTORY_PATH, ContractSourceArtifact, ContractSourceArtifactError,
@@ -197,6 +201,7 @@ impl PublicToncenterApiKeys {
 pub struct StudioServer {
     config: StudioServerConfig,
     contract_registry: ContractRegistryStore,
+    api_calls: api_calls::ApiCallLog,
     environment_runtime: Arc<dyn EnvironmentRuntime>,
     test_run_runtime: Arc<dyn TestRunRuntime>,
     wallet_runtime: Arc<dyn WalletRuntime>,
@@ -210,6 +215,7 @@ impl StudioServer {
         Self {
             config,
             contract_registry: ContractRegistryStore::ephemeral(),
+            api_calls: api_calls::ApiCallLog::default(),
             environment_runtime: Arc::new(environment_catalog::EnvironmentCatalogRuntime::new(
                 managed_environment_runtime,
             )),
@@ -273,6 +279,7 @@ impl StudioServer {
                     }),
             },
             contract_registry: self.contract_registry.clone(),
+            api_calls: self.api_calls.clone(),
             environment_runtime: Arc::clone(&self.environment_runtime),
             test_run_runtime: Arc::clone(&self.test_run_runtime),
             wallet_runtime: Arc::clone(&self.wallet_runtime),
@@ -305,6 +312,10 @@ impl StudioServer {
             .route(
                 "/environments/{environment_id}/wallets/{wallet_name}/sign",
                 post(sign_wallet),
+            )
+            .route(
+                "/environments/{environment_id}/api-calls",
+                get(get_environment_api_calls),
             )
             .route(
                 "/environments/{environment_id}/rpc",
@@ -364,6 +375,7 @@ impl StudioServer {
 pub(crate) struct StudioState {
     info: StudioInfo,
     contract_registry: ContractRegistryStore,
+    api_calls: api_calls::ApiCallLog,
     environment_runtime: Arc<dyn EnvironmentRuntime>,
     test_run_runtime: Arc<dyn TestRunRuntime>,
     wallet_runtime: Arc<dyn WalletRuntime>,
@@ -531,8 +543,9 @@ async fn delete_environment(
         .environment_runtime
         .delete(&environment_id)
         .await
-        .map(|()| StatusCode::NO_CONTENT)
-        .map_err(StudioApiError)
+        .map_err(StudioApiError)?;
+    state.api_calls.remove(&environment_id);
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[utoipa::path(
@@ -665,6 +678,33 @@ async fn sign_wallet(
         .map_err(WalletApiError::Wallet)
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/api-calls",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("limit" = Option<usize>, Query, description = "Maximum number of retained calls to return")
+    ),
+    responses(
+        (status = 200, description = "API calls observed through the Studio environment proxy", body = ApiCallLogSnapshot),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environment RPC"
+)]
+async fn get_environment_api_calls(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+    Query(query): Query<api_calls::GetApiCallsQuery>,
+) -> Result<Json<ApiCallLogSnapshot>, StudioApiError> {
+    state
+        .environment_runtime
+        .get(&environment_id)
+        .await
+        .map_err(StudioApiError)?;
+    Ok(Json(state.api_calls.snapshot(&environment_id, query.limit)))
+}
+
 async fn wallet_environment(
     state: &StudioState,
     environment_id: &str,
@@ -724,29 +764,43 @@ async fn proxy_environment_rpc_root(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
     request: Request,
-) -> Result<Response, StudioApiError> {
-    proxy_environment_request(state, environment_id, String::new(), request).await
+) -> Response {
+    proxy_environment_request_with_capture(state, environment_id, String::new(), request).await
 }
 
 async fn proxy_environment_rpc(
     State(state): State<StudioState>,
     AxumPath((environment_id, path)): AxumPath<(String, String)>,
     request: Request,
-) -> Result<Response, StudioApiError> {
-    proxy_environment_request(state, environment_id, path, request).await
+) -> Response {
+    proxy_environment_request_with_capture(state, environment_id, path, request).await
 }
 
-async fn proxy_environment_request(
+async fn proxy_environment_request_with_capture(
     state: StudioState,
     environment_id: String,
     path: String,
     request: Request,
-) -> Result<Response, StudioApiError> {
-    let environment = state
-        .environment_runtime
-        .get(&environment_id)
+) -> Response {
+    let environment = match state.environment_runtime.get(&environment_id).await {
+        Ok(environment) => environment,
+        Err(error) => return StudioApiError(error).into_response(),
+    };
+    let (request, capture) = state
+        .api_calls
+        .capture(environment_id.clone(), path.clone(), request);
+    let response = proxy_environment_request(state, environment, path, request)
         .await
-        .map_err(StudioApiError)?;
+        .into_response();
+    capture.finish(response)
+}
+
+async fn proxy_environment_request(
+    state: StudioState,
+    environment: StudioEnvironment,
+    path: String,
+    request: Request,
+) -> Result<Response, StudioApiError> {
     if environment.status != EnvironmentStatus::Running {
         return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
             code: "environment_not_running",
@@ -907,7 +961,6 @@ fn is_safe_external_request_header(name: &HeaderName) -> bool {
     matches!(
         name.as_str(),
         "accept"
-            | "accept-encoding"
             | "cache-control"
             | "content-encoding"
             | "content-length"
@@ -927,7 +980,10 @@ fn should_forward_upstream_request_header(name: &HeaderName, is_public_toncenter
     if is_public_toncenter {
         return is_safe_external_request_header(name);
     }
-    !is_hop_by_hop_header(name) && name != axum::http::header::HOST
+    !is_hop_by_hop_header(name)
+        && name != axum::http::header::HOST
+        && name != axum::http::header::ACCEPT_ENCODING
+        && name.as_str() != api_calls::REQUEST_SOURCE_HEADER
 }
 
 fn should_forward_upstream_response_header(name: &HeaderName, is_public_toncenter: bool) -> bool {
@@ -1368,6 +1424,7 @@ referer: <missing>
 cf-access-jwt-assertion: <missing>
 marker: <missing>
 accept: application/json
+accept-encoding: <missing>
 content-type: application/json
 content-length: 12
 content-encoding: gzip
@@ -1388,6 +1445,7 @@ referer: https://studio.example/testnet
 cf-access-jwt-assertion: cloudflare-access-token
 marker: forwarded
 accept: application/json
+accept-encoding: <missing>
 content-type: application/json
 content-length: 12
 content-encoding: gzip
@@ -1579,6 +1637,7 @@ not json: false"]]
             ("cf-access-jwt-assertion", "cf-access-jwt-assertion"),
             ("marker", "x-test-marker"),
             ("accept", "accept"),
+            ("accept-encoding", "accept-encoding"),
             ("content-type", "content-type"),
             ("content-length", "content-length"),
             ("content-encoding", "content-encoding"),

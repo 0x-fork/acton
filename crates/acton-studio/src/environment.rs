@@ -251,6 +251,7 @@ impl EnvironmentConfig {
                 EnvironmentCapability::Wallets,
                 EnvironmentCapability::Simulator,
                 EnvironmentCapability::Contracts,
+                EnvironmentCapability::ApiCalls,
             ],
             Self::RemoteTonNetwork { .. } => vec![
                 EnvironmentCapability::ApiV2,
@@ -260,6 +261,7 @@ impl EnvironmentConfig {
                 EnvironmentCapability::Wallets,
                 EnvironmentCapability::Simulator,
                 EnvironmentCapability::Contracts,
+                EnvironmentCapability::ApiCalls,
             ],
         }
     }

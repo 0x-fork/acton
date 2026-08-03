@@ -488,7 +488,11 @@ const AppContent: FC<AppContentProps> = ({
                 "apiCalls",
                 <DashboardPage>
                   <RouteSuspense>
-                    <ApiCallsPage client={client} />
+                    {runtime.environment ? (
+                      <ApiCallsPage environmentId={runtime.environment.id} />
+                    ) : (
+                      fallback
+                    )}
                   </RouteSuspense>
                 </DashboardPage>,
               )}

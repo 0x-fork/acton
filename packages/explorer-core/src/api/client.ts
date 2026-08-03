@@ -12,7 +12,6 @@ import type {
   AccountStateTokenInfo,
   AccountStatesResponse,
   ApiResponse,
-  ApiCallLogResponse,
   BuildSourceTraceRequest,
   JettonMaster,
   JettonMasterMetadata,
@@ -1135,12 +1134,6 @@ export class TonClient {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({address}),
     })
-  }
-
-  async getApiCalls(limit = 1200): Promise<ApiCallLogResponse> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getApiCalls")
-    url.searchParams.append("limit", limit.toString())
-    return this.request(url, "Failed to fetch API calls")
   }
 
   async setAddressName(address: string, name: string): Promise<void> {

@@ -1449,78 +1449,6 @@ fn localnet_auto_mining_fork_keeps_running_after_remote_account_fetch() {
 }
 
 #[test]
-fn localnet_records_api_calls_for_dashboard() {
-    let project = ProjectBuilder::new("localnet-api-calls-dashboard").build();
-    let node = project.localnet().start();
-
-    let mut initial_log = node.get_json("/acton_getApiCalls");
-    normalize_api_calls_for_snapshot(&mut initial_log);
-
-    let _startup_accounts = node.get_json("/acton_getStartupAccounts");
-    let _admin_status = node.get_json("/acton_nodeInfo");
-    let _v2_status = node.get_json("/api/v2/getMasterchainInfo?archival=true&limit=2");
-    Client::new()
-        .get(format!("{}/api/v2/getMasterchainInfo", node.base_url()))
-        .header("X-Acton-Request-Source", "studio-ui")
-        .send()
-        .expect("Studio UI request must be sent")
-        .error_for_status()
-        .expect("Studio UI request must succeed");
-    let _successful_rpc = node.post_json(
-        "/api/v2/jsonRPC",
-        &json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "getMasterchainInfo",
-            "params": {}
-        }),
-    );
-    let (failed_status, _failed_rpc) = node.post_json_with_status(
-        "/api/v2/jsonRPC",
-        &json!({
-            "jsonrpc": "2.0",
-            "id": "missing",
-            "method": "missingMethod",
-            "params": {}
-        }),
-    );
-    let (_write_status, _write_rpc) = node.post_json_with_status(
-        "/api/v2/jsonRPC",
-        &json!({
-            "jsonrpc": "2.0",
-            "id": "write",
-            "method": "sendBoc",
-            "params": {
-                "boc": "invalid"
-            }
-        }),
-    );
-    let (_estimate_status, _estimate_response) = node.post_json_with_status(
-        "/api/v3/estimateFee",
-        &json!({
-            "address": "invalid",
-            "body": "invalid"
-        }),
-    );
-
-    let mut logged_calls = node.get_json("/acton_getApiCalls?limit=10");
-    normalize_api_calls_for_snapshot(&mut logged_calls);
-
-    let snapshot = json!({
-        "initial_log": initial_log,
-        "failed_status": failed_status,
-        "logged_calls": logged_calls,
-    });
-
-    assertion().eq(
-        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
-        snapbox::file!("snapshots/localnet/test_localnet_api_calls_dashboard.response.json"),
-    );
-
-    node.stop();
-}
-
-#[test]
 fn localnet_serves_get_shard_account_cell_for_empty_account() {
     let project = ProjectBuilder::new("localnet-shard-account-cell-empty").build();
     let node = project.localnet().start();
@@ -8219,50 +8147,6 @@ fn normalize_out_msg_queue_size_for_snapshot(response: &mut Value) {
                 }
             }
         }
-    }
-}
-
-fn normalize_api_calls_for_snapshot(response: &mut Value) {
-    normalize_extra_for_snapshot(response);
-
-    if let Some(calls) = response
-        .pointer_mut("/result/calls")
-        .and_then(Value::as_array_mut)
-    {
-        for call in calls {
-            if let Some(timestamp_ms) = call.get_mut("timestamp_ms") {
-                *timestamp_ms = json!("[TIMESTAMP_MS]");
-            }
-            if let Some(duration_ms) = call.get_mut("duration_ms") {
-                *duration_ms = json!("[DURATION_MS]");
-            }
-            if let Some(duration_ns) = call.get_mut("duration_ns") {
-                *duration_ns = json!("[DURATION_NS]");
-            }
-            if let Some(response_body) = call.get_mut("response_body") {
-                normalize_nested_extra_for_snapshot(response_body);
-            }
-        }
-    }
-}
-
-fn normalize_nested_extra_for_snapshot(value: &mut Value) {
-    match value {
-        Value::Array(items) => {
-            for item in items {
-                normalize_nested_extra_for_snapshot(item);
-            }
-        }
-        Value::Object(map) => {
-            for (key, inner) in map {
-                if key == "@extra" {
-                    *inner = json!("[EXTRA]");
-                } else {
-                    normalize_nested_extra_for_snapshot(inner);
-                }
-            }
-        }
-        _ => {}
     }
 }
 
