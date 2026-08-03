@@ -2,15 +2,16 @@ use std::future::Future;
 use std::pin::Pin;
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateEnvironmentRequest {
     pub name: String,
     pub config: CreateEnvironmentConfig,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",
@@ -39,13 +40,13 @@ pub enum CreateEnvironmentConfig {
     },
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateEnvironmentRequest {
     pub name: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",
@@ -74,14 +75,14 @@ pub enum EnvironmentConfig {
     },
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum PublicTonNetwork {
     Testnet,
     Mainnet,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum EnvironmentCapability {
     ApiV2,
@@ -101,7 +102,7 @@ pub enum EnvironmentCapability {
     Checkpoints,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentEndpoints {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -112,7 +113,7 @@ pub struct EnvironmentEndpoints {
     pub control: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentNetwork {
     pub id: String,
@@ -121,7 +122,7 @@ pub struct EnvironmentNetwork {
     pub test_only: bool,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum EnvironmentStatus {
     Starting,
@@ -131,14 +132,14 @@ pub enum EnvironmentStatus {
     Failed,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum EnvironmentLifecycle {
     Managed,
     External,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StudioEnvironment {
     pub id: String,
@@ -151,6 +152,7 @@ pub struct StudioEnvironment {
     pub endpoints: EnvironmentEndpoints,
     pub network: EnvironmentNetwork,
     #[serde(skip)]
+    #[schema(ignore)]
     pub runtime_endpoints: EnvironmentEndpoints,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,

@@ -227,6 +227,7 @@ dependencies = [
  "tracing",
  "url",
  "urlencoding",
+ "utoipa",
  "uuid",
  "xxhash-rust",
 ]

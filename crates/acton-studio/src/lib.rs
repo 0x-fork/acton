@@ -31,6 +31,7 @@ mod full_ton_network;
 mod local_artifacts;
 mod local_process;
 mod local_test_process;
+mod openapi;
 mod test_api;
 mod test_run;
 mod test_runtime;
@@ -52,6 +53,7 @@ pub use environment_catalog::{
 };
 pub use local_process::LocalProcessEnvironmentRuntime;
 pub use local_test_process::LocalProcessTestRunRuntime;
+pub use openapi::openapi;
 pub use test_run::{
     STUDIO_TEST_RUN_FORMAT_VERSION, STUDIO_TEST_RUNS_PATH, StartTestRunRequest,
     StudioDaemonDescriptor, StudioTestDuration, StudioTestExecutionLogs, StudioTestReport,
@@ -73,6 +75,7 @@ pub const STUDIO_API_VERSION: u32 = 1;
 pub const STUDIO_ENVIRONMENTS_PATH: &str = "/api/v1/environments";
 pub const STUDIO_HEALTH_PATH: &str = "/api/v1/health";
 pub const STUDIO_INFO_PATH: &str = "/api/v1/info";
+pub const STUDIO_OPENAPI_PATH: &str = "/api/v1/openapi.json";
 pub const STUDIO_WALLETS_PATH_SUFFIX: &str = "/wallets";
 
 const MAX_DEPLOYMENT_SUBMISSION_BODY_BYTES: usize = 4 * 1024 * 1024;
@@ -277,6 +280,7 @@ impl StudioServer {
             toncenter_api_keys: self.config.toncenter_api_keys.clone(),
         };
         let api = Router::new()
+            .route("/openapi.json", get(openapi::handler))
             .route("/health", get(health))
             .route("/info", get(info))
             .route(
@@ -367,7 +371,7 @@ pub(crate) struct StudioState {
     toncenter_api_keys: PublicToncenterApiKeys,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StudioInfo {
     pub protocol_version: u32,
@@ -375,7 +379,7 @@ pub struct StudioInfo {
     pub workspace: Option<WorkspaceInfo>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceInfo {
     pub name: String,
@@ -393,14 +397,35 @@ pub enum StudioServerError {
     TestRunShutdown { source: TestRunRuntimeError },
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/health",
+    responses((status = 204, description = "Studio is ready")),
+    tag = "system"
+)]
 async fn health() -> StatusCode {
     StatusCode::NO_CONTENT
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/info",
+    responses((status = 200, description = "Studio server information", body = StudioInfo)),
+    tag = "system"
+)]
 async fn info(State(state): State<StudioState>) -> Json<StudioInfo> {
     Json(state.info)
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments",
+    responses(
+        (status = 200, description = "Available environments", body = [StudioEnvironment]),
+        (status = 500, description = "Failed to list environments", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn list_environments(
     State(state): State<StudioState>,
 ) -> Result<Json<Vec<StudioEnvironment>>, StudioApiError> {
@@ -412,6 +437,18 @@ async fn list_environments(
         .map_err(StudioApiError)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments",
+    request_body = CreateEnvironmentRequest,
+    responses(
+        (status = 201, description = "Environment created", body = StudioEnvironment),
+        (status = 400, description = "Invalid environment configuration", body = StudioApiErrorBody),
+        (status = 409, description = "Environment conflicts with existing state", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to create the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn create_environment(
     State(state): State<StudioState>,
     Json(request): Json<CreateEnvironmentRequest>,
@@ -424,6 +461,17 @@ async fn create_environment(
         .map_err(StudioApiError)
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 200, description = "Environment details", body = StudioEnvironment),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn get_environment(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
@@ -436,6 +484,20 @@ async fn get_environment(
         .map_err(StudioApiError)
 }
 
+#[utoipa::path(
+    patch,
+    path = "/api/v1/environments/{environment_id}",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    request_body = UpdateEnvironmentRequest,
+    responses(
+        (status = 200, description = "Environment updated", body = StudioEnvironment),
+        (status = 400, description = "Invalid update", body = StudioApiErrorBody),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment cannot be updated in its current state", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to update the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn update_environment(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
@@ -449,6 +511,18 @@ async fn update_environment(
         .map_err(StudioApiError)
 }
 
+#[utoipa::path(
+    delete,
+    path = "/api/v1/environments/{environment_id}",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 204, description = "Environment deleted"),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment cannot be deleted in its current state", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to delete the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn delete_environment(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
@@ -461,6 +535,18 @@ async fn delete_environment(
         .map_err(StudioApiError)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/stop",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 200, description = "Environment stopped", body = StudioEnvironment),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment cannot be stopped in its current state", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to stop the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn stop_environment(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
@@ -473,6 +559,18 @@ async fn stop_environment(
         .map_err(StudioApiError)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/restart",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 200, description = "Environment restarted", body = StudioEnvironment),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment cannot be restarted in its current state", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to restart the environment", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
 async fn restart_environment(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
@@ -485,6 +583,19 @@ async fn restart_environment(
         .map_err(StudioApiError)
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/wallets",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 200, description = "Environment wallets", body = [StudioWallet]),
+        (status = 400, description = "Wallets are not available", body = StudioApiErrorBody),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment is not running", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to list wallets", body = StudioApiErrorBody)
+    ),
+    tag = "wallets"
+)]
 async fn list_wallets(
     State(state): State<StudioState>,
     AxumPath(environment_id): AxumPath<String>,
@@ -498,6 +609,23 @@ async fn list_wallets(
         .map_err(WalletApiError::Wallet)
 }
 
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/wallets/{wallet_name}/sign",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("wallet_name" = String, Path, description = "Wallet name")
+    ),
+    request_body = SignWalletRequest,
+    responses(
+        (status = 200, description = "Signature", body = SignWalletResponse),
+        (status = 400, description = "Invalid signing request", body = StudioApiErrorBody),
+        (status = 404, description = "Environment or wallet not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment is not running", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to sign the payload", body = StudioApiErrorBody)
+    ),
+    tag = "wallets"
+)]
 async fn sign_wallet(
     State(state): State<StudioState>,
     AxumPath((environment_id, wallet_name)): AxumPath<(String, String)>,
@@ -1018,15 +1146,15 @@ enum WalletApiError {
     Wallet(WalletRuntimeError),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct StudioApiErrorBody {
-    error: StudioApiErrorDetails,
+    pub(crate) error: StudioApiErrorDetails,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 struct StudioApiErrorDetails {
-    code: &'static str,
-    message: String,
+    pub(crate) code: &'static str,
+    pub(crate) message: String,
 }
 
 impl IntoResponse for StudioApiError {
