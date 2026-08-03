@@ -104,12 +104,7 @@ impl From<SourceBundleError> for ApiError {
 
 impl From<SourceStorageError> for ApiError {
     fn from(err: SourceStorageError) -> Self {
-        let should_hide_message = matches!(
-            &err,
-            SourceStorageError::Git { .. }
-                | SourceStorageError::GitSpawn { .. }
-                | SourceStorageError::GitOutputUtf8 { .. }
-        );
+        let should_hide_message = should_hide_source_storage_message(&err);
         let message = err.to_string();
 
         if should_hide_message {
@@ -117,6 +112,20 @@ impl From<SourceStorageError> for ApiError {
         } else {
             Self::bad_gateway(message)
         }
+    }
+}
+
+fn should_hide_source_storage_message(err: &SourceStorageError) -> bool {
+    match err {
+        SourceStorageError::Git { .. }
+        | SourceStorageError::GitSpawn { .. }
+        | SourceStorageError::GitOutputUtf8 { .. } => true,
+        SourceStorageError::UnpreparedSourceRepository { message, .. } => {
+            message.starts_with("git command failed:")
+                || message.starts_with("failed to spawn git command ")
+                || message.starts_with("git output was not valid UTF-8 for ")
+        }
+        _ => false,
     }
 }
 
@@ -144,11 +153,54 @@ pub struct ErrorResponse {
 
 #[cfg(test)]
 mod tests {
-    use std::io;
+    use std::{
+        io::{self, Write},
+        path::PathBuf,
+        sync::{Arc, Mutex},
+    };
 
     use axum::body::{Body, to_bytes};
+    use tracing_subscriber::fmt::MakeWriter;
 
     use super::*;
+
+    #[derive(Clone, Default)]
+    struct LogBuffer(Arc<Mutex<Vec<u8>>>);
+
+    struct LogWriter(Arc<Mutex<Vec<u8>>>);
+
+    impl Write for LogWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.0
+                .lock()
+                .expect("log buffer mutex should not be poisoned")
+                .write(bytes)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl<'a> MakeWriter<'a> for LogBuffer {
+        type Writer = LogWriter;
+
+        fn make_writer(&'a self) -> Self::Writer {
+            LogWriter(Arc::clone(&self.0))
+        }
+    }
+
+    impl LogBuffer {
+        fn content(&self) -> String {
+            String::from_utf8(
+                self.0
+                    .lock()
+                    .expect("log buffer mutex should not be poisoned")
+                    .clone(),
+            )
+            .expect("log output should be UTF-8")
+        }
+    }
 
     async fn response_body(response: Response<Body>) -> String {
         let bytes = to_bytes(response.into_body(), usize::MAX)
@@ -157,12 +209,10 @@ mod tests {
         String::from_utf8(bytes.to_vec()).expect("response body should be UTF-8")
     }
 
-    #[tokio::test]
-    async fn git_error_details_are_not_returned_to_client() {
-        let secret = "secret-token";
+    fn git_errors(secret: &str) -> [SourceStorageError; 3] {
         let invalid_utf8 =
             String::from_utf8(vec![0xff]).expect_err("invalid UTF-8 fixture should fail to decode");
-        let errors = [
+        [
             SourceStorageError::Git {
                 command: format!("git push https://user:{secret}@example.com/repository.git main"),
                 status: "exit status: 1".to_owned(),
@@ -170,21 +220,56 @@ mod tests {
             },
             SourceStorageError::GitSpawn {
                 command: format!("git push https://user:{secret}@example.com/repository.git main"),
-                source: io::Error::other(secret),
+                source: io::Error::other(secret.to_owned()),
             },
             SourceStorageError::GitOutputUtf8 {
                 command: format!("git show https://user:{secret}@example.com/repository.git"),
                 source: invalid_utf8,
             },
-        ];
+        ]
+    }
 
-        for error in errors {
+    #[tokio::test]
+    async fn git_error_details_are_not_returned_to_client() {
+        let secret = "secret-token";
+
+        for error in git_errors(secret) {
             let response = ApiError::from(error).into_response();
             assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
             let body = response_body(response).await;
             assert_eq!(body, r#"{"error":"internal verifier error"}"#);
             assert!(!body.contains(secret));
         }
+    }
+
+    #[tokio::test]
+    async fn stringified_git_error_details_are_not_returned_to_client() {
+        let secret = "secret-token";
+
+        for error in git_errors(secret) {
+            let error = SourceStorageError::UnpreparedSourceRepository {
+                path: PathBuf::from("source-repository"),
+                message: error.to_string(),
+            };
+            let response = ApiError::from(error).into_response();
+            assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+            let body = response_body(response).await;
+            assert_eq!(body, r#"{"error":"internal verifier error"}"#);
+            assert!(!body.contains(secret));
+        }
+    }
+
+    #[tokio::test]
+    async fn ordinary_unprepared_repository_message_is_returned_to_client() {
+        let message = "root commit must contain only `.gitattributes`";
+        let error = SourceStorageError::UnpreparedSourceRepository {
+            path: PathBuf::from("source-repository"),
+            message: message.to_owned(),
+        };
+        let response = ApiError::from(error).into_response();
+
+        assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+        assert!(response_body(response).await.contains(message));
     }
 
     #[tokio::test]
@@ -207,5 +292,34 @@ mod tests {
             assert_eq!(body, r#"{"error":"internal verifier error"}"#);
             assert!(!body.contains(secret));
         }
+    }
+
+    #[tokio::test]
+    async fn hidden_git_error_details_are_written_to_application_log() {
+        let logs = LogBuffer::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .without_time()
+            .with_writer(logs.clone())
+            .finish();
+        let secret = "secret-token";
+        let git_error = SourceStorageError::Git {
+            command: format!("git push https://user:{secret}@example.com/repository.git main"),
+            status: "exit status: 1".to_owned(),
+            stderr: "authentication failed".to_owned(),
+        };
+        let error = RegistryError::VerificationIndex(VerificationIndexError::SourceStorage(
+            SourceStorageError::UnpreparedSourceRepository {
+                path: PathBuf::from("source-repository"),
+                message: git_error.to_string(),
+            },
+        ));
+
+        let response =
+            tracing::subscriber::with_default(subscriber, || ApiError::from(error).into_response());
+
+        let body = response_body(response).await;
+        assert!(!body.contains(secret));
+        assert!(logs.content().contains(secret));
     }
 }
