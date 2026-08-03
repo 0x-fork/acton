@@ -39,6 +39,8 @@ fn asset_path(request_path: &str) -> Option<String> {
     let path = request_path.trim_start_matches('/');
     let path = if path.is_empty() {
         "index.html"
+    } else if path == "statistics" || path == "statistics/" {
+        "statistics.html"
     } else if path == "verified" || path == "verified/" {
         "verified.html"
     } else if asset_path_has_extension(path) {
@@ -107,5 +109,33 @@ fn content_type(asset_path: &str) -> &'static str {
         Some("woff") => "font/woff",
         Some("woff2") => "font/woff2",
         _ => "application/octet-stream",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::asset_path;
+
+    #[test]
+    fn dedicated_frontend_routes_use_their_html_entries() {
+        assert_eq!(asset_path("/"), Some("index.html".to_owned()));
+        assert_eq!(
+            asset_path("/statistics"),
+            Some("statistics.html".to_owned())
+        );
+        assert_eq!(
+            asset_path("/statistics/"),
+            Some("statistics.html".to_owned())
+        );
+        assert_eq!(asset_path("/verified"), Some("verified.html".to_owned()));
+        assert_eq!(asset_path("/verified/"), Some("verified.html".to_owned()));
+    }
+
+    #[test]
+    fn contract_routes_keep_using_contract_entry() {
+        assert_eq!(
+            asset_path("/EQD0000000000000000000000000000000000000000000000"),
+            Some("contract.html".to_owned())
+        );
     }
 }
