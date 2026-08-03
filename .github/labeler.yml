@@ -132,3 +132,8 @@
   - changed-files:
       - any-glob-to-any-file:
           - "apps/verifier/**"
+
+"localton":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/localton/**"
