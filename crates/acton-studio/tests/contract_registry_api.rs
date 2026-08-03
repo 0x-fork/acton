@@ -250,6 +250,7 @@ fn full_ton_environment(base_url: &str) -> StudioEnvironment {
         EnvironmentConfig::FullTonNetwork {
             api_v2_port: 18080,
             api_v3_port: 18081,
+            admin_port: 18082,
             validators: 1,
         },
         EnvironmentEndpoints {

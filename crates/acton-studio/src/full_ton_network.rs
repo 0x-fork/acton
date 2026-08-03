@@ -13,8 +13,8 @@ use xxhash_rust::xxh3::xxh3_64;
 use crate::EnvironmentRuntimeError;
 
 const COMPOSE_TEMPLATE: &str = include_str!("../assets/full-ton-network.compose.yaml");
-const DEFAULT_MYLOCALACTON_IMAGE: &str =
-    "ghcr.io/i582/mylocalacton:sha-bf02368cf822b311aa89ba8bc599fa0a6b90accb";
+const DEFAULT_LOCALTON_IMAGE: &str =
+    "ghcr.io/ton-blockchain/localton:sha-e5d33846df348f86021de6031080969db2735a41";
 const COMPOSE_WAIT_TIMEOUT_SECONDS: u16 = 600;
 const DOCKER_CONFIG_DIRECTORY: &str = "docker-pull-config";
 const RUNTIME_DESCRIPTOR_FILE: &str = "runtime.json";
@@ -61,14 +61,15 @@ impl FullTonNetworkDriver {
         environment_id: &str,
         api_v2_port: u16,
         api_v3_port: u16,
+        admin_port: u16,
         validators: u16,
     ) -> Result<Self, EnvironmentRuntimeError> {
         let runtime_file = data_dir.join(RUNTIME_DESCRIPTOR_FILE);
         let runtime = match load_runtime_descriptor(&runtime_file).await? {
             Some(runtime) => runtime,
             None => {
-                let image = std::env::var("ACTON_STUDIO_MYLOCALACTON_IMAGE")
-                    .unwrap_or_else(|_| DEFAULT_MYLOCALACTON_IMAGE.to_owned());
+                let image = std::env::var("ACTON_STUDIO_LOCALTON_IMAGE")
+                    .unwrap_or_else(|_| DEFAULT_LOCALTON_IMAGE.to_owned());
                 validate_image_reference(&image)?;
                 let runtime = RuntimeDescriptor {
                     version: RUNTIME_DESCRIPTOR_VERSION,
@@ -87,7 +88,7 @@ impl FullTonNetworkDriver {
         } = runtime;
 
         let compose_file = data_dir.join("compose.yaml");
-        let isolated_docker_config_dir = if image == DEFAULT_MYLOCALACTON_IMAGE {
+        let isolated_docker_config_dir = if image == DEFAULT_LOCALTON_IMAGE {
             let path = data_dir.join(DOCKER_CONFIG_DIRECTORY);
             tokio::fs::create_dir_all(&path).await.map_err(|error| {
                 EnvironmentRuntimeError::Internal {
@@ -102,7 +103,7 @@ impl FullTonNetworkDriver {
         } else {
             None
         };
-        let compose = render_compose(&image, api_v2_port, api_v3_port, validators);
+        let compose = render_compose(&image, api_v2_port, api_v3_port, admin_port, validators);
         tokio::fs::write(&compose_file, compose)
             .await
             .map_err(|error| EnvironmentRuntimeError::Internal {
@@ -548,12 +549,19 @@ async fn docker_text(mut command: Command) -> Result<String, EnvironmentRuntimeE
     Ok(value)
 }
 
-fn render_compose(image: &str, api_v2_port: u16, api_v3_port: u16, validators: u16) -> String {
+fn render_compose(
+    image: &str,
+    api_v2_port: u16,
+    api_v3_port: u16,
+    admin_port: u16,
+    validators: u16,
+) -> String {
     COMPOSE_TEMPLATE
-        .replace("__MYLOCALACTON_IMAGE__", image)
-        .replace("__MYLOCALACTON_V2_PORT__", &api_v2_port.to_string())
-        .replace("__MYLOCALACTON_V3_PORT__", &api_v3_port.to_string())
-        .replace("__MYLOCALACTON_VALIDATORS__", &validators.to_string())
+        .replace("__LOCALTON_IMAGE__", image)
+        .replace("__LOCALTON_V2_PORT__", &api_v2_port.to_string())
+        .replace("__LOCALTON_V3_PORT__", &api_v3_port.to_string())
+        .replace("__LOCALTON_ADMIN_PORT__", &admin_port.to_string())
+        .replace("__LOCALTON_VALIDATORS__", &validators.to_string())
 }
 
 fn compose_project_name(workspace_root: &Path, environment_id: &str) -> String {
@@ -583,14 +591,14 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use super::{
-        DEFAULT_MYLOCALACTON_IMAGE, DockerTarget, FullTonNetworkDriver, IsolatedPullTarget,
+        DEFAULT_LOCALTON_IMAGE, DockerTarget, FullTonNetworkDriver, IsolatedPullTarget,
         RUNTIME_DESCRIPTOR_FILE, RUNTIME_DESCRIPTOR_VERSION, RuntimeDescriptor,
         compose_project_name, render_compose, write_runtime_descriptor,
     };
 
     #[test]
     fn compose_definition_uses_environment_specific_runtime_values() {
-        let compose = render_compose("registry.example/ton:build-42", 18180, 18181, 3);
+        let compose = render_compose("registry.example/ton:build-42", 18180, 18181, 18182, 3);
         let selected_lines = compose
             .lines()
             .filter(|line| {
@@ -612,13 +620,15 @@ mod tests {
         expect![[r#"project: acton-studio-<workspace>-environment-7
     image: "registry.example/ton:build-42"
       - "3"
-      - "127.0.0.1:18180:18080"
+      - "127.0.0.1:18182:18001"
+      - "127.0.0.1:18180:18002"
     image: "registry.example/ton:build-42"
     image: "registry.example/ton:build-42"
     image: "registry.example/ton:build-42"
-      - "127.0.0.1:18181:8081"
+      - "127.0.0.1:18181:18003"
     image: "registry.example/ton:build-42""#]]
         .assert_eq(&actual);
+        assert!(!compose.contains("__LOCALTON_"));
         assert!(!compose.contains("platform:"));
     }
 
@@ -698,6 +708,7 @@ mod tests {
             "environment-17",
             19180,
             19181,
+            19182,
             5,
         )
         .await
@@ -750,11 +761,12 @@ mod tests {
             COMPOSE
                 image: "registry.example/persisted/ton:build-17"
                   - "5"
-                  - "127.0.0.1:19180:18080"
+                  - "127.0.0.1:19182:18001"
+                  - "127.0.0.1:19180:18002"
                 image: "registry.example/persisted/ton:build-17"
                 image: "registry.example/persisted/ton:build-17"
                 image: "registry.example/persisted/ton:build-17"
-                  - "127.0.0.1:19181:8081"
+                  - "127.0.0.1:19181:18003"
                 image: "registry.example/persisted/ton:build-17""#]]
         .assert_eq(&actual);
     }
@@ -777,6 +789,7 @@ mod tests {
             "environment-invalid",
             18180,
             18181,
+            18182,
             1,
         )
         .await
@@ -789,7 +802,7 @@ mod tests {
 
     #[test]
     fn lifecycle_commands_pin_the_environment_docker_context() {
-        let driver = test_driver(DEFAULT_MYLOCALACTON_IMAGE, true);
+        let driver = test_driver(DEFAULT_LOCALTON_IMAGE, true);
         let command = driver.compose_command();
         let actual = normalize_project_name(
             &command_args(&command),
@@ -813,7 +826,7 @@ acton-studio-<workspace>-environment-1
             docker_host: "unix:///docker.sock".to_owned(),
             platform: "linux/arm64".to_owned(),
         };
-        let default_driver = test_driver(DEFAULT_MYLOCALACTON_IMAGE, true);
+        let default_driver = test_driver(DEFAULT_LOCALTON_IMAGE, true);
         let inspect = command_args(&default_driver.image_inspect_command());
         let normal = command_args(&default_driver.normal_pull_command());
         let isolated = command_args(
@@ -834,13 +847,13 @@ image
 inspect
 --format
 {{.Id}}
-ghcr.io/i582/mylocalacton:sha-bf02368cf822b311aa89ba8bc599fa0a6b90accb
+ghcr.io/ton-blockchain/localton:sha-e5d33846df348f86021de6031080969db2735a41
 
 NORMAL
 --context
 desktop-linux
 pull
-ghcr.io/i582/mylocalacton:sha-bf02368cf822b311aa89ba8bc599fa0a6b90accb
+ghcr.io/ton-blockchain/localton:sha-e5d33846df348f86021de6031080969db2735a41
 
 ISOLATED
 --config
@@ -850,7 +863,7 @@ unix:///docker.sock
 pull
 --platform
 linux/arm64
-ghcr.io/i582/mylocalacton:sha-bf02368cf822b311aa89ba8bc599fa0a6b90accb
+ghcr.io/ton-blockchain/localton:sha-e5d33846df348f86021de6031080969db2735a41
 
 CUSTOM ISOLATED: false"]]
         .assert_eq(&actual);

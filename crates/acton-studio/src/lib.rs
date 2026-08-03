@@ -583,11 +583,11 @@ fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
             .api_v3
             .as_ref()
             .map(|_| format!("{proxy_root}/api/v3")),
-        control: environment
-            .runtime_endpoints
-            .control
-            .as_ref()
-            .map(|_| proxy_root),
+        control: (environment
+            .capabilities
+            .contains(&EnvironmentCapability::ControlApi)
+            && environment.runtime_endpoints.control.is_some())
+        .then_some(proxy_root),
     };
     environment
 }
@@ -721,20 +721,6 @@ fn environment_upstream_url(
             (
                 environment.runtime_endpoints.api_v3.as_deref(),
                 remaining_path,
-            )
-        } else if path == "acton_fundAccount"
-            && matches!(
-                &environment.config,
-                EnvironmentConfig::FullTonNetwork { .. }
-            )
-        {
-            (
-                environment
-                    .runtime_endpoints
-                    .api_v2
-                    .as_deref()
-                    .and_then(|endpoint| endpoint.strip_suffix("/api/v2")),
-                path,
             )
         } else {
             (environment.runtime_endpoints.control.as_deref(), path)

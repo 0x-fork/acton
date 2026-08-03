@@ -34,6 +34,7 @@ pub enum CreateEnvironmentConfig {
     FullTonNetwork {
         api_v2_port: Option<u16>,
         api_v3_port: Option<u16>,
+        admin_port: Option<u16>,
         validators: Option<u16>,
     },
 }
@@ -65,6 +66,7 @@ pub enum EnvironmentConfig {
     FullTonNetwork {
         api_v2_port: u16,
         api_v3_port: u16,
+        admin_port: u16,
         validators: u16,
     },
     RemoteTonNetwork {

@@ -71,20 +71,23 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
                 CreateEnvironmentConfig::FullTonNetwork {
                     api_v2_port,
                     api_v3_port,
+                    admin_port,
                     validators,
                 } => {
                     let api_v2_port = api_v2_port.unwrap_or(18080);
                     let api_v3_port = api_v3_port.unwrap_or(18081);
+                    let admin_port = admin_port.unwrap_or(18082);
                     (
                         EnvironmentConfig::FullTonNetwork {
                             api_v2_port,
                             api_v3_port,
+                            admin_port,
                             validators: validators.unwrap_or(1),
                         },
                         EnvironmentEndpoints {
                             api_v2: Some(format!("http://127.0.0.1:{api_v2_port}/api/v2")),
                             api_v3: Some(format!("http://127.0.0.1:{api_v3_port}/api/v3")),
-                            control: None,
+                            control: Some(format!("http://127.0.0.1:{admin_port}")),
                         },
                     )
                 }
@@ -568,6 +571,7 @@ async fn full_ton_environment_advertises_only_its_supported_surface() {
                             "kind":"fullTonNetwork",
                             "apiV2Port":18180,
                             "apiV3Port":18181,
+                            "adminPort":18182,
                             "validators":3
                         }
                     }"#,
@@ -580,12 +584,12 @@ async fn full_ton_environment_advertises_only_its_supported_surface() {
 
     expect![[r#"
         status: 201 Created
-        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18180,"apiV3Port":18181,"validators":3},"capabilities":["apiV2","apiV3","explorer","integration","gramFaucet","wallets","simulator","contracts"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3"},"network":{"id":"full-ton-network","label":"Local TON network","chainId":-239,"testOnly":true}}"#]]
+        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18180,"apiV3Port":18181,"adminPort":18182,"validators":3},"capabilities":["apiV2","apiV3","explorer","integration","gramFaucet","wallets","simulator","contracts"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3"},"network":{"id":"full-ton-network","label":"Local TON network","chainId":-239,"testOnly":true}}"#]]
     .assert_eq(&actual);
 }
 
 #[tokio::test]
-async fn full_ton_environment_routes_v2_and_v3_to_separate_upstreams() {
+async fn full_ton_environment_routes_each_api_to_its_own_upstream() {
     let v2_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("V2 proxy test listener must bind");
@@ -620,6 +624,23 @@ async fn full_ton_environment_routes_v2_and_v3_to_separate_upstreams() {
         .await
         .expect("V3 proxy target must serve");
     });
+    let admin_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("admin proxy test listener must bind");
+    let admin_port = admin_listener
+        .local_addr()
+        .expect("admin listener must have an address")
+        .port();
+    let admin_upstream = tokio::spawn(async move {
+        axum::serve(
+            admin_listener,
+            Router::new()
+                .fallback(any(proxy_target))
+                .into_make_service(),
+        )
+        .await
+        .expect("admin proxy target must serve");
+    });
 
     let app = router();
     app.clone()
@@ -632,7 +653,8 @@ async fn full_ton_environment_routes_v2_and_v3_to_separate_upstreams() {
                         "config":{{
                             "kind":"fullTonNetwork",
                             "apiV2Port":{v2_port},
-                            "apiV3Port":{v3_port}
+                            "apiV3Port":{v3_port},
+                            "adminPort":{admin_port}
                         }}
                     }}"#
                 )))
@@ -677,24 +699,16 @@ async fn full_ton_environment_routes_v2_and_v3_to_separate_upstreams() {
         )
         .await
         .expect("faucet proxy request must succeed");
-    let unsupported_control_response = app
-        .oneshot(
-            Request::get("/api/v1/environments/test-environment-1/rpc/status")
-                .body(Body::empty())
-                .expect("unsupported control proxy request must be valid"),
-        )
-        .await
-        .expect("unsupported control proxy request must succeed");
     let actual = format!(
-        "V2 ROOT\n{}\n\nV2\n{}\n\nV3\n{}\n\nFAUCET\n{}\n\nUNSUPPORTED CONTROL\n{}",
+        "V2 ROOT\n{}\n\nV2\n{}\n\nV3\n{}\n\nFAUCET\n{}",
         response_snapshot(v2_root_response).await,
         response_snapshot(v2_response).await,
         response_snapshot(v3_response).await,
         response_snapshot(faucet_response).await,
-        response_snapshot(unsupported_control_response).await,
     );
     v2_upstream.abort();
     v3_upstream.abort();
+    admin_upstream.abort();
 
     expect![[r#"V2 ROOT
 status: 202 Accepted
@@ -722,11 +736,7 @@ status: 202 Accepted
 body: method: POST
 uri: /acton_fundAccount
 marker: missing
-body: {"address":"test","amount":100}
-
-UNSUPPORTED CONTROL
-status: 409 Conflict
-body: {"error":{"code":"environment_endpoint_unavailable","message":"This endpoint is not available in Protocol network"}}"#]]
+body: {"address":"test","amount":100}"#]]
     .assert_eq(&actual);
 }
 

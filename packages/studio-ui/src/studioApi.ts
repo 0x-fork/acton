@@ -33,6 +33,7 @@ export interface FullTonNetworkEnvironmentConfig {
   readonly kind: "fullTonNetwork"
   readonly apiV2Port: number
   readonly apiV3Port: number
+  readonly adminPort: number
   readonly validators: number
 }
 
@@ -63,6 +64,7 @@ export interface CreateFullTonNetworkEnvironmentConfig {
   readonly kind: "fullTonNetwork"
   readonly apiV2Port?: number
   readonly apiV3Port?: number
+  readonly adminPort?: number
   readonly validators?: number
 }
 

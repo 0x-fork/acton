@@ -26,6 +26,7 @@ use crate::local_artifacts::{ProjectArtifactSynchronizer, ProjectFingerprint};
 const FIRST_LOCALNET_PORT: u16 = 5411;
 const FIRST_FULL_TON_V2_PORT: u16 = 18080;
 const FIRST_FULL_TON_V3_PORT: u16 = 18081;
+const FIRST_FULL_TON_ADMIN_PORT: u16 = 18082;
 const DEFAULT_FULL_TON_VALIDATORS: u16 = 1;
 const MAX_FULL_TON_VALIDATORS: u16 = 100;
 const LOCALNET_READY_TIMEOUT: Duration = Duration::from_secs(15);
@@ -482,20 +483,18 @@ fn resolve_request(
         CreateEnvironmentConfig::FullTonNetwork {
             api_v2_port,
             api_v3_port,
+            admin_port,
             validators,
         } => {
             validate_requested_port(api_v2_port)?;
             validate_requested_port(api_v3_port)?;
+            validate_requested_port(admin_port)?;
             let api_v2_port = select_port(FIRST_FULL_TON_V2_PORT, api_v2_port, reserved_ports)?;
-            if api_v3_port == Some(api_v2_port) {
-                return Err(EnvironmentRuntimeError::InvalidRequest {
-                    code: "environment_ports_must_differ",
-                    message: "V2 and V3 API ports must be different".to_owned(),
-                });
-            }
             let mut excluded_ports = reserved_ports.to_vec();
             excluded_ports.push(api_v2_port);
             let api_v3_port = select_port(FIRST_FULL_TON_V3_PORT, api_v3_port, &excluded_ports)?;
+            excluded_ports.push(api_v3_port);
+            let admin_port = select_port(FIRST_FULL_TON_ADMIN_PORT, admin_port, &excluded_ports)?;
             let validators = validators.unwrap_or(DEFAULT_FULL_TON_VALIDATORS);
             if !(1..=MAX_FULL_TON_VALIDATORS).contains(&validators) {
                 return Err(EnvironmentRuntimeError::InvalidRequest {
@@ -508,6 +507,7 @@ fn resolve_request(
             EnvironmentConfig::FullTonNetwork {
                 api_v2_port,
                 api_v3_port,
+                admin_port,
                 validators,
             }
         }
@@ -572,17 +572,19 @@ fn port_is_available(port: u16) -> bool {
 
 async fn reserved_environment_ports(runtime: &LocalProcessRuntimeInner) -> Vec<u16> {
     let environments = runtime.environments.read().await.clone();
-    let mut ports = Vec::with_capacity(environments.len() * 2);
+    let mut ports = Vec::with_capacity(environments.len() * 3);
     for environment in environments {
         match &environment.details.read().await.config {
             EnvironmentConfig::ActonLocalnet { port, .. } => ports.push(*port),
             EnvironmentConfig::FullTonNetwork {
                 api_v2_port,
                 api_v3_port,
+                admin_port,
                 ..
             } => {
                 ports.push(*api_v2_port);
                 ports.push(*api_v3_port);
+                ports.push(*admin_port);
             }
             EnvironmentConfig::RemoteTonNetwork { .. } => {}
         }
@@ -603,11 +605,12 @@ fn runtime_endpoints(config: &EnvironmentConfig) -> EnvironmentEndpoints {
         EnvironmentConfig::FullTonNetwork {
             api_v2_port,
             api_v3_port,
+            admin_port,
             ..
         } => EnvironmentEndpoints {
             api_v2: Some(format!("http://127.0.0.1:{api_v2_port}/api/v2")),
             api_v3: Some(format!("http://127.0.0.1:{api_v3_port}/api/v3")),
-            control: None,
+            control: Some(format!("http://127.0.0.1:{admin_port}")),
         },
         EnvironmentConfig::RemoteTonNetwork { .. } => EnvironmentEndpoints::default(),
     }
@@ -719,6 +722,7 @@ impl EnvironmentDriver {
             EnvironmentConfig::FullTonNetwork {
                 api_v2_port,
                 api_v3_port,
+                admin_port,
                 validators,
             } => FullTonNetworkDriver::materialize(
                 data_dir,
@@ -726,6 +730,7 @@ impl EnvironmentDriver {
                 environment_id,
                 *api_v2_port,
                 *api_v3_port,
+                *admin_port,
                 *validators,
             )
             .await

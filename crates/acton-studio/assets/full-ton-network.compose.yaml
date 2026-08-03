@@ -1,19 +1,20 @@
 services:
   localton:
-    image: "__MYLOCALACTON_IMAGE__"
+    image: "__LOCALTON_IMAGE__"
     command:
       - run
       - --state-dir
-      - /var/lib/mylocalacton
+      - /var/lib/localton
       - --ton-http-api
       - --validators
-      - "__MYLOCALACTON_VALIDATORS__"
+      - "__LOCALTON_VALIDATORS__"
     stop_grace_period: 60s
     restart: unless-stopped
     ports:
-      - "127.0.0.1:__MYLOCALACTON_V2_PORT__:18080"
+      - "127.0.0.1:__LOCALTON_ADMIN_PORT__:18001"
+      - "127.0.0.1:__LOCALTON_V2_PORT__:18002"
     volumes:
-      - localton-state:/var/lib/mylocalacton
+      - localton-state:/var/lib/localton
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -23,7 +24,7 @@ services:
         - --fail
         - --silent
         - --show-error
-        - http://127.0.0.1:18080/api/v2/getMasterchainInfo
+        - http://127.0.0.1:18002/api/v2/getMasterchainInfo
       interval: 10s
       timeout: 3s
       start_period: 240s
@@ -72,7 +73,7 @@ services:
     restart: unless-stopped
 
   v3-migrations:
-    image: "__MYLOCALACTON_IMAGE__"
+    image: "__LOCALTON_IMAGE__"
     command:
       - v3-migrate
     depends_on:
@@ -83,7 +84,7 @@ services:
     restart: on-failure
 
   v3-worker:
-    image: "__MYLOCALACTON_IMAGE__"
+    image: "__LOCALTON_IMAGE__"
     user: "0:0"
     command:
       - v3-worker
@@ -106,7 +107,7 @@ services:
       - --max-batch-msgs
       - "2048"
     environment:
-      TON_WORKER_DBROOT: /var/lib/mylocalacton/genesis/db
+      TON_WORKER_DBROOT: /var/lib/localton/genesis/db
       TON_WORKER_FROM: "1"
       TON_WORKER_WORKDIR: /var/lib/ton-indexer/work
     depends_on:
@@ -124,16 +125,16 @@ services:
         soft: 1000000
         hard: 1000000
     volumes:
-      - localton-state:/var/lib/mylocalacton:ro
+      - localton-state:/var/lib/localton:ro
       - ton-index-workdir:/var/lib/ton-indexer/work
 
   v3-api:
-    image: "__MYLOCALACTON_IMAGE__"
+    image: "__LOCALTON_IMAGE__"
     command:
       - v3-api
     environment:
       TON_INDEXER_API_THREADS: "2"
-      TON_INDEXER_TON_HTTP_API_ENDPOINT: http://localton:18080/api/v2
+      TON_INDEXER_TON_HTTP_API_ENDPOINT: http://localton:18002/api/v2
       TON_INDEXER_REDIS_DSN: redis://redis:6379
       TON_INDEXER_IS_TESTNET: "1"
     depends_on:
@@ -154,17 +155,17 @@ services:
         - --fail
         - --silent
         - --show-error
-        - http://127.0.0.1:8081/healthcheck
+        - http://127.0.0.1:18003/healthcheck
       interval: 5s
       timeout: 3s
       start_period: 30s
       retries: 24
     ports:
-      - "127.0.0.1:__MYLOCALACTON_V3_PORT__:8081"
+      - "127.0.0.1:__LOCALTON_V3_PORT__:18003"
     restart: unless-stopped
 
   v3-classifier:
-    image: "__MYLOCALACTON_IMAGE__"
+    image: "__LOCALTON_IMAGE__"
     command:
       - v3-classifier
       - --pool-size

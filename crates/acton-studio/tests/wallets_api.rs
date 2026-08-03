@@ -46,12 +46,13 @@ impl TestEnvironmentRuntime {
             EnvironmentConfig::FullTonNetwork {
                 api_v2_port: 18_080,
                 api_v3_port: 18_081,
+                admin_port: 18_082,
                 validators: 1,
             },
             EnvironmentEndpoints {
                 api_v2: Some("http://127.0.0.1:18080/api/v2".to_owned()),
                 api_v3: Some("http://127.0.0.1:18081/api/v3".to_owned()),
-                control: None,
+                control: Some("http://127.0.0.1:18082".to_owned()),
             },
         );
         let mut read_only = localnet.clone();

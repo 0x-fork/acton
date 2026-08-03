@@ -1,9 +1,6 @@
-[workspace]
-members = [".", "xtask"]
-resolver = "2"
-
 [package]
 name = "localton"
+description = "A complete headless local TON development network"
 version = "0.1.0"
 publish = false
 authors = ["TON Core"]
@@ -11,7 +8,10 @@ edition = "2024"
 rust-version = "1.96.1"
 repository = "https://github.com/ton-blockchain/acton"
 license = "GPL-3.0-or-later"
-description = "A complete headless local TON development network"
+
+[workspace]
+members = ["xtask"]
+resolver = "2"
 
 [dependencies]
 anyhow = "1.0"
