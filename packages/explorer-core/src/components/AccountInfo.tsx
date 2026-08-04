@@ -70,6 +70,7 @@ interface AccountInfoProps {
   readonly collectiblesLoading?: boolean
   readonly onCollectiblesClick?: () => void
   readonly hasContextCard?: boolean
+  readonly showActonscanLink?: boolean
 }
 
 interface CollectiblePreview {
@@ -101,6 +102,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   collectiblesLoading = false,
   onCollectiblesClick,
   hasContextCard = false,
+  showActonscanLink = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false)
   const [customName, setCustomName] = useState<string | undefined>()
@@ -250,6 +252,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const addressRowText = hasContextCard ? shortAddress : displayAddress
   const statusAddress = formatRawAddress(displayAddress)
   const tonscanUrl = getTonscanUrl(displayAddress, network.id, forkNetwork)
+  const actonscanUrl = showActonscanLink ? getActonscanUrl(displayAddress, network.id) : undefined
   const unfreezerUrl =
     state?.status === "frozen" ? getUnfreezerUrl(bounceableAddress, network.id) : undefined
   const isNameUnchanged = editValue.trim() === (displayName || "")
@@ -765,6 +768,16 @@ export const AccountInfo: FC<AccountInfoProps> = ({
             <span className={styles.statusAddress} title={rawAddress}>
               {statusAddress}
             </span>
+            {actonscanUrl && (
+              <a
+                className={styles.externalLink}
+                href={actonscanUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                actonscan.com
+              </a>
+            )}
             {tonscanUrl && (
               <a className={styles.externalLink} href={tonscanUrl} target="_blank" rel="noreferrer">
                 tonscan.org
@@ -969,6 +982,15 @@ function getTonscanUrl(
   }
 
   return `https://tonscan.org/address/${encodedAddress}`
+}
+
+function getActonscanUrl(address: string, networkId: ExplorerNetworkId): string | undefined {
+  if (networkId !== "mainnet" && networkId !== "testnet") {
+    return undefined
+  }
+
+  const encodedAddress = encodeURIComponent(address)
+  return `https://actonscan.com/address/${encodedAddress}?network=${networkId}`
 }
 
 function getUnfreezerUrl(address: string, networkId: ExplorerNetworkId): string | undefined {

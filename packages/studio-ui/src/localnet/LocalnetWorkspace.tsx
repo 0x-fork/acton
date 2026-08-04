@@ -622,6 +622,7 @@ const AppContent: FC<AppContentProps> = ({
                     client={client}
                     enableJettonMint={runtime.jettonFaucetEnabled}
                     jettonMintPath={path("/faucet")}
+                    showActonscanLink
                     enableTransactionStreaming={
                       runtime.environment?.status === "running" &&
                       supports(runtime.environment, "controlApi")

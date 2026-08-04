@@ -77,6 +77,7 @@ interface AccountPageProps {
   readonly enableJettonMint?: boolean
   readonly enableTransactionStreaming?: boolean
   readonly jettonMintPath?: string
+  readonly showActonscanLink?: boolean
   readonly tokensLoadMoreLimit?: number
   readonly holdersLoadMoreLimit?: number
 }
@@ -200,6 +201,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   enableJettonMint = false,
   enableTransactionStreaming = true,
   jettonMintPath,
+  showActonscanLink = false,
   tokensLoadMoreLimit = ACCOUNT_TOKENS_LOAD_MORE_LIMIT,
   holdersLoadMoreLimit = JETTON_HOLDERS_LOAD_MORE_LIMIT,
 }) => {
@@ -2031,6 +2033,7 @@ export const AccountPage: FC<AccountPageProps> = ({
                   collectiblesLoading={accountLoading || nftItemsLoading}
                   onCollectiblesClick={() => handleTabChange("nfts")}
                   hasContextCard={hasHeaderContextCard}
+                  showActonscanLink={showActonscanLink}
                 />
               )}
               {hasHeaderContextCard && (
