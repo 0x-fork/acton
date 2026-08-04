@@ -151,150 +151,278 @@
 }
 
 .sectionHeader a:focus-visible,
-.runBarButton:focus-visible,
+.latestRun:focus-visible,
 .runRow:focus-visible,
 .environmentRow:focus-visible {
   outline: 2px solid var(--acton-color-accent);
   outline-offset: -2px;
 }
 
-.testSummary {
+.latestRun {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  width: 100%;
+  min-height: 9rem;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--acton-space-4);
+  padding: var(--acton-space-5);
+  color: var(--acton-color-text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.latestRun:hover {
+  background: var(--acton-color-surface-hover);
+}
+
+.latestRunIcon {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-group);
+  border-radius: var(--acton-radius-control-sm);
+}
+
+.latestRunIcon[data-status="passed"] {
+  color: var(--acton-color-success);
+}
+
+.latestRunIcon[data-status="failed"] {
+  color: var(--acton-color-danger-text);
+}
+
+.latestRunIcon[data-status="running"],
+.latestRunIcon[data-status="queued"] {
+  color: var(--acton-color-warning-text);
+}
+
+.latestRunCopy {
+  display: grid;
+  min-width: 0;
+  gap: 0.3rem;
+}
+
+.latestRunKicker,
+.latestRunMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--acton-space-2);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-3xs);
+}
+
+.latestRunKicker span:first-child {
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.latestRunKicker span[data-status="passed"] {
+  color: var(--acton-color-success);
+}
+
+.latestRunKicker span[data-status="failed"] {
+  color: var(--acton-color-danger-text);
+}
+
+.latestRunKicker span[data-status="running"],
+.latestRunKicker span[data-status="queued"] {
+  color: var(--acton-color-warning-text);
+}
+
+.latestRunCopy > strong {
+  overflow: hidden;
+  font-size: var(--acton-font-size-lg);
+  font-weight: var(--acton-font-weight-semibold);
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.latestRunCopy > code {
+  overflow: hidden;
+  color: var(--acton-color-text-subtle);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-3xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.failures,
+.outcomeNotice,
+.recentRunsHeader {
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.failuresHeader,
+.recentRunsHeader {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-3) var(--acton-space-5);
+}
+
+.recentRunsHeader {
   border-bottom: 1px solid var(--acton-color-border);
 }
 
-.testSummary > div {
+.failuresHeader strong,
+.recentRunsHeader strong {
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.failuresHeader span,
+.recentRunsHeader span {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-3xs);
+}
+
+.failureList,
+.recentRuns,
+.environmentList {
   display: grid;
-  gap: 0.15rem;
+}
+
+.environmentList {
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.failureRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-3) var(--acton-space-5);
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.failureRow > svg {
+  margin-top: 0.15rem;
+  color: var(--acton-color-danger-text);
+}
+
+.failureCopy {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.failureCopy strong,
+.failureCopy code,
+.failureCopy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.failureCopy strong {
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.failureCopy code {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-3xs);
+}
+
+.failureCopy small {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-3xs);
+}
+
+.failureLoading {
+  display: grid;
+  gap: var(--acton-space-2);
+  padding: var(--acton-space-4) var(--acton-space-5);
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.moreFailures {
+  padding: var(--acton-space-3) var(--acton-space-5);
+  color: var(--acton-color-danger-text);
+  font-size: var(--acton-font-size-3xs);
+  font-weight: var(--acton-font-weight-medium);
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.outcomeNotice {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-3);
   padding: var(--acton-space-4) var(--acton-space-5);
 }
 
-.testSummary > div + div {
-  border-left: 1px solid var(--acton-color-border);
+.outcomeNotice > svg {
+  flex: 0 0 auto;
+  color: var(--acton-color-text-muted);
 }
 
-.testSummary strong {
-  font-size: var(--acton-font-size-xl);
+.outcomeNotice[data-status="passed"] > svg {
+  color: var(--acton-color-success);
+}
+
+.outcomeNotice[data-status="failed"] > svg {
+  color: var(--acton-color-danger-text);
+}
+
+.outcomeNotice[data-status="running"] > svg,
+.outcomeNotice[data-status="queued"] > svg {
+  color: var(--acton-color-warning-text);
+}
+
+.outcomeNotice > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.outcomeNotice strong,
+.outcomeNotice small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outcomeNotice strong {
+  font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-semibold);
-  letter-spacing: -0.025em;
 }
 
-.testSummary span,
+.outcomeNotice small {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-3xs);
+}
+
+.spinner {
+  animation: overview-spin 900ms linear infinite;
+}
+
+@keyframes overview-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .environmentSummary small {
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-3xs);
 }
 
-.chartArea {
-  display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr);
-  height: 12rem;
-  padding: var(--acton-space-5) var(--acton-space-5) var(--acton-space-3);
-  background-image: linear-gradient(to bottom, var(--acton-color-border) 1px, transparent 1px);
-  background-position: 0 var(--acton-space-5);
-  background-size: 100% calc((100% - var(--acton-space-8)) / 2);
-}
-
-.chartScale {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding-bottom: 0.25rem;
-  color: var(--acton-color-text-subtle);
-  font-size: var(--acton-font-size-3xs);
-}
-
-.runChart {
-  display: flex;
-  height: 100%;
-  align-items: end;
-  gap: clamp(0.35rem, 1.2vw, 0.8rem);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.runChartItem {
-  display: flex;
-  height: 100%;
-  min-width: 0;
-  flex: 1;
-  align-items: end;
-}
-
-.runBarButton {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  align-items: end;
-  justify-content: center;
-  padding: 0;
-  color: inherit;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.runBar {
-  display: flex;
-  width: min(100%, 2rem);
-  height: var(--run-height);
-  min-height: 0.4rem;
-  overflow: hidden;
-  flex-direction: column-reverse;
-  background: var(--acton-color-surface-group);
-  border-radius: 0.3rem 0.3rem 0 0;
-  transition: opacity var(--acton-duration-fast) var(--acton-ease-standard);
-}
-
-.runBarButton:hover .runBar {
-  opacity: 0.72;
-}
-
-.runBarPassed {
-  background: var(--acton-color-success);
-}
-
-.runBarFailed {
-  background: var(--acton-color-danger-text);
-}
-
-.runBarSkipped {
-  background: var(--acton-color-text-subtle);
-}
-
-.runBarEmpty {
-  height: 100%;
-  background: var(--acton-color-text-subtle);
-}
-
-.runBar[data-status="failed"] .runBarEmpty {
-  background: var(--acton-color-danger-text);
-}
-
-.runBar[data-status="running"] .runBarEmpty,
-.runBar[data-status="queued"] .runBarEmpty {
-  background: var(--acton-color-warning);
-}
-
-.chartLegend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--acton-space-4);
-  padding: 0 var(--acton-space-5) var(--acton-space-4) 4.95rem;
-  color: var(--acton-color-text-muted);
-  font-size: var(--acton-font-size-3xs);
-}
-
-.chartLegend span,
 .environmentLegend span {
   display: inline-flex;
   align-items: center;
   gap: var(--acton-space-2);
 }
 
-.chartLegend span::before,
 .environmentLegend span::before {
   width: 0.45rem;
   height: 0.45rem;
@@ -303,12 +431,10 @@
   border-radius: var(--acton-radius-round);
 }
 
-.chartLegend span[data-tone="passed"]::before,
 .environmentLegend span[data-status="running"]::before {
   background: var(--acton-color-success);
 }
 
-.chartLegend span[data-tone="failed"]::before,
 .environmentLegend span[data-status="failed"]::before {
   background: var(--acton-color-danger-text);
 }
@@ -316,12 +442,6 @@
 .environmentLegend span[data-status="starting"]::before,
 .environmentLegend span[data-status="stopping"]::before {
   background: var(--acton-color-warning);
-}
-
-.recentRuns,
-.environmentList {
-  display: grid;
-  border-top: 1px solid var(--acton-color-border);
 }
 
 .runRow,
@@ -512,9 +632,16 @@
   padding: var(--acton-space-5);
 }
 
-.loadingMetrics {
+.loadingLatestRun {
   display: flex;
-  gap: var(--acton-space-8);
+  align-items: center;
+  gap: var(--acton-space-4);
+}
+
+.loadingLatestRun > div {
+  display: grid;
+  flex: 1;
+  gap: var(--acton-space-2);
 }
 
 @media (max-width: 1120px) {
@@ -543,7 +670,13 @@
   }
 
   .sectionHeader,
-  .testSummary > div,
+  .latestRun,
+  .failuresHeader,
+  .failureRow,
+  .failureLoading,
+  .moreFailures,
+  .outcomeNotice,
+  .recentRunsHeader,
   .environmentSummary,
   .runRow,
   .environmentRow {
@@ -554,21 +687,13 @@
     display: none;
   }
 
-  .testSummary > div {
-    padding-block: var(--acton-space-3);
+  .latestRun {
+    min-height: 8rem;
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .testSummary strong {
-    font-size: var(--acton-font-size-lg);
-  }
-
-  .chartArea {
-    grid-template-columns: 1.75rem minmax(0, 1fr);
-    padding-inline: var(--acton-space-4);
-  }
-
-  .chartLegend {
-    padding-left: 3.75rem;
+  .latestRun > svg {
+    display: none;
   }
 
   .runRow {

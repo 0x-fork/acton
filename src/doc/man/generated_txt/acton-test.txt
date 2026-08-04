@@ -159,6 +159,11 @@ OPTIONS
        --junit-merge
            Merge all test suites into a single JUnit XML file.
 
+       --no-studio-reporting
+           Do not send test run data to Acton Studio for this run.
+
+           This overrides [test].studio-reporting = true.
+
        --ui
            Open test results in a browser UI.
 
@@ -327,6 +332,9 @@ DISCOVERY
 
 REPORTING AND ARTIFACTS
        o  --reporter on the CLI overrides [test].reporter for the current run
+
+       o  --no-studio-reporting disables Studio reporting for the current run
+          even when [test].studio-reporting is enabled and Studio is running
 
        o  --ui adds the browser UI in addition to text reporters
 

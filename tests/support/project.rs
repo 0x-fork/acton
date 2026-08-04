@@ -81,6 +81,7 @@ pub(crate) struct TestConfig {
     pub fuzz_seed: Option<u64>,
     pub fail_on_diff: Option<bool>,
     pub fail_fast: Option<bool>,
+    pub studio_reporting: Option<bool>,
 }
 
 #[allow(dead_code)]
@@ -1059,6 +1060,10 @@ version = "0.1.0"
 
             if let Some(fail_on_diff) = config.fail_on_diff {
                 let _ = writeln!(toml_content, "fail-on-diff = {fail_on_diff}");
+            }
+
+            if let Some(studio_reporting) = config.studio_reporting {
+                let _ = writeln!(toml_content, "studio-reporting = {studio_reporting}");
             }
 
             if let Some(gas_profile) = &config.gas_profile {

@@ -213,6 +213,12 @@ Defaults to `[test].junit-path`, or `test-results` when it is not configured.
 Merge all test suites into a single JUnit XML file.
 {{/option}}
 
+{{#option "`--no-studio-reporting`" }}
+Do not send test run data to Acton Studio for this run.
+
+This overrides `[test].studio-reporting = true`.
+{{/option}}
+
 {{#option "`--ui`" }}
 Open test results in a browser UI.
 {{/option}}
@@ -401,6 +407,8 @@ Acton discovers tests by finding files that end with `.test.tolk`.
 ## Reporting And Artifacts
 
 - `--reporter` on the CLI overrides `[test].reporter` for the current run
+- `--no-studio-reporting` disables Studio reporting for the current run even
+  when `[test].studio-reporting` is enabled and Studio is running
 - `--ui` adds the browser UI in addition to text reporters
 - `--coverage --ui` adds a `Coverage` tab to the browser UI for browsing
   coverage summaries, files, and annotated source

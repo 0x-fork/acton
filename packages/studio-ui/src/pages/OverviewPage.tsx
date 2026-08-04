@@ -1,14 +1,28 @@
 import {Skeleton} from "@acton/ui"
-import {ArrowRight, Boxes, CircleGauge, FolderKanban, FlaskConical} from "lucide-react"
-import type {CSSProperties, MouseEvent, ReactNode} from "react"
+import {
+  ArrowRight,
+  Ban,
+  Boxes,
+  Check,
+  CircleAlert,
+  CircleGauge,
+  FlaskConical,
+  FolderKanban,
+  LoaderCircle,
+} from "lucide-react"
+import {useEffect, useState} from "react"
+import type {MouseEvent, ReactNode} from "react"
 
 import {environmentStatusLabels, formatEnvironmentType} from "../environmentPresentation"
 import type {
   EnvironmentStatus,
   StudioConnectionState,
   StudioEnvironment,
+  TestRunRecord,
+  TestRunStatus,
   TestRunSummary,
 } from "../studioApi"
+import {fetchStudioTestRun} from "../studioApi"
 import type {StudioPath} from "../studioPages"
 import {
   formatTestRunDuration,
@@ -34,8 +48,7 @@ interface OverviewPageProps {
   readonly onSelectTestRun: (runId: string) => void
 }
 
-const chartRunCount = 10
-const recentRunCount = 4
+const recentRunCount = 3
 const visibleEnvironmentCount = 4
 const environmentStatuses: readonly EnvironmentStatus[] = [
   "running",
@@ -89,12 +102,34 @@ export function OverviewPage({
   const runningEnvironmentCount = environments.filter(
     environment => environment.status === "running",
   ).length
-  const chartRuns = testRuns.slice(0, chartRunCount).reverse()
-  const maxTestsInRun = Math.max(1, ...chartRuns.map(run => run.stats.total))
-  const completedRuns = testRuns.filter(run => run.status !== "queued" && run.status !== "running")
-  const totalTests = completedRuns.reduce((total, run) => total + run.stats.total, 0)
-  const passedTests = completedRuns.reduce((total, run) => total + run.stats.passed, 0)
-  const passRate = totalTests === 0 ? undefined : Math.round((passedTests / totalTests) * 100)
+  const latestRun = testRuns[0]
+  const latestRunId = latestRun?.id
+  const latestRunStatus = latestRun?.status
+  const previousRuns = testRuns.slice(1, recentRunCount + 1)
+  const [latestRunDetailsState, setLatestRunDetailsState] = useState<{
+    readonly runId: string
+    readonly run?: TestRunRecord
+  }>()
+
+  useEffect(() => {
+    if (latestRunStatus !== "failed" || !latestRunId) return
+
+    const controller = new AbortController()
+    void fetchStudioTestRun(latestRunId, controller.signal).then(
+      run => {
+        if (!controller.signal.aborted) setLatestRunDetailsState({runId: latestRunId, run})
+      },
+      () => {
+        if (!controller.signal.aborted) setLatestRunDetailsState({runId: latestRunId})
+      },
+    )
+    return () => controller.abort()
+  }, [latestRunId, latestRunStatus])
+
+  const latestRunDetails =
+    latestRunDetailsState?.runId === latestRun?.id ? latestRunDetailsState.run : undefined
+  const latestRunDetailsLoading =
+    latestRun?.status === "failed" && latestRunDetailsState?.runId !== latestRun.id
 
   const navigateFromAnchor = (event: MouseEvent<HTMLAnchorElement>, path: StudioPath) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
@@ -150,17 +185,17 @@ export function OverviewPage({
         <section className={styles.panel} aria-labelledby="test-activity-title">
           <div className={styles.sectionHeader}>
             <div>
-              <h2 id="test-activity-title">Test activity</h2>
-              <p>Results from the latest workspace runs</p>
+              <h2 id="test-activity-title">Tests</h2>
+              <p>Latest result and actionable failures</p>
             </div>
             <a href="/tests" onClick={event => navigateFromAnchor(event, "/tests")}>
-              View tests
+              All runs
               <ArrowRight size={15} aria-hidden="true" />
             </a>
           </div>
 
           {testRunsLoading ? (
-            <LoadingChart />
+            <LoadingTests />
           ) : testRunsError && testRuns.length === 0 ? (
             <PanelMessage title="Could not load test runs" description={testRunsError} />
           ) : testRuns.length === 0 ? (
@@ -171,96 +206,72 @@ export function OverviewPage({
             />
           ) : (
             <>
-              <div className={styles.testSummary}>
-                <div>
-                  <strong>{passRate === undefined ? "—" : `${passRate}%`}</strong>
-                  <span>Pass rate</span>
-                </div>
-                <div>
-                  <strong>{totalTests.toLocaleString()}</strong>
-                  <span>Test executions</span>
-                </div>
-                <div>
-                  <strong>{testRuns.length.toLocaleString()}</strong>
-                  <span>Runs recorded</span>
-                </div>
-              </div>
+              <button
+                type="button"
+                className={styles.latestRun}
+                onClick={() => onSelectTestRun(latestRun.id)}
+              >
+                <span className={styles.latestRunIcon} data-status={latestRun.status}>
+                  <LatestRunStatusIcon status={latestRun.status} />
+                </span>
+                <span className={styles.latestRunCopy}>
+                  <span className={styles.latestRunKicker}>
+                    <span data-status={latestRun.status}>
+                      {testRunStatusLabel(latestRun.status)}
+                    </span>
+                    <span>{latestRun.source === "studio" ? "Studio" : "CLI"}</span>
+                  </span>
+                  <strong>{latestRunHeadline(latestRun)}</strong>
+                  <span className={styles.latestRunMeta}>
+                    {testRunSummary(latestRun)}
+                    <span aria-hidden="true">·</span>
+                    {latestRun.stats.durationMs > 0
+                      ? formatTestRunDuration(latestRun.stats.durationMs)
+                      : "In progress"}
+                    <span aria-hidden="true">·</span>
+                    <time dateTime={latestRun.startedAt}>{testRunTime(latestRun.startedAt)}</time>
+                  </span>
+                  <code title={latestRun.command.join(" ")}>{latestRun.command.join(" ")}</code>
+                </span>
+                <ArrowRight size={17} aria-hidden="true" />
+              </button>
 
-              <div className={styles.chartArea}>
-                <div className={styles.chartScale} aria-hidden="true">
-                  <span>{maxTestsInRun}</span>
-                  <span>0</span>
-                </div>
-                <ol className={styles.runChart} aria-label="Tests in recent runs">
-                  {chartRuns.map(run => (
-                    <li key={run.id} className={styles.runChartItem}>
+              <LatestRunOutcome
+                run={latestRun}
+                details={latestRunDetails}
+                detailsLoading={latestRunDetailsLoading}
+              />
+
+              {previousRuns.length > 0 ? (
+                <>
+                  <div className={styles.recentRunsHeader}>
+                    <strong>Previous runs</strong>
+                    <span>{previousRuns.length}</span>
+                  </div>
+                  <div className={styles.recentRuns}>
+                    {previousRuns.map(run => (
                       <button
+                        key={run.id}
                         type="button"
-                        className={styles.runBarButton}
-                        aria-label={`${testRunTime(run.startedAt)}, ${testRunSummary(run)}`}
-                        title={`${testRunTime(run.startedAt)} · ${testRunSummary(run)}`}
+                        className={styles.runRow}
                         onClick={() => onSelectTestRun(run.id)}
                       >
-                        <span
-                          className={styles.runBar}
-                          data-status={run.status}
-                          style={
-                            {
-                              "--run-height": `${Math.max(6, (run.stats.total / maxTestsInRun) * 100)}%`,
-                            } as CSSProperties
-                          }
-                        >
-                          {run.stats.total > 0 ? (
-                            <>
-                              <span
-                                className={styles.runBarPassed}
-                                style={{flexGrow: run.stats.passed}}
-                              />
-                              <span
-                                className={styles.runBarFailed}
-                                style={{flexGrow: run.stats.failed}}
-                              />
-                              <span
-                                className={styles.runBarSkipped}
-                                style={{flexGrow: run.stats.skipped + run.stats.todo}}
-                              />
-                            </>
-                          ) : (
-                            <span className={styles.runBarEmpty} />
-                          )}
+                        <span className={styles.runStatus} data-status={run.status}>
+                          {testRunStatusLabel(run.status)}
                         </span>
+                        <span className={styles.runDescription}>{testRunSummary(run)}</span>
+                        <span className={styles.runDuration}>
+                          {run.stats.durationMs > 0
+                            ? formatTestRunDuration(run.stats.durationMs)
+                            : "—"}
+                        </span>
+                        <span className={styles.runTime}>{testRunTime(run.startedAt)}</span>
+                        <ArrowRight size={15} aria-hidden="true" />
                       </button>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-
-              <div className={styles.chartLegend} aria-label="Chart legend">
-                <span data-tone="passed">Passed</span>
-                <span data-tone="failed">Failed</span>
-                <span data-tone="skipped">Skipped or todo</span>
-              </div>
-
-              <div className={styles.recentRuns}>
-                {testRuns.slice(0, recentRunCount).map(run => (
-                  <button
-                    key={run.id}
-                    type="button"
-                    className={styles.runRow}
-                    onClick={() => onSelectTestRun(run.id)}
-                  >
-                    <span className={styles.runStatus} data-status={run.status}>
-                      {testRunStatusLabel(run.status)}
-                    </span>
-                    <span className={styles.runDescription}>{testRunSummary(run)}</span>
-                    <span className={styles.runDuration}>
-                      {run.stats.durationMs > 0 ? formatTestRunDuration(run.stats.durationMs) : "—"}
-                    </span>
-                    <span className={styles.runTime}>{testRunTime(run.startedAt)}</span>
-                    <ArrowRight size={15} aria-hidden="true" />
-                  </button>
-                ))}
-              </div>
+                    ))}
+                  </div>
+                </>
+              ) : null}
             </>
           )}
         </section>
@@ -366,17 +377,137 @@ export function OverviewPage({
   )
 }
 
-function LoadingChart() {
+function LatestRunOutcome({
+  details,
+  detailsLoading,
+  run,
+}: {
+  readonly details?: TestRunRecord
+  readonly detailsLoading: boolean
+  readonly run: TestRunSummary
+}) {
+  if (run.status === "failed") {
+    const failures = details?.reports.filter(report => report.status === "Failed").slice(0, 3) ?? []
+    const remainingFailures = Math.max(0, run.stats.failed - failures.length)
+
+    return (
+      <section className={styles.failures} aria-label="Failures in the latest run">
+        <header className={styles.failuresHeader}>
+          <strong>Failures</strong>
+          {run.stats.failed > 0 ? <span>{run.stats.failed}</span> : null}
+        </header>
+        {detailsLoading ? (
+          <div className={styles.failureLoading} role="status" aria-label="Loading failures">
+            <Skeleton width="38%" />
+            <Skeleton width="72%" />
+          </div>
+        ) : failures.length > 0 ? (
+          <div className={styles.failureList}>
+            {failures.map(report => {
+              const message = failureMessage(report)
+              return (
+                <div
+                  key={`${report.file_path}:${report.row}:${report.column}:${report.name}`}
+                  className={styles.failureRow}
+                >
+                  <CircleAlert size={16} aria-hidden="true" />
+                  <span className={styles.failureCopy}>
+                    <strong>{report.name}</strong>
+                    <code title={report.file_path}>
+                      {relativeTestLocation(report.file_path, details?.projectRoot, report.row)}
+                    </code>
+                    {message ? <small title={message}>{message}</small> : null}
+                  </span>
+                </div>
+              )
+            })}
+            {remainingFailures > 0 ? (
+              <div className={styles.moreFailures}>
+                +{remainingFailures} more {remainingFailures === 1 ? "failure" : "failures"}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <OutcomeNotice
+            status="failed"
+            title="Run failed before test results were recorded"
+            description={run.error ?? "Open the run to inspect runner output and build errors"}
+          />
+        )}
+      </section>
+    )
+  }
+
+  if (run.status === "passed") {
+    return (
+      <OutcomeNotice
+        status="passed"
+        title="No failures in the latest run"
+        description={testRunSummary(run)}
+      />
+    )
+  }
+
+  if (run.status === "cancelled") {
+    return (
+      <OutcomeNotice
+        status="cancelled"
+        title="Latest run was cancelled"
+        description={run.error ?? "Start another run when you are ready"}
+      />
+    )
+  }
+
+  return (
+    <OutcomeNotice
+      status={run.status}
+      title={run.status === "queued" ? "Test run is queued" : "Test run is in progress"}
+      description="Results and failures will appear here when the run finishes"
+    />
+  )
+}
+
+function OutcomeNotice({
+  description,
+  status,
+  title,
+}: {
+  readonly description: string
+  readonly status: TestRunStatus
+  readonly title: string
+}) {
+  return (
+    <div className={styles.outcomeNotice} data-status={status}>
+      <LatestRunStatusIcon status={status} />
+      <span>
+        <strong>{title}</strong>
+        <small>{description}</small>
+      </span>
+    </div>
+  )
+}
+
+function LatestRunStatusIcon({status}: {readonly status: TestRunStatus}) {
+  if (status === "passed") return <Check size={18} aria-hidden="true" />
+  if (status === "failed") return <CircleAlert size={18} aria-hidden="true" />
+  if (status === "cancelled") return <Ban size={18} aria-hidden="true" />
+  return <LoaderCircle className={styles.spinner} size={18} aria-hidden="true" />
+}
+
+function LoadingTests() {
   return (
     <div className={styles.loadingPanel} role="status" aria-label="Loading test activity">
-      <div className={styles.loadingMetrics}>
-        <Skeleton width="5rem" height="2rem" />
-        <Skeleton width="5rem" height="2rem" />
-        <Skeleton width="5rem" height="2rem" />
+      <div className={styles.loadingLatestRun}>
+        <Skeleton shape="rect" width="2.5rem" height="2.5rem" radius="md" />
+        <div>
+          <Skeleton width="6rem" />
+          <Skeleton width="15rem" height="1.5rem" />
+          <Skeleton width="21rem" />
+        </div>
       </div>
-      <Skeleton shape="rect" width="100%" height="10rem" radius="md" />
-      <Skeleton width="100%" height="3rem" />
-      <Skeleton width="100%" height="3rem" />
+      <Skeleton width="58%" />
+      <Skeleton width="100%" height="3.5rem" />
+      <Skeleton width="100%" height="3.5rem" />
     </div>
   )
 }
@@ -414,4 +545,31 @@ function PanelMessage({
 function formatEnvironmentMetadata(environment: StudioEnvironment) {
   const type = formatEnvironmentType(environment.config)
   return type === environment.network.label ? type : `${type} · ${environment.network.label}`
+}
+
+function latestRunHeadline(run: TestRunSummary) {
+  if (run.status === "failed") {
+    if (run.stats.failed === 1) return "1 test failed"
+    if (run.stats.failed > 1) return `${run.stats.failed} tests failed`
+    return "Test run failed"
+  }
+  if (run.status === "passed") {
+    return run.stats.total === 1 ? "1 test passed" : `${run.stats.total} tests passed`
+  }
+  if (run.status === "cancelled") return "Test run cancelled"
+  return run.status === "queued" ? "Waiting to start" : "Running tests"
+}
+
+function relativeTestLocation(filePath: string, projectRoot: string | undefined, row: number) {
+  const normalizedPath = filePath.replaceAll("\\", "/")
+  const normalizedRoot = projectRoot?.replaceAll("\\", "/").replace(/\/$/, "")
+  const relativePath =
+    normalizedRoot && normalizedPath.startsWith(`${normalizedRoot}/`)
+      ? normalizedPath.slice(normalizedRoot.length + 1)
+      : normalizedPath
+  return `${relativePath}:${row + 1}`
+}
+
+function failureMessage(report: TestRunRecord["reports"][number]) {
+  return report.message?.trim() || report.detailed_message?.trim() || report.details?.trim()
 }

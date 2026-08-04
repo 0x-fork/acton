@@ -298,6 +298,7 @@ Configures the behavior of `acton test`.
 | `fork-block-number`         | `integer`  | -             | Specific block number to fork from.                                    |
 | `fail-fast`                 | `boolean`  | `false`       | Stop execution after the first test failure.                           |
 | `fail-on-diff`              | `boolean`  | `false`       | Exit with non-zero code when profiling differs from baseline snapshot. |
+| `studio-reporting`          | `boolean`  | `true`        | Send test run data to Acton Studio when it is available.               |
 | `gas-profile`               | `string`   | -             | Path to write a gas-weighted execution profile.                        |
 | `gas-profile-format`        | `string`   | `cpuprofile`  | Gas profile output format: `cpuprofile` or `collapsed`.                |
 | `gas-profile-include-tests` | `boolean`  | `false`       | Include `.test.tolk` unit-test get-method execution in the profile.    |

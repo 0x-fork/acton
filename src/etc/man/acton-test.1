@@ -209,6 +209,13 @@ Defaults to \fB[test].junit\-path\fR, or \fBtest\-results\fR when it is not conf
 Merge all test suites into a single JUnit XML file.
 .RE
 .sp
+\fB\-\-no\-studio\-reporting\fR
+.RS 4
+Do not send test run data to Acton Studio for this run.
+.sp
+This overrides \fB[test].studio\-reporting = true\fR\&.
+.RE
+.sp
 \fB\-\-ui\fR
 .RS 4
 Open test results in a browser UI.
@@ -422,6 +429,11 @@ Acton discovers tests by finding files that end with \fB\&.test.tolk\fR\&.
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-reporter\fR on the CLI overrides \fB[test].reporter\fR for the current run
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-no\-studio\-reporting\fR disables Studio reporting for the current run even
+when \fB[test].studio\-reporting\fR is enabled and Studio is running
 .RE
 .sp
 .RS 4

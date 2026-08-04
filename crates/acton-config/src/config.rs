@@ -331,6 +331,8 @@ pub struct TestSettings {
     pub fail_fast: Option<bool>,
     /// Exit with a non-zero code when profiling differs from baseline
     pub fail_on_diff: Option<bool>,
+    /// Send test run data to Acton Studio when it is available
+    pub studio_reporting: Option<bool>,
     /// Enable the test UI server
     pub ui: Option<bool>,
     /// Port for the test UI server
@@ -1447,6 +1449,7 @@ impl TestSettings {
             fail_on_diff: fail_on_diff_override
                 .unwrap_or_else(|| self.fail_on_diff.unwrap_or(false)),
             fail_fast: fail_fast_override.unwrap_or_else(|| self.fail_fast.unwrap_or(false)),
+            studio_reporting: self.studio_reporting.unwrap_or(true),
             ui: ui_override || self.ui.unwrap_or(false),
             ui_port: ui_port_override.unwrap_or_else(|| self.ui_port.unwrap_or(12344)),
         }
@@ -1520,6 +1523,7 @@ mod tests {
             junit_path: Some("configured-reports".to_owned()),
             fork_net: Some("custom:devnet".to_owned()),
             fail_fast: Some(true),
+            studio_reporting: Some(false),
             ui_port: Some(23_456),
             fork_block_number: Some(111_111),
             ..TestSettings::default()
@@ -1531,6 +1535,7 @@ mod tests {
         assert_eq!(config.fork_net, Some(Network::Custom(Arc::from("devnet"))));
         assert_eq!(config.fork_block_number, Some(111_111));
         assert!(config.fail_fast);
+        assert!(!config.studio_reporting);
         assert_eq!(config.ui_port, 23_456);
 
         let config = test_settings_to_config(
@@ -1547,6 +1552,7 @@ mod tests {
         assert_eq!(config.fork_net, Some(Network::Testnet));
         assert_eq!(config.fork_block_number, Some(222_222));
         assert!(!config.fail_fast);
+        assert!(!config.studio_reporting);
         assert_eq!(config.ui_port, 34_567);
     }
 
@@ -1560,6 +1566,7 @@ mod tests {
         assert_eq!(config.fork_net, None);
         assert_eq!(config.fork_block_number, None);
         assert!(!config.fail_fast);
+        assert!(config.studio_reporting);
         assert_eq!(config.ui_port, 12_344);
     }
 
@@ -2030,6 +2037,7 @@ exclude = ["**/integration/**"]
 include = ["**/unit/**"]
 junit-path = "custom-reports"
 junit-merge = true
+studio-reporting = false
 
 [test.coverage]
 enabled = true
@@ -2080,6 +2088,7 @@ seed = 42
         assert_eq!(test_settings.include, Some(vec!["**/unit/**".to_string()]));
         assert_eq!(test_settings.junit_path, Some("custom-reports".to_string()));
         assert_eq!(test_settings.junit_merge, Some(true));
+        assert_eq!(test_settings.studio_reporting, Some(false));
     }
 
     #[test]
