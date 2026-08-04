@@ -20,8 +20,9 @@ import type {ProjectWalletRecord} from "./types"
 
 const TON_CONNECT_BRIDGE_URL =
   import.meta.env.VITE_TON_CONNECT_BRIDGE_URL?.trim() || "https://bridge.tonapi.io/bridge"
-export const ACTON_WALLET_APP_NAME = "Acton Studio"
-export const ACTON_WALLET_JS_BRIDGE_KEY = "acton-studio"
+const TONKEEPER_WALLET_NAME = "Tonkeeper"
+const TONKEEPER_WALLET_APP_NAME = "tonkeeper"
+const TONKEEPER_WALLET_JS_BRIDGE_KEY = "tonkeeper"
 
 function getWalletOrigin(): string {
   if (globalThis.location === undefined) {
@@ -89,7 +90,7 @@ export function createWalletKit(
 
   return new TonWalletKit({
     deviceInfo: createDeviceInfo({
-      appName: ACTON_WALLET_APP_NAME,
+      appName: TONKEEPER_WALLET_APP_NAME,
       appVersion: "0.1.0",
       features: [
         "SendTransaction",
@@ -98,13 +99,13 @@ export function createWalletKit(
       ],
     }),
     walletManifest: createWalletManifest({
-      name: ACTON_WALLET_APP_NAME,
-      appName: ACTON_WALLET_APP_NAME,
+      name: TONKEEPER_WALLET_NAME,
+      appName: TONKEEPER_WALLET_APP_NAME,
       imageUrl: walletIconUrl,
       aboutUrl: origin,
       universalLink: walletUrl,
       bridgeUrl: TON_CONNECT_BRIDGE_URL,
-      jsBridgeKey: ACTON_WALLET_JS_BRIDGE_KEY,
+      jsBridgeKey: TONKEEPER_WALLET_JS_BRIDGE_KEY,
       injected: false,
       embedded: false,
       platforms: ["chrome", "firefox", "safari", "android", "ios", "windows", "macos", "linux"],
