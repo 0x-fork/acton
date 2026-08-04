@@ -204,14 +204,11 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   const navigate = useNavigate()
   const routes = useLocalnetRoutes()
   const {environment} = useLocalnetRuntime()
-  const {forkNetwork, network} = useNetworkInfo()
+  const {forkNetwork} = useNetworkInfo()
   const navigationRef = useRef<HTMLElement>(null)
   const [explorerPath, setExplorerPath] = useState(() => readExplorerLastPath())
   const forkBadgeLabel =
-    environment?.config.kind === "fullTonNetwork"
-      ? undefined
-      : (formatForkNetworkLabel(forkNetwork) ??
-        (network.id === "localnet" ? undefined : network.label))
+    environment?.config.kind === "actonLocalnet" ? formatForkNetworkLabel(forkNetwork) : undefined
   const visibleStandaloneItems = supports(environment, "simulator") ? standaloneItems : []
   const visibleEnvironmentItems = environmentItems.filter(item =>
     item.path === "/wallets"

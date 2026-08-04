@@ -58,6 +58,7 @@ pub(crate) struct IsolatedPullTarget {
 }
 
 impl FullTonNetworkDriver {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn materialize(
         data_dir: &Path,
         workspace_root: &Path,

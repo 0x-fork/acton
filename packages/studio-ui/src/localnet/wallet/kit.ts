@@ -76,6 +76,17 @@ function createLocalnetApiClient(
   })
 }
 
+function resolveNetwork(chainId: number): Network {
+  if (chainId === Number(Network.mainnet().chainId)) {
+    return Network.mainnet()
+  }
+  if (chainId === Number(Network.testnet().chainId)) {
+    return Network.testnet()
+  }
+
+  return Network.custom(String(chainId))
+}
+
 export function createWalletKit(
   apiBaseUrl: string,
   environmentId: string,
@@ -86,7 +97,7 @@ export function createWalletKit(
   const walletUrl = origin
   const walletIconUrl = new URL("/favicon.svg", origin).toString()
   const apiEndpoint = getApiEndpoint(apiBaseUrl)
-  const network = Network.custom(String(chainId))
+  const network = resolveNetwork(chainId)
 
   return new TonWalletKit({
     deviceInfo: createDeviceInfo({
@@ -134,7 +145,7 @@ export async function addProjectWalletToKit(
   },
 ): Promise<Wallet | undefined> {
   const signer = createStudioWalletSigner(options.environmentId, walletRecord)
-  const network = Network.custom(String(options.chainId))
+  const network = resolveNetwork(options.chainId)
   const client = kit.getApiClient(network)
   const adapterOptions = {
     client,

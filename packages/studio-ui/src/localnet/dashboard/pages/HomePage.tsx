@@ -143,11 +143,12 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   const networkSummary = hasSimulatedControlApi
     ? forkSummary
     : (environment?.network.label ?? "Virtual environment")
-  const forkBadgeLabel =
-    formatForkNetworkLabel(forkNetwork) ??
-    (environment?.network.id === "localnet"
-      ? "Local genesis"
-      : (environment?.network.label ?? "Local genesis"))
+  const forkBadgeLabel = remoteNetworkConfig
+    ? undefined
+    : (formatForkNetworkLabel(forkNetwork) ??
+      (environment?.network.id === "localnet"
+        ? "Local genesis"
+        : (environment?.network.label ?? "Local genesis")))
   const connectPanelStorageKey = runtime.environment?.id
     ? `${CONNECT_PANEL_DISMISSED_STORAGE_PREFIX}${runtime.environment.id}`
     : undefined
@@ -408,9 +409,11 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           <h1 className={styles.environmentHomeName}>
             {runtime.environment?.name ?? "Virtual environment"}
           </h1>
-          <span className={styles.workspaceForkBadge} title={networkSummary}>
-            {forkBadgeLabel}
-          </span>
+          {forkBadgeLabel ? (
+            <span className={styles.workspaceForkBadge} title={networkSummary}>
+              {forkBadgeLabel}
+            </span>
+          ) : undefined}
         </div>
         <EnvironmentActions
           client={client}

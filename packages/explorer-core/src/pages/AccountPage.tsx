@@ -1,6 +1,6 @@
 import {useLocation, useNavigate, useParams} from "react-router"
-import {useCallback, useEffect, useMemo, useRef, useState} from "react"
-import type {FC, ReactNode} from "react"
+import {useCallback, useEffect, useMemo, useReducer, useRef, useState} from "react"
+import type {FC, ReactNode, SetStateAction} from "react"
 
 import {codeLookupHashHex} from "@acton/transaction-ui"
 import {Button, Dialog, HighlightedCode, RawDataBlock} from "@acton/ui"
@@ -138,6 +138,63 @@ interface AccountLoadIssue {
   readonly networkLabel: string
 }
 
+interface AccountActionHistoryState {
+  readonly actions: V3Action[]
+  readonly tracesLoadMore: Record<string, ActionTraceLoadMoreState>
+}
+
+type AccountActionHistoryStateAction =
+  | {readonly type: "set-actions"; readonly update: SetStateAction<V3Action[]>}
+  | {
+      readonly type: "set-traces-load-more"
+      readonly update: SetStateAction<Record<string, ActionTraceLoadMoreState>>
+    }
+  | {
+      readonly type: "merge-streamed-actions"
+      readonly actions: readonly V3Action[]
+      readonly sortOrder: AccountHistorySortOrder
+    }
+
+const INITIAL_ACCOUNT_ACTION_HISTORY_STATE: AccountActionHistoryState = {
+  actions: [],
+  tracesLoadMore: {},
+}
+
+function accountActionHistoryReducer(
+  state: AccountActionHistoryState,
+  action: AccountActionHistoryStateAction,
+): AccountActionHistoryState {
+  switch (action.type) {
+    case "set-actions":
+      return {
+        ...state,
+        actions: resolveStateUpdate(state.actions, action.update),
+      }
+    case "set-traces-load-more":
+      return {
+        ...state,
+        tracesLoadMore: resolveStateUpdate(state.tracesLoadMore, action.update),
+      }
+    case "merge-streamed-actions": {
+      const merged = mergeStreamedActions(state.actions, action.actions, action.sortOrder)
+      return {
+        actions: merged.actions,
+        tracesLoadMore: markCollapsedActionTraces(
+          state.tracesLoadMore,
+          merged.collapsedTraceIds,
+          merged.actions,
+        ),
+      }
+    }
+    default:
+      return state
+  }
+}
+
+function resolveStateUpdate<T>(current: T, update: SetStateAction<T>): T {
+  return typeof update === "function" ? (update as (current: T) => T)(current) : update
+}
+
 export const AccountPage: FC<AccountPageProps> = ({
   client,
   enableJettonMint = false,
@@ -169,7 +226,19 @@ export const AccountPage: FC<AccountPageProps> = ({
   const [historySortOrder, setHistorySortOrder] = useState<AccountHistorySortOrder>(
     readAccountHistorySortOrder,
   )
-  const [actions, setActions] = useState<V3Action[]>([])
+  const [{actions, tracesLoadMore: actionTracesLoadMore}, dispatchActionHistory] = useReducer(
+    accountActionHistoryReducer,
+    INITIAL_ACCOUNT_ACTION_HISTORY_STATE,
+  )
+  const setActions = useCallback(
+    (update: SetStateAction<V3Action[]>) => dispatchActionHistory({type: "set-actions", update}),
+    [],
+  )
+  const setActionTracesLoadMore = useCallback(
+    (update: SetStateAction<Record<string, ActionTraceLoadMoreState>>) =>
+      dispatchActionHistory({type: "set-traces-load-more", update}),
+    [],
+  )
   const [actionMetadata, setActionMetadata] = useState<V3Metadata>({})
   const [highlightedTransactionHashes, setHighlightedTransactionHashes] = useState<string[]>([])
   const [transactionsHasMore, setTransactionsHasMore] = useState(false)
@@ -177,9 +246,6 @@ export const AccountPage: FC<AccountPageProps> = ({
   const [actionsCursor, setActionsCursor] = useState<AccountActionPageCursor>({offset: 0})
   const [actionsHasMore, setActionsHasMore] = useState(false)
   const [actionsLoadingMore, setActionsLoadingMore] = useState(false)
-  const [actionTracesLoadMore, setActionTracesLoadMore] = useState<
-    Record<string, ActionTraceLoadMoreState>
-  >({})
   const [jettonMaster, setJettonMaster] = useState<JettonMaster | undefined>()
   const [jettonWalletAccount, setJettonWalletAccount] = useState<JettonWallet | undefined>()
   const [jettonWalletMaster, setJettonWalletMaster] = useState<JettonMasterMetadata | undefined>()
@@ -697,6 +763,8 @@ export const AccountPage: FC<AccountPageProps> = ({
     historyRequestKey,
     historySortOrder,
     initialTransactionLimit,
+    setActions,
+    setActionTracesLoadMore,
     supportsAccountActions,
     updateDomains,
   ])
@@ -989,12 +1057,10 @@ export const AccountPage: FC<AccountPageProps> = ({
             if (event.metadata) {
               setActionMetadata(current => ({...current, ...event.metadata}))
             }
-            setActions(current => {
-              const merged = mergeStreamedActions(current, event.actions, historySortOrder)
-              setActionTracesLoadMore(traceState =>
-                markCollapsedActionTraces(traceState, merged.collapsedTraceIds, merged.actions),
-              )
-              return merged.actions
+            dispatchActionHistory({
+              type: "merge-streamed-actions",
+              actions: event.actions,
+              sortOrder: historySortOrder,
             })
             setActionsLoading(false)
             setActionsError(undefined)
