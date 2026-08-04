@@ -14,6 +14,16 @@ import {
   Button,
   CopyButton,
   CopyInlineAction,
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableEmpty,
+  DataTableFooter,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableSkeletonRows,
+  DataTableTable,
   InlineAction,
   InlineActions,
   Input,
@@ -944,35 +954,38 @@ const BlockTableSection: FC<{
     return <BlockTableSkeleton title={title} rows={4} showShardFlags={showShardFlags} />
   }
 
-  if (blocks.length === 0) {
-    return <TableStateBlock title={title}>{emptyLabel}</TableStateBlock>
-  }
-
   return (
-    <section className={styles.blocksTableFrame} aria-label={title}>
-      <header className={styles.blocksTableTitle}>{title}</header>
-      <div className={styles.blocksTableScroller}>
-        <table className={`${styles.blocksTable} ${showShardFlags ? styles.shardBlocksTable : ""}`}>
-          <thead>
-            <tr>
-              <th>Block</th>
-              <th>Transactions</th>
-              <th>Generated at</th>
-              {showShardFlags ? (
-                <>
-                  <th>Before split</th>
-                  <th>After split</th>
-                  <th>Want split</th>
-                  <th>Want merge</th>
-                </>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody>
-            {blocks.map(block => (
-              <tr
+    <DataTable title={title} minWidth={showShardFlags ? "42rem" : "32.5rem"} aria-label={title}>
+      <DataTableTable aria-label={title} layout="fixed">
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell columnWidth={showShardFlags ? "20%" : "14rem"}>
+              Block
+            </DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth={showShardFlags ? "18%" : "8rem"}>
+              Transactions
+            </DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth={showShardFlags ? "18%" : "12rem"}>
+              Generated at
+            </DataTableHeaderCell>
+            {showShardFlags ? (
+              <>
+                <DataTableHeaderCell columnWidth="11%">Before split</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="11%">After split</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="11%">Want split</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="11%">Want merge</DataTableHeaderCell>
+              </>
+            ) : null}
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
+          {blocks.length === 0 ? (
+            <DataTableEmpty colSpan={showShardFlags ? 7 : 3}>{emptyLabel}</DataTableEmpty>
+          ) : (
+            blocks.map(block => (
+              <DataTableRow
                 key={formatToncenterBlockId(block)}
-                className={styles.blocksTableRow}
+                interactive
                 tabIndex={0}
                 onClick={event => onOpenBlock(block, event)}
                 onKeyDown={event => {
@@ -982,7 +995,7 @@ const BlockTableSection: FC<{
                   }
                 }}
               >
-                <td className={styles.blocksPrimaryCell}>
+                <DataTableCell>
                   <BlockChip
                     workchain={block.workchain}
                     shard={block.shard}
@@ -993,37 +1006,38 @@ const BlockTableSection: FC<{
                       onOpenBlock(block, event)
                     }}
                   />
-                </td>
-                <td>{block.tx_count.toLocaleString()}</td>
-                <td
+                </DataTableCell>
+                <DataTableCell>{block.tx_count.toLocaleString()}</DataTableCell>
+                <DataTableCell
                   title={formatAbsoluteBlockTime(block)}
                   data-visual-dynamic="time"
                   data-visual-placeholder="<time>"
+                  truncate
                 >
                   {formatAbsoluteBlockTime(block)}
-                </td>
+                </DataTableCell>
                 {showShardFlags ? (
                   <>
-                    <td>
+                    <DataTableCell align="center">
                       <BooleanValue value={block.before_split} />
-                    </td>
-                    <td>
+                    </DataTableCell>
+                    <DataTableCell align="center">
                       <BooleanValue value={block.after_split} />
-                    </td>
-                    <td>
+                    </DataTableCell>
+                    <DataTableCell align="center">
                       <BooleanValue value={block.want_split} />
-                    </td>
-                    <td>
+                    </DataTableCell>
+                    <DataTableCell align="center">
                       <BooleanValue value={block.want_merge} />
-                    </td>
+                    </DataTableCell>
                   </>
                 ) : null}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+              </DataTableRow>
+            ))
+          )}
+        </DataTableBody>
+      </DataTableTable>
+    </DataTable>
   )
 }
 
@@ -1074,33 +1088,32 @@ const BlockTransactionsTable: FC<{
     return () => observer.disconnect()
   }, [hasMore, isLoadingMore, loadMoreError, onLoadMore])
 
-  if (transactions.length === 0) {
-    return <TableStateBlock title="Transactions">No transactions in this block</TableStateBlock>
-  }
-
   return (
-    <section className={styles.blocksTableFrame} aria-label="Transactions">
-      <header className={styles.blocksTableTitle}>Transactions</header>
-      <div className={styles.blocksTableScroller}>
-        <table className={`${styles.blocksTable} ${styles.blockTransactionsTable}`}>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Account</th>
-              <th>Logical time</th>
-              <th>Hash</th>
-              <th>Exit code</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transactions.map((transaction, index) => {
+    <DataTable title="Transactions" minWidth="47.5rem" aria-label="Transactions">
+      <DataTableTable aria-label="Transactions" layout="fixed">
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell columnWidth="3.375rem">#</DataTableHeaderCell>
+            <DataTableHeaderCell>Account</DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth="8.125rem">Logical time</DataTableHeaderCell>
+            <DataTableHeaderCell>Hash</DataTableHeaderCell>
+            <DataTableHeaderCell align="right" columnWidth="8.125rem">
+              Exit code
+            </DataTableHeaderCell>
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
+          {transactions.length === 0 ? (
+            <DataTableEmpty colSpan={5}>No transactions in this block</DataTableEmpty>
+          ) : (
+            transactions.map((transaction, index) => {
               const hash = hashToHex(transaction.hash) ?? transaction.hash
               const exitCode = formatTransactionExitCode(transaction)
               const hasNonZeroExitCode = exitCode !== "0" && exitCode !== "Unknown"
               return (
-                <tr
+                <DataTableRow
                   key={`${transaction.hash}:${transaction.lt}`}
-                  className={styles.blocksTableRow}
+                  interactive
                   tabIndex={0}
                   onClick={event => onOpenTransaction(transaction.hash, event)}
                   onKeyDown={event => {
@@ -1110,16 +1123,16 @@ const BlockTransactionsTable: FC<{
                     }
                   }}
                 >
-                  <td>{index + 1}</td>
-                  <td>
+                  <DataTableCell tone="muted">{index + 1}</DataTableCell>
+                  <DataTableCell>
                     <ExplorerAddressChip
                       address={transaction.account}
                       fallback="Account"
                       onAddressClick={onOpenAccount}
                     />
-                  </td>
-                  <td>{transaction.lt}</td>
-                  <td>
+                  </DataTableCell>
+                  <DataTableCell mono>{transaction.lt}</DataTableCell>
+                  <DataTableCell>
                     <span className={styles.blocksHashCell}>
                       <span className={styles.blocksHashText} title={hash}>
                         {compactMiddle(hash, 18)}
@@ -1131,39 +1144,45 @@ const BlockTransactionsTable: FC<{
                         copiedLabel="Transaction hash copied"
                       />
                     </span>
-                  </td>
-                  <td
-                    className={`${styles.blocksExitCodeCell} ${
-                      hasNonZeroExitCode ? styles.blocksExitCodeFailure : ""
-                    }`}
+                  </DataTableCell>
+                  <DataTableCell
+                    align="right"
+                    mono
+                    className={hasNonZeroExitCode ? styles.blocksExitCodeFailure : undefined}
                   >
                     {exitCode}
-                  </td>
-                </tr>
+                  </DataTableCell>
+                </DataTableRow>
               )
-            })}
-          </tbody>
-        </table>
-      </div>
-      {hasMore ? (
-        <div ref={loadMoreRef} className={styles.blockTransactionsLoadMore}>
-          {loadMoreError ? (
-            <span className={styles.blockTransactionsLoadMoreError} role="alert">
-              {loadMoreError}
-            </span>
-          ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onLoadMore}
-            disabled={isLoadingMore}
-          >
-            {isLoadingMore ? "Loading..." : loadMoreError ? "Retry" : "Load more"}
-          </Button>
-        </div>
-      ) : null}
-    </section>
+            })
+          )}
+        </DataTableBody>
+        {hasMore && transactions.length > 0 ? (
+          <DataTableFooter>
+            <DataTableRow>
+              <DataTableCell colSpan={5} className={styles.blockTransactionsLoadMoreCell}>
+                <div ref={loadMoreRef} className={styles.blockTransactionsLoadMore}>
+                  {loadMoreError ? (
+                    <span className={styles.blockTransactionsLoadMoreError} role="alert">
+                      {loadMoreError}
+                    </span>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onLoadMore}
+                    disabled={isLoadingMore}
+                  >
+                    {isLoadingMore ? "Loading..." : loadMoreError ? "Retry" : "Load more"}
+                  </Button>
+                </div>
+              </DataTableCell>
+            </DataTableRow>
+          </DataTableFooter>
+        ) : null}
+      </DataTableTable>
+    </DataTable>
   )
 }
 
@@ -1172,93 +1191,77 @@ const BlockTableSkeleton: FC<{
   readonly rows: number
   readonly showShardFlags?: boolean
 }> = ({title, rows, showShardFlags = false}) => (
-  <section className={styles.blocksTableFrame} aria-label={`Loading ${title}`}>
-    <header className={styles.blocksTableTitle}>{title}</header>
-    <div className={styles.blocksTableScroller}>
-      <table className={`${styles.blocksTable} ${showShardFlags ? styles.shardBlocksTable : ""}`}>
-        <thead>
-          <tr>
-            <th>Block</th>
-            <th>Transactions</th>
-            <th>Generated at</th>
-            {showShardFlags ? (
-              <>
-                <th>Before split</th>
-                <th>After split</th>
-                <th>Want split</th>
-                <th>Want merge</th>
-              </>
-            ) : null}
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({length: rows}, (_, index) => (
-            <tr key={`block-table-skeleton-${index}`}>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonBlock}`} />
-              </td>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonCount}`} />
-              </td>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonTime}`} />
-              </td>
-              {showShardFlags
-                ? Array.from({length: 4}, (_, flagIndex) => (
-                    <td key={`block-table-skeleton-${index}-flag-${flagIndex}`}>
-                      <span className={`${styles.skeletonLine} ${styles.blocksSkeletonFlag}`} />
-                    </td>
-                  ))
-                : null}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </section>
+  <DataTable
+    title={title}
+    minWidth={showShardFlags ? "42rem" : "32.5rem"}
+    aria-label={`Loading ${title}`}
+  >
+    <DataTableTable aria-busy="true" aria-label={title} layout="fixed">
+      <DataTableHead>
+        <DataTableRow>
+          <DataTableHeaderCell columnWidth={showShardFlags ? "20%" : "14rem"}>
+            Block
+          </DataTableHeaderCell>
+          <DataTableHeaderCell columnWidth={showShardFlags ? "18%" : "8rem"}>
+            Transactions
+          </DataTableHeaderCell>
+          <DataTableHeaderCell columnWidth={showShardFlags ? "18%" : "12rem"}>
+            Generated at
+          </DataTableHeaderCell>
+          {showShardFlags ? (
+            <>
+              <DataTableHeaderCell columnWidth="11%">Before split</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="11%">After split</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="11%">Want split</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="11%">Want merge</DataTableHeaderCell>
+            </>
+          ) : null}
+        </DataTableRow>
+      </DataTableHead>
+      <DataTableBody>
+        <DataTableSkeletonRows
+          columns={showShardFlags ? 7 : 3}
+          rows={rows}
+          alignments={
+            showShardFlags
+              ? ["left", "left", "left", "center", "center", "center", "center"]
+              : undefined
+          }
+          widths={
+            showShardFlags
+              ? ["8rem", "5rem", "8rem", "2.5rem", "2.5rem", "2.5rem", "2.5rem"]
+              : ["8rem", "5rem", "10rem"]
+          }
+        />
+      </DataTableBody>
+    </DataTableTable>
+  </DataTable>
 )
 
 const BlockTransactionsTableSkeleton: FC<{readonly rows: number}> = ({rows}) => (
-  <section className={styles.blocksTableFrame} aria-label="Loading transactions">
-    <header className={styles.blocksTableTitle}>Transactions</header>
-    <div className={styles.blocksTableScroller}>
-      <table className={`${styles.blocksTable} ${styles.blockTransactionsTable}`}>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Account</th>
-            <th>Logical time</th>
-            <th>Hash</th>
-            <th>Exit code</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({length: rows}, (_, index) => (
-            <tr key={`block-transaction-skeleton-${index}`}>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonIndex}`} />
-              </td>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonAccount}`} />
-              </td>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonLt}`} />
-              </td>
-              <td>
-                <span className={styles.blocksSkeletonHashCell}>
-                  <span className={`${styles.skeletonLine} ${styles.blocksSkeletonHash}`} />
-                  <span className={`${styles.skeletonLine} ${styles.blocksSkeletonCopy}`} />
-                </span>
-              </td>
-              <td>
-                <span className={`${styles.skeletonLine} ${styles.blocksSkeletonExitCode}`} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </section>
+  <DataTable title="Transactions" minWidth="47.5rem" aria-label="Loading transactions">
+    <DataTableTable aria-busy="true" aria-label="Transactions" layout="fixed">
+      <DataTableHead>
+        <DataTableRow>
+          <DataTableHeaderCell columnWidth="3.375rem">#</DataTableHeaderCell>
+          <DataTableHeaderCell>Account</DataTableHeaderCell>
+          <DataTableHeaderCell columnWidth="8.125rem">Logical time</DataTableHeaderCell>
+          <DataTableHeaderCell>Hash</DataTableHeaderCell>
+          <DataTableHeaderCell align="right" columnWidth="8.125rem">
+            Exit code
+          </DataTableHeaderCell>
+        </DataTableRow>
+      </DataTableHead>
+      <DataTableBody>
+        <DataTableSkeletonRows
+          columns={5}
+          rows={rows}
+          alignments={["left", "left", "left", "left", "right"]}
+          widths={["2rem", "12rem", "7rem", "15rem", "3rem"]}
+        />
+      </DataTableBody>
+    </DataTableTable>
+  </DataTable>
 )
 
 const BlockSummaryTable: FC<{

@@ -1,4 +1,14 @@
-import {DataTableEmpty} from "@acton/ui"
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableEmpty,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableSkeletonRows,
+  DataTableTable,
+} from "@acton/ui"
 import type {FC, ReactNode} from "react"
 
 import {addressKey} from "../api/compilerAbi"
@@ -57,48 +67,41 @@ export const DeveloperTransactionListSkeleton: FC<{
   readonly title?: string
   readonly rows?: number
 }> = ({className, title, rows = 5}) => (
-  <div
-    className={`${styles.tableWrap} ${className ?? ""}`}
+  <DataTable
+    className={className}
+    title={title}
+    minWidth="45rem"
     aria-label={title ? `Loading ${title}` : "Loading transactions"}
   >
-    {title ? <div className={styles.tableTitle}>{title}</div> : null}
-    <table className={styles.table}>
-      <thead>
-        <tr>
-          <th className={styles.timeHeader}>Time</th>
-          <th className={styles.fromHeader}>From</th>
-          <th className={styles.directionHeader} aria-label="Direction" />
-          <th>To</th>
-          <th className={styles.opcodeHeader}>Opcode</th>
-          <th className={styles.valueHeader}>Value</th>
-        </tr>
-      </thead>
-      <tbody>
-        {Array.from({length: rows}, (_, index) => (
-          <tr key={`developer-transaction-skeleton-${index}`} className={styles.row}>
-            <td className={styles.timeCell}>
-              <span className={`${styles.skeletonLine} ${styles.skeletonTime}`} />
-            </td>
-            <td className={`${styles.addressCell} ${styles.fromCell}`}>
-              <span className={`${styles.skeletonLine} ${styles.skeletonAddress}`} />
-            </td>
-            <td className={styles.directionCell}>
-              <span className={`${styles.skeletonLine} ${styles.skeletonDirection}`} />
-            </td>
-            <td className={styles.addressCell}>
-              <span className={`${styles.skeletonLine} ${styles.skeletonAddress}`} />
-            </td>
-            <td className={styles.opcodeCell}>
-              <span className={`${styles.skeletonLine} ${styles.skeletonOpcode}`} />
-            </td>
-            <td className={styles.valueCell}>
-              <span className={`${styles.skeletonLine} ${styles.skeletonValue}`} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
+    <DataTableTable aria-busy="true" aria-label={title ?? "Loading transactions"} layout="fixed">
+      <DataTableHead>
+        <DataTableRow>
+          <DataTableHeaderCell className={styles.timeCell} columnWidth="6.25rem">
+            Time
+          </DataTableHeaderCell>
+          <DataTableHeaderCell align="right">From</DataTableHeaderCell>
+          <DataTableHeaderCell
+            className={styles.directionCell}
+            columnWidth="3.125rem"
+            aria-label="Direction"
+          />
+          <DataTableHeaderCell>To</DataTableHeaderCell>
+          <DataTableHeaderCell columnWidth="15rem">Opcode</DataTableHeaderCell>
+          <DataTableHeaderCell align="right" columnWidth="12rem">
+            Value
+          </DataTableHeaderCell>
+        </DataTableRow>
+      </DataTableHead>
+      <DataTableBody>
+        <DataTableSkeletonRows
+          columns={6}
+          rows={rows}
+          alignments={["left", "right", "center", "left", "left", "right"]}
+          widths={["3.5rem", "10rem", "1rem", "10rem", "10rem", "5rem"]}
+        />
+      </DataTableBody>
+    </DataTableTable>
+  </DataTable>
 )
 
 export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
@@ -117,20 +120,27 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
   const rows = maxRows === undefined ? allRows : allRows.slice(0, maxRows)
 
   return (
-    <div className={`${styles.tableWrap} ${className ?? ""}`}>
-      {title ? <div className={styles.tableTitle}>{title}</div> : null}
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th className={styles.timeHeader}>Time</th>
-            <th className={styles.fromHeader}>From</th>
-            <th className={styles.directionHeader} aria-label="Direction" />
-            <th>To</th>
-            <th className={styles.opcodeHeader}>Opcode</th>
-            <th className={styles.valueHeader}>Value</th>
-          </tr>
-        </thead>
-        <tbody>
+    <DataTable className={className} title={title} minWidth="45rem" aria-label={title}>
+      <DataTableTable aria-label={title ?? "Transactions"} layout="fixed">
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell className={styles.timeCell} columnWidth="6.25rem">
+              Time
+            </DataTableHeaderCell>
+            <DataTableHeaderCell align="right">From</DataTableHeaderCell>
+            <DataTableHeaderCell
+              className={styles.directionCell}
+              columnWidth="3.125rem"
+              aria-label="Direction"
+            />
+            <DataTableHeaderCell>To</DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth="15rem">Opcode</DataTableHeaderCell>
+            <DataTableHeaderCell align="right" columnWidth="12rem">
+              Value
+            </DataTableHeaderCell>
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
           {rows.length === 0 ? (
             <DataTableEmpty colSpan={6}>{emptyState}</DataTableEmpty>
           ) : (
@@ -140,17 +150,28 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
               const timeTitle = formatAbsoluteTime(row.time)
 
               return (
-                <tr
+                <DataTableRow
                   key={row.key}
-                  className={`${styles.row} ${canOpenTransaction ? styles.rowInteractive : ""}`}
+                  interactive={canOpenTransaction}
+                  tabIndex={canOpenTransaction ? 0 : undefined}
                   onClick={event => {
                     if (hashHex) {
                       onTransactionClick?.(hashHex, row.transaction, event)
                     }
                   }}
+                  onKeyDown={event => {
+                    if (
+                      hashHex &&
+                      (event.key === "Enter" || event.key === " ") &&
+                      onTransactionClick
+                    ) {
+                      event.preventDefault()
+                      onTransactionClick(hashHex, row.transaction)
+                    }
+                  }}
                   title={row.statusLabel}
                 >
-                  <td className={styles.timeCell}>
+                  <DataTableCell className={styles.timeCell} tone="muted">
                     <span
                       title={timeTitle}
                       data-visual-dynamic="time"
@@ -158,15 +179,15 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
                     >
                       {formatTimeAgo(row.time)}
                     </span>
-                  </td>
-                  <td className={`${styles.addressCell} ${styles.fromCell}`}>
+                  </DataTableCell>
+                  <DataTableCell align="right">
                     <EndpointCell
                       endpoint={row.from}
                       copyPlacement="left"
                       onAddressClick={onAddressClick}
                     />
-                  </td>
-                  <td className={styles.directionCell}>
+                  </DataTableCell>
+                  <DataTableCell className={styles.directionCell} align="center">
                     <span
                       className={`${styles.directionBadge} ${
                         row.direction === "IN" ? styles.directionIn : styles.directionOut
@@ -174,14 +195,14 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
                     >
                       {row.direction}
                     </span>
-                  </td>
-                  <td className={styles.addressCell}>
+                  </DataTableCell>
+                  <DataTableCell>
                     <EndpointCell endpoint={row.to} onAddressClick={onAddressClick} />
-                  </td>
-                  <td className={styles.opcodeCell}>
+                  </DataTableCell>
+                  <DataTableCell tone="muted">
                     <span className={styles.opcodeValue}>{row.messageName ?? "—"}</span>
-                  </td>
-                  <td className={styles.valueCell}>
+                  </DataTableCell>
+                  <DataTableCell align="right" tone="strong">
                     <span
                       className={`${styles.valueText} ${
                         row.valueKind === "empty" ? styles.valueEmpty : ""
@@ -189,14 +210,14 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
                     >
                       {row.valueLabel}
                     </span>
-                  </td>
-                </tr>
+                  </DataTableCell>
+                </DataTableRow>
               )
             })
           )}
-        </tbody>
-      </table>
-    </div>
+        </DataTableBody>
+      </DataTableTable>
+    </DataTable>
   )
 }
 
