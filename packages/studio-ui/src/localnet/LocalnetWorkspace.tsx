@@ -16,7 +16,6 @@ import type {FC, ReactNode} from "react"
 import {supports} from "../environmentCapabilities"
 import type {EnvironmentCapability, StudioEnvironment} from "../studioApi"
 import dashboardStyles from "./dashboard/DashboardPage.module.css"
-import {useExplorerPageTitle} from "@acton/explorer-core/components/ExplorerDocumentTitle"
 import {AccountPage} from "@acton/explorer-core/pages/AccountPage"
 import {BlockDetailsPage, BlocksPage} from "@acton/explorer-core/pages/BlocksPage"
 import {CellInspectorPage} from "@acton/explorer-core/pages/CellInspectorPage"
@@ -175,14 +174,14 @@ const AppContent: FC<AppContentProps> = ({
   const {pathname} = useLocation()
   const navigate = useNavigate()
   const [isAddContractOpen, setIsAddContractOpen] = useState(false)
-  const explorerPageTitle = useExplorerPageTitle()
   const localPathname = pathname.slice(basePath.length) || "/"
   const allowsOverflow = localPathname === "/faucet"
-  const pageTitle =
-    explorerPageTitle ??
-    LOCALNET_PAGE_TITLES[localPathname] ??
-    contractDetailsPageTitle(localPathname) ??
-    "Virtual Environment"
+  const isExplorerPage = localPathname === "/explorer" || localPathname.startsWith("/explorer/")
+  const pageTitle = isExplorerPage
+    ? "Explorer"
+    : (LOCALNET_PAGE_TITLES[localPathname] ??
+      contractDetailsPageTitle(localPathname) ??
+      "Virtual Environment")
   const pageDescription =
     LOCALNET_PAGE_DESCRIPTIONS[localPathname] ??
     contractDetailsPageDescription(localPathname) ??
