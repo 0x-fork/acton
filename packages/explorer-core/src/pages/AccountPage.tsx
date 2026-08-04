@@ -1659,7 +1659,8 @@ export const AccountPage: FC<AccountPageProps> = ({
     }
 
     const hash = tab === "contract" ? "contract-storage" : tab
-    void navigate(`${location.pathname}#${hash}`, {replace: true})
+    if (location.hash === `#${hash}`) return
+    void navigate(`${location.pathname}#${hash}`)
   }
 
   useEffect(() => {
