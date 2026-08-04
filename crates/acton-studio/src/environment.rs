@@ -190,6 +190,7 @@ pub struct EnvironmentNetwork {
     pub label: String,
     pub chain_id: i32,
     pub test_only: bool,
+    pub supports_actions: bool,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
@@ -351,18 +352,21 @@ impl EnvironmentConfig {
                 },
                 chain_id: -3,
                 test_only: true,
+                supports_actions: false,
             },
             Self::ActonLocalnet { .. } => EnvironmentNetwork {
                 id: "acton-localnet".to_owned(),
                 label: "Acton localnet".to_owned(),
                 chain_id: -3,
                 test_only: true,
+                supports_actions: false,
             },
             Self::FullTonNetwork { .. } => EnvironmentNetwork {
                 id: "full-ton-network".to_owned(),
                 label: "Local TON network".to_owned(),
                 chain_id: -239,
                 test_only: true,
+                supports_actions: true,
             },
             Self::RemoteTonNetwork {
                 network: PublicTonNetwork::Testnet,
@@ -371,6 +375,7 @@ impl EnvironmentConfig {
                 label: "Testnet".to_owned(),
                 chain_id: -3,
                 test_only: true,
+                supports_actions: true,
             },
             Self::RemoteTonNetwork {
                 network: PublicTonNetwork::Mainnet,
@@ -379,6 +384,7 @@ impl EnvironmentConfig {
                 label: "Mainnet".to_owned(),
                 chain_id: -239,
                 test_only: false,
+                supports_actions: true,
             },
         }
     }

@@ -68,7 +68,12 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
   const jettonFaucetEnabled = supports(environment, "jettonFaucet")
   const networkIdentity = useMemo(
     () => environment?.network,
-    [environment?.network.id, environment?.network.label, environment?.network.testOnly],
+    [
+      environment?.network.id,
+      environment?.network.label,
+      environment?.network.supportsActions,
+      environment?.network.testOnly,
+    ],
   )
   const [localnetApiToken, setLocalnetApiTokenState] = useState<string>()
   const [isAuthOverlayOpen, setIsAuthOverlayOpen] = useState(false)

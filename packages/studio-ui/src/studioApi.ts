@@ -100,6 +100,7 @@ export interface EnvironmentNetwork {
   readonly label: string
   readonly chainId: number
   readonly testOnly: boolean
+  readonly supportsActions: boolean
 }
 
 export interface StudioEnvironment {
