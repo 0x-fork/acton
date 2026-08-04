@@ -34,6 +34,7 @@ const REGISTRY_SCHEMA: u32 = 1;
 const V5_EXTERNAL_SIGNED_OP: u32 = 0x7369_676e;
 const MAX_GRAMS_NANO: u128 = (1_u128 << 120) - 1;
 
+/// Wallet versions that Localton can manage
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum StoredWalletVersion {
@@ -59,14 +60,22 @@ pub struct WalletRecord {
     pub created_at: i64,
 }
 
+/// Public wallet data without private keys
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PublicWallet {
+    /// Stable wallet name
     pub name: String,
+    /// Wallet contract version
     pub version: StoredWalletVersion,
+    /// Wallet workchain
     pub workchain: i32,
+    /// Wallet subwallet identifier
     pub wallet_id: u32,
+    /// User-friendly TON address
     pub address: String,
+    /// `true` for the genesis wallet
     pub genesis: bool,
+    /// Unix time when Localton created the wallet
     pub created_at: i64,
 }
 
