@@ -65,6 +65,7 @@ impl FullTonNetworkDriver {
         api_v2_port: u16,
         api_v3_port: u16,
         admin_port: u16,
+        config_port: u16,
         validators: u16,
     ) -> Result<Self, EnvironmentRuntimeError> {
         let runtime_file = data_dir.join(RUNTIME_DESCRIPTOR_FILE);
@@ -89,7 +90,6 @@ impl FullTonNetworkDriver {
             docker_target,
             ..
         } = runtime;
-
         let compose_file = data_dir.join("compose.yaml");
         let isolated_docker_config_dir = if image == DEFAULT_LOCALTON_IMAGE {
             let path = data_dir.join(DOCKER_CONFIG_DIRECTORY);
@@ -106,7 +106,14 @@ impl FullTonNetworkDriver {
         } else {
             None
         };
-        let compose = render_compose(&image, api_v2_port, api_v3_port, admin_port, validators);
+        let compose = render_compose(
+            &image,
+            api_v2_port,
+            api_v3_port,
+            admin_port,
+            config_port,
+            validators,
+        );
         tokio::fs::write(&compose_file, compose)
             .await
             .map_err(|error| EnvironmentRuntimeError::Internal {
@@ -671,6 +678,7 @@ fn render_compose(
     api_v2_port: u16,
     api_v3_port: u16,
     admin_port: u16,
+    config_port: u16,
     validators: u16,
 ) -> String {
     COMPOSE_TEMPLATE
@@ -678,6 +686,7 @@ fn render_compose(
         .replace("__LOCALTON_V2_PORT__", &api_v2_port.to_string())
         .replace("__LOCALTON_V3_PORT__", &api_v3_port.to_string())
         .replace("__LOCALTON_ADMIN_PORT__", &admin_port.to_string())
+        .replace("__LOCALTON_CONFIG_PORT__", &config_port.to_string())
         .replace("__LOCALTON_VALIDATORS__", &validators.to_string())
 }
 
@@ -715,7 +724,14 @@ mod tests {
 
     #[test]
     fn compose_definition_uses_environment_specific_runtime_values() {
-        let compose = render_compose("registry.example/ton:build-42", 18180, 18181, 18182, 3);
+        let compose = render_compose(
+            "registry.example/ton:build-42",
+            18180,
+            18181,
+            18182,
+            18183,
+            3,
+        );
         let selected_lines = compose
             .lines()
             .filter(|line| {
@@ -737,6 +753,7 @@ mod tests {
         expect![[r#"project: acton-studio-<workspace>-environment-7
     image: "registry.example/ton:build-42"
       - "3"
+      - "127.0.0.1:18183:18000"
       - "127.0.0.1:18182:18001"
       - "127.0.0.1:18180:18002"
     image: "registry.example/ton:build-42"
@@ -826,6 +843,7 @@ mod tests {
             19180,
             19181,
             19182,
+            19183,
             5,
         )
         .await
@@ -878,6 +896,7 @@ mod tests {
             COMPOSE
                 image: "registry.example/persisted/ton:build-17"
                   - "5"
+                  - "127.0.0.1:19183:18000"
                   - "127.0.0.1:19182:18001"
                   - "127.0.0.1:19180:18002"
                 image: "registry.example/persisted/ton:build-17"
@@ -907,6 +926,7 @@ mod tests {
             18180,
             18181,
             18182,
+            18183,
             1,
         )
         .await

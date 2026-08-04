@@ -900,6 +900,11 @@ fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
             .api_v3
             .as_ref()
             .map(|_| format!("{proxy_root}/api/v3")),
+        config: environment
+            .runtime_endpoints
+            .config
+            .as_ref()
+            .map(|_| format!("{proxy_root}/config")),
         control: (environment
             .capabilities
             .contains(&EnvironmentCapability::ControlApi)
@@ -1051,6 +1056,11 @@ fn environment_upstream_url(
         } else if let Some(remaining_path) = endpoint_relative_path(path, "api/v3") {
             (
                 environment.runtime_endpoints.api_v3.as_deref(),
+                remaining_path,
+            )
+        } else if let Some(remaining_path) = endpoint_relative_path(path, "config") {
+            (
+                environment.runtime_endpoints.config.as_deref(),
                 remaining_path,
             )
         } else {

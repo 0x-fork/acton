@@ -70,6 +70,7 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
                         EnvironmentEndpoints {
                             api_v2: Some(format!("http://127.0.0.1:{port}/api/v2")),
                             api_v3: Some(format!("http://127.0.0.1:{port}/api/v3")),
+                            config: None,
                             control: Some(format!("http://127.0.0.1:{port}")),
                         },
                     )
@@ -78,21 +79,25 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
                     api_v2_port,
                     api_v3_port,
                     admin_port,
+                    config_port,
                     validators,
                 } => {
                     let api_v2_port = api_v2_port.unwrap_or(18080);
                     let api_v3_port = api_v3_port.unwrap_or(18081);
                     let admin_port = admin_port.unwrap_or(18082);
+                    let config_port = config_port.unwrap_or(18083);
                     (
                         EnvironmentConfig::FullTonNetwork {
                             api_v2_port,
                             api_v3_port,
                             admin_port,
+                            config_port,
                             validators: validators.unwrap_or(1),
                         },
                         EnvironmentEndpoints {
                             api_v2: Some(format!("http://127.0.0.1:{api_v2_port}/api/v2")),
                             api_v3: Some(format!("http://127.0.0.1:{api_v3_port}/api/v3")),
+                            config: Some(format!("http://127.0.0.1:{config_port}")),
                             control: Some(format!("http://127.0.0.1:{admin_port}")),
                         },
                     )
@@ -999,6 +1004,7 @@ async fn full_ton_environment_advertises_only_its_supported_surface() {
                             "apiV2Port":18180,
                             "apiV3Port":18181,
                             "adminPort":18182,
+                            "configPort":18183,
                             "validators":3
                         }
                     }"#,
@@ -1011,7 +1017,7 @@ async fn full_ton_environment_advertises_only_its_supported_surface() {
 
     expect![[r#"
         status: 201 Created
-        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18180,"apiV3Port":18181,"adminPort":18182,"validators":3},"capabilities":["apiV2","apiV3","explorer","integration","gramFaucet","wallets","simulator","contracts","apiCalls","snapshots"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3"},"network":{"id":"full-ton-network","label":"Full localnet","chainId":-3,"testOnly":true,"supportsActions":true}}"#]]
+        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18180,"apiV3Port":18181,"adminPort":18182,"configPort":18183,"validators":3},"capabilities":["apiV2","apiV3","configApi","controlApi","explorer","integration","gramFaucet","wallets","simulator","contracts","apiCalls","snapshots"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","config":"/api/v1/environments/test-environment-1/rpc/config","control":"/api/v1/environments/test-environment-1/rpc"},"network":{"id":"full-ton-network","label":"Full localnet","chainId":-3,"testOnly":true,"supportsActions":true}}"#]]
     .assert_eq(&actual);
 }
 
@@ -1068,6 +1074,23 @@ async fn full_ton_environment_routes_each_api_to_its_own_upstream() {
         .await
         .expect("admin proxy target must serve");
     });
+    let config_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("config proxy test listener must bind");
+    let config_port = config_listener
+        .local_addr()
+        .expect("config listener must have an address")
+        .port();
+    let config_upstream = tokio::spawn(async move {
+        axum::serve(
+            config_listener,
+            Router::new()
+                .fallback(any(proxy_target))
+                .into_make_service(),
+        )
+        .await
+        .expect("config proxy target must serve");
+    });
 
     let app = router();
     app.clone()
@@ -1081,7 +1104,8 @@ async fn full_ton_environment_routes_each_api_to_its_own_upstream() {
                             "kind":"fullTonNetwork",
                             "apiV2Port":{v2_port},
                             "apiV3Port":{v3_port},
-                            "adminPort":{admin_port}
+                            "adminPort":{admin_port},
+                            "configPort":{config_port}
                         }}
                     }}"#
                 )))
@@ -1126,16 +1150,27 @@ async fn full_ton_environment_routes_each_api_to_its_own_upstream() {
         )
         .await
         .expect("faucet proxy request must succeed");
+    let config_response = app
+        .clone()
+        .oneshot(
+            Request::get("/api/v1/environments/test-environment-1/rpc/config/openapi.json")
+                .body(Body::empty())
+                .expect("config proxy request must be valid"),
+        )
+        .await
+        .expect("config proxy request must succeed");
     let actual = format!(
-        "V2 ROOT\n{}\n\nV2\n{}\n\nV3\n{}\n\nFAUCET\n{}",
+        "V2 ROOT\n{}\n\nV2\n{}\n\nV3\n{}\n\nFAUCET\n{}\n\nCONFIG\n{}",
         response_snapshot(v2_root_response).await,
         response_snapshot(v2_response).await,
         response_snapshot(v3_response).await,
         response_snapshot(faucet_response).await,
+        response_snapshot(config_response).await,
     );
     v2_upstream.abort();
     v3_upstream.abort();
     admin_upstream.abort();
+    config_upstream.abort();
 
     expect![[r#"V2 ROOT
 status: 202 Accepted
@@ -1163,7 +1198,14 @@ status: 202 Accepted
 body: method: POST
 uri: /acton_fundAccount
 marker: missing
-body: {"address":"test","amount":100}"#]]
+body: {"address":"test","amount":100}
+
+CONFIG
+status: 202 Accepted
+body: method: GET
+uri: /openapi.json
+marker: missing
+body: <empty>"#]]
     .assert_eq(&actual);
 }
 

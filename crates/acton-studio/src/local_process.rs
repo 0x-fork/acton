@@ -30,6 +30,7 @@ const FIRST_LOCALNET_PORT: u16 = 5411;
 const FIRST_FULL_TON_V2_PORT: u16 = 18080;
 const FIRST_FULL_TON_V3_PORT: u16 = 18081;
 const FIRST_FULL_TON_ADMIN_PORT: u16 = 18082;
+const FIRST_FULL_TON_CONFIG_PORT: u16 = 18083;
 const DEFAULT_FULL_TON_VALIDATORS: u16 = 1;
 const MAX_FULL_TON_VALIDATORS: u16 = 100;
 const LOCALNET_READY_TIMEOUT: Duration = Duration::from_secs(15);
@@ -839,17 +840,22 @@ fn resolve_request(
             api_v2_port,
             api_v3_port,
             admin_port,
+            config_port,
             validators,
         } => {
             validate_requested_port(api_v2_port)?;
             validate_requested_port(api_v3_port)?;
             validate_requested_port(admin_port)?;
+            validate_requested_port(config_port)?;
             let api_v2_port = select_port(FIRST_FULL_TON_V2_PORT, api_v2_port, reserved_ports)?;
             let mut excluded_ports = reserved_ports.to_vec();
             excluded_ports.push(api_v2_port);
             let api_v3_port = select_port(FIRST_FULL_TON_V3_PORT, api_v3_port, &excluded_ports)?;
             excluded_ports.push(api_v3_port);
             let admin_port = select_port(FIRST_FULL_TON_ADMIN_PORT, admin_port, &excluded_ports)?;
+            excluded_ports.push(admin_port);
+            let config_port =
+                select_port(FIRST_FULL_TON_CONFIG_PORT, config_port, &excluded_ports)?;
             let validators = validators.unwrap_or(DEFAULT_FULL_TON_VALIDATORS);
             if !(1..=MAX_FULL_TON_VALIDATORS).contains(&validators) {
                 return Err(EnvironmentRuntimeError::InvalidRequest {
@@ -863,6 +869,7 @@ fn resolve_request(
                 api_v2_port,
                 api_v3_port,
                 admin_port,
+                config_port,
                 validators,
             }
         }
@@ -927,7 +934,7 @@ fn port_is_available(port: u16) -> bool {
 
 async fn reserved_environment_ports(runtime: &LocalProcessRuntimeInner) -> Vec<u16> {
     let environments = runtime.environments.read().await.clone();
-    let mut ports = Vec::with_capacity(environments.len() * 3);
+    let mut ports = Vec::with_capacity(environments.len() * 4);
     for environment in environments {
         match &environment.details.read().await.config {
             EnvironmentConfig::ActonLocalnet { port, .. } => ports.push(*port),
@@ -935,11 +942,13 @@ async fn reserved_environment_ports(runtime: &LocalProcessRuntimeInner) -> Vec<u
                 api_v2_port,
                 api_v3_port,
                 admin_port,
+                config_port,
                 ..
             } => {
                 ports.push(*api_v2_port);
                 ports.push(*api_v3_port);
                 ports.push(*admin_port);
+                ports.push(*config_port);
             }
             EnvironmentConfig::RemoteTonNetwork { .. } => {}
         }
@@ -954,6 +963,7 @@ fn runtime_endpoints(config: &EnvironmentConfig) -> EnvironmentEndpoints {
             EnvironmentEndpoints {
                 api_v2: Some(format!("{root}/api/v2")),
                 api_v3: Some(format!("{root}/api/v3")),
+                config: None,
                 control: Some(root),
             }
         }
@@ -961,10 +971,12 @@ fn runtime_endpoints(config: &EnvironmentConfig) -> EnvironmentEndpoints {
             api_v2_port,
             api_v3_port,
             admin_port,
+            config_port,
             ..
         } => EnvironmentEndpoints {
             api_v2: Some(format!("http://127.0.0.1:{api_v2_port}/api/v2")),
             api_v3: Some(format!("http://127.0.0.1:{api_v3_port}/api/v3")),
+            config: Some(format!("http://127.0.0.1:{config_port}")),
             control: Some(format!("http://127.0.0.1:{admin_port}")),
         },
         EnvironmentConfig::RemoteTonNetwork { .. } => EnvironmentEndpoints::default(),
@@ -1079,6 +1091,7 @@ impl EnvironmentDriver {
                 api_v2_port,
                 api_v3_port,
                 admin_port,
+                config_port,
                 validators,
             } => FullTonNetworkDriver::materialize(
                 data_dir,
@@ -1087,6 +1100,7 @@ impl EnvironmentDriver {
                 *api_v2_port,
                 *api_v3_port,
                 *admin_port,
+                *config_port,
                 *validators,
             )
             .await

@@ -67,6 +67,8 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/integrate": "Integrate",
   "/api-reference/v2": "API Reference v2",
   "/api-reference/v3": "API Reference v3",
+  "/api-reference/admin": "Admin API Reference",
+  "/api-reference/config": "Config API Reference",
   "/api-reference/control": "Control API Reference",
   "/api-calls": "API Calls",
 }
@@ -88,6 +90,8 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/integrate": "Connect Acton projects, applications and TON-compatible tools to this network",
   "/api-reference/v2": "Explore the v2 API",
   "/api-reference/v3": "Explore the v3 API",
+  "/api-reference/admin": "Inspect and manage Full localnet services",
+  "/api-reference/config": "Read Full localnet configuration and connection endpoints",
   "/api-reference/control": "Explore network management methods",
   "/api-calls": "Review requests made to this environment",
 }
@@ -189,6 +193,7 @@ const AppContent: FC<AppContentProps> = ({
   const fallback = <Navigate to={path("/dashboard")} replace />
   const withCapability = (capability: EnvironmentCapability, page: ReactNode) =>
     supports(runtime.environment, capability) ? page : fallback
+  const isFullLocalnet = runtime.environment?.config.kind === "fullTonNetwork"
   const openAddContract = useCallback(() => setIsAddContractOpen(true), [])
   const openCreateSnapshot = useCallback(() => setIsCreateSnapshotOpen(true), [])
   const primaryAction = useMemo<LocalnetWorkspaceShellAction | undefined>(() => {
@@ -471,20 +476,64 @@ const AppContent: FC<AppContentProps> = ({
               )}
             />
             <Route
-              path={path("/api-reference/control")}
+              path={path("/api-reference/admin")}
+              element={
+                isFullLocalnet
+                  ? withCapability(
+                      "controlApi",
+                      <DashboardPage embedded>
+                        <RouteSuspense>
+                          <ApiReferencePage
+                            apiBaseUrl={
+                              runtime.environment?.endpoints.control ?? runtime.rpcBaseUrl
+                            }
+                            localnetApiToken={runtime.localnetApiToken}
+                            onUnauthorized={runtime.requireAuthToken}
+                            version="admin"
+                          />
+                        </RouteSuspense>
+                      </DashboardPage>,
+                    )
+                  : fallback
+              }
+            />
+            <Route
+              path={path("/api-reference/config")}
               element={withCapability(
-                "controlApi",
+                "configApi",
                 <DashboardPage embedded>
                   <RouteSuspense>
                     <ApiReferencePage
-                      apiBaseUrl={runtime.environment?.endpoints.control ?? runtime.rpcBaseUrl}
+                      apiBaseUrl={runtime.environment?.endpoints.config ?? runtime.rpcBaseUrl}
                       localnetApiToken={runtime.localnetApiToken}
                       onUnauthorized={runtime.requireAuthToken}
-                      version="control"
+                      version="config"
                     />
                   </RouteSuspense>
                 </DashboardPage>,
               )}
+            />
+            <Route
+              path={path("/api-reference/control")}
+              element={
+                isFullLocalnet
+                  ? fallback
+                  : withCapability(
+                      "controlApi",
+                      <DashboardPage embedded>
+                        <RouteSuspense>
+                          <ApiReferencePage
+                            apiBaseUrl={
+                              runtime.environment?.endpoints.control ?? runtime.rpcBaseUrl
+                            }
+                            localnetApiToken={runtime.localnetApiToken}
+                            onUnauthorized={runtime.requireAuthToken}
+                            version="control"
+                          />
+                        </RouteSuspense>
+                      </DashboardPage>,
+                    )
+              }
             />
             <Route
               path={path("/dashboard/faucet")}

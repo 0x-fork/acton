@@ -34,6 +34,7 @@ export interface FullTonNetworkEnvironmentConfig {
   readonly apiV2Port: number
   readonly apiV3Port: number
   readonly adminPort: number
+  readonly configPort: number
   readonly validators: number
 }
 
@@ -65,6 +66,7 @@ export interface CreateFullTonNetworkEnvironmentConfig {
   readonly apiV2Port?: number
   readonly apiV3Port?: number
   readonly adminPort?: number
+  readonly configPort?: number
   readonly validators?: number
 }
 
@@ -75,6 +77,7 @@ export type CreateEnvironmentConfig =
 export type EnvironmentCapability =
   | "apiV2"
   | "apiV3"
+  | "configApi"
   | "explorer"
   | "integration"
   | "controlApi"
@@ -92,6 +95,7 @@ export type EnvironmentCapability =
 export interface EnvironmentEndpoints {
   readonly apiV2?: string
   readonly apiV3?: string
+  readonly config?: string
   readonly control?: string
 }
 

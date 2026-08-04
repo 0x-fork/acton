@@ -36,6 +36,7 @@ pub enum CreateEnvironmentConfig {
         api_v2_port: Option<u16>,
         api_v3_port: Option<u16>,
         admin_port: Option<u16>,
+        config_port: Option<u16>,
         validators: Option<u16>,
     },
 }
@@ -138,6 +139,7 @@ pub enum EnvironmentConfig {
         api_v2_port: u16,
         api_v3_port: u16,
         admin_port: u16,
+        config_port: u16,
         validators: u16,
     },
     RemoteTonNetwork {
@@ -157,6 +159,7 @@ pub enum PublicTonNetwork {
 pub enum EnvironmentCapability {
     ApiV2,
     ApiV3,
+    ConfigApi,
     ControlApi,
     Explorer,
     Integration,
@@ -179,6 +182,8 @@ pub struct EnvironmentEndpoints {
     pub api_v2: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_v3: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub control: Option<String>,
 }
@@ -315,6 +320,8 @@ impl EnvironmentConfig {
             Self::FullTonNetwork { .. } => vec![
                 EnvironmentCapability::ApiV2,
                 EnvironmentCapability::ApiV3,
+                EnvironmentCapability::ConfigApi,
+                EnvironmentCapability::ControlApi,
                 EnvironmentCapability::Explorer,
                 EnvironmentCapability::Integration,
                 EnvironmentCapability::GramFaucet,

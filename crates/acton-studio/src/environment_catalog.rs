@@ -192,6 +192,7 @@ fn public_environment(descriptor: &PublicTonNetworkDescriptor) -> StudioEnvironm
         EnvironmentEndpoints {
             api_v2: Some(descriptor.api_v2_endpoint.to_owned()),
             api_v3: Some(descriptor.api_v3_endpoint.to_owned()),
+            config: None,
             control: None,
         },
     )

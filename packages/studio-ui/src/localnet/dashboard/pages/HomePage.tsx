@@ -107,8 +107,8 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
     environment?.config.kind === "fullTonNetwork" ? environment.config : undefined
   const remoteNetworkConfig =
     environment?.config.kind === "remoteTonNetwork" ? environment.config : undefined
-  const hasControlApi = supports(environment, "controlApi")
-  const hasNetworkNodeInfo = !hasControlApi && supports(environment, "apiV3")
+  const hasSimulatedControlApi = localnetConfig !== undefined && supports(environment, "controlApi")
+  const hasNetworkNodeInfo = !hasSimulatedControlApi && supports(environment, "apiV3")
   const hasIntegration = supports(environment, "integration")
   const navigate = useNavigate()
   const routes = useExplorerRoutePaths()
@@ -137,10 +137,10 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   const forkBlockNumber =
     nodeInfo === undefined ? localnetConfig?.forkBlockNumber : nodeInfo.fork_block_number
   const hasFork = Boolean(forkNetwork?.trim())
-  const showUptime = hasControlApi && !fullNetworkConfig
+  const showUptime = hasSimulatedControlApi
   const nodeInfoColumnCount = hasFork ? 6 : remoteNetworkConfig ? 3 : 4
   const forkSummary = formatForkSummary(forkNetwork, forkBlockNumber)
-  const networkSummary = hasControlApi
+  const networkSummary = hasSimulatedControlApi
     ? forkSummary
     : (environment?.network.label ?? "Virtual environment")
   const forkBadgeLabel =
@@ -197,7 +197,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   }, [connectPanelStorageKey])
 
   useEffect(() => {
-    if (!hasControlApi) {
+    if (!hasSimulatedControlApi) {
       setNodeInfo(undefined)
       return
     }
@@ -230,7 +230,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         globalThis.clearTimeout(timeoutId)
       }
     }
-  }, [client, hasControlApi])
+  }, [client, hasSimulatedControlApi])
 
   useEffect(() => {
     if (!hasNetworkNodeInfo) {
@@ -440,7 +440,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               />
             )}
 
-            {hasControlApi || hasNetworkNodeInfo ? (
+            {hasSimulatedControlApi || hasNetworkNodeInfo ? (
               <DataTable title="Node info" minWidth="42rem">
                 <DataTableTable aria-label="Node info">
                   <DataTableHead>
