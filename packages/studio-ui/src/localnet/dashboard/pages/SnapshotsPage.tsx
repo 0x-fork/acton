@@ -1,4 +1,18 @@
-import {Button, Dialog, Input, useToast} from "@acton/ui"
+import {
+  Button,
+  DataTableBody,
+  DataTableCell,
+  DataTableEmpty,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableSkeletonRows,
+  DataTableTable,
+  Dialog,
+  Input,
+  InlineAction,
+  useToast,
+} from "@acton/ui"
 import {Archive, RotateCcw, Trash2} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC} from "react"
@@ -21,7 +35,9 @@ import pageStyles from "../DashboardPage.module.css"
 import styles from "./SnapshotsPage.module.css"
 
 interface SnapshotsPageProps {
+  readonly createOpen: boolean
   readonly environment: StudioEnvironment
+  readonly onCreateOpenChange: (open: boolean) => void
 }
 
 type DialogState =
@@ -48,7 +64,11 @@ interface Phase {
   readonly label: string
 }
 
-export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment}) => {
+export const SnapshotsPage: FC<SnapshotsPageProps> = ({
+  createOpen,
+  environment,
+  onCreateOpenChange,
+}) => {
   const {showToast} = useToast()
   const [snapshots, setSnapshots] = useState<readonly EnvironmentSnapshot[]>([])
   const [operation, setOperation] = useState<EnvironmentSnapshotOperation | null>(null)
@@ -94,6 +114,12 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment}) => {
     void load(controller.signal)
     return () => controller.abort()
   }, [load])
+
+  useEffect(() => {
+    if (!createOpen) return
+    setDialog({kind: "create"})
+    onCreateOpenChange(false)
+  }, [createOpen, onCreateOpenChange])
 
   const active =
     operation !== null && operation.phase !== "completed" && operation.phase !== "failed"
@@ -185,26 +211,7 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment}) => {
   }, [dialog, environment.id, loadSnapshots, showToast, snapshotName])
 
   return (
-    <section
-      className={`${pageStyles.settingsSection} ${styles.page}`}
-      aria-labelledby="snapshot-list-title"
-    >
-      <header className={styles.header}>
-        <div>
-          <h2 id="snapshot-list-title">Saved snapshots</h2>
-          <p>Save the current chain state and restore it later</p>
-        </div>
-        <Button
-          size="sm"
-          variant="primary"
-          leadingIcon={<Archive size={14} aria-hidden="true" />}
-          disabled={active || loading}
-          onClick={() => setDialog({kind: "create"})}
-        >
-          Create snapshot
-        </Button>
-      </header>
-
+    <section className={`${pageStyles.settingsSection} ${styles.page}`}>
       <div className={styles.notice}>
         <Archive size={17} aria-hidden="true" />
         <div>
@@ -216,7 +223,7 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment}) => {
         </div>
       </div>
 
-      <div className={styles.panel}>
+      <div className={styles.panel} aria-busy={loading}>
         {active && operation ? <OperationProgress operation={operation} now={now} /> : undefined}
 
         {operation?.phase === "failed" ? (
@@ -226,55 +233,78 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment}) => {
           </div>
         ) : undefined}
 
-        {loading ? (
-          <div className={styles.emptyState}>Loading snapshots</div>
-        ) : loadError ? (
-          <div className={styles.loadError} role="alert">
-            <span>{loadError}</span>
-            <Button size="sm" variant="outline" onClick={() => void load()}>
-              Retry
-            </Button>
-          </div>
-        ) : snapshots.length === 0 ? (
-          <div className={styles.emptyState}>No snapshots yet</div>
-        ) : (
-          <div className={styles.list}>
-            {snapshots.map(snapshot => (
-              <div className={styles.snapshotRow} key={snapshot.id}>
-                <div className={styles.snapshotMain}>
-                  <strong>{snapshotLabel(snapshot)}</strong>
-                  <span>
-                    {formatDate(snapshot.createdAt)} · {formatBytes(snapshot.archiveSizeBytes)}
-                    {snapshot.stateSizeBytes > snapshot.archiveSizeBytes
-                      ? ` compressed · ${formatBytes(snapshot.stateSizeBytes)} state`
-                      : ""}
-                  </span>
-                </div>
-                <div className={styles.actions}>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    leadingIcon={<RotateCcw size={14} aria-hidden="true" />}
-                    disabled={active || deletingId !== undefined}
-                    onClick={() => setDialog({kind: "restore", snapshot})}
-                  >
-                    Restore
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    title={`Delete ${snapshotLabel(snapshot)}`}
-                    disabled={active || deletingId !== undefined}
-                    loading={deletingId === snapshot.id}
-                    onClick={() => setDialog({kind: "delete", snapshot})}
-                  >
-                    <Trash2 size={14} aria-hidden="true" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <div className={styles.tableWrap}>
+          <DataTableTable aria-label="Saved snapshots">
+            <DataTableHead>
+              <DataTableRow>
+                <DataTableHeaderCell columnWidth="26%">Snapshot</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="24%">Created</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="10%">Block</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="14%">Archive</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="14%">State</DataTableHeaderCell>
+                <DataTableHeaderCell align="right" columnWidth="9rem">
+                  Actions
+                </DataTableHeaderCell>
+              </DataTableRow>
+            </DataTableHead>
+            <DataTableBody>
+              {loading ? (
+                <DataTableSkeletonRows
+                  alignments={["left", "left", "left", "left", "left", "right"]}
+                  columns={6}
+                  rowKeyPrefix="snapshot-row-skeleton"
+                  rows={4}
+                  widths={["14rem", "12rem", "5rem", "5rem", "5rem", "7rem"]}
+                />
+              ) : loadError ? (
+                <DataTableEmpty colSpan={6}>
+                  <div className={styles.loadError} role="alert">
+                    <span>{loadError}</span>
+                    <Button size="sm" variant="outline" onClick={() => void load()}>
+                      Retry
+                    </Button>
+                  </div>
+                </DataTableEmpty>
+              ) : snapshots.length === 0 ? (
+                <DataTableEmpty colSpan={6}>No snapshots yet</DataTableEmpty>
+              ) : (
+                snapshots.map(snapshot => (
+                  <DataTableRow key={snapshot.id}>
+                    <DataTableCell>
+                      <strong className={styles.snapshotName}>{snapshotLabel(snapshot)}</strong>
+                    </DataTableCell>
+                    <DataTableCell tone="muted">{formatDate(snapshot.createdAt)}</DataTableCell>
+                    <DataTableCell tone="muted" mono>
+                      {formatMasterchainSeqno(snapshot.masterchainSeqno)}
+                    </DataTableCell>
+                    <DataTableCell tone="muted" mono>
+                      {formatBytes(snapshot.archiveSizeBytes)}
+                    </DataTableCell>
+                    <DataTableCell tone="muted" mono>
+                      {formatBytes(snapshot.stateSizeBytes)}
+                    </DataTableCell>
+                    <DataTableCell align="right">
+                      <span className={styles.actions}>
+                        <InlineAction
+                          label="Restore snapshot"
+                          icon={<RotateCcw />}
+                          disabled={active || deletingId !== undefined}
+                          onClick={() => setDialog({kind: "restore", snapshot})}
+                        />
+                        <InlineAction
+                          label={`Delete ${snapshotLabel(snapshot)}`}
+                          icon={<Trash2 />}
+                          disabled={active || deletingId !== undefined}
+                          onClick={() => setDialog({kind: "delete", snapshot})}
+                        />
+                      </span>
+                    </DataTableCell>
+                  </DataTableRow>
+                ))
+              )}
+            </DataTableBody>
+          </DataTableTable>
+        </div>
       </div>
 
       <SnapshotDialog
@@ -426,6 +456,10 @@ function formatBytes(bytes: number): string {
     unit = next
   }
   return `${value < 10 ? value.toFixed(1) : value.toFixed(0)} ${unit}`
+}
+
+function formatMasterchainSeqno(seqno: number | undefined): string {
+  return seqno === undefined ? "—" : seqno.toLocaleString()
 }
 
 function formatElapsed(startedAt: string, now: number): string {
