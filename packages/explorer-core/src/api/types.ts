@@ -1092,6 +1092,15 @@ export interface StreamingTransactionsEvent {
   readonly transactions: readonly V3Transaction[]
 }
 
+export interface StreamingActionsEvent {
+  readonly type: "actions"
+  readonly finality: StreamingFinality
+  readonly trace_external_hash_norm?: string
+  readonly actions: readonly V3Action[]
+  readonly address_book?: Record<string, V3AddressBookRow>
+  readonly metadata?: V3Metadata
+}
+
 export interface V3TransactionStoragePhase {
   readonly storage_fees_collected?: string
   readonly storage_fees_due?: string

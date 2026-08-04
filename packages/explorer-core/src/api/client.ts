@@ -27,6 +27,7 @@ import type {
   LocalnetTimeInfo,
   NftItem,
   Shards,
+  StreamingActionsEvent,
   StreamingTransactionsEvent,
   SourceTraceResponse,
   V3ActionsResponse,
@@ -321,8 +322,9 @@ function booleanValue(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined
 }
 
-interface TransactionStreamHandlers {
+interface AccountHistoryStreamHandlers {
   readonly onTransactions: (event: StreamingTransactionsEvent) => void
+  readonly onActions?: (event: StreamingActionsEvent) => void
   readonly onError?: (error: Error) => void
 }
 
@@ -467,9 +469,9 @@ export class TonClient {
     return this.request(url, "Failed to fetch account transactions")
   }
 
-  subscribeAccountTransactions(address: string, handlers: TransactionStreamHandlers): () => void {
+  subscribeAccountHistory(address: string, handlers: AccountHistoryStreamHandlers): () => void {
     const controller = new AbortController()
-    void this.readAccountTransactionStream(address, handlers, controller.signal)
+    void this.readAccountHistoryStream(address, handlers, controller.signal)
     return () => controller.abort()
   }
 
@@ -1239,9 +1241,9 @@ export class TonClient {
     return url
   }
 
-  private async readAccountTransactionStream(
+  private async readAccountHistoryStream(
     address: string,
-    handlers: TransactionStreamHandlers,
+    handlers: AccountHistoryStreamHandlers,
     signal: AbortSignal,
   ): Promise<void> {
     try {
@@ -1256,7 +1258,7 @@ export class TonClient {
           },
           body: JSON.stringify({
             addresses: [address],
-            types: ["transactions"],
+            types: handlers.onActions ? ["transactions", "actions"] : ["transactions"],
             min_finality: "confirmed",
           }),
           signal,
@@ -1277,6 +1279,8 @@ export class TonClient {
       await this.readSseEvents(response.body, value => {
         if (isStreamingTransactionsEvent(value)) {
           handlers.onTransactions(value)
+        } else if (isStreamingActionsEvent(value)) {
+          handlers.onActions?.(value)
         }
       })
     } catch (error) {
@@ -1572,5 +1576,20 @@ function isStreamingTransactionsEvent(value: unknown): value is StreamingTransac
       event.finality === "confirmed" ||
       event.finality === "finalized") &&
     Array.isArray(event.transactions)
+  )
+}
+
+function isStreamingActionsEvent(value: unknown): value is StreamingActionsEvent {
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+
+  const event = value as Partial<StreamingActionsEvent>
+  return (
+    event.type === "actions" &&
+    (event.finality === "pending" ||
+      event.finality === "confirmed" ||
+      event.finality === "finalized") &&
+    Array.isArray(event.actions)
   )
 }

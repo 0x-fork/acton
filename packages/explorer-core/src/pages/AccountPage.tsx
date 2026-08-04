@@ -67,6 +67,7 @@ import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import {
   countActionsForTrace,
   mergeAutomaticActionPage,
+  mergeStreamedActions,
   type AccountActionPageCursor,
 } from "./accountActionPagination"
 import styles from "./AccountPage.module.css"
@@ -951,7 +952,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     }
 
     let isActive = true
-    const unsubscribe = client.subscribeAccountTransactions(formattedAddress, {
+    const unsubscribe = client.subscribeAccountHistory(formattedAddress, {
       onTransactions: event => {
         if (event.finality === "pending") {
           return
@@ -976,6 +977,29 @@ export const AccountPage: FC<AccountPageProps> = ({
         setTransactionsLoading(false)
         setTransactionsError(undefined)
       },
+      onActions: supportsAccountActions
+        ? event => {
+            if (event.finality === "pending") {
+              return
+            }
+
+            if (event.address_book) {
+              updateDomains(event.address_book)
+            }
+            if (event.metadata) {
+              setActionMetadata(current => ({...current, ...event.metadata}))
+            }
+            setActions(current => {
+              const merged = mergeStreamedActions(current, event.actions, historySortOrder)
+              setActionTracesLoadMore(traceState =>
+                markCollapsedActionTraces(traceState, merged.collapsedTraceIds, merged.actions),
+              )
+              return merged.actions
+            })
+            setActionsLoading(false)
+            setActionsError(undefined)
+          }
+        : undefined,
       onError: error => {
         if (isActive) {
           console.debug("Account transaction stream closed", error)
@@ -987,7 +1011,14 @@ export const AccountPage: FC<AccountPageProps> = ({
       isActive = false
       unsubscribe()
     }
-  }, [accountAddressKey, client, enableTransactionStreaming])
+  }, [
+    accountAddressKey,
+    client,
+    enableTransactionStreaming,
+    historySortOrder,
+    supportsAccountActions,
+    updateDomains,
+  ])
 
   useEffect(() => {
     setJettonMetadataOpen(false)

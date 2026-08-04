@@ -422,6 +422,59 @@ test("account history requests forward the requested sort order", async () => {
   }
 })
 
+test("account history streaming subscribes to and dispatches transactions and actions", async () => {
+  const originalFetch = globalThis.fetch
+  let subscriptionBody = ""
+  const streamEvents = [
+    {
+      type: "transactions",
+      finality: "confirmed",
+      transactions: [{hash: "transaction-hash"}],
+    },
+    {
+      type: "actions",
+      finality: "confirmed",
+      actions: [{action_id: "action-id"}],
+      address_book: {"0:account": {user_friendly: "EQAccount"}},
+      metadata: {"0:account": {token_info: []}},
+    },
+  ]
+  globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    subscriptionBody = String(init?.body ?? "")
+    return new Response(streamEvents.map(event => `data: ${JSON.stringify(event)}\n\n`).join(""), {
+      headers: {"Content-Type": "text/event-stream"},
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+    const receivedEvents: unknown[] = []
+
+    const receivedActions = new Promise<void>((resolve, reject) => {
+      client.subscribeAccountHistory("EQAddress", {
+        onTransactions: event => receivedEvents.push(event),
+        onActions: event => {
+          receivedEvents.push(event)
+          resolve()
+        },
+        onError: reject,
+      })
+    })
+    await receivedActions
+
+    expect({
+      receivedEvents,
+      subscription: JSON.parse(subscriptionBody) as unknown,
+    }).toMatchSnapshot()
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("jetton wallet requests forward pagination options", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
