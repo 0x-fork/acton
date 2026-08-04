@@ -586,7 +586,9 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "explorer",
                 <DashboardPage embedded>
-                  <TransactionPage client={client} openRetraceOnLoad />
+                  <div className={styles.transactionDebugPage}>
+                    <TransactionPage client={client} openRetraceOnLoad />
+                  </div>
                 </DashboardPage>,
               )}
             />
@@ -595,7 +597,9 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "explorer",
                 <DashboardPage embedded>
-                  <TransactionPage client={client} />
+                  <div className={styles.transactionDebugPage}>
+                    <TransactionPage client={client} />
+                  </div>
                 </DashboardPage>,
               )}
             />
