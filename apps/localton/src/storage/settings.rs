@@ -559,6 +559,7 @@ mod tests {
     fn defaults_cover_all_local_node_slots() {
         let settings = Settings::default();
         settings.validate().unwrap();
+        assert_eq!(settings.network.global_id, -3);
         assert_eq!(settings.nodes.len(), 7);
         assert!(settings.nodes[0].participate_in_elections);
         assert_eq!(settings.nodes[6].name, "node7");

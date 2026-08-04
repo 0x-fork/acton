@@ -177,11 +177,14 @@ const AppContent: FC<AppContentProps> = ({
   const localPathname = pathname.slice(basePath.length) || "/"
   const allowsOverflow = localPathname === "/faucet"
   const isExplorerPage = localPathname === "/explorer" || localPathname.startsWith("/explorer/")
+  const isAbiDetailsPage = /^\/contracts\/abi\/[^/]+$/.test(localPathname)
   const pageTitle = isExplorerPage
     ? "Explorer"
-    : (LOCALNET_PAGE_TITLES[localPathname] ??
-      contractDetailsPageTitle(localPathname) ??
-      "Virtual Environment")
+    : isAbiDetailsPage
+      ? "ABI"
+      : (LOCALNET_PAGE_TITLES[localPathname] ??
+        contractDetailsPageTitle(localPathname) ??
+        "Virtual Environment")
   const pageDescription =
     LOCALNET_PAGE_DESCRIPTIONS[localPathname] ??
     contractDetailsPageDescription(localPathname) ??
@@ -643,13 +646,8 @@ const RouteSuspense: FC<{readonly children: ReactNode}> = ({children}) => (
 )
 
 function contractDetailsPageTitle(localPathname: string): string | undefined {
-  const abiMatch = localPathname.match(/^\/contracts\/abi\/([^/]+)$/)
-  if (abiMatch?.[1]) {
-    try {
-      return `${decodeURIComponent(abiMatch[1])} ABI`
-    } catch {
-      return `${abiMatch[1]} ABI`
-    }
+  if (/^\/contracts\/abi\/[^/]+$/.test(localPathname)) {
+    return "ABI"
   }
 
   return /^\/contracts\/[^/]+(?:\/(?:abi|raw-abi))?$/.test(localPathname) ? "Contract" : undefined
