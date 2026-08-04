@@ -47,10 +47,12 @@ pub use contract_source_artifact::{
     ContractSourceArtifactStore,
 };
 pub use environment::{
-    CreateEnvironmentConfig, CreateEnvironmentRequest, EnvironmentCapability, EnvironmentConfig,
-    EnvironmentEndpoints, EnvironmentLifecycle, EnvironmentNetwork, EnvironmentRuntime,
-    EnvironmentRuntimeError, EnvironmentRuntimeFuture, EnvironmentStatus, PublicTonNetwork,
-    StudioEnvironment, UpdateEnvironmentRequest,
+    CreateEnvironmentConfig, CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest,
+    EnvironmentCapability, EnvironmentConfig, EnvironmentEndpoints, EnvironmentLifecycle,
+    EnvironmentNetwork, EnvironmentRuntime, EnvironmentRuntimeError, EnvironmentRuntimeFuture,
+    EnvironmentSnapshot, EnvironmentSnapshotOperation, EnvironmentSnapshotOperationKind,
+    EnvironmentSnapshotOperationPhase, EnvironmentStatus, PublicTonNetwork, StudioEnvironment,
+    UpdateEnvironmentRequest,
 };
 pub use environment_catalog::{
     MAINNET_ENVIRONMENT_ID, PUBLIC_TON_ENVIRONMENT_IDS, TESTNET_ENVIRONMENT_ID,
@@ -307,6 +309,22 @@ impl StudioServer {
             .route(
                 "/environments/{environment_id}/restart",
                 post(restart_environment),
+            )
+            .route(
+                "/environments/{environment_id}/snapshots",
+                get(list_environment_snapshots).post(create_environment_snapshot),
+            )
+            .route(
+                "/environments/{environment_id}/snapshots/{snapshot_id}",
+                axum::routing::delete(delete_environment_snapshot),
+            )
+            .route(
+                "/environments/{environment_id}/snapshots/{snapshot_id}/restore",
+                post(restore_environment_snapshot),
+            )
+            .route(
+                "/environments/{environment_id}/snapshot-operation",
+                get(get_environment_snapshot_operation),
             )
             .route("/environments/{environment_id}/wallets", get(list_wallets))
             .route(
@@ -593,6 +611,137 @@ async fn restart_environment(
         .restart(&environment_id)
         .await
         .map(|environment| Json(public_environment(environment)))
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/snapshots",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 200, description = "Saved environment snapshots", body = [EnvironmentSnapshot]),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Snapshots are not available", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to list snapshots", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn list_environment_snapshots(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+) -> Result<Json<Vec<EnvironmentSnapshot>>, StudioApiError> {
+    state
+        .environment_runtime
+        .list_snapshots(&environment_id)
+        .await
+        .map(Json)
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/snapshots",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    request_body = CreateEnvironmentSnapshotRequest,
+    responses(
+        (status = 202, description = "Snapshot creation started", body = EnvironmentSnapshotOperation),
+        (status = 400, description = "Invalid snapshot name", body = StudioApiErrorBody),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "A conflicting operation is running", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to start snapshot creation", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn create_environment_snapshot(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+    Json(request): Json<CreateEnvironmentSnapshotRequest>,
+) -> Result<(StatusCode, Json<EnvironmentSnapshotOperation>), StudioApiError> {
+    state
+        .environment_runtime
+        .create_snapshot(&environment_id, request)
+        .await
+        .map(|operation| (StatusCode::ACCEPTED, Json(operation)))
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/snapshots/{snapshot_id}/restore",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("snapshot_id" = String, Path, description = "Snapshot ID")
+    ),
+    responses(
+        (status = 202, description = "Snapshot restore started", body = EnvironmentSnapshotOperation),
+        (status = 400, description = "Invalid snapshot ID", body = StudioApiErrorBody),
+        (status = 404, description = "Environment or snapshot not found", body = StudioApiErrorBody),
+        (status = 409, description = "A conflicting operation is running", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to start snapshot restore", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn restore_environment_snapshot(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, snapshot_id)): AxumPath<(String, String)>,
+) -> Result<(StatusCode, Json<EnvironmentSnapshotOperation>), StudioApiError> {
+    state
+        .environment_runtime
+        .restore_snapshot(&environment_id, &snapshot_id)
+        .await
+        .map(|operation| (StatusCode::ACCEPTED, Json(operation)))
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/environments/{environment_id}/snapshots/{snapshot_id}",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("snapshot_id" = String, Path, description = "Snapshot ID")
+    ),
+    responses(
+        (status = 204, description = "Snapshot deleted"),
+        (status = 400, description = "Invalid snapshot ID", body = StudioApiErrorBody),
+        (status = 404, description = "Environment or snapshot not found", body = StudioApiErrorBody),
+        (status = 409, description = "A conflicting operation is running", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to delete snapshot", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn delete_environment_snapshot(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, snapshot_id)): AxumPath<(String, String)>,
+) -> Result<StatusCode, StudioApiError> {
+    state
+        .environment_runtime
+        .delete_snapshot(&environment_id, &snapshot_id)
+        .await
+        .map_err(StudioApiError)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/snapshot-operation",
+    params(("environment_id" = String, Path, description = "Environment ID")),
+    responses(
+        (status = 200, description = "Latest snapshot operation", body = Option<EnvironmentSnapshotOperation>),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Snapshots are not available", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to read snapshot operation", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn get_environment_snapshot_operation(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+) -> Result<Json<Option<EnvironmentSnapshotOperation>>, StudioApiError> {
+    state
+        .environment_runtime
+        .snapshot_operation(&environment_id)
+        .await
+        .map(Json)
         .map_err(StudioApiError)
 }
 

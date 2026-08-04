@@ -168,6 +168,39 @@ export interface UpdateEnvironmentRequest {
   readonly name: string
 }
 
+export interface EnvironmentSnapshot {
+  readonly formatVersion: number
+  readonly id: string
+  readonly name?: string
+  readonly createdAt: number
+  readonly archiveSizeBytes: number
+  readonly stateSizeBytes: number
+  readonly stateSchemaVersion: number
+  readonly tonRelease: string
+  readonly masterchainSeqno?: number
+}
+
+export type EnvironmentSnapshotOperationKind = "create" | "restore"
+export type EnvironmentSnapshotOperationPhase =
+  | "preparing"
+  | "stopping"
+  | "creatingArchive"
+  | "restoringState"
+  | "resettingIndexer"
+  | "starting"
+  | "completed"
+  | "failed"
+
+export interface EnvironmentSnapshotOperation {
+  readonly kind: EnvironmentSnapshotOperationKind
+  readonly phase: EnvironmentSnapshotOperationPhase
+  readonly startedAt: string
+  readonly finishedAt?: string
+  readonly snapshotId?: string
+  readonly snapshotName?: string
+  readonly error?: string
+}
+
 export type TestRunSource = "manual" | "studio"
 export type TestRunStatus = "queued" | "running" | "passed" | "failed" | "cancelled"
 
@@ -312,6 +345,60 @@ export async function deleteStudioEnvironment(environmentId: string): Promise<vo
     method: "DELETE",
     headers: {accept: "application/json"},
   })
+}
+
+export function fetchStudioEnvironmentSnapshots(
+  environmentId: string,
+  signal?: AbortSignal,
+): Promise<EnvironmentSnapshot[]> {
+  return requestJson<EnvironmentSnapshot[]>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/snapshots`,
+    {headers: {accept: "application/json"}, signal},
+  )
+}
+
+export function createStudioEnvironmentSnapshot(
+  environmentId: string,
+  name?: string,
+): Promise<EnvironmentSnapshotOperation> {
+  return requestJson<EnvironmentSnapshotOperation>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/snapshots`,
+    {
+      method: "POST",
+      headers: {accept: "application/json", "content-type": "application/json"},
+      body: JSON.stringify({name}),
+    },
+  )
+}
+
+export function restoreStudioEnvironmentSnapshot(
+  environmentId: string,
+  snapshotId: string,
+): Promise<EnvironmentSnapshotOperation> {
+  return requestJson<EnvironmentSnapshotOperation>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/snapshots/${encodeURIComponent(snapshotId)}/restore`,
+    {method: "POST", headers: {accept: "application/json"}},
+  )
+}
+
+export async function deleteStudioEnvironmentSnapshot(
+  environmentId: string,
+  snapshotId: string,
+): Promise<void> {
+  await request(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/snapshots/${encodeURIComponent(snapshotId)}`,
+    {method: "DELETE", headers: {accept: "application/json"}},
+  )
+}
+
+export function fetchStudioEnvironmentSnapshotOperation(
+  environmentId: string,
+  signal?: AbortSignal,
+): Promise<EnvironmentSnapshotOperation | null> {
+  return requestJson<EnvironmentSnapshotOperation | null>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/snapshot-operation`,
+    {headers: {accept: "application/json"}, signal},
+  )
 }
 
 export function fetchStudioWallets(

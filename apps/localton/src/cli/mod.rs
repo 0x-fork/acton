@@ -51,6 +51,11 @@ pub enum Command {
         #[command(subcommand)]
         command: NodeCommand,
     },
+    /// Save and restore persistent network state.
+    Snapshot {
+        #[command(subcommand)]
+        command: SnapshotCommand,
+    },
     /// Manage validator elections, keys, stakes, and rewards.
     Validator {
         #[command(subcommand)]
@@ -65,6 +70,45 @@ pub struct StateArgs {
     /// Persistent network state.
     #[arg(long, default_value = ".localton", global = true)]
     pub state_dir: PathBuf,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct SnapshotArgs {
+    #[command(flatten)]
+    pub state: StateArgs,
+
+    /// Snapshot storage. Defaults to a sibling of the state directory.
+    #[arg(long, global = true)]
+    pub snapshot_dir: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum SnapshotCommand {
+    /// Save a compressed cold snapshot.
+    Create {
+        #[command(flatten)]
+        paths: SnapshotArgs,
+        /// Optional label shown in snapshot listings.
+        #[arg(long)]
+        name: Option<String>,
+    },
+    /// List saved snapshots as JSON.
+    List {
+        #[command(flatten)]
+        paths: SnapshotArgs,
+    },
+    /// Restore a snapshot into the state directory.
+    Restore {
+        #[command(flatten)]
+        paths: SnapshotArgs,
+        id: String,
+    },
+    /// Delete a saved snapshot.
+    Delete {
+        #[command(flatten)]
+        paths: SnapshotArgs,
+        id: String,
+    },
 }
 
 #[derive(Debug, Clone, Args)]

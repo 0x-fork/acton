@@ -1,4 +1,4 @@
-import {Navigate, Route, Routes, useLocation} from "react-router"
+import {Navigate, Route, Routes, useLocation, useNavigate} from "react-router"
 import {Check, KeyRound, ShieldCheck} from "lucide-react"
 import {Dialog, Input} from "@acton/ui"
 import {
@@ -35,6 +35,7 @@ import {ContractPage} from "./dashboard/pages/ContractPage"
 import {ContractsPage} from "./dashboard/pages/ContractsPage"
 import {NftsPage} from "./dashboard/pages/NftsPage"
 import {SettingsPage} from "./dashboard/pages/SettingsPage"
+import {SnapshotsPage} from "./dashboard/pages/SnapshotsPage"
 import {SourceCatalogPage} from "./dashboard/pages/SourceCatalogPage"
 import {TokensPage} from "./dashboard/pages/TokensPage"
 import {WalletsPage} from "./dashboard/pages/WalletsPage"
@@ -67,6 +68,7 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/explorer/nfts": "NFTs",
   "/explorer/suspended": "Suspended addresses",
   "/settings": "Settings",
+  "/snapshots": "Snapshots",
   "/integrate": "Integrate",
   "/api-reference/v2": "API Reference v2",
   "/api-reference/v3": "API Reference v3",
@@ -87,6 +89,7 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/explorer/nfts": "NFT items indexed from this network",
   "/explorer/suspended": "Addresses restricted by the network configuration",
   "/settings": "Manage environment identity, network behavior and mining",
+  "/snapshots": "Create and restore persistent network snapshots",
   "/integrate": "Connect Acton projects, applications and TON-compatible tools to this network",
   "/api-reference/v2": "Explore the v2 API",
   "/api-reference/v3": "Explore the v3 API",
@@ -109,7 +112,7 @@ export interface LocalnetWorkspaceShellState {
 }
 
 export interface LocalnetWorkspaceShellAction {
-  readonly icon: "plus"
+  readonly icon: "archive" | "plus"
   readonly label: string
   readonly onClick: () => void
 }
@@ -170,6 +173,7 @@ const AppContent: FC<AppContentProps> = ({
   const runtime = useLocalnetRuntime()
   const client = runtime.client
   const {pathname} = useLocation()
+  const navigate = useNavigate()
   const [isAddContractOpen, setIsAddContractOpen] = useState(false)
   const explorerPageTitle = useExplorerPageTitle()
   const localPathname = pathname.slice(basePath.length) || "/"
@@ -187,13 +191,19 @@ const AppContent: FC<AppContentProps> = ({
   const withCapability = (capability: EnvironmentCapability, page: ReactNode) =>
     supports(runtime.environment, capability) ? page : fallback
   const openAddContract = useCallback(() => setIsAddContractOpen(true), [])
-  const primaryAction = useMemo<LocalnetWorkspaceShellAction | undefined>(
-    () =>
-      localPathname === "/contracts" && supports(runtime.environment, "contracts")
-        ? {icon: "plus", label: "Add contract", onClick: openAddContract}
-        : undefined,
-    [localPathname, openAddContract, runtime.environment],
+  const openSnapshots = useCallback(
+    () => void navigate(localnetPath(basePath, "/snapshots")),
+    [basePath, navigate],
   )
+  const primaryAction = useMemo<LocalnetWorkspaceShellAction | undefined>(() => {
+    if (localPathname === "/dashboard" && supports(runtime.environment, "snapshots")) {
+      return {icon: "archive", label: "Snapshots", onClick: openSnapshots}
+    }
+    if (localPathname === "/contracts" && supports(runtime.environment, "contracts")) {
+      return {icon: "plus", label: "Add contract", onClick: openAddContract}
+    }
+    return undefined
+  }, [localPathname, openAddContract, openSnapshots, runtime.environment])
   const primaryEndpoint =
     runtime.environment?.endpoints.apiV3 ??
     runtime.environment?.endpoints.apiV2 ??
@@ -322,6 +332,19 @@ const AppContent: FC<AppContentProps> = ({
                   fallback
                 )
               }
+            />
+            <Route
+              path={path("/snapshots")}
+              element={withCapability(
+                "snapshots",
+                <DashboardPage>
+                  {runtime.environment ? (
+                    <SnapshotsPage environment={runtime.environment} />
+                  ) : (
+                    fallback
+                  )}
+                </DashboardPage>,
+              )}
             />
             <Route
               path={path("/integrate")}

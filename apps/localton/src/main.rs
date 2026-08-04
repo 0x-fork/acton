@@ -30,6 +30,7 @@ async fn main() -> Result<()> {
         Some(Command::Lite { command }) => cli::commands::lite(command).await,
         Some(Command::Wallet { command }) => operations::wallets::execute(command).await,
         Some(Command::Node { command }) => operations::nodes::execute(command).await,
+        Some(Command::Snapshot { command }) => operations::snapshots::execute(command),
         Some(Command::Validator { command }) => operations::validators::execute(command).await,
         Some(Command::Hardfork(args)) => operations::hardfork::execute(args).await,
         None => bootstrap::run(cli.run).await,

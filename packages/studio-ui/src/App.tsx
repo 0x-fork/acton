@@ -1,4 +1,4 @@
-import {FolderOpen, Plus} from "lucide-react"
+import {Archive, FolderOpen, Plus} from "lucide-react"
 import {lazy, Suspense, useCallback, useEffect, useState} from "react"
 import {useLocation, useNavigate, useSearchParams} from "react-router"
 import {Button, CopyButton, ToastProvider, useToast} from "@acton/ui"
@@ -282,7 +282,9 @@ function StudioWorkspace({
               leadingIcon={
                 activeEnvironmentShell.primaryAction.icon === "plus" ? (
                   <Plus size={16} aria-hidden="true" />
-                ) : undefined
+                ) : (
+                  <Archive size={16} aria-hidden="true" />
+                )
               }
               onClick={activeEnvironmentShell.primaryAction.onClick}
             >

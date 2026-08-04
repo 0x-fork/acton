@@ -66,7 +66,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
   const hasFaucet = supportsAny(environment, "gramFaucet", "jettonFaucet")
   const hasAccountActions = hasFaucet || supports(environment, "simulator")
   const hasRuntimeActions = supports(environment, "mining") || supports(environment, "timeTravel")
-  const hasStateActions = supports(environment, "checkpoints") || supports(environment, "snapshots")
+  const hasStateActions = supports(environment, "checkpoints")
 
   const loadCheckpoints = useCallback(async () => {
     setIsLoadingCheckpoints(true)
@@ -342,12 +342,13 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
           {hasStateActions ? (
             <div className={styles.environmentActionGroup} aria-label="State actions">
               {supports(environment, "checkpoints") ? (
-                <InlineButton leadingIcon={<ArchiveRestore size={15} />} onClick={openCheckpoints}>
-                  Checkpoints
-                </InlineButton>
-              ) : undefined}
-              {supports(environment, "snapshots") ? (
                 <>
+                  <InlineButton
+                    leadingIcon={<ArchiveRestore size={15} />}
+                    onClick={openCheckpoints}
+                  >
+                    Checkpoints
+                  </InlineButton>
                   <InlineButton
                     leadingIcon={<Upload size={15} />}
                     onClick={() => stateFileInputRef.current?.click()}

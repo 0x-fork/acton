@@ -10,7 +10,7 @@ use tokio::process::{Child, Command};
 use tokio::time::timeout;
 use xxhash_rust::xxh3::xxh3_64;
 
-use crate::EnvironmentRuntimeError;
+use crate::{EnvironmentRuntimeError, EnvironmentSnapshot};
 
 const COMPOSE_TEMPLATE: &str = include_str!("../assets/full-ton-network.compose.yaml");
 const DEFAULT_LOCALTON_IMAGE: &str =
@@ -24,6 +24,9 @@ const STARTUP_ERROR_LINES: usize = 12;
 const DOCKER_METADATA_TIMEOUT: Duration = Duration::from_secs(10);
 const COMPOSE_STOP_TIMEOUT: Duration = Duration::from_secs(2 * 60);
 const COMPOSE_DELETE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(60 * 60);
+const LOCALTON_STATE_DIR: &str = "/var/lib/localton";
+const LOCALTON_SNAPSHOT_DIR: &str = "/var/lib/localton-snapshots";
 
 pub(crate) struct FullTonNetworkDriver {
     compose_file: PathBuf,
@@ -257,6 +260,64 @@ impl FullTonNetworkDriver {
         .await
     }
 
+    pub(crate) async fn list_snapshots(
+        &self,
+    ) -> Result<Vec<EnvironmentSnapshot>, EnvironmentRuntimeError> {
+        self.snapshot_json(["list"]).await
+    }
+
+    pub(crate) async fn create_snapshot(
+        &self,
+        name: Option<&str>,
+    ) -> Result<EnvironmentSnapshot, EnvironmentRuntimeError> {
+        let mut args = vec!["create"];
+        if let Some(name) = name {
+            args.extend(["--name", name]);
+        }
+        self.snapshot_json(args).await
+    }
+
+    pub(crate) async fn restore_snapshot(
+        &self,
+        snapshot_id: &str,
+    ) -> Result<EnvironmentSnapshot, EnvironmentRuntimeError> {
+        self.snapshot_json(["restore", snapshot_id]).await
+    }
+
+    pub(crate) async fn delete_snapshot(
+        &self,
+        snapshot_id: &str,
+    ) -> Result<(), EnvironmentRuntimeError> {
+        let _: serde_json::Value = self.snapshot_json(["delete", snapshot_id]).await?;
+        Ok(())
+    }
+
+    pub(crate) async fn reset_indexer(&self) -> Result<(), EnvironmentRuntimeError> {
+        self.run_compose(
+            ["down", "--remove-orphans"],
+            "prepare to rebuild the index",
+            "environment_snapshot_restore_failed",
+            COMPOSE_DELETE_TIMEOUT,
+        )
+        .await?;
+        for volume in ["postgres-data", "ton-index-workdir"] {
+            let mut command = self.docker_command();
+            command
+                .arg("volume")
+                .arg("rm")
+                .arg("--force")
+                .arg(format!("{}_{volume}", self.project_name));
+            self.run_command(
+                command,
+                "remove derived index data",
+                "environment_snapshot_restore_failed",
+                COMPOSE_DELETE_TIMEOUT,
+            )
+            .await?;
+        }
+        Ok(())
+    }
+
     pub(crate) async fn isolated_pull_target(
         &self,
     ) -> Result<Option<IsolatedPullTarget>, EnvironmentRuntimeError> {
@@ -374,6 +435,87 @@ impl FullTonNetworkDriver {
         docker_text(command).await
     }
 
+    async fn snapshot_json<T, I, S>(&self, args: I) -> Result<T, EnvironmentRuntimeError>
+    where
+        T: serde::de::DeserializeOwned,
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        let mut command = self.compose_command();
+        command
+            .arg("run")
+            .arg("--rm")
+            .arg("--no-deps")
+            .arg("localton")
+            .arg("snapshot")
+            .args(args)
+            .arg("--state-dir")
+            .arg(LOCALTON_STATE_DIR)
+            .arg("--snapshot-dir")
+            .arg(LOCALTON_SNAPSHOT_DIR);
+        let output = self
+            .command_output(
+                command,
+                "manage snapshots",
+                "environment_snapshot_failed",
+                SNAPSHOT_TIMEOUT,
+            )
+            .await?;
+        serde_json::from_slice(&output.stdout).map_err(|error| EnvironmentRuntimeError::Internal {
+            code: "environment_snapshot_failed",
+            message: format!("localton returned invalid snapshot data: {error}"),
+        })
+    }
+
+    async fn run_command(
+        &self,
+        command: Command,
+        operation: &str,
+        code: &'static str,
+        operation_timeout: Duration,
+    ) -> Result<(), EnvironmentRuntimeError> {
+        self.command_output(command, operation, code, operation_timeout)
+            .await
+            .map(|_| ())
+    }
+
+    async fn command_output(
+        &self,
+        mut command: Command,
+        operation: &str,
+        code: &'static str,
+        operation_timeout: Duration,
+    ) -> Result<std::process::Output, EnvironmentRuntimeError> {
+        command.stdin(Stdio::null()).kill_on_drop(true);
+        let output = timeout(operation_timeout, command.output())
+            .await
+            .map_err(|_| EnvironmentRuntimeError::Internal {
+                code,
+                message: format!(
+                    "Timed out after {} seconds while trying to {operation}",
+                    operation_timeout.as_secs()
+                ),
+            })?
+            .map_err(|error| EnvironmentRuntimeError::Internal {
+                code,
+                message: format!("Failed to {operation}: {error}"),
+            })?;
+        if output.status.success() {
+            return Ok(output);
+        }
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let details = stderr.trim();
+        Err(EnvironmentRuntimeError::Internal {
+            code,
+            message: if details.is_empty() {
+                format!("Could not {operation} ({})", output.status)
+            } else {
+                format!("Could not {operation}: {details}")
+            },
+        })
+    }
+
     async fn run_compose<I, S>(
         &self,
         args: I,
@@ -386,39 +528,14 @@ impl FullTonNetworkDriver {
         S: AsRef<OsStr>,
     {
         let mut command = self.compose_command();
-        command.args(args).stdin(Stdio::null()).kill_on_drop(true);
-        let output = timeout(operation_timeout, command.output())
-            .await
-            .map_err(|_| EnvironmentRuntimeError::Internal {
-                code,
-                message: format!(
-                    "Timed out after {} seconds while trying to {operation} the full TON network with Docker Compose",
-                    operation_timeout.as_secs()
-                ),
-            })?
-            .map_err(|error| EnvironmentRuntimeError::Internal {
-                code,
-                message: format!(
-                    "Failed to {operation} the full TON network with Docker Compose: {error}"
-                ),
-            })?;
-        if output.status.success() {
-            return Ok(());
-        }
-
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let details = stderr.trim();
-        Err(EnvironmentRuntimeError::Internal {
+        command.args(args);
+        self.run_command(
+            command,
+            &format!("{operation} the full TON network with Docker Compose"),
             code,
-            message: if details.is_empty() {
-                format!(
-                    "Docker Compose could not {operation} the full TON network ({})",
-                    output.status
-                )
-            } else {
-                format!("Docker Compose could not {operation} the full TON network: {details}")
-            },
-        })
+            operation_timeout,
+        )
+        .await
     }
 }
 

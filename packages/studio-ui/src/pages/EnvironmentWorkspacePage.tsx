@@ -1,7 +1,9 @@
 import {Button} from "@acton/ui"
 import {CircleAlert, LoaderCircle, Play} from "lucide-react"
 import {useEffect, useState} from "react"
+import {useLocation} from "react-router"
 
+import {supports} from "../environmentCapabilities"
 import {LocalnetWorkspace, type LocalnetWorkspaceShellState} from "../localnet/LocalnetWorkspace"
 import {type StudioEnvironment, restartStudioEnvironment} from "../studioApi"
 
@@ -28,13 +30,16 @@ export function EnvironmentWorkspacePage({
   onRetry,
   onShellChange,
 }: EnvironmentWorkspacePageProps) {
+  const location = useLocation()
   const [isRestarting, setIsRestarting] = useState(false)
   const [restartError, setRestartError] = useState<string>()
   const visibleError = loadError ?? restartError
   const isManaged = environment?.lifecycle === "managed"
+  const isSnapshotsPage =
+    location.pathname === `${basePath}/snapshots` && supports(environment, "snapshots")
 
   useEffect(() => {
-    if (environment?.status === "running") return
+    if (environment?.status === "running" || isSnapshotsPage) return
 
     const subject = isManaged ? "virtual environment" : "network"
     const pageDescription = visibleError
@@ -54,6 +59,7 @@ export function EnvironmentWorkspacePage({
     environment?.name,
     environment?.rpcUrl,
     environment?.status,
+    isSnapshotsPage,
     isManaged,
     onShellChange,
     visibleError,
@@ -74,7 +80,7 @@ export function EnvironmentWorkspacePage({
     }
   }
 
-  if (environment?.status === "running") {
+  if (environment?.status === "running" || isSnapshotsPage) {
     return (
       <LocalnetWorkspace
         basePath={basePath}

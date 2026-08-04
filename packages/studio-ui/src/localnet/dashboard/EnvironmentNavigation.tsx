@@ -2,6 +2,7 @@ import {useEffect, useMemo, useState} from "react"
 import type {FC} from "react"
 import {
   Activity,
+  Archive,
   Binary,
   Box,
   Brackets,
@@ -85,6 +86,7 @@ const standaloneItems: SidebarItem[] = [
 const environmentItems: SidebarItem[] = [
   {label: "Wallets", icon: Wallet, path: "/wallets"},
   {label: "Faucet", icon: HandCoins, path: "/faucet"},
+  {label: "Snapshots", icon: Archive, path: "/snapshots"},
 ]
 
 const apiCallsItem: SidebarItem = {
@@ -212,7 +214,9 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   const visibleEnvironmentItems = environmentItems.filter(item =>
     item.path === "/wallets"
       ? supports(environment, "wallets")
-      : supportsAny(environment, "gramFaucet", "jettonFaucet"),
+      : item.path === "/snapshots"
+        ? supports(environment, "snapshots")
+        : supportsAny(environment, "gramFaucet", "jettonFaucet"),
   )
   const visibleApiReferenceItems = apiReferenceItems.filter(item =>
     item.path === "/api-reference/v2"

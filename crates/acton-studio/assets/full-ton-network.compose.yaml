@@ -15,6 +15,7 @@ services:
       - "127.0.0.1:__LOCALTON_V2_PORT__:18002"
     volumes:
       - localton-state:/var/lib/localton
+      - localton-snapshots:/var/lib/localton-snapshots
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -192,5 +193,6 @@ services:
 
 volumes:
   localton-state:
+  localton-snapshots:
   postgres-data:
   ton-index-workdir:

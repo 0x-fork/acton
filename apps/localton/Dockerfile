@@ -3,6 +3,7 @@
 ARG RUST_VERSION=1.96.1
 ARG GO_VERSION=1.24.11
 ARG UBUNTU_VERSION=24.04
+ARG LOCALTON_BASE_IMAGE=ghcr.io/ton-blockchain/localton:sha-e5d33846df348f86021de6031080969db2735a41
 
 FROM rust:${RUST_VERSION}-bookworm AS launcher-builder
 WORKDIR /src
@@ -17,12 +18,20 @@ RUN --mount=type=cache,id=localton-cargo-registry,target=/usr/local/cargo/regist
 COPY src ./src
 COPY xtask ./xtask
 COPY assets ./assets
-COPY LICENSE NOTICE.md README.md ./
+COPY NOTICE.md README.md ./
 RUN --mount=type=cache,id=localton-cargo-registry,target=/usr/local/cargo/registry \
     --mount=type=cache,id=localton-cargo-target,target=/src/target \
     cargo build --locked --release --workspace \
     && install -Dm755 target/release/localton /out/localton \
     && install -Dm755 target/release/xtask /out/xtask
+
+# Development target: reuse the native TON and indexer layers from the published
+# image and replace only the localton launcher built from this checkout.
+FROM ${LOCALTON_BASE_IMAGE} AS localton-rust-only
+USER root
+COPY --from=launcher-builder --chmod=0755 /out/localton /usr/local/bin/localton
+RUN install -d -o localton -g localton -m 0700 /var/lib/localton-snapshots
+USER localton
 
 FROM ubuntu:${UBUNTU_VERSION} AS ton-binaries
 ARG TARGETARCH
@@ -342,6 +351,7 @@ RUN apt-get update \
         --shell /usr/sbin/nologin \
         localton \
     && install -d -o localton -g localton -m 0700 /var/lib/localton \
+    && install -d -o localton -g localton -m 0700 /var/lib/localton-snapshots \
     && install -d -m 0755 /usr/share/doc/localton
 
 COPY --from=launcher-builder /out/localton /usr/local/bin/localton
@@ -363,7 +373,7 @@ COPY --from=ton-index-classifier-builder \
     /opt/ton-indexer/classifier
 COPY --from=ton-indexer-builder /src/ton-indexer/LICENSE /usr/share/doc/localton/TON-INDEXER-LICENSE
 COPY --chmod=0755 docker/container-entrypoint.sh /usr/local/bin/localton-container-entrypoint
-COPY LICENSE NOTICE.md /usr/share/doc/localton/
+COPY NOTICE.md /usr/share/doc/localton/
 
 ENV HOME=/var/lib/localton \
     APPIMAGE_EXTRACT_AND_RUN=1 \

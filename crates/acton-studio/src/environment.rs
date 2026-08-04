@@ -46,6 +46,76 @@ pub struct UpdateEnvironmentRequest {
     pub name: String,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateEnvironmentSnapshotRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentSnapshot {
+    pub format_version: u32,
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub created_at: u64,
+    pub archive_size_bytes: u64,
+    pub state_size_bytes: u64,
+    pub state_schema_version: u32,
+    pub ton_release: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub masterchain_seqno: Option<u32>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum EnvironmentSnapshotOperationKind {
+    Create,
+    Restore,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum EnvironmentSnapshotOperationPhase {
+    Preparing,
+    Stopping,
+    CreatingArchive,
+    RestoringState,
+    ResettingIndexer,
+    Starting,
+    Completed,
+    Failed,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentSnapshotOperation {
+    pub kind: EnvironmentSnapshotOperationKind,
+    pub phase: EnvironmentSnapshotOperationPhase,
+    pub started_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finished_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snapshot_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snapshot_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+impl EnvironmentSnapshotOperation {
+    #[must_use]
+    pub const fn is_active(&self) -> bool {
+        !matches!(
+            self.phase,
+            EnvironmentSnapshotOperationPhase::Completed
+                | EnvironmentSnapshotOperationPhase::Failed
+        )
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(
     tag = "kind",
@@ -239,7 +309,6 @@ impl EnvironmentConfig {
                 EnvironmentCapability::ApiCalls,
                 EnvironmentCapability::Mining,
                 EnvironmentCapability::TimeTravel,
-                EnvironmentCapability::Snapshots,
                 EnvironmentCapability::Checkpoints,
             ],
             Self::FullTonNetwork { .. } => vec![
@@ -252,6 +321,7 @@ impl EnvironmentConfig {
                 EnvironmentCapability::Simulator,
                 EnvironmentCapability::Contracts,
                 EnvironmentCapability::ApiCalls,
+                EnvironmentCapability::Snapshots,
             ],
             Self::RemoteTonNetwork { .. } => vec![
                 EnvironmentCapability::ApiV2,
@@ -351,9 +421,56 @@ pub trait EnvironmentRuntime: Send + Sync {
 
     fn restart(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment>;
 
+    fn list_snapshots(
+        &self,
+        _environment_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, Vec<EnvironmentSnapshot>> {
+        snapshots_unavailable()
+    }
+
+    fn create_snapshot(
+        &self,
+        _environment_id: &str,
+        _request: CreateEnvironmentSnapshotRequest,
+    ) -> EnvironmentRuntimeFuture<'_, EnvironmentSnapshotOperation> {
+        snapshots_unavailable()
+    }
+
+    fn restore_snapshot(
+        &self,
+        _environment_id: &str,
+        _snapshot_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, EnvironmentSnapshotOperation> {
+        snapshots_unavailable()
+    }
+
+    fn delete_snapshot(
+        &self,
+        _environment_id: &str,
+        _snapshot_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, ()> {
+        snapshots_unavailable()
+    }
+
+    fn snapshot_operation(
+        &self,
+        _environment_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, Option<EnvironmentSnapshotOperation>> {
+        snapshots_unavailable()
+    }
+
     fn shutdown(&self) -> EnvironmentRuntimeFuture<'_, ()> {
         Box::pin(async { Ok(()) })
     }
+}
+
+fn snapshots_unavailable<T>() -> EnvironmentRuntimeFuture<'static, T> {
+    Box::pin(async {
+        Err(EnvironmentRuntimeError::Conflict {
+            code: "environment_snapshots_unavailable",
+            message: "Snapshots are not available for this environment".to_owned(),
+        })
+    })
 }
 
 pub(crate) struct EmptyEnvironmentRuntime;

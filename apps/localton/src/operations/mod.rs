@@ -5,5 +5,6 @@
 
 pub(crate) mod hardfork;
 pub(crate) mod nodes;
+pub(crate) mod snapshots;
 pub(crate) mod validators;
 pub(crate) mod wallets;
