@@ -1,5 +1,5 @@
-import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC, FormEvent} from "react"
+import {useCallback, useEffect, useRef, useState} from "react"
 import {Link2, RefreshCw, Unplug} from "lucide-react"
 import {
   Button,
@@ -26,15 +26,15 @@ import type {JettonWallet} from "@acton/explorer-core/api/types"
 import {ExplorerAddressChip} from "@acton/explorer-core/components/ExplorerAddressChip"
 import {WalletAccountSummary} from "@acton/explorer-core/components/WalletAccountSummary"
 import {
+  type AddressFormatOptions,
   normalizeAddress,
   toRawAddress,
-  type AddressFormatOptions,
 } from "@acton/explorer-core/components/utils"
 import {useAddressFormat} from "@acton/explorer-core/hooks/useNetworkInfo"
 import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
 import {
-  useOpenExplorerPath,
   type ExplorerNavigationClickEvent,
+  useOpenExplorerPath,
 } from "@acton/explorer-core/hooks/useOpenExplorerPath"
 import type {RuntimeWallet} from "../../wallet/types"
 import {useWalletRuntime} from "../../wallet/useWalletRuntime"
@@ -391,7 +391,7 @@ const SessionWalletCell: FC<SessionWalletCellProps> = ({
   onAddressClick,
   onCopyAddress,
 }) => {
-  const wallet = findRuntimeWallet(wallets, walletId)
+  const wallet = wallets.find(wallet => wallet.id === walletId)
   if (!wallet) {
     return <span className={styles.sessionWalletFallback}>Unknown wallet</span>
   }
@@ -406,11 +406,4 @@ const SessionWalletCell: FC<SessionWalletCellProps> = ({
       onCopyAddress={onCopyAddress}
     />
   )
-}
-
-function findRuntimeWallet(
-  wallets: readonly RuntimeWallet[],
-  walletId: string,
-): RuntimeWallet | undefined {
-  return wallets.find(wallet => wallet.id === walletId)
 }

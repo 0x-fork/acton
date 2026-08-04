@@ -1,6 +1,6 @@
 import {Cell} from "@ton/core"
 
-import type {ExtendedContractABI} from "./compilerAbi"
+import {addressKey, type ExtendedContractABI} from "./compilerAbi"
 import {
   parseSuspendedAccountsConfig,
   readSuspendedAccountsConfigCache,
@@ -30,10 +30,12 @@ import type {
   StreamingActionsEvent,
   StreamingTransactionsEvent,
   SourceTraceResponse,
+  V3Action,
   V3ActionsResponse,
   V3BlocksResponse,
   V3MultisigOrdersResponse,
   V3MultisigWalletsResponse,
+  V3Metadata,
   V3RunGetMethodResponse,
   V3RunGetMethodStackEntry,
   V3TransactionDetailsResponse,
@@ -235,6 +237,13 @@ function jettonMasterMetadataFromWalletResponse(
 
   const totalSupply = stringValue(tokenInfo.total_supply) ?? stringValue(extra.total_supply)
   const mintable = booleanValue(tokenInfo.mintable) ?? booleanValue(extra.mintable)
+  if (
+    Object.keys(jettonContent).length === 0 &&
+    totalSupply === undefined &&
+    mintable === undefined
+  ) {
+    return undefined
+  }
 
   return {
     address: jettonAddress,
@@ -242,6 +251,92 @@ function jettonMasterMetadataFromWalletResponse(
     ...(totalSupply ? {total_supply: totalSupply} : undefined),
     ...(mintable === undefined ? undefined : {mintable}),
   }
+}
+
+const ACTION_JETTON_ASSET_KEYS = new Set([
+  "asset",
+  "asset_in",
+  "asset_out",
+  "asset_1",
+  "asset_2",
+  "source_asset",
+  "target_asset_1",
+  "target_asset_2",
+])
+
+function collectActionAssetAddresses(actions: readonly V3Action[]): string[] {
+  const addresses = new Set<string>()
+
+  const visit = (value: unknown, key?: string): void => {
+    if (key && ACTION_JETTON_ASSET_KEYS.has(key) && stringValue(value)) {
+      addresses.add(value as string)
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        visit(item)
+      }
+      return
+    }
+
+    if (isRecord(value)) {
+      for (const [childKey, childValue] of Object.entries(value)) {
+        visit(childValue, childKey)
+      }
+    }
+  }
+
+  for (const action of actions) {
+    visit(action.details)
+  }
+
+  return [...addresses]
+}
+
+function metadataTokenInfoForAddress(
+  metadata: V3Metadata,
+  address: string,
+): AccountStateTokenInfo | undefined {
+  const entry = metadata[address] ?? metadata[addressKey(address)]
+  return entry?.token_info?.find(info => info.type === "jetton_masters")
+}
+
+function metadataTokenHasSymbol(tokenInfo: AccountStateTokenInfo | undefined): boolean {
+  const extra = isRecord(tokenInfo?.extra) ? tokenInfo.extra : {}
+  return stringValue(tokenInfo?.symbol) !== undefined || stringValue(extra.symbol) !== undefined
+}
+
+function mergeJettonMastersIntoMetadata(
+  metadata: V3Metadata,
+  masters: readonly JettonMaster[],
+): V3Metadata {
+  let mergedMetadata = metadata
+
+  for (const master of masters) {
+    const normalizedKey = addressKey(master.address)
+    const key = mergedMetadata[master.address] ? master.address : normalizedKey
+    const existing = mergedMetadata[key]
+    const existingTokenInfo = existing?.token_info ?? []
+    const masterTokenInfo: AccountStateTokenInfo = {
+      ...(existingTokenInfo.find(info => info.type === "jetton_masters") ?? {}),
+      type: "jetton_masters",
+      ...master.jetton_content,
+      total_supply: master.total_supply,
+      mintable: master.mintable,
+    }
+
+    mergedMetadata = {
+      ...mergedMetadata,
+      [key]: {
+        ...(existing ?? {}),
+        token_info: existingTokenInfo.some(info => info.type === "jetton_masters")
+          ? existingTokenInfo.map(info => (info.type === "jetton_masters" ? masterTokenInfo : info))
+          : [...existingTokenInfo, masterTokenInfo],
+      },
+    }
+  }
+
+  return mergedMetadata
 }
 
 function attachJettonMasterMetadata(
@@ -694,7 +789,9 @@ export class TonClient {
       url.searchParams.append("offset", offset.toString())
     }
     url.searchParams.append("sort", sort)
-    return this.request(url, "Failed to fetch account actions")
+    const response = await this.request<V3ActionsResponse>(url, "Failed to fetch account actions")
+    const metadata = await this.enrichActionMetadata(response.actions, response.metadata)
+    return metadata === response.metadata ? response : {...response, metadata}
   }
 
   async getTracesByMessageHash(msgHash: string): Promise<V3TracesResponse> {
@@ -1276,11 +1373,14 @@ export class TonClient {
         throw new Error("Streaming subscription returned an empty body")
       }
 
-      await this.readSseEvents(response.body, value => {
+      await this.readSseEvents(response.body, async value => {
         if (isStreamingTransactionsEvent(value)) {
           handlers.onTransactions(value)
         } else if (isStreamingActionsEvent(value)) {
-          handlers.onActions?.(value)
+          const metadata = value.metadata
+            ? await this.enrichActionMetadata(value.actions, value.metadata)
+            : value.metadata
+          handlers.onActions?.(metadata === value.metadata ? value : {...value, metadata})
         }
       })
     } catch (error) {
@@ -1291,14 +1391,14 @@ export class TonClient {
 
   private async readSseEvents(
     body: ReadableStream<Uint8Array>,
-    onEvent: (value: unknown) => void,
+    onEvent: (value: unknown) => void | Promise<void>,
   ): Promise<void> {
     const reader = body.getReader()
     const decoder = new TextDecoder()
     let buffer = ""
     let dataLines: string[] = []
 
-    const dispatch = () => {
+    const dispatch = async (): Promise<void> => {
       if (dataLines.length === 0) {
         return
       }
@@ -1306,15 +1406,15 @@ export class TonClient {
       const data = dataLines.join("\n")
       dataLines = []
       try {
-        onEvent(JSON.parse(data) as unknown)
+        await onEvent(JSON.parse(data) as unknown)
       } catch (error) {
         console.debug("Failed to parse streaming event", error)
       }
     }
 
-    const processLine = (line: string) => {
+    const processLine = async (line: string): Promise<void> => {
       if (line.length === 0) {
-        dispatch()
+        await dispatch()
         return
       }
       if (line.startsWith("data:")) {
@@ -1333,14 +1433,14 @@ export class TonClient {
       const lines = buffer.split(/\r?\n/)
       buffer = lines.pop() ?? ""
       for (const line of lines) {
-        processLine(line)
+        await processLine(line)
       }
     }
 
     if (buffer.length > 0) {
-      processLine(buffer)
+      await processLine(buffer)
     }
-    dispatch()
+    await dispatch()
   }
 
   private attachJettonWalletMaster(
@@ -1349,6 +1449,27 @@ export class TonClient {
   ): JettonWallet {
     const master = wallet.master ?? jettonMasterMetadataFromWalletResponse(wallet.jetton, metadata)
     return master ? {...wallet, master} : wallet
+  }
+
+  private async enrichActionMetadata(
+    actions: readonly V3Action[],
+    metadata: V3Metadata,
+  ): Promise<V3Metadata> {
+    const missingMasterAddresses = collectActionAssetAddresses(actions).filter(address => {
+      const tokenInfo = metadataTokenInfoForAddress(metadata, address)
+      return tokenInfo !== undefined && !metadataTokenHasSymbol(tokenInfo)
+    })
+    if (missingMasterAddresses.length === 0) {
+      return metadata
+    }
+
+    try {
+      const masters = await this.getJettonMasters(missingMasterAddresses)
+      return mergeJettonMastersIntoMetadata(metadata, masters)
+    } catch (error) {
+      console.debug("Failed to enrich action jetton metadata", error)
+      return metadata
+    }
   }
 
   private async request<T>(url: URL, errorMessage: string, options?: RequestInit): Promise<T> {

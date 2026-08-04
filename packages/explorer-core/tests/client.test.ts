@@ -422,6 +422,133 @@ test("account history requests forward the requested sort order", async () => {
   }
 })
 
+test("account action metadata resolves type-only jetton masters", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  globalThis.fetch = mock(async input => {
+    const url = new URL(input.toString())
+    requests.push(url)
+    if (url.pathname.endsWith("/actions")) {
+      return Response.json({
+        actions: [
+          {
+            type: "jetton_mint",
+            details: {asset: "0:master", amount: "1000000000"},
+          },
+        ],
+        address_book: {},
+        metadata: {
+          "0:master": {
+            token_info: [{type: "jetton_masters"}],
+          },
+        },
+      })
+    }
+
+    return Response.json({
+      jetton_masters: [
+        {
+          address: "0:master",
+          admin_address: null,
+          code_hash: "code",
+          data_hash: "data",
+          jetton_content: {name: "Acton Token", symbol: "ACT", decimals: "9"},
+          jetton_wallet_code_hash: "wallet-code",
+          last_transaction_lt: "1",
+          mintable: true,
+          total_supply: "1000000000",
+        },
+      ],
+      metadata: {},
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+    const response = await client.getAccountActions("EQAddress")
+
+    expect({
+      requests: requests.map(request => request.toString()),
+      tokenInfo: response.metadata["0:master"]?.token_info,
+    }).toMatchInlineSnapshot(`
+      {
+        "requests": [
+          "https://toncenter.example/api/v3/actions?account=EQAddress&limit=20&sort=desc",
+          "https://toncenter.example/api/v3/jetton/masters?address=0%3Amaster&limit=1",
+        ],
+        "tokenInfo": [
+          {
+            "decimals": "9",
+            "mintable": true,
+            "name": "Acton Token",
+            "symbol": "ACT",
+            "total_supply": "1000000000",
+            "type": "jetton_masters",
+          },
+        ],
+      }
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("account action metadata skips master lookup when the symbol is present", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  globalThis.fetch = mock(async input => {
+    const url = new URL(input.toString())
+    requests.push(url)
+    return Response.json({
+      actions: [
+        {
+          type: "jetton_mint",
+          details: {asset: "0:master", amount: "1000000000"},
+        },
+      ],
+      address_book: {},
+      metadata: {
+        "0:master": {
+          token_info: [{type: "jetton_masters", name: "Acton Token", symbol: "ACT"}],
+        },
+      },
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+    const response = await client.getAccountActions("EQAddress")
+
+    expect({
+      requests: requests.map(request => request.toString()),
+      tokenInfo: response.metadata["0:master"]?.token_info,
+    }).toMatchInlineSnapshot(`
+      {
+        "requests": [
+          "https://toncenter.example/api/v3/actions?account=EQAddress&limit=20&sort=desc",
+        ],
+        "tokenInfo": [
+          {
+            "name": "Acton Token",
+            "symbol": "ACT",
+            "type": "jetton_masters",
+          },
+        ],
+      }
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("account history streaming subscribes to and dispatches transactions and actions", async () => {
   const originalFetch = globalThis.fetch
   let subscriptionBody = ""
@@ -501,6 +628,66 @@ test("jetton wallet requests forward pagination options", async () => {
       "https://toncenter.example/api/v3/jetton/wallets?owner_address=EQOwner&limit=100&offset=200",
       "https://toncenter.example/api/v3/jetton/wallets?jetton_address=EQJetton&limit=100&offset=300&sort=desc",
     ])
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("jetton wallet metadata without content stays unresolved for master lookup", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: URL[] = []
+  globalThis.fetch = mock(async input => {
+    requests.push(new URL(input.toString()))
+    return Response.json({
+      jetton_wallets: [
+        {
+          address: "0:wallet",
+          balance: "100",
+          owner: "0:owner",
+          jetton: "0:master",
+          last_transaction_lt: "1",
+          code_hash: "code",
+          data_hash: "data",
+        },
+      ],
+      metadata: {
+        "0:master": {
+          is_indexed: false,
+          token_info: [{type: "jetton_masters"}],
+        },
+      },
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+    const wallets = await client.getJettonWallets(["EQOwner"])
+
+    expect({
+      requests: requests.map(request => request.toString()),
+      wallets: wallets.map(wallet => ({
+        balance: wallet.balance,
+        jetton: wallet.jetton,
+        master: wallet.master ?? null,
+      })),
+    }).toMatchInlineSnapshot(`
+      {
+        "requests": [
+          "https://toncenter.example/api/v3/jetton/wallets?owner_address=EQOwner",
+        ],
+        "wallets": [
+          {
+            "balance": "100",
+            "jetton": "0:master",
+            "master": null,
+          },
+        ],
+      }
+    `)
   } finally {
     globalThis.fetch = originalFetch
   }
