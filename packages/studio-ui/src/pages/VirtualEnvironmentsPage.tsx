@@ -18,8 +18,8 @@ import {Boxes, Plus, RotateCcw, Square} from "lucide-react"
 import {useState} from "react"
 
 import {TablePage} from "../components/TablePage"
+import {environmentStatusLabels, formatEnvironmentType} from "../environmentPresentation"
 import {
-  type EnvironmentConfig,
   type EnvironmentStatus,
   type StudioEnvironment,
   restartStudioEnvironment,
@@ -41,14 +41,6 @@ interface VirtualEnvironmentsPageProps {
   readonly onOpenEnvironment: (environment: StudioEnvironment) => void
   readonly onRefresh: () => Promise<void>
 }
-
-const statusLabels = {
-  starting: "Starting",
-  running: "Running",
-  stopping: "Stopping",
-  stopped: "Stopped",
-  failed: "Failed",
-} satisfies Record<EnvironmentStatus, string>
 
 export function VirtualEnvironmentsPage({
   createOpen,
@@ -286,15 +278,9 @@ function EnvironmentStatusLabel({status}: {readonly status: EnvironmentStatus}) 
   return (
     <span className={styles.status} data-status={status}>
       <span className={styles.statusDot} aria-hidden="true" />
-      {statusLabels[status]}
+      {environmentStatusLabels[status]}
     </span>
   )
-}
-
-function formatEnvironmentType(config: EnvironmentConfig) {
-  if (config.kind === "actonLocalnet") return "Simulated localnet"
-  if (config.kind === "fullTonNetwork") return "Full localnet"
-  return config.network === "mainnet" ? "Mainnet" : "Testnet"
 }
 
 function primaryEndpoint(environment: StudioEnvironment): string | undefined {
