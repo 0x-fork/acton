@@ -295,14 +295,6 @@ export function StudioNavigation({
                                     <span className={styles.environmentNavName}>
                                       {network.name}
                                     </span>
-                                    {!network.network.testOnly && (
-                                      <span
-                                        className={styles.networkNavBadge}
-                                        title="Live production network"
-                                      >
-                                        Live
-                                      </span>
-                                    )}
                                   </span>
                                   <span
                                     className={styles.environmentStatusDot}

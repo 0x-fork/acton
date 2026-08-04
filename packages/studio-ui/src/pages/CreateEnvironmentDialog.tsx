@@ -161,13 +161,17 @@ export function CreateEnvironmentDialog({
       <form className={styles.form} onSubmit={event => void handleSubmit(event)}>
         <Select
           label="Environment type"
-          description="Use the fast Acton runtime or start a validator-backed TON network"
+          description={
+            form.kind === "actonLocalnet"
+              ? "Uses the Acton emulator instead of TON validators, starts quickly, uses little disk space, and supports forks, manual mining, time travel, and network controls, but can behave differently from a real TON network in edge cases"
+              : "Runs local TON validators and a full indexer, produces blocks through validator nodes, supports actions, and reproduces full-node API behavior, but starts more slowly and uses more memory and disk space"
+          }
           value={form.kind}
           autoFocus
           onChange={event => updateKind(event.target.value as EnvironmentFormState["kind"])}
         >
-          <option value="actonLocalnet">Fast local network</option>
-          <option value="fullTonNetwork">Full TON network</option>
+          <option value="actonLocalnet">Simulated localnet</option>
+          <option value="fullTonNetwork">Full localnet</option>
         </Select>
 
         <Input
@@ -330,8 +334,8 @@ function defaultEnvironmentName(
   environmentCount: number,
 ): string {
   return kind === "actonLocalnet"
-    ? `Localnet ${environmentCount + 1}`
-    : `Full TON network ${environmentCount + 1}`
+    ? `Simulated localnet ${environmentCount + 1}`
+    : `Full localnet ${environmentCount + 1}`
 }
 
 function optionalPositiveInteger(value: string, label: string): number | undefined {

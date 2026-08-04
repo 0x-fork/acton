@@ -356,14 +356,14 @@ impl EnvironmentConfig {
             },
             Self::ActonLocalnet { .. } => EnvironmentNetwork {
                 id: "acton-localnet".to_owned(),
-                label: "Acton localnet".to_owned(),
+                label: "Simulated localnet".to_owned(),
                 chain_id: -3,
                 test_only: true,
                 supports_actions: false,
             },
             Self::FullTonNetwork { .. } => EnvironmentNetwork {
                 id: "full-ton-network".to_owned(),
-                label: "Local TON network".to_owned(),
+                label: "Full localnet".to_owned(),
                 chain_id: -3,
                 test_only: true,
                 supports_actions: true,

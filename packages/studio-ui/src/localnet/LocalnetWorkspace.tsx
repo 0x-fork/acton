@@ -1,4 +1,4 @@
-import {Navigate, Route, Routes, useLocation, useNavigate} from "react-router"
+import {Navigate, Route, Routes, useLocation} from "react-router"
 import {Check, KeyRound, ShieldCheck} from "lucide-react"
 import {Dialog, Input} from "@acton/ui"
 import {
@@ -172,8 +172,8 @@ const AppContent: FC<AppContentProps> = ({
   const runtime = useLocalnetRuntime()
   const client = runtime.client
   const {pathname} = useLocation()
-  const navigate = useNavigate()
   const [isAddContractOpen, setIsAddContractOpen] = useState(false)
+  const [isCreateSnapshotOpen, setIsCreateSnapshotOpen] = useState(false)
   const localPathname = pathname.slice(basePath.length) || "/"
   const allowsOverflow = localPathname === "/faucet"
   const isExplorerPage = localPathname === "/explorer" || localPathname.startsWith("/explorer/")
@@ -194,19 +194,16 @@ const AppContent: FC<AppContentProps> = ({
   const withCapability = (capability: EnvironmentCapability, page: ReactNode) =>
     supports(runtime.environment, capability) ? page : fallback
   const openAddContract = useCallback(() => setIsAddContractOpen(true), [])
-  const openSnapshots = useCallback(
-    () => void navigate(localnetPath(basePath, "/snapshots")),
-    [basePath, navigate],
-  )
+  const openCreateSnapshot = useCallback(() => setIsCreateSnapshotOpen(true), [])
   const primaryAction = useMemo<LocalnetWorkspaceShellAction | undefined>(() => {
-    if (localPathname === "/dashboard" && supports(runtime.environment, "snapshots")) {
-      return {icon: "archive", label: "Snapshots", onClick: openSnapshots}
-    }
     if (localPathname === "/contracts" && supports(runtime.environment, "contracts")) {
       return {icon: "plus", label: "Add contract", onClick: openAddContract}
     }
+    if (localPathname === "/snapshots" && supports(runtime.environment, "snapshots")) {
+      return {icon: "archive", label: "Create snapshot", onClick: openCreateSnapshot}
+    }
     return undefined
-  }, [localPathname, openAddContract, openSnapshots, runtime.environment])
+  }, [localPathname, openAddContract, openCreateSnapshot, runtime.environment])
   const primaryEndpoint =
     runtime.environment?.endpoints.apiV3 ??
     runtime.environment?.endpoints.apiV2 ??
@@ -223,6 +220,7 @@ const AppContent: FC<AppContentProps> = ({
 
   useEffect(() => {
     if (localPathname !== "/contracts") setIsAddContractOpen(false)
+    if (localPathname !== "/snapshots") setIsCreateSnapshotOpen(false)
   }, [localPathname])
 
   return (
@@ -342,7 +340,11 @@ const AppContent: FC<AppContentProps> = ({
                 "snapshots",
                 <DashboardPage>
                   {runtime.environment ? (
-                    <SnapshotsPage environment={runtime.environment} />
+                    <SnapshotsPage
+                      createOpen={isCreateSnapshotOpen}
+                      environment={runtime.environment}
+                      onCreateOpenChange={setIsCreateSnapshotOpen}
+                    />
                   ) : (
                     fallback
                   )}

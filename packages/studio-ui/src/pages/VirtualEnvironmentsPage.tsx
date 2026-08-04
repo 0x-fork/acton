@@ -292,8 +292,8 @@ function EnvironmentStatusLabel({status}: {readonly status: EnvironmentStatus}) 
 }
 
 function formatEnvironmentType(config: EnvironmentConfig) {
-  if (config.kind === "actonLocalnet") return "Fast local network"
-  if (config.kind === "fullTonNetwork") return "Full TON network"
+  if (config.kind === "actonLocalnet") return "Simulated localnet"
+  if (config.kind === "fullTonNetwork") return "Full localnet"
   return config.network === "mainnet" ? "Mainnet" : "Testnet"
 }
 

@@ -266,10 +266,10 @@ export const SettingsPage: FC<SettingsPageProps> = ({
             description="The runtime used by this environment"
             value={
               environment?.config.kind === "fullTonNetwork"
-                ? "Full TON network"
+                ? "Full localnet"
                 : environment?.config.kind === "remoteTonNetwork"
                   ? "Remote TON network"
-                  : "Fast local network"
+                  : "Simulated localnet"
             }
           />
 

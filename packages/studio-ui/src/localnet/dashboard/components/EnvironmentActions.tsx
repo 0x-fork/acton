@@ -1,4 +1,5 @@
 import {
+  Archive,
   ArchiveRestore,
   Download,
   FastForward,
@@ -31,6 +32,7 @@ interface EnvironmentActionsProps {
   readonly onOpenMiningSettings: () => void
   readonly onFund: () => void
   readonly onSend: () => void
+  readonly onSnapshots: () => void
   readonly onStateChanged: () => void
 }
 
@@ -50,6 +52,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
   onOpenMiningSettings,
   onFund,
   onSend,
+  onSnapshots,
   onStateChanged,
 }) => {
   const {showToast} = useToast()
@@ -67,6 +70,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
   const hasAccountActions = hasFaucet || supports(environment, "simulator")
   const hasRuntimeActions = supports(environment, "mining") || supports(environment, "timeTravel")
   const hasStateActions = supports(environment, "checkpoints")
+  const hasSnapshots = supports(environment, "snapshots")
 
   const loadCheckpoints = useCallback(async () => {
     setIsLoadingCheckpoints(true)
@@ -298,7 +302,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
 
   return (
     <>
-      {hasAccountActions || hasRuntimeActions || hasStateActions ? (
+      {hasAccountActions || hasRuntimeActions || hasStateActions || hasSnapshots ? (
         <div className={styles.environmentActions}>
           {hasAccountActions ? (
             <div className={styles.environmentActionGroup} aria-label="Account actions">
@@ -339,8 +343,13 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
             </div>
           ) : undefined}
 
-          {hasStateActions ? (
+          {hasStateActions || hasSnapshots ? (
             <div className={styles.environmentActionGroup} aria-label="State actions">
+              {hasSnapshots ? (
+                <InlineButton leadingIcon={<Archive size={15} />} onClick={onSnapshots}>
+                  Snapshots
+                </InlineButton>
+              ) : undefined}
               {supports(environment, "checkpoints") ? (
                 <>
                   <InlineButton

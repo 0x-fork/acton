@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from "react"
+import {useEffect, useState} from "react"
 import type {FC} from "react"
 import {
   Activity,
@@ -204,12 +204,11 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   const {environment} = useLocalnetRuntime()
   const {forkNetwork, network} = useNetworkInfo()
   const [explorerPath, setExplorerPath] = useState(() => readExplorerLastPath())
-  const forkBadgeLabel = useMemo(
-    () =>
-      formatForkNetworkLabel(forkNetwork) ??
-      (network.id === "localnet" ? undefined : network.label),
-    [forkNetwork, network.id, network.label],
-  )
+  const forkBadgeLabel =
+    environment?.config.kind === "fullTonNetwork"
+      ? undefined
+      : (formatForkNetworkLabel(forkNetwork) ??
+        (network.id === "localnet" ? undefined : network.label))
   const visibleStandaloneItems = supports(environment, "simulator") ? standaloneItems : []
   const visibleEnvironmentItems = environmentItems.filter(item =>
     item.path === "/wallets"

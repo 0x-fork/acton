@@ -1,4 +1,4 @@
-import {CircleDot, FastForward, GitBranch, Network} from "lucide-react"
+import {CircleDot, CircleHelp, FastForward, GitBranch, Network} from "lucide-react"
 import {
   BlockChip,
   Button,
@@ -12,6 +12,7 @@ import {
   DataTableTable,
   Dialog,
   Input,
+  Tooltip,
   useToast,
 } from "@acton/ui"
 import {useNavigate} from "react-router"
@@ -420,6 +421,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           onOpenMiningSettings={() => void navigate(localnetRoutes.path("/settings"))}
           onFund={() => void navigate(localnetRoutes.path("/faucet"))}
           onSend={() => void navigate(localnetRoutes.path("/simulator"))}
+          onSnapshots={() => void navigate(localnetRoutes.path("/snapshots"))}
           onStateChanged={() => setNodeInfo(undefined)}
         />
       </header>
@@ -492,20 +494,35 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                                 <Network size={15} aria-hidden="true" />
                                 <span>{environment?.network.label ?? "Remote network"}</span>
                               </>
-                            ) : fullNetworkConfig ? (
-                              <>
-                                <Network size={15} aria-hidden="true" />
-                                <span>Validator network</span>
-                              </>
-                            ) : nodeInfo?.fork_network ? (
-                              <>
-                                <GitBranch size={15} aria-hidden="true" />
-                                <span>Fork</span>
-                              </>
                             ) : (
                               <>
-                                <CircleDot size={15} aria-hidden="true" />
-                                <span>Local genesis</span>
+                                {fullNetworkConfig ? (
+                                  <Network size={15} aria-hidden="true" />
+                                ) : nodeInfo?.fork_network ? (
+                                  <GitBranch size={15} aria-hidden="true" />
+                                ) : (
+                                  <CircleDot size={15} aria-hidden="true" />
+                                )}
+                                <span>
+                                  {fullNetworkConfig ? "Full localnet" : "Simulated localnet"}
+                                </span>
+                                <Tooltip
+                                  content={
+                                    fullNetworkConfig
+                                      ? "Runs local TON validators and a full indexer, produces blocks through validator nodes, supports actions, and reproduces full-node API behavior, but starts more slowly and uses more memory and disk space"
+                                      : nodeInfo?.fork_network
+                                        ? "Uses the Acton emulator and starts from a TON network snapshot, supports manual mining, time travel, and network controls, but can behave differently from a real TON network in edge cases"
+                                        : "Uses the Acton emulator instead of TON validators, starts quickly, uses little disk space, and supports manual mining, time travel, and network controls, but can behave differently from a real TON network in edge cases"
+                                  }
+                                >
+                                  <button
+                                    type="button"
+                                    className={styles.settingsSectionHelp}
+                                    aria-label={`About ${fullNetworkConfig ? "Full localnet" : "Simulated localnet"}`}
+                                  >
+                                    <CircleHelp size={14} aria-hidden="true" />
+                                  </button>
+                                </Tooltip>
                               </>
                             )}
                           </span>

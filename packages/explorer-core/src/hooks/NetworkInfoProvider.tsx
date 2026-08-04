@@ -70,7 +70,7 @@ export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({
     const id = explorerNetworkId(networkIdentity?.id)
     return {
       id,
-      label: networkIdentity?.label ?? "Localnet",
+      label: networkIdentity?.label ?? "Simulated localnet",
       testOnly: networkIdentity?.testOnly ?? true,
       supportsActions: networkIdentity?.supportsActions ?? (id === "mainnet" || id === "testnet"),
       api,
