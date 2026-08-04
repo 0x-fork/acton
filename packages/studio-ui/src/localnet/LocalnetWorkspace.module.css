@@ -14,6 +14,10 @@
   overflow: hidden;
 }
 
+.allowsOverflow {
+  overflow: visible;
+}
+
 .pageContent {
   max-width: none;
   margin-inline: 0;

@@ -1,6 +1,7 @@
 import {ArrowUpRight, Check, ChevronDown, Coins, Loader2} from "lucide-react"
 import {Button, Dialog, Input, useToast} from "@acton/ui"
-import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
+import {TonAddressInput, type TonAddressSuggestion} from "@acton/transaction-ui"
+import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
 import {useSearchParams} from "react-router"
 
@@ -80,12 +81,6 @@ export const FaucetPage: FC<FaucetPageProps> = ({
   const loadedJettonMinterQueryRef = useRef<string | undefined>(undefined)
   const amountNano = useMemo(() => parseGramAmount(amount), [amount])
   const projectWallets = walletRuntime?.projectWallets ?? []
-  const walletsLoading =
-    projectWalletsEnabled &&
-    (walletRuntime?.isLoadingWallets ||
-      walletRuntime?.isInitializing ||
-      walletRuntime?.isSyncingWallets ||
-      walletRuntime === undefined)
   const isJettonMode = mode === "jetton"
   const canChooseAsset = jettonFaucetEnabled
   const isSubmitDisabled =
@@ -211,24 +206,17 @@ export const FaucetPage: FC<FaucetPageProps> = ({
     }
   }, [client, jettonFaucetEnabled])
 
-  const walletOptions = useMemo<FaucetOption[]>(
+  const walletSuggestions = useMemo<TonAddressSuggestion[]>(
     () =>
       projectWallets.map(wallet => {
         const value = parseAddress(wallet.address)?.toString(addressFormat) ?? wallet.address
         return {
-          id: wallet.address,
-          title: wallet.name,
-          subtitle: `${wallet.version} · ${formatAddress(value, true, addressFormat)}`,
-          value,
-          badge: wallet.name,
-          fallbackInitial: wallet.name.slice(0, 1).toUpperCase(),
+          address: value,
+          label: wallet.name,
+          description: `${wallet.version} · ${formatAddress(value, true, addressFormat)}`,
         }
       }),
     [addressFormat, projectWallets],
-  )
-  const selectedWalletOption = useMemo(
-    () => walletOptions.find(option => isSameAddress(option.value, address)),
-    [address, walletOptions],
   )
   const jettonOptions = useMemo<FaucetOption[]>(() => {
     if (!jettonFaucetEnabled) return []
@@ -617,35 +605,15 @@ export const FaucetPage: FC<FaucetPageProps> = ({
           </div>
 
           <div className={styles.fieldBlock}>
-            <label className={styles.label} htmlFor="dashboard-address">
-              Recipient
-            </label>
-            {projectWalletsEnabled ? (
-              <FaucetDropdownInput
-                id="dashboard-address"
-                menuLabel="Choose wallet"
-                emptyLabel="No project wallets found."
-                isLoading={walletsLoading}
-                loadingLabel="Loading wallets..."
-                options={walletOptions}
-                placeholder="EQ..."
-                selectedOption={selectedWalletOption}
-                value={address}
-                onChange={setAddress}
-                onSelect={option => setAddress(option.value)}
-              />
-            ) : (
-              <Input
-                id="dashboard-address"
-                className={styles.fieldInput}
-                placeholder="EQ..."
-                value={address}
-                autoComplete="off"
-                autoCorrect="off"
-                spellCheck={false}
-                onChange={event => setAddress(event.target.value)}
-              />
-            )}
+            <TonAddressInput
+              ariaLabel="Recipient"
+              className={styles.fieldInput}
+              label="Recipient"
+              placeholder="EQ..."
+              suggestions={projectWalletsEnabled ? walletSuggestions : []}
+              value={address}
+              onValueChange={setAddress}
+            />
           </div>
 
           <div className={styles.quickActions}>
@@ -784,166 +752,5 @@ export const FaucetPage: FC<FaucetPageProps> = ({
         </Dialog>
       ) : undefined}
     </>
-  )
-}
-
-interface FaucetDropdownInputProps {
-  readonly id: string
-  readonly menuLabel: string
-  readonly emptyLabel: string
-  readonly isLoading: boolean
-  readonly loadingLabel: string
-  readonly options: readonly FaucetOption[]
-  readonly placeholder: string
-  readonly selectedOption?: FaucetOption
-  readonly showOptionBadge?: boolean
-  readonly value: string
-  readonly onChange: (value: string) => void
-  readonly onSelect: (option: FaucetOption) => void
-}
-
-const FaucetDropdownInput: FC<FaucetDropdownInputProps> = ({
-  id,
-  menuLabel,
-  emptyLabel,
-  isLoading,
-  loadingLabel,
-  options,
-  placeholder,
-  selectedOption,
-  showOptionBadge = false,
-  value,
-  onChange,
-  onSelect,
-}) => {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const listboxId = useId()
-
-  useEffect(() => {
-    if (!isOpen) {
-      return
-    }
-
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target
-      if (target instanceof Node && !containerRef.current?.contains(target)) {
-        setIsOpen(false)
-      }
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOpen(false)
-      }
-    }
-
-    globalThis.addEventListener("pointerdown", onPointerDown)
-    globalThis.addEventListener("keydown", onKeyDown)
-    return () => {
-      globalThis.removeEventListener("pointerdown", onPointerDown)
-      globalThis.removeEventListener("keydown", onKeyDown)
-    }
-  }, [isOpen])
-
-  return (
-    <div
-      ref={containerRef}
-      className={`${styles.faucetDropdownField} ${isOpen ? styles.faucetDropdownFieldOpen : ""}`}
-    >
-      <Input
-        id={id}
-        className={`${styles.fieldInput} ${styles.faucetDropdownInput}`}
-        placeholder={placeholder}
-        value={value}
-        autoComplete="off"
-        autoCorrect="off"
-        spellCheck={false}
-        onChange={event => onChange(event.target.value)}
-      />
-      <button
-        type="button"
-        className={`${styles.faucetDropdownTrigger} ${isOpen ? styles.faucetDropdownTriggerOpen : ""}`}
-        aria-label={menuLabel}
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        aria-controls={listboxId}
-        onClick={() => setIsOpen(current => !current)}
-      >
-        <span className={styles.faucetDropdownTriggerLabel}>
-          {selectedOption?.image && (
-            <img
-              src={selectedOption.image}
-              alt=""
-              className={styles.faucetDropdownTriggerImage}
-              onError={event => {
-                const imageElement = event.currentTarget
-                if (imageElement.getAttribute("src") !== TOKEN_PLACEHOLDER_IMAGE) {
-                  imageElement.src = TOKEN_PLACEHOLDER_IMAGE
-                }
-              }}
-            />
-          )}
-          {selectedOption?.badge ?? "Select"}
-        </span>
-        <ChevronDown
-          size={16}
-          className={`${styles.faucetDropdownChevron} ${isOpen ? styles.faucetDropdownChevronOpen : ""}`}
-          aria-hidden="true"
-        />
-      </button>
-
-      {isOpen && (
-        <div id={listboxId} className={styles.faucetDropdownMenu} role="listbox">
-          {isLoading ? (
-            <div className={styles.faucetDropdownState}>{loadingLabel}</div>
-          ) : options.length === 0 ? (
-            <div className={styles.faucetDropdownState}>{emptyLabel}</div>
-          ) : (
-            options.map(option => {
-              const isSelected = selectedOption?.id === option.id
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={`${styles.faucetDropdownOption} ${isSelected ? styles.faucetDropdownOptionSelected : ""}`}
-                  role="option"
-                  aria-selected={isSelected}
-                  onClick={() => {
-                    onSelect(option)
-                    setIsOpen(false)
-                  }}
-                >
-                  {option.image ? (
-                    <img
-                      src={option.image}
-                      alt=""
-                      className={styles.faucetDropdownOptionImage}
-                      onError={event => {
-                        const imageElement = event.currentTarget
-                        if (imageElement.getAttribute("src") !== TOKEN_PLACEHOLDER_IMAGE) {
-                          imageElement.src = TOKEN_PLACEHOLDER_IMAGE
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span className={styles.faucetDropdownOptionAvatar}>
-                      {option.fallbackInitial || "A"}
-                    </span>
-                  )}
-                  <span className={styles.faucetDropdownOptionBody}>
-                    <span className={styles.faucetDropdownOptionTitle}>{option.title}</span>
-                    <span className={styles.faucetDropdownOptionSubtitle}>{option.subtitle}</span>
-                  </span>
-                  {showOptionBadge && option.badge && (
-                    <span className={styles.faucetDropdownBadge}>{option.badge}</span>
-                  )}
-                  {isSelected && <Check size={16} className={styles.faucetDropdownCheck} />}
-                </button>
-              )
-            })
-          )}
-        </div>
-      )}
-    </div>
   )
 }

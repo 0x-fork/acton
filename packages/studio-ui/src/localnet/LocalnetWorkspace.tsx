@@ -177,6 +177,7 @@ const AppContent: FC<AppContentProps> = ({
   const [isAddContractOpen, setIsAddContractOpen] = useState(false)
   const explorerPageTitle = useExplorerPageTitle()
   const localPathname = pathname.slice(basePath.length) || "/"
+  const allowsOverflow = localPathname === "/faucet"
   const pageTitle =
     explorerPageTitle ??
     LOCALNET_PAGE_TITLES[localPathname] ??
@@ -228,8 +229,8 @@ const AppContent: FC<AppContentProps> = ({
         environmentName={runtime.environment?.name ?? "Virtual Environment"}
         pageTitle={pageTitle}
       />
-      <div className={styles.app}>
-        <main className={styles.main}>
+      <div className={`${styles.app} ${allowsOverflow ? styles.allowsOverflow : ""}`}>
+        <main className={`${styles.main} ${allowsOverflow ? styles.allowsOverflow : ""}`}>
           <Routes>
             <Route path={basePath} element={<Navigate to={path("/dashboard")} replace />} />
             <Route
