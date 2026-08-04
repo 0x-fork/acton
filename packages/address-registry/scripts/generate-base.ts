@@ -7,8 +7,8 @@ import {mergeSources} from "./merge.ts"
 import {resolveConflicts} from "./resolve.ts"
 import {readSources} from "./sources.ts"
 
-const MAINNET_JSON_URL = new URL("../src/mainnet.json", import.meta.url)
-const TESTNET_JSON_URL = new URL("../src/testnet.json", import.meta.url)
+const MAINNET_BASE_JSON_URL = new URL("../src/mainnet-base.json", import.meta.url)
+const TESTNET_BASE_JSON_URL = new URL("../src/testnet-base.json", import.meta.url)
 
 const isTestnetAddress = (address: string): boolean =>
   Address.isFriendly(address) && Address.parseFriendly(address).isTestOnly
@@ -50,14 +50,14 @@ async function main(): Promise<void> {
   }
 
   await Promise.all([
-    writeFile(MAINNET_JSON_URL, `${JSON.stringify(mainnetAddresses, null, 2)}\n`, "utf8"),
-    writeFile(TESTNET_JSON_URL, `${JSON.stringify(testnetAddresses, null, 2)}\n`, "utf8"),
+    writeFile(MAINNET_BASE_JSON_URL, `${JSON.stringify(mainnetAddresses, null, 2)}\n`, "utf8"),
+    writeFile(TESTNET_BASE_JSON_URL, `${JSON.stringify(testnetAddresses, null, 2)}\n`, "utf8"),
   ])
 
   console.log(`mainnet: merged ${mainnetAddresses.length} addresses`)
-  console.log("wrote: src/mainnet.json")
-  console.log(`testnet: merged ${testnetAddresses.length} addresses`)
-  console.log("wrote: src/testnet.json")
+  console.log("wrote: src/mainnet-base.json")
+  console.log(`testnet base: merged ${testnetAddresses.length} addresses`)
+  console.log("wrote: src/testnet-base.json")
 }
 
 await main()
