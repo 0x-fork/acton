@@ -29,6 +29,7 @@ import {MetadataRegistryProvider} from "@acton/explorer-core/metadata/MetadataRe
 import {FaucetPage} from "./dashboard/pages/FaucetPage"
 import {HomePage} from "./dashboard/pages/HomePage"
 import {AbiCatalogPage, AbiDetailsPage} from "./dashboard/pages/AbiCatalogPage"
+import {ApiCallsPage} from "./dashboard/pages/ApiCallsPage"
 import {IntegratePage} from "./dashboard/pages/IntegratePage"
 import {ContractPage} from "./dashboard/pages/ContractPage"
 import {ContractsPage} from "./dashboard/pages/ContractsPage"
@@ -49,11 +50,6 @@ const ApiReferencePage = lazy(async () => {
   const module = await import("./dashboard/pages/ApiReferencePage")
   return {default: module.ApiReferencePage}
 })
-const ApiCallsPage = lazy(async () => {
-  const module = await import("./dashboard/pages/ApiCallsPage")
-  return {default: module.ApiCallsPage}
-})
-
 const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/dashboard": "Dashboard",
   "/faucet": "Faucet",
@@ -515,13 +511,11 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "apiCalls",
                 <DashboardPage>
-                  <RouteSuspense>
-                    {runtime.environment ? (
-                      <ApiCallsPage environmentId={runtime.environment.id} />
-                    ) : (
-                      fallback
-                    )}
-                  </RouteSuspense>
+                  {runtime.environment ? (
+                    <ApiCallsPage environmentId={runtime.environment.id} />
+                  ) : (
+                    fallback
+                  )}
                 </DashboardPage>,
               )}
             />

@@ -215,7 +215,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                         <DataTableCell tone="strong" truncate>
                           {wallet.record.version.toUpperCase()}
                         </DataTableCell>
-                        <DataTableCell align="right">
+                        <DataTableCell align="right" className={styles.walletBalanceCell}>
                           <WalletAccountSummary
                             address={walletAddress}
                             tokens={walletTokensById[wallet.id] ?? []}
