@@ -208,7 +208,7 @@ pub struct NetworkSettings {
 impl Default for NetworkSettings {
     fn default() -> Self {
         Self {
-            global_id: -239,
+            global_id: -3,
             workchain_enabled: true,
             initial_balance: 4_999_990_000,
             gas_price: 26_214_400,

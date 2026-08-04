@@ -364,7 +364,7 @@ impl EnvironmentConfig {
             Self::FullTonNetwork { .. } => EnvironmentNetwork {
                 id: "full-ton-network".to_owned(),
                 label: "Local TON network".to_owned(),
-                chain_id: -239,
+                chain_id: -3,
                 test_only: true,
                 supports_actions: true,
             },
