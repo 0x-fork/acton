@@ -118,6 +118,7 @@ export interface StudioEnvironment {
   readonly endpoints: EnvironmentEndpoints
   readonly network: EnvironmentNetwork
   readonly error?: string
+  readonly startupTimings?: EnvironmentStartupTimings
 }
 
 export type ApiCallStatus = "success" | "failed"
@@ -196,6 +197,13 @@ export type EnvironmentSnapshotOperationPhase =
   | "completed"
   | "failed"
 
+export interface EnvironmentStartupTimings {
+  readonly composeMs?: number
+  readonly tonReadyMs?: number
+  readonly indexerReadyMs?: number
+  readonly apiReadyMs?: number
+}
+
 export interface EnvironmentSnapshotOperation {
   readonly kind: EnvironmentSnapshotOperationKind
   readonly phase: EnvironmentSnapshotOperationPhase
@@ -203,6 +211,7 @@ export interface EnvironmentSnapshotOperation {
   readonly finishedAt?: string
   readonly snapshotId?: string
   readonly snapshotName?: string
+  readonly startupTimings?: EnvironmentStartupTimings
   readonly error?: string
 }
 

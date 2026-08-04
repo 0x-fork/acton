@@ -15,9 +15,9 @@ use crate::{
     CreateEnvironmentConfig, CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest,
     EnvironmentCapability, EnvironmentConfig, EnvironmentEndpoints, EnvironmentLifecycle,
     EnvironmentNetwork, EnvironmentSnapshot, EnvironmentSnapshotOperation,
-    EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStatus,
-    PublicTonNetwork, SignWalletRequest, SignWalletResponse, StudioApiErrorBody, StudioEnvironment,
-    StudioInfo, StudioWallet, UpdateEnvironmentRequest, WorkspaceInfo,
+    EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings,
+    EnvironmentStatus, PublicTonNetwork, SignWalletRequest, SignWalletResponse, StudioApiErrorBody,
+    StudioEnvironment, StudioInfo, StudioWallet, UpdateEnvironmentRequest, WorkspaceInfo,
 };
 
 #[utoipa::path(
@@ -102,6 +102,7 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
         EnvironmentSnapshotOperation,
         EnvironmentSnapshotOperationKind,
         EnvironmentSnapshotOperationPhase,
+        EnvironmentStartupTimings,
         StudioWallet,
         SignWalletRequest,
         SignWalletResponse,

@@ -764,6 +764,8 @@ mod tests {
         .assert_eq(&actual);
         assert!(!compose.contains("__LOCALTON_"));
         assert!(!compose.contains("platform:"));
+        assert_eq!(compose.matches("start_interval: 1s").count(), 4);
+        assert_eq!(compose.matches("start_period: 30s").count(), 3);
     }
 
     #[test]

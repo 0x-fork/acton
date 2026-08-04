@@ -90,6 +90,19 @@ pub enum EnvironmentSnapshotOperationPhase {
     Failed,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentStartupTimings {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compose_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ton_ready_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub indexer_ready_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_ready_ms: Option<u64>,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentSnapshotOperation {
@@ -102,6 +115,8 @@ pub struct EnvironmentSnapshotOperation {
     pub snapshot_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snapshot_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub startup_timings: Option<EnvironmentStartupTimings>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -232,6 +247,8 @@ pub struct StudioEnvironment {
     pub runtime_endpoints: EnvironmentEndpoints,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub startup_timings: Option<EnvironmentStartupTimings>,
 }
 
 impl StudioEnvironment {
@@ -293,6 +310,7 @@ impl StudioEnvironment {
             network,
             runtime_endpoints,
             error: None,
+            startup_timings: None,
         }
     }
 }

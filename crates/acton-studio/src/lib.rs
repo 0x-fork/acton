@@ -51,8 +51,8 @@ pub use environment::{
     EnvironmentCapability, EnvironmentConfig, EnvironmentEndpoints, EnvironmentLifecycle,
     EnvironmentNetwork, EnvironmentRuntime, EnvironmentRuntimeError, EnvironmentRuntimeFuture,
     EnvironmentSnapshot, EnvironmentSnapshotOperation, EnvironmentSnapshotOperationKind,
-    EnvironmentSnapshotOperationPhase, EnvironmentStatus, PublicTonNetwork, StudioEnvironment,
-    UpdateEnvironmentRequest,
+    EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings, EnvironmentStatus,
+    PublicTonNetwork, StudioEnvironment, UpdateEnvironmentRequest,
 };
 pub use environment_catalog::{
     MAINNET_ENVIRONMENT_ID, PUBLIC_TON_ENVIRONMENT_IDS, TESTNET_ENVIRONMENT_ID,

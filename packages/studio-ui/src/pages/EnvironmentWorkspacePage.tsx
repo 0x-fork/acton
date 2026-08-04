@@ -3,6 +3,7 @@ import {CircleAlert, LoaderCircle, Play} from "lucide-react"
 import {useEffect, useState} from "react"
 import {useLocation} from "react-router"
 
+import {EnvironmentStartupProgress} from "../components/EnvironmentStartupProgress"
 import {supports} from "../environmentCapabilities"
 import {LocalnetWorkspace, type LocalnetWorkspaceShellState} from "../localnet/LocalnetWorkspace"
 import {type StudioEnvironment, restartStudioEnvironment} from "../studioApi"
@@ -125,6 +126,9 @@ export function EnvironmentWorkspacePage({
               ? "The workspace will open when the localnet is ready"
               : "Restart the environment to continue working with it")}
         </span>
+        {isStarting && environment?.startupTimings ? (
+          <EnvironmentStartupProgress timings={environment.startupTimings} />
+        ) : undefined}
         {canRestart ? (
           <Button
             variant="primary"

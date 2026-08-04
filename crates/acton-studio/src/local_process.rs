@@ -17,8 +17,8 @@ use crate::environment::{
     CreateEnvironmentConfig, CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest,
     EnvironmentConfig, EnvironmentEndpoints, EnvironmentRuntime, EnvironmentRuntimeError,
     EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation,
-    EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStatus,
-    StudioEnvironment, UpdateEnvironmentRequest,
+    EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings,
+    EnvironmentStatus, StudioEnvironment, UpdateEnvironmentRequest,
 };
 use crate::environment_store::{
     LoadedEnvironments, StoredEnvironment, load_environments, persist_environment,
@@ -40,6 +40,7 @@ const FULL_TON_IMAGE_INSPECT_TIMEOUT: Duration = Duration::from_secs(10);
 const FULL_TON_IMAGE_PULL_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const FULL_TON_COMPOSE_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const SNAPSHOT_START_TIMEOUT: Duration = Duration::from_secs(20 * 60);
+const STARTUP_READINESS_REQUEST_TIMEOUT: Duration = Duration::from_millis(750);
 const PROJECT_ARTIFACT_POLL_INTERVAL: Duration = Duration::from_millis(750);
 const PROJECT_ARTIFACT_DEBOUNCE: Duration = Duration::from_millis(500);
 const PROJECT_ARTIFACT_PUBLISH_RETRY_INTERVAL: Duration = Duration::from_secs(2);
@@ -72,6 +73,7 @@ struct LocalEnvironment {
     resume_on_startup: AtomicBool,
     deleted: AtomicBool,
     snapshot_operation: RwLock<Option<EnvironmentSnapshotOperation>>,
+    startup_compose_started_at: Mutex<Option<Instant>>,
 }
 
 enum EnvironmentDriver {
@@ -116,6 +118,14 @@ enum FullTonImagePullKind {
 enum SnapshotAction {
     Create { name: Option<String> },
     Restore { snapshot_id: String },
+}
+
+#[derive(Clone, Copy)]
+enum EnvironmentStartupMilestone {
+    Compose,
+    TonReady,
+    IndexerReady,
+    ApiReady,
 }
 
 impl SnapshotAction {
@@ -323,7 +333,11 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 resume_on_startup: AtomicBool::new(true),
                 deleted: AtomicBool::new(false),
                 snapshot_operation: RwLock::new(None),
+                startup_compose_started_at: Mutex::new(None),
             });
+            if matches!(&environment.driver, EnvironmentDriver::FullTonNetwork(_)) {
+                prepare_environment_startup(&environment).await;
+            }
             if let Err(error) =
                 persist_environment_definition(&self.inner, &environment, true).await
             {
@@ -573,6 +587,7 @@ async fn start_snapshot_operation(
             SnapshotAction::Create { name } => name.clone(),
             SnapshotAction::Restore { .. } => None,
         },
+        startup_timings: None,
         error: None,
     };
     {
@@ -675,8 +690,12 @@ async fn wait_for_environment_start(
     timeout(SNAPSHOT_START_TIMEOUT, async {
         loop {
             let details = environment.details.read().await;
-            match details.status {
-                EnvironmentStatus::Running => return Ok(()),
+            let status = details.status;
+            let startup_complete = details
+                .startup_timings
+                .as_ref()
+                .is_some_and(startup_timings_complete);
+            match status {
                 EnvironmentStatus::Failed => {
                     return Err(EnvironmentRuntimeError::Internal {
                         code: "environment_snapshot_restart_failed",
@@ -688,10 +707,15 @@ async fn wait_for_environment_start(
                 }
                 EnvironmentStatus::Starting
                 | EnvironmentStatus::Stopping
-                | EnvironmentStatus::Stopped => {}
+                | EnvironmentStatus::Stopped
+                | EnvironmentStatus::Running => {}
             }
             drop(details);
-            sleep(Duration::from_millis(500)).await;
+
+            if status == EnvironmentStatus::Running && startup_complete {
+                return Ok(());
+            }
+            sleep(LOCALNET_STATUS_POLL_INTERVAL).await;
         }
     })
     .await
@@ -702,6 +726,177 @@ async fn wait_for_environment_start(
             SNAPSHOT_START_TIMEOUT.as_secs() / 60
         ),
     })?
+}
+
+async fn startup_readiness_urls(
+    environment: &LocalEnvironment,
+) -> Option<(String, String, String)> {
+    let endpoints = environment.details.read().await.runtime_endpoints.clone();
+    let api_v2 = endpoints.api_v2?;
+    let api_v3 = endpoints.api_v3?;
+    let api_v3_root = api_v3
+        .strip_suffix("/api/v3")
+        .unwrap_or(api_v3.as_str())
+        .trim_end_matches('/');
+    Some((
+        format!("{}/getMasterchainInfo", api_v2.trim_end_matches('/')),
+        format!("{}/masterchainInfo", api_v3.trim_end_matches('/')),
+        format!("{api_v3_root}/healthcheck"),
+    ))
+}
+
+async fn fetch_masterchain_seqno(
+    http_client: &reqwest::Client,
+    url: &str,
+    json_pointer: &str,
+) -> Option<u64> {
+    http_client
+        .get(url)
+        .send()
+        .await
+        .ok()?
+        .error_for_status()
+        .ok()?
+        .json::<serde_json::Value>()
+        .await
+        .ok()?
+        .pointer(json_pointer)?
+        .as_u64()
+}
+
+async fn endpoint_is_ready(http_client: &reqwest::Client, url: &str) -> bool {
+    http_client
+        .get(url)
+        .send()
+        .await
+        .is_ok_and(|response| response.status().is_success())
+}
+
+fn spawn_environment_startup_probe(environment: Arc<LocalEnvironment>, generation: u64) {
+    tokio::spawn(async move {
+        let Some((ton_url, indexer_url, api_health_url)) =
+            startup_readiness_urls(&environment).await
+        else {
+            return;
+        };
+        let Ok(http_client) = reqwest::Client::builder()
+            .timeout(STARTUP_READINESS_REQUEST_TIMEOUT)
+            .build()
+        else {
+            return;
+        };
+
+        loop {
+            if !is_current_generation(&environment, generation) {
+                return;
+            }
+            let status = environment.details.read().await.status;
+            if matches!(
+                status,
+                EnvironmentStatus::Stopped
+                    | EnvironmentStatus::Stopping
+                    | EnvironmentStatus::Failed
+            ) {
+                return;
+            }
+
+            let (ton_seqno, indexer_seqno, api_ready) = tokio::join!(
+                fetch_masterchain_seqno(&http_client, &ton_url, "/result/last/seqno"),
+                fetch_masterchain_seqno(&http_client, &indexer_url, "/last/seqno"),
+                endpoint_is_ready(&http_client, &api_health_url),
+            );
+            if ton_seqno.is_some() {
+                record_environment_startup_milestone(
+                    &environment,
+                    EnvironmentStartupMilestone::TonReady,
+                )
+                .await;
+            }
+            if api_ready {
+                record_environment_startup_milestone(
+                    &environment,
+                    EnvironmentStartupMilestone::ApiReady,
+                )
+                .await;
+            }
+            if let (Some(ton_seqno), Some(indexer_seqno)) = (ton_seqno, indexer_seqno)
+                && indexer_seqno >= ton_seqno.saturating_sub(1)
+            {
+                record_environment_startup_milestone(
+                    &environment,
+                    EnvironmentStartupMilestone::IndexerReady,
+                )
+                .await;
+            }
+
+            let readiness_complete = environment
+                .details
+                .read()
+                .await
+                .startup_timings
+                .as_ref()
+                .is_some_and(|timings| {
+                    timings.ton_ready_ms.is_some()
+                        && timings.indexer_ready_ms.is_some()
+                        && timings.api_ready_ms.is_some()
+                });
+            if readiness_complete {
+                return;
+            }
+            sleep(LOCALNET_STATUS_POLL_INTERVAL).await;
+        }
+    });
+}
+
+async fn prepare_environment_startup(environment: &LocalEnvironment) {
+    *environment.startup_compose_started_at.lock().await = None;
+    let timings = EnvironmentStartupTimings::default();
+    environment.details.write().await.startup_timings = Some(timings.clone());
+    if let Some(operation) = environment.snapshot_operation.write().await.as_mut()
+        && operation.phase == EnvironmentSnapshotOperationPhase::Starting
+    {
+        operation.startup_timings = Some(timings);
+    }
+}
+
+async fn mark_environment_compose_started(environment: &LocalEnvironment) {
+    *environment.startup_compose_started_at.lock().await = Some(Instant::now());
+}
+
+async fn record_environment_startup_milestone(
+    environment: &LocalEnvironment,
+    milestone: EnvironmentStartupMilestone,
+) {
+    let Some(started_at) = *environment.startup_compose_started_at.lock().await else {
+        return;
+    };
+    let elapsed_ms = u64::try_from(started_at.elapsed().as_millis()).unwrap_or(u64::MAX);
+    let mut details = environment.details.write().await;
+    let Some(timings) = details.startup_timings.as_mut() else {
+        return;
+    };
+    let timing = match milestone {
+        EnvironmentStartupMilestone::Compose => &mut timings.compose_ms,
+        EnvironmentStartupMilestone::TonReady => &mut timings.ton_ready_ms,
+        EnvironmentStartupMilestone::IndexerReady => &mut timings.indexer_ready_ms,
+        EnvironmentStartupMilestone::ApiReady => &mut timings.api_ready_ms,
+    };
+    timing.get_or_insert(elapsed_ms);
+    let timings = timings.clone();
+    drop(details);
+
+    if let Some(operation) = environment.snapshot_operation.write().await.as_mut()
+        && operation.phase == EnvironmentSnapshotOperationPhase::Starting
+    {
+        operation.startup_timings = Some(timings);
+    }
+}
+
+const fn startup_timings_complete(timings: &EnvironmentStartupTimings) -> bool {
+    timings.compose_ms.is_some()
+        && timings.ton_ready_ms.is_some()
+        && timings.indexer_ready_ms.is_some()
+        && timings.api_ready_ms.is_some()
 }
 
 async fn set_snapshot_phase(
@@ -734,6 +929,7 @@ async fn finish_snapshot_operation(
         operation.snapshot_name = snapshot.name;
     }
     drop(current);
+    *environment.startup_compose_started_at.lock().await = None;
 }
 
 async fn ensure_no_active_snapshot(
@@ -1037,7 +1233,13 @@ async fn restore_environment(
         resume_on_startup: AtomicBool::new(record.resume_on_startup),
         deleted: AtomicBool::new(false),
         snapshot_operation: RwLock::new(None),
+        startup_compose_started_at: Mutex::new(None),
     });
+    if status == EnvironmentStatus::Starting
+        && matches!(&environment.driver, EnvironmentDriver::FullTonNetwork(_))
+    {
+        prepare_environment_startup(&environment).await;
+    }
     if let Some(error) = error {
         environment.details.write().await.error = Some(error);
     }
@@ -1438,10 +1640,17 @@ async fn monitor_full_ton_network(
                 if !started {
                     return;
                 }
+                mark_environment_compose_started(&environment).await;
+                spawn_environment_startup_probe(Arc::clone(&environment), generation);
                 phase = FullTonStartPhase::ComposeUp;
                 deadline = Instant::now() + FULL_TON_COMPOSE_TIMEOUT;
             }
             FullTonTransition::Running => {
+                record_environment_startup_milestone(
+                    &environment,
+                    EnvironmentStartupMilestone::Compose,
+                )
+                .await;
                 set_environment_status_if_current(
                     &environment,
                     generation,
@@ -1962,6 +2171,9 @@ async fn restart_environment(
     };
     *environment.child.lock().await = Some(child);
     let generation = environment.generation.load(Ordering::Acquire);
+    if matches!(&environment.driver, EnvironmentDriver::FullTonNetwork(_)) {
+        prepare_environment_startup(environment).await;
+    }
     set_environment_status(environment, EnvironmentStatus::Starting, None).await;
     spawn_environment_monitor(Arc::clone(runtime), Arc::clone(environment), generation);
     Ok(environment.details.read().await.clone())
@@ -2154,6 +2366,7 @@ child installed: false"]]
             resume_on_startup: AtomicBool::new(true),
             deleted: AtomicBool::new(false),
             snapshot_operation: RwLock::new(None),
+            startup_compose_started_at: Mutex::new(None),
         })
     }
 }

@@ -195,7 +195,7 @@ async fn openapi_contract_lists_every_studio_operation_and_resolves_schema_refer
         POST /api/v1/test-runs
         POST /api/v1/test-runs/{run_id}/cancel
         POST /api/v1/test-runs/{run_id}/events
-        schemas: 69
+        schemas: 70
         missing schema references: none"]]
     .assert_eq(&actual);
 }

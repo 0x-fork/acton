@@ -30,6 +30,7 @@ services:
       interval: 10s
       timeout: 3s
       start_period: 240s
+      start_interval: 1s
       retries: 12
 
   postgres:
@@ -52,6 +53,8 @@ services:
         - pg_isready -U postgres -d ton_index
       interval: 5s
       timeout: 5s
+      start_period: 30s
+      start_interval: 1s
       retries: 12
     shm_size: 512m
     restart: unless-stopped
@@ -71,6 +74,8 @@ services:
         - ping
       interval: 5s
       timeout: 5s
+      start_period: 30s
+      start_interval: 1s
       retries: 12
     restart: unless-stopped
 
@@ -161,6 +166,7 @@ services:
       interval: 5s
       timeout: 3s
       start_period: 30s
+      start_interval: 1s
       retries: 24
     ports:
       - "127.0.0.1:__LOCALTON_V3_PORT__:18003"

@@ -34,7 +34,7 @@
   animation: environment-spin 900ms linear infinite;
 }
 
-.stateContent strong {
+.stateContent > strong {
   font-size: var(--acton-font-size-md);
   font-weight: var(--acton-font-weight-semibold);
 }

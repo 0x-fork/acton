@@ -327,6 +327,7 @@ fn operation_fixture(
         finished_at: None,
         snapshot_id: snapshot_id.map(ToOwned::to_owned),
         snapshot_name,
+        startup_timings: None,
         error: None,
     }
 }

@@ -17,6 +17,7 @@ import {Archive, RotateCcw, Trash2} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 
+import {EnvironmentStartupProgress} from "../../../components/EnvironmentStartupProgress"
 import {
   createStudioEnvironmentSnapshot,
   deleteStudioEnvironmentSnapshot,
@@ -324,6 +325,7 @@ const OperationProgress: FC<{
   readonly operation: EnvironmentSnapshotOperation
 }> = ({now, operation}) => {
   const phases = operation.kind === "create" ? CREATE_PHASES : RESTORE_PHASES
+  const startupTimings = operation.startupTimings
   const currentIndex = Math.max(
     0,
     phases.findIndex(phase => phase.id === operation.phase),
@@ -359,6 +361,9 @@ const OperationProgress: FC<{
           </li>
         ))}
       </ol>
+      {operation.phase === "starting" && startupTimings ? (
+        <EnvironmentStartupProgress timings={startupTimings} />
+      ) : undefined}
       <p>You can leave this page. Studio continues the operation in the background.</p>
     </div>
   )
