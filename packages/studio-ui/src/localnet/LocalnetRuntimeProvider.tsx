@@ -63,6 +63,7 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
   const apiV3BaseUrl = environment?.endpoints.apiV3 ?? `${rpcBaseUrl}/api/v3`
   const controlBaseUrl = environment?.endpoints.control ?? rpcBaseUrl
   const controlEnabled = supports(environment, "controlApi")
+  const toncenterApiCompatible = environment?.network.supportsActions ?? !controlEnabled
   const contractsEnabled = supports(environment, "contracts")
   const gramFaucetEnabled = supports(environment, "gramFaucet")
   const jettonFaucetEnabled = supports(environment, "jettonFaucet")
@@ -141,7 +142,7 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
         v3BaseUrl: apiV3BaseUrl,
         addressNameBaseUrl: controlBaseUrl,
         localnetControlEnabled: controlEnabled,
-        toncenterApiCompatible: !controlEnabled,
+        toncenterApiCompatible,
         localnetApiToken,
         onUnauthorized: requireAuthToken,
       }),
@@ -152,6 +153,7 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
       controlEnabled,
       localnetApiToken,
       requireAuthToken,
+      toncenterApiCompatible,
     ],
   )
   const metadataRegistry = useMemo(() => {

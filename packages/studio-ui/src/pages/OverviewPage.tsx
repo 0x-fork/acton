@@ -127,7 +127,7 @@ export function OverviewPage({
   }, [latestRunId, latestRunStatus])
 
   const latestRunDetails =
-    latestRunDetailsState?.runId === latestRun?.id ? latestRunDetailsState.run : undefined
+    latestRunDetailsState?.runId === latestRun?.id ? latestRunDetailsState?.run : undefined
   const latestRunDetailsLoading =
     latestRun?.status === "failed" && latestRunDetailsState?.runId !== latestRun.id
 
