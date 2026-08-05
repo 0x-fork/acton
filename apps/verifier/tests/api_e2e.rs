@@ -1604,6 +1604,40 @@ async fn verify_rejects_non_ascii_source_paths() {
 }
 
 #[tokio::test]
+async fn verify_rejects_control_characters_in_source_paths() {
+    for path in [
+        "contracts/file\0.tolk",
+        "contracts/file\n.tolk",
+        "contracts/file\r.tolk",
+        "contracts/file\t.tolk",
+        "contracts/file\u{7f}.tolk",
+    ] {
+        let sources = serde_json::to_string(&json!([{
+            "path": path,
+            "is_entrypoint": true,
+        }]))
+        .expect("source metadata should serialize");
+        let response = post_verify(
+            app_state(&[], CODE_HASH_ONE),
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", "tolk"),
+                text_part("compile_params", COMPILE_PARAMS_TOLK),
+                owned_text_part("sources", sources),
+                file_part("files", path, "text/plain", "fun main() {}"),
+            ],
+        )
+        .await;
+
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "control character should be rejected: {path:?}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn verify_rejects_unsafe_source_paths() {
     let cases = [
         ("../main.tolk", "invalid component"),
