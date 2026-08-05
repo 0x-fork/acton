@@ -10,6 +10,7 @@ import {Cell} from "@ton/core"
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import {isAddressSuspended} from "../api/suspendedAccounts"
+import {hasTokenInfoType} from "../api/tokenMetadata"
 import type {
   AddressInformation,
   AccountStatesResponse,
@@ -348,8 +349,12 @@ export const AccountPage: FC<AccountPageProps> = ({
     }
   }, [accountState?.code, accountStateV3?.code_hash])
   const compilerAbi = extendedContractAbi?.compiler_abi
-  const isJettonMasterAccount = hasAccountInterface(accountInterfaces, "jetton_master")
-  const isJettonWalletAccount = hasAccountInterface(accountInterfaces, "jetton_wallet")
+  const isJettonMasterAccount =
+    hasAccountInterface(accountInterfaces, "jetton_master") ||
+    hasTokenInfoType(accountTokenInfo, "jetton_masters")
+  const isJettonWalletAccount =
+    hasAccountInterface(accountInterfaces, "jetton_wallet") ||
+    hasTokenInfoType(accountTokenInfo, "jetton_wallets")
   const isNftItemAccount = hasAccountInterface(accountInterfaces, "nft_item")
   const isNftCollectionAccount = hasAccountInterface(accountInterfaces, "nft_collection")
   const isMultisigWalletAccount = hasAccountInterface(accountInterfaces, "multisig_v2")

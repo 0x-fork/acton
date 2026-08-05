@@ -1,6 +1,13 @@
 import {addressKey} from "./compilerAbi"
 import type {AccountStateTokenInfo, V3Metadata} from "./types"
 
+export function hasTokenInfoType(
+  tokenInfo: readonly AccountStateTokenInfo[],
+  type: string,
+): boolean {
+  return tokenInfo.some(info => info.type === type)
+}
+
 export function getMetadataTokenInfo(
   metadata: V3Metadata,
   address: string,
