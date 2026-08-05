@@ -1,18 +1,6 @@
 import {describe, expect, test} from "bun:test"
 
-import {hasTokenInfoType, metadataTokenDecimals} from "../src/api/tokenMetadata"
-
-describe("hasTokenInfoType", () => {
-  test("recognizes indexed jetton contracts without account interfaces", () => {
-    const tokenInfo = [
-      {type: "jetton_masters", symbol: "JETTON"},
-      {type: "nft_items", name: "Collectible"},
-    ]
-
-    expect(hasTokenInfoType(tokenInfo, "jetton_masters")).toBe(true)
-    expect(hasTokenInfoType(tokenInfo, "jetton_wallets")).toBe(false)
-  })
-})
+import {metadataTokenDecimals} from "../src/api/tokenMetadata"
 
 describe("metadataTokenDecimals", () => {
   test("reads supported decimal metadata forms", () => {

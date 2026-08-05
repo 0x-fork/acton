@@ -10,7 +10,6 @@ import {Cell} from "@ton/core"
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import {isAddressSuspended} from "../api/suspendedAccounts"
-import {hasTokenInfoType} from "../api/tokenMetadata"
 import type {
   AddressInformation,
   AccountStatesResponse,
@@ -71,6 +70,7 @@ import {
   mergeStreamedActions,
   type AccountActionPageCursor,
 } from "./accountActionPagination"
+import {hasAccountContractHint, hasAccountInterface} from "./accountContractTypes"
 import styles from "./AccountPage.module.css"
 
 interface AccountPageProps {
@@ -349,14 +349,22 @@ export const AccountPage: FC<AccountPageProps> = ({
     }
   }, [accountState?.code, accountStateV3?.code_hash])
   const compilerAbi = extendedContractAbi?.compiler_abi
-  const isJettonMasterAccount =
-    hasAccountInterface(accountInterfaces, "jetton_master") ||
-    hasTokenInfoType(accountTokenInfo, "jetton_masters")
-  const isJettonWalletAccount =
-    hasAccountInterface(accountInterfaces, "jetton_wallet") ||
-    hasTokenInfoType(accountTokenInfo, "jetton_wallets")
-  const isNftItemAccount = hasAccountInterface(accountInterfaces, "nft_item")
-  const isNftCollectionAccount = hasAccountInterface(accountInterfaces, "nft_collection")
+  const isJettonMasterAccount = hasAccountContractHint(
+    accountInterfaces,
+    accountTokenInfo,
+    "jetton_master",
+  )
+  const isJettonWalletAccount = hasAccountContractHint(
+    accountInterfaces,
+    accountTokenInfo,
+    "jetton_wallet",
+  )
+  const isNftItemAccount = hasAccountContractHint(accountInterfaces, accountTokenInfo, "nft_item")
+  const isNftCollectionAccount = hasAccountContractHint(
+    accountInterfaces,
+    accountTokenInfo,
+    "nft_collection",
+  )
   const isMultisigWalletAccount = hasAccountInterface(accountInterfaces, "multisig_v2")
   const isMultisigOrderAccount = hasAccountInterface(accountInterfaces, "multisig_order_v2")
   const isMultisigAccount = isMultisigWalletAccount || isMultisigOrderAccount
@@ -2617,10 +2625,6 @@ function isAccountTab(value: string): value is AccountTab {
     value === "orders" ||
     value === "actions"
   )
-}
-
-function hasAccountInterface(interfaces: readonly string[], expected: string): boolean {
-  return interfaces.some(iface => iface.trim().toLowerCase() === expected)
 }
 
 function transactionHashSet(

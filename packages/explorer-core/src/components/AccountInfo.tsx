@@ -865,7 +865,8 @@ function getInterfaceLabel(value: string): string | undefined {
     case "jetton_wallet": {
       return "Jetton Wallet interface"
     }
-    case "nft_item": {
+    case "nft_item":
+    case "nft_item_simple": {
       return "NFT item interface"
     }
     case "nft_collection": {
