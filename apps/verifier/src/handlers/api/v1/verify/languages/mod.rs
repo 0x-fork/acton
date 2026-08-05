@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    path::Path,
-};
+use std::{collections::BTreeMap, path::Path};
 
 use serde_json::Value;
 
@@ -142,7 +139,7 @@ fn validate_sources(sources: &[SourceMetadata]) -> Result<(), ApiError> {
         ));
     }
 
-    let mut seen_paths = BTreeSet::new();
+    let mut seen_paths = BTreeMap::new();
     let mut has_entrypoint = false;
 
     for source in sources {
@@ -153,9 +150,10 @@ fn validate_sources(sources: &[SourceMetadata]) -> Result<(), ApiError> {
                 source.path
             )));
         }
-        if !seen_paths.insert(source.path.clone()) {
+        let normalized_path = source.path.to_ascii_lowercase();
+        if let Some(existing_path) = seen_paths.insert(normalized_path, source.path.clone()) {
             return Err(ApiError::bad_request(format!(
-                "duplicate source path: {}",
+                "duplicate source paths: {existing_path}, {}",
                 source.path
             )));
         }

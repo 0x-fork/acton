@@ -1429,6 +1429,56 @@ async fn verify_rejects_multiple_entrypoint_sources() {
 }
 
 #[tokio::test]
+async fn verify_compares_source_path_duplicates_case_insensitively() {
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part(
+                "sources",
+                r#"[
+                  {"path":"Contracts/Aa.tolk","is_entrypoint":true},
+                  {"path":"contracts/aa.tolk","is_entrypoint":false},
+                  {"path":"CONTRACTS/aA.TOLK","is_entrypoint":false},
+                  {"path":"CoNtRaCtS/AA.ToLk","is_entrypoint":false}
+                ]"#,
+            ),
+            file_part("files", "Contracts/Aa.tolk", "text/plain", "source one"),
+            file_part("files", "contracts/aa.tolk", "text/plain", "source two"),
+            file_part("files", "CONTRACTS/aA.TOLK", "text/plain", "source three"),
+            file_part("files", "CoNtRaCtS/AA.ToLk", "text/plain", "source four"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_contains(response, "duplicate source paths").await;
+
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part(
+                "sources",
+                r#"[
+                  {"path":"one/main.tolk","is_entrypoint":true},
+                  {"path":"two/main.tolk","is_entrypoint":false}
+                ]"#,
+            ),
+            file_part("files", "one/main.tolk", "text/plain", "source one"),
+            file_part("files", "two/main.tolk", "text/plain", "source two"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
 async fn verify_rejects_uploaded_file_without_source_metadata() {
     let response = post_verify(
         app_state(&[], CODE_HASH_ONE),
