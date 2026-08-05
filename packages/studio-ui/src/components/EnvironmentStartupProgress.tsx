@@ -1,4 +1,5 @@
 import {Check, LoaderCircle} from "lucide-react"
+import {Duration} from "@acton/ui"
 
 import type {EnvironmentStartupTimings} from "../studioApi"
 
@@ -29,7 +30,14 @@ export function EnvironmentStartupProgress({timings}: EnvironmentStartupProgress
           </span>
         </div>
         <span className={styles.duration}>
-          {composeComplete ? `Completed in ${formatDuration(timings.composeMs)}` : "Running"}
+          {composeComplete ? (
+            <>
+              Completed in{" "}
+              <Duration display="startup" unit="milliseconds" value={timings.composeMs} />
+            </>
+          ) : (
+            "Running"
+          )}
         </span>
       </div>
 
@@ -40,7 +48,15 @@ export function EnvironmentStartupProgress({timings}: EnvironmentStartupProgress
             <li key={label} data-state={complete ? "complete" : "active"}>
               <StatusIcon complete={complete} />
               <span>{label}</span>
-              <strong>{complete ? `Ready in ${formatDuration(duration)}` : "Waiting"}</strong>
+              <strong>
+                {complete ? (
+                  <>
+                    Ready in <Duration display="startup" unit="milliseconds" value={duration} />
+                  </>
+                ) : (
+                  "Waiting"
+                )}
+              </strong>
             </li>
           )
         })}
@@ -59,10 +75,4 @@ function StatusIcon({complete}: {readonly complete: boolean}) {
       )}
     </span>
   )
-}
-
-function formatDuration(durationMs: number): string {
-  if (durationMs < 1000) return `${durationMs} ms`
-  const seconds = durationMs / 1000
-  return `${seconds < 10 ? seconds.toFixed(1) : seconds.toFixed(0)} s`
 }

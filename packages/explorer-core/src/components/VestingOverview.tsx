@@ -9,20 +9,17 @@ import {
   DataTableHeaderCell,
   DataTableRow,
   DataTableTable,
+  DateTime,
   Dialog,
+  formatSchedulePeriod,
+  formatTimeUntil,
   InlineButton,
   Skeleton,
 } from "@acton/ui"
 
 import type {TonClient} from "../api/client"
 import styles from "./LockerOverview.module.css"
-import {
-  capitalize,
-  formatGramAmount,
-  formatScheduleDate,
-  formatSchedulePeriod,
-  formatTimeUntil,
-} from "./scheduleFormatting"
+import {capitalize, formatGramAmount} from "./scheduleFormatting"
 import {
   buildVestingSchedule,
   parseVestingData,
@@ -131,9 +128,10 @@ export const VestingOverview: FC<VestingOverviewProps> = ({address, client, onDa
           </InlineButton>
           <p className={styles.description}>
             {schedule.totalPeriods} periods over {formatSchedulePeriod(data.vestingTotalDuration)},
-            from {formatScheduleDate(data.vestingStartTime)} to {formatScheduleDate(vestingEndTime)}
+            from <DateTime display="date-day-month" unit="seconds" value={data.vestingStartTime} />{" "}
+            to <DateTime display="date-day-month" unit="seconds" value={vestingEndTime} />
             {"; cliff ends "}
-            {formatScheduleDate(cliffEndTime)}.
+            <DateTime display="date-day-month" unit="seconds" value={cliffEndTime} />.
           </p>
         </div>
 
@@ -228,8 +226,12 @@ function VestingPeriodRow({period}: {readonly period: VestingPeriod}) {
   return (
     <DataTableRow selected={period.status === "next"}>
       <DataTableCell tone="muted">{period.number}</DataTableCell>
-      <DataTableCell>{formatScheduleDate(period.startTime)}</DataTableCell>
-      <DataTableCell>{formatScheduleDate(period.payoutTime)}</DataTableCell>
+      <DataTableCell>
+        <DateTime display="date-day-month" unit="seconds" value={period.startTime} />
+      </DataTableCell>
+      <DataTableCell>
+        <DateTime display="date-day-month" unit="seconds" value={period.payoutTime} />
+      </DataTableCell>
       <DataTableCell align="right" tone="strong">
         {formatGramAmount(period.amount)}
       </DataTableCell>

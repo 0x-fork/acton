@@ -1,4 +1,4 @@
-import {useEffect, useState, type FC} from "react"
+import {useEffect, useState, type FC, type ReactNode} from "react"
 
 import {
   Button,
@@ -9,7 +9,10 @@ import {
   DataTableHeaderCell,
   DataTableRow,
   DataTableTable,
+  DateTime,
   Dialog,
+  formatSchedulePeriod,
+  formatTimeUntil,
   InlineButton,
   Skeleton,
 } from "@acton/ui"
@@ -22,14 +25,7 @@ import {
   type LockerPayment,
 } from "./lockerSchedule"
 import styles from "./LockerOverview.module.css"
-import {
-  capitalize,
-  formatGramAmount,
-  formatScheduleDate,
-  formatSchedulePeriod,
-  formatTimeUntil,
-  SECONDS_PER_DAY,
-} from "./scheduleFormatting"
+import {capitalize, formatGramAmount, SECONDS_PER_DAY} from "./scheduleFormatting"
 
 interface LockerOverviewProps {
   readonly address: string
@@ -131,8 +127,17 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
           </InlineButton>
           <p className={styles.description}>
             {schedule.totalPeriods} payments every {formatSchedulePeriod(data.unlockPeriod)}, from{" "}
-            {firstPayment ? formatScheduleDate(firstPayment.unlockTime) : "—"} to{" "}
-            {finalPayment ? formatScheduleDate(finalPayment.unlockTime) : "—"}
+            {firstPayment ? (
+              <DateTime display="date-day-month" unit="seconds" value={firstPayment.unlockTime} />
+            ) : (
+              "—"
+            )}{" "}
+            to{" "}
+            {finalPayment ? (
+              <DateTime display="date-day-month" unit="seconds" value={finalPayment.unlockTime} />
+            ) : (
+              "—"
+            )}
           </p>
         </div>
 
@@ -146,9 +151,15 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
           <LockerMetric
             label="Next payment"
             value={
-              schedule.nextPayment
-                ? formatScheduleDate(schedule.nextPayment.unlockTime)
-                : "Completed"
+              schedule.nextPayment ? (
+                <DateTime
+                  display="date-day-month"
+                  unit="seconds"
+                  value={schedule.nextPayment.unlockTime}
+                />
+              ) : (
+                "Completed"
+              )
             }
           />
         </div>
@@ -223,7 +234,7 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
   )
 }
 
-function LockerMetric({label, value}: {readonly label: string; readonly value: string}) {
+function LockerMetric({label, value}: {readonly label: string; readonly value: ReactNode}) {
   return (
     <div className={styles.metric}>
       <div className={styles.metricLabel}>{label}</div>
@@ -236,7 +247,9 @@ function LockerPaymentRow({payment}: {readonly payment: LockerPayment}) {
   return (
     <DataTableRow selected={payment.status === "next"}>
       <DataTableCell tone="muted">{payment.number}</DataTableCell>
-      <DataTableCell>{formatScheduleDate(payment.unlockTime)}</DataTableCell>
+      <DataTableCell>
+        <DateTime display="date-day-month" unit="seconds" value={payment.unlockTime} />
+      </DataTableCell>
       <DataTableCell align="right" tone="strong">
         {formatGramAmount(payment.amount)}
       </DataTableCell>

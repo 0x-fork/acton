@@ -14,7 +14,7 @@ import {
   decodeStorageShardAccount,
   type ValueFlowItem,
 } from "@acton/transaction-ui"
-import {InlineAction, Tooltip} from "@acton/ui"
+import {DateTime, InlineAction, Tooltip} from "@acton/ui"
 import {
   AlertCircle,
   ArrowLeft,
@@ -1144,9 +1144,12 @@ export function TransactionTraceView({
                     )}
                   </div>
                   <div className={styles.overviewMeta}>
-                    <div className={styles.value}>
-                      {new Date(firstTrace.transaction.now * 1000).toLocaleString()}
-                    </div>
+                    <DateTime
+                      className={styles.value}
+                      display="date-time-seconds"
+                      unit="seconds"
+                      value={firstTrace.transaction.now}
+                    />
                     {onToggleFavorite && (
                       <InlineAction
                         className={`${styles.favoriteAction} ${isFavorite ? styles.favoriteActionActive : ""}`}

@@ -28,9 +28,11 @@ import {
   DataTableHeaderCell,
   DataTableRow,
   DataTableTable,
+  DateTime,
   NftChip,
   Pagination,
   Popover,
+  RelativeTime,
   Tooltip,
 } from "@acton/ui"
 import {
@@ -113,11 +115,8 @@ import {Nfts, NftsSkeleton} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
 import {
-  formatAbsoluteTime,
   formatAddress,
   formatNano,
-  formatRelativeTime,
-  formatTimeAgo,
   hashToHex,
   isSameAddress,
   parseAddress,
@@ -1183,11 +1182,6 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                     const valueLabel = isEmptyValue
                       ? "empty"
                       : `${valuePrefix}${Number.parseFloat(valueStr).toLocaleString()} GRAM`
-                    const formattedTime = formatTransactionTime(
-                      tx.now,
-                      nowSeconds,
-                      transactionFilters.timeFormat,
-                    )
                     const isAddressHovered =
                       hoveredAddress && info.address
                         ? isSameAddress(info.address, hoveredAddress)
@@ -1221,13 +1215,11 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                         }
                       >
                         <td className={`${styles.time} ${styles.timeColumn}`}>
-                          <span
-                            title={formattedTime.title}
-                            data-visual-dynamic="time"
-                            data-visual-placeholder="<time>"
-                          >
-                            {formattedTime.label}
-                          </span>
+                          <TransactionTime
+                            nowSeconds={nowSeconds}
+                            timeFormat={transactionFilters.timeFormat}
+                            utime={tx.now}
+                          />
                         </td>
                         <td className={styles.actionColumn}>
                           <div className={styles.action}>
@@ -1784,9 +1776,6 @@ export function ActionHistoryRows({
   return (
     <>
       {rows.map(({action, info}, index) => {
-        const formattedTime = showTimeColumn
-          ? formatTransactionTime(info.utime, nowSeconds, timeFormat)
-          : undefined
         const isAddressHovered =
           hoveredAddress && info.address ? isSameAddress(info.address, hoveredAddress) : false
         const isHighlighted =
@@ -1802,14 +1791,12 @@ export function ActionHistoryRows({
           <>
             {showTimeColumn && (
               <Cell className={`${styles.time} ${styles.timeColumn}`} data-mobile-area="time">
-                {!continuesFromTrace && formattedTime && (
-                  <span
-                    title={formattedTime.title}
-                    data-visual-dynamic="time"
-                    data-visual-placeholder="<time>"
-                  >
-                    {formattedTime.label}
-                  </span>
+                {!continuesFromTrace && (
+                  <TransactionTime
+                    nowSeconds={nowSeconds}
+                    timeFormat={timeFormat}
+                    utime={info.utime}
+                  />
                 )}
               </Cell>
             )}
@@ -3600,25 +3587,39 @@ function compareBigIntStrings(left: string, right: string): number {
   }
 }
 
-function formatTransactionTime(
-  utime: number,
-  nowSeconds: number,
-  timeFormat: AccountTimeFormat,
-): {label: string; title: string} {
+function TransactionTime({
+  utime,
+  nowSeconds,
+  timeFormat,
+}: {
+  readonly utime: number
+  readonly nowSeconds: number
+  readonly timeFormat: AccountTimeFormat
+}): JSX.Element | string {
   if (utime <= 0) {
-    return {label: "-", title: "Unknown time"}
+    return (
+      <span
+        data-visual-dynamic="time"
+        data-visual-placeholder="<time>"
+        title="Unknown time"
+      >
+        -
+      </span>
+    )
   }
 
-  const absolute = formatAbsoluteTime(utime, nowSeconds)
   if (timeFormat === "absolute") {
-    return {label: absolute, title: absolute}
+    return <DateTime display="compact" now={nowSeconds} unit="seconds" value={utime} />
   }
 
-  if (timeFormat === "relative") {
-    return {label: formatRelativeTime(utime, nowSeconds), title: absolute}
-  }
-
-  return {label: formatTimeAgo(utime, nowSeconds), title: absolute}
+  return (
+    <RelativeTime
+      mode={timeFormat === "relative" ? "relative" : "hybrid"}
+      now={nowSeconds}
+      unit="seconds"
+      value={Math.min(utime, nowSeconds)}
+    />
+  )
 }
 
 function resolveMessageName(

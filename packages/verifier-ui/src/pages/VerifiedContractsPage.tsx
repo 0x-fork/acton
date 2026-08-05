@@ -1,5 +1,6 @@
 import {
   CopyInlineAction,
+  DateTime,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -19,17 +20,6 @@ import type {MouseEvent as ReactMouseEvent} from "react"
 import type {LastVerifiedItem, VerifierApi} from "../lib/api"
 import {shortenMiddle} from "../lib/target"
 import styles from "./VerifiedPage.module.css"
-
-function formatVerifiedAt(timestamp: number): string {
-  if (!Number.isFinite(timestamp) || timestamp <= 0) {
-    return "Unknown"
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(timestamp * 1000))
-}
 
 function compilerLabel(item: LastVerifiedItem): string {
   const language = item.compiler.language || "unknown"
@@ -250,7 +240,17 @@ export function VerifiedContractsPage({
                     {compilerLabel(item)}
                   </DataTableCell>
                   <DataTableCell>{item.file_count}</DataTableCell>
-                  <DataTableCell truncate>{formatVerifiedAt(item.verified_at)}</DataTableCell>
+                  <DataTableCell truncate>
+                    <DateTime
+                      fallback="Unknown"
+                      unit="seconds"
+                      value={
+                        Number.isFinite(item.verified_at) && item.verified_at > 0
+                          ? item.verified_at
+                          : undefined
+                      }
+                    />
+                  </DataTableCell>
                 </DataTableRow>
               ))
             )}

@@ -1,4 +1,5 @@
 import {
+  DateTime,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -44,12 +45,6 @@ type SuspendedAccountsLoadState =
 const ACCOUNT_STATE_BATCH_SIZE = 50
 const SUSPENSION_STATUS_REFRESH_MS = 60_000
 const SUSPENDED_ACCOUNTS_VOTE_URL = "https://t.me/tonblockchain/182"
-const UNLOCK_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-})
 
 export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}) => {
   const routes = useExplorerRoutePaths()
@@ -157,7 +152,13 @@ export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}
                 ) : (
                   "validators' voting"
                 )}{" "}
-                until {formatUnlockDate(config.suspendedUntil)}
+                until{" "}
+                <DateTime
+                  display="date-long"
+                  timeZone="UTC"
+                  unit="seconds"
+                  value={config.suspendedUntil}
+                />
               </>
             ) : config ? (
               "No addresses are currently suspended by the network configuration"
@@ -263,10 +264,6 @@ function compareSuspendedAccounts(left: SuspendedAccountRow, right: SuspendedAcc
     return left.rawAddress.localeCompare(right.rawAddress)
   }
   return leftBalance > rightBalance ? -1 : 1
-}
-
-function formatUnlockDate(timestamp: number): string {
-  return UNLOCK_DATE_FORMATTER.format(new Date(timestamp * 1000))
 }
 
 function chunk<T>(items: readonly T[], size: number): T[][] {

@@ -11,6 +11,8 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  DateTime,
+  Duration,
   HighlightedCode,
   InlineAction,
   RawDataBlock,
@@ -47,9 +49,6 @@ const ALL_ENDPOINTS = "all"
 const DEFAULT_CALLS_PER_PAGE = 20
 const CALLS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 500] as const
 const CALLS_PER_PAGE_STORAGE_KEY = "acton-studio.api-calls-per-page"
-
-const NANOSECONDS_PER_MICROSECOND = 1000
-const NANOSECONDS_PER_MILLISECOND = NANOSECONDS_PER_MICROSECOND * 1000
 
 export const ApiCallsPage: FC<ApiCallsPageProps> = ({environmentId}) => {
   const [calls, setCalls] = useState<readonly ApiCallRecord[]>([])
@@ -339,15 +338,27 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({environmentId}) => {
                           {call.method}
                         </DataTableCell>
                         <DataTableCell className={styles.rpcDurationCell} tone="muted">
-                          {formatApiCallDuration(call.duration_ns)}
+                          <Duration
+                            display="latency"
+                            fallback="Unknown"
+                            unit="nanoseconds"
+                            value={
+                              Number.isFinite(call.duration_ns) && call.duration_ns >= 0
+                                ? call.duration_ns
+                                : undefined
+                            }
+                          />
                         </DataTableCell>
-                        <DataTableCell
-                          className={styles.rpcTimestampCell}
-                          tone="muted"
-                          data-visual-dynamic="time"
-                          data-visual-placeholder="<time>"
-                        >
-                          {formatTimestamp(call.timestamp_ms)}
+                        <DataTableCell className={styles.rpcTimestampCell} tone="muted">
+                          <DateTime
+                            display="date-time-seconds"
+                            fallback="Unknown"
+                            value={
+                              Number.isFinite(call.timestamp_ms) && call.timestamp_ms > 0
+                                ? call.timestamp_ms
+                                : undefined
+                            }
+                          />
                         </DataTableCell>
                       </DataTableRow>
                       {expanded ? (
@@ -491,44 +502,6 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({environmentId}) => {
       </section>
     </>
   )
-}
-
-function formatTimestamp(timestampMs: number): string {
-  if (!Number.isFinite(timestampMs) || timestampMs <= 0) {
-    return "Unknown"
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "medium",
-  }).format(new Date(timestampMs))
-}
-
-function formatApiCallDuration(durationNs: number): string {
-  if (!Number.isFinite(durationNs) || durationNs < 0) {
-    return "Unknown"
-  }
-
-  if (durationNs < NANOSECONDS_PER_MICROSECOND) {
-    return `${Math.round(durationNs)} ns`
-  }
-
-  if (durationNs < NANOSECONDS_PER_MILLISECOND) {
-    return `${formatDurationValue(durationNs / NANOSECONDS_PER_MICROSECOND)} µs`
-  }
-
-  const durationMs = durationNs / NANOSECONDS_PER_MILLISECOND
-  if (durationMs < 10) {
-    return `${formatDurationValue(durationMs)} ms`
-  }
-
-  return `${Math.round(durationMs)} ms`
-}
-
-function formatDurationValue(value: number): string {
-  return value.toLocaleString(undefined, {
-    maximumFractionDigits: value < 10 ? 2 : value < 100 ? 1 : 0,
-  })
 }
 
 function formatRequestData(data: unknown | null, truncated = false): string | undefined {

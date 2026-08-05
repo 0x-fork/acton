@@ -8,7 +8,9 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  DateTime,
   Dialog,
+  Duration,
   Input,
   InlineAction,
   useToast,
@@ -274,7 +276,9 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({
                     <DataTableCell>
                       <strong className={styles.snapshotName}>{snapshotLabel(snapshot)}</strong>
                     </DataTableCell>
-                    <DataTableCell tone="muted">{formatDate(snapshot.createdAt)}</DataTableCell>
+                    <DataTableCell tone="muted">
+                      <DateTime value={snapshot.createdAt} unit="seconds" />
+                    </DataTableCell>
                     <DataTableCell tone="muted" mono>
                       {formatMasterchainSeqno(snapshot.masterchainSeqno)}
                     </DataTableCell>
@@ -339,7 +343,12 @@ const OperationProgress: FC<{
           </strong>
           <span>{operationDetail(operation.phase)}</span>
         </div>
-        <span className={styles.elapsed}>{formatElapsed(operation.startedAt, now)}</span>
+        <span className={styles.elapsed}>
+          <Duration
+            display="elapsed"
+            value={Math.max(0, Math.floor((now - Date.parse(operation.startedAt)) / 1000))}
+          />
+        </span>
       </div>
       <ol
         className={styles.phases}
@@ -444,12 +453,6 @@ function snapshotLabel(snapshot: EnvironmentSnapshot): string {
   return snapshot.name ?? snapshot.id
 }
 
-function formatDate(timestamp: number): string {
-  return new Intl.DateTimeFormat(undefined, {dateStyle: "medium", timeStyle: "short"}).format(
-    timestamp * 1000,
-  )
-}
-
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   const units = ["KB", "MB", "GB", "TB"]
@@ -465,13 +468,6 @@ function formatBytes(bytes: number): string {
 
 function formatMasterchainSeqno(seqno: number | undefined): string {
   return seqno === undefined ? "—" : seqno.toLocaleString()
-}
-
-function formatElapsed(startedAt: string, now: number): string {
-  const elapsedSeconds = Math.max(0, Math.floor((now - Date.parse(startedAt)) / 1000))
-  const minutes = Math.floor(elapsedSeconds / 60)
-  const seconds = elapsedSeconds % 60
-  return minutes > 0 ? `${minutes}m ${seconds.toString().padStart(2, "0")}s` : `${seconds}s`
 }
 
 function operationDetail(phase: EnvironmentSnapshotOperationPhase): string {

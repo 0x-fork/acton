@@ -9,6 +9,7 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  formatDateTime,
   Skeleton,
 } from "@acton/ui"
 import {CircleAlert, RefreshCw} from "lucide-react"
@@ -81,22 +82,14 @@ const LANGUAGE_LABELS: Readonly<Record<string, string>> = {
 }
 const FALLBACK_LANGUAGE_COLOR = "var(--acton-color-text-subtle)"
 const LEGEND_SKELETON_KEYS = ["first", "second", "third"] as const
-const MONTH_TICK_FORMATTER = new Intl.DateTimeFormat("en", {
-  month: "short",
-  timeZone: "UTC",
-  year: "2-digit",
-})
-const MONTH_TOOLTIP_FORMATTER = new Intl.DateTimeFormat("en", {
-  month: "long",
-  timeZone: "UTC",
-  year: "numeric",
-})
 const CHART_TOOLTIP_STYLE = {
   background: "var(--acton-color-surface-raised)",
   border: "1px solid var(--acton-color-border)",
   borderRadius: "10px",
   color: "var(--acton-color-text)",
 }
+const MONTH_TICK_FORMAT = {display: "month-short", locale: "en", timeZone: "UTC"} as const
+const MONTH_TOOLTIP_FORMAT = {display: "month-long", locale: "en", timeZone: "UTC"} as const
 
 function normalizedCount(value: number): number {
   return Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0
@@ -132,14 +125,6 @@ function monthStart(timestamp: number): number {
 function nextMonth(timestamp: number): number {
   const date = new Date(timestamp)
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)
-}
-
-function formatMonthTick(timestamp: number): string {
-  return MONTH_TICK_FORMATTER.format(timestamp)
-}
-
-function formatMonthTooltip(timestamp: number): string {
-  return MONTH_TOOLTIP_FORMATTER.format(timestamp)
 }
 
 function buildHistorySeries(items: readonly VerificationStatisticsHistoryItem[]): HistorySeries {
@@ -412,7 +397,7 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                           dataKey="timestamp"
                           minTickGap={32}
                           tick={{fill: "var(--acton-color-text-muted)", fontSize: 12}}
-                          tickFormatter={formatMonthTick}
+                          tickFormatter={timestamp => formatDateTime(timestamp, MONTH_TICK_FORMAT)}
                           tickLine={false}
                         />
                         <YAxis
@@ -426,7 +411,9 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                         <Tooltip
                           contentStyle={CHART_TOOLTIP_STYLE}
                           itemStyle={{color: "var(--acton-color-text)"}}
-                          labelFormatter={value => formatMonthTooltip(Number(value))}
+                          labelFormatter={value =>
+                            formatDateTime(Number(value), MONTH_TOOLTIP_FORMAT)
+                          }
                           formatter={(value, name) => [formatCount(Number(value)), name]}
                         />
                         {historySeries.languages.map(language => (
@@ -476,7 +463,7 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                           dataKey="timestamp"
                           minTickGap={32}
                           tick={{fill: "var(--acton-color-text-muted)", fontSize: 12}}
-                          tickFormatter={formatMonthTick}
+                          tickFormatter={timestamp => formatDateTime(timestamp, MONTH_TICK_FORMAT)}
                           tickLine={false}
                         />
                         <YAxis
@@ -491,7 +478,9 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                           contentStyle={CHART_TOOLTIP_STYLE}
                           cursor={{fill: "var(--acton-color-surface-hover)"}}
                           itemStyle={{color: "var(--acton-color-text)"}}
-                          labelFormatter={value => formatMonthTooltip(Number(value))}
+                          labelFormatter={value =>
+                            formatDateTime(Number(value), MONTH_TOOLTIP_FORMAT)
+                          }
                           formatter={(value, name) => [formatCount(Number(value)), name]}
                         />
                         {historySeries.languages.map(language => (

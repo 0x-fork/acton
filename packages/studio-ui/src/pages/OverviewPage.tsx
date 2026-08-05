@@ -1,4 +1,4 @@
-import {Skeleton} from "@acton/ui"
+import {DateTime, Duration, Skeleton} from "@acton/ui"
 import {
   ArrowRight,
   Ban,
@@ -24,12 +24,7 @@ import type {
 } from "../studioApi"
 import {fetchStudioTestRun} from "../studioApi"
 import type {StudioPath} from "../studioPages"
-import {
-  formatTestRunDuration,
-  testRunStatusLabel,
-  testRunSummary,
-  testRunTime,
-} from "../testRunPresentation"
+import {testRunStatusLabel, testRunSummary} from "../testRunPresentation"
 
 import styles from "./OverviewPage.module.css"
 
@@ -225,11 +220,17 @@ export function OverviewPage({
                   <span className={styles.latestRunMeta}>
                     {testRunSummary(latestRun)}
                     <span aria-hidden="true">·</span>
-                    {latestRun.stats.durationMs > 0
-                      ? formatTestRunDuration(latestRun.stats.durationMs)
-                      : "In progress"}
+                    {latestRun.stats.durationMs > 0 ? (
+                      <Duration
+                        display="runtime"
+                        unit="milliseconds"
+                        value={latestRun.stats.durationMs}
+                      />
+                    ) : (
+                      "In progress"
+                    )}
                     <span aria-hidden="true">·</span>
-                    <time dateTime={latestRun.startedAt}>{testRunTime(latestRun.startedAt)}</time>
+                    <DateTime value={latestRun.startedAt} display="smart" />
                   </span>
                   <code title={latestRun.command.join(" ")}>{latestRun.command.join(" ")}</code>
                 </span>
@@ -261,11 +262,21 @@ export function OverviewPage({
                         </span>
                         <span className={styles.runDescription}>{testRunSummary(run)}</span>
                         <span className={styles.runDuration}>
-                          {run.stats.durationMs > 0
-                            ? formatTestRunDuration(run.stats.durationMs)
-                            : "—"}
+                          {run.stats.durationMs > 0 ? (
+                            <Duration
+                              display="runtime"
+                              unit="milliseconds"
+                              value={run.stats.durationMs}
+                            />
+                          ) : (
+                            "—"
+                          )}
                         </span>
-                        <span className={styles.runTime}>{testRunTime(run.startedAt)}</span>
+                        <DateTime
+                          className={styles.runTime}
+                          value={run.startedAt}
+                          display="smart"
+                        />
                         <ArrowRight size={15} aria-hidden="true" />
                       </button>
                     ))}

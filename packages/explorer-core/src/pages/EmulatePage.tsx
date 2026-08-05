@@ -22,6 +22,8 @@ import {
   ContentTabs,
   CopyButton,
   Dialog,
+  DateTime,
+  formatDateTime,
   InlineAction,
   InlineButton,
   Input,
@@ -1172,9 +1174,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
       await navigator.clipboard.writeText(shareUrl)
       showToast({
         title: "Share link copied",
-        description: `Anyone with the link can open this emulation until ${new Date(
-          expiresAt,
-        ).toLocaleDateString()}.`,
+        description: `Anyone with the link can open this emulation until ${formatDateTime(expiresAt, {display: "date-numeric"})}`,
         variant: "success",
       })
     } catch (error) {
@@ -1576,9 +1576,17 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
           previewUnixTime !== undefined &&
           previewUnixTime <= MAX_UINT32 && (
             <div className={styles.timeOverridePreview}>
-              <span>{formatEmulationUnixTime(baseBlockUnixTime)}</span>
+              <DateTime
+                display="date-time-numeric-seconds"
+                unit="seconds"
+                value={baseBlockUnixTime}
+              />
               <span aria-hidden="true">→</span>
-              <span>{formatEmulationUnixTime(previewUnixTime)}</span>
+              <DateTime
+                display="date-time-numeric-seconds"
+                unit="seconds"
+                value={previewUnixTime}
+              />
             </div>
           )}
       </div>
@@ -2152,17 +2160,6 @@ async function loadEmulationBlockInfo(
     throw new Error("Failed to resolve selected masterchain block")
   }
   return {mcSeqno: resolvedMcSeqno, unixTime}
-}
-
-function formatEmulationUnixTime(value: number): string {
-  return new Date(value * 1000).toLocaleString(undefined, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
 }
 
 function parseManualAbi(value: string): {readonly abi?: ContractABI; readonly error?: string} {

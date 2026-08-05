@@ -9,6 +9,8 @@ import {codeViewerGallery} from "./codeViewerGallery"
 import {contentTabsGallery} from "./contentTabsGallery"
 import {contractChipGallery} from "./contractChipGallery"
 import {dataTableGallery} from "./dataTableGallery"
+import {dateTimeGallery} from "./dateTimeGallery"
+import {durationGallery} from "./durationGallery"
 import {dialogGallery} from "./dialogGallery"
 import {disclosureGallery} from "./disclosureGallery"
 import {disclosureToggleGallery} from "./disclosureToggleGallery"
@@ -81,6 +83,8 @@ export const galleries = [
   toastGallery,
   rawDataBlockGallery,
   dataTableGallery,
+  dateTimeGallery,
+  durationGallery,
   skeletonGallery,
   visuallyGroupedNumberGallery,
   checkboxGallery,

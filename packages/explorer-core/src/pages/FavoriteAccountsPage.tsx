@@ -3,6 +3,7 @@ import type {FC} from "react"
 import {Link} from "react-router"
 import {
   BlockChip,
+  DateTime,
   InlineAction,
   InlineActions,
   Pagination,
@@ -260,12 +261,8 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                         }
                       />
                     </td>
-                    <td
-                      className={styles.savedAtCell}
-                      data-visual-dynamic="time"
-                      data-visual-placeholder="<time>"
-                    >
-                      {formatSavedAt(favorite.savedAt)}
+                    <td className={styles.savedAtCell}>
+                      <DateTime value={positiveTime(favorite.savedAt)} fallback="Unknown" />
                     </td>
                   </tr>
                 ))}
@@ -323,19 +320,15 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                           />
                         </div>
                       </td>
-                      <td
-                        className={styles.blockTimeCell}
-                        data-visual-dynamic="time"
-                        data-visual-placeholder="<time>"
-                      >
-                        {formatBlockGeneratedAt(favorite.generatedAt)}
+                      <td className={styles.blockTimeCell}>
+                        <DateTime
+                          fallback="Unknown"
+                          unit="seconds"
+                          value={positiveTime(favorite.generatedAt)}
+                        />
                       </td>
-                      <td
-                        className={styles.blockTimeCell}
-                        data-visual-dynamic="time"
-                        data-visual-placeholder="<time>"
-                      >
-                        {formatSavedAt(favorite.savedAt)}
+                      <td className={styles.blockTimeCell}>
+                        <DateTime value={positiveTime(favorite.savedAt)} fallback="Unknown" />
                       </td>
                     </tr>
                   )
@@ -407,12 +400,8 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                       )}
                     </td>
                     <td className={styles.ltCell}>{favorite.lt ?? "—"}</td>
-                    <td
-                      className={styles.savedAtCell}
-                      data-visual-dynamic="time"
-                      data-visual-placeholder="<time>"
-                    >
-                      {formatSavedAt(favorite.savedAt)}
+                    <td className={styles.savedAtCell}>
+                      <DateTime value={positiveTime(favorite.savedAt)} fallback="Unknown" />
                     </td>
                   </tr>
                 ))}
@@ -432,22 +421,6 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
   )
 }
 
-function formatBlockGeneratedAt(generatedAt: number | undefined): string {
-  if (!generatedAt) {
-    return "Unknown"
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(generatedAt * 1000))
-}
-
-function formatSavedAt(savedAt: number): string {
-  if (!savedAt) {
-    return "Unknown"
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(savedAt))
+function positiveTime(value: number | undefined): number | undefined {
+  return value !== undefined && Number.isFinite(value) && value > 0 ? value : undefined
 }

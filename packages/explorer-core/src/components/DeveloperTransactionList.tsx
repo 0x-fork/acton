@@ -8,6 +8,7 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  RelativeTime,
 } from "@acton/ui"
 import type {FC, ReactNode} from "react"
 
@@ -16,7 +17,7 @@ import type {V3Message, V3TransactionListItem} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
 import {ExplorerAddressChip} from "./ExplorerAddressChip"
-import {formatNano, formatTimeAgo, hashToHex} from "./utils"
+import {formatNano, hashToHex} from "./utils"
 import type {MessageNamesByAddress} from "../hooks/useMessageNamesByAddress"
 
 import styles from "./DeveloperTransactionList.module.css"
@@ -147,8 +148,6 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
             rows.map(row => {
               const hashHex = hashToHex(getTransactionHash(row.transaction))
               const canOpenTransaction = hashHex !== undefined && onTransactionClick !== undefined
-              const timeTitle = formatAbsoluteTime(row.time)
-
               return (
                 <DataTableRow
                   key={row.key}
@@ -172,13 +171,7 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
                   title={row.statusLabel}
                 >
                   <DataTableCell className={styles.timeCell} tone="muted">
-                    <span
-                      title={timeTitle}
-                      data-visual-dynamic="time"
-                      data-visual-placeholder="<time>"
-                    >
-                      {formatTimeAgo(row.time)}
-                    </span>
+                    <RelativeTime value={row.time} unit="seconds" mode="hybrid" />
                   </DataTableCell>
                   <DataTableCell align="right">
                     <EndpointCell
@@ -443,15 +436,4 @@ function resolveMessageLabel(
   messageNamesByAddress?: MessageNamesByAddress,
 ): string | undefined {
   return resolveMessageName(message, messageNamesByAddress) ?? formatMessageOpcode(message)
-}
-
-function formatAbsoluteTime(utime: number): string {
-  return new Date(utime * 1000).toLocaleString(undefined, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
 }

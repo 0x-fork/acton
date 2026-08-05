@@ -24,11 +24,14 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  DateTime,
+  formatDateTimeLocalInput,
   InlineAction,
   InlineActions,
   Input,
   ModeViewer,
   Popover,
+  RelativeTime,
   formatToncenterBlockId,
   type ModeInfo,
   type ModeParser,
@@ -51,7 +54,7 @@ import {
 } from "../components/DeveloperTransactionList"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {NetworkTpsPanel} from "../components/NetworkTpsPanel"
-import {formatNano, formatRelativeTime, hashToHex} from "../components/utils"
+import {formatNano, hashToHex} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useFavoriteBlocks} from "../hooks/useFavoriteBlocks"
@@ -1021,26 +1024,26 @@ const BlockTableSection: FC<{
                   />
                 </DataTableCell>
                 <DataTableCell>{block.tx_count.toLocaleString()}</DataTableCell>
-                <DataTableCell
-                  title={formatAbsoluteBlockTime(block)}
-                  data-visual-dynamic="time"
-                  data-visual-placeholder="<time>"
-                  truncate
-                >
-                  {formatAbsoluteBlockTime(block)}
+                <DataTableCell truncate>
+                  <DateTime
+                    display="date-time-numeric-seconds"
+                    fallback="Unknown"
+                    unit="seconds"
+                    value={blockUnixTime(block)}
+                  />
                 </DataTableCell>
                 {showShardFlags ? (
                   <>
-                    <DataTableCell align="center">
+                    <DataTableCell>
                       <BooleanValue value={block.before_split} />
                     </DataTableCell>
-                    <DataTableCell align="center">
+                    <DataTableCell>
                       <BooleanValue value={block.after_split} />
                     </DataTableCell>
-                    <DataTableCell align="center">
+                    <DataTableCell>
                       <BooleanValue value={block.want_split} />
                     </DataTableCell>
-                    <DataTableCell align="center">
+                    <DataTableCell>
                       <BooleanValue value={block.want_merge} />
                     </DataTableCell>
                   </>
@@ -1243,9 +1246,7 @@ const BlockTableSkeleton: FC<{
           columns={showShardFlags ? 7 : 3}
           rows={rows}
           alignments={
-            showShardFlags
-              ? ["left", "left", "left", "center", "center", "center", "center"]
-              : undefined
+            showShardFlags ? ["left", "left", "left", "left", "left", "left", "left"] : undefined
           }
           widths={
             showShardFlags
@@ -1298,7 +1299,6 @@ const BlockSummaryTable: FC<{
   const prevKeyBlockSeqno = block.prev_key_block_seqno
   const minRefMcSeqno = block.min_ref_mc_seqno
   const genUtime = blockUnixTime(block)
-  const absoluteGenTime = formatAbsoluteBlockTime(block)
   const hasGenSoftware =
     block.gen_software_version !== undefined || block.gen_software_capabilities !== undefined
 
@@ -1326,17 +1326,16 @@ const BlockSummaryTable: FC<{
           label="Gen utime"
           value={
             genUtime === undefined ? (
-              absoluteGenTime
+              "Unknown"
             ) : (
               <>
-                {absoluteGenTime}{" "}
+                <DateTime display="date-time-numeric-seconds" unit="seconds" value={genUtime} />{" "}
                 <span className={styles.blockDetailRelativeTime}>
-                  ({formatRelativeTime(genUtime)})
+                  (<RelativeTime mode="relative" tooltip={false} unit="seconds" value={genUtime} />)
                 </span>
               </>
             )
           }
-          title={absoluteGenTime}
           visualPlaceholder="<time>"
         />
         <BlockDetailItem label="Version" value={formatOptionalNumber(block.version)} mono />
@@ -1750,31 +1749,7 @@ function blockUnixTime(block: V3Block): number | undefined {
   return Number.isFinite(value) && value > 0 ? value : undefined
 }
 
-function formatDateTimeLocalInput(unixTime: number): string {
-  const date = new Date(unixTime * 1000)
-  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-  return localDate.toISOString().slice(0, 19)
-}
-
-function formatAbsoluteBlockTime(block: V3Block): string {
-  const unixTime = blockUnixTime(block)
-  if (unixTime === undefined) {
-    return "Unknown"
-  }
-
-  const date = new Date(unixTime * 1000)
-  const day = date.getDate().toString().padStart(2, "0")
-  const month = (date.getMonth() + 1).toString().padStart(2, "0")
-  const hours = date.getHours().toString().padStart(2, "0")
-  const minutes = date.getMinutes().toString().padStart(2, "0")
-  const seconds = date.getSeconds().toString().padStart(2, "0")
-  return `${day}.${month}.${date.getFullYear()}, ${hours}:${minutes}:${seconds}`
-}
-
-function formatTransactionExitCode(transaction: BlockTransactionListItem): string {
-  if (!("description" in transaction)) {
-    return "Unknown"
-  }
+function formatTransactionExitCode(transaction: V3TransactionListItem): string {
   const computeExitCode = transaction.description.compute_ph?.exit_code
   if (typeof computeExitCode === "number") {
     return computeExitCode.toString()

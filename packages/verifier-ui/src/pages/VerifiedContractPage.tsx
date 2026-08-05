@@ -1,5 +1,5 @@
-import {Button, CodeViewer, CopyInlineAction, HighlightedCode} from "@acton/ui"
-import {useEffect, useMemo, useState} from "react"
+import {Button, CodeViewer, CopyInlineAction, DateTime, HighlightedCode} from "@acton/ui"
+import {useEffect, useMemo, useState, type ReactNode} from "react"
 import {Download, ExternalLink} from "lucide-react"
 
 import {StatusPill} from "../components/StatusPill"
@@ -26,7 +26,7 @@ function DetailRow({
   copyable = true,
 }: {
   readonly label: string
-  readonly value: string
+  readonly value: ReactNode
   readonly href?: string
   readonly monospace?: boolean
   readonly copyable?: boolean
@@ -49,9 +49,9 @@ function DetailRow({
             <ExternalLink size={13} aria-hidden="true" />
           </a>
         ) : (
-          <span title={value}>{value}</span>
+          <span title={typeof value === "string" ? value : undefined}>{value}</span>
         )}
-        {copyable && (
+        {copyable && typeof value === "string" && value && (
           <CopyInlineAction value={value} label={`Copy ${label}`} copiedLabel={`${label} copied`} />
         )}
       </dd>
@@ -113,17 +113,6 @@ function CompilerVersionLink({
       <ExternalLink size={13} aria-hidden="true" />
     </a>
   )
-}
-
-function formatVerifiedAt(timestamp: number): string | undefined {
-  if (!Number.isFinite(timestamp) || timestamp <= 0) {
-    return undefined
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "medium",
-  }).format(new Date(timestamp * 1000))
 }
 
 function PanelHeading({
@@ -221,7 +210,8 @@ function VerifiedContract({
     )
   }
 
-  const verifiedAt = formatVerifiedAt(bundle.verified_at)
+  const verifiedAt =
+    Number.isFinite(bundle.verified_at) && bundle.verified_at > 0 ? bundle.verified_at : undefined
   const compactCompilerParams = JSON.stringify(bundle.compiler.params)
   const readableCompilerParams =
     compactCompilerParams.length <= 96
@@ -288,7 +278,13 @@ function VerifiedContract({
           </div>
           <dl>
             {address && <DetailRow label="Address" value={address} monospace />}
-            {verifiedAt && <DetailRow label="Verified at" value={verifiedAt} />}
+            {verifiedAt && (
+              <DetailRow
+                label="Verified at"
+                value={<DateTime display="date-time-seconds" unit="seconds" value={verifiedAt} />}
+                copyable={false}
+              />
+            )}
             <DetailRow label="Code hash" value={data.code_hash} monospace />
             <DetailRow label="Bundle hash" value={bundle.source_bundle_hash} monospace />
             {bundle.storage_revision && (

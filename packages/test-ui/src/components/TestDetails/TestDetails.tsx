@@ -25,6 +25,7 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  Duration,
   getIdeUrl,
   IdeSelector,
   RawDataBlock,
@@ -145,13 +146,6 @@ const getStatusDescription = (test: TestReport): string | undefined => {
 
 const stringifyError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
-
-const formatDuration = (duration: {secs: number; nanos: number}): string => {
-  const ms = duration.secs * 1000 + duration.nanos / 1_000_000
-  if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`
-  if (ms < 1000) return `${ms.toFixed(1)}ms`
-  return `${(ms / 1000).toFixed(2)}s`
-}
 
 export const TestDetails: React.FC<TestDetailsProps> = ({
   test,
@@ -775,9 +769,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
             <div className={styles.infoItem}>
               <div className={styles.infoLabel}>Stats</div>
               <div className={styles.infoValue}>
-                <span data-visual-dynamic="duration" data-visual-placeholder="<duration>">
-                  {formatDuration(test.duration)}
-                </span>{" "}
+                <Duration
+                  display="precise"
+                  unit="milliseconds"
+                  value={test.duration.secs * 1000 + test.duration.nanos / 1_000_000}
+                />{" "}
                 • {transactionStats}
               </div>
             </div>

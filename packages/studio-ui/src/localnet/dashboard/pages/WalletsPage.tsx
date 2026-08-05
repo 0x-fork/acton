@@ -13,6 +13,7 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  DateTime,
   InlineButton,
   Input,
 } from "@acton/ui"
@@ -297,10 +298,11 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                       <DataTableCell
                         tone="muted"
                         truncate
-                        data-visual-dynamic="time"
-                        data-visual-placeholder="<time>"
                       >
-                        {formatDateTime(session.lastActivityAt)}
+                        <DateTime
+                          fallback={session.lastActivityAt}
+                          value={session.lastActivityAt}
+                        />
                       </DataTableCell>
                       <DataTableCell align="right">
                         <InlineButton
@@ -359,15 +361,6 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
       </section>
     </>
   )
-}
-
-function formatDateTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return date.toLocaleString()
 }
 
 function getDappName(name: string | undefined): string {

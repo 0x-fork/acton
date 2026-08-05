@@ -147,60 +147,6 @@ export function formatNano(nano: string | number, maximumFractionDigits = 9): st
   })
 }
 
-export function formatTimeAgo(
-  utime: number,
-  nowSeconds: number = Math.floor(Date.now() / 1000),
-): string {
-  const diff = Math.max(0, nowSeconds - utime)
-
-  if (diff === 0) return "right now"
-  if (diff < 60) return `${diff}s ago`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86_400) return `${Math.floor(diff / 3600)}h ago`
-
-  return formatAbsoluteTime(utime, nowSeconds)
-}
-
-export function formatRelativeTime(
-  utime: number,
-  nowSeconds: number = Math.floor(Date.now() / 1000),
-): string {
-  const diff = Math.max(0, nowSeconds - utime)
-
-  if (diff === 0) return "right now"
-  if (diff < 60) return `${diff}s ago`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86_400) return `${Math.floor(diff / 3600)}h ago`
-  if (diff < 604_800) return `${Math.floor(diff / 86_400)}d ago`
-  if (diff < 2_629_800) return `${Math.floor(diff / 604_800)}w ago`
-  if (diff < 31_557_600) return `${Math.floor(diff / 2_629_800)}mo ago`
-  return `${Math.floor(diff / 31_557_600)}y ago`
-}
-
-export function formatAbsoluteTime(
-  utime: number,
-  nowSeconds: number = Math.floor(Date.now() / 1000),
-): string {
-  const date = new Date(utime * 1000)
-  const currentYear = new Date(nowSeconds * 1000).getFullYear()
-  const day = date.getDate()
-  const month = date.toLocaleString("default", {month: "short"})
-  const year = date.getFullYear() === currentYear ? "" : ` ${date.getFullYear()}`
-  const time = date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
-  return `${day} ${month}${year}, ${time}`
-}
-
-export function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
-  if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h`
-  return `${Math.floor(seconds / 86_400)}d`
-}
-
 export function shortenIdentifier(value: string, edgeLength = 6): string {
   return value.length > edgeLength * 2
     ? `${value.slice(0, edgeLength)}…${value.slice(-edgeLength)}`

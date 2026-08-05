@@ -1,6 +1,13 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
-import {CopyInlineAction, InlineAction, InlineActions, Pagination, useToast} from "@acton/ui"
+import {
+  CopyInlineAction,
+  DateTime,
+  InlineAction,
+  InlineActions,
+  Pagination,
+  useToast,
+} from "@acton/ui"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 
 import type {TonClient} from "../api/client"
@@ -235,8 +242,15 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
                       </td>
                       <td>{entry.compiler}</td>
                       <td>{entry.files}</td>
-                      <td data-visual-dynamic="time" data-visual-placeholder="<time>">
-                        {formatSavedAt(entry.savedAt)}
+                      <td>
+                        <DateTime
+                          fallback="unknown"
+                          value={
+                            Number.isFinite(entry.savedAt) && entry.savedAt > 0
+                              ? entry.savedAt
+                              : undefined
+                          }
+                        />
                       </td>
                     </tr>
                   ))
@@ -340,16 +354,6 @@ function formatCompiler(compiler: SourceCompiler): string {
   const language = compiler.language || "unknown"
   const version = compiler.version ? ` ${compiler.version}` : ""
   return `${language}${version}`
-}
-
-function formatSavedAt(savedAt: number): string {
-  if (!Number.isFinite(savedAt) || savedAt <= 0) {
-    return "unknown"
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(savedAt)
 }
 
 function shortCodeHash(codeHash: string): string {

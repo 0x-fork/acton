@@ -8,6 +8,7 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  RelativeTime,
   Select,
 } from "@acton/ui"
 import {useCallback, useEffect, useRef, useState} from "react"
@@ -23,7 +24,7 @@ import {
   getImageSources,
   replaceBrokenImageWithFallback,
 } from "../components/imageFallbacks"
-import {formatAbsoluteTime, formatRelativeTime, parseAddress} from "../components/utils"
+import {parseAddress} from "../components/utils"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
 
@@ -272,12 +273,7 @@ export const TokenCatalogPage: FC<TokenCatalogPageProps> = ({client, embedded = 
                       {order === "recent" ? (
                         <DataTableCell>
                           {item.lastActivityAt ? (
-                            <time
-                              dateTime={new Date(item.lastActivityAt * 1000).toISOString()}
-                              title={formatAbsoluteTime(item.lastActivityAt)}
-                            >
-                              {formatRelativeTime(item.lastActivityAt)}
-                            </time>
+                            <RelativeTime unit="seconds" value={item.lastActivityAt} />
                           ) : (
                             <span className={styles.muted}>—</span>
                           )}

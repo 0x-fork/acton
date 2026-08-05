@@ -5,6 +5,7 @@ import {
   ContractChip,
   CopyInlineAction,
   CopyInlineButton,
+  DateTime,
   DisclosureToggle,
   ExitCodeChip,
   InfoPopover,
@@ -504,13 +505,14 @@ export function TransactionDetails({
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Created At</div>
-                <div
+                <DateTime
                   className={`${styles.multiColumnItemValue} ${styles.timestampValue}`}
                   data-visual-dynamic="timestamp"
                   data-visual-placeholder="<timestamp>"
-                >
-                  {formatDetailedTimestamp(inMessage.info.createdAt, false)}
-                </div>
+                  display="date-time-numeric-seconds"
+                  unit="seconds"
+                  value={inMessage.info.createdAt}
+                />
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Created Lt</div>
@@ -926,7 +928,20 @@ export function TransactionDetails({
             data-visual-dynamic="timestamp"
             data-visual-placeholder="<timestamp>"
           >
-            {formatDetailedTimestamp(tx.transaction.now)}
+            <DateTime
+              display="date-time-numeric-seconds"
+              unit="seconds"
+              value={tx.transaction.now}
+            />
+            <span className={styles.timestampDetailSecondary}>
+              {" — "}
+              <DateTime
+                display="date-time-day-month-short"
+                tooltip={false}
+                unit="seconds"
+                value={tx.transaction.now}
+              />
+            </span>
           </span>
           <span className={styles.timeInlineItem}>
             <span className={styles.timeInlineLabel}>LT:</span>
@@ -991,48 +1006,4 @@ function formatAccountStatus(status: string): string {
       return status
     }
   }
-}
-
-function formatDetailedTimestamp(
-  timestampInput: number | string | undefined,
-  showShort = true,
-): React.JSX.Element | string {
-  if (timestampInput === undefined) return "—"
-
-  const date =
-    typeof timestampInput === "string" ? new Date(timestampInput) : new Date(timestampInput * 1000)
-
-  const pad = (number: number): string => number.toString().padStart(2, "0")
-  const monthAbbrs = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ]
-
-  const day = date.getDate()
-  const monthIndex = date.getMonth()
-  const monthNumber = monthIndex + 1
-  const year = date.getFullYear()
-  const hours = date.getHours()
-  const minutes = date.getMinutes()
-  const seconds = date.getSeconds()
-
-  const fullPart = `${pad(day)}.${pad(monthNumber)}.${year}, ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
-  const shortPart = `${pad(day)} ${monthAbbrs[monthIndex]}, ${pad(hours)}:${pad(minutes)}`
-
-  return (
-    <>
-      {fullPart}
-      {showShort && <span className={styles.timestampDetailSecondary}> — {shortPart}</span>}
-    </>
-  )
 }

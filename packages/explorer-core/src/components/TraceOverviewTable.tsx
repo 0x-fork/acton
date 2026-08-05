@@ -1,4 +1,4 @@
-import {BlockChip, CopyInlineAction, InlineActions} from "@acton/ui"
+import {BlockChip, CopyInlineAction, DateTime, Duration, InlineActions} from "@acton/ui"
 import {
   getTransactionComputePhase,
   type TransactionBlockRef,
@@ -45,22 +45,6 @@ const formatState = (state: string): string => {
   return normalized.length > 0
     ? normalized.charAt(0).toUpperCase() + normalized.slice(1)
     : "Unknown"
-}
-
-const formatDuration = (seconds: number): string => {
-  if (seconds <= 0) {
-    return "Less than 1 second"
-  }
-  if (seconds === 1) {
-    return "1 second"
-  }
-  if (seconds < 60) {
-    return `${seconds} seconds`
-  }
-
-  const minutes = Math.floor(seconds / 60)
-  const remainingSeconds = seconds % 60
-  return remainingSeconds === 0 ? `${minutes} min` : `${minutes} min ${remainingSeconds} sec`
 }
 
 const isSameBlock = (left: TransactionBlockRef | undefined, right: TransactionBlockRef): boolean =>
@@ -168,9 +152,15 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
     {label: "Skipped Compute", value: skippedComputeCount},
   ]
   const timeItems: readonly {readonly label: string; readonly value: ReactNode}[] = [
-    {label: "Started", value: new Date(data.startUtime * 1000).toLocaleString()},
-    {label: "Finished", value: new Date(data.endUtime * 1000).toLocaleString()},
-    {label: "Duration", value: formatDuration(duration)},
+    {
+      label: "Started",
+      value: <DateTime display="date-time-seconds" value={data.startUtime} unit="seconds" />,
+    },
+    {
+      label: "Finished",
+      value: <DateTime display="date-time-seconds" value={data.endUtime} unit="seconds" />,
+    },
+    {label: "Duration", value: <Duration display="human" value={duration} />},
     {label: "Logical Time", value: `${data.startLt} — ${data.endLt}`},
   ]
 

@@ -45,7 +45,7 @@ Status: ready
 Import:
 
 ```tsx
-import { Button, CopyButton } from "@acton/ui"
+import { Button, CopyButton } from "@acton/ui";
 ```
 
 Use Button for explicit user-triggered commands: submit, confirm, start, stop,
@@ -103,7 +103,7 @@ Status: ready
 Import:
 
 ```tsx
-import { Breadcrumbs } from "@acton/ui"
+import { Breadcrumbs } from "@acton/ui";
 ```
 
 Use Breadcrumbs for compact page hierarchy and explorer paths such as account,
@@ -115,9 +115,27 @@ semantic breadcrumb nav while keeping links router-agnostic.
 ```tsx
 <Breadcrumbs
   items={[
-    { label: "Explore", link: (children, className) => <Link to="/" className={className}>{children}</Link> },
-    { label: address, link: (children, className) => <Link to={addressPath} className={className}>{children}</Link> },
-    { loading: true, loadingLabel: "Loading transaction hash", skeletonWidth: "18rem" },
+    {
+      label: "Explore",
+      link: (children, className) => (
+        <Link to="/" className={className}>
+          {children}
+        </Link>
+      ),
+    },
+    {
+      label: address,
+      link: (children, className) => (
+        <Link to={addressPath} className={className}>
+          {children}
+        </Link>
+      ),
+    },
+    {
+      loading: true,
+      loadingLabel: "Loading transaction hash",
+      skeletonWidth: "18rem",
+    },
   ]}
 />
 ```
@@ -169,7 +187,7 @@ Status: ready
 Import:
 
 ```tsx
-import { CopyInlineButton, InlineButton } from "@acton/ui"
+import { CopyInlineButton, InlineButton } from "@acton/ui";
 ```
 
 Use InlineButton for embedded command actions inside rows, cards, details
@@ -232,7 +250,7 @@ Status: ready
 Import:
 
 ```tsx
-import { CopyInlineAction, InlineAction, InlineActions } from "@acton/ui"
+import { CopyInlineAction, InlineAction, InlineActions } from "@acton/ui";
 ```
 
 Use InlineActions when an inline value needs one or more compact icon-only
@@ -303,7 +321,7 @@ Status: ready
 Import:
 
 ```tsx
-import { Input } from "@acton/ui"
+import { Input } from "@acton/ui";
 ```
 
 Use Input for standalone single-line form values, filters, editable names,
@@ -377,7 +395,7 @@ Status: ready
 Import:
 
 ```tsx
-import { MultiValueInput } from "@acton/ui"
+import { MultiValueInput } from "@acton/ui";
 ```
 
 Use MultiValueInput when a form accepts several values from a searchable,
@@ -434,7 +452,7 @@ Status: ready
 Import:
 
 ```tsx
-import { Select } from "@acton/ui"
+import { Select } from "@acton/ui";
 ```
 
 Use Select for choosing one value from a concise, known option set. It renders
@@ -494,7 +512,7 @@ Status: ready
 Import:
 
 ```tsx
-import { SearchInput } from "@acton/ui"
+import { SearchInput } from "@acton/ui";
 ```
 
 Use SearchInput for a search field that reveals recent queries or resolved
@@ -508,7 +526,7 @@ history persistence, validation messages, and navigation.
 <SearchInput
   ariaLabel="Explorer search"
   value={query}
-  items={matches.map(match => ({
+  items={matches.map((match) => ({
     id: match.address,
     label: match.name,
     description: match.address,
@@ -567,7 +585,7 @@ Status: ready
 Import:
 
 ```tsx
-import { AddressChip } from "@acton/ui"
+import { AddressChip } from "@acton/ui";
 ```
 
 Use AddressChip for a compact technical address that may need copying,
@@ -626,7 +644,7 @@ Status: ready
 Import:
 
 ```tsx
-import { BlockChip } from "@acton/ui"
+import { BlockChip } from "@acton/ui";
 ```
 
 Use BlockChip for a compact block seqno or full block ID link/read-only value.
@@ -679,7 +697,7 @@ Status: ready
 Import:
 
 ```tsx
-import { ContractChip } from "@acton/ui"
+import { ContractChip } from "@acton/ui";
 ```
 
 Use ContractChip for TON addresses that may have a known contract identity. It
@@ -712,7 +730,7 @@ Status: ready
 Import:
 
 ```tsx
-import {NftChip} from "@acton/ui"
+import { NftChip } from "@acton/ui";
 ```
 
 Use NftChip for a compact NFT identity inside value flows and action tables. It
@@ -741,7 +759,7 @@ Status: ready
 Import:
 
 ```tsx
-import { ParsedValueView, type ParsedValue } from "@acton/ui"
+import { ParsedValueView, type ParsedValue } from "@acton/ui";
 ```
 
 Use ParsedValueView after domain code has decoded an ABI, message body, or
@@ -785,7 +803,7 @@ Status: ready
 Import:
 
 ```tsx
-import { buildStorageDiff, ParsedValueDiffView } from "@acton/ui"
+import { buildStorageDiff, ParsedValueDiffView } from "@acton/ui";
 ```
 
 Use `buildStorageDiff` to compare two minimal named `ParsedValue` roots and
@@ -825,7 +843,7 @@ Status: ready
 Import:
 
 ```tsx
-import { ParsedBodySection } from "@acton/ui"
+import { ParsedBodySection } from "@acton/ui";
 ```
 
 Use ParsedBodySection for an accessible disclosure around a decoded body. It
@@ -855,7 +873,7 @@ Status: ready
 Import:
 
 ```tsx
-import { OpcodeChip } from "@acton/ui"
+import { OpcodeChip } from "@acton/ui";
 ```
 
 Use OpcodeChip for TON message opcodes that may have a domain-resolved ABI name.
@@ -865,11 +883,7 @@ It owns hexadecimal formatting and composes its copy interaction from
 ### Composition
 
 ```tsx
-<OpcodeChip
-  opcode={opcode}
-  abiName={resolvedOpcodeName}
-  showOpcode
-/>
+<OpcodeChip opcode={opcode} abiName={resolvedOpcodeName} showOpcode />
 ```
 
 - `opcode`: numeric opcode. Zero is valid and renders as `0x0`; `undefined`
@@ -903,7 +917,7 @@ Status: ready
 Import:
 
 ```tsx
-import { Disclosure } from "@acton/ui"
+import { Disclosure } from "@acton/ui";
 ```
 
 Use Disclosure for full-width collapsible sections in forms, settings, and
@@ -914,10 +928,7 @@ open-state motion.
 ### Composition
 
 ```tsx
-<Disclosure
-  label="Network and mining"
-  description="Optional runtime behavior"
->
+<Disclosure label="Network and mining" description="Optional runtime behavior">
   <NetworkSettings />
 </Disclosure>
 ```
@@ -951,7 +962,7 @@ Status: ready
 Import:
 
 ```tsx
-import { DisclosureToggle } from "@acton/ui"
+import { DisclosureToggle } from "@acton/ui";
 ```
 
 Use DisclosureToggle for compact inline Show/Hide controls that reveal content
@@ -1004,7 +1015,7 @@ Status: ready
 Import:
 
 ```tsx
-import {ExitCodeChip} from "@acton/ui"
+import { ExitCodeChip } from "@acton/ui";
 ```
 
 Use ExitCodeChip for TVM compute-phase exit codes and transaction action result
@@ -1019,10 +1030,10 @@ reads:
 ```tsx
 interface ExitCodeAbi {
   readonly thrown_errors?: readonly {
-    readonly err_code: number
-    readonly name?: string
-    readonly description?: string
-  }[]
+    readonly err_code: number;
+    readonly name?: string;
+    readonly description?: string;
+  }[];
 }
 ```
 
@@ -1061,7 +1072,7 @@ import {
   ModeViewer,
   ReserveModeViewer,
   SendModeViewer,
-} from "@acton/ui"
+} from "@acton/ui";
 ```
 
 Use the three domain wrappers for TON action modes. They share the same inline
@@ -1106,7 +1117,7 @@ Status: ready
 Import:
 
 ```tsx
-import { ContentTabs } from "@acton/ui"
+import { ContentTabs } from "@acton/ui";
 ```
 
 Use ContentTabs for compact connected tabs above a bordered panel when the user
@@ -1173,7 +1184,7 @@ Status: ready
 Import:
 
 ```tsx
-import { PillTab, PillTabs, PillTabToggle } from "@acton/ui"
+import { PillTab, PillTabs, PillTabToggle } from "@acton/ui";
 ```
 
 Use PillTabs for detached pill-like selector rows, for example Test UI trace
@@ -1184,7 +1195,10 @@ It does not own a content panel.
 
 ```tsx
 <PillTabs ariaLabel="Trace selector">
-  <PillTabToggle expanded={showDeploys} onClick={() => setShowDeploys(open => !open)}>
+  <PillTabToggle
+    expanded={showDeploys}
+    onClick={() => setShowDeploys((open) => !open)}
+  >
     2 treasury deploys
   </PillTabToggle>
   {showDeploys && <PillTab variant="muted">Trace 1</PillTab>}
@@ -1224,7 +1238,7 @@ Status: ready
 Import:
 
 ```tsx
-import { VisuallyGroupedNumber } from "@acton/ui"
+import { VisuallyGroupedNumber } from "@acton/ui";
 ```
 
 Use VisuallyGroupedNumber for long decimal technical values where visual
@@ -1264,7 +1278,7 @@ Status: ready
 Import:
 
 ```tsx
-import { CodeViewer } from "@acton/ui"
+import { CodeViewer } from "@acton/ui";
 ```
 
 Use CodeViewer for read-only multi-file source bundles. It owns the collapsible
@@ -1330,7 +1344,7 @@ Status: ready
 Import:
 
 ```tsx
-import { HighlightedCode } from "@acton/ui"
+import { HighlightedCode } from "@acton/ui";
 ```
 
 Use HighlightedCode for read-only syntax-highlighted source code. It owns the
@@ -1352,9 +1366,7 @@ and wrapping behavior.
 <RawDataBlock
   title="Disassembly"
   value={disassembly}
-  customContent={
-    <HighlightedCode value={disassembly} language="tasm" />
-  }
+  customContent={<HighlightedCode value={disassembly} language="tasm" />}
 />
 ```
 
@@ -1386,7 +1398,7 @@ Status: ready
 Import:
 
 ```tsx
-import { RawDataBlock } from "@acton/ui"
+import { RawDataBlock } from "@acton/ui";
 ```
 
 Use RawDataBlock for large raw values and code-like payloads: base64, hex,
@@ -1465,7 +1477,7 @@ Status: ready
 Import:
 
 ```tsx
-import { MarkdownText } from "@acton/ui"
+import { MarkdownText } from "@acton/ui";
 ```
 
 Use MarkdownText for trusted markdown prose in help text, release notes,
@@ -1515,7 +1527,7 @@ Status: ready
 Import:
 
 ```tsx
-import { Popover } from "@acton/ui"
+import { Popover } from "@acton/ui";
 ```
 
 Use Popover for rich contextual overlays attached to inline values, status
@@ -1581,7 +1593,7 @@ Status: ready
 Import:
 
 ```tsx
-import { Tooltip } from "@acton/ui"
+import { Tooltip } from "@acton/ui";
 ```
 
 Use Tooltip for short, supplementary button labels that appear on hover or
@@ -1624,7 +1636,7 @@ Status: ready
 Import:
 
 ```tsx
-import { Dialog } from "@acton/ui"
+import { Dialog } from "@acton/ui";
 ```
 
 Use Dialog for modal content that needs focus trapping, Escape and outside-click
@@ -1634,12 +1646,7 @@ the modal frame and scroll behavior while callers own the domain content.
 ### Composition
 
 ```tsx
-<Dialog
-  open={open}
-  onOpenChange={setOpen}
-  title="Metadata"
-  maxWidth="42rem"
->
+<Dialog open={open} onOpenChange={setOpen} title="Metadata" maxWidth="42rem">
   <MetadataDetails />
 </Dialog>
 ```
@@ -1677,7 +1684,7 @@ Status: ready
 Import:
 
 ```tsx
-import { InfoPopover } from "@acton/ui"
+import { InfoPopover } from "@acton/ui";
 ```
 
 Use InfoPopover for the standard compact info icon attached to labels or
@@ -1719,7 +1726,7 @@ Status: ready
 Import:
 
 ```tsx
-import { ToastProvider, useToast } from "@acton/ui"
+import { ToastProvider, useToast } from "@acton/ui";
 ```
 
 Use Toast for temporary, non-blocking feedback after user actions and async
@@ -1734,26 +1741,26 @@ function AppRoot() {
     <ToastProvider theme={theme}>
       <App />
     </ToastProvider>
-  )
+  );
 }
 
 function RefreshButton() {
-  const { showToast, updateToast } = useToast()
+  const { showToast, updateToast } = useToast();
 
   async function refresh() {
     const toastId = showToast({
       title: "Refreshing wallets",
       description: "Fetching sessions and balances.",
       variant: "loading",
-    })
+    });
 
-    await refreshWallets()
+    await refreshWallets();
 
     updateToast(toastId, {
       title: "Wallets refreshed",
       description: "Sessions and balances are up to date.",
       variant: "success",
-    })
+    });
   }
 }
 ```
@@ -1812,7 +1819,7 @@ import {
   DataTableHeaderCell,
   DataTableRow,
   DataTableTable,
-} from "@acton/ui"
+} from "@acton/ui";
 ```
 
 Use DataTable for standalone framed tables in localnet, explorer, test UI, and
@@ -1823,7 +1830,11 @@ loading rows.
 ### Composition
 
 ```tsx
-<DataTable title="Startup wallets" actions={<InlineButton>Refresh</InlineButton>} minWidth="54rem">
+<DataTable
+  title="Startup wallets"
+  actions={<InlineButton>Refresh</InlineButton>}
+  minWidth="54rem"
+>
   <DataTableTable aria-label="Startup wallets">
     <DataTableHead>
       <DataTableRow>
@@ -1836,7 +1847,9 @@ loading rows.
       <DataTableRow hover>
         <DataTableCell tone="strong">deployer</DataTableCell>
         <DataTableCell truncate>{address}</DataTableCell>
-        <DataTableCell align="right" tone="strong">100.2519 GRAM</DataTableCell>
+        <DataTableCell align="right" tone="strong">
+          100.2519 GRAM
+        </DataTableCell>
       </DataTableRow>
     </DataTableBody>
   </DataTableTable>
@@ -1885,6 +1898,137 @@ loading rows.
 - Keep row click behavior in the caller. DataTable only provides visual row
   states and table semantics.
 
+## DateTime
+
+Status: ready
+
+Import:
+
+```tsx
+import {
+  DateTime,
+  RelativeTime,
+  formatDateTime,
+  formatDateTimeLocalInput,
+  formatRelativeDateTime,
+  formatTimeUntil,
+} from "@acton/ui";
+```
+
+Use `DateTime` for absolute calendar timestamps and `RelativeTime` for recent
+activity labels. Both components render semantic `time` elements. Numeric
+timestamps must declare whether they use seconds or milliseconds.
+
+```tsx
+<DateTime value={transaction.now} unit="seconds" />
+<RelativeTime value={transaction.now} unit="seconds" now={nowSeconds} />
+```
+
+- `display`: `date`, `date-long`, `date-numeric`,
+  `date-day-month`, `date-time`, `date-time-seconds`,
+  `date-time-numeric`,
+  `date-time-numeric-seconds`, `date-time-day-month`,
+  `date-time-day-month-short`, `time`, `time-seconds`, `compact`, `smart`,
+  `month-short`, or `month-long`.
+- Numeric date presets always use `DD.MM.YYYY`, with optional time and seconds,
+  regardless of the active locale.
+- All time presets use the 24-hour clock, regardless of the active locale.
+- `unit`: `milliseconds` by default. Set it to `seconds` for UNIX timestamps
+  from TON APIs.
+- `mode="relative"`: keeps old timestamps relative.
+- `mode="hybrid"`: changes timestamps older than one day to a compact absolute
+  date.
+- `locale` and `timeZone`: use only when a domain requires a stable locale or
+  UTC presentation.
+- `formatDateTime` and `formatRelativeDateTime`: use the same rules outside JSX,
+  for example in chart labels and toast descriptions.
+- `formatTimeUntil(timestampSeconds, nowSeconds)`: creates schedule copy such as
+  `in 2 weeks`, `in 3 days`, `in 4 hours`, or `soon`. Both arguments are
+  UNIX seconds. Values below one hour and elapsed values return `soon`.
+- `formatDateTimeLocalInput(value, options)`: creates the
+  `YYYY-MM-DDTHH:mm:ss` value required by `input[type="datetime-local"]`.
+  Numeric input uses milliseconds by default. Set `unit: "seconds"` for UNIX
+  seconds. Set `timeZone` when the input must show a specific wall-clock zone.
+  Invalid and missing values return an empty string.
+- Both components show a detailed tooltip with the full numeric timestamp,
+  relative time, timezone, UNIX value, and ISO value. UNIX and ISO values have
+  copy actions. Set `tooltip={false}` only when the same detail is already
+  visible next to the timestamp.
+
+### Agent Guidance
+
+- Use the default `date-time` display in tables and metadata.
+- Use `date-time-seconds` only when the data has useful second-level precision.
+- Use `RelativeTime` in activity feeds. Pass one shared `now` value when a list
+  updates many rows together.
+- Keep the detailed tooltip enabled so abbreviated and relative labels never
+  hide the exact timestamp.
+- Visual test metadata is included by the components. Do not repeat
+  `data-visual-dynamic="time"` or `data-visual-placeholder="<time>"` on a table
+  cell or wrapper.
+- Do not create local `Intl.DateTimeFormat` instances for standard timestamps.
+- Do not infer a numeric timestamp unit from its size.
+- Do not use these components for latency, execution duration, gas timing, or
+  countdown input values.
+
+## Duration
+
+Status: ready
+
+Import:
+
+```tsx
+import {
+  Duration,
+  formatDuration,
+  formatRecurringPeriod,
+  formatSchedulePeriod,
+} from "@acton/ui";
+```
+
+Use `Duration` for elapsed time, uptime, latency, and execution measurements.
+Always declare the numeric unit when it is not seconds.
+
+```tsx
+<Duration value={node.uptimeSeconds} />
+<Duration display="latency" value={request.durationNs} unit="nanoseconds" />
+<Duration display="runtime" value={test.durationMs} unit="milliseconds" />
+```
+
+- `display="compact"`: one coarse unit, for example `5m` or `2h`.
+- `display="elapsed"`: minute and second progress, for example `2m 05s`.
+- `display="human"`: readable trace duration, for example `2 min 5 sec`.
+- `display="latency"`: adaptive nanosecond, microsecond, or millisecond output.
+- `display="precise"`: high-precision microsecond, millisecond, or second output.
+- `display="runtime"`: test runtime output from milliseconds.
+- `display="startup"`: rounded service startup output from milliseconds.
+- `display="parts"` and `display="readable"`: multi-part compact or long output.
+- `unit`: `seconds` by default, or `milliseconds` or `nanoseconds`.
+- `sign="always"`: includes `+` for positive values. `sign="never"` removes a
+  sign. The default only shows a negative sign.
+- `maxParts`: limits multi-part output from `parts` and `readable`.
+- `formatDuration`: use the same presets where JSX cannot contain a component,
+  such as select labels or toast descriptions.
+- `formatSchedulePeriod(seconds)`: uses the largest exact day, hour, or minute
+  unit. It returns `2 days`, `3 hours`, or `5 minutes`. A value that is not
+  an exact whole unit stays in seconds, for example `90 seconds`. Zero returns
+  `0 seconds`. Invalid values return `—`.
+- `formatRecurringPeriod(value, options)`: creates recurring-window copy.
+  Values use milliseconds by default. One hour returns `per hour`, one day
+  returns `per day`, and other values return `every N minutes`. Set
+  `unit: "seconds"` or `unit: "nanoseconds"` when required. Invalid values
+  return `—`.
+
+### Agent Guidance
+
+- Use the component in rendered UI and the formatter only for required strings.
+- Preserve the source unit explicitly instead of converting by convention.
+- Visual test metadata is included by the component. Do not repeat
+  `data-visual-dynamic="duration"` or `data-visual-placeholder="<duration>"` on
+  a wrapper.
+- Do not create local duration, latency, elapsed-time, or runtime formatters.
+- Do not create local schedule-period or recurring-window formatters.
+
 ## Pagination
 
 Status: ready
@@ -1892,7 +2036,7 @@ Status: ready
 Import:
 
 ```tsx
-import {Pagination, useClientPagination} from "@acton/ui"
+import { Pagination, useClientPagination } from "@acton/ui";
 ```
 
 Use `Pagination` below a table or list when the full result set is already
@@ -1927,7 +2071,7 @@ Status: ready
 Import:
 
 ```tsx
-import { Skeleton, SkeletonText } from "@acton/ui"
+import { Skeleton, SkeletonText } from "@acton/ui";
 ```
 
 Use Skeleton for loading placeholders when the destination layout is known but
@@ -1975,7 +2119,7 @@ Status: ready
 Import:
 
 ```tsx
-import { InlineLoader } from "@acton/ui"
+import { InlineLoader } from "@acton/ui";
 ```
 
 Use InlineLoader for an indeterminate operation when the destination layout is
@@ -2025,7 +2169,7 @@ Status: ready
 Import:
 
 ```tsx
-import { Checkbox } from "@acton/ui"
+import { Checkbox } from "@acton/ui";
 ```
 
 Use Checkbox for independent boolean choices in filters, settings, and option
@@ -2067,7 +2211,7 @@ Status: ready
 Import:
 
 ```tsx
-import { IdeSelector, useIdePreference } from "@acton/ui"
+import { IdeSelector, useIdePreference } from "@acton/ui";
 ```
 
 Use IdeSelector for source locations that can be opened in a desktop IDE. The
@@ -2109,7 +2253,7 @@ Status: ready
 Import:
 
 ```tsx
-import { ThemeProvider, useTheme } from "@acton/ui"
+import { ThemeProvider, useTheme } from "@acton/ui";
 ```
 
 Wrap each UI root once. ThemeProvider resolves the saved preference, falls back
@@ -2126,7 +2270,7 @@ Transition API when available and fall back to an immediate switch elsewhere.
 Theme-aware components read the shared state instead of receiving theme props:
 
 ```tsx
-const { theme, setTheme, toggleTheme } = useTheme()
+const { theme, setTheme, toggleTheme } = useTheme();
 ```
 
 - `storageKey`: local-storage key; defaults to `theme`.
@@ -2150,7 +2294,7 @@ Status: ready
 Import:
 
 ```tsx
-import { ThemeProvider, ThemeSwitch } from "@acton/ui"
+import { ThemeProvider, ThemeSwitch } from "@acton/ui";
 ```
 
 Use ThemeSwitch for app-level light/dark mode toggles in app chrome, sidebars,

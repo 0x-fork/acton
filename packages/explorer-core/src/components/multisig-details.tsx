@@ -13,6 +13,7 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  DateTime,
   ParsedBodySection,
   type ParsedTransactionBody,
   type ParsedValue,
@@ -218,7 +219,11 @@ export function MultisigSignersTab({
                         {approved ? "Approved" : "Not approved"}
                       </DataTableCell>
                       <DataTableCell tone="muted">
-                        {formatTimestamp(approvedAt ?? null)}
+                        <DateTime
+                          display="date-time-day-month"
+                          unit="seconds"
+                          value={positiveTimestamp(approvedAt)}
+                        />
                       </DataTableCell>
                     </>
                   )}
@@ -344,7 +349,11 @@ export function MultisigOrdersTab({state, onAddressClick, onOrderClick}: Multisi
                     {formatApprovals(order)}
                   </DataTableCell>
                   <DataTableCell tone="muted">
-                    {formatTimestamp(order.expiration_date)}
+                    <DateTime
+                      value={positiveTimestamp(order.expiration_date)}
+                      unit="seconds"
+                      display="date-time-day-month"
+                    />
                   </DataTableCell>
                 </DataTableRow>
               )
@@ -489,7 +498,16 @@ function MultisigOrderOverview({
       <div className={overviewStyles.metrics}>
         <OverviewMetric label="Approvals" value={`${approvals} of ${threshold}`} />
         <OverviewMetric label="Signers" value={order.signers.length.toLocaleString()} />
-        <OverviewMetric label="Expires" value={formatTimestamp(order.expiration_date)} />
+        <OverviewMetric
+          label="Expires"
+          value={
+            <DateTime
+              display="date-time-day-month"
+              unit="seconds"
+              value={positiveTimestamp(order.expiration_date)}
+            />
+          }
+        />
         <OverviewMetric label="Actions" value={actionCount.toLocaleString()} />
       </div>
       <ApprovalProgress
@@ -626,7 +644,12 @@ function ApprovedSignerTooltip({signer}: {readonly signer: ApprovedSigner}) {
       </span>
       {signer.approvedAt !== undefined && (
         <span className={overviewStyles.approvalTooltipAddress}>
-          Approved {formatTimestamp(signer.approvedAt)}
+          Approved{" "}
+          <DateTime
+            display="date-time-day-month"
+            unit="seconds"
+            value={positiveTimestamp(signer.approvedAt)}
+          />
         </span>
       )}
     </span>
@@ -783,18 +806,13 @@ function formatApprovals(order: V3MultisigOrder): string {
   return `${order.approvals_num ?? 0} of ${order.threshold ?? 0}`
 }
 
-function formatTimestamp(timestamp: number | null): string {
-  if (timestamp === null || !Number.isFinite(timestamp) || timestamp <= 0) {
-    return "—"
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(new Date(timestamp * 1000))
+function positiveTimestamp(timestamp: number | null | undefined): number | undefined {
+  return timestamp !== null &&
+    timestamp !== undefined &&
+    Number.isFinite(timestamp) &&
+    timestamp > 0
+    ? timestamp
+    : undefined
 }
 
 function formatActionType(value: string): string {
