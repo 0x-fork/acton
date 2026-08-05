@@ -35,13 +35,24 @@ prepare_postgres() {
 }
 
 account_scan_complete() {
-    : "${TON_ACCOUNT_SCANNER_SEQNO:=1}"
     : "${TON_ACCOUNT_SCANNER_WORKDIR:=/var/lib/ton-indexer/account-scan}"
+    : "${TON_ACCOUNT_SCANNER_SEQNO_FILE:=${TON_ACCOUNT_SCANNER_WORKDIR}/target-seqno}"
+
+    local scanner_seqno="${TON_ACCOUNT_SCANNER_SEQNO:-}"
+    if [[ -z "${scanner_seqno}" ]]; then
+        if [[ ! -s "${TON_ACCOUNT_SCANNER_SEQNO_FILE}" ]]; then
+            return 1
+        fi
+        scanner_seqno="$(tr -d '\r\n' < "${TON_ACCOUNT_SCANNER_SEQNO_FILE}")"
+    fi
+    if [[ ! "${scanner_seqno}" =~ ^[0-9]+$ ]]; then
+        return 1
+    fi
 
     local checkpoints=()
     local checkpoint
     shopt -s nullglob
-    checkpoints=("${TON_ACCOUNT_SCANNER_WORKDIR}/${TON_ACCOUNT_SCANNER_SEQNO}_"*.checkpoint)
+    checkpoints=("${TON_ACCOUNT_SCANNER_WORKDIR}/${scanner_seqno}_"*.checkpoint)
     shopt -u nullglob
 
     if (( ${#checkpoints[@]} < 2 )); then
@@ -77,18 +88,22 @@ case "${component}" in
     v3-account-scan)
         prepare_postgres
         : "${TON_WORKER_DBROOT:=/var/lib/localton/genesis/db}"
-        : "${TON_ACCOUNT_SCANNER_SEQNO:=1}"
         : "${TON_ACCOUNT_SCANNER_WORKDIR:=/var/lib/ton-indexer/account-scan}"
+        : "${TON_ACCOUNT_SCANNER_SEQNO_FILE:=${TON_ACCOUNT_SCANNER_WORKDIR}/target-seqno}"
         : "${TON_INDEXER_TON_HTTP_API_ENDPOINT:=http://localton:18002/api/v2}"
         mkdir -p "${TON_ACCOUNT_SCANNER_WORKDIR}"
 
-        until curl --fail --silent --show-error \
-            "${TON_INDEXER_TON_HTTP_API_ENDPOINT}/getMasterchainInfo" \
-            | python3 -c 'import json, sys; result = json.load(sys.stdin)["result"]; raise SystemExit(0 if int(result["last"]["seqno"]) >= int(sys.argv[1]) else 1)' \
-                "${TON_ACCOUNT_SCANNER_SEQNO}"
-        do
-            sleep 1
-        done
+        if [[ -z "${TON_ACCOUNT_SCANNER_SEQNO:-}" ]]; then
+            until [[ -s "${TON_ACCOUNT_SCANNER_SEQNO_FILE}" ]]; do
+                sleep 1
+            done
+            TON_ACCOUNT_SCANNER_SEQNO="$(tr -d '\r\n' < "${TON_ACCOUNT_SCANNER_SEQNO_FILE}")"
+        fi
+        if [[ ! "${TON_ACCOUNT_SCANNER_SEQNO}" =~ ^[0-9]+$ ]]; then
+            echo "Invalid account scanner seqno: ${TON_ACCOUNT_SCANNER_SEQNO}" >&2
+            exit 1
+        fi
+        printf '%s\n' "${TON_ACCOUNT_SCANNER_SEQNO}" > "${TON_ACCOUNT_SCANNER_SEQNO_FILE}"
 
         scanner_args=(
             --pg "${TON_INDEXER_PG_URI}"

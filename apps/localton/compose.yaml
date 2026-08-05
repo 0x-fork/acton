@@ -27,6 +27,26 @@ services:
       start_period: 240s
       retries: 12
 
+  v3-basechain-bootstrap:
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    command:
+      - indexer
+      - bootstrap-basechain
+      - --state-dir
+      - /var/lib/localton
+      - --endpoint
+      - http://localton:18002/api/v2
+      - --seqno-file
+      - /var/lib/ton-indexer/account-scan/target-seqno
+    depends_on:
+      localton:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    volumes:
+      - localton-state:/var/lib/localton
+      - ton-account-scan:/var/lib/ton-indexer/account-scan
+
   postgres:
     image: postgres:17-alpine
     environment:
@@ -131,7 +151,6 @@ services:
     command:
       - v3-account-scan
     environment:
-      TON_ACCOUNT_SCANNER_SEQNO: "1"
       TON_ACCOUNT_SCANNER_WORKDIR: /var/lib/ton-indexer/account-scan
       TON_INDEXER_IS_TESTNET: ${TON_INDEXER_IS_TESTNET:-1}
       TON_INDEXER_TON_HTTP_API_ENDPOINT: http://localton:18002/api/v2
@@ -141,6 +160,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      v3-basechain-bootstrap:
+        condition: service_completed_successfully
       v3-migrations:
         condition: service_completed_successfully
     healthcheck:
@@ -156,7 +177,7 @@ services:
     restart: unless-stopped
     volumes:
       - localton-state:/var/lib/localton:ro
-      - ton-index-workdir:/var/lib/ton-indexer/work
+      - ton-account-scan:/var/lib/ton-indexer/account-scan
 
   v3-api:
     image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
@@ -225,4 +246,5 @@ services:
 volumes:
   localton-state:
   postgres-data:
+  ton-account-scan:
   ton-index-workdir:

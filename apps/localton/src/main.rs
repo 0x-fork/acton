@@ -29,6 +29,7 @@ async fn main() -> Result<()> {
         Some(Command::Config { command }) => cli::commands::config(command).await,
         Some(Command::Lite { command }) => cli::commands::lite(command).await,
         Some(Command::Wallet { command }) => operations::wallets::execute(command).await,
+        Some(Command::Indexer { command }) => operations::indexer::execute(command).await,
         Some(Command::Node { command }) => operations::nodes::execute(command).await,
         Some(Command::Snapshot { command }) => operations::snapshots::execute(command),
         Some(Command::Validator { command }) => operations::validators::execute(command).await,

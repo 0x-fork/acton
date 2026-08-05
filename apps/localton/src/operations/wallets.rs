@@ -171,41 +171,14 @@ pub async fn execute(command: WalletCommand) -> Result<()> {
             wallet,
             amount,
         } => {
-            let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
-            let registry = load_registry(&toolchain.layout)?;
-            let destination = resolve_wallet_or_address(&registry, &wallet)?;
-            let status = send(
-                &toolchain,
-                SendRequest {
-                    from: "faucet",
-                    to: &destination,
-                    amount: &amount,
-                    comment: None,
-                    body: None,
-                    state_init: None,
-                    mode: 3,
-                    bounce: false,
-                },
-            )
-            .await?;
-            if let Some(record) = registry.wallets.get(&wallet)
-                && let Some(deploy) = record.deploy_boc.as_ref()
-            {
-                wait_for_balance(&toolchain.layout.global_config, &record.address).await?;
-                let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
-                client
-                    .send_boc(fs::read(deploy).with_context(|| {
-                        format!("failed to read deployment BoC {}", deploy.display())
-                    })?)
-                    .await?;
-            }
+            let funded = fund_wallet(&state.state_dir, &wallet, &amount).await?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&serde_json::json!({
                     "wallet": wallet,
-                    "address": destination,
+                    "address": funded.address,
                     "amount": amount,
-                    "status": status,
+                    "status": funded.status,
                 }))?
             );
         }
@@ -237,6 +210,69 @@ pub fn wallet(layout: &Layout, name: &str) -> Result<WalletRecord> {
         .get(name)
         .cloned()
         .with_context(|| format!("unknown wallet `{name}`"))
+}
+
+pub async fn ensure_wallet(
+    state_dir: &Path,
+    name: &str,
+    version: WalletVersion,
+    workchain: i32,
+    wallet_id: u32,
+) -> Result<PublicWallet> {
+    let toolchain = Toolchain::resolve(state_dir, None).await?;
+    let registry = load_registry(&toolchain.layout)?;
+    if let Some(existing) = registry.wallets.get(name) {
+        ensure!(
+            existing.workchain == workchain,
+            "wallet `{name}` already exists in workchain {}, expected {workchain}",
+            existing.workchain
+        );
+        return Ok(PublicWallet::from(existing));
+    }
+    let wallet = create_wallet(&toolchain, name, version, workchain, wallet_id).await?;
+    Ok(PublicWallet::from(&wallet))
+}
+
+pub struct FundWalletResult {
+    pub address: String,
+    pub status: u32,
+}
+
+pub async fn fund_wallet(state_dir: &Path, wallet: &str, amount: &str) -> Result<FundWalletResult> {
+    let toolchain = Toolchain::resolve(state_dir, None).await?;
+    let registry = load_registry(&toolchain.layout)?;
+    let destination = resolve_wallet_or_address(&registry, wallet)?;
+    let status = send(
+        &toolchain,
+        SendRequest {
+            from: "faucet",
+            to: &destination,
+            amount,
+            comment: None,
+            body: None,
+            state_init: None,
+            mode: 3,
+            bounce: false,
+        },
+    )
+    .await?;
+    if let Some(record) = registry.wallets.get(wallet)
+        && let Some(deploy) = record.deploy_boc.as_ref()
+    {
+        wait_for_balance(&toolchain.layout.global_config, &record.address).await?;
+        let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
+        client
+            .send_boc(
+                fs::read(deploy).with_context(|| {
+                    format!("failed to read deployment BoC {}", deploy.display())
+                })?,
+            )
+            .await?;
+    }
+    Ok(FundWalletResult {
+        address: destination,
+        status,
+    })
 }
 
 pub fn read_address(path: &Path) -> Result<Address> {

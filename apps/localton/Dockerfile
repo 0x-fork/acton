@@ -30,7 +30,9 @@ RUN --mount=type=cache,id=localton-cargo-registry,target=/usr/local/cargo/regist
 FROM ${LOCALTON_BASE_IMAGE} AS localton-rust-only
 USER root
 COPY --from=launcher-builder --chmod=0755 /out/localton /usr/local/bin/localton
-RUN install -d -o localton -g localton -m 0700 /var/lib/localton-snapshots
+COPY --chmod=0755 docker/container-entrypoint.sh /usr/local/bin/localton-container-entrypoint
+RUN install -d -o localton -g localton -m 0700 /var/lib/localton-snapshots \
+    && install -d -o localton -g localton -m 0755 /var/lib/ton-indexer/account-scan
 USER localton
 
 FROM ubuntu:${UBUNTU_VERSION} AS ton-binaries
@@ -356,6 +358,7 @@ RUN apt-get update \
         localton \
     && install -d -o localton -g localton -m 0700 /var/lib/localton \
     && install -d -o localton -g localton -m 0700 /var/lib/localton-snapshots \
+    && install -d -o localton -g localton -m 0755 /var/lib/ton-indexer/account-scan \
     && install -d -m 0755 /usr/share/doc/localton
 
 COPY --from=launcher-builder /out/localton /usr/local/bin/localton

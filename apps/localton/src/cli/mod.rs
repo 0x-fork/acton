@@ -46,6 +46,11 @@ pub enum Command {
         #[command(subcommand)]
         command: WalletCommand,
     },
+    /// Prepare local chain state for indexer services.
+    Indexer {
+        #[command(subcommand)]
+        command: IndexerCommand,
+    },
     /// Manage full nodes and validators.
     Node {
         #[command(subcommand)]
@@ -353,6 +358,30 @@ pub enum WalletCommand {
         #[command(flatten)]
         state: StateArgs,
         wallet: String,
+    },
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum IndexerCommand {
+    /// Ensure the basechain has a block and save a masterchain seqno for account scanning.
+    BootstrapBasechain {
+        #[command(flatten)]
+        state: StateArgs,
+        /// TON HTTP API V2 endpoint.
+        #[arg(long, default_value = "http://127.0.0.1:18002/api/v2")]
+        endpoint: String,
+        /// Managed workchain 0 wallet used only to create the first basechain block.
+        #[arg(long, default_value = "studio-indexer-bootstrap")]
+        wallet: String,
+        /// Grams transferred from the genesis faucet when the basechain is empty.
+        #[arg(long, default_value = "1")]
+        amount: String,
+        /// File that receives the indexable masterchain seqno.
+        #[arg(long)]
+        seqno_file: Option<PathBuf>,
+        /// Maximum time to wait for the first basechain block.
+        #[arg(long, default_value_t = 120)]
+        timeout: u64,
     },
 }
 

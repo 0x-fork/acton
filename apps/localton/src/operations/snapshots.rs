@@ -512,10 +512,7 @@ fn info_path(snapshot_dir: &Path, id: &str) -> PathBuf {
 }
 
 fn work_dir(state_dir: &Path, kind: &str, id: &str) -> PathBuf {
-    state_dir.join(format!(
-        ".snapshot-{kind}-{id}-{}",
-        std::process::id()
-    ))
+    state_dir.join(format!(".snapshot-{kind}-{id}-{}", std::process::id()))
 }
 
 fn remove_dir_if_exists(path: &Path) -> Result<()> {
