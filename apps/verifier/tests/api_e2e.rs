@@ -1567,8 +1567,8 @@ async fn verify_rejects_source_path_over_length_limit() {
 #[tokio::test]
 async fn verify_rejects_non_ascii_source_paths() {
     for path in [
-        "caf\u{e9}.tolk",
-        "cafe\u{301}.tolk",
+        concat!("ca", "f", "\u{e9}.tolk"),
+        concat!("ca", "f", "e\u{301}.tolk"),
         "contracts/🚀.tolk",
         "contracts/👩‍💻.tolk",
         "contracts/👍🏽.tolk",
@@ -1824,6 +1824,63 @@ async fn verify_rejects_source_extensions_that_do_not_match_language() {
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         assert_error_contains(response, expected_extensions).await;
     }
+}
+
+#[tokio::test]
+async fn verify_rejects_multiple_source_extensions() {
+    for (language, compile_params, path) in [
+        ("func", COMPILE_PARAMS_FUNC, "main.tolk.fc"),
+        ("func", COMPILE_PARAMS_FUNC, "main.func.fc"),
+        ("tolk", COMPILE_PARAMS_TOLK, "main.fc.tolk"),
+        ("tact", EMPTY_COMPILE_PARAMS, "contract.tact.pkg"),
+        ("tolk", COMPILE_PARAMS_TOLK, "main.FC.ToLk"),
+    ] {
+        let sources = serde_json::to_string(&json!([{
+            "path": path,
+            "is_entrypoint": true,
+        }]))
+        .expect("source metadata should serialize");
+        let response = post_verify(
+            app_state(&[], CODE_HASH_ONE),
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", language),
+                text_part("compile_params", compile_params),
+                owned_text_part("sources", sources),
+                file_part("files", path, "text/plain", "source"),
+            ],
+        )
+        .await;
+
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "multiple source extensions should be rejected: {path}"
+        );
+        assert_error_contains(response, "multiple source extensions").await;
+    }
+
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part(
+                "sources",
+                r#"[{"path":"contracts/my.contract.tolk","is_entrypoint":true}]"#,
+            ),
+            file_part(
+                "files",
+                "contracts/my.contract.tolk",
+                "text/plain",
+                "fun main() {}",
+            ),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[tokio::test]

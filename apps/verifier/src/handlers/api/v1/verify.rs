@@ -35,6 +35,7 @@ mod languages;
 
 const API_KEY_HEADER: &str = "x-verifier-key";
 const MAX_SOURCE_PATH_CHARS: usize = 128;
+const SOURCE_EXTENSIONS: [&str; 5] = ["tolk", "fc", "func", "tact", "pkg"];
 
 #[utoipa::path(
     post,
@@ -345,7 +346,31 @@ fn validate_source_path(path: &str) -> Result<(), ApiError> {
         )));
     }
 
-    validate_relative_path("source path", path)
+    validate_relative_path("source path", path)?;
+    validate_source_extension_count(path)
+}
+
+fn validate_source_extension_count(path: &str) -> Result<(), ApiError> {
+    let file_name = path
+        .rsplit_once('/')
+        .map_or(path, |(_, file_name)| file_name);
+    let source_extension_count = file_name
+        .split('.')
+        .skip(1)
+        .filter(|extension| {
+            SOURCE_EXTENSIONS
+                .iter()
+                .any(|known| extension.eq_ignore_ascii_case(known))
+        })
+        .take(2)
+        .count();
+    if source_extension_count > 1 {
+        return Err(ApiError::bad_request(
+            "source path must not contain multiple source extensions".to_owned(),
+        ));
+    }
+
+    Ok(())
 }
 
 fn validate_import_mappings(import_mappings: &BTreeMap<String, String>) -> Result<(), ApiError> {
