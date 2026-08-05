@@ -2112,6 +2112,15 @@ impl ActonCommand {
         }
     }
 
+    /// Spawn a long-running command with captured output.
+    pub(crate) fn spawn(self) -> std::io::Result<std::process::Child> {
+        let mut command = self.into_prepared_command().into_std();
+        command
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+    }
+
     /// Spawn command in a pseudo-terminal for interactive tests.
     #[cfg(unix)]
     pub(crate) fn spawn_pty(self) -> PtySession {
