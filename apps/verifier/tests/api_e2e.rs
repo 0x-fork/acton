@@ -816,6 +816,53 @@ async fn verify_passes_uploaded_file_contents_to_compiler() {
 }
 
 #[tokio::test]
+async fn verify_treats_link_multipart_parts_as_regular_file_contents() {
+    let state = app_state(&[], CODE_HASH_ONE);
+    let response = post_verify(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part(
+                "sources",
+                r#"[
+                  {"path":"symlink.tolk","is_entrypoint":true},
+                  {"path":"hardlink.tolk","is_entrypoint":false}
+                ]"#,
+            ),
+            file_part("files", "symlink.tolk", "inode/symlink", "../target.tolk"),
+            file_part(
+                "files",
+                "hardlink.tolk",
+                "application/x-hardlink",
+                "symlink.tolk",
+            ),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response = get(
+        state,
+        &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response_json::<VerificationSourceResponse>(response).await;
+    let bundle = body
+        .bundle
+        .expect("verified source should include a bundle");
+    assert_eq!(bundle.files.len(), 2);
+    assert_eq!(bundle.files[0].path, "hardlink.tolk");
+    assert_eq!(bundle.files[0].content, "symlink.tolk");
+    assert_eq!(bundle.files[1].path, "symlink.tolk");
+    assert_eq!(bundle.files[1].content, "../target.tolk");
+}
+
+#[tokio::test]
 async fn verify_passes_import_mappings_to_compiler() {
     let (state, recorded_requests) = recording_app_state(&[], CODE_HASH_ONE);
     let response = post_verify(
