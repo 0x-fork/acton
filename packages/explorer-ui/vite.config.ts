@@ -12,7 +12,7 @@ const nodePolyfillsRoot = path.dirname(path.dirname(require.resolve("vite-plugin
 
 const toncenterDevProxy = (
   prefix: string,
-  endpoint: "blocks" | "getShards" | "traces" | "transactions",
+  endpoint: "blocks" | "getBlockTransactions" | "getShards" | "traces" | "transactions",
   apiUrl: string,
   apiKey?: string,
 ): ProxyOptions => {
@@ -33,6 +33,7 @@ const toncenterNetworkDevProxies = (
   apiKey?: string,
 ): Record<string, ProxyOptions> => {
   const endpoints = [
+    ["v2", "getBlockTransactions", apiV2Url],
     ["v2", "getShards", apiV2Url],
     ["v3", "blocks", apiV3Url],
     ["v3", "traces", apiV3Url],

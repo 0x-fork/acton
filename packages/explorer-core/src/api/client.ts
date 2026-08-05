@@ -41,8 +41,10 @@ import type {
   V3TransactionDetailsResponse,
   V3TracesResponse,
   V3TransactionsResponse,
+  V2BlockTransactionsResponse,
   VerificationSourceResponse,
 } from "./types"
+import {v2ShardToV3Shard, v3ShardToV2Shard} from "./shardId"
 import {isNftItemNsfw} from "../nftSafetyRegistry"
 
 interface TonClientOptions {
@@ -147,6 +149,17 @@ interface GetBlockTransactionsOptions {
   readonly seqno: number
   readonly limit?: number
   readonly offset?: number
+}
+
+interface GetBlockTransactionsV2Options {
+  readonly workchain: number
+  readonly shard: string
+  readonly seqno: number
+  readonly rootHash?: string
+  readonly fileHash?: string
+  readonly count?: number
+  readonly afterLt?: string
+  readonly afterHash?: string
 }
 
 interface RawBlockResponse {
@@ -894,6 +907,23 @@ export class TonClient {
       url.searchParams.append("offset", options.offset.toString())
     }
     return this.request(url, "Failed to fetch block transactions")
+  }
+
+  async getBlockTransactionsV2(
+    options: GetBlockTransactionsV2Options,
+  ): Promise<V2BlockTransactionsResponse> {
+    const url = this.buildUrl(this.toncenterProxyV2BaseUrl, "/getBlockTransactions")
+    url.searchParams.append("workchain", options.workchain.toString())
+    url.searchParams.append("shard", v3ShardToV2Shard(options.shard))
+    url.searchParams.append("seqno", options.seqno.toString())
+    appendOptionalSearchParam(url, "root_hash", options.rootHash)
+    appendOptionalSearchParam(url, "file_hash", options.fileHash)
+    url.searchParams.append("count", (options.count ?? 100).toString())
+    if (options.afterLt !== undefined && options.afterHash !== undefined) {
+      url.searchParams.append("after_lt", options.afterLt)
+      url.searchParams.append("after_hash", options.afterHash)
+    }
+    return this.request(url, "Failed to fetch fallback block transactions")
   }
 
   async getNftItems(options?: GetNftItemsOptions): Promise<NftItem[]> {
@@ -1707,10 +1737,6 @@ function appendOptionalSearchParam(
   if (value !== undefined) {
     url.searchParams.append(name, value.toString())
   }
-}
-
-function v2ShardToV3Shard(shard: string): string {
-  return BigInt.asUintN(64, BigInt(shard)).toString(16).padStart(16, "0").toUpperCase()
 }
 
 function isStreamingTransactionsEvent(value: unknown): value is StreamingTransactionsEvent {

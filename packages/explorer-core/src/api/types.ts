@@ -33,6 +33,22 @@ export interface Shards {
   readonly shards: readonly BlockId[]
 }
 
+export interface V2BlockTransactionListItem {
+  readonly "@type": "blocks.shortTxId"
+  readonly mode: number
+  readonly account: string
+  readonly lt: string
+  readonly hash: string
+}
+
+export interface V2BlockTransactionsResponse {
+  readonly "@type": "blocks.transactions"
+  readonly id: BlockId
+  readonly req_count: number
+  readonly incomplete: boolean
+  readonly transactions: readonly V2BlockTransactionListItem[]
+}
+
 export interface AddressInformation {
   readonly balance: string
   readonly code: string | null

@@ -922,6 +922,52 @@ test("trace and block lookups can use their same-origin proxies", async () => {
   }
 })
 
+test("block transaction fallback uses the V2 proxy and signed shard cursor", async () => {
+  const originalFetch = globalThis.fetch
+  let requestUrl = ""
+  globalThis.fetch = mock((input: RequestInfo | URL) => {
+    requestUrl = input.toString()
+    return Promise.resolve(
+      Response.json({
+        ok: true,
+        result: {
+          "@type": "blocks.transactions",
+          id: {},
+          req_count: 100,
+          incomplete: false,
+          transactions: [],
+        },
+      }),
+    )
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      toncenterProxyV2BaseUrl: "https://actonscan.example/api/toncenter/mainnet/v2",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    await client.getBlockTransactionsV2({
+      workchain: -1,
+      shard: "8000000000000000",
+      seqno: 42,
+      rootHash: "root/hash=",
+      fileHash: "file/hash=",
+      count: 100,
+      afterLt: "123",
+      afterHash: "f".repeat(64),
+    })
+
+    expect(requestUrl).toBe(
+      "https://actonscan.example/api/toncenter/mainnet/v2/getBlockTransactions?workchain=-1&shard=-9223372036854775808&seqno=42&root_hash=root%2Fhash%3D&file_hash=file%2Fhash%3D&count=100&after_lt=123&after_hash=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("custom networks keep trace and block lookups on their configured APIs", async () => {
   const originalFetch = globalThis.fetch
   const requests: Array<{readonly url: string; readonly apiKey: string | null}> = []
