@@ -25,7 +25,10 @@ export function hasAccountInterface(interfaces: readonly string[], expected: str
   return interfaces.some(iface => iface.trim().toLowerCase() === expected)
 }
 
-function hasTokenInfoType(tokenInfo: readonly AccountStateTokenInfo[], expected: string): boolean {
+export function hasTokenInfoType(
+  tokenInfo: readonly AccountStateTokenInfo[],
+  expected: string,
+): boolean {
   return tokenInfo.some(info => info.type === expected)
 }
 

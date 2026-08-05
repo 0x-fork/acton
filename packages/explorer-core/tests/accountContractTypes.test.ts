@@ -1,10 +1,27 @@
 import {describe, expect, test} from "bun:test"
 
-import {hasAccountContractHint, hasAccountInterface} from "../src/pages/accountContractTypes"
+import {
+  hasAccountContractHint,
+  hasAccountInterface,
+  hasTokenInfoType,
+} from "../src/pages/accountContractTypes"
 
 describe("account interface detection", () => {
   test("normalizes whitespace and letter case", () => {
     expect(hasAccountInterface([" NFT_ITEM_SIMPLE "], "nft_item_simple")).toBe(true)
+  })
+})
+
+describe("token info type detection", () => {
+  const tokenInfo = [{type: "jetton_masters"}, {type: "nft_items"}]
+
+  test("matches an indexed token type", () => {
+    expect(hasTokenInfoType(tokenInfo, "jetton_masters")).toBe(true)
+  })
+
+  test("rejects missing and differently cased token types", () => {
+    expect(hasTokenInfoType(tokenInfo, "jetton_wallets")).toBe(false)
+    expect(hasTokenInfoType(tokenInfo, "NFT_ITEMS")).toBe(false)
   })
 })
 
