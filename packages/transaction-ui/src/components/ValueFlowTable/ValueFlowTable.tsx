@@ -10,10 +10,11 @@ import {
   DataTableHeaderCell,
   DataTableRow,
   DataTableTable,
+  GramAmount,
 } from "@acton/ui"
 
 import type {ContractData, ValueFlowAsset, ValueFlowItem} from "../../model/transaction"
-import {formatAddress, formatCurrency, formatDecimalAmount} from "../../lib/format"
+import {formatAddress, formatDecimalAmount} from "../../lib/format"
 
 import styles from "./ValueFlowTable.module.css"
 
@@ -95,7 +96,7 @@ export function ValueFlowTable({
                 </DataTableCell>
                 <DataTableCell align="right" data-mobile-label="Balance change">
                   <span className={item.change > 0n ? styles.positive : undefined}>
-                    {formatSignedCurrency(item.change)}
+                    <SignedGramAmount value={item.change} />
                   </span>
                 </DataTableCell>
                 {assets.map(asset => {
@@ -121,7 +122,7 @@ export function ValueFlowTable({
                   )
                 })}
                 <DataTableCell align="right" data-mobile-label="Network fee">
-                  {formatCurrency(item.fee)}
+                  <GramAmount value={item.fee} />
                 </DataTableCell>
               </DataTableRow>
             ))
@@ -132,7 +133,7 @@ export function ValueFlowTable({
             <DataTableRow>
               <DataTableCell colSpan={2 + assets.length} />
               <DataTableCell align="right" className={styles.totalCell} tone="strong">
-                Total: {formatCurrency(totalFee)}
+                Total: <GramAmount value={totalFee} />
               </DataTableCell>
             </DataTableRow>
           </DataTableFooter>
@@ -171,14 +172,12 @@ function formatSignedAssetChange(value: bigint, asset: ValueFlowAsset): string {
   return `${sign}${amount}${asset.symbol ? ` ${asset.symbol}` : ""}`
 }
 
-function formatSignedCurrency(value: bigint): string {
-  if (value > 0n) {
-    return `+ ${formatCurrency(value)}`
-  }
-
-  if (value < 0n) {
-    return `- ${formatCurrency(-value)}`
-  }
-
-  return formatCurrency(value)
+function SignedGramAmount({value}: {readonly value: bigint}) {
+  const sign = value > 0n ? "+ " : value < 0n ? "- " : ""
+  return (
+    <>
+      {sign}
+      <GramAmount signDisplay="never" value={value} />
+    </>
+  )
 }

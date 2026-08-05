@@ -8,6 +8,7 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  GramAmount,
   RelativeTime,
 } from "@acton/ui"
 import type {FC, ReactNode} from "react"
@@ -17,7 +18,7 @@ import type {V3Message, V3TransactionListItem} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
 import {ExplorerAddressChip} from "./ExplorerAddressChip"
-import {formatNano, hashToHex} from "./utils"
+import {hashToHex} from "./utils"
 import type {MessageNamesByAddress} from "../hooks/useMessageNamesByAddress"
 
 import styles from "./DeveloperTransactionList.module.css"
@@ -43,6 +44,7 @@ interface DeveloperTransactionRow {
   readonly direction: "IN" | "OUT"
   readonly messageName?: string
   readonly valueLabel: string
+  readonly valueNanograms?: bigint
   readonly valueKind: "value" | "empty"
   readonly isSuccess: boolean
   readonly statusLabel: string
@@ -201,7 +203,11 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
                         row.valueKind === "empty" ? styles.valueEmpty : ""
                       }`}
                     >
-                      {row.valueLabel}
+                      {row.valueNanograms === undefined ? (
+                        row.valueLabel
+                      ) : (
+                        <GramAmount value={row.valueNanograms} useGrouping />
+                      )}
                     </span>
                   </DataTableCell>
                 </DataTableRow>
@@ -271,6 +277,7 @@ function buildDeveloperRows(
       direction: "OUT",
       messageName: resolveMessageLabel(message, messageNamesByAddress),
       valueLabel: value.label,
+      valueNanograms: value.nanograms,
       valueKind: value.kind,
       isSuccess,
       statusLabel,
@@ -289,6 +296,7 @@ function buildDeveloperRows(
       direction: "IN",
       messageName: resolveMessageLabel(transaction.in_msg, messageNamesByAddress),
       valueLabel: value.label,
+      valueNanograms: value.nanograms,
       valueKind: value.kind,
       isSuccess,
       statusLabel,
@@ -357,14 +365,10 @@ function parseNanoValue(value: string | number | undefined): bigint {
   }
 }
 
-function formatTransactionValue(value: bigint): string {
-  return `${formatNano(value.toString())} GRAM`
-}
-
 function formatMessageValue(
   message: TransactionMessage,
   externalEndpoint: DeveloperEndpoint,
-): {label: string; kind: "value" | "empty"} {
+): {label: string; nanograms?: bigint; kind: "value" | "empty"} {
   if (externalEndpoint.kind === "text" && externalEndpoint.label === "External") {
     return {label: "empty", kind: "empty"}
   }
@@ -374,7 +378,7 @@ function formatMessageValue(
     return {label: "empty", kind: "empty"}
   }
 
-  return {label: formatTransactionValue(value), kind: "value"}
+  return {label: "", nanograms: value, kind: "value"}
 }
 
 function formatMessageOpcode(message: TransactionMessage | undefined): string | undefined {

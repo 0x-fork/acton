@@ -1,5 +1,6 @@
 import {describe, expect, test} from "bun:test"
 import {Address, beginCell, Dictionary} from "@ton/core"
+import {formatGramAmount} from "@acton/ui"
 
 import {
   SAMPLE_ADDRESS,
@@ -11,7 +12,6 @@ import {
   encodeAbiValueToBoc,
   formatAbiAddress,
   formatAbiCellBoc,
-  formatNanoAsGram,
   isTonAddress,
   parseAbiCellArg,
   parseAbiJson,
@@ -386,8 +386,8 @@ describe("ABI value serialization", () => {
       leadingFraction: parseGramAsNano(".5"),
       tooPrecise: parseGramAsNano("0.0000000001"),
       negative: parseGramAsNano("-1"),
-      formatted: formatNanoAsGram("1250000000"),
-      malformedNano: formatNanoAsGram("1.5"),
+      formatted: formatGramAmount("1250000000", {showUnit: false}),
+      malformedNano: formatGramAmount("1.5", {fallback: "", showUnit: false}),
     }).toMatchSnapshot()
     expect(() => parseAbiJsonStrict("{")).toThrow()
   })

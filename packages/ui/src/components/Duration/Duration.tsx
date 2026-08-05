@@ -1,5 +1,7 @@
 import type {HTMLAttributes, ReactNode} from "react"
 
+import {DAY_SECONDS} from "../../lib/time"
+
 export type DurationUnit = "nanoseconds" | "milliseconds" | "seconds"
 export type DurationDisplay =
   | "compact"
@@ -36,7 +38,6 @@ export interface DurationProps
 const SECOND_MS = 1000
 const MINUTE_SECONDS = 60
 const HOUR_SECONDS = 3600
-const DAY_SECONDS = 86_400
 const WEEK_SECONDS = 604_800
 const MONTH_SECONDS = 2_592_000
 const YEAR_SECONDS = 31_536_000

@@ -1,5 +1,6 @@
 import type {HTMLAttributes, ReactNode} from "react"
 
+import {DAY_SECONDS} from "../../lib/time"
 import {Tooltip, type TooltipPlacement} from "../Tooltip"
 import {CopyInlineAction} from "../InlineActions/InlineActions"
 
@@ -233,7 +234,7 @@ export function formatRelativeDateTime(
   const differenceSeconds = Math.trunc((date.getTime() - now.getTime()) / 1000)
   if (differenceSeconds === 0) return "right now"
 
-  if ((options.mode ?? "relative") === "hybrid" && differenceSeconds <= -86_400) {
+  if ((options.mode ?? "relative") === "hybrid" && differenceSeconds <= -DAY_SECONDS) {
     return formatDateTime(date, {...options, display: "compact", now})
   }
 
@@ -254,13 +255,13 @@ export function formatRelativeDateTime(
  */
 export function formatTimeUntil(timestampSeconds: number, nowSeconds: number): string {
   const remaining = Math.max(0, timestampSeconds - nowSeconds)
-  if (remaining >= 7 * 86_400) {
-    const days = Math.ceil(remaining / 86_400)
+  if (remaining >= 7 * DAY_SECONDS) {
+    const days = Math.ceil(remaining / DAY_SECONDS)
     const weeks = Math.max(1, Math.round(days / 7))
     return `in ${weeks} ${weeks === 1 ? "week" : "weeks"}`
   }
-  if (remaining >= 86_400) {
-    const days = Math.ceil(remaining / 86_400)
+  if (remaining >= DAY_SECONDS) {
+    const days = Math.ceil(remaining / DAY_SECONDS)
     return `in ${days} ${days === 1 ? "day" : "days"}`
   }
 
@@ -327,12 +328,12 @@ function relativePart(seconds: number, future: boolean): {amount: number; unit: 
   if (seconds < 3600) {
     return {amount: future ? Math.ceil(seconds / 60) : Math.floor(seconds / 60), unit: "m"}
   }
-  if (seconds < 86_400) {
+  if (seconds < DAY_SECONDS) {
     return {amount: future ? Math.ceil(seconds / 3600) : Math.floor(seconds / 3600), unit: "h"}
   }
   if (seconds < 604_800) {
     return {
-      amount: future ? Math.ceil(seconds / 86_400) : Math.floor(seconds / 86_400),
+      amount: future ? Math.ceil(seconds / DAY_SECONDS) : Math.floor(seconds / DAY_SECONDS),
       unit: "d",
     }
   }

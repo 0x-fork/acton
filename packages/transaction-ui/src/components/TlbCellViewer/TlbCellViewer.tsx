@@ -1,7 +1,13 @@
-import {HighlightedCode, ParsedValueView, RawDataBlock, type ParsedValue} from "@acton/ui"
+import {
+  formatGramAmount,
+  HighlightedCode,
+  ParsedValueView,
+  RawDataBlock,
+  type ParsedValue,
+} from "@acton/ui"
 import {Box} from "lucide-react"
 import {parseTLB, replacer, type ParsedCell} from "@ton-community/tlb-runtime"
-import {Address, Cell, fromNano} from "@ton/core"
+import {Address, Cell} from "@ton/core"
 import {useMemo} from "react"
 
 import styles from "./TlbCellViewer.module.css"
@@ -183,7 +189,7 @@ function toParsedValue(value: ParsedCell, fieldName: string): ParsedValue {
 function formatScalar(fieldName: string, value: ParsedCell): string {
   if (typeof value === "bigint") {
     if (looksLikeAmount(fieldName)) {
-      return `${fromNano(value)} GRAM (${value.toString()} nano)`
+      return `${formatGramAmount(value)} (${value.toString()} nano)`
     }
 
     if (looksLikeHash(fieldName)) {

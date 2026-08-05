@@ -2029,6 +2029,59 @@ Always declare the numeric unit when it is not seconds.
 - Do not create local duration, latency, elapsed-time, or runtime formatters.
 - Do not create local schedule-period or recurring-window formatters.
 
+## GramAmount
+
+Status: ready
+
+Import:
+
+```tsx
+import { GramAmount, formatGramAmount } from "@acton/ui";
+```
+
+Use `GramAmount` for GRAM values stored as integer nanograms. It accepts a
+`bigint`, a safe integer, or an integer string and formats the value without a
+conversion through JavaScript `Number`.
+
+```tsx
+<GramAmount value={transaction.totalFees} />
+<GramAmount value={account.balance} useGrouping />
+<GramAmount value={wallet.balance} maximumFractionDigits={4} showLessThanMinimum />
+```
+
+- The default output preserves every significant nanogram digit and includes
+  the `GRAM` unit.
+- `maximumFractionDigits` rounds the visible value to at most nine fractional
+  digits. Set `roundingMode="truncate"` when the existing domain display must
+  not round up.
+- `minimumFractionDigits` preserves trailing decimal places in fixed-precision
+  views.
+- `useGrouping` adds locale-aware whole-number separators without losing bigint
+  precision.
+- `signDisplay` can show, hide, or preserve signs without modifying the raw
+  nanogram value.
+- `showLessThanMinimum` displays a small non-zero value as `<0.0001 GRAM` when
+  the selected precision would otherwise produce zero.
+- `showUnit={false}` is for editable numeric inputs that already show a GRAM
+  suffix.
+- The default tooltip shows the exact GRAM and nanogram values with copy
+  actions. Set `tooltip={false}` only when that information is already visible.
+- `formatGramAmount` applies the same rules where JSX is not available, such as
+  graph data, form defaults, or diagnostic strings.
+
+### Agent Guidance
+
+- Keep monetary values as integer nanograms until they reach this component.
+- Use the component in rendered UI and the formatter only for required strings.
+- Keep the detailed tooltip enabled when the visible value is rounded or
+  abbreviated.
+- Visual test metadata is included by the component. Do not repeat
+  `data-visual-dynamic="gram-amount"` or
+  `data-visual-placeholder="<gram>"` on a wrapper.
+- Do not convert nanograms through `Number`, `parseFloat`, or `fromNano` for UI
+  display.
+- Do not create local GRAM, TON coin, or nanogram formatters.
+
 ## Pagination
 
 Status: ready

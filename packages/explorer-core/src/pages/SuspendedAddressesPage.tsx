@@ -1,5 +1,6 @@
 import {
   DateTime,
+  GramAmount,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -17,7 +18,7 @@ import type {TonClient} from "../api/client"
 import type {SuspendedAccountsConfig} from "../api/suspendedAccounts"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
-import {formatNano, toRawAddress} from "../components/utils"
+import {toRawAddress} from "../components/utils"
 import {useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
@@ -218,11 +219,15 @@ export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}
                         />
                       </DataTableCell>
                       <DataTableCell align="right" tone="strong">
-                        {row.balance === undefined
-                          ? loadState.balancesStatus === "loading"
-                            ? "Loading…"
-                            : "—"
-                          : `${formatNano(row.balance)} GRAM`}
+                        {row.balance === undefined ? (
+                          loadState.balancesStatus === "loading" ? (
+                            "Loading…"
+                          ) : (
+                            "—"
+                          )
+                        ) : (
+                          <GramAmount value={row.balance} useGrouping />
+                        )}
                       </DataTableCell>
                     </DataTableRow>
                   )
@@ -241,11 +246,13 @@ export const SuspendedAddressesPage: FC<SuspendedAddressesPageProps> = ({client}
                     Total balance
                   </DataTableCell>
                   <DataTableCell className={styles.totalCell} align="right" tone="strong">
-                    {loadState.balancesStatus === "loading"
-                      ? "Loading…"
-                      : loadState.balancesStatus === "error"
-                        ? "Unavailable"
-                        : `${formatNano(totalBalance.toString())} GRAM`}
+                    {loadState.balancesStatus === "loading" ? (
+                      "Loading…"
+                    ) : loadState.balancesStatus === "error" ? (
+                      "Unavailable"
+                    ) : (
+                      <GramAmount value={totalBalance} useGrouping />
+                    )}
                   </DataTableCell>
                 </DataTableRow>
               </DataTableFooter>

@@ -26,6 +26,7 @@ import {
   DataTableTable,
   DateTime,
   formatDateTimeLocalInput,
+  GramAmount,
   InlineAction,
   InlineActions,
   Input,
@@ -54,7 +55,7 @@ import {
 } from "../components/DeveloperTransactionList"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {NetworkTpsPanel} from "../components/NetworkTpsPanel"
-import {formatNano, hashToHex} from "../components/utils"
+import {hashToHex} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useFavoriteBlocks} from "../hooks/useFavoriteBlocks"
@@ -1450,7 +1451,7 @@ const BlockSummaryTable: FC<{
         {block.fees_collected === undefined ? null : (
           <BlockDetailItem
             label="Fees collected"
-            value={`${formatNano(block.fees_collected)} GRAM`}
+            value={<GramAmount value={block.fees_collected} useGrouping />}
           />
         )}
         {block.in_msg_descr_length === undefined ? null : (
@@ -1749,7 +1750,11 @@ function blockUnixTime(block: V3Block): number | undefined {
   return Number.isFinite(value) && value > 0 ? value : undefined
 }
 
-function formatTransactionExitCode(transaction: V3TransactionListItem): string {
+function formatTransactionExitCode(transaction: BlockTransactionListItem): string {
+  if (!("description" in transaction)) {
+    return "Unknown"
+  }
+
   const computeExitCode = transaction.description.compute_ph?.exit_code
   if (typeof computeExitCode === "number") {
     return computeExitCode.toString()

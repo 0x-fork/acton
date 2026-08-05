@@ -15,6 +15,7 @@ import {dialogGallery} from "./dialogGallery"
 import {disclosureGallery} from "./disclosureGallery"
 import {disclosureToggleGallery} from "./disclosureToggleGallery"
 import {exitCodeChipGallery} from "./exitCodeChipGallery"
+import {gramAmountGallery} from "./gramAmountGallery"
 import {highlightedCodeGallery} from "./highlightedCodeGallery"
 import {ideSelectorGallery} from "./ideSelectorGallery"
 import {infoPopoverGallery} from "./infoPopoverGallery"
@@ -83,6 +84,7 @@ export const galleries = [
   toastGallery,
   rawDataBlockGallery,
   dataTableGallery,
+  gramAmountGallery,
   dateTimeGallery,
   durationGallery,
   skeletonGallery,

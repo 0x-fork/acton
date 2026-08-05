@@ -242,6 +242,7 @@ export function VerifiedContractsPage({
                   <DataTableCell>{item.file_count}</DataTableCell>
                   <DataTableCell truncate>
                     <DateTime
+                      className={styles.verifiedAt}
                       fallback="Unknown"
                       unit="seconds"
                       value={

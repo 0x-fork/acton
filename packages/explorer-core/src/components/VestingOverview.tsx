@@ -1,4 +1,4 @@
-import {useEffect, useState, type FC} from "react"
+import {useEffect, useState, type FC, type ReactNode} from "react"
 
 import {
   Button,
@@ -13,13 +13,14 @@ import {
   Dialog,
   formatSchedulePeriod,
   formatTimeUntil,
+  GramAmount,
   InlineButton,
   Skeleton,
 } from "@acton/ui"
 
 import type {TonClient} from "../api/client"
 import styles from "./LockerOverview.module.css"
-import {capitalize, formatGramAmount} from "./scheduleFormatting"
+import {capitalize} from "./scheduleFormatting"
 import {
   buildVestingSchedule,
   parseVestingData,
@@ -136,8 +137,18 @@ export const VestingOverview: FC<VestingOverviewProps> = ({address, client, onDa
         </div>
 
         <div className={styles.metrics}>
-          <VestingMetric label="Total vested" value={formatGramAmount(data.vestingTotalAmount)} />
-          <VestingMetric label="Unlocked" value={formatGramAmount(schedule.unlockedAmount)} />
+          <VestingMetric
+            label="Total vested"
+            value={
+              <GramAmount maximumFractionDigits={2} useGrouping value={data.vestingTotalAmount} />
+            }
+          />
+          <VestingMetric
+            label="Unlocked"
+            value={
+              <GramAmount maximumFractionDigits={2} useGrouping value={schedule.unlockedAmount} />
+            }
+          />
           <VestingMetric label="Cliff period" value={formatSchedulePeriod(data.cliffDuration)} />
           <VestingMetric label="Unlock period" value={formatSchedulePeriod(data.unlockPeriod)} />
         </div>
@@ -170,7 +181,10 @@ export const VestingOverview: FC<VestingOverviewProps> = ({address, client, onDa
             ))}
           </div>
           <div className={styles.progressMeta}>
-            <span>{formatGramAmount(schedule.unlockedAmount)} unlocked</span>
+            <span>
+              <GramAmount maximumFractionDigits={2} useGrouping value={schedule.unlockedAmount} />{" "}
+              unlocked
+            </span>
             <span>
               {schedule.nextPayoutTime
                 ? `Next unlock ${formatTimeUntil(schedule.nextPayoutTime, nowSeconds)}`
@@ -213,7 +227,7 @@ export const VestingOverview: FC<VestingOverviewProps> = ({address, client, onDa
   )
 }
 
-function VestingMetric({label, value}: {readonly label: string; readonly value: string}) {
+function VestingMetric({label, value}: {readonly label: string; readonly value: ReactNode}) {
   return (
     <div className={styles.metric}>
       <div className={styles.metricLabel}>{label}</div>
@@ -233,9 +247,11 @@ function VestingPeriodRow({period}: {readonly period: VestingPeriod}) {
         <DateTime display="date-day-month" unit="seconds" value={period.payoutTime} />
       </DataTableCell>
       <DataTableCell align="right" tone="strong">
-        {formatGramAmount(period.amount)}
+        <GramAmount maximumFractionDigits={2} useGrouping value={period.amount} />
       </DataTableCell>
-      <DataTableCell align="right">{formatGramAmount(period.cumulativeAmount)}</DataTableCell>
+      <DataTableCell align="right">
+        <GramAmount maximumFractionDigits={2} useGrouping value={period.cumulativeAmount} />
+      </DataTableCell>
       <DataTableCell>
         <span className={`${styles.status} ${styles[`status${capitalize(period.status)}`]}`}>
           {capitalize(period.status)}

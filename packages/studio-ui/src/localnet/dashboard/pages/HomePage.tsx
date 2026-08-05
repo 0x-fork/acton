@@ -15,6 +15,7 @@ import {
   Duration,
   formatDuration,
   Input,
+  DAY_SECONDS,
   Tooltip,
   useToast,
 } from "@acton/ui"
@@ -58,7 +59,6 @@ const MASTERCHAIN_BLOCK_SHARD = "8000000000000000"
 const DEFAULT_TIME_ADVANCE_SECONDS = "0"
 const MINUTE_SECONDS = 60
 const HOUR_SECONDS = 3600
-const DAY_SECONDS = 86_400
 const WEEK_SECONDS = 604_800
 const MONTH_SECONDS = 2_592_000
 const YEAR_SECONDS = 31_536_000

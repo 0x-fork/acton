@@ -6,7 +6,6 @@ import {
   Dictionary,
   ExternalAddress,
   Slice,
-  fromNano,
   toNano,
   type DictionaryKey,
   type DictionaryKeyTypes,
@@ -54,16 +53,6 @@ export function parseGramAsNano(value: string): string | undefined {
     return toNano(normalized).toString()
   } catch {
     return undefined
-  }
-}
-
-export function formatNanoAsGram(value: string): string {
-  if (!/^[0-9]+$/.test(value)) return ""
-
-  try {
-    return fromNano(BigInt(value))
-  } catch {
-    return ""
   }
 }
 

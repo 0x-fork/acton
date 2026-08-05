@@ -1,6 +1,5 @@
-import type {FC} from "react"
-import {formatUnits} from "@ton/walletkit"
-import {Tooltip} from "@acton/ui"
+import type {FC, ReactNode} from "react"
+import {GramAmount, Tooltip} from "@acton/ui"
 
 import type {JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
@@ -124,14 +123,21 @@ function WalletTokenPreview({
   )
 }
 
-function formatWalletBalanceLabel(balanceState: AccountBalanceState | undefined): string {
+function formatWalletBalanceLabel(balanceState: AccountBalanceState | undefined): ReactNode {
   if (!balanceState) {
     return "Loading balance..."
   }
 
   if (balanceState.value) {
-    const balance = `${formatCompactGramBalance(balanceState.value)} GRAM`
-    return balanceState.isLoading ? `${balance} · updating` : balance
+    const balance = (
+      <GramAmount
+        maximumFractionDigits={4}
+        showLessThanMinimum
+        useGrouping
+        value={balanceState.value}
+      />
+    )
+    return balanceState.isLoading ? <>{balance} · updating</> : balance
   }
 
   if (balanceState.isLoading) {
@@ -139,23 +145,6 @@ function formatWalletBalanceLabel(balanceState: AccountBalanceState | undefined)
   }
 
   return balanceState.error ? "Balance unavailable" : "Balance not loaded"
-}
-
-function formatCompactGramBalance(balance: string): string {
-  const formattedBalance = formatUnits(balance, 9)
-  const numericBalance = Number(formattedBalance)
-
-  if (!Number.isFinite(numericBalance)) {
-    return formattedBalance
-  }
-
-  if (numericBalance > 0 && numericBalance < 0.0001) {
-    return "<0.0001"
-  }
-
-  return numericBalance.toLocaleString(undefined, {
-    maximumFractionDigits: 4,
-  })
 }
 
 function parseJettonDecimals(master: JettonMasterMetadata | undefined): number {

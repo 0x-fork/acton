@@ -138,15 +138,6 @@ export function isSameAddress(a: string, b: string): boolean {
   return a === b
 }
 
-export function formatNano(nano: string | number, maximumFractionDigits = 9): string {
-  const n = typeof nano === "string" ? BigInt(nano) : BigInt(nano)
-  const ton = Number(n) / 1e9
-  return ton.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits,
-  })
-}
-
 export function shortenIdentifier(value: string, edgeLength = 6): string {
   return value.length > edgeLength * 2
     ? `${value.slice(0, edgeLength)}…${value.slice(-edgeLength)}`

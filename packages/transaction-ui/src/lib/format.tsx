@@ -1,6 +1,5 @@
 import type React from "react"
 import {Address} from "@ton/core"
-export {formatCurrency} from "@acton/ui"
 
 export function formatAddress(address: string): string {
   if (!address) return "unknown"

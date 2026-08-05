@@ -3,7 +3,7 @@ import {Check, Copy, Edit2, QrCode, Star} from "lucide-react"
 import {QRCodeSVG} from "qrcode.react"
 import {memo, useEffect, useId, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
-import {CopyInlineAction, InfoPopover, Input, Popover, Tooltip} from "@acton/ui"
+import {CopyInlineAction, GramAmount, InfoPopover, Input, Popover, Tooltip} from "@acton/ui"
 
 import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {TonClient} from "../api/client"
@@ -21,13 +21,7 @@ import {
   replaceBrokenImageWithFallback,
 } from "./imageFallbacks"
 import {getAccountNameDetails} from "./accountNameDetails"
-import {
-  formatAddress,
-  formatNano,
-  normalizeAddress,
-  toAccountQrAddress,
-  toRawAddress,
-} from "./utils"
+import {formatAddress, normalizeAddress, toAccountQrAddress, toRawAddress} from "./utils"
 
 const TOKEN_PREVIEW_LIMIT = 5
 
@@ -225,8 +219,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
       setRenameSaving(false)
     }
   }
-
-  const gramBalance = state ? formatNano(state.balance) : undefined
 
   const copyToClipboard = () => {
     void navigator.clipboard.writeText(displayAddress)
@@ -507,7 +499,9 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                 {stateLoading ? (
                   <div className={`${styles.skeleton} ${styles.skeletonValue}`} />
                 ) : state ? (
-                  <span className={styles.primaryValue}>{gramBalance} GRAM</span>
+                  <span className={styles.primaryValue}>
+                    <GramAmount value={state.balance} useGrouping />
+                  </span>
                 ) : (
                   <span className={styles.mutedValue}>-</span>
                 )}

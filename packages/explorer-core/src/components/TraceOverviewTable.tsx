@@ -1,4 +1,4 @@
-import {BlockChip, CopyInlineAction, DateTime, Duration, InlineActions} from "@acton/ui"
+import {BlockChip, CopyInlineAction, DateTime, Duration, GramAmount, InlineActions} from "@acton/ui"
 import {
   getTransactionComputePhase,
   type TransactionBlockRef,
@@ -8,7 +8,7 @@ import {useLayoutEffect, useRef, useState} from "react"
 import type {FC, MouseEvent, ReactNode} from "react"
 
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
-import {formatNano, hashToHex} from "./utils"
+import {hashToHex} from "./utils"
 import {buildTraceShardFlow} from "./traceShardFlow"
 
 import styles from "./TraceOverviewTable.module.css"
@@ -147,7 +147,7 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
     {label: "Pending Messages", value: data.pendingMessageCount},
   ]
   const executionItems: readonly {readonly label: string; readonly value: ReactNode}[] = [
-    {label: "Total Fees", value: `${formatNano(totalFees.toString())} GRAM`},
+    {label: "Total Fees", value: <GramAmount value={totalFees} useGrouping />},
     {label: "Aborted", value: abortedTransactionCount},
     {label: "Skipped Compute", value: skippedComputeCount},
   ]

@@ -13,7 +13,9 @@ import {
   Dialog,
   formatSchedulePeriod,
   formatTimeUntil,
+  GramAmount,
   InlineButton,
+  DAY_SECONDS,
   Skeleton,
 } from "@acton/ui"
 
@@ -25,7 +27,7 @@ import {
   type LockerPayment,
 } from "./lockerSchedule"
 import styles from "./LockerOverview.module.css"
-import {capitalize, formatGramAmount, SECONDS_PER_DAY} from "./scheduleFormatting"
+import {capitalize} from "./scheduleFormatting"
 
 interface LockerOverviewProps {
   readonly address: string
@@ -108,8 +110,7 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
   const schedule = buildLockerSchedule(data, nowSeconds)
   const firstPayment = schedule.payments[0]
   const finalPayment = schedule.payments.at(-1)
-  const paymentLabel =
-    data.unlockPeriod === 30 * SECONDS_PER_DAY ? "Monthly payment" : "Payment amount"
+  const paymentLabel = data.unlockPeriod === 30 * DAY_SECONDS ? "Monthly payment" : "Payment amount"
 
   return (
     <>
@@ -142,11 +143,25 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
         </div>
 
         <div className={styles.metrics}>
-          <LockerMetric label="Deposit" value={formatGramAmount(data.totalCoinsLocked)} />
-          <LockerMetric label="Reward" value={formatGramAmount(data.totalReward)} />
+          <LockerMetric
+            label="Deposit"
+            value={
+              <GramAmount maximumFractionDigits={2} useGrouping value={data.totalCoinsLocked} />
+            }
+          />
+          <LockerMetric
+            label="Reward"
+            value={<GramAmount maximumFractionDigits={2} useGrouping value={data.totalReward} />}
+          />
           <LockerMetric
             label={paymentLabel}
-            value={firstPayment ? formatGramAmount(firstPayment.amount) : "—"}
+            value={
+              firstPayment ? (
+                <GramAmount maximumFractionDigits={2} useGrouping value={firstPayment.amount} />
+              ) : (
+                "—"
+              )
+            }
           />
           <LockerMetric
             label="Next payment"
@@ -192,7 +207,10 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
             ))}
           </div>
           <div className={styles.progressMeta}>
-            <span>{formatGramAmount(schedule.unlockedAmount)} unlocked</span>
+            <span>
+              <GramAmount maximumFractionDigits={2} useGrouping value={schedule.unlockedAmount} />{" "}
+              unlocked
+            </span>
             <span>
               {schedule.nextPayment
                 ? `Next payment ${formatTimeUntil(schedule.nextPayment.unlockTime, nowSeconds)}`
@@ -251,9 +269,11 @@ function LockerPaymentRow({payment}: {readonly payment: LockerPayment}) {
         <DateTime display="date-day-month" unit="seconds" value={payment.unlockTime} />
       </DataTableCell>
       <DataTableCell align="right" tone="strong">
-        {formatGramAmount(payment.amount)}
+        <GramAmount maximumFractionDigits={2} useGrouping value={payment.amount} />
       </DataTableCell>
-      <DataTableCell align="right">{formatGramAmount(payment.cumulativeAmount)}</DataTableCell>
+      <DataTableCell align="right">
+        <GramAmount maximumFractionDigits={2} useGrouping value={payment.cumulativeAmount} />
+      </DataTableCell>
       <DataTableCell>
         <span className={`${styles.status} ${styles[`status${capitalize(payment.status)}`]}`}>
           {capitalize(payment.status)}

@@ -1,7 +1,14 @@
 import type {Address} from "@ton/core"
 import type React from "react"
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
-import {buildStorageDiff, InlineButton, type ParsedValueDiff, ParsedValueDiffView} from "@acton/ui"
+import {
+  buildStorageDiff,
+  formatGramAmount,
+  GramAmount,
+  InlineButton,
+  type ParsedValueDiff,
+  ParsedValueDiffView,
+} from "@acton/ui"
 import {GitBranch, Route} from "lucide-react"
 import {
   type CustomNodeElementProps,
@@ -194,13 +201,15 @@ function EdgeTransactionTooltipContent({
       <div className={styles.tooltipField}>
         <div className={styles.tooltipFieldLabel}>Money</div>
         <div className={styles.tooltipFieldValue}>
-          <div>Sent Total: {fmt.formatCurrency(data.sentTotal)}</div>
+          <div>
+            Sent Total: <GramAmount value={data.sentTotal} />
+          </div>
           <div className={styles.tooltipSubValue}>
-            Total Fees: {fmt.formatCurrency(data.fees.totalFees)}
+            Total Fees: <GramAmount value={data.fees.totalFees} />
           </div>
           {data.fees.gasFees !== undefined && (
             <div className={styles.tooltipSubValue}>
-              Gas Fees: {fmt.formatCurrency(data.fees.gasFees)}
+              Gas Fees: <GramAmount value={data.fees.gasFees} />
             </div>
           )}
         </div>
@@ -475,7 +484,7 @@ export function TransactionTree({
       const value =
         inMessage?.info.type === "external-in"
           ? "—"
-          : fmt.formatCurrency(
+          : formatGramAmount(
               inMessage?.info.type === "internal" ? inMessage.info.value.coins : undefined,
             )
 

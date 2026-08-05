@@ -26,6 +26,7 @@ import {
   DataTableSkeletonRows,
   DataTableTable,
   Duration,
+  GramAmount,
   getIdeUrl,
   IdeSelector,
   RawDataBlock,
@@ -730,9 +731,15 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
         </DataTableCell>
         <DataTableCell align="center">{summary.transactionCount.toString()}</DataTableCell>
         <DataTableCell>{summary.totalGasUsed.toString()}</DataTableCell>
-        <DataTableCell>{fmt.formatCurrency(summary.totalGasFees)}</DataTableCell>
-        <DataTableCell>{fmt.formatCurrency(summary.totalForwardFees)}</DataTableCell>
-        <DataTableCell>{fmt.formatCurrency(summary.totalFees)}</DataTableCell>
+        <DataTableCell>
+          <GramAmount value={summary.totalGasFees} />
+        </DataTableCell>
+        <DataTableCell>
+          <GramAmount value={summary.totalForwardFees} />
+        </DataTableCell>
+        <DataTableCell>
+          <GramAmount value={summary.totalFees} />
+        </DataTableCell>
       </DataTableRow>
     )
   }

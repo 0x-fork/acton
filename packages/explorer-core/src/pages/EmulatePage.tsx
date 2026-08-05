@@ -24,6 +24,7 @@ import {
   Dialog,
   DateTime,
   formatDateTime,
+  formatGramAmount,
   InlineAction,
   InlineButton,
   Input,
@@ -55,15 +56,7 @@ import {
 } from "@acton/transaction-ui"
 import {useLocation, useNavigate, useSearchParams} from "react-router"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-import {
-  Address,
-  Cell,
-  fromNano,
-  loadMessage,
-  loadShardAccount,
-  toNano,
-  type ShardAccount,
-} from "@ton/core"
+import {Address, Cell, loadMessage, loadShardAccount, toNano, type ShardAccount} from "@ton/core"
 
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
@@ -2224,7 +2217,9 @@ function accountStateOverrideDraftsFromShare(
     return {
       ...draft,
       loadState: {type: "ready"},
-      balance: override.balance ? fromNano(override.balance) : "",
+      balance: override.balance
+        ? formatGramAmount(override.balance, {fallback: "", showUnit: false})
+        : "",
       stateKind: state?.type ?? "keep",
       codeBoc: activeState?.codeBoc ?? "",
       storageEnabled: Boolean(activeState?.dataBoc),
@@ -2262,7 +2257,7 @@ function hydrateAccountStateOverrideDraft(
     abi,
     loadedAddress: address,
     loadState: {type: "ready"},
-    balance: fromNano(account?.storage.balance.coins ?? 0n),
+    balance: formatGramAmount(account?.storage.balance.coins ?? 0n, {showUnit: false}),
     stateKind: entry.stateKind,
     currentStateKind,
     codeBoc,

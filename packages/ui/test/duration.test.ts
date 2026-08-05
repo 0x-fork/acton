@@ -8,8 +8,13 @@ import {
   formatRecurringPeriod,
   formatSchedulePeriod,
 } from "../src/components/Duration"
+import {DAY_SECONDS} from "../src/lib/time"
 
 describe("duration", () => {
+  test("exports the shared number of seconds per day", () => {
+    expect(DAY_SECONDS).toBe(86_400)
+  })
+
   test("formats shared duration presets", () => {
     expect({
       compactSeconds: formatDuration(42),
@@ -42,8 +47,8 @@ describe("duration", () => {
 
   test("formats schedule periods", () => {
     expect({
-      day: formatSchedulePeriod(86_400),
-      days: formatSchedulePeriod(2 * 86_400),
+      day: formatSchedulePeriod(DAY_SECONDS),
+      days: formatSchedulePeriod(2 * DAY_SECONDS),
       hour: formatSchedulePeriod(3600),
       hours: formatSchedulePeriod(2 * 3600),
       minute: formatSchedulePeriod(60),

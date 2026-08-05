@@ -7,13 +7,12 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import {Checkbox, InlineAction, Input, Select} from "@acton/ui"
+import {Checkbox, formatGramAmount, InlineAction, Input, Select} from "@acton/ui"
 import {renderTy, type SymTable, type UnionVariant} from "@ton/tolk-abi-to-typescript"
 import {Plus, Trash2} from "lucide-react"
 
 import {
   abiValueToFormValue,
-  formatNanoAsGram,
   parseGramAsNano,
   SAMPLE_ADDRESS,
   sampleAbiValueForTy,
@@ -94,12 +93,16 @@ function TonCoinsInput({
   readonly disabled: boolean
 }) {
   const nanoValue = formatScalarValue(value)
-  const [draft, setDraft] = useState(() => formatNanoAsGram(nanoValue))
+  const [draft, setDraft] = useState(() =>
+    formatGramAmount(nanoValue, {fallback: "", showUnit: false}),
+  )
 
   useEffect(() => {
     setDraft(current => {
       const currentNano = parseGramAsNano(current)
-      return currentNano === nanoValue ? current : formatNanoAsGram(nanoValue)
+      return currentNano === nanoValue
+        ? current
+        : formatGramAmount(nanoValue, {fallback: "", showUnit: false})
     })
   }, [nanoValue])
 
@@ -118,7 +121,9 @@ function TonCoinsInput({
             onChange(nextNano)
           }
         }}
-        onBlur={() => setDraft(formatNanoAsGram(formatScalarValue(value)))}
+        onBlur={() =>
+          setDraft(formatGramAmount(formatScalarValue(value), {fallback: "", showUnit: false}))
+        }
         inputMode="decimal"
         placeholder="0.1"
         disabled={disabled}

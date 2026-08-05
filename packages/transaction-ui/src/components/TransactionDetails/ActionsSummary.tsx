@@ -4,6 +4,8 @@ import {
   ContractChip,
   CopyInlineButton,
   ExitCodeChip,
+  formatGramAmount,
+  GramAmount,
   OpcodeChip,
   parseReserveMode,
   ParsedBodySection,
@@ -20,7 +22,6 @@ import type {
   SourceLocation,
 } from "../../model/backend"
 import type {ContractData} from "../../model/transaction"
-import * as fmt from "../../lib/format"
 import {decodeMessageBody, getMessageOpcode, resolveMessageOpcodeName} from "../../lib/messageBody"
 
 import {DisasmSection} from "../DisasmSection/DisasmSection"
@@ -133,14 +134,6 @@ const isActionFailed = (action: BackendExecutorAction): boolean => {
   return action.failure_code !== undefined || failureReason !== undefined
 }
 
-const formatNanograms = (value: string): string => {
-  try {
-    return fmt.formatCurrency(BigInt(value))
-  } catch {
-    return `${value} ng`
-  }
-}
-
 const formatFailureReason = (
   reason: BackendExecutorActionFailureReason | undefined,
 ): string | undefined => {
@@ -148,10 +141,10 @@ const formatFailureReason = (
 
   switch (reason.type) {
     case "not_enough_grams_to_send": {
-      return `Not enough GRAM: balance ${formatNanograms(reason.remaining_balance)}, required ${formatNanograms(reason.required)}.`
+      return `Not enough GRAM: balance ${formatGramAmount(reason.remaining_balance, {fallback: `${reason.remaining_balance} ng`})}, required ${formatGramAmount(reason.required, {fallback: `${reason.required} ng`})}.`
     }
     case "cannot_reserve_grams": {
-      return `Cannot reserve ${formatNanograms(reason.requested)}: only ${formatNanograms(reason.available)} available.`
+      return `Cannot reserve ${formatGramAmount(reason.requested, {fallback: `${reason.requested} ng`})}: only ${formatGramAmount(reason.available, {fallback: `${reason.available} ng`})} available.`
     }
   }
 }
@@ -309,7 +302,9 @@ const renderActionDetails = (
                 </div>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Value:</span>
-                  <span className={styles.detailValue}>{fmt.formatCurrency(info.value.coins)}</span>
+                  <span className={styles.detailValue}>
+                    <GramAmount value={info.value.coins} />
+                  </span>
                 </div>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Bounce:</span>
@@ -482,7 +477,7 @@ const renderActionDetails = (
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>Amount:</span>
               <span className={styles.detailValue}>
-                {fmt.formatCurrency(action.currency.coins)}
+                <GramAmount value={action.currency.coins} />
               </span>
             </div>
             {execution.failureReasonText && (
@@ -588,14 +583,16 @@ export function ActionsSummary({
 
   const getActionSummary = (
     action: OutAction,
-  ): {title: string; description: string; value: string} => {
+  ): {title: string; description: string; value: React.ReactNode} => {
     switch (action.type) {
       case "sendMsg": {
         const message = action.outMsg
         const value =
-          message.info.type === "internal"
-            ? fmt.formatCurrency(message.info.value.coins)
-            : "external-out"
+          message.info.type === "internal" ? (
+            <GramAmount value={message.info.value.coins} />
+          ) : (
+            "external-out"
+          )
         return {
           title: "Send Message",
           description:
@@ -616,7 +613,7 @@ export function ActionsSummary({
         return {
           title: "Reserve",
           description: `Mode: ${formatReserveModeNames(action.mode)}`,
-          value: fmt.formatCurrency(action.currency.coins),
+          value: <GramAmount value={action.currency.coins} />,
         }
       }
       case "changeLibrary": {

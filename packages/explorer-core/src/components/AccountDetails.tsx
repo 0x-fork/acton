@@ -29,6 +29,8 @@ import {
   DataTableRow,
   DataTableTable,
   DateTime,
+  formatGramAmount,
+  GramAmount,
   NftChip,
   Pagination,
   Popover,
@@ -114,14 +116,7 @@ import {
 import {Nfts, NftsSkeleton} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
-import {
-  formatAddress,
-  formatNano,
-  hashToHex,
-  isSameAddress,
-  parseAddress,
-  shortenIdentifier,
-} from "./utils"
+import {formatAddress, hashToHex, isSameAddress, parseAddress, shortenIdentifier} from "./utils"
 
 type Tabs = "history" | "contract" | "get-methods" | "tokens" | "nfts" | "items" | "holders"
 
@@ -248,6 +243,9 @@ interface HistoryTextValueLine {
   readonly fullLabel?: string
   readonly unitLabel?: string
   readonly tone: HistoryValueTone
+  readonly gramMaximumFractionDigits?: number
+  readonly gramNanograms?: string
+  readonly gramSign?: string
 }
 
 interface HistoryNftValueLine {
@@ -1176,12 +1174,16 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                 ) : (
                   displayedTransactionRows.map(({tx, info}) => {
                     const transactionHash = tx.hash
-                    const valueStr = formatNano(info.displayValue.toString())
                     const isEmptyValue = info.displayValue === 0n
                     const valuePrefix = isEmptyValue ? "" : info.isIncoming ? "+ " : "- "
-                    const valueLabel = isEmptyValue
-                      ? "empty"
-                      : `${valuePrefix}${Number.parseFloat(valueStr).toLocaleString()} GRAM`
+                    const valueLabel = isEmptyValue ? (
+                      "empty"
+                    ) : (
+                      <>
+                        {valuePrefix}
+                        <GramAmount value={info.displayValue} useGrouping />
+                      </>
+                    )
                     const isAddressHovered =
                       hoveredAddress && info.address
                         ? isSameAddress(info.address, hoveredAddress)
@@ -1731,7 +1733,19 @@ function HistoryTextValue({
 
   return (
     <span className={className} title={line.fullLabel}>
-      {line.label}
+      {line.gramNanograms === undefined ? (
+        line.label
+      ) : (
+        <>
+          {line.gramSign}
+          <GramAmount
+            maximumFractionDigits={line.gramMaximumFractionDigits}
+            signDisplay="never"
+            useGrouping
+            value={line.gramNanograms}
+          />
+        </>
+      )}
       {line.unitLabel ? (
         <>
           {" "}
@@ -3370,13 +3384,21 @@ function tonValueLine(
   }
 
   const signlessAmount = amount.trim().replace(/^[+-]/, "")
-  const readableAmount = formatNano(signlessAmount, options.maximumFractionDigits)
+  const readableAmount = formatGramAmount(signlessAmount, {
+    fallback: signlessAmount,
+    maximumFractionDigits: options.maximumFractionDigits,
+    showUnit: false,
+    useGrouping: true,
+  })
   const displayTone = isZeroDisplayNumber(readableAmount) ? "neutral" : tone
   const sign = options.showSign === false ? "" : valueSign(displayTone)
   return {
     kind: "text",
     label: `${sign}${readableAmount} GRAM`,
     tone: displayTone,
+    gramMaximumFractionDigits: options.maximumFractionDigits,
+    gramNanograms: displayTone === "negative" ? `-${signlessAmount}` : signlessAmount,
+    gramSign: sign,
   }
 }
 
@@ -3598,11 +3620,7 @@ function TransactionTime({
 }): JSX.Element | string {
   if (utime <= 0) {
     return (
-      <span
-        data-visual-dynamic="time"
-        data-visual-placeholder="<time>"
-        title="Unknown time"
-      >
+      <span data-visual-dynamic="time" data-visual-placeholder="<time>" title="Unknown time">
         -
       </span>
     )

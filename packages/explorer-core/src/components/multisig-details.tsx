@@ -14,6 +14,7 @@ import {
   DataTableSkeletonRows,
   DataTableTable,
   DateTime,
+  formatGramAmount,
   ParsedBodySection,
   type ParsedTransactionBody,
   type ParsedValue,
@@ -42,7 +43,7 @@ import {
   isMultisigSignerApproved,
   multisigAddressKey,
 } from "./multisigApprovals"
-import {capitalize, formatGramAmount} from "./scheduleFormatting"
+import {capitalize} from "./scheduleFormatting"
 import {formatAddress} from "./utils"
 
 export type MultisigDetailsState =
@@ -834,11 +835,7 @@ function formatActionValue(value: string | null): string {
   if (value === null) {
     return "—"
   }
-  try {
-    return formatGramAmount(BigInt(value), 9)
-  } catch {
-    return value
-  }
+  return formatGramAmount(value, {fallback: value, useGrouping: true})
 }
 
 function formatRawValue(value: unknown): string {

@@ -8,6 +8,7 @@ import {
   DateTime,
   DisclosureToggle,
   ExitCodeChip,
+  GramAmount,
   InfoPopover,
   InlineActions,
   OpcodeChip,
@@ -480,7 +481,7 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Value</div>
                 <div className={`${styles.multiColumnItemValue}`}>
-                  {fmt.formatCurrency(inMessage.info.value.coins)}
+                  <GramAmount value={inMessage.info.value.coins} />
                 </div>
               </div>
               {sendMode !== undefined && (
@@ -750,26 +751,26 @@ export function TransactionDetails({
             <div className={styles.multiColumnItem}>
               <div className={styles.multiColumnItemTitle}>Amount Sent (Total)</div>
               <div className={`${styles.multiColumnItemValue}`}>
-                {fmt.formatCurrency(sentTotal)}
+                <GramAmount value={sentTotal} />
               </div>
             </div>
             <div className={styles.multiColumnItem}>
               <div className={styles.multiColumnItemTitle}>End Balance</div>
               <div className={`${styles.multiColumnItemValue}`}>
-                {endBalance === undefined ? "—" : fmt.formatCurrency(endBalance)}
+                <GramAmount value={endBalance} />
               </div>
             </div>
             <div className={styles.multiColumnItem}>
               <div className={styles.multiColumnItemTitle}>Total Fee</div>
               <div className={`${styles.multiColumnItemValue}`}>
-                {fmt.formatCurrency(tx.transaction.totalFees.coins)}
+                <GramAmount value={tx.transaction.totalFees.coins} />
               </div>
             </div>
             {actionPhase && (
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Action Fee</div>
                 <div className={`${styles.multiColumnItemValue}`}>
-                  {actionFee === undefined ? "—" : fmt.formatCurrency(actionFee)}
+                  <GramAmount value={actionFee} />
                 </div>
               </div>
             )}
@@ -777,7 +778,7 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Forward Fee</div>
                 <div className={`${styles.multiColumnItemValue}`}>
-                  {fmt.formatCurrency(tx.transaction.inMessage.info.forwardFee)}
+                  <GramAmount value={tx.transaction.inMessage.info.forwardFee} />
                 </div>
               </div>
             )}
@@ -793,15 +794,13 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Storage Fee</div>
                 <div className={styles.multiColumnItemValue}>
-                  {fmt.formatCurrency(tickTockDescription.storagePhase.storageFeesCollected)}
+                  <GramAmount value={tickTockDescription.storagePhase.storageFeesCollected} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Storage Due</div>
                 <div className={styles.multiColumnItemValue}>
-                  {typeof tickTockStorageFeesDue === "bigint"
-                    ? fmt.formatCurrency(tickTockStorageFeesDue)
-                    : "—"}
+                  <GramAmount value={tickTockStorageFeesDue} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
@@ -847,7 +846,7 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Gas Fee</div>
                 <div className={styles.multiColumnItemValue}>
-                  {fmt.formatCurrency(computePhase.gasFees)}
+                  <GramAmount value={computePhase.gasFees} />
                 </div>
               </div>
             </div>

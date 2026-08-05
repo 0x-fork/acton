@@ -1,15 +1,14 @@
 import {Check, Copy, KeyRound, Shield} from "lucide-react"
 import {TlbCellViewer} from "@acton/transaction-ui"
-import {Button, Dialog, RawDataBlock, useToast} from "@acton/ui"
+import {Button, Dialog, GramAmount, RawDataBlock, useToast} from "@acton/ui"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
-import {
-  formatUnits,
-  type ConnectionRequestEvent,
-  type RequestErrorEvent,
-  type SendTransactionRequestEvent,
-  type SignDataRequestEvent,
-  type TONConnectSession,
+import type {
+  ConnectionRequestEvent,
+  RequestErrorEvent,
+  SendTransactionRequestEvent,
+  SignDataRequestEvent,
+  TONConnectSession,
 } from "@ton/walletkit"
 
 import {fetchStudioWallets, type EnvironmentConfig, type StudioWallet} from "../../studioApi"
@@ -742,11 +741,15 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
               const walletAddress = normalizeAddress(wallet.record.address, addressFormat)
               const balance = walletBalances[wallet.id]
               const balanceLabel =
-                balance?.value === undefined
-                  ? balance?.isLoading
-                    ? "Loading balance"
-                    : "Balance unavailable"
-                  : `${formatGramBalance(balance.value)} GRAM`
+                balance?.value === undefined ? (
+                  balance?.isLoading ? (
+                    "Loading balance"
+                  ) : (
+                    "Balance unavailable"
+                  )
+                ) : (
+                  <GramAmount tabIndex={-1} value={balance.value} />
+                )
               return (
                 <button
                   key={wallet.id}
@@ -811,12 +814,12 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
             </MetaRow>
             <MetaRow label="Network">{networkLabel}</MetaRow>
             <MetaRow label="Amount">
-              {formatGramBalance(
-                pendingTransactionRequest.request.messages
-                  .reduce((sum, message) => sum + BigInt(message.amount), 0n)
-                  .toString(),
-              )}{" "}
-              GRAM
+              <GramAmount
+                value={pendingTransactionRequest.request.messages.reduce(
+                  (sum, message) => sum + BigInt(message.amount),
+                  0n,
+                )}
+              />
             </MetaRow>
           </div>
 
@@ -831,7 +834,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
                     onCopy={handleCopyAddress}
                   />
                   <div className={styles.messageValue}>
-                    {formatGramBalance(message.amount)} GRAM
+                    <GramAmount value={message.amount} />
                   </div>
                 </div>
               </div>
@@ -975,10 +978,6 @@ function shortenAddress(address: string, visibleChars: number): string {
   }
 
   return `${address.slice(0, visibleChars)}...${address.slice(-visibleChars)}`
-}
-
-function formatGramBalance(balance: string): string {
-  return formatUnits(balance, 9)
 }
 
 function getDappName(name: string | undefined): string {
