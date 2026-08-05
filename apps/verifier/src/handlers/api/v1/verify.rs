@@ -34,6 +34,7 @@ use crate::{
 mod languages;
 
 const API_KEY_HEADER: &str = "x-verifier-key";
+const MAX_SOURCE_PATH_CHARS: usize = 128;
 
 #[utoipa::path(
     post,
@@ -333,6 +334,12 @@ fn prepare_compile_input(
 }
 
 fn validate_source_path(path: &str) -> Result<(), ApiError> {
+    if path.chars().count() > MAX_SOURCE_PATH_CHARS {
+        return Err(ApiError::bad_request(format!(
+            "source path must be no longer than {MAX_SOURCE_PATH_CHARS} characters"
+        )));
+    }
+
     validate_relative_path("source path", path)
 }
 

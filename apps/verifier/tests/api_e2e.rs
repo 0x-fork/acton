@@ -1466,6 +1466,55 @@ async fn verify_rejects_source_metadata_without_uploaded_file() {
 }
 
 #[tokio::test]
+async fn verify_accepts_source_path_at_length_limit() {
+    let path = format!("path/to/large{}/file.tolk", "a".repeat(105));
+    assert_eq!(path.chars().count(), 128);
+    let sources = serde_json::to_string(&json!([{
+        "path": path,
+        "is_entrypoint": true,
+    }]))
+    .expect("source metadata should serialize");
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            owned_text_part("sources", sources),
+            owned_file_part("files", path, "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn verify_rejects_source_path_over_length_limit() {
+    let path = format!("path/to/large{}/file.tolk", "a".repeat(106));
+    assert_eq!(path.chars().count(), 129);
+    let sources = serde_json::to_string(&json!([{
+        "path": path,
+        "is_entrypoint": true,
+    }]))
+    .expect("source metadata should serialize");
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            owned_text_part("sources", sources),
+            owned_file_part("files", path, "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_contains(response, "no longer than 128 characters").await;
+}
+
+#[tokio::test]
 async fn verify_rejects_unsafe_source_paths() {
     let cases = [
         ("../main.tolk", "invalid component"),
