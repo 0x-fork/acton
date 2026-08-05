@@ -14,7 +14,7 @@ use crate::{EnvironmentRuntimeError, EnvironmentSnapshot};
 
 const COMPOSE_TEMPLATE: &str = include_str!("../assets/full-ton-network.compose.yaml");
 const DEFAULT_LOCALTON_IMAGE: &str =
-    "ghcr.io/ton-blockchain/localton:sha-e5d33846df348f86021de6031080969db2735a41";
+    "ghcr.io/ton-blockchain/localton:sha-eee0c78827aee140fea013f3b0108514a0a337ad";
 const COMPOSE_WAIT_TIMEOUT_SECONDS: u16 = 600;
 const DOCKER_CONFIG_DIRECTORY: &str = "docker-pull-config";
 const RUNTIME_DESCRIPTOR_FILE: &str = "runtime.json";
@@ -987,13 +987,13 @@ image
 inspect
 --format
 {{.Id}}
-ghcr.io/ton-blockchain/localton:sha-e5d33846df348f86021de6031080969db2735a41
+ghcr.io/ton-blockchain/localton:sha-eee0c78827aee140fea013f3b0108514a0a337ad
 
 NORMAL
 --context
 desktop-linux
 pull
-ghcr.io/ton-blockchain/localton:sha-e5d33846df348f86021de6031080969db2735a41
+ghcr.io/ton-blockchain/localton:sha-eee0c78827aee140fea013f3b0108514a0a337ad
 
 ISOLATED
 --config
@@ -1003,7 +1003,7 @@ unix:///docker.sock
 pull
 --platform
 linux/arm64
-ghcr.io/ton-blockchain/localton:sha-e5d33846df348f86021de6031080969db2735a41
+ghcr.io/ton-blockchain/localton:sha-eee0c78827aee140fea013f3b0108514a0a337ad
 
 CUSTOM ISOLATED: false"]]
         .assert_eq(&actual);
