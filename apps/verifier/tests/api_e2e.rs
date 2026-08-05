@@ -1515,6 +1515,45 @@ async fn verify_rejects_source_path_over_length_limit() {
 }
 
 #[tokio::test]
+async fn verify_rejects_non_ascii_source_paths() {
+    for path in [
+        "caf\u{e9}.tolk",
+        "cafe\u{301}.tolk",
+        "contracts/🚀.tolk",
+        "contracts/👩‍💻.tolk",
+        "contracts/👍🏽.tolk",
+        "contracts/✈️.tolk",
+        "contracts/\u{fb01}.tolk",
+        "contracts/Ａ.tolk",
+        "contracts/контракт.tolk",
+        "contracts/foo\u{a0}bar.tolk",
+    ] {
+        let sources = serde_json::to_string(&json!([{
+            "path": path,
+            "is_entrypoint": true,
+        }]))
+        .expect("source metadata should serialize");
+        let response = post_verify(
+            app_state(&[], CODE_HASH_ONE),
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", "tolk"),
+                text_part("compile_params", COMPILE_PARAMS_TOLK),
+                owned_text_part("sources", sources),
+                file_part("files", path, "text/plain", "fun main() {}"),
+            ],
+        )
+        .await;
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "non-ASCII path should be rejected: {path:?}"
+        );
+        assert_error_contains(response, "only ASCII characters").await;
+    }
+}
+
+#[tokio::test]
 async fn verify_rejects_unsafe_source_paths() {
     let cases = [
         ("../main.tolk", "invalid component"),
