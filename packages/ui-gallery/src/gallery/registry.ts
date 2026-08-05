@@ -40,6 +40,7 @@ import {skeletonGallery} from "./skeletonGallery"
 import {themeSwitchGallery} from "./themeSwitchGallery"
 import {tlbCellViewerGallery} from "./tlbCellViewerGallery"
 import {toastGallery} from "./toastGallery"
+import {tokenAmountGallery} from "./tokenAmountGallery"
 import {tokensGallery} from "./tokensGallery"
 import {tooltipGallery} from "./tooltipGallery"
 import {visuallyGroupedNumberGallery} from "./visuallyGroupedNumberGallery"
@@ -84,6 +85,7 @@ export const galleries = [
   toastGallery,
   rawDataBlockGallery,
   dataTableGallery,
+  tokenAmountGallery,
   gramAmountGallery,
   dateTimeGallery,
   durationGallery,

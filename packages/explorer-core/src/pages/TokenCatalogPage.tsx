@@ -10,6 +10,7 @@ import {
   DataTableTable,
   RelativeTime,
   Select,
+  TokenAmount,
 } from "@acton/ui"
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
@@ -263,7 +264,12 @@ export const TokenCatalogPage: FC<TokenCatalogPageProps> = ({client, embedded = 
                         </div>
                       </DataTableCell>
                       <DataTableCell align="right" tone="strong">
-                        {formatTokenSupply(token)}
+                        <TokenAmount
+                          decimals={token.jetton_content.decimals}
+                          symbol={token.jetton_content.symbol}
+                          useGrouping
+                          value={token.total_supply}
+                        />
                       </DataTableCell>
                       <DataTableCell>
                         <span className={token.mintable ? styles.positive : styles.muted}>
@@ -415,22 +421,4 @@ async function loadRecentlyActiveTokenBatch(
 
 function tokenAddressKey(address: string): string {
   return parseAddress(address)?.toRawString() ?? address
-}
-
-function formatTokenSupply(token: JettonMaster): string {
-  const parsedDecimals = Number(token.jetton_content.decimals ?? 9)
-  const decimals =
-    Number.isInteger(parsedDecimals) && parsedDecimals >= 0 && parsedDecimals <= 30
-      ? parsedDecimals
-      : 9
-
-  try {
-    const supply = BigInt(token.total_supply)
-    const scale = 10n ** BigInt(decimals)
-    const whole = supply / scale
-    const fraction = (supply % scale).toString().padStart(decimals, "0").replace(/0+$/, "")
-    return fraction ? `${whole.toLocaleString()}.${fraction}` : whole.toLocaleString()
-  } catch {
-    return token.total_supply
-  }
 }

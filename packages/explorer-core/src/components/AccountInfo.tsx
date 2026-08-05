@@ -3,7 +3,15 @@ import {Check, Copy, Edit2, QrCode, Star} from "lucide-react"
 import {QRCodeSVG} from "qrcode.react"
 import {memo, useEffect, useId, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
-import {CopyInlineAction, GramAmount, InfoPopover, Input, Popover, Tooltip} from "@acton/ui"
+import {
+  CopyInlineAction,
+  GramAmount,
+  InfoPopover,
+  Input,
+  Popover,
+  TokenAmount,
+  Tooltip,
+} from "@acton/ui"
 
 import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {TonClient} from "../api/client"
@@ -54,7 +62,7 @@ interface AccountInfoProps {
   readonly jettonWallets: JettonWallet[]
   readonly accountLoading?: boolean
   readonly assetsLoading?: boolean
-  readonly amount?: string
+  readonly amount?: ReactNode
   readonly amountLoading?: boolean
   readonly details?: readonly AccountInfoDetail[]
   readonly client: TonClient
@@ -267,7 +275,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
     wallet,
     master: wallet.master ?? tokenMastersByAddress.get(toRawAddress(wallet.jetton)),
   }))
-  const firstWalletDecimals = Number(firstMaster?.jetton_content?.decimals || 9)
   const firstWalletSymbol = firstMaster?.jetton_content?.symbol || "tokens"
   const firstWalletImageSources = getImageSources(
     firstMaster?.jetton_content,
@@ -554,8 +561,13 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                           }
                         />
                         <span className={styles.primaryValue}>
-                          {formatTokenAmount(firstWallet.balance, firstWalletDecimals)}{" "}
-                          {firstWalletSymbol}
+                          <TokenAmount
+                            decimals={firstMaster?.jetton_content.decimals}
+                            symbol={firstWalletSymbol}
+                            tabIndex={-1}
+                            useGrouping
+                            value={firstWallet.balance}
+                          />
                         </span>
                       </button>
                       {tokenPreviewItems.length > 0 && (
@@ -1006,13 +1018,6 @@ function normalizeForkNetwork(forkNetwork?: string): "mainnet" | "testnet" | und
     return normalizedFork
   }
   return undefined
-}
-
-function formatTokenAmount(value: string, decimals: number): string {
-  const decimalsNumber = Number.isFinite(decimals) ? decimals : 9
-  return (Number(value) / 10 ** decimalsNumber).toLocaleString(undefined, {
-    maximumFractionDigits: decimalsNumber,
-  })
 }
 
 function formatCollectibleCount(count: number): string {

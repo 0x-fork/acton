@@ -17,7 +17,7 @@ import type {
   MouseEvent,
   ReactNode,
 } from "react"
-import {AbiGetMethods, fmt} from "@acton/transaction-ui"
+import {AbiGetMethods} from "@acton/transaction-ui"
 import {
   Button,
   DataTable,
@@ -30,11 +30,13 @@ import {
   DataTableTable,
   DateTime,
   formatGramAmount,
+  formatTokenAmount,
   GramAmount,
   NftChip,
   Pagination,
   Popover,
   RelativeTime,
+  TokenAmount,
   Tooltip,
 } from "@acton/ui"
 import {
@@ -243,9 +245,14 @@ interface HistoryTextValueLine {
   readonly fullLabel?: string
   readonly unitLabel?: string
   readonly tone: HistoryValueTone
-  readonly gramMaximumFractionDigits?: number
-  readonly gramNanograms?: string
-  readonly gramSign?: string
+  readonly amount?: {
+    readonly decimals: number
+    readonly kind: "gram" | "token"
+    readonly maximumFractionDigits?: number
+    readonly rawValue: string
+    readonly signDisplay: "except-zero" | "never"
+    readonly symbol?: string
+  }
 }
 
 interface HistoryNftValueLine {
@@ -1431,8 +1438,6 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                 </thead>
                 <tbody>
                   {(holders || []).map(holder => {
-                    const decimals = Number(jettonMaster?.jetton_content?.decimals || 9)
-                    const balance = Number(holder.balance) / 10 ** decimals
                     const symbol = jettonMaster?.jetton_content?.symbol || ""
 
                     return (
@@ -1467,8 +1472,12 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                         </td>
                         <td className={styles.valueContainer}>
                           <div className={styles.valuePositive}>
-                            {balance.toLocaleString(undefined, {maximumFractionDigits: decimals})}{" "}
-                            {symbol}
+                            <TokenAmount
+                              decimals={jettonMaster?.jetton_content?.decimals}
+                              symbol={symbol}
+                              useGrouping
+                              value={holder.balance}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -1733,18 +1742,24 @@ function HistoryTextValue({
 
   return (
     <span className={className} title={line.fullLabel}>
-      {line.gramNanograms === undefined ? (
+      {line.amount === undefined ? (
         line.label
+      ) : line.amount.kind === "gram" ? (
+        <GramAmount
+          maximumFractionDigits={line.amount.maximumFractionDigits}
+          signDisplay={line.amount.signDisplay}
+          useGrouping
+          value={line.amount.rawValue}
+        />
       ) : (
-        <>
-          {line.gramSign}
-          <GramAmount
-            maximumFractionDigits={line.gramMaximumFractionDigits}
-            signDisplay="never"
-            useGrouping
-            value={line.gramNanograms}
-          />
-        </>
+        <TokenAmount
+          decimals={line.amount.decimals}
+          maximumFractionDigits={line.amount.maximumFractionDigits}
+          signDisplay={line.amount.signDisplay}
+          symbol={line.amount.symbol}
+          useGrouping
+          value={line.amount.rawValue}
+        />
       )}
       {line.unitLabel ? (
         <>
@@ -3396,9 +3411,13 @@ function tonValueLine(
     kind: "text",
     label: `${sign}${readableAmount} GRAM`,
     tone: displayTone,
-    gramMaximumFractionDigits: options.maximumFractionDigits,
-    gramNanograms: displayTone === "negative" ? `-${signlessAmount}` : signlessAmount,
-    gramSign: sign,
+    amount: {
+      decimals: 9,
+      kind: "gram",
+      maximumFractionDigits: options.maximumFractionDigits,
+      rawValue: displayTone === "negative" ? `-${signlessAmount}` : signlessAmount,
+      signDisplay: sign ? "except-zero" : "never",
+    },
   }
 }
 
@@ -3427,12 +3446,15 @@ function assetValueLine(
   }
 
   const tokenInfo = getMetadataTokenInfo(metadata, asset, "jetton_masters")
-  const decimals = metadataTokenDecimals(tokenInfo)
+  const decimals = metadataTokenDecimals(tokenInfo) ?? 0
   const symbol = metadataTokenString(tokenInfo, "symbol")
   const normalizedAmount = amount.trim().replace(/^[+-]/, "")
-  const formattedAmount =
-    decimals === undefined ? normalizedAmount : fmt.formatDecimalAmount(normalizedAmount, decimals)
-  const readableAmount = formatReadableNumber(formattedAmount, options.maximumFractionDigits)
+  const readableAmount = formatTokenAmount(normalizedAmount, decimals, {
+    fallback: normalizedAmount,
+    maximumFractionDigits: options.maximumFractionDigits,
+    showSymbol: false,
+    useGrouping: true,
+  })
   const displayTone = isZeroDisplayNumber(readableAmount) ? "neutral" : tone
   const sign = options.showSign === false ? "" : valueSign(displayTone)
   const fullAssetLabel = symbol ?? formatAddress(asset, false)
@@ -3441,7 +3463,14 @@ function assetValueLine(
     kind: "text",
     label: `${sign}${readableAmount}`,
     ...(symbol ? {} : {fullLabel: `${sign}${readableAmount} ${fullAssetLabel}`}),
-    unitLabel: assetLabel,
+    amount: {
+      decimals,
+      kind: "token",
+      maximumFractionDigits: options.maximumFractionDigits,
+      rawValue: displayTone === "negative" ? `-${normalizedAmount}` : normalizedAmount,
+      signDisplay: sign ? "except-zero" : "never",
+      symbol: assetLabel,
+    },
     tone: displayTone,
   }
 }

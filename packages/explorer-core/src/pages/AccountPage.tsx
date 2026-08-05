@@ -3,12 +3,13 @@ import {useCallback, useEffect, useMemo, useReducer, useRef, useState} from "rea
 import type {FC, ReactNode, SetStateAction} from "react"
 
 import {codeLookupHashHex} from "@acton/transaction-ui"
-import {Button, Dialog, HighlightedCode, RawDataBlock} from "@acton/ui"
+import {Button, Dialog, HighlightedCode, RawDataBlock, TokenAmount} from "@acton/ui"
 import {ListChecks, ScrollText, UsersRound} from "lucide-react"
 import {Cell} from "@ton/core"
 
 import type {AccountHistorySortOrder, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
+import {sortJettonWalletsByAmount} from "../api/jettonWallets"
 import {isAddressSuspended} from "../api/suspendedAccounts"
 import type {
   AddressInformation,
@@ -1757,19 +1758,6 @@ export const AccountPage: FC<AccountPageProps> = ({
   const tokenImageSources = getImageSources(tokenInfo?.jetton_content, TOKEN_IMAGE_SOURCE_KEYS)
   const tokenImage = tokenImageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE
   const jettonMasterAdminAddress = jettonMaster?.admin_address ?? undefined
-  const tokenTotalSupply = jettonMaster
-    ? formatJettonAmount(jettonMaster.total_supply, tokenDecimals)
-    : undefined
-  const tokenTotalSupplyLabel = tokenTotalSupply
-    ? `${tokenTotalSupply}${tokenSymbol ? ` ${tokenSymbol}` : ""}`
-    : undefined
-  const jettonWalletAmount =
-    jettonWalletAccount && jettonWalletMaster
-      ? formatJettonAmount(jettonWalletAccount.balance, jettonWalletMaster.jetton_content.decimals)
-      : undefined
-  const jettonWalletAmountLabel = jettonWalletAmount
-    ? `${jettonWalletAmount}${tokenSymbol ? ` ${tokenSymbol}` : ""}`
-    : undefined
   const jettonMetadataJson = jettonMaster
     ? JSON.stringify(
         {
@@ -2036,7 +2024,16 @@ export const AccountPage: FC<AccountPageProps> = ({
                   jettonWallets={jettonWallets}
                   accountLoading={accountLoading}
                   assetsLoading={accountLoading || jettonWalletsLoading}
-                  amount={jettonWalletAmountLabel}
+                  amount={
+                    jettonWalletAccount && jettonWalletMaster ? (
+                      <TokenAmount
+                        decimals={jettonWalletMaster.jetton_content.decimals}
+                        symbol={tokenSymbol}
+                        useGrouping
+                        value={jettonWalletAccount.balance}
+                      />
+                    ) : undefined
+                  }
                   amountLoading={isJettonWalletAccount && jettonWalletLoading}
                   details={accountInfoDetails}
                   client={client}
@@ -2091,9 +2088,15 @@ export const AccountPage: FC<AccountPageProps> = ({
                               <div className={styles.jettonSymbol}>{tokenSymbol}</div>
                             )}
                           </div>
-                          {jettonMaster && tokenTotalSupplyLabel && (
+                          {jettonMaster && (
                             <div className={styles.jettonSupply}>
-                              Max.supply: {tokenTotalSupplyLabel}
+                              Max.supply:{" "}
+                              <TokenAmount
+                                decimals={tokenDecimals}
+                                symbol={tokenSymbol}
+                                useGrouping
+                                value={jettonMaster.total_supply}
+                              />
                             </div>
                           )}
                           {jettonMaster && (
@@ -2366,10 +2369,17 @@ export const AccountPage: FC<AccountPageProps> = ({
                         )}
                       </dd>
                     </div>
-                    {tokenTotalSupplyLabel && (
+                    {jettonMaster && (
                       <div className={styles.metadataRow}>
                         <dt className={styles.metadataLabel}>Max supply</dt>
-                        <dd className={styles.metadataValue}>{tokenTotalSupplyLabel}</dd>
+                        <dd className={styles.metadataValue}>
+                          <TokenAmount
+                            decimals={tokenDecimals}
+                            symbol={tokenSymbol}
+                            useGrouping
+                            value={jettonMaster.total_supply}
+                          />
+                        </dd>
                       </div>
                     )}
                     <div className={styles.metadataRow}>
@@ -2434,49 +2444,6 @@ export const AccountPage: FC<AccountPageProps> = ({
       )}
     </div>
   )
-}
-
-function formatJettonAmount(value: string, decimals?: string): string {
-  const decimalsNumber = Number(decimals || 9)
-  return (Number(value) / 10 ** decimalsNumber).toLocaleString(undefined, {
-    maximumFractionDigits: decimalsNumber,
-  })
-}
-
-function sortJettonWalletsByAmount(wallets: readonly JettonWallet[]): JettonWallet[] {
-  return [...wallets].sort(compareJettonWalletAmount)
-}
-
-function compareJettonWalletAmount(left: JettonWallet, right: JettonWallet): number {
-  const leftBalance = parseBigIntAmount(left.balance)
-  const rightBalance = parseBigIntAmount(right.balance)
-  const leftDecimals = parseJettonDecimals(left.master?.jetton_content.decimals)
-  const rightDecimals = parseJettonDecimals(right.master?.jetton_content.decimals)
-  const leftScaled = leftBalance * 10n ** BigInt(rightDecimals)
-  const rightScaled = rightBalance * 10n ** BigInt(leftDecimals)
-
-  if (leftScaled > rightScaled) return -1
-  if (leftScaled < rightScaled) return 1
-
-  const leftSymbol = left.master?.jetton_content.symbol ?? ""
-  const rightSymbol = right.master?.jetton_content.symbol ?? ""
-  return leftSymbol.localeCompare(rightSymbol)
-}
-
-function parseBigIntAmount(value: string): bigint {
-  try {
-    return BigInt(value)
-  } catch {
-    return 0n
-  }
-}
-
-function parseJettonDecimals(decimals: string | undefined): number {
-  const value = Number(decimals ?? 9)
-  if (!Number.isInteger(value) || value < 0) {
-    return 9
-  }
-  return Math.min(value, 36)
 }
 
 interface AccountIssueCardProps {

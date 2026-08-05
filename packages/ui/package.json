@@ -47,6 +47,7 @@
     "./components/skeleton": "./src/components/Skeleton/index.ts",
     "./components/theme-provider": "./src/components/Theme/index.ts",
     "./components/theme-switch": "./src/components/ThemeSwitch/index.ts",
+    "./components/token-amount": "./src/components/TokenAmount/index.ts",
     "./components/toast": "./src/components/Toast/index.ts",
     "./components/tooltip": "./src/components/Tooltip/index.ts",
     "./components/visually-grouped-number": "./src/components/VisuallyGroupedNumber/index.ts",

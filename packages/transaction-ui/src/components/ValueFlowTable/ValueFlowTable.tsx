@@ -11,10 +11,11 @@ import {
   DataTableRow,
   DataTableTable,
   GramAmount,
+  TokenAmount,
 } from "@acton/ui"
 
 import type {ContractData, ValueFlowAsset, ValueFlowItem} from "../../model/transaction"
-import {formatAddress, formatDecimalAmount} from "../../lib/format"
+import {formatAddress} from "../../lib/format"
 
 import styles from "./ValueFlowTable.module.css"
 
@@ -96,7 +97,7 @@ export function ValueFlowTable({
                 </DataTableCell>
                 <DataTableCell align="right" data-mobile-label="Balance change">
                   <span className={item.change > 0n ? styles.positive : undefined}>
-                    <SignedGramAmount value={item.change} />
+                    <GramAmount signDisplay="except-zero" value={item.change} />
                   </span>
                 </DataTableCell>
                 {assets.map(asset => {
@@ -115,7 +116,12 @@ export function ValueFlowTable({
                               : styles.assetValue
                           }
                         >
-                          {formatSignedAssetChange(assetChange.change, asset)}
+                          <TokenAmount
+                            decimals={asset.decimals ?? 0}
+                            signDisplay="except-zero"
+                            symbol={asset.symbol}
+                            value={assetChange.change}
+                          />
                         </span>
                       )}
                     </DataTableCell>
@@ -160,24 +166,4 @@ function collectAssets(items: readonly ValueFlowItem[]): ValueFlowAsset[] {
   return [...assets.values()].sort((left, right) => {
     return (left.symbol ?? left.id).localeCompare(right.symbol ?? right.id)
   })
-}
-
-function formatSignedAssetChange(value: bigint, asset: ValueFlowAsset): string {
-  const sign = value > 0n ? "+" : value < 0n ? "-" : ""
-  const absolute = value < 0n ? -value : value
-  const amount =
-    asset.decimals === undefined
-      ? absolute.toString()
-      : formatDecimalAmount(absolute.toString(), asset.decimals)
-  return `${sign}${amount}${asset.symbol ? ` ${asset.symbol}` : ""}`
-}
-
-function SignedGramAmount({value}: {readonly value: bigint}) {
-  const sign = value > 0n ? "+ " : value < 0n ? "- " : ""
-  return (
-    <>
-      {sign}
-      <GramAmount signDisplay="never" value={value} />
-    </>
-  )
 }

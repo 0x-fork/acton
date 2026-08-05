@@ -2029,6 +2029,70 @@ Always declare the numeric unit when it is not seconds.
 - Do not create local duration, latency, elapsed-time, or runtime formatters.
 - Do not create local schedule-period or recurring-window formatters.
 
+## TokenAmount
+
+Status: ready
+
+Import:
+
+```tsx
+import { TokenAmount, formatTokenAmount } from "@acton/ui";
+```
+
+Use `TokenAmount` for fungible-token values stored as integer raw units. Pass
+the decimal precision from the token metadata. The component uses bigint
+arithmetic and does not convert the value through JavaScript `Number`.
+
+```tsx
+<TokenAmount value={wallet.balance} decimals={9} symbol="ACT" />
+<TokenAmount value={transfer.amount} decimals={6} symbol="USD₮" useGrouping />
+<TokenAmount value={rawAmount} decimals={0} symbol={symbol} signDisplay="except-zero" />
+```
+
+- `value` accepts a `bigint`, a safe integer, or an integer string. It must be
+  raw integer units, not an already scaled decimal string.
+- `decimals` accepts a number or the numeric string commonly returned in token
+  metadata. It controls the scale. If the token precision is unknown, use `0`
+  to display raw units.
+- Invalid decimal metadata uses `9`, which is the common Jetton default.
+- `symbol` is appended to the visible value and identifies the amount in the
+  tooltip. If the UI shows the symbol separately, set `showSymbol={false}`.
+- `maximumFractionDigits` rounds the visible value without changing the exact
+  raw value. If a view must not round up, set `roundingMode="truncate"`.
+- `minimumFractionDigits` preserves trailing decimal places in fixed-precision
+  views.
+- `useGrouping` adds locale-aware whole-number separators without losing bigint
+  precision.
+- `signDisplay` follows the usual `auto`, `always`, `except-zero`, and `never`
+  modes. Use `except-zero` for signed balance changes.
+- `showLessThanMinimum` displays a small non-zero value as a lower bound when
+  the selected precision would otherwise produce zero.
+- The default tooltip shows the exact decimal amount, raw integer units, and
+  decimal precision. Each value has a copy action. If this information is
+  visible, set `tooltip={false}`.
+- `rawUnitsLabel` changes the label for raw integer units. If the token defines
+  a unit name, set this property to that name. An example is `Nanograms`.
+- If the decimal precision adds no useful information, set
+  `showDecimalsInTooltip={false}`.
+- `formatTokenAmount` applies the same rules where JSX is not available, such
+  as component string props, form defaults, or diagnostic text.
+
+### Agent Guidance
+
+- Keep token values as integer raw units until they reach this component.
+- Use the component in rendered UI and the formatter only where a string is
+  required.
+- Pass the token symbol even with `showSymbol={false}` so the tooltip can name
+  the token.
+- If the visible value is rounded or abbreviated, keep the detailed tooltip
+  enabled.
+- Visual test metadata is included by the component. Do not repeat
+  `data-visual-dynamic="token-amount"` or
+  `data-visual-placeholder="<token>"` on a wrapper.
+- Do not convert token units through `Number`, `parseFloat`, or floating-point
+  powers of ten for UI display.
+- Do not create local token, Jetton, asset, or supply formatters.
+
 ## GramAmount
 
 Status: ready

@@ -20,16 +20,14 @@
 
 .tooltip {
   min-width: min(22rem, 100%);
-  display: flex;
-  flex-direction: column;
-  gap: var(--acton-space-1-5);
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--acton-space-2);
+  row-gap: var(--acton-space-1-5);
 }
 
 .tooltipRow {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr);
-  gap: var(--acton-space-2);
+  display: contents;
 }
 
 .tooltipRow > :first-child {
