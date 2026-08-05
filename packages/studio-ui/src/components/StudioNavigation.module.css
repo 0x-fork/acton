@@ -853,12 +853,6 @@
   white-space: nowrap;
 }
 
-.networkNavGroup {
-  padding-top: 8px;
-  margin-top: 8px;
-  border-top: 1px solid var(--acton-color-border);
-}
-
 .networkNavLabel {
   display: flex;
   min-height: 36px;

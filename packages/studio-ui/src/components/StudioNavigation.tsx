@@ -195,6 +195,45 @@ export function StudioNavigation({
 
                         return (
                           <Fragment key={page.path}>
+                            {page.path === "/tests" && networks.length > 0 ? (
+                              <div>
+                                <div className={styles.networkNavLabel}>
+                                  <Globe2 size={18} aria-hidden="true" />
+                                  <span>Networks</span>
+                                </div>
+                                <ul className={styles.environmentNavList} aria-label="Networks">
+                                  {networks.map(network => (
+                                    <li key={network.id}>
+                                      <button
+                                        type="button"
+                                        className={`${styles.environmentNavItem} ${
+                                          activeNetworkId === network.id
+                                            ? styles.environmentNavItemActive
+                                            : ""
+                                        }`}
+                                        aria-current={
+                                          activeNetworkId === network.id ? "page" : undefined
+                                        }
+                                        onClick={() => openEnvironmentAndClose(network)}
+                                      >
+                                        <span className={styles.networkNavIdentity}>
+                                          <span className={styles.environmentNavName}>
+                                            {network.name}
+                                          </span>
+                                        </span>
+                                        <span
+                                          className={styles.environmentStatusDot}
+                                          data-status={network.status}
+                                          role="img"
+                                          aria-label={`Status: ${network.status}`}
+                                          title={network.status}
+                                        />
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : undefined}
                             <button
                               type="button"
                               className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
@@ -272,43 +311,6 @@ export function StudioNavigation({
                           </Fragment>
                         )
                       })}
-                      {networks.length > 0 ? (
-                        <div className={styles.networkNavGroup}>
-                          <div className={styles.networkNavLabel}>
-                            <Globe2 size={18} aria-hidden="true" />
-                            <span>Networks</span>
-                          </div>
-                          <ul className={styles.environmentNavList} aria-label="Networks">
-                            {networks.map(network => (
-                              <li key={network.id}>
-                                <button
-                                  type="button"
-                                  className={`${styles.environmentNavItem} ${
-                                    activeNetworkId === network.id
-                                      ? styles.environmentNavItemActive
-                                      : ""
-                                  }`}
-                                  aria-current={activeNetworkId === network.id ? "page" : undefined}
-                                  onClick={() => openEnvironmentAndClose(network)}
-                                >
-                                  <span className={styles.networkNavIdentity}>
-                                    <span className={styles.environmentNavName}>
-                                      {network.name}
-                                    </span>
-                                  </span>
-                                  <span
-                                    className={styles.environmentStatusDot}
-                                    data-status={network.status}
-                                    role="img"
-                                    aria-label={`Status: ${network.status}`}
-                                    title={network.status}
-                                  />
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : undefined}
                     </div>
                   </div>
                 </nav>

@@ -1,7 +1,7 @@
-import {Boxes, FlaskConical, LayoutDashboard, Waypoints} from "lucide-react"
+import {Boxes, FlaskConical, LayoutDashboard} from "lucide-react"
 import type {LucideIcon} from "lucide-react"
 
-export type StudioPath = "/" | "/virtual-environments" | "/simulator" | "/tests"
+export type StudioPath = "/" | "/virtual-environments" | "/tests"
 
 export interface StudioPage {
   readonly path: StudioPath
@@ -31,12 +31,6 @@ export const studioPages: readonly StudioPage[] = [
     icon: Boxes,
   },
   {
-    path: "/simulator",
-    label: "Simulator",
-    shortDescription: "Build a message or replay a transaction in a reproducible workspace",
-    icon: Waypoints,
-  },
-  {
     path: "/tests",
     label: "Tests",
     shortDescription: "Run Acton tests and inspect failures, traces, gas data and history",
@@ -52,15 +46,8 @@ export const studioFeaturePages: Readonly<Record<Exclude<StudioPath, "/">, Studi
     emptyDescription:
       "Your environments will appear here after Studio is connected to the Acton runtime",
   },
-  "/simulator": {
-    ...studioPages[2],
-    actionLabel: "New simulation",
-    emptyTitle: "No simulation sessions",
-    emptyDescription:
-      "Builder and raw BoC sessions will live here with their inputs, results and share state",
-  },
   "/tests": {
-    ...studioPages[3],
+    ...studioPages[2],
     actionLabel: "Run tests",
     emptyTitle: "No test runs",
     emptyDescription:
