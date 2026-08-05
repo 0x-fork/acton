@@ -13,7 +13,7 @@ export interface TooltipProps {
   readonly disabled?: boolean
   readonly offset?: number
   readonly placement?: TooltipPlacement
-  readonly width?: "default" | "wide"
+  readonly width?: "default" | "wide" | "extra-wide"
 }
 
 export function Tooltip({

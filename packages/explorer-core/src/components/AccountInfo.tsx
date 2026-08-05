@@ -771,9 +771,22 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                 {statusInfo.label}
               </span>
             )}
-            <span className={styles.statusAddress} title={rawAddress}>
-              {statusAddress}
-            </span>
+            <Tooltip
+              content={
+                <span className={styles.addressFormatValueRow}>
+                  <code className={styles.addressFormatValue}>{rawAddress}</code>
+                  <CopyInlineAction
+                    copiedLabel="Raw address copied"
+                    label="Copy raw address"
+                    size="compact"
+                    value={rawAddress}
+                  />
+                </span>
+              }
+              width="extra-wide"
+            >
+              <span className={styles.statusAddress}>{statusAddress}</span>
+            </Tooltip>
             {actonscanUrl && (
               <a
                 className={styles.externalLink}

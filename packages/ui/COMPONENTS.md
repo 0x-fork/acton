@@ -1614,6 +1614,8 @@ the button's own accessible name.
 - `placement`: preferred side: `top`, `right`, `bottom`, or `left`.
 - `delay` and `closeDelay`: hover/focus timing in milliseconds.
 - `offset`: distance between the trigger and popup.
+- `width`: use `wide` for structured values and `extra-wide` for long technical
+  values that must stay on one line when space is available.
 - Positioning uses Base UI collision handling and a portal.
 
 ### Agent Guidance
@@ -1623,11 +1625,11 @@ the button's own accessible name.
 - Prefer the button's existing `title` prop when using `Button`,
   `InlineButton`, or `InlineAction`; those components render the shared
   Tooltip automatically.
-- Keep tooltip copy short and action-oriented.
-- Use Popover instead when the content contains links, controls, or structured
-  detail.
-- Do not attach Tooltip to non-button content until the component adoption
-  scope is intentionally expanded.
+- Keep help text short and action-oriented. A value tooltip can include the
+  full value and one compact copy action.
+- Use Popover when the content contains links, several controls, or a workflow.
+- A truncated read-only value can be a Tooltip trigger when the tooltip shows
+  the complete value.
 
 ## Dialog
 
