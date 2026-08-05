@@ -8,6 +8,7 @@ use acton_studio::StudioInfo;
 
 mod reporting;
 mod start;
+mod test_runs;
 
 const STUDIO_START_TIMEOUT: Duration = Duration::from_secs(10);
 const STUDIO_STOP_TIMEOUT: Duration = Duration::from_secs(5);
