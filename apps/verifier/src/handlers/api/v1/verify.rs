@@ -334,11 +334,6 @@ fn prepare_compile_input(
 }
 
 fn validate_source_path(path: &str) -> Result<(), ApiError> {
-    if !path.is_ascii() {
-        return Err(ApiError::bad_request(
-            "source path must contain only ASCII characters".to_owned(),
-        ));
-    }
     if path.chars().count() > MAX_SOURCE_PATH_CHARS {
         return Err(ApiError::bad_request(format!(
             "source path must be no longer than {MAX_SOURCE_PATH_CHARS} characters"
@@ -346,7 +341,26 @@ fn validate_source_path(path: &str) -> Result<(), ApiError> {
     }
 
     validate_relative_path("source path", path)?;
+    validate_source_path_components(path)?;
     validate_source_extension_count(path)
+}
+
+fn validate_source_path_components(path: &str) -> Result<(), ApiError> {
+    if !path.bytes().all(|character| {
+        character.is_ascii_alphanumeric() || matches!(character, b'/' | b'.' | b'_' | b'-')
+    }) {
+        return Err(ApiError::bad_request(
+            "source path components may contain only ASCII letters, numbers, '.', '_' and '-'"
+                .to_owned(),
+        ));
+    }
+    if path.split('/').any(|component| component.ends_with('.')) {
+        return Err(ApiError::bad_request(
+            "source path component must not end with '.'".to_owned(),
+        ));
+    }
+
+    Ok(())
 }
 
 fn validate_source_extension_count(path: &str) -> Result<(), ApiError> {
