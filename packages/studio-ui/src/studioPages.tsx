@@ -24,30 +24,30 @@ export const studioPages: readonly StudioPage[] = [
     icon: LayoutDashboard,
   },
   {
+    path: "/tests",
+    label: "Tests",
+    shortDescription: "Run Acton tests and inspect failures, traces, gas data and history",
+    icon: FlaskConical,
+  },
+  {
     path: "/virtual-environments",
     label: "Virtual Environments",
     shortDescription:
       "Create isolated TON networks, keep presets and move between active environments",
     icon: Boxes,
   },
-  {
-    path: "/tests",
-    label: "Tests",
-    shortDescription: "Run Acton tests and inspect failures, traces, gas data and history",
-    icon: FlaskConical,
-  },
 ]
 
 export const studioFeaturePages: Readonly<Record<Exclude<StudioPath, "/">, StudioFeaturePage>> = {
   "/virtual-environments": {
-    ...studioPages[1],
+    ...studioPages[2],
     actionLabel: "Create environment",
     emptyTitle: "No virtual environments yet",
     emptyDescription:
       "Your environments will appear here after Studio is connected to the Acton runtime",
   },
   "/tests": {
-    ...studioPages[2],
+    ...studioPages[1],
     actionLabel: "Run tests",
     emptyTitle: "No test runs",
     emptyDescription:
