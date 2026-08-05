@@ -1,4 +1,5 @@
 import {Address} from "@ton/core"
+import {shortenMiddle} from "@acton/ui"
 import {toUnicode} from "punycode/"
 
 import type {AddressInformation} from "../api/types"
@@ -138,12 +139,6 @@ export function isSameAddress(a: string, b: string): boolean {
   return a === b
 }
 
-export function shortenIdentifier(value: string, edgeLength = 6): string {
-  return value.length > edgeLength * 2
-    ? `${value.slice(0, edgeLength)}…${value.slice(-edgeLength)}`
-    : value
-}
-
 export function formatAddress(
   address: string,
   shorten: boolean = true,
@@ -162,11 +157,11 @@ export function formatAddress(
 
   if (displayAddress.includes(":")) {
     const [workchain, hash] = displayAddress.split(":")
-    return `${workchain}:${hash.slice(0, 6)}…${hash.slice(-6)}`
+    return `${workchain}:${shortenMiddle(hash, {start: 6, end: 6})}`
   }
 
   if (displayAddress.length > 12) {
-    return shortenIdentifier(displayAddress)
+    return shortenMiddle(displayAddress, {start: 6, end: 6})
   }
   return displayAddress
 }

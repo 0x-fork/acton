@@ -5,10 +5,13 @@ import {memo, useEffect, useId, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {
   CopyInlineAction,
+  formatCountLabel,
   GramAmount,
+  humanizeIdentifier,
   InfoPopover,
   Input,
   Popover,
+  shortenMiddle,
   TokenAmount,
   Tooltip,
 } from "@acton/ui"
@@ -739,7 +742,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                                         rel="noreferrer"
                                       >
                                         <span className={styles.contractDescriptionLinkKind}>
-                                          {formatContractLinkKind(link.kind)}
+                                          {humanizeIdentifier(link.kind)}
                                         </span>
                                         <span className={styles.contractDescriptionLinkTitle}>
                                           {link.url}
@@ -898,7 +901,7 @@ function getInterfaceLabel(value: string): string | undefined {
       return "Multisig order v2"
     }
     default: {
-      return normalizedInterface.replaceAll("_", " ")
+      return humanizeIdentifier(normalizedInterface)
     }
   }
 }
@@ -933,10 +936,6 @@ function normalizeContractAbiLink(link: ContractAbiLink): ContractAbiLink | unde
     url,
     kind: kind || "link",
   }
-}
-
-function formatContractLinkKind(kind: string): string {
-  return kind.replaceAll("_", " ")
 }
 
 function getStatusInfo(state?: AddressInformation): {
@@ -1034,7 +1033,7 @@ function normalizeForkNetwork(forkNetwork?: string): "mainnet" | "testnet" | und
 }
 
 function formatCollectibleCount(count: number): string {
-  return `${count.toLocaleString()} ${count === 1 ? "NFT" : "NFTs"}`
+  return formatCountLabel(count, {singular: "NFT"})
 }
 
 function formatRawAddress(address: string): string {
@@ -1042,8 +1041,5 @@ function formatRawAddress(address: string): string {
   if (!workchain || !hash) {
     return address
   }
-  if (hash.length <= 11) {
-    return `${workchain}:${hash}`
-  }
-  return `${workchain}:${hash.slice(0, 3)}…${hash.slice(-5)}`
+  return `${workchain}:${shortenMiddle(hash, {start: 3, end: 5})}`
 }

@@ -886,7 +886,7 @@ It owns hexadecimal formatting and composes its copy interaction from
 <OpcodeChip opcode={opcode} abiName={resolvedOpcodeName} showOpcode />
 ```
 
-- `opcode`: numeric opcode. Zero is valid and renders as `0x0`; `undefined`
+- `opcode`: numeric or string opcode. Zero is valid and renders as `0x00000000`; `undefined`
   renders `Empty` without a copy action.
 - `abiName`: optional symbolic name resolved by domain code.
 - `showOpcode`: keeps the hexadecimal value visible beside `abiName`.
@@ -904,7 +904,8 @@ It owns hexadecimal formatting and composes its copy interaction from
 
 ### Agent Guidance
 
-- Pass a number and let OpcodeChip format the hexadecimal value.
+- Pass the raw number or string and let OpcodeChip format the canonical unsigned
+  32-bit hexadecimal value.
 - Resolve ABI names outside `@acton/ui` and pass the prepared string.
 - Do not wrap OpcodeChip in another copy control.
 - Do not duplicate copy state, timers, clipboard calls, or copy/check icons in
@@ -2030,6 +2031,137 @@ Always declare the numeric unit when it is not seconds.
   a wrapper.
 - Do not create local duration, latency, elapsed-time, or runtime formatters.
 - Do not create local schedule-period or recurring-window formatters.
+
+## NumberValue and CountValue
+
+Status: ready
+
+Import:
+
+```tsx
+import { CountValue, NumberValue, formatCountLabel, formatNumberValue } from "@acton/ui";
+```
+
+Use `NumberValue` for exact decimal values and grouped counters. It accepts a
+number, bigint, or decimal string without converting exact inputs to a float.
+Use `CountValue` when the number and its singular or plural noun belong together.
+
+```tsx
+<NumberValue value="12345678901234567.125" />
+<CountValue value={transactionCount} singular="transaction" />
+<CountValue value={entryCount} singular="entry" plural="entries" />
+```
+
+- Use the components in JSX
+- Use `formatNumberValue` or `formatCountLabel` only when an API requires a string
+- Set `maximumFractionDigits`, `minimumFractionDigits`, `signDisplay`, or
+  `useGrouping` on `NumberValue` when the view needs a specific numeric contract
+- Do not call `Number`, `parseFloat`, or `toLocaleString` before the shared API
+- Do not select singular and plural labels in feature code when `CountValue` fits
+
+## Percentage
+
+Status: ready
+
+Import:
+
+```tsx
+import { Percentage, formatPercentage, formatPercentageRatio } from "@acton/ui";
+```
+
+Use `Percentage` for percentage points. Pass `total` when `value` is a part of a
+whole. The component calculates the ratio and handles a zero total.
+
+```tsx
+<Percentage value={coverageScore} maximumFractionDigits={1} />
+<Percentage value={usedGas} total={totalGas} maximumFractionDigits={1} />
+```
+
+- Do not repeat `(value / total) * 100` in callers
+- Use `formatPercentage` or `formatPercentageRatio` only for chart callbacks,
+  toast descriptions, and other required strings
+
+## ByteSize
+
+Status: ready
+
+Import:
+
+```tsx
+import { ByteSize, formatByteSize } from "@acton/ui";
+```
+
+Use `ByteSize` for byte counts. It selects a binary unit from B through TB and
+uses adaptive precision.
+
+```tsx
+<ByteSize value={snapshot.archiveSizeBytes} />
+```
+
+Use `formatByteSize` only where JSX is not available. Do not create local file
+or archive size formatters.
+
+## BooleanValue
+
+Status: ready
+
+Import:
+
+```tsx
+import { BooleanValue } from "@acton/ui";
+```
+
+Use `BooleanValue` for semantic flags. Positive values are green. Negative
+values are neutral gray.
+
+```tsx
+<BooleanValue value={transaction.success} />
+<BooleanValue value={block.want_merge} display="true-false" />
+```
+
+The default labels are `Yes` and `No`. Use `display="true-false"` for technical
+block and protocol fields.
+
+## TechnicalValue and SourceLocationValue
+
+Status: ready
+
+Import:
+
+```tsx
+import {
+  SourceLocationValue,
+  TechnicalValue,
+  shortenMiddle,
+  truncateEnd,
+} from "@acton/ui";
+```
+
+Use `TechnicalValue` for hashes and identifiers that need middle shortening,
+full-value inspection, and copy feedback. Use `SourceLocationValue` for paths
+with optional line and column values.
+
+```tsx
+<TechnicalValue value={transaction.hash} copyLabel="transaction hash" />
+<SourceLocationValue
+  value={{ file: location.file, line: location.line, column: location.column }}
+  projectRoot={projectRoot}
+/>
+```
+
+- Keep the tooltip enabled when the visible value is shortened
+- Technical values use the shared extra-small monospace size by default
+- The copy action uses the standard `InlineActions` spacing
+- Set `copyVisibility="always"` when the copy action must remain visible
+- Full values use CSS ellipsis only when their container is too narrow, so the
+  copy action stays reachable
+- The extra-wide tooltip shows the complete value and includes its own copy action
+- Set `copyable={false}` only when copying has no value in that context
+- Use `shortenMiddle`, `formatSourcePath`, or `formatSourceLocation` only when a
+  component cannot be used, such as an accessible label or URL title
+- Use `truncateEnd` for non-React previews that must preserve the start and fit
+  an exact character limit
+- Do not assemble a shortened value, title, and copy button independently
 
 ## TokenAmount
 

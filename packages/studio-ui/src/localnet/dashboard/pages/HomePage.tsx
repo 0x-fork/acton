@@ -14,6 +14,8 @@ import {
   Dialog,
   Duration,
   formatDuration,
+  formatNumberValue,
+  humanizeIdentifier,
   Input,
   DAY_SECONDS,
   Tooltip,
@@ -753,29 +755,20 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   )
 }
 
-function formatNodeInfoValue(value: string): string {
-  const normalized = value.trim()
-  if (normalized.length === 0) {
-    return "—"
-  }
-
-  return normalized.replace(/_/g, " ")
-}
-
 function formatForkSummary(
   network: string | null | undefined,
   block: number | null | undefined,
 ): string {
   const networkValue = network?.trim()
   const networkLabel = networkValue
-    ? `${networkValue.charAt(0).toUpperCase()}${formatNodeInfoValue(networkValue).slice(1)} fork`
+    ? `${humanizeIdentifier(networkValue, {capitalize: true})} fork`
     : undefined
 
   if (block === undefined || block === null) {
     return networkLabel ?? "Clean network"
   }
 
-  const blockLabel = `Block ${block.toLocaleString()}`
+  const blockLabel = `Block ${formatNumberValue(block)}`
   return networkLabel ? `${networkLabel} · ${blockLabel}` : `Fork · ${blockLabel}`
 }
 

@@ -1,11 +1,12 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
 import {
-  CopyInlineAction,
   DateTime,
+  formatCompilerLabel,
   InlineAction,
   InlineActions,
   Pagination,
+  TechnicalValue,
   useToast,
 } from "@acton/ui"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
@@ -214,29 +215,25 @@ export const SourceCatalog: FC<{readonly client: TonClient}> = ({client}) => {
                       </td>
                       <td>
                         <div className={styles.codeHashCell}>
-                          <span className={styles.codeHash} title={entry.artifactId}>
-                            {shortCodeHash(entry.artifactId)}
-                          </span>
-                          <CopyInlineAction
-                            className={styles.hashCopyButton}
+                          <TechnicalValue
+                            className={styles.codeHash}
                             value={entry.artifactId}
-                            label="Copy artifact ID"
-                            copiedLabel="Copied artifact ID"
-                            size="compact"
+                            copyLabel="artifact ID"
+                            startLength={10}
+                            endLength={6}
+                            copyVisibility="always"
                           />
                         </div>
                       </td>
                       <td>
                         <div className={styles.codeHashCell}>
-                          <span className={styles.codeHash} title={entry.codeHash}>
-                            {shortCodeHash(entry.codeHash)}
-                          </span>
-                          <CopyInlineAction
-                            className={styles.hashCopyButton}
+                          <TechnicalValue
+                            className={styles.codeHash}
                             value={entry.codeHash}
-                            label="Copy code hash"
-                            copiedLabel="Copied code hash"
-                            size="compact"
+                            copyLabel="code hash"
+                            startLength={10}
+                            endLength={6}
+                            copyVisibility="always"
                           />
                         </div>
                       </td>
@@ -344,20 +341,10 @@ function sourceToTableEntry(source: RegisteredSource): SourceTableEntry {
     artifactId: source.artifactId ?? bundle?.source_bundle_hash ?? source.codeHash,
     codeHash: source.codeHash,
     entrypoint: bundle?.entrypoint ?? "unknown",
-    compiler: bundle ? formatCompiler(bundle.compiler) : "unknown",
+    compiler: formatCompilerLabel(bundle?.compiler, "unknown"),
     files: bundle?.files.length ?? 0,
     savedAt: source.savedAt,
   }
-}
-
-function formatCompiler(compiler: SourceCompiler): string {
-  const language = compiler.language || "unknown"
-  const version = compiler.version ? ` ${compiler.version}` : ""
-  return `${language}${version}`
-}
-
-function shortCodeHash(codeHash: string): string {
-  return codeHash.length > 18 ? `${codeHash.slice(0, 10)}…${codeHash.slice(-6)}` : codeHash
 }
 
 function SourceCatalogSkeleton(): JSX.Element {

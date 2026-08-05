@@ -1,4 +1,14 @@
-import {BlockChip, CopyInlineAction, DateTime, Duration, GramAmount, InlineActions} from "@acton/ui"
+import {
+  BlockChip,
+  CopyInlineAction,
+  CountValue,
+  DateTime,
+  Duration,
+  formatCountLabel,
+  GramAmount,
+  humanizeIdentifier,
+  InlineActions,
+} from "@acton/ui"
 import {
   getTransactionComputePhase,
   type TransactionBlockRef,
@@ -39,13 +49,6 @@ interface TraceOverviewTableProps {
 }
 
 const MASTERCHAIN_BLOCK_SHARD = "8000000000000000"
-
-const formatState = (state: string): string => {
-  const normalized = state.trim().replaceAll("_", " ")
-  return normalized.length > 0
-    ? normalized.charAt(0).toUpperCase() + normalized.slice(1)
-    : "Unknown"
-}
 
 const isSameBlock = (left: TransactionBlockRef | undefined, right: TransactionBlockRef): boolean =>
   left?.workchain === right.workchain && left.shard === right.shard && left.seqno === right.seqno
@@ -125,7 +128,7 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
     ? (hashToHex(data.externalHash) ?? data.externalHash)
     : undefined
   const status = data.isIncomplete ? "Incomplete" : "Complete"
-  const traceState = formatState(data.traceState)
+  const traceState = humanizeIdentifier(data.traceState, {capitalize: true, fallback: "Unknown"})
   const traceItems: readonly {readonly label: string; readonly value: ReactNode}[] = [
     {
       label: "Status",
@@ -246,9 +249,8 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
           <div className={styles.sectionTitle}>Shard Flow</div>
           <div className={`${styles.sectionContent} ${styles.shardFlowContent}`}>
             <div className={styles.shardFlowSummary}>
-              Logical-time order · {shardFlow.shardCount}{" "}
-              {shardFlow.shardCount === 1 ? "shard" : "shards"} · {shardFlow.transactionCount}{" "}
-              {shardFlow.transactionCount === 1 ? "transaction" : "transactions"}
+              Logical-time order · <CountValue singular="shard" value={shardFlow.shardCount} /> ·{" "}
+              <CountValue singular="transaction" value={shardFlow.transactionCount} />
             </div>
             <div
               ref={shardFlowRef}
@@ -265,9 +267,7 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
                       index === currentShardFlowSegmentIndex ? currentShardFlowStepRef : undefined
                     }
                     role="group"
-                    aria-label={`${segment.workchain}:${segment.shard}, ${segment.transactionCount} ${
-                      segment.transactionCount === 1 ? "transaction" : "transactions"
-                    }`}
+                    aria-label={`${segment.workchain}:${segment.shard}, ${formatCountLabel(segment.transactionCount, {singular: "transaction"})}`}
                     className={`${styles.shardFlowStep} ${
                       index === currentShardFlowSegmentIndex ? styles.shardFlowStepCurrent : ""
                     } ${
@@ -295,10 +295,7 @@ export const TraceOverviewTable: FC<TraceOverviewTableProps> = ({
                       </span>
                     </div>
                     <div className={styles.shardFlowMeta}>
-                      <span>
-                        {segment.transactionCount}{" "}
-                        {segment.transactionCount === 1 ? "transaction" : "transactions"}
-                      </span>
+                      <CountValue singular="transaction" value={segment.transactionCount} />
                     </div>
                     <div className={styles.shardFlowBlocks}>
                       <span className={styles.shardFlowBlocksLabel}>

@@ -1,6 +1,6 @@
 import {Check, Copy, KeyRound, Shield} from "lucide-react"
 import {TlbCellViewer} from "@acton/transaction-ui"
-import {Button, Dialog, GramAmount, RawDataBlock, useToast} from "@acton/ui"
+import {Button, Dialog, GramAmount, RawDataBlock, shortenMiddle, useToast} from "@acton/ui"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 import type {
@@ -928,7 +928,7 @@ const CopyableAddress: FC<CopyableAddressProps> = ({address, copiedAddress, onCo
   return (
     <div className={styles.copyableAddress}>
       <span className={styles.copyableAddressText} title={address}>
-        {shortenAddress(address, 14)}
+        {shortenMiddle(address, {start: 14, end: 14, separator: "..."})}
       </span>
       <button
         type="button"
@@ -970,14 +970,6 @@ const SignRequestPreview: FC<SignRequestPreviewProps> = ({preview}) => {
       />
     </div>
   )
-}
-
-function shortenAddress(address: string, visibleChars: number): string {
-  if (address.length <= visibleChars * 2) {
-    return address
-  }
-
-  return `${address.slice(0, visibleChars)}...${address.slice(-visibleChars)}`
 }
 
 function getDappName(name: string | undefined): string {

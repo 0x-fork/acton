@@ -7,6 +7,7 @@ import {
   InlineAction,
   InlineActions,
   Pagination,
+  shortenMiddle,
   useClientPagination,
   useToast,
 } from "@acton/ui"
@@ -18,7 +19,7 @@ import type {JettonWallet} from "../api/types"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {WalletAccountSummary, type AccountBalanceState} from "../components/WalletAccountSummary"
-import {normalizeAddress, shortenIdentifier, toRawAddress} from "../components/utils"
+import {normalizeAddress, toRawAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useFavoriteAccounts, type FavoriteAccount} from "../hooks/useFavoriteAccounts"
@@ -381,7 +382,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                           to={routes.transactionPath(favorite.hash)}
                           title={favorite.hash}
                         >
-                          {shortenIdentifier(favorite.hash)}
+                          {shortenMiddle(favorite.hash, {start: 6, end: 6})}
                         </Link>
                       </InlineActions>
                     </td>

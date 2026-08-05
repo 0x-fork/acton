@@ -1,31 +1,14 @@
-import type React from "react"
 import {Address} from "@ton/core"
+import {shortenMiddle} from "@acton/ui"
 
 export function formatAddress(address: string): string {
   if (!address) return "unknown"
   try {
     const parsed = Address.parse(address)
     const displayAddress = parsed.toString({testOnly: true})
-    return `${displayAddress.slice(0, 6)}...${displayAddress.slice(-6)}`
+    return shortenMiddle(displayAddress, {start: 6, end: 6, separator: "..."})
   } catch {
     if (address.length <= 12) return address
-    return `${address.slice(0, 6)}...${address.slice(Math.max(0, address.length - 6))}`
+    return shortenMiddle(address, {start: 6, end: 6, separator: "..."})
   }
-}
-
-export function truncateMiddle(value: string, maxLength: number): string {
-  if (value.length <= maxLength) return value
-  if (maxLength <= 0) return ""
-  if (maxLength === 1) return "…"
-
-  const visibleLength = maxLength - 1
-  const startLength = Math.ceil(visibleLength / 2)
-  const endLength = Math.floor(visibleLength / 2)
-  const end = endLength === 0 ? "" : value.slice(-endLength)
-  return `${value.slice(0, startLength)}…${end}`
-}
-
-export const formatNumber = (v: number | bigint | undefined | null): React.JSX.Element => {
-  if (v === undefined || v === null) return <span>—</span>
-  return <span className="number-value">{v.toString()}</span>
 }

@@ -1,5 +1,6 @@
 import type {OutAction} from "@ton/core"
 import {
+  BooleanValue,
   ChangeLibraryModeViewer,
   ContractChip,
   CopyInlineButton,
@@ -12,6 +13,7 @@ import {
   RawDataBlock,
   ReserveModeViewer,
   SendModeViewer,
+  SourceLocationValue,
 } from "@acton/ui"
 import React, {useState} from "react"
 import {FiBookOpen, FiCode, FiCornerUpRight, FiLock, FiPackage} from "react-icons/fi"
@@ -95,10 +97,6 @@ const getActionIcon = (actionType: OutAction["type"]): ActionIconMeta => {
     }
   }
 }
-
-const formatBoolean = (v: boolean): React.JSX.Element => (
-  <span className={v ? styles.booleanTrue : styles.booleanFalse}>{v ? "Yes" : "No"}</span>
-)
 
 const formatModeNames = (names: readonly string[]): string =>
   names.length > 0 ? names.join(" + ") : "—"
@@ -192,12 +190,6 @@ const getActionExecutionMeta = (
   ),
 })
 
-const formatSourceLocation = (location: SourceLocation): string => {
-  const parts = location.file.split("/")
-  const file = parts.length > 3 ? `.../${parts.slice(-3).join("/")}` : location.file
-  return `${file}:${location.line}:${location.column}`
-}
-
 const renderActionSourceLocation = (
   executorAction: BackendExecutorAction | undefined,
   renderSourceLocation: ((location: SourceLocation) => React.ReactNode) | undefined,
@@ -211,7 +203,11 @@ const renderActionSourceLocation = (
     <div className={styles.detailRow}>
       <span className={styles.detailLabel}>Source:</span>
       <span className={`${styles.detailValue} ${styles.sourceLocationValue}`}>
-        {renderSourceLocation ? renderSourceLocation(location) : formatSourceLocation(location)}
+        {renderSourceLocation ? (
+          renderSourceLocation(location)
+        ) : (
+          <SourceLocationValue maxSegments={3} value={location} />
+        )}
       </span>
     </div>
   )
@@ -308,11 +304,15 @@ const renderActionDetails = (
                 </div>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Bounce:</span>
-                  <span className={styles.detailValue}>{formatBoolean(info.bounce)}</span>
+                  <span className={styles.detailValue}>
+                    <BooleanValue value={info.bounce} />
+                  </span>
                 </div>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Bounced:</span>
-                  <span className={styles.detailValue}>{formatBoolean(info.bounced)}</span>
+                  <span className={styles.detailValue}>
+                    <BooleanValue value={info.bounced} />
+                  </span>
                 </div>
               </>
             )}

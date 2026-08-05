@@ -12,19 +12,21 @@ import {
   DataTableSkeletonRows,
   DataTableTable,
   Pagination,
+  formatCompilerLabel,
+  shortenMiddle,
 } from "@acton/ui"
 import {ChartPie} from "lucide-react"
 import {useEffect, useMemo, useRef, useState} from "react"
 import type {MouseEvent as ReactMouseEvent} from "react"
 
 import type {LastVerifiedItem, VerifierApi} from "../lib/api"
-import {shortenMiddle} from "../lib/target"
 import styles from "./VerifiedPage.module.css"
 
 function compilerLabel(item: LastVerifiedItem): string {
-  const language = item.compiler.language || "unknown"
-  const version = item.compiler.version || "unknown"
-  return `${language} ${version}`
+  return formatCompilerLabel({
+    language: item.compiler.language || "unknown",
+    version: item.compiler.version || "unknown",
+  })
 }
 
 function sourceName(item: LastVerifiedItem): string {
@@ -221,7 +223,7 @@ export function VerifiedContractsPage({
                         aria-label={`Open code hash ${item.code_hash}`}
                         onClick={event => handleLinkClick(event, () => onOpenContract(item))}
                       >
-                        {shortenMiddle(item.code_hash, 18, 12)}
+                        {shortenMiddle(item.code_hash, {start: 18, end: 12})}
                       </a>
                       <CopyInlineAction
                         className={styles.hashCopyButton}

@@ -1,4 +1,11 @@
-import {Button, formatDateTime, formatRecurringPeriod, SearchInput, useToast} from "@acton/ui"
+import {
+  Button,
+  formatDateTime,
+  formatNumberValue,
+  formatRecurringPeriod,
+  SearchInput,
+  useToast,
+} from "@acton/ui"
 import type {SearchInputItem} from "@acton/ui"
 import {Address} from "@ton/core"
 import {
@@ -371,7 +378,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
           const progressDescription =
             progress.attempts === 0
               ? statusDescription("solving")
-              : `${formatHashRate(progress)} · ${progress.attempts.toLocaleString()} attempts`
+              : `${formatHashRate(progress)} · ${formatNumberValue(progress.attempts)} attempts`
           updateToast(toastId, {
             variant: "loading",
             title: statusTitle("solving"),

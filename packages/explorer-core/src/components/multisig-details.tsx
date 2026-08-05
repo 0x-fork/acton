@@ -15,6 +15,7 @@ import {
   DataTableTable,
   DateTime,
   formatGramAmount,
+  NumberValue,
   ParsedBodySection,
   type ParsedTransactionBody,
   type ParsedValue,
@@ -367,7 +368,8 @@ export function MultisigOrdersTab({state, onAddressClick, onOrderClick}: Multisi
         {hasMoreOrders && (
           <div ref={loadMoreRef} className={styles.ordersLoadMore}>
             <span className={styles.ordersLoadMoreSummary}>
-              Showing {visibleOrders.length.toLocaleString()} of {orders.length.toLocaleString()}
+              Showing <NumberValue value={visibleOrders.length} /> of{" "}
+              <NumberValue value={orders.length} />
             </span>
             <Button
               type="button"
@@ -446,15 +448,15 @@ function MultisigWalletOverview({wallet}: {readonly wallet: V3Multisig}) {
           Multisig wallet
         </h2>
         <p className={overviewStyles.description}>
-          Requires {threshold.toLocaleString()} of {signerCount.toLocaleString()} signers to approve
-          an order before execution.
+          Requires <NumberValue value={threshold} /> of <NumberValue value={signerCount} /> signers
+          to approve an order before execution.
         </p>
       </div>
       <div className={overviewStyles.metrics}>
         <OverviewMetric label="Threshold" value={`${threshold} of ${signerCount}`} />
-        <OverviewMetric label="Contributors" value={totalContributors.toLocaleString()} />
-        <OverviewMetric label="Orders" value={wallet.orders.length.toLocaleString()} />
-        <OverviewMetric label="Pending" value={pendingOrders.toLocaleString()} />
+        <OverviewMetric label="Contributors" value={<NumberValue value={totalContributors} />} />
+        <OverviewMetric label="Orders" value={<NumberValue value={wallet.orders.length} />} />
+        <OverviewMetric label="Pending" value={<NumberValue value={pendingOrders} />} />
       </div>
     </section>
   )
@@ -498,7 +500,7 @@ function MultisigOrderOverview({
       </div>
       <div className={overviewStyles.metrics}>
         <OverviewMetric label="Approvals" value={`${approvals} of ${threshold}`} />
-        <OverviewMetric label="Signers" value={order.signers.length.toLocaleString()} />
+        <OverviewMetric label="Signers" value={<NumberValue value={order.signers.length} />} />
         <OverviewMetric
           label="Expires"
           value={
@@ -509,7 +511,7 @@ function MultisigOrderOverview({
             />
           }
         />
-        <OverviewMetric label="Actions" value={actionCount.toLocaleString()} />
+        <OverviewMetric label="Actions" value={<NumberValue value={actionCount} />} />
       </div>
       <ApprovalProgress
         approved={approvals}

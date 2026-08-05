@@ -1,10 +1,10 @@
 import {describe, expect, test} from "bun:test"
+import {shortenMiddle} from "@acton/ui"
 
 import {
   formatDnsName,
   mergeAccountDomains,
   parseTonDnsSearchQuery,
-  shortenIdentifier,
   toAccountQrAddress,
 } from "../src/components/utils"
 
@@ -69,15 +69,16 @@ describe("mergeAccountDomains", () => {
   })
 })
 
-describe("shortenIdentifier", () => {
+describe("shortenMiddle", () => {
   test("keeps short identifiers unchanged", () => {
-    expect(shortenIdentifier("123456789012")).toBe("123456789012")
+    expect(shortenMiddle("123456789012", {start: 6, end: 6})).toBe("123456789012")
   })
 
   test("preserves both ends of long identifiers", () => {
     expect(
-      shortenIdentifier(
+      shortenMiddle(
         "7971555897574548850977350810590246753707871758085628535730858724873159573504",
+        {start: 6, end: 6},
       ),
     ).toBe("797155…573504")
   })

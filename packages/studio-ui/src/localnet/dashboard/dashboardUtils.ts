@@ -1,4 +1,5 @@
 import type {V3TransactionListItem} from "@acton/explorer-core/api/types"
+import {shortenMiddle} from "@acton/ui"
 
 export function parseGramAmount(value: string): number | undefined {
   const trimmed = value.trim()
@@ -25,7 +26,7 @@ export function contentString(
 }
 
 export function shortHash(hash: string): string {
-  return hash.length > 16 ? `${hash.slice(0, 8)}…${hash.slice(-8)}` : hash
+  return shortenMiddle(hash, {start: 8, end: 8})
 }
 
 export function matchesQuery(fields: readonly (string | undefined)[], query: string): boolean {

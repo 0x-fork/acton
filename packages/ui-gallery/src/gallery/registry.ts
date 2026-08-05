@@ -44,6 +44,7 @@ import {tokenAmountGallery} from "./tokenAmountGallery"
 import {tokensGallery} from "./tokensGallery"
 import {tooltipGallery} from "./tooltipGallery"
 import {visuallyGroupedNumberGallery} from "./visuallyGroupedNumberGallery"
+import {valueFormattingGallery} from "./valueFormattingGallery"
 import type {ComponentGallery} from "./types"
 
 export const galleries = [
@@ -89,6 +90,7 @@ export const galleries = [
   gramAmountGallery,
   dateTimeGallery,
   durationGallery,
+  valueFormattingGallery,
   skeletonGallery,
   visuallyGroupedNumberGallery,
   checkboxGallery,

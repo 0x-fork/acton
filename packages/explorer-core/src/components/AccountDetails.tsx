@@ -27,15 +27,19 @@ import {
   DataTableHead,
   DataTableHeaderCell,
   DataTableRow,
+  DataTableSkeletonRows,
   DataTableTable,
   DateTime,
+  formatOpcode,
   formatGramAmount,
+  formatNumberValue,
   formatTokenAmount,
   GramAmount,
   NftChip,
   Pagination,
   Popover,
   RelativeTime,
+  shortenMiddle,
   TokenAmount,
   Tooltip,
 } from "@acton/ui"
@@ -118,7 +122,7 @@ import {
 import {Nfts, NftsSkeleton} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
-import {formatAddress, hashToHex, isSameAddress, parseAddress, shortenIdentifier} from "./utils"
+import {formatAddress, hashToHex, isSameAddress, parseAddress} from "./utils"
 
 type Tabs = "history" | "contract" | "get-methods" | "tokens" | "nfts" | "items" | "holders"
 
@@ -1427,23 +1431,26 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
           {holdersLoading ? (
             <HoldersSkeleton />
           ) : (
-            <div className={styles.tableWrapper}>
-              <table className={styles.table}>
-                <thead className={styles.historyHeaderGroup}>
-                  <tr className={styles.historyHeaderRow}>
-                    <th className={styles.tableHeader}>Owner</th>
-                    <th className={styles.tableHeader}>Wallet</th>
-                    <th className={`${styles.tableHeader} ${styles.valueContainer}`}>Balance</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <DataTable className={styles.embeddedTable} minWidth="42rem">
+              <DataTableTable aria-label="Jetton holders">
+                <DataTableHead>
+                  <DataTableRow>
+                    <DataTableHeaderCell columnWidth="38%">Owner</DataTableHeaderCell>
+                    <DataTableHeaderCell columnWidth="38%">Wallet</DataTableHeaderCell>
+                    <DataTableHeaderCell align="right" columnWidth="24%">
+                      Balance
+                    </DataTableHeaderCell>
+                  </DataTableRow>
+                </DataTableHead>
+                <DataTableBody>
                   {(holders || []).map(holder => {
                     const symbol = jettonMaster?.jetton_content?.symbol || ""
 
                     return (
-                      <tr
+                      <DataTableRow
                         key={holder.address}
-                        className={`${styles.row} ${styles.clickableRow}`}
+                        hover
+                        interactive={onAddressClick !== undefined}
                         tabIndex={onAddressClick ? 0 : undefined}
                         onClick={event => onAddressClick?.(holder.owner, event)}
                         onKeyDown={
@@ -1458,19 +1465,19 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                             : undefined
                         }
                       >
-                        <td>
+                        <DataTableCell truncate>
                           <ExplorerAddressChip
                             address={holder.owner}
                             onAddressClick={onAddressClick}
                           />
-                        </td>
-                        <td>
+                        </DataTableCell>
+                        <DataTableCell truncate>
                           <ExplorerAddressChip
                             address={holder.address}
                             onAddressClick={onAddressClick}
                           />
-                        </td>
-                        <td className={styles.valueContainer}>
+                        </DataTableCell>
+                        <DataTableCell align="right" tone="strong">
                           <div className={styles.valuePositive}>
                             <TokenAmount
                               decimals={jettonMaster?.jetton_content?.decimals}
@@ -1479,20 +1486,16 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                               value={holder.balance}
                             />
                           </div>
-                        </td>
-                      </tr>
+                        </DataTableCell>
+                      </DataTableRow>
                     )
                   })}
                   {(!holders || holders.length === 0) && (
-                    <tr className={styles.emptyRow}>
-                      <td colSpan={3} className={styles.emptyCell}>
-                        <div className={styles.emptyState}>No holders found</div>
-                      </td>
-                    </tr>
+                    <DataTableEmpty colSpan={3}>No holders found</DataTableEmpty>
                   )}
-                </tbody>
-              </table>
-            </div>
+                </DataTableBody>
+              </DataTableTable>
+            </DataTable>
           )}
           {showLoadMoreHolders && onLoadMoreHolders && (
             <div ref={holdersLoadMoreRef} className={styles.listLoadMore}>
@@ -1557,32 +1560,28 @@ function isBuiltInTab(value: string): value is Tabs {
 
 function HoldersSkeleton(): JSX.Element {
   return (
-    <div className={styles.tableWrapper}>
-      <table className={styles.table} aria-label="Loading holders">
-        <thead className={styles.historyHeaderGroup}>
-          <tr className={styles.historyHeaderRow}>
-            <th className={styles.tableHeader}>Owner</th>
-            <th className={styles.tableHeader}>Wallet</th>
-            <th className={`${styles.tableHeader} ${styles.valueContainer}`}>Balance</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({length: 4}, (_, index) => (
-            <tr key={`holders-skeleton-${index}`} className={styles.skeletonRow}>
-              <td>
-                <div className={`${styles.skeleton} ${styles.historySkeletonAddress}`} />
-              </td>
-              <td>
-                <div className={`${styles.skeleton} ${styles.historySkeletonAddress}`} />
-              </td>
-              <td className={styles.valueContainer}>
-                <div className={`${styles.skeleton} ${styles.historySkeletonValue}`} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable className={styles.embeddedTable} minWidth="42rem">
+      <DataTableTable aria-label="Loading holders">
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell columnWidth="38%">Owner</DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth="38%">Wallet</DataTableHeaderCell>
+            <DataTableHeaderCell align="right" columnWidth="24%">
+              Balance
+            </DataTableHeaderCell>
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
+          <DataTableSkeletonRows
+            alignments={["left", "left", "right"]}
+            columns={3}
+            rowKeyPrefix="holders"
+            rows={4}
+            widths={["11rem", "11rem", "8rem"]}
+          />
+        </DataTableBody>
+      </DataTableTable>
+    </DataTable>
   )
 }
 
@@ -2112,7 +2111,7 @@ function getHistoryTransactionInfo(
     : outMsgs.find(message => message.destination) ||
       outMsgs.find(message => message.opcode) ||
       outMsgs[0]
-  const opcode = normalizeOpcode(displayMessage?.opcode)
+  const opcode = formatOpcode(displayMessage?.opcode)
   const normalizedOpcode = opcode
   const actionLabel =
     resolveMessageName(displayMessage, messageNamesByAddress) ||
@@ -2498,7 +2497,7 @@ function opcodeTechnicalLabel(
   destination: string | null | undefined,
   messageNamesByAddress: MessageNamesByAddress,
 ): HistoryTechnicalLabel | undefined {
-  const normalizedOpcode = normalizeOpcode(opcode)
+  const normalizedOpcode = formatOpcode(opcode)
   if (!normalizedOpcode) {
     return undefined
   }
@@ -3458,7 +3457,7 @@ function assetValueLine(
   const displayTone = isZeroDisplayNumber(readableAmount) ? "neutral" : tone
   const sign = options.showSign === false ? "" : valueSign(displayTone)
   const fullAssetLabel = symbol ?? formatAddress(asset, false)
-  const assetLabel = symbol ?? shortenIdentifier(fullAssetLabel, 3)
+  const assetLabel = symbol ?? shortenMiddle(fullAssetLabel, {start: 3, end: 3})
   return {
     kind: "text",
     label: `${sign}${readableAmount}`,
@@ -3497,7 +3496,7 @@ function rawValueLine(
   }
 
   const normalizedAmount = amount.trim().replace(/^[+-]/, "")
-  const readableAmount = formatReadableNumber(normalizedAmount)
+  const readableAmount = formatNumberValue(normalizedAmount, {maximumFractionDigits: 9})
   const displayTone = isZeroDisplayNumber(readableAmount) ? "neutral" : tone
   return {
     kind: "text",
@@ -3529,7 +3528,8 @@ function actionNftValueLine(
   const fullLabel = name ?? (isNonEmptyString(itemIndex) ? `NFT #${itemIndex}` : undefined)
   if (!fullLabel && !itemAddress) return undefined
   const label =
-    name ?? (isNonEmptyString(itemIndex) ? `NFT #${shortenIdentifier(itemIndex)}` : "NFT")
+    name ??
+    (isNonEmptyString(itemIndex) ? `NFT #${shortenMiddle(itemIndex, {start: 6, end: 6})}` : "NFT")
 
   const imageSources = getImageSources(tokenInfo, NFT_IMAGE_SOURCE_KEYS)
   return {
@@ -3561,13 +3561,6 @@ function tonToNftValueLine(
   }
 
   return ton ?? nft
-}
-
-function formatReadableNumber(value: string, maximumFractionDigits = 9): string {
-  const numeric = Number(value)
-  return Number.isFinite(numeric) && value.length < 18
-    ? numeric.toLocaleString(undefined, {maximumFractionDigits})
-    : value
 }
 
 function valueSign(tone: HistoryValueTone): string {
@@ -3677,7 +3670,7 @@ function resolveMessageName(
     return undefined
   }
 
-  const opcode = normalizeOpcode(message.opcode)
+  const opcode = formatOpcode(message.opcode)
   if (!opcode) {
     return undefined
   }
@@ -3697,34 +3690,6 @@ function resolveOpcodeName(
   const sourceNames = source ? messageNamesByAddress.get(addressKey(source)) : undefined
 
   return destinationNames?.incoming.get(opcode) ?? sourceNames?.outgoing.get(opcode) ?? undefined
-}
-
-function normalizeOpcode(opcode: string | number | null | undefined): string | undefined {
-  if (opcode === null || opcode === undefined) {
-    return undefined
-  }
-
-  const normalized = typeof opcode === "string" ? opcode.trim() : opcode
-  if (normalized === "") {
-    return undefined
-  }
-
-  try {
-    const value =
-      typeof normalized === "number"
-        ? normalized
-        : normalized.startsWith("0x") || normalized.startsWith("0X")
-          ? Number.parseInt(normalized.slice(2), 16)
-          : Number.parseInt(normalized, 10)
-
-    if (!Number.isInteger(value) || value < 0 || value > 0xff_ff_ff_ff) {
-      return undefined
-    }
-
-    return `0x${value.toString(16).padStart(8, "0")}`
-  } catch {
-    return undefined
-  }
 }
 
 const ContractCode = lazy(async () => {

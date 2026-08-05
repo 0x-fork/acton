@@ -1,5 +1,6 @@
 import {
   Button,
+  CountValue,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -10,6 +11,9 @@ import {
   DataTableSkeletonRows,
   DataTableTable,
   formatDateTime,
+  formatNumberValue,
+  NumberValue,
+  Percentage,
   Skeleton,
 } from "@acton/ui"
 import {CircleAlert, RefreshCw} from "lucide-react"
@@ -105,16 +109,6 @@ function languageLabel(language: string): string {
 
 function languageColor(language: string): string {
   return LANGUAGE_COLORS[language.trim().toLowerCase()] ?? FALLBACK_LANGUAGE_COLOR
-}
-
-function formatCount(value: number): string {
-  return normalizedCount(value).toLocaleString()
-}
-
-function formatShare(value: number, total: number): string {
-  if (total <= 0) return "0%"
-  const share = (normalizedCount(value) / total) * 100
-  return `${share >= 10 ? share.toFixed(0) : share.toFixed(1)}%`
 }
 
 function monthStart(timestamp: number): number {
@@ -276,12 +270,19 @@ export function StatisticsPage({api}: StatisticsPageProps) {
               {isLoading ? (
                 <Skeleton width="11rem" height="4.5rem" radius="md" />
               ) : (
-                <strong className={styles.totalValue}>{formatCount(total)}</strong>
+                <strong className={styles.totalValue}>
+                  <NumberValue value={total} />
+                </strong>
               )}
               <span className={styles.totalCaption}>
-                {isLoading
-                  ? "Reading the verifier registry"
-                  : `Across ${languages.length.toLocaleString()} compiler languages`}
+                {isLoading ? (
+                  "Reading the verifier registry"
+                ) : (
+                  <>
+                    <span>Across </span>
+                    <CountValue singular="compiler language" value={languages.length} />
+                  </>
+                )}
               </span>
             </div>
 
@@ -315,14 +316,16 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                             contentStyle={CHART_TOOLTIP_STYLE}
                             itemStyle={{color: "var(--acton-color-text)"}}
                             formatter={value => [
-                              formatCount(typeof value === "number" ? value : Number(value)),
+                              formatNumberValue(Array.isArray(value) ? value[0] : value),
                               "Contracts",
                             ]}
                           />
                         </PieChart>
                       </ResponsiveContainer>
                       <div className={styles.chartCenter} aria-hidden="true">
-                        <strong>{formatCount(total)}</strong>
+                        <strong>
+                          <NumberValue value={total} />
+                        </strong>
                         <span>Total</span>
                       </div>
                     </>
@@ -350,8 +353,16 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                             <span>{language.label}</span>
                           </div>
                           <div className={styles.legendValue}>
-                            <strong>{formatCount(language.total)}</strong>
-                            <span>{formatShare(language.total, total)}</span>
+                            <strong>
+                              <NumberValue value={language.total} />
+                            </strong>
+                            <span>
+                              <Percentage
+                                maximumFractionDigits={1}
+                                total={total}
+                                value={language.total}
+                              />
+                            </span>
                           </div>
                         </div>
                       ))}
@@ -367,7 +378,11 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                 <p>Registry growth and monthly verification activity.</p>
               </div>
               <span>
-                {isLoading ? "Loading" : `${formatCount(history?.items.length ?? 0)} records`}
+                {isLoading ? (
+                  "Loading"
+                ) : (
+                  <CountValue singular="record" value={history?.items.length ?? 0} />
+                )}
               </span>
             </header>
 
@@ -404,7 +419,7 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                           allowDecimals={false}
                           axisLine={false}
                           tick={{fill: "var(--acton-color-text-muted)", fontSize: 12}}
-                          tickFormatter={formatCount}
+                          tickFormatter={value => formatNumberValue(value)}
                           tickLine={false}
                           width={46}
                         />
@@ -414,7 +429,10 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                           labelFormatter={value =>
                             formatDateTime(Number(value), MONTH_TOOLTIP_FORMAT)
                           }
-                          formatter={(value, name) => [formatCount(Number(value)), name]}
+                          formatter={(value, name) => [
+                            formatNumberValue(Array.isArray(value) ? value[0] : value),
+                            name,
+                          ]}
                         />
                         {historySeries.languages.map(language => (
                           <Area
@@ -470,7 +488,7 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                           allowDecimals={false}
                           axisLine={false}
                           tick={{fill: "var(--acton-color-text-muted)", fontSize: 12}}
-                          tickFormatter={formatCount}
+                          tickFormatter={value => formatNumberValue(value)}
                           tickLine={false}
                           width={46}
                         />
@@ -481,7 +499,10 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                           labelFormatter={value =>
                             formatDateTime(Number(value), MONTH_TOOLTIP_FORMAT)
                           }
-                          formatter={(value, name) => [formatCount(Number(value)), name]}
+                          formatter={(value, name) => [
+                            formatNumberValue(Array.isArray(value) ? value[0] : value),
+                            name,
+                          ]}
                         />
                         {historySeries.languages.map(language => (
                           <Bar
@@ -506,7 +527,9 @@ export function StatisticsPage({api}: StatisticsPageProps) {
           <section className={styles.compilerSection}>
             <header className={styles.compilerHeading}>
               <h2>Versions by language</h2>
-              <span>{isLoading ? "Loading" : `${versionCount.toLocaleString()} versions`}</span>
+              <span>
+                {isLoading ? "Loading" : <CountValue singular="version" value={versionCount} />}
+              </span>
             </header>
 
             {isLoading ? (
@@ -553,7 +576,12 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                         {language.label}
                       </span>
                     }
-                    meta={`${formatCount(language.total)} contracts · ${language.versions.length.toLocaleString()} versions`}
+                    meta={
+                      <>
+                        <CountValue singular="contract" value={language.total} /> ·{" "}
+                        <CountValue singular="version" value={language.versions.length} />
+                      </>
+                    }
                     minWidth="36rem"
                   >
                     <DataTableTable
@@ -575,13 +603,21 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                             <DataTableRow key={`${language.language}:${row.version}`} hover>
                               <DataTableCell mono>{row.version}</DataTableCell>
                               <DataTableCell align="right" tone="strong">
-                                {formatCount(row.total)}
+                                <NumberValue value={row.total} />
                               </DataTableCell>
                               <DataTableCell align="right" tone="muted">
-                                {formatShare(row.total, language.total)}
+                                <Percentage
+                                  maximumFractionDigits={1}
+                                  total={language.total}
+                                  value={row.total}
+                                />
                               </DataTableCell>
                               <DataTableCell align="right" tone="muted">
-                                {formatShare(row.total, total)}
+                                <Percentage
+                                  maximumFractionDigits={1}
+                                  total={total}
+                                  value={row.total}
+                                />
                               </DataTableCell>
                             </DataTableRow>
                           ))

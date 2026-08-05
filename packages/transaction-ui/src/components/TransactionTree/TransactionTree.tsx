@@ -3,9 +3,12 @@ import type React from "react"
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import {
   buildStorageDiff,
+  formatOpcode,
   formatGramAmount,
+  formatNumberValue,
   GramAmount,
   InlineButton,
+  shortenMiddle,
   type ParsedValueDiff,
   ParsedValueDiffView,
 } from "@acton/ui"
@@ -26,7 +29,6 @@ import type {
 } from "../../model/transaction"
 import type {ContractVerifiedSource} from "../ContractSourcePanel/ContractSourcePanel"
 import type {ResolveVerifiedSourceByCodeHash} from "../CodeCellDetails/CodeCellDetails"
-import * as fmt from "../../lib/format"
 import {decodeTransactionMessageBody} from "../../lib/messageBody"
 import {
   getTransactionActionPhase,
@@ -503,7 +505,7 @@ export function TransactionTree({
           ? parsedBody.name
           : opcode === undefined
             ? "empty"
-            : `0x${opcode.toString(16)}`)
+            : (formatOpcode(opcode) ?? "unknown"))
 
       const contractLetter = thisAddress ? (targetContract?.letter ?? "?") : "?"
 
@@ -631,7 +633,7 @@ export function TransactionTree({
     const omittedLabel =
       omittedTransactionCount === undefined
         ? "Trace segment unavailable"
-        : `${omittedTransactionCount.toLocaleString("en-US")} tx omitted`
+        : `${formatNumberValue(omittedTransactionCount, {locale: "en-US"})} tx omitted`
     const createTraceGapNode = (children: RawNodeDatum[] = []): RawNodeDatum => ({
       name: omittedLabel,
       attributes: {
@@ -796,7 +798,7 @@ export function TransactionTree({
               <div className={styles.edgeText} role="note">
                 <div className={styles.topText}>
                   <p className={styles.edgeTextTitle} aria-label={nodeDatum.name}>
-                    {fmt.truncateMiddle(nodeDatum.name, TREE_ACCOUNT_LABEL_MAX_LENGTH)}
+                    {shortenMiddle(nodeDatum.name, {maxLength: TREE_ACCOUNT_LABEL_MAX_LENGTH})}
                   </p>
                   <p className={styles.edgeTextContent}>—</p>
                 </div>
@@ -1115,7 +1117,7 @@ export function TransactionTree({
           >
             <div className={styles.topText}>
               <p className={styles.edgeTextTitle} aria-label={nodeDatum.name}>
-                {fmt.truncateMiddle(nodeDatum.name, TREE_ACCOUNT_LABEL_MAX_LENGTH)}
+                {shortenMiddle(nodeDatum.name, {maxLength: TREE_ACCOUNT_LABEL_MAX_LENGTH})}
               </p>
               {nodeDatum.attributes?.value && (
                 <p className={styles.edgeTextContent}>{nodeDatum.attributes.value as string}</p>
@@ -1395,7 +1397,7 @@ function formatAddress(address: Address | undefined, contracts: Map<string, Cont
     }
   }
 
-  return `${displayAddress.slice(0, 5)}...${displayAddress.slice(-5)}`
+  return shortenMiddle(displayAddress, {start: 5, end: 5, separator: "..."})
 }
 
 function getSharedInternalSource(

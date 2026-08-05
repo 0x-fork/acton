@@ -1,4 +1,4 @@
-import {DateTime, Duration, Skeleton} from "@acton/ui"
+import {DateTime, Duration, formatCountLabel, Skeleton, SourceLocationValue} from "@acton/ui"
 import {
   ArrowRight,
   Ban,
@@ -424,9 +424,11 @@ function LatestRunOutcome({
                   <CircleAlert size={16} aria-hidden="true" />
                   <span className={styles.failureCopy}>
                     <strong>{report.name}</strong>
-                    <code title={report.file_path}>
-                      {relativeTestLocation(report.file_path, details?.projectRoot, report.row)}
-                    </code>
+                    <SourceLocationValue
+                      maxSegments={Number.MAX_SAFE_INTEGER}
+                      projectRoot={details?.projectRoot}
+                      value={{file: report.file_path, line: report.row + 1}}
+                    />
                     {message ? <small title={message}>{message}</small> : null}
                   </span>
                 </div>
@@ -565,20 +567,10 @@ function latestRunHeadline(run: TestRunSummary) {
     return "Test run failed"
   }
   if (run.status === "passed") {
-    return run.stats.total === 1 ? "1 test passed" : `${run.stats.total} tests passed`
+    return `${formatCountLabel(run.stats.total, {singular: "test"})} passed`
   }
   if (run.status === "cancelled") return "Test run cancelled"
   return run.status === "queued" ? "Waiting to start" : "Running tests"
-}
-
-function relativeTestLocation(filePath: string, projectRoot: string | undefined, row: number) {
-  const normalizedPath = filePath.replaceAll("\\", "/")
-  const normalizedRoot = projectRoot?.replaceAll("\\", "/").replace(/\/$/, "")
-  const relativePath =
-    normalizedRoot && normalizedPath.startsWith(`${normalizedRoot}/`)
-      ? normalizedPath.slice(normalizedRoot.length + 1)
-      : normalizedPath
-  return `${relativePath}:${row + 1}`
 }
 
 function failureMessage(report: TestRunRecord["reports"][number]) {

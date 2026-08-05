@@ -8,6 +8,7 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  formatOpcode,
   GramAmount,
   RelativeTime,
 } from "@acton/ui"
@@ -387,29 +388,6 @@ function formatMessageOpcode(message: TransactionMessage | undefined): string | 
   }
 
   return formatOpcode(message.opcode)
-}
-
-function formatOpcode(opcode: string | number | null | undefined): string | undefined {
-  if (opcode === null || opcode === undefined) {
-    return undefined
-  }
-
-  const normalized = typeof opcode === "string" ? opcode.trim() : opcode
-  if (normalized === "") {
-    return undefined
-  }
-  const value =
-    typeof normalized === "number"
-      ? normalized
-      : normalized.startsWith("0x") || normalized.startsWith("0X")
-        ? Number.parseInt(normalized.slice(2), 16)
-        : Number.parseInt(normalized, 10)
-
-  if (!Number.isInteger(value) || value < 0 || value > 0xff_ff_ff_ff) {
-    return undefined
-  }
-
-  return `0x${value.toString(16).padStart(8, "0")}`
 }
 
 function resolveMessageName(

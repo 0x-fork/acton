@@ -1,4 +1,4 @@
-import {SearchInput, formatToncenterBlockId, useToast} from "@acton/ui"
+import {formatOpcode, SearchInput, formatToncenterBlockId, useToast} from "@acton/ui"
 import type {SearchInputItem} from "@acton/ui"
 import {abiSymbolAnchorId} from "@acton/transaction-ui/abi"
 import {FileCode2, History, Search} from "lucide-react"
@@ -486,8 +486,7 @@ function declarationOpcode(
     return undefined
   }
 
-  const opcode = declaration.prefix.prefix_num >>> 0
-  return `0x${opcode.toString(16).padStart(8, "0")}`
+  return formatOpcode(declaration.prefix.prefix_num >>> 0)
 }
 
 function searchAbiIndex(

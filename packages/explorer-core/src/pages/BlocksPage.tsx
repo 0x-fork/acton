@@ -11,6 +11,7 @@ import {
 import {useNavigate, useParams} from "react-router"
 import {
   BlockChip,
+  BooleanValue,
   Button,
   CopyButton,
   CopyInlineAction,
@@ -31,8 +32,10 @@ import {
   InlineActions,
   Input,
   ModeViewer,
+  NumberValue,
   Popover,
   RelativeTime,
+  shortenMiddle,
   formatToncenterBlockId,
   type ModeInfo,
   type ModeParser,
@@ -1024,7 +1027,9 @@ const BlockTableSection: FC<{
                     }}
                   />
                 </DataTableCell>
-                <DataTableCell>{block.tx_count.toLocaleString()}</DataTableCell>
+                <DataTableCell>
+                  <NumberValue value={block.tx_count} />
+                </DataTableCell>
                 <DataTableCell truncate>
                   <DateTime
                     display="date-time-numeric-seconds"
@@ -1036,16 +1041,16 @@ const BlockTableSection: FC<{
                 {showShardFlags ? (
                   <>
                     <DataTableCell>
-                      <BooleanValue value={block.before_split} />
+                      <BooleanValue display="true-false" value={block.before_split} />
                     </DataTableCell>
                     <DataTableCell>
-                      <BooleanValue value={block.after_split} />
+                      <BooleanValue display="true-false" value={block.after_split} />
                     </DataTableCell>
                     <DataTableCell>
-                      <BooleanValue value={block.want_split} />
+                      <BooleanValue display="true-false" value={block.want_split} />
                     </DataTableCell>
                     <DataTableCell>
-                      <BooleanValue value={block.want_merge} />
+                      <BooleanValue display="true-false" value={block.want_merge} />
                     </DataTableCell>
                   </>
                 ) : null}
@@ -1159,7 +1164,7 @@ const BlockTransactionsTable: FC<{
                   <DataTableCell>
                     <span className={styles.blocksHashCell}>
                       <span className={styles.blocksHashText} title={hash}>
-                        {compactMiddle(hash, 18)}
+                        {shortenMiddle(hash, {maxLength: 19})}
                       </span>
                       <CopyInlineAction
                         value={hash}
@@ -1447,7 +1452,7 @@ const BlockSummaryTable: FC<{
       </BlockDetailSection>
 
       <BlockDetailSection label="Activity">
-        <BlockDetailItem label="Tx quantity" value={block.tx_count.toLocaleString()} mono />
+        <BlockDetailItem label="Tx quantity" value={<NumberValue value={block.tx_count} />} mono />
         {block.fees_collected === undefined ? null : (
           <BlockDetailItem
             label="Fees collected"
@@ -1457,26 +1462,44 @@ const BlockSummaryTable: FC<{
         {block.in_msg_descr_length === undefined ? null : (
           <BlockDetailItem
             label="In msg descr length"
-            value={block.in_msg_descr_length.toLocaleString()}
+            value={<NumberValue value={block.in_msg_descr_length} />}
             mono
           />
         )}
         {block.out_msg_descr_length === undefined ? null : (
           <BlockDetailItem
             label="Out msg descr length"
-            value={block.out_msg_descr_length.toLocaleString()}
+            value={<NumberValue value={block.out_msg_descr_length} />}
             mono
           />
         )}
       </BlockDetailSection>
 
       <BlockDetailSection label="Flags" contentClassName={styles.blockSixColumnGrid}>
-        <BlockDetailItem label="Key block" value={<BooleanValue value={block.key_block} />} />
-        <BlockDetailItem label="After merge" value={<BooleanValue value={block.after_merge} />} />
-        <BlockDetailItem label="After split" value={<BooleanValue value={block.after_split} />} />
-        <BlockDetailItem label="Before split" value={<BooleanValue value={block.before_split} />} />
-        <BlockDetailItem label="Want merge" value={<BooleanValue value={block.want_merge} />} />
-        <BlockDetailItem label="Want split" value={<BooleanValue value={block.want_split} />} />
+        <BlockDetailItem
+          label="Key block"
+          value={<BooleanValue display="true-false" value={block.key_block} />}
+        />
+        <BlockDetailItem
+          label="After merge"
+          value={<BooleanValue display="true-false" value={block.after_merge} />}
+        />
+        <BlockDetailItem
+          label="After split"
+          value={<BooleanValue display="true-false" value={block.after_split} />}
+        />
+        <BlockDetailItem
+          label="Before split"
+          value={<BooleanValue display="true-false" value={block.before_split} />}
+        />
+        <BlockDetailItem
+          label="Want merge"
+          value={<BooleanValue display="true-false" value={block.want_merge} />}
+        />
+        <BlockDetailItem
+          label="Want split"
+          value={<BooleanValue display="true-false" value={block.want_split} />}
+        />
       </BlockDetailSection>
 
       <BlockDetailSection label="Logical time">
@@ -1543,17 +1566,6 @@ const BlockDetailItem: FC<BlockDetailItemProps> = ({
     </span>
   </div>
 )
-
-const BooleanValue: FC<{readonly value: boolean | undefined}> = ({value}) => {
-  if (value === undefined) {
-    return <>—</>
-  }
-  return (
-    <span className={value ? styles.blockBooleanTrue : styles.blockBooleanFalse}>
-      {value ? "true" : "false"}
-    </span>
-  )
-}
 
 const BlockCapabilities: FC<{readonly value: string | number}> = ({value}) => {
   const mode = Number(value)
@@ -1761,13 +1773,4 @@ function formatTransactionExitCode(transaction: BlockTransactionListItem): strin
   }
   const resultCode = transaction.description.action?.result_code
   return typeof resultCode === "number" ? resultCode.toString() : "Unknown"
-}
-
-function compactMiddle(value: string, visibleChars: number): string {
-  if (value.length <= visibleChars + 3) {
-    return value
-  }
-
-  const side = Math.max(4, Math.floor(visibleChars / 2))
-  return `${value.slice(0, side)}…${value.slice(-side)}`
 }

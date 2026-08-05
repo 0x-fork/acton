@@ -404,15 +404,6 @@
   gap: 6px 12px;
 }
 
-.blockBooleanTrue {
-  color: var(--acton-color-success);
-  font-weight: var(--acton-font-weight-emphasis);
-}
-
-.blockBooleanFalse {
-  color: var(--acton-color-text-muted);
-}
-
 .blockDetailsPanel .skeletonLine {
   align-self: flex-start;
   background: transparent;

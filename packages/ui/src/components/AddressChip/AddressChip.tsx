@@ -2,6 +2,7 @@ import {Check, Copy} from "lucide-react"
 import type {MouseEvent, ReactNode} from "react"
 
 import {cx} from "../../lib/cx"
+import {shortenMiddle} from "../../lib/formatting"
 import {useCopyValue} from "../../lib/useCopyValue"
 import {InlineAction} from "../InlineActions/InlineActions"
 import {Tooltip} from "../Tooltip"
@@ -139,9 +140,8 @@ function getDisplayAddress(
 function shortenAddress(address: string): string {
   if (address.includes(":")) {
     const [workchain, hash] = address.split(":")
-    return `${workchain}:${hash.slice(0, 6)}…${hash.slice(-6)}`
+    return `${workchain}:${shortenMiddle(hash, {start: 6, end: 6})}`
   }
 
-  if (address.length > 12) return `${address.slice(0, 6)}…${address.slice(-6)}`
-  return address
+  return shortenMiddle(address, {start: 6, end: 6})
 }

@@ -1,5 +1,6 @@
 import {
   Button,
+  ByteSize,
   DataTableBody,
   DataTableCell,
   DataTableEmpty,
@@ -13,6 +14,7 @@ import {
   Duration,
   Input,
   InlineAction,
+  NumberValue,
   useToast,
 } from "@acton/ui"
 import {Archive, RotateCcw, Trash2} from "lucide-react"
@@ -280,13 +282,13 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({
                       <DateTime value={snapshot.createdAt} unit="seconds" />
                     </DataTableCell>
                     <DataTableCell tone="muted" mono>
-                      {formatMasterchainSeqno(snapshot.masterchainSeqno)}
+                      <NumberValue value={snapshot.masterchainSeqno} />
                     </DataTableCell>
                     <DataTableCell tone="muted" mono>
-                      {formatBytes(snapshot.archiveSizeBytes)}
+                      <ByteSize value={snapshot.archiveSizeBytes} />
                     </DataTableCell>
                     <DataTableCell tone="muted" mono>
-                      {formatBytes(snapshot.stateSizeBytes)}
+                      <ByteSize value={snapshot.stateSizeBytes} />
                     </DataTableCell>
                     <DataTableCell align="right">
                       <span className={styles.actions}>
@@ -451,23 +453,6 @@ const SnapshotDialog: FC<SnapshotDialogProps> = ({
 
 function snapshotLabel(snapshot: EnvironmentSnapshot): string {
   return snapshot.name ?? snapshot.id
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  const units = ["KB", "MB", "GB", "TB"]
-  let value = bytes / 1024
-  let unit = units[0]
-  for (const next of units.slice(1)) {
-    if (value < 1024) break
-    value /= 1024
-    unit = next
-  }
-  return `${value < 10 ? value.toFixed(1) : value.toFixed(0)} ${unit}`
-}
-
-function formatMasterchainSeqno(seqno: number | undefined): string {
-  return seqno === undefined ? "—" : seqno.toLocaleString()
 }
 
 function operationDetail(phase: EnvironmentSnapshotOperationPhase): string {
