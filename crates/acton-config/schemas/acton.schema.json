@@ -891,6 +891,10 @@
             "$ref": "#/definitions/ReportFormat"
           }
         },
+        "studio-reporting": {
+          "description": "Send test run data to Acton Studio when it is available",
+          "type": "boolean"
+        },
         "ui": {
           "description": "Enable the test UI server",
           "type": "boolean"
