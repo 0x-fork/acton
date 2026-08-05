@@ -1793,6 +1793,13 @@ async fn verify_rejects_source_extensions_that_do_not_match_language() {
             ".tolk",
         ),
         (
+            "tolk",
+            COMPILE_PARAMS_TOLK,
+            r#"[{"path":"main.tolk.","is_entrypoint":true}]"#,
+            "main.tolk.",
+            ".tolk",
+        ),
+        (
             "func",
             COMPILE_PARAMS_FUNC,
             r#"[{"path":"main.tolk","is_entrypoint":true}]"#,
