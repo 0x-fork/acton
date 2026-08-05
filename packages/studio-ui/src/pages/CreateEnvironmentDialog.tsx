@@ -128,13 +128,9 @@ export function CreateEnvironmentDialog({
       const environment = await createStudioEnvironment(request)
       onCreated(environment)
       onOpenChange(false)
-      const endpoint =
-        environment.endpoints.apiV3 ?? environment.endpoints.apiV2 ?? environment.endpoints.control
       showToast({
         title: `${environment.name} is starting`,
-        description: endpoint
-          ? `The network will be available at ${endpoint}`
-          : "Studio is preparing the network",
+        description: "Studio is starting the network in the background",
         variant: "success",
       })
     } catch (error) {

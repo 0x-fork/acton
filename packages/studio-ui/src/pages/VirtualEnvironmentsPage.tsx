@@ -18,7 +18,11 @@ import {Boxes, Plus, RotateCcw, Square} from "lucide-react"
 import {useState} from "react"
 
 import {TablePage} from "../components/TablePage"
-import {environmentStatusLabels, formatEnvironmentType} from "../environmentPresentation"
+import {
+  environmentStatusLabels,
+  formatEnvironmentNetwork,
+  formatEnvironmentType,
+} from "../environmentPresentation"
 import {
   type EnvironmentStatus,
   type StudioEnvironment,
@@ -208,7 +212,9 @@ export function VirtualEnvironmentsPage({
                       <DataTableCell tone="muted">
                         {formatEnvironmentType(environment.config)}
                       </DataTableCell>
-                      <DataTableCell tone="muted">{environment.network.label}</DataTableCell>
+                      <DataTableCell tone="muted">
+                        {formatEnvironmentNetwork(environment)}
+                      </DataTableCell>
                       <DataTableCell>
                         {primaryEndpoint(environment) ? (
                           <InlineActions
