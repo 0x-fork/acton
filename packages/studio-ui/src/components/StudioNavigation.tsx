@@ -15,6 +15,7 @@ import {ThemeSwitch, Tooltip} from "@acton/ui"
 
 import type {StudioEnvironment, TestRunSummary} from "../studioApi"
 import type {StudioPage, StudioPath} from "../studioPages"
+import actonStudioLogo from "../assets/acton-studio-logo.svg"
 import {StudioSearch} from "./StudioSearch"
 import {TestRunsNavigationList} from "./TestRunsNavigationList"
 
@@ -107,7 +108,7 @@ export function StudioNavigation({
 
   const renderWorkspaceHeader = () => (
     <div className={styles.workspaceHeader}>
-      <span className={styles.workspaceMark} />
+      <img className={styles.workspaceMark} src={actonStudioLogo} alt="" />
       <span className={styles.workspaceBody}>
         <span className={styles.workspaceTitleRow}>
           <span className={styles.workspaceName}>Acton Studio</span>

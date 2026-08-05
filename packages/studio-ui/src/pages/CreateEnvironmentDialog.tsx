@@ -22,6 +22,8 @@ import {WalletNamesInput} from "./WalletNamesInput"
 
 import styles from "./CreateEnvironmentDialog.module.css"
 
+const MAX_FULL_TON_VALIDATORS = 7
+
 interface CreateEnvironmentDialogProps {
   readonly environmentCount: number
   readonly importSourceEnvironments: readonly StudioEnvironment[]
@@ -179,7 +181,11 @@ export function CreateEnvironmentDialog({
               }
             : {
                 kind: "fullTonNetwork",
-                validators: optionalPositiveInteger(form.validators, "Validators"),
+                validators: optionalPositiveInteger(
+                  form.validators,
+                  "Validators",
+                  MAX_FULL_TON_VALIDATORS,
+                ),
                 importedAccounts,
               },
       }
@@ -218,148 +224,149 @@ export function CreateEnvironmentDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Create environment"
-      description="Choose the network model for this workspace"
       maxWidth="60rem"
       dismissible={!isSubmitting}
       contentClassName={styles.dialogContent}
     >
       <form className={styles.form} onSubmit={event => void handleSubmit(event)}>
-        <Select
-          label="Environment type"
-          description={
-            form.kind === "actonLocalnet"
-              ? "Uses the Acton emulator instead of TON validators, starts quickly, uses little disk space, and supports forks, manual mining, time travel, and network controls, but can behave differently from a real TON network in edge cases"
-              : "Runs local TON validators and a full indexer, produces blocks through validator nodes, supports actions, and reproduces full-node API behavior, but starts more slowly and uses more memory and disk space"
-          }
-          value={form.kind}
-          autoFocus
-          onChange={event => updateKind(event.target.value as EnvironmentFormState["kind"])}
-        >
-          <option value="actonLocalnet">Simulated localnet</option>
-          <option value="fullTonNetwork">Full localnet</option>
-        </Select>
+        <div className={styles.formBody}>
+          <Select
+            label="Environment type"
+            description={
+              form.kind === "actonLocalnet"
+                ? "Uses the Acton emulator instead of TON validators, starts quickly, uses little disk space, and supports forks, manual mining, time travel, and network controls, but can behave differently from a real TON network in edge cases"
+                : "Runs local TON validators and a full indexer, produces blocks through validator nodes, supports actions, and reproduces full-node API behavior, but starts more slowly and uses more memory and disk space"
+            }
+            value={form.kind}
+            autoFocus
+            onChange={event => updateKind(event.target.value as EnvironmentFormState["kind"])}
+          >
+            <option value="actonLocalnet">Simulated localnet</option>
+            <option value="fullTonNetwork">Full localnet</option>
+          </Select>
 
-        <Input
-          label="Name"
-          description="Used in Studio and environment history"
-          value={form.name}
-          maxLength={80}
-          required
-          spellCheck
-          onChange={event => updateForm("name", event.target.value)}
-        />
+          <Input
+            label="Name"
+            description="Used in Studio and environment history"
+            value={form.name}
+            maxLength={80}
+            required
+            spellCheck
+            onChange={event => updateForm("name", event.target.value)}
+          />
 
-        {form.kind === "actonLocalnet" ? (
-          <>
-            <div className={styles.formGrid}>
-              <Input
-                label="Local port"
-                description="Leave empty to select the first available port"
-                type="number"
-                min={1}
-                max={65_535}
-                placeholder="Automatic"
-                value={form.port}
-                onChange={event => updateForm("port", event.target.value)}
-              />
-              <Select
-                label="Initial state"
-                description="Start clean or fork an existing TON network"
-                value={form.forkNetwork}
-                onChange={event => updateForkNetwork(event.target.value)}
-              >
-                <option value="">Clean network</option>
-                <option value="mainnet">Fork mainnet</option>
-                <option value="testnet">Fork testnet</option>
-              </Select>
-              <Input
-                label="Fork block"
-                description="Leave empty to use the latest available state"
-                type="number"
-                min={1}
-                placeholder="Latest"
-                disabled={!form.forkNetwork}
-                value={form.forkBlockNumber}
-                onChange={event => updateForm("forkBlockNumber", event.target.value)}
-              />
-            </div>
-
-            <WalletNamesInput
-              values={form.accounts}
-              walletNames={walletNames}
-              onChange={values => updateForm("accounts", values)}
-            />
-
-            <Disclosure label="Network and mining" contentClassName={styles.advancedContent}>
+          {form.kind === "actonLocalnet" ? (
+            <>
               <div className={styles.formGrid}>
                 <Input
-                  label="Rate limit"
-                  description="Maximum API requests per second"
-                  suffix="RPS"
+                  label="Local port"
+                  description="Leave empty to select the first available port"
                   type="number"
                   min={1}
-                  placeholder="Unlimited"
-                  value={form.rateLimit}
-                  onChange={event => updateForm("rateLimit", event.target.value)}
+                  max={65_535}
+                  placeholder="Automatic"
+                  value={form.port}
+                  onChange={event => updateForm("port", event.target.value)}
                 />
+                <Select
+                  label="Initial state"
+                  description="Start clean or fork an existing TON network"
+                  value={form.forkNetwork}
+                  onChange={event => updateForkNetwork(event.target.value)}
+                >
+                  <option value="">Clean network</option>
+                  <option value="mainnet">Fork mainnet</option>
+                  <option value="testnet">Fork testnet</option>
+                </Select>
                 <Input
-                  label="Response delay"
-                  description="Delay TonCenter and Emulate API responses"
-                  suffix="ms"
+                  label="Fork block"
+                  description="Leave empty to use the latest available state"
                   type="number"
                   min={1}
-                  placeholder="None"
-                  value={form.responseDelayMs}
-                  onChange={event => updateForm("responseDelayMs", event.target.value)}
-                />
-                <Input
-                  label="Block interval"
-                  description="Leave empty to use the Acton project setting"
-                  suffix="ms"
-                  type="number"
-                  min={1}
-                  placeholder="Project default"
-                  value={form.blockIntervalMs}
-                  onChange={event => updateForm("blockIntervalMs", event.target.value)}
+                  placeholder="Latest"
+                  disabled={!form.forkNetwork}
+                  value={form.forkBlockNumber}
+                  onChange={event => updateForm("forkBlockNumber", event.target.value)}
                 />
               </div>
-              <div className={styles.checkboxGroup}>
-                <Checkbox
-                  label="Manual mining"
-                  description="Create blocks only when requested"
-                  checked={form.noMining}
-                  onChange={event => updateNoMining(event.target.checked)}
-                />
-                <Checkbox
-                  label="Mine empty blocks"
-                  description="Keep producing blocks when no messages are pending"
-                  checked={form.mineEmptyBlocks}
-                  disabled={form.noMining}
-                  onChange={event => updateForm("mineEmptyBlocks", event.target.checked)}
-                />
-              </div>
-            </Disclosure>
-          </>
-        ) : (
-          <div className={styles.fullTonFields}>
-            <Input
-              label="Validators"
-              description="Validator nodes started for this network"
-              type="number"
-              min={1}
-              max={100}
-              value={form.validators}
-              onChange={event => updateForm("validators", event.target.value)}
-            />
-            <AccountImportEditor
-              accounts={form.importedAccounts}
-              sources={availableImportSources(importSourceEnvironments)}
-              onAdd={addImportedAccount}
-              onChange={updateImportedAccount}
-              onRemove={removeImportedAccount}
-            />
-          </div>
-        )}
+
+              <WalletNamesInput
+                values={form.accounts}
+                walletNames={walletNames}
+                onChange={values => updateForm("accounts", values)}
+              />
+
+              <Disclosure label="Network and mining" contentClassName={styles.advancedContent}>
+                <div className={styles.formGrid}>
+                  <Input
+                    label="Rate limit"
+                    description="Maximum API requests per second"
+                    suffix="RPS"
+                    type="number"
+                    min={1}
+                    placeholder="Unlimited"
+                    value={form.rateLimit}
+                    onChange={event => updateForm("rateLimit", event.target.value)}
+                  />
+                  <Input
+                    label="Response delay"
+                    description="Delay TonCenter and Emulate API responses"
+                    suffix="ms"
+                    type="number"
+                    min={1}
+                    placeholder="None"
+                    value={form.responseDelayMs}
+                    onChange={event => updateForm("responseDelayMs", event.target.value)}
+                  />
+                  <Input
+                    label="Block interval"
+                    description="Leave empty to use the Acton project setting"
+                    suffix="ms"
+                    type="number"
+                    min={1}
+                    placeholder="Project default"
+                    value={form.blockIntervalMs}
+                    onChange={event => updateForm("blockIntervalMs", event.target.value)}
+                  />
+                </div>
+                <div className={styles.checkboxGroup}>
+                  <Checkbox
+                    label="Manual mining"
+                    description="Create blocks only when requested"
+                    checked={form.noMining}
+                    onChange={event => updateNoMining(event.target.checked)}
+                  />
+                  <Checkbox
+                    label="Mine empty blocks"
+                    description="Keep producing blocks when no messages are pending"
+                    checked={form.mineEmptyBlocks}
+                    disabled={form.noMining}
+                    onChange={event => updateForm("mineEmptyBlocks", event.target.checked)}
+                  />
+                </div>
+              </Disclosure>
+            </>
+          ) : (
+            <div className={styles.fullTonFields}>
+              <Input
+                label="Validators"
+                description="Validator nodes started for this network. Each additional validator increases the startup time"
+                type="number"
+                min={1}
+                max={MAX_FULL_TON_VALIDATORS}
+                value={form.validators}
+                onChange={event => updateForm("validators", event.target.value)}
+              />
+              <AccountImportEditor
+                accounts={form.importedAccounts}
+                sources={availableImportSources(importSourceEnvironments)}
+                onAdd={addImportedAccount}
+                onChange={updateImportedAccount}
+                onRemove={removeImportedAccount}
+              />
+            </div>
+          )}
+        </div>
 
         <footer className={styles.formActions}>
           <Button
@@ -504,6 +511,12 @@ function AccountImportEditor({
                 suggestions={suggestions[account.sourceEnvironmentId] ?? []}
                 value={account.address}
                 onValueChange={address => onChange(account.id, {address})}
+                onSuggestionSelect={suggestion =>
+                  onChange(account.id, {
+                    address: suggestion.address,
+                    name: account.name.trim() ? account.name : (suggestion.label ?? ""),
+                  })
+                }
               />
               <InlineAction
                 label={`Remove account ${index + 1}`}
@@ -546,11 +559,14 @@ async function loadAddressSuggestions(
   const contracts = await client.listContracts()
   return contracts
     .filter(contract => contract.status === "active")
-    .map(contract => ({
-      address: contract.address,
-      label: contract.name ?? contract.abiName ?? contract.address,
-      description: source.name,
-    }))
+    .map(contract => {
+      const name = contract.name ?? contract.abiName
+      return {
+        address: contract.address,
+        label: name,
+        description: contract.address,
+      }
+    })
 }
 
 function defaultEnvironmentName(
@@ -562,13 +578,20 @@ function defaultEnvironmentName(
     : `Full localnet ${environmentCount + 1}`
 }
 
-function optionalPositiveInteger(value: string, label: string): number | undefined {
+function optionalPositiveInteger(
+  value: string,
+  label: string,
+  maximum?: number,
+): number | undefined {
   const trimmed = value.trim()
   if (!trimmed) return
 
   const parsed = Number(trimmed)
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     throw new Error(`${label} must be a positive whole number`)
+  }
+  if (maximum !== undefined && parsed > maximum) {
+    throw new Error(`${label} must not exceed ${maximum}`)
   }
   return parsed
 }
