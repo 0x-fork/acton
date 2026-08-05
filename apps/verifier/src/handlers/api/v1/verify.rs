@@ -35,7 +35,6 @@ mod languages;
 
 const API_KEY_HEADER: &str = "x-verifier-key";
 const MAX_SOURCE_PATH_CHARS: usize = 128;
-const SOURCE_EXTENSIONS: [&str; 5] = ["tolk", "fc", "func", "tact", "pkg"];
 
 #[utoipa::path(
     post,
@@ -357,11 +356,7 @@ fn validate_source_extension_count(path: &str) -> Result<(), ApiError> {
     let source_extension_count = file_name
         .split('.')
         .skip(1)
-        .filter(|extension| {
-            SOURCE_EXTENSIONS
-                .iter()
-                .any(|known| extension.eq_ignore_ascii_case(known))
-        })
+        .filter(|extension| languages::is_known_source_extension(extension))
         .take(2)
         .count();
     if source_extension_count > 1 {

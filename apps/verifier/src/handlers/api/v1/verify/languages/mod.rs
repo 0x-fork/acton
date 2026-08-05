@@ -9,6 +9,12 @@ mod func;
 mod tact;
 mod tolk;
 
+const SOURCE_EXTENSIONS_BY_LANGUAGE: [(&str, &[&str]); 3] = [
+    (func::LANGUAGE, &["fc", "func"]),
+    (tolk::LANGUAGE, &["tolk"]),
+    (tact::LANGUAGE, &["pkg", "tact"]),
+];
+
 pub(super) struct LanguageCompileInput {
     pub language: String,
     pub compiler_version: String,
@@ -24,7 +30,7 @@ pub(super) fn prepare(
 ) -> Result<LanguageCompileInput, ApiError> {
     let language = Language::parse(language)?;
     validate_sources(sources)?;
-    validate_source_extensions(language.as_str(), sources)?;
+    validate_source_extensions(language, sources)?;
 
     let entrypoint = language.entrypoint(sources, files)?;
     let compiler_version = language.compiler_version(compile_params, sources, files)?;
@@ -98,17 +104,17 @@ impl Language {
     }
 }
 
-fn validate_source_extensions(language: &str, sources: &[SourceMetadata]) -> Result<(), ApiError> {
-    let allowed_extensions: &[&str] = match language {
-        func::LANGUAGE => &["fc", "func"],
-        tolk::LANGUAGE => &["tolk"],
-        tact::LANGUAGE => &["pkg", "tact"],
-        _ => {
-            return Err(ApiError::bad_request(format!(
-                "unsupported language: {language}"
-            )));
-        }
-    };
+fn validate_source_extensions(
+    language: Language,
+    sources: &[SourceMetadata],
+) -> Result<(), ApiError> {
+    let language_name = language.as_str();
+    let allowed_extensions = SOURCE_EXTENSIONS_BY_LANGUAGE
+        .iter()
+        .find_map(|(known_language, extensions)| {
+            (*known_language == language_name).then_some(*extensions)
+        })
+        .ok_or_else(|| ApiError::bad_request(format!("unsupported language: {language_name}")))?;
 
     for source in sources {
         let extension = Path::new(&source.path)
@@ -123,13 +129,21 @@ fn validate_source_extensions(language: &str, sources: &[SourceMetadata]) -> Res
         }
 
         return Err(ApiError::bad_request(format!(
-            "source extension does not match language {language}: {}; expected .{}",
+            "source extension does not match language {}: {}; expected .{}",
+            language.as_str(),
             source.path,
             allowed_extensions.join(", ."),
         )));
     }
 
     Ok(())
+}
+
+pub(super) fn is_known_source_extension(extension: &str) -> bool {
+    SOURCE_EXTENSIONS_BY_LANGUAGE
+        .iter()
+        .flat_map(|(_, extensions)| *extensions)
+        .any(|known| extension.eq_ignore_ascii_case(known))
 }
 
 fn validate_sources(sources: &[SourceMetadata]) -> Result<(), ApiError> {
