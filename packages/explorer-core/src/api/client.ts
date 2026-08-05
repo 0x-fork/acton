@@ -58,6 +58,10 @@ interface TonClientOptions {
   readonly toncenterApiKey?: string
 }
 
+type NodeAddressInformation = Omit<AddressInformation, "status"> & {
+  readonly state: AddressInformation["status"]
+}
+
 const REQUEST_SOURCE_HEADER = "X-Acton-Request-Source"
 const STUDIO_UI_REQUEST_SOURCE = "studio-ui"
 
@@ -476,7 +480,31 @@ export class TonClient {
     const url = this.buildUrl(this.v3BaseUrl, "/addressInformation")
     url.searchParams.append("address", address)
     url.searchParams.append("include_boc", "true")
-    return this.request(url, "Failed to fetch address information")
+    const indexed = await this.request<AddressInformation>(
+      url,
+      "Failed to fetch address information",
+    )
+    if (
+      indexed.balance !== "0" ||
+      indexed.code !== null ||
+      indexed.data !== null ||
+      !["uninitialized", "uninit", "nonexist"].includes(indexed.status)
+    ) {
+      return indexed
+    }
+
+    const nodeUrl = this.buildUrl(this.v2BaseUrl, "/getAddressInformation")
+    nodeUrl.searchParams.append("address", address)
+    try {
+      const node = await this.request<NodeAddressInformation>(
+        nodeUrl,
+        "Failed to fetch address information from the node",
+      )
+      const {state, ...information} = node
+      return {...information, status: state}
+    } catch {
+      return indexed
+    }
   }
 
   async getSuspendedAccountsConfig(): Promise<SuspendedAccountsConfig> {

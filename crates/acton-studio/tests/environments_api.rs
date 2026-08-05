@@ -81,6 +81,7 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
                     admin_port,
                     config_port,
                     validators,
+                    imported_accounts,
                 } => {
                     let api_v2_port = api_v2_port.unwrap_or(18080);
                     let api_v3_port = api_v3_port.unwrap_or(18081);
@@ -93,6 +94,7 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
                             admin_port,
                             config_port,
                             validators: validators.unwrap_or(1),
+                            imported_accounts,
                         },
                         EnvironmentEndpoints {
                             api_v2: Some(format!("http://127.0.0.1:{api_v2_port}/api/v2")),

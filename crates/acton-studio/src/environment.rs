@@ -11,6 +11,36 @@ pub struct CreateEnvironmentRequest {
     pub config: CreateEnvironmentConfig,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FullTonAccountImport {
+    pub source_environment_id: String,
+    pub address: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip)]
+    #[schema(ignore)]
+    pub(crate) shard_account_boc_hex: Option<String>,
+}
+
+impl FullTonAccountImport {
+    #[must_use]
+    pub fn new(source_environment_id: impl Into<String>, address: impl Into<String>) -> Self {
+        Self {
+            source_environment_id: source_environment_id.into(),
+            address: address.into(),
+            name: None,
+            shard_account_boc_hex: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(
     tag = "kind",
@@ -38,6 +68,8 @@ pub enum CreateEnvironmentConfig {
         admin_port: Option<u16>,
         config_port: Option<u16>,
         validators: Option<u16>,
+        #[serde(default)]
+        imported_accounts: Vec<FullTonAccountImport>,
     },
 }
 
@@ -156,6 +188,7 @@ pub enum EnvironmentConfig {
         admin_port: u16,
         config_port: u16,
         validators: u16,
+        imported_accounts: Vec<FullTonAccountImport>,
     },
     RemoteTonNetwork {
         network: PublicTonNetwork,

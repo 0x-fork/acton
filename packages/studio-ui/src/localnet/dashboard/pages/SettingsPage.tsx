@@ -30,8 +30,9 @@ export const SettingsPage: FC<SettingsPageProps> = ({
     environment?.config.kind === "actonLocalnet" ? environment.config : undefined
   const fullNetworkConfig =
     environment?.config.kind === "fullTonNetwork" ? environment.config : undefined
-  const hasControlApi = supports(environment, "controlApi")
-  const hasMining = supports(environment, "mining")
+  const runtimeAvailable = environment?.status === "running"
+  const hasControlApi = runtimeAvailable && supports(environment, "controlApi")
+  const hasMining = runtimeAvailable && supports(environment, "mining")
   const [miningMode, setMiningMode] = useState<LocalnetMiningMode>()
   const [autoMining, setAutoMining] = useState<boolean>()
   const [blockIntervalMs, setBlockIntervalMs] = useState<number>()

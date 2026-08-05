@@ -1,7 +1,18 @@
-import {Button, Checkbox, Dialog, Disclosure, Input, Select, useToast} from "@acton/ui"
-import {Plus} from "lucide-react"
-import {type FormEvent, useEffect, useState} from "react"
+import {
+  Button,
+  Checkbox,
+  Dialog,
+  Disclosure,
+  InlineAction,
+  Input,
+  Select,
+  useToast,
+} from "@acton/ui"
+import {Plus, Trash2} from "lucide-react"
+import {type FormEvent, useEffect, useRef, useState} from "react"
 
+import {TonClient} from "@acton/explorer-core/api/client"
+import {TonAddressInput, type TonAddressSuggestion} from "@acton/transaction-ui"
 import {
   type CreateEnvironmentRequest,
   type StudioEnvironment,
@@ -13,6 +24,7 @@ import styles from "./CreateEnvironmentDialog.module.css"
 
 interface CreateEnvironmentDialogProps {
   readonly environmentCount: number
+  readonly importSourceEnvironments: readonly StudioEnvironment[]
   readonly open: boolean
   readonly walletNames: readonly string[]
   readonly onCreated: (environment: StudioEnvironment) => void
@@ -32,10 +44,19 @@ interface EnvironmentFormState {
   readonly noMining: boolean
   readonly mineEmptyBlocks: boolean
   readonly validators: string
+  readonly importedAccounts: readonly ImportedAccountForm[]
+}
+
+interface ImportedAccountForm {
+  readonly id: number
+  readonly sourceEnvironmentId: string
+  readonly name: string
+  readonly address: string
 }
 
 export function CreateEnvironmentDialog({
   environmentCount,
+  importSourceEnvironments,
   open,
   walletNames,
   onCreated,
@@ -44,9 +65,13 @@ export function CreateEnvironmentDialog({
   const {showToast} = useToast()
   const [form, setForm] = useState<EnvironmentFormState>(() => createInitialForm(environmentCount))
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const nextImportedAccountId = useRef(1)
 
   useEffect(() => {
-    if (open) setForm(createInitialForm(environmentCount))
+    if (open) {
+      setForm(createInitialForm(environmentCount))
+      nextImportedAccountId.current = 1
+    }
   }, [environmentCount, open])
 
   const updateForm = <Key extends keyof EnvironmentFormState>(
@@ -86,11 +111,54 @@ export function CreateEnvironmentDialog({
     }))
   }
 
+  const addImportedAccount = () => {
+    const sourceEnvironmentId = preferredImportSource(importSourceEnvironments)?.id
+    if (!sourceEnvironmentId) return
+    const account: ImportedAccountForm = {
+      id: nextImportedAccountId.current,
+      sourceEnvironmentId,
+      name: "",
+      address: "",
+    }
+    nextImportedAccountId.current += 1
+    setForm(current => ({
+      ...current,
+      importedAccounts: [...current.importedAccounts, account],
+    }))
+  }
+
+  const updateImportedAccount = (
+    id: number,
+    update: Partial<Pick<ImportedAccountForm, "sourceEnvironmentId" | "name" | "address">>,
+  ) => {
+    setForm(current => ({
+      ...current,
+      importedAccounts: current.importedAccounts.map(account =>
+        account.id === id ? {...account, ...update} : account,
+      ),
+    }))
+  }
+
+  const removeImportedAccount = (id: number) => {
+    setForm(current => ({
+      ...current,
+      importedAccounts: current.importedAccounts.filter(account => account.id !== id),
+    }))
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     let request: CreateEnvironmentRequest
     try {
+      const importedAccounts = form.importedAccounts.map(account => ({
+        sourceEnvironmentId: account.sourceEnvironmentId,
+        name: account.name.trim() || undefined,
+        address: account.address.trim(),
+      }))
+      if (importedAccounts.some(account => !account.address)) {
+        throw new Error("Enter an account address or remove the empty import row")
+      }
       request = {
         name: form.name.trim(),
         config:
@@ -112,6 +180,7 @@ export function CreateEnvironmentDialog({
             : {
                 kind: "fullTonNetwork",
                 validators: optionalPositiveInteger(form.validators, "Validators"),
+                importedAccounts,
               },
       }
     } catch (error) {
@@ -150,7 +219,7 @@ export function CreateEnvironmentDialog({
       onOpenChange={onOpenChange}
       title="Create environment"
       description="Choose the network model for this workspace"
-      maxWidth="44rem"
+      maxWidth="60rem"
       dismissible={!isSubmitting}
       contentClassName={styles.dialogContent}
     >
@@ -272,7 +341,7 @@ export function CreateEnvironmentDialog({
             </Disclosure>
           </>
         ) : (
-          <div>
+          <div className={styles.fullTonFields}>
             <Input
               label="Validators"
               description="Validator nodes started for this network"
@@ -281,6 +350,13 @@ export function CreateEnvironmentDialog({
               max={100}
               value={form.validators}
               onChange={event => updateForm("validators", event.target.value)}
+            />
+            <AccountImportEditor
+              accounts={form.importedAccounts}
+              sources={availableImportSources(importSourceEnvironments)}
+              onAdd={addImportedAccount}
+              onChange={updateImportedAccount}
+              onRemove={removeImportedAccount}
             />
           </div>
         )}
@@ -322,7 +398,159 @@ function createInitialForm(environmentCount: number): EnvironmentFormState {
     noMining: false,
     mineEmptyBlocks: false,
     validators: "1",
+    importedAccounts: [],
   }
+}
+
+interface AccountImportEditorProps {
+  readonly accounts: readonly ImportedAccountForm[]
+  readonly sources: readonly StudioEnvironment[]
+  readonly onAdd: () => void
+  readonly onChange: (
+    id: number,
+    update: Partial<Pick<ImportedAccountForm, "sourceEnvironmentId" | "name" | "address">>,
+  ) => void
+  readonly onRemove: (id: number) => void
+}
+
+function AccountImportEditor({
+  accounts,
+  sources,
+  onAdd,
+  onChange,
+  onRemove,
+}: AccountImportEditorProps) {
+  const [suggestions, setSuggestions] = useState<
+    Readonly<Record<string, readonly TonAddressSuggestion[]>>
+  >({})
+  const loadingSources = useRef(new Set<string>())
+
+  useEffect(() => {
+    for (const sourceEnvironmentId of new Set(
+      accounts.map(account => account.sourceEnvironmentId),
+    )) {
+      if (suggestions[sourceEnvironmentId] || loadingSources.current.has(sourceEnvironmentId)) {
+        continue
+      }
+      const source = sources.find(environment => environment.id === sourceEnvironmentId)
+      if (!source) continue
+
+      loadingSources.current.add(sourceEnvironmentId)
+      void loadAddressSuggestions(source)
+        .then(items => {
+          setSuggestions(current => ({...current, [sourceEnvironmentId]: items}))
+        })
+        .catch(() => {
+          setSuggestions(current => ({...current, [sourceEnvironmentId]: []}))
+        })
+        .finally(() => {
+          loadingSources.current.delete(sourceEnvironmentId)
+        })
+    }
+  }, [accounts, sources, suggestions])
+
+  return (
+    <section className={styles.importPicker} aria-labelledby="account-import-title">
+      <header className={styles.importHeader}>
+        <div>
+          <strong id="account-import-title">Accounts to import</strong>
+          <span>Copy active account balance, code, and data into the new network zerostate</span>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          leadingIcon={<Plus size={14} aria-hidden="true" />}
+          disabled={sources.length === 0}
+          onClick={onAdd}
+        >
+          Add account
+        </Button>
+      </header>
+
+      {accounts.length === 0 ? (
+        <div className={styles.importMessage}>No accounts will be imported</div>
+      ) : (
+        <div className={styles.importList}>
+          <div className={styles.importColumns} aria-hidden="true">
+            <span>Source</span>
+            <span>Contract name (optional)</span>
+            <span>Account address</span>
+          </div>
+          {accounts.map((account, index) => (
+            <div key={account.id} className={styles.importRow}>
+              <Select
+                aria-label={`Source network for account ${index + 1}`}
+                value={account.sourceEnvironmentId}
+                onChange={event => onChange(account.id, {sourceEnvironmentId: event.target.value})}
+              >
+                {sources.map(source => (
+                  <option key={source.id} value={source.id}>
+                    {source.name}
+                  </option>
+                ))}
+              </Select>
+              <Input
+                aria-label={`Account ${index + 1} contract name`}
+                placeholder={`Account ${index + 1}`}
+                value={account.name}
+                maxLength={80}
+                spellCheck
+                onChange={event => onChange(account.id, {name: event.target.value})}
+              />
+              <TonAddressInput
+                ariaLabel={`Account ${index + 1} address`}
+                className={styles.importAddressInput}
+                suggestions={suggestions[account.sourceEnvironmentId] ?? []}
+                value={account.address}
+                onValueChange={address => onChange(account.id, {address})}
+              />
+              <InlineAction
+                label={`Remove account ${index + 1}`}
+                icon={<Trash2 />}
+                onClick={() => onRemove(account.id)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      <p className={styles.importHint}>
+        Select a source to get saved contract completions, or enter any active TON address.
+      </p>
+    </section>
+  )
+}
+
+function availableImportSources(environments: readonly StudioEnvironment[]) {
+  return environments.filter(
+    environment => environment.status === "running" && environment.endpoints.apiV2,
+  )
+}
+
+function preferredImportSource(environments: readonly StudioEnvironment[]) {
+  const sources = availableImportSources(environments)
+  return sources.find(environment => environment.id === "mainnet") ?? sources[0]
+}
+
+async function loadAddressSuggestions(
+  source: StudioEnvironment,
+): Promise<readonly TonAddressSuggestion[]> {
+  if (!source.capabilities.includes("contracts") || !source.endpoints.apiV3) return []
+  const client = new TonClient({
+    v2BaseUrl: source.endpoints.apiV2 ?? source.rpcUrl,
+    v3BaseUrl: source.endpoints.apiV3,
+    addressNameBaseUrl: source.endpoints.control ?? source.rpcUrl,
+    localnetControlEnabled: source.capabilities.includes("controlApi"),
+    toncenterApiCompatible: source.network.supportsActions,
+  })
+  const contracts = await client.listContracts()
+  return contracts
+    .filter(contract => contract.status === "active")
+    .map(contract => ({
+      address: contract.address,
+      label: contract.name ?? contract.abiName ?? contract.address,
+      description: source.name,
+    }))
 }
 
 function defaultEnvironmentName(

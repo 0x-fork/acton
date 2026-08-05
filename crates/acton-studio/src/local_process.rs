@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener as StdTcpListener};
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
@@ -11,14 +12,17 @@ use tokio::net::TcpStream;
 use tokio::process::{Child, Command};
 use tokio::sync::{Mutex, Notify, RwLock};
 use tokio::time::{Instant, sleep, timeout};
+use ton::ton_core::types::TonAddress;
 
-use crate::contract_registry::{ContractRegistryStore, VerifiedSourceRegistration};
+use crate::contract_registry::{
+    ContractRegistration, ContractRegistryStore, VerifiedSourceRegistration,
+};
 use crate::environment::{
     CreateEnvironmentConfig, CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest,
     EnvironmentConfig, EnvironmentEndpoints, EnvironmentRuntime, EnvironmentRuntimeError,
     EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation,
     EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings,
-    EnvironmentStatus, StudioEnvironment, UpdateEnvironmentRequest,
+    EnvironmentStatus, FullTonAccountImport, StudioEnvironment, UpdateEnvironmentRequest,
 };
 use crate::environment_store::{
     LoadedEnvironments, StoredEnvironment, load_environments, persist_environment,
@@ -279,6 +283,12 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         Box::pin(async move {
             let _create_guard = self.inner.create_lock.lock().await;
             let reserved_ports = reserved_environment_ports(&self.inner).await;
+            let resolved_imported_accounts = match &request.config {
+                CreateEnvironmentConfig::FullTonNetwork {
+                    imported_accounts, ..
+                } if !imported_accounts.is_empty() => Some(imported_accounts.clone()),
+                _ => None,
+            };
             let (name, config) = resolve_request(request, &reserved_ports)?;
             let id_number = self
                 .inner
@@ -308,6 +318,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 &data_dir,
                 &id,
                 &config,
+                resolved_imported_accounts.as_deref(),
             )
             .await
             {
@@ -320,7 +331,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             let runtime_endpoints = runtime_endpoints(&config);
             let environment = Arc::new(LocalEnvironment {
                 details: RwLock::new(StudioEnvironment::new(
-                    id,
+                    id.clone(),
                     name,
                     EnvironmentStatus::Starting,
                     config,
@@ -340,6 +351,17 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             }
             if let Err(error) =
                 persist_environment_definition(&self.inner, &environment, true).await
+            {
+                let _ = tokio::fs::remove_dir_all(&data_dir).await;
+                return Err(error);
+            }
+            if let Some(imported_accounts) = resolved_imported_accounts.as_deref()
+                && let Err(error) = register_imported_contracts(
+                    &self.inner.contract_registry,
+                    &id,
+                    imported_accounts,
+                )
+                .await
             {
                 let _ = tokio::fs::remove_dir_all(&data_dir).await;
                 return Err(error);
@@ -536,6 +558,97 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             }
             Ok(())
         })
+    }
+}
+
+async fn register_imported_contracts(
+    contract_registry: &ContractRegistryStore,
+    environment_id: &str,
+    imported_accounts: &[FullTonAccountImport],
+) -> Result<(), EnvironmentRuntimeError> {
+    let registrations = imported_accounts
+        .iter()
+        .enumerate()
+        .map(|(index, account)| {
+            let address = TonAddress::from_str(&account.address).map_err(|_| {
+                EnvironmentRuntimeError::InvalidRequest {
+                    code: "full_ton_import_address_invalid",
+                    message: format!("Invalid TON address {}", account.address),
+                }
+            })?;
+            Ok(ContractRegistration {
+                canonical_address: address.to_hex(),
+                display_address: address.to_base64(false, true, true),
+                name: account
+                    .name
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|name| !name.is_empty())
+                    .map(str::to_owned)
+                    .or_else(|| Some(format!("Account {}", index + 1))),
+            })
+        })
+        .collect::<Result<Vec<_>, EnvironmentRuntimeError>>()?;
+
+    contract_registry
+        .register_contracts(environment_id, registrations)
+        .await
+        .map(|_| ())
+        .map_err(|error| EnvironmentRuntimeError::Internal {
+            code: "environment_contract_registry_failed",
+            message: format!("Failed to register imported contracts: {error}"),
+        })
+}
+
+#[cfg(test)]
+mod imported_contract_tests {
+    use expect_test::expect;
+    use serde_json::json;
+
+    use super::register_imported_contracts;
+    use crate::{ContractRegistryStore, FullTonAccountImport};
+
+    #[tokio::test]
+    async fn imported_accounts_are_registered_as_named_environment_contracts() {
+        let registry = ContractRegistryStore::ephemeral();
+        register_imported_contracts(
+            &registry,
+            "environment-4",
+            &[FullTonAccountImport::new(
+                "mainnet",
+                "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+            )],
+        )
+        .await
+        .expect("imported contract registration");
+
+        let snapshot = registry
+            .snapshot("environment-4")
+            .await
+            .expect("contract registry snapshot");
+        let actual = snapshot
+            .contracts
+            .iter()
+            .map(|(canonical_address, contract)| {
+                json!({
+                    "address": contract.address,
+                    "canonicalAddress": canonical_address,
+                    "name": snapshot.address_name(canonical_address),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        expect![[r#"
+            [
+              {
+                "address": "kQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHTW",
+                "canonicalAddress": "0:0000000000000000000000000000000000000000000000000000000000000000",
+                "name": "Account 1"
+              }
+            ]"#]]
+        .assert_eq(
+            &serde_json::to_string_pretty(&actual).expect("serializable contract registrations"),
+        );
     }
 }
 
@@ -1038,6 +1151,7 @@ fn resolve_request(
             admin_port,
             config_port,
             validators,
+            mut imported_accounts,
         } => {
             validate_requested_port(api_v2_port)?;
             validate_requested_port(api_v3_port)?;
@@ -1061,12 +1175,16 @@ fn resolve_request(
                     ),
                 });
             }
+            for account in &mut imported_accounts {
+                account.shard_account_boc_hex = None;
+            }
             EnvironmentConfig::FullTonNetwork {
                 api_v2_port,
                 api_v3_port,
                 admin_port,
                 config_port,
                 validators,
+                imported_accounts,
             }
         }
     };
@@ -1197,6 +1315,7 @@ async fn restore_environment(
         &data_dir,
         &record.id,
         &record.config,
+        None,
     )
     .await?;
     let runtime_endpoints = runtime_endpoints(&record.config);
@@ -1280,6 +1399,7 @@ impl EnvironmentDriver {
         data_dir: &Path,
         environment_id: &str,
         config: &EnvironmentConfig,
+        resolved_imported_accounts: Option<&[FullTonAccountImport]>,
     ) -> Result<Self, EnvironmentRuntimeError> {
         match config {
             EnvironmentConfig::ActonLocalnet { port, .. } => Ok(Self::ActonLocalnet {
@@ -1295,6 +1415,7 @@ impl EnvironmentDriver {
                 admin_port,
                 config_port,
                 validators,
+                imported_accounts,
             } => FullTonNetworkDriver::materialize(
                 data_dir,
                 workspace_root,
@@ -1304,6 +1425,8 @@ impl EnvironmentDriver {
                 *admin_port,
                 *config_port,
                 *validators,
+                imported_accounts,
+                resolved_imported_accounts,
             )
             .await
             .map(Self::FullTonNetwork),
@@ -2394,6 +2517,7 @@ mod external_environment_tests {
             &EnvironmentConfig::RemoteTonNetwork {
                 network: PublicTonNetwork::Testnet,
             },
+            None,
         )
         .await;
         let error = match result {

@@ -36,6 +36,13 @@ export interface FullTonNetworkEnvironmentConfig {
   readonly adminPort: number
   readonly configPort: number
   readonly validators: number
+  readonly importedAccounts: readonly FullTonAccountImport[]
+}
+
+export interface FullTonAccountImport {
+  readonly sourceEnvironmentId: string
+  readonly address: string
+  readonly name?: string
 }
 
 export interface RemoteTonNetworkEnvironmentConfig {
@@ -68,6 +75,7 @@ export interface CreateFullTonNetworkEnvironmentConfig {
   readonly adminPort?: number
   readonly configPort?: number
   readonly validators?: number
+  readonly importedAccounts: readonly FullTonAccountImport[]
 }
 
 export type CreateEnvironmentConfig =

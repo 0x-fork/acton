@@ -78,6 +78,13 @@ pub(crate) struct DeploymentCandidateRegistration {
     pub(crate) code_hash: String,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ContractRegistration {
+    pub(crate) canonical_address: String,
+    pub(crate) display_address: String,
+    pub(crate) name: Option<String>,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct SavedCompilerAbi {
@@ -322,17 +329,52 @@ impl ContractRegistryStore {
         display_address: String,
         name: Option<String>,
     ) -> Result<RegisteredContract, ContractRegistryError> {
-        let name = non_empty_text(name);
-        let registered = RegisteredContract {
-            address: display_address,
-        };
+        let mut registered = self
+            .register_contracts(
+                environment_id,
+                vec![ContractRegistration {
+                    canonical_address,
+                    display_address,
+                    name,
+                }],
+            )
+            .await?;
+        Ok(registered
+            .pop()
+            .expect("one contract registration produces one result"))
+    }
+
+    pub(crate) async fn register_contracts(
+        &self,
+        environment_id: &str,
+        registrations: Vec<ContractRegistration>,
+    ) -> Result<Vec<RegisteredContract>, ContractRegistryError> {
+        let changes = registrations
+            .into_iter()
+            .map(|registration| {
+                let registered = RegisteredContract {
+                    address: registration.display_address,
+                };
+                (
+                    registration.canonical_address,
+                    non_empty_text(registration.name),
+                    registered,
+                )
+            })
+            .collect::<Vec<_>>();
+        let registered = changes
+            .iter()
+            .map(|(_, _, contract)| contract.clone())
+            .collect();
         self.mutate(environment_id, |registry| {
-            registry
-                .contracts
-                .insert(canonical_address.clone(), registered.clone());
-            registry.deployment_candidates.remove(&canonical_address);
-            if let Some(name) = name {
-                registry.address_names.insert(canonical_address, name);
+            for (canonical_address, name, contract) in changes {
+                registry
+                    .contracts
+                    .insert(canonical_address.clone(), contract);
+                registry.deployment_candidates.remove(&canonical_address);
+                if let Some(name) = name {
+                    registry.address_names.insert(canonical_address, name);
+                }
             }
         })
         .await?;

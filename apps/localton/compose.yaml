@@ -2,7 +2,7 @@ name: localton
 
 services:
   localton:
-    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
     stop_grace_period: 60s
     restart: unless-stopped
     ports:
@@ -28,7 +28,7 @@ services:
       retries: 12
 
   v3-basechain-bootstrap:
-    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
     command:
       - indexer
       - bootstrap-basechain
@@ -90,7 +90,7 @@ services:
     restart: unless-stopped
 
   v3-migrations:
-    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
     command:
       - v3-migrate
     depends_on:
@@ -101,7 +101,7 @@ services:
     restart: on-failure
 
   v3-worker:
-    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
     user: "0:0"
     command:
       - v3-worker
@@ -146,7 +146,7 @@ services:
       - ton-index-workdir:/var/lib/ton-indexer/work
 
   v3-account-scanner:
-    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
     user: "0:0"
     command:
       - v3-account-scan
@@ -180,7 +180,7 @@ services:
       - ton-account-scan:/var/lib/ton-indexer/account-scan
 
   v3-api:
-    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
     command:
       - v3-api
     environment:
@@ -218,7 +218,7 @@ services:
     restart: unless-stopped
 
   v3-classifier:
-    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:latest}
+    image: ${LOCALTON_IMAGE:-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6}
     command:
       - v3-classifier
       - --pool-size

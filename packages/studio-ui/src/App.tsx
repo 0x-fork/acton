@@ -436,6 +436,7 @@ function StudioWorkspace({
         <VirtualEnvironmentsPage
           createOpen={isEnvironmentCreateOpen}
           environments={managedEnvironments}
+          importSourceEnvironments={environmentsState.environments}
           isLoading={environmentsState.isLoading}
           loadError={environmentsState.error}
           walletNames={studioInfo?.workspace?.walletNames ?? []}

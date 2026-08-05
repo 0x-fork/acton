@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -12,6 +13,7 @@ use axum::http::Uri;
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{any, get, post};
+use base64::Engine;
 use futures::StreamExt;
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
@@ -52,7 +54,7 @@ pub use environment::{
     EnvironmentNetwork, EnvironmentRuntime, EnvironmentRuntimeError, EnvironmentRuntimeFuture,
     EnvironmentSnapshot, EnvironmentSnapshotOperation, EnvironmentSnapshotOperationKind,
     EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings, EnvironmentStatus,
-    PublicTonNetwork, StudioEnvironment, UpdateEnvironmentRequest,
+    FullTonAccountImport, PublicTonNetwork, StudioEnvironment, UpdateEnvironmentRequest,
 };
 pub use environment_catalog::{
     MAINNET_ENVIRONMENT_ID, PUBLIC_TON_ENVIRONMENT_IDS, TESTNET_ENVIRONMENT_ID,
@@ -481,14 +483,166 @@ async fn list_environments(
 )]
 async fn create_environment(
     State(state): State<StudioState>,
-    Json(request): Json<CreateEnvironmentRequest>,
+    Json(mut request): Json<CreateEnvironmentRequest>,
 ) -> Result<(StatusCode, Json<StudioEnvironment>), StudioApiError> {
+    resolve_full_ton_account_imports(&state, &mut request).await?;
     state
         .environment_runtime
         .create(request)
         .await
         .map(|environment| (StatusCode::CREATED, Json(public_environment(environment))))
         .map_err(StudioApiError)
+}
+
+async fn resolve_full_ton_account_imports(
+    state: &StudioState,
+    request: &mut CreateEnvironmentRequest,
+) -> Result<(), StudioApiError> {
+    let CreateEnvironmentConfig::FullTonNetwork {
+        imported_accounts, ..
+    } = &mut request.config
+    else {
+        return Ok(());
+    };
+
+    let mut addresses = BTreeSet::new();
+    for account in imported_accounts {
+        let source_environment_id = account.source_environment_id.trim().to_owned();
+        account.source_environment_id = source_environment_id;
+        account.name = account
+            .name
+            .take()
+            .map(|name| name.trim().to_owned())
+            .filter(|name| !name.is_empty());
+        if account.source_environment_id.is_empty() {
+            return Err(StudioApiError(EnvironmentRuntimeError::InvalidRequest {
+                code: "full_ton_import_source_required",
+                message: "An import source environment is required".to_owned(),
+            }));
+        }
+
+        let address = TonAddress::from_str(account.address.trim()).map_err(|_| {
+            StudioApiError(EnvironmentRuntimeError::InvalidRequest {
+                code: "full_ton_import_address_invalid",
+                message: format!("Invalid TON address {}", account.address),
+            })
+        })?;
+        let canonical_address = address.to_hex();
+        if !addresses.insert(canonical_address.clone()) {
+            return Err(StudioApiError(EnvironmentRuntimeError::InvalidRequest {
+                code: "full_ton_import_address_duplicate",
+                message: format!("Account {canonical_address} was selected more than once"),
+            }));
+        }
+        account.address = address.to_base64(false, true, true);
+
+        let source = state
+            .environment_runtime
+            .get(&account.source_environment_id)
+            .await
+            .map_err(StudioApiError)?;
+        if source.status != EnvironmentStatus::Running {
+            return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
+                code: "full_ton_import_source_not_running",
+                message: format!("{} must be running to import contracts", source.name),
+            }));
+        }
+        account.shard_account_boc_hex =
+            Some(fetch_shard_account_boc_hex(state, &source, &canonical_address).await?);
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+struct ShardAccountCellResponse {
+    ok: bool,
+    result: Option<ShardAccountCell>,
+    error: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ShardAccountCell {
+    bytes: String,
+}
+
+async fn fetch_shard_account_boc_hex(
+    state: &StudioState,
+    source: &StudioEnvironment,
+    address: &str,
+) -> Result<String, StudioApiError> {
+    let mut url = reqwest::Url::parse(&environment_upstream_url(
+        source,
+        "/api/v2/getShardAccountCell",
+    )?)
+    .map_err(|error| {
+        StudioApiError(EnvironmentRuntimeError::Internal {
+            code: "full_ton_import_source_invalid",
+            message: format!("{} has an invalid V2 API endpoint: {error}", source.name),
+        })
+    })?;
+    url.query_pairs_mut().append_pair("address", address);
+    let response = apply_environment_upstream_auth(
+        state.http_client.get(url),
+        source,
+        state.toncenter_api_keys.for_environment(source),
+    )
+    .send()
+    .await
+    .map_err(|error| {
+        StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "full_ton_import_failed",
+            message: format!("Failed to load {address} from {}: {error}", source.name),
+        })
+    })?;
+    let status = response.status();
+    let body = response.text().await.map_err(|error| {
+        StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "full_ton_import_failed",
+            message: format!("Failed to read {address} from {}: {error}", source.name),
+        })
+    })?;
+    if !status.is_success() {
+        return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "full_ton_import_failed",
+            message: format!(
+                "Failed to load {address} from {}: upstream returned {status}",
+                source.name
+            ),
+        }));
+    }
+
+    let payload = serde_json::from_str::<ShardAccountCellResponse>(&body).map_err(|error| {
+        StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "full_ton_import_failed",
+            message: format!(
+                "Failed to parse {address} from {} as a shard account: {error}",
+                source.name
+            ),
+        })
+    })?;
+    if !payload.ok {
+        return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "full_ton_import_failed",
+            message: payload
+                .error
+                .unwrap_or_else(|| format!("{} could not export account {address}", source.name)),
+        }));
+    }
+    let bytes = payload.result.ok_or_else(|| {
+        StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "full_ton_import_failed",
+            message: format!("{} returned no state for {address}", source.name),
+        })
+    })?;
+    let boc = base64::engine::general_purpose::STANDARD
+        .decode(bytes.bytes)
+        .map_err(|error| {
+            StudioApiError(EnvironmentRuntimeError::Conflict {
+                code: "full_ton_import_failed",
+                message: format!("{} returned an invalid account BoC: {error}", source.name),
+            })
+        })?;
+    Ok(hex::encode(boc))
 }
 
 #[utoipa::path(

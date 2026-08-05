@@ -37,6 +37,7 @@ import styles from "./VirtualEnvironmentsPage.module.css"
 interface VirtualEnvironmentsPageProps {
   readonly createOpen: boolean
   readonly environments: readonly StudioEnvironment[]
+  readonly importSourceEnvironments: readonly StudioEnvironment[]
   readonly isLoading: boolean
   readonly loadError?: string
   readonly walletNames: readonly string[]
@@ -49,6 +50,7 @@ interface VirtualEnvironmentsPageProps {
 export function VirtualEnvironmentsPage({
   createOpen,
   environments,
+  importSourceEnvironments,
   isLoading,
   loadError,
   walletNames,
@@ -265,6 +267,7 @@ export function VirtualEnvironmentsPage({
 
       <CreateEnvironmentDialog
         environmentCount={environments.length}
+        importSourceEnvironments={importSourceEnvironments}
         open={createOpen}
         walletNames={walletNames}
         onCreated={handleCreated}

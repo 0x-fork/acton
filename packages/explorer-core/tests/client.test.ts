@@ -3,6 +3,116 @@ import {beginCell} from "@ton/core"
 
 import {TonClient} from "../src/api/client"
 
+test("address information falls back to the node when the index has no account", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: string[] = []
+  globalThis.fetch = mock(async input => {
+    const url = new URL(input.toString())
+    requests.push(url.toString())
+    if (url.pathname.endsWith("/addressInformation")) {
+      return Response.json({
+        balance: "0",
+        code: null,
+        data: null,
+        frozen_hash: null,
+        last_transaction_hash: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        last_transaction_lt: "0",
+        status: "uninit",
+      })
+    }
+    return Response.json({
+      ok: true,
+      result: {
+        balance: "99885000",
+        code: "code-boc",
+        data: "data-boc",
+        frozen_hash: null,
+        last_transaction_hash: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        last_transaction_lt: "0",
+        state: "active",
+      },
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    expect({
+      result: await client.getAddressInformation("EQImportedAccount"),
+      requests,
+    }).toMatchInlineSnapshot(`
+      {
+        "requests": [
+          "https://toncenter.example/api/v3/addressInformation?address=EQImportedAccount&include_boc=true",
+          "https://toncenter.example/api/v2/getAddressInformation?address=EQImportedAccount",
+        ],
+        "result": {
+          "balance": "99885000",
+          "code": "code-boc",
+          "data": "data-boc",
+          "frozen_hash": null,
+          "last_transaction_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "last_transaction_lt": "0",
+          "status": "active",
+        },
+      }
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("address information does not query the node when indexed state is present", async () => {
+  const originalFetch = globalThis.fetch
+  const requests: string[] = []
+  globalThis.fetch = mock(async input => {
+    requests.push(input.toString())
+    return Response.json({
+      balance: "42",
+      code: "code-boc",
+      data: "data-boc",
+      frozen_hash: null,
+      last_transaction_hash: "transaction-hash",
+      last_transaction_lt: "10",
+      status: "active",
+    })
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    expect({
+      result: await client.getAddressInformation("EQIndexedAccount"),
+      requests,
+    }).toMatchInlineSnapshot(`
+      {
+        "requests": [
+          "https://toncenter.example/api/v3/addressInformation?address=EQIndexedAccount&include_boc=true",
+        ],
+        "result": {
+          "balance": "42",
+          "code": "code-boc",
+          "data": "data-boc",
+          "frozen_hash": null,
+          "last_transaction_hash": "transaction-hash",
+          "last_transaction_lt": "10",
+          "status": "active",
+        },
+      }
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("raw blocks are loaded from the selected TonAPI LiteServer", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []

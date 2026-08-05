@@ -50,6 +50,7 @@ impl TestEnvironmentRuntime {
                 admin_port: 18_082,
                 config_port: 18_083,
                 validators: 1,
+                imported_accounts: Vec::new(),
             },
             EnvironmentEndpoints {
                 api_v2: Some("http://127.0.0.1:18080/api/v2".to_owned()),

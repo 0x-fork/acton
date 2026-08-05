@@ -3,7 +3,7 @@ TEST_FEATURE_ARGS := if env_var_or_default("CI", "") != "" { "--features only_ci
 SOURCE_TRACE_WASM_OUT := env_var_or_default("ACTON_SOURCE_TRACE_WASM_OUT", "/tmp/acton-source-trace-wasm")
 FAUCET_POW_WASM_OUT := env_var_or_default("ACTON_FAUCET_POW_WASM_OUT", justfile_directory() + "/packages/explorer-ui/src/faucet/wasm")
 LOCALTON_DEV_IMAGE := env_var_or_default("ACTON_STUDIO_LOCALTON_IMAGE", "localton:dev")
-LOCALTON_BASE_IMAGE := env_var_or_default("LOCALTON_BASE_IMAGE", "ghcr.io/ton-blockchain/localton:sha-eee0c78827aee140fea013f3b0108514a0a337ad")
+LOCALTON_BASE_IMAGE := env_var_or_default("LOCALTON_BASE_IMAGE", "ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6")
 
 all: precommit
 

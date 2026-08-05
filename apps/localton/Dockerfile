@@ -3,7 +3,7 @@
 ARG RUST_VERSION=1.96.1
 ARG GO_VERSION=1.24.11
 ARG UBUNTU_VERSION=24.04
-ARG LOCALTON_BASE_IMAGE=ghcr.io/ton-blockchain/localton:sha-eee0c78827aee140fea013f3b0108514a0a337ad
+ARG LOCALTON_BASE_IMAGE=ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6
 
 FROM rust:${RUST_VERSION}-bookworm AS launcher-builder
 WORKDIR /src

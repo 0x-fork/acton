@@ -12,6 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 axum = { workspace = true }
+base64 = { workspace = true }
 chrono = { workspace = true }
 dunce = { workspace = true }
 futures = { workspace = true }
