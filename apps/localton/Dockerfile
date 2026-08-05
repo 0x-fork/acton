@@ -245,6 +245,7 @@ ENV CC=clang \
 COPY docker/ton-indexer-cors.patch /tmp/ton-indexer-cors.patch
 COPY docker/ton-indexer-classifier-cpu.patch /tmp/ton-indexer-classifier-cpu.patch
 COPY docker/ton-indexer-v3-catchup.patch /tmp/ton-indexer-v3-catchup.patch
+COPY docker/ton-indexer-localton-scanner.patch /tmp/ton-indexer-localton-scanner.patch
 
 RUN git init -q /src/ton-indexer \
     && git -C /src/ton-indexer remote add origin "${TON_INDEXER_REPOSITORY}" \
@@ -255,7 +256,8 @@ RUN git init -q /src/ton-indexer \
     && git -C /src/ton-indexer apply \
         /tmp/ton-indexer-cors.patch \
         /tmp/ton-indexer-classifier-cpu.patch \
-        /tmp/ton-indexer-v3-catchup.patch
+        /tmp/ton-indexer-v3-catchup.patch \
+        /tmp/ton-indexer-localton-scanner.patch
 
 RUN --mount=type=cache,id=ton-indexer-ccache,target=/ccache \
     cmake \
@@ -272,6 +274,7 @@ RUN --mount=type=cache,id=ton-indexer-ccache,target=/ccache \
         --target \
             ton-index-postgres \
             ton-index-postgres-migrate \
+            ton-smc-scanner \
             ton-marker \
             ton-marker-cli \
             ton-marker-core \
@@ -279,6 +282,7 @@ RUN --mount=type=cache,id=ton-indexer-ccache,target=/ccache \
     && install -m 0755 \
         /src/ton-indexer/build-worker/ton-index-postgres/ton-index-postgres \
         /src/ton-indexer/build-worker/ton-index-postgres/ton-index-postgres-migrate \
+        /src/ton-indexer/build-worker/ton-smc-scanner/ton-smc-scanner \
         /out/ton-indexer/bin/ \
     && cp -a \
         /src/ton-indexer/build-worker/ton-marker/libton-marker* \
@@ -360,6 +364,7 @@ COPY --from=http-api-builder /opt/ton-http-api-v2 /opt/ton-http-api-v2
 COPY --from=ton-indexer-builder \
     /out/ton-indexer/bin/ton-index-postgres \
     /out/ton-indexer/bin/ton-index-postgres-migrate \
+    /out/ton-indexer/bin/ton-smc-scanner \
     /opt/ton-indexer/bin/
 COPY --from=ton-indexer-builder /out/ton-indexer/lib /opt/ton-indexer/lib
 COPY --from=ton-index-api-builder \

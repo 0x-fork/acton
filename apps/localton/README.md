@@ -36,7 +36,7 @@ Show the service state:
 
 ```bash
 docker compose ps
-docker compose logs -f localton v3-worker v3-api
+docker compose logs -f localton v3-account-scanner v3-worker v3-api
 ```
 
 The first run can take several minutes. The node must create the network before the V3 worker can index blocks.
@@ -57,6 +57,7 @@ curl 'http://127.0.0.1:18003/api/v3/blocks?workchain=-1&limit=8&sort=desc'
 | `postgres` | Stores the indexed blockchain data. |
 | `redis` | Stores data for API V3 and the event classifier. |
 | `v3-migrations` | Creates the PostgreSQL schema. |
+| `v3-account-scanner` | Indexes every account present in the initial network state. |
 | `v3-worker` | Reads the validator database and indexes blocks. |
 | `v3-api` | Serves TON Center API V3. |
 | `v3-classifier` | Classifies indexed actions. |
