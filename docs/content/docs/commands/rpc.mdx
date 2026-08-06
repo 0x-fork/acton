@@ -188,11 +188,38 @@ Print machine-readable JSON output.
 <CommandOption>
 <CommandOptionTitle>
 
+`--with-comments`
+
+</CommandOptionTitle>
+
+Include field comments from ABI metadata in the result. In JSON mode, a
+described field is returned as an object with `value` and `comment` keys. In
+the default human-readable mode, the comment is printed on the line before the
+field value.
+
+<CommandOptionMeta label="Conflicts with">
+
+`--raw`
+
+</CommandOptionMeta>
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
 `--raw`
 
 </CommandOptionTitle>
 
 Print the raw TonCenter stack without ABI decoding.
+
+<CommandOptionMeta label="Conflicts with">
+
+`--with-comments`
+
+</CommandOptionMeta>
 
 </CommandOption>
 

@@ -65,6 +65,12 @@ pub enum RpcCommand {
         block_number: Option<u64>,
         #[arg(long, help = "Print machine-readable JSON output")]
         json: bool,
+        #[arg(
+            long,
+            conflicts_with = "raw",
+            help = "Include ABI field comments in the result"
+        )]
+        with_comments: bool,
         #[arg(long, help = "Print the raw TonCenter stack without ABI decoding")]
         raw: bool,
     },
@@ -132,8 +138,20 @@ pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
             net,
             block_number,
             json,
+            with_comments,
             raw,
-        } => call::rpc_call_cmd(&address, &method, &args, net, block_number, json, raw),
+        } => call::rpc_call_cmd(
+            &address,
+            &method,
+            &args,
+            call::RpcCallOptions {
+                net,
+                block_number,
+                json,
+                with_comments,
+                raw,
+            },
+        ),
         RpcCommand::Block { net } => rpc_block_cmd(net),
         RpcCommand::BlockNumber { net } => rpc_block_number_cmd(net),
         RpcCommand::Trace {

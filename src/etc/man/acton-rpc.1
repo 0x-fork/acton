@@ -131,6 +131,14 @@ Supported values include \fBmainnet\fR, \fBtestnet\fR, \fBlocalnet\fR, and
 Print machine\-readable JSON output.
 .RE
 .sp
+\fB\-\-with\-comments\fR
+.RS 4
+Include field comments from ABI metadata in the result. In JSON mode, a
+described field is returned as an object with \fBvalue\fR and \fBcomment\fR keys. In
+the default human\-readable mode, the comment is printed on the line before the
+field value.
+.RE
+.sp
 \fB\-\-raw\fR
 .RS 4
 Print the raw TonCenter stack without ABI decoding.

@@ -111,6 +111,13 @@ Supported values include `mainnet`, `testnet`, `localnet`, and
 Print machine-readable JSON output.
 {{/option}}
 
+{{#option "`--with-comments`" }}
+Include field comments from ABI metadata in the result. In JSON mode, a
+described field is returned as an object with `value` and `comment` keys. In
+the default human-readable mode, the comment is printed on the line before the
+field value.
+{{/option}}
+
 {{#option "`--raw`" }}
 Print the raw TonCenter stack without ABI decoding.
 {{/option}}
