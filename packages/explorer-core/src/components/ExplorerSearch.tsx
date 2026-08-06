@@ -53,7 +53,7 @@ const MASTERCHAIN_SHARD = "8000000000000000"
 const MAX_BLOCK_NUMBER = 2_147_483_647
 const MIN_WORKCHAIN = -2_147_483_648
 const MAX_WORKCHAIN = 2_147_483_647
-const TONCENTER_BLOCK_ID_PATTERN = /^\(\s*(-?\d+)\s*,\s*([\da-f]{16})\s*,\s*(\d+)\s*\)$/i
+const TONCENTER_BLOCK_ID_PATTERN = /^\s*(-?\d+)\s*,\s*([\da-f]{16})\s*,\s*(\d+)\s*$/i
 const INVALID_SEARCH_DESCRIPTION =
   "Paste a valid TON address, .ton or .t.me name, transaction hash, block ID, or ABI name."
 const OPCODE_NOT_FOUND_DESCRIPTION = "No ABI declaration found for opcode"
@@ -343,17 +343,25 @@ function resolveSearchTarget(
   return undefined
 }
 
-function parseBlockSearchQuery(
+export function parseBlockSearchQuery(
   value: string,
 ): {workchain: number; shard: string; seqno: number} | undefined {
-  if (/^\d+$/.test(value)) {
-    const seqno = parseBlockNumber(value)
+  const trimmed = value.trim()
+  if (/^\d+$/.test(trimmed)) {
+    const seqno = parseBlockNumber(trimmed)
     return seqno === undefined
       ? undefined
       : {workchain: MASTERCHAIN_WORKCHAIN, shard: MASTERCHAIN_SHARD, seqno}
   }
 
-  const match = TONCENTER_BLOCK_ID_PATTERN.exec(value)
+  const hasOpeningParenthesis = trimmed.startsWith("(")
+  const hasClosingParenthesis = trimmed.endsWith(")")
+  if (hasOpeningParenthesis !== hasClosingParenthesis) {
+    return undefined
+  }
+
+  const blockId = hasOpeningParenthesis ? trimmed.slice(1, -1) : trimmed
+  const match = TONCENTER_BLOCK_ID_PATTERN.exec(blockId)
   if (!match) {
     return undefined
   }
