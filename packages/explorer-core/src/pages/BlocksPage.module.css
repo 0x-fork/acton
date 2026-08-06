@@ -372,8 +372,9 @@
   top: -1px;
 }
 
-.blockDetailRelativeTime {
+.blockDetailSecondaryValue {
   color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-sans);
 }
 
 .blockCapabilitiesPopover {

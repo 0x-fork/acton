@@ -1323,16 +1323,47 @@ const BlockSummaryTable: FC<{
   const prevKeyBlockSeqno = block.prev_key_block_seqno
   const minRefMcSeqno = block.min_ref_mc_seqno
   const genUtime = blockUnixTime(block)
+  const workchainName =
+    block.workchain === -1 ? "Masterchain" : block.workchain === 0 ? "Basechain" : undefined
+  const globalIdName =
+    block.global_id === -239 ? "Mainnet" : block.global_id === -3 ? "Testnet" : undefined
   const hasGenSoftware =
     block.gen_software_version !== undefined || block.gen_software_capabilities !== undefined
 
   return (
     <section className={styles.blockDetailsPanel} aria-label="Block details">
       <BlockDetailSection label="Identity" contentClassName={styles.blockFourColumnGrid}>
-        <BlockDetailItem label="Workchain" value={block.workchain.toString()} />
+        <BlockDetailItem
+          label="Workchain"
+          value={
+            <>
+              {block.workchain}
+              {workchainName ? (
+                <>
+                  {" "}
+                  <span className={styles.blockDetailSecondaryValue}>({workchainName})</span>
+                </>
+              ) : null}
+            </>
+          }
+        />
         <BlockDetailItem label="Shard" value={block.shard} mono />
         <BlockDetailItem label="Seqno" value={block.seqno.toString()} mono />
-        <BlockDetailItem label="Global ID" value={formatOptionalNumber(block.global_id)} mono />
+        <BlockDetailItem
+          label="Global ID"
+          value={
+            <>
+              {formatOptionalNumber(block.global_id)}
+              {globalIdName ? (
+                <>
+                  {" "}
+                  <span className={styles.blockDetailSecondaryValue}>({globalIdName})</span>
+                </>
+              ) : null}
+            </>
+          }
+          mono
+        />
       </BlockDetailSection>
 
       <BlockDetailSection label="Hashes" contentClassName={styles.blockHashesGrid}>
@@ -1354,7 +1385,7 @@ const BlockSummaryTable: FC<{
             ) : (
               <>
                 <DateTime display="date-time-numeric-seconds" unit="seconds" value={genUtime} />{" "}
-                <span className={styles.blockDetailRelativeTime}>
+                <span className={styles.blockDetailSecondaryValue}>
                   (<RelativeTime mode="relative" tooltip={false} unit="seconds" value={genUtime} />)
                 </span>
               </>
@@ -1403,7 +1434,6 @@ const BlockSummaryTable: FC<{
                 workchain={masterchainBlockRef.workchain}
                 shard={masterchainBlockRef.shard}
                 seqno={masterchainBlockRef.seqno}
-                display="full"
                 href={routes.blockPath(
                   masterchainBlockRef.workchain,
                   masterchainBlockRef.shard,
