@@ -1318,7 +1318,8 @@ const BlockSummaryTable: FC<{
   const fileHash = formatBlockHash(block.file_hash)
   const createdBy = formatBlockHash(block.created_by)
   const randSeed = formatBlockHash(block.rand_seed)
-  const masterchainShard = block.masterchain_block_ref?.shard ?? MASTERCHAIN_SHARD
+  const masterchainBlockRef = block.masterchain_block_ref
+  const masterchainShard = masterchainBlockRef?.shard ?? MASTERCHAIN_SHARD
   const prevKeyBlockSeqno = block.prev_key_block_seqno
   const minRefMcSeqno = block.min_ref_mc_seqno
   const genUtime = blockUnixTime(block)
@@ -1394,6 +1395,25 @@ const BlockSummaryTable: FC<{
       </BlockDetailSection>
 
       <BlockDetailSection label="References">
+        {block.workchain !== -1 && masterchainBlockRef ? (
+          <BlockDetailItem
+            label="Masterchain block"
+            value={
+              <BlockChip
+                workchain={masterchainBlockRef.workchain}
+                shard={masterchainBlockRef.shard}
+                seqno={masterchainBlockRef.seqno}
+                display="full"
+                href={routes.blockPath(
+                  masterchainBlockRef.workchain,
+                  masterchainBlockRef.shard,
+                  masterchainBlockRef.seqno,
+                )}
+                onClick={event => onOpenBlock(masterchainBlockRef, event)}
+              />
+            }
+          />
+        ) : null}
         <BlockDetailItem
           label="Prev refs"
           value={

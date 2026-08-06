@@ -46,9 +46,7 @@ export function BlockChip({
       {content}
     </a>
   ) : (
-    <span className={chipClassName}>
-      {content}
-    </span>
+    <span className={chipClassName}>{content}</span>
   )
   const chipWithTooltip = (
     <Tooltip
@@ -97,7 +95,7 @@ function BlockChipTooltip({
 }: {
   readonly blockId: string
   readonly heading?: string
-  readonly seqno: number
+  readonly seqno: number | string
   readonly shard: string
   readonly workchain: number
 }) {
