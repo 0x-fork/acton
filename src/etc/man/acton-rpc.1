@@ -41,8 +41,8 @@ Query blockchain account state through a configured network endpoint.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'decode account storage and get\-method results through local or bundled ABI
-metadata when a match is found
+\h'-04'\(bu\h'+03'decode account storage and get\-method results through local, bundled, or
+verifier ABI metadata when a match is found
 .RE
 .sp
 The command works without a project manifest for raw remote inspection.
@@ -50,7 +50,11 @@ The command works without a project manifest for raw remote inspection.
 When Acton can resolve a local project and finds a contract with the same
 compiled \fBcode_hash\fR, it also prints the matched contract name and decodes the
 account storage using the local compiler ABI. If no local match exists, Acton
-falls back to its bundled ABI catalog.
+falls back to the bundled ABI catalog and then the Acton verifier API.
+Successful verifier ABI responses are cached in \fBbuild/cache/verifier\-abi\fR for
+24 hours. If the verifier is unavailable, an expired cache entry is still used
+when available. Set \fBACTON_NEW_VERIFY_BACKEND\fR to override the verifier backend,
+for example when running the verifier locally.
 .SH "SUBCOMMANDS"
 .SS "acton rpc info"
 Show information about a single account.
@@ -85,8 +89,8 @@ hashes
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'ABI match information when a project contract or bundled catalog entry has
-the same \fBcode_hash\fR
+\h'-04'\(bu\h'+03'ABI match information when a project contract, bundled catalog entry, or
+verifier response has the same \fBcode_hash\fR
 .RE
 .sp
 .RS 4
@@ -144,8 +148,8 @@ field value.
 Print the raw TonCenter stack without ABI decoding.
 .RE
 .SS "ABI Arguments"
-When Acton finds local or bundled ABI metadata for the remote contract,
-get\-method arguments are parsed against that ABI.
+When Acton finds local, bundled, or verifier ABI metadata for the remote
+contract, get\-method arguments are parsed against that ABI.
 .sp
 The \fImethod\fR argument can be either an ABI get\-method name or a numeric TVM
 method id. When the numeric id is present in the ABI, Acton still uses ABI
@@ -293,9 +297,9 @@ Print decoded message bodies in the transaction tree.
 .RE
 .sp
 Tree and verbose modes then reuse the same transaction tree formatter as Acton
-tests. When current account code matches a local contract or bundled catalog
-entry, Acton prints the matched contract name. Add \fB\-\-show\-bodies\fR to print
-decoded inbound message bodies.
+tests. When current account code matches a local contract, bundled catalog
+entry, or verifier response, Acton prints the matched contract name. Add
+\fB\-\-show\-bodies\fR to print decoded inbound message bodies.
 .SH "DISPLAY OPTIONS"
 .sp
 \fB\-\-color\fR \fIwhen\fR
@@ -350,7 +354,8 @@ usually to keep these keys there and use shell environment variables only for
 one\-off overrides or CI.
 .SH "ABI MATCHING"
 Storage decoding, get\-method argument parsing, and get\-method result decoding
-are best\-effort and depend on local project context or the bundled ABI catalog.
+are best\-effort and depend on local project context, the bundled ABI catalog,
+or the verifier API.
 .sp
 Acton attempts to:
 .sp
@@ -371,12 +376,21 @@ Acton attempts to:
 .RE
 .sp
 .RS 4
-\h'-04' 5.\h'+01'decode storage and get\-method results with the matched compiler ABI
+\h'-04' 5.\h'+01'query the verifier API when no local or bundled ABI matches
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'cache successful verifier responses for 24 hours and use stale entries
+during verifier outages
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'decode storage and get\-method results with the matched compiler ABI
 .RE
 .sp
 This means decoding is robust for contracts you control in the current Acton
-project, and available for known third\-party deployments in the bundled
-catalog.
+project, available for known third\-party deployments in the bundled catalog,
+and extendable to verified deployments through the verifier API.
 .sp
 For \fBacton rpc call\fR, missing ABI metadata does not prevent a get\-method call.
 Acton sends raw stack arguments instead and prints the raw result stack.

@@ -1,4 +1,5 @@
 use crate::commands::common::format_nanograms;
+use crate::context::code_lookup_hash;
 use crate::contract_interface::{
     compile_optional_contract_interface_with_cache, is_boc_path, read_precompiled_boc,
 };
@@ -23,6 +24,7 @@ use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, Std
 mod call;
 mod info;
 mod trace;
+mod verifier;
 
 #[derive(Subcommand, Clone)]
 pub enum RpcCommand {
@@ -212,20 +214,39 @@ pub(crate) fn load_rpc_config() -> anyhow::Result<ActonConfig> {
     }
 }
 
-pub(crate) struct LocalContractMatch {
+pub(crate) struct ContractMatch {
     pub(crate) contract_name: String,
     pub(crate) abi: Option<Arc<ContractABI>>,
+    pub(crate) source: ContractMatchSource,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ContractMatchSource {
+    Local,
+    Catalog,
+    Verifier,
+}
+
+impl ContractMatchSource {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Local => "local",
+            Self::Catalog => "catalog",
+            Self::Verifier => "verifier",
+        }
+    }
 }
 
 pub(super) fn find_local_contract_match(
     code_hash: &HashBytes,
     config: &ActonConfig,
-) -> anyhow::Result<Option<LocalContractMatch>> {
+) -> anyhow::Result<Option<ContractMatch>> {
     for candidate in load_local_contract_candidates(config)? {
         if &candidate.code_hash == code_hash {
-            return Ok(Some(LocalContractMatch {
+            return Ok(Some(ContractMatch {
                 contract_name: candidate.contract_name,
                 abi: candidate.abi,
+                source: ContractMatchSource::Local,
             }));
         }
     }
@@ -233,10 +254,59 @@ pub(super) fn find_local_contract_match(
     Ok(None)
 }
 
+pub(crate) fn find_contract_match_for_code(
+    code: &Cell,
+    config: &ActonConfig,
+) -> anyhow::Result<Option<ContractMatch>> {
+    let code_hash = code_lookup_hash(code);
+    let local_match = find_local_contract_match(&code_hash, config)?;
+    if local_match
+        .as_ref()
+        .is_some_and(|matched| matched.abi.is_some())
+    {
+        return Ok(local_match);
+    }
+
+    let Some(fallback_match) = find_fallback_contract_match(&code_hash) else {
+        return Ok(local_match);
+    };
+    let Some(mut local_match) = local_match else {
+        return Ok(Some(fallback_match));
+    };
+
+    local_match.abi = fallback_match.abi;
+    local_match.source = fallback_match.source;
+    Ok(Some(local_match))
+}
+
+pub(crate) fn find_fallback_contract_match(code_hash: &HashBytes) -> Option<ContractMatch> {
+    let code_hash = code_hash.to_string();
+    if let Some(catalog_contract) = acton_abi_catalog::find_contract_by_code_hash(&code_hash) {
+        return Some(ContractMatch {
+            contract_name: catalog_contract.display_name.clone(),
+            abi: Some(catalog_contract.abi()),
+            source: ContractMatchSource::Catalog,
+        });
+    }
+
+    match verifier::find_abi(&code_hash) {
+        Ok(Some(abi)) => Some(ContractMatch {
+            contract_name: abi.contract_name.clone(),
+            abi: Some(abi),
+            source: ContractMatchSource::Verifier,
+        }),
+        Ok(None) => None,
+        Err(err) => {
+            warn!("Skipping verifier ABI lookup for code hash {code_hash}: {err:#}");
+            None
+        }
+    }
+}
+
 pub(crate) fn find_local_contract_by_config_name(
     contract_name: &str,
     config: &ActonConfig,
-) -> anyhow::Result<Option<LocalContractMatch>> {
+) -> anyhow::Result<Option<ContractMatch>> {
     let Some(contracts) = config.contracts() else {
         return Ok(None);
     };
@@ -253,9 +323,10 @@ pub(crate) fn find_local_contract_by_config_name(
 
         let candidate =
             load_local_contract_candidate(contract_id, contract, config, file_cache.as_mut())?;
-        return Ok(Some(LocalContractMatch {
+        return Ok(Some(ContractMatch {
             contract_name: candidate.contract_name,
             abi: candidate.abi,
+            source: ContractMatchSource::Local,
         }));
     }
 
@@ -265,7 +336,7 @@ pub(crate) fn find_local_contract_by_config_name(
 pub(crate) fn find_local_contract_by_abi_name(
     contract_name: &str,
     config: &ActonConfig,
-) -> anyhow::Result<Option<LocalContractMatch>> {
+) -> anyhow::Result<Option<ContractMatch>> {
     let normalized = normalize_contract_lookup_name(contract_name);
     if normalized.is_empty() {
         return Ok(None);
@@ -277,9 +348,10 @@ pub(crate) fn find_local_contract_by_abi_name(
             .as_ref()
             .is_some_and(|abi| normalize_contract_lookup_name(&abi.contract_name) == normalized)
         {
-            return Ok(Some(LocalContractMatch {
+            return Ok(Some(ContractMatch {
                 contract_name: candidate.contract_name,
                 abi: candidate.abi,
+                source: ContractMatchSource::Local,
             }));
         }
     }

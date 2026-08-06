@@ -1,14 +1,12 @@
 use super::{
-    LocalContractMatch, find_local_contract_match, format_get_method_signature,
-    format_get_method_signature_colored, format_int_address, format_std_address, load_rpc_config,
-    pretty_address_format, resolve_rpc_network,
+    find_contract_match_for_code, format_get_method_signature, format_get_method_signature_colored,
+    format_int_address, format_std_address, load_rpc_config, pretty_address_format,
+    resolve_rpc_network,
 };
 use crate::commands::abi_args::{parse_abi_parameters, parse_number, parse_raw_stack_args};
 use crate::commands::common::error_fmt;
-use crate::context::code_lookup_hash;
 use crate::formatter::FormatterContext;
 use acton_config::color::{OwoColorize, colors_enabled};
-use acton_config::config::ActonConfig;
 #[cfg(test)]
 use acton_debug::PrettyAddressFormat;
 use acton_debug::{PrettyRenderOptions, RenderedValue, render_tuple_as_tolk_type};
@@ -61,7 +59,7 @@ pub(super) fn rpc_call_cmd(
     let code = TonApiClient::decode_optional_cell(&remote.code)?;
     let contract_match = code
         .as_ref()
-        .map(|code| find_contract_match_for_rpc_call(code, &config))
+        .map(|code| find_contract_match_for_code(code, &config))
         .transpose()?
         .flatten();
 
@@ -168,30 +166,6 @@ pub(super) fn rpc_call_cmd(
     }
 
     Ok(())
-}
-
-fn find_contract_match_for_rpc_call(
-    code: &Cell,
-    config: &ActonConfig,
-) -> anyhow::Result<Option<LocalContractMatch>> {
-    let local_match = find_local_contract_match(code.repr_hash(), config)?;
-    if local_match
-        .as_ref()
-        .is_some_and(|matched| matched.abi.is_some())
-    {
-        return Ok(local_match);
-    }
-
-    if let Some(catalog_contract) =
-        acton_abi_catalog::find_contract_by_code_hash(&code_lookup_hash(code).to_string())
-    {
-        return Ok(Some(LocalContractMatch {
-            contract_name: catalog_contract.display_name.clone(),
-            abi: Some(catalog_contract.abi()),
-        }));
-    }
-
-    Ok(local_match)
 }
 
 fn resolve_get_method<'a>(

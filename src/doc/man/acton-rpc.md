@@ -21,15 +21,19 @@ Query blockchain account state through a configured network endpoint.
 - inspect balance, last transaction metadata, and state hashes
 - render a TonCenter v3 trace as a decoded transaction tree
 - match deployed code against a local Acton project by `code_hash`
-- decode account storage and get-method results through local or bundled ABI
-  metadata when a match is found
+- decode account storage and get-method results through local, bundled, or
+  verifier ABI metadata when a match is found
 
 The command works without a project manifest for raw remote inspection.
 
 When Acton can resolve a local project and finds a contract with the same
 compiled `code_hash`, it also prints the matched contract name and decodes the
 account storage using the local compiler ABI. If no local match exists, Acton
-falls back to its bundled ABI catalog.
+falls back to the bundled ABI catalog and then the Acton verifier API.
+Successful verifier ABI responses are cached in `build/cache/verifier-abi` for
+24 hours. If the verifier is unavailable, an expired cache entry is still used
+when available. Set `ACTON_NEW_VERIFY_BACKEND` to override the verifier backend,
+for example when running the verifier locally.
 
 ## Subcommands
 
@@ -67,8 +71,8 @@ Supported values include `mainnet`, `testnet`, `localnet`, and
 - remote account metadata such as status, balance, last transaction LT and
   hashes
 - code and data hashes when the account has deployed state
-- ABI match information when a project contract or bundled catalog entry has
-  the same `code_hash`
+- ABI match information when a project contract, bundled catalog entry, or
+  verifier response has the same `code_hash`
 - decoded storage in a YAML-like view when compiler ABI metadata is available
 
 If no ABI match is found, Acton still prints the raw remote account information
@@ -126,8 +130,8 @@ Print the raw TonCenter stack without ABI decoding.
 
 #### ABI Arguments
 
-When Acton finds local or bundled ABI metadata for the remote contract,
-get-method arguments are parsed against that ABI.
+When Acton finds local, bundled, or verifier ABI metadata for the remote
+contract, get-method arguments are parsed against that ABI.
 
 The _method_ argument can be either an ABI get-method name or a numeric TVM
 method id. When the numeric id is present in the ABI, Acton still uses ABI
@@ -271,9 +275,9 @@ Print decoded message bodies in the transaction tree.
 - total transaction and message counts
 
 Tree and verbose modes then reuse the same transaction tree formatter as Acton
-tests. When current account code matches a local contract or bundled catalog
-entry, Acton prints the matched contract name. Add `--show-bodies` to print
-decoded inbound message bodies.
+tests. When current account code matches a local contract, bundled catalog
+entry, or verifier response, Acton prints the matched contract name. Add
+`--show-bodies` to print decoded inbound message bodies.
 
 ## Display Options
 
@@ -308,7 +312,8 @@ one-off overrides or CI.
 ## ABI Matching
 
 Storage decoding, get-method argument parsing, and get-method result decoding
-are best-effort and depend on local project context or the bundled ABI catalog.
+are best-effort and depend on local project context, the bundled ABI catalog,
+or the verifier API.
 
 Acton attempts to:
 
@@ -316,11 +321,14 @@ Acton attempts to:
 2. compute its `code_hash`
 3. compare that hash with locally configured contracts
 4. fall back to the bundled ABI catalog when there is no local ABI
-5. decode storage and get-method results with the matched compiler ABI
+5. query the verifier API when no local or bundled ABI matches
+6. cache successful verifier responses for 24 hours and use stale entries
+   during verifier outages
+7. decode storage and get-method results with the matched compiler ABI
 
 This means decoding is robust for contracts you control in the current Acton
-project, and available for known third-party deployments in the bundled
-catalog.
+project, available for known third-party deployments in the bundled catalog,
+and extendable to verified deployments through the verifier API.
 
 For `acton rpc call`, missing ABI metadata does not prevent a get-method call.
 Acton sends raw stack arguments instead and prints the raw result stack.
