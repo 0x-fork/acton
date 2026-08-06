@@ -1248,3 +1248,29 @@ test("localnet state and checkpoint methods transfer JSON through the control AP
     globalThis.fetch = originalFetch
   }
 })
+
+test("account funding sends exact nanograms beyond the safe integer range", async () => {
+  const originalFetch = globalThis.fetch
+  let requestBody: string | undefined
+  globalThis.fetch = mock(async (_input, init) => {
+    requestBody = String(init?.body)
+    return Response.json({success: true, hash: "message-hash"})
+  }) as typeof fetch
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "http://localhost:8081/api/v2",
+      v3BaseUrl: "http://localhost:8081/api/v3",
+      addressNameBaseUrl: "http://localhost:8081",
+    })
+
+    await expect(
+      client.fundAccount("EQExactRecipient", 123_456_789_012_345_678_901_234_567_890n),
+    ).resolves.toBe("message-hash")
+    expect(requestBody).toBe(
+      '{"address":"EQExactRecipient","amount":123456789012345678901234567890}',
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})

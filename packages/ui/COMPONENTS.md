@@ -2170,7 +2170,7 @@ Status: ready
 Import:
 
 ```tsx
-import { TokenAmount, formatTokenAmount } from "@acton/ui";
+import { TokenAmount, formatTokenAmount, parseTokenAmount } from "@acton/ui";
 ```
 
 Use `TokenAmount` for fungible-token values stored as integer raw units. Pass
@@ -2210,6 +2210,9 @@ arithmetic and does not convert the value through JavaScript `Number`.
   `showDecimalsInTooltip={false}`.
 - `formatTokenAmount` applies the same rules where JSX is not available, such
   as component string props, form defaults, or diagnostic text.
+- `parseTokenAmount` converts a decimal input string into exact `bigint` raw
+  units. It accepts decimal precision as a number or numeric metadata string
+  and uses the same internal normalization as formatting.
 
 ### Agent Guidance
 
@@ -2226,6 +2229,8 @@ arithmetic and does not convert the value through JavaScript `Number`.
 - Do not convert token units through `Number`, `parseFloat`, or floating-point
   powers of ten for UI display.
 - Do not create local token, Jetton, asset, or supply formatters.
+- Do not create local token or Jetton parsers or convert decimal inputs through
+  `Number`, `parseFloat`, or floating-point powers of ten.
 
 ## GramAmount
 
@@ -2234,7 +2239,7 @@ Status: ready
 Import:
 
 ```tsx
-import { GramAmount, formatGramAmount } from "@acton/ui";
+import { GramAmount, formatGramAmount, parseGramAmount } from "@acton/ui";
 ```
 
 Use `GramAmount` for GRAM values stored as integer nanograms. It accepts a
@@ -2266,6 +2271,9 @@ conversion through JavaScript `Number`.
   actions. Set `tooltip={false}` only when that information is already visible.
 - `formatGramAmount` applies the same rules where JSX is not available, such as
   graph data, form defaults, or diagnostic strings.
+- `parseGramAmount` converts a decimal GRAM input string into an exact `bigint`
+  nanogram value. It rejects negative values and values with more than nine
+  fractional digits.
 
 ### Agent Guidance
 
@@ -2279,6 +2287,8 @@ conversion through JavaScript `Number`.
 - Do not convert nanograms through `Number`, `parseFloat`, or `fromNano` for UI
   display.
 - Do not create local GRAM, TON coin, or nanogram formatters.
+- Do not create local GRAM parsers or convert decimal GRAM inputs through
+  `Number`, `parseFloat`, or floating-point multiplication.
 
 ## Pagination
 

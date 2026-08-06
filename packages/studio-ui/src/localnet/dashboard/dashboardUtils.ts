@@ -1,21 +1,4 @@
 import type {V3TransactionListItem} from "@acton/explorer-core/api/types"
-import {shortenMiddle} from "@acton/ui"
-
-export function parseGramAmount(value: string): number | undefined {
-  const trimmed = value.trim()
-  if (!trimmed || !/^\d+(\.\d{0,9})?$/.test(trimmed)) {
-    return undefined
-  }
-
-  const [wholePart, fractionPart = ""] = trimmed.split(".")
-  const whole = BigInt(wholePart)
-  const fraction = BigInt(fractionPart.padEnd(9, "0"))
-  const nano = whole * 1_000_000_000n + fraction
-  if (nano <= 0n || nano > BigInt(Number.MAX_SAFE_INTEGER)) {
-    return undefined
-  }
-  return Number(nano)
-}
 
 export function contentString(
   content: Record<string, unknown> | undefined,
@@ -23,10 +6,6 @@ export function contentString(
 ): string | undefined {
   const value = content?.[key]
   return typeof value === "string" && value.length > 0 ? value : undefined
-}
-
-export function shortHash(hash: string): string {
-  return shortenMiddle(hash, {start: 8, end: 8})
 }
 
 export function matchesQuery(fields: readonly (string | undefined)[], query: string): boolean {

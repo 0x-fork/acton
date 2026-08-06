@@ -1,6 +1,7 @@
 export {
   TokenAmount,
   formatTokenAmount,
+  parseTokenAmount,
   type TokenAmountFormatOptions,
   type TokenAmountDecimals,
   type TokenAmountProps,

@@ -2,9 +2,29 @@ import {describe, expect, test} from "bun:test"
 import {createElement} from "react"
 import {renderToStaticMarkup} from "react-dom/server"
 
-import {GramAmount, formatGramAmount} from "../src/components/GramAmount"
+import {GramAmount, formatGramAmount, parseGramAmount} from "../src/components/GramAmount"
 
 describe("GRAM amounts", () => {
+  test("parses decimal GRAM amounts into exact nanograms", () => {
+    expect({
+      zero: parseGramAmount("0"),
+      oneNanogram: parseGramAmount("0.000000001"),
+      leadingFraction: parseGramAmount(".5"),
+      large: parseGramAmount("123456789012345678901.123456789"),
+      tooPrecise: parseGramAmount("0.0000000001"),
+      negative: parseGramAmount("-1"),
+    }).toMatchInlineSnapshot(`
+      {
+        "large": 123456789012345678901123456789n,
+        "leadingFraction": 500000000n,
+        "negative": undefined,
+        "oneNanogram": 1n,
+        "tooPrecise": undefined,
+        "zero": 0n,
+      }
+    `)
+  })
+
   test("formats exact nanogram values without losing precision", () => {
     expect({
       zero: formatGramAmount(0n),

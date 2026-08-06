@@ -2,6 +2,7 @@ import type {ReactNode} from "react"
 
 import {
   formatTokenAmount,
+  parseTokenAmount,
   TokenAmount,
   type TokenAmountFormatOptions,
   type TokenAmountProps,
@@ -49,6 +50,11 @@ export function formatGramAmount(
     showSymbol: options.showUnit !== false,
     symbol: "GRAM",
   })
+}
+
+/** Parses a non-negative decimal GRAM amount into exact integer nanograms */
+export function parseGramAmount(value: string): bigint | undefined {
+  return parseTokenAmount(value, NANOGRAM_DECIMALS)
 }
 
 export function GramAmount({showUnit, ...props}: GramAmountProps) {

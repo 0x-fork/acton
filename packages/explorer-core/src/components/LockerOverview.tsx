@@ -27,7 +27,12 @@ import {
   type LockerPayment,
 } from "./lockerSchedule"
 import styles from "./LockerOverview.module.css"
-import {capitalize} from "./scheduleFormatting"
+
+const LOCKER_STATUS_LABELS = {
+  locked: "Locked",
+  next: "Next",
+  unlocked: "Unlocked",
+} as const
 
 interface LockerOverviewProps {
   readonly address: string
@@ -200,8 +205,8 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
             {schedule.payments.map(payment => (
               <span
                 key={payment.number}
-                className={`${styles.progressSegment} ${styles[`progressSegment${capitalize(payment.status)}`]}`}
-                title={`Payment ${payment.number}: ${capitalize(payment.status)}`}
+                className={`${styles.progressSegment} ${styles[`progressSegment${LOCKER_STATUS_LABELS[payment.status]}`]}`}
+                title={`Payment ${payment.number}: ${LOCKER_STATUS_LABELS[payment.status]}`}
                 aria-hidden="true"
               />
             ))}
@@ -262,6 +267,8 @@ function LockerMetric({label, value}: {readonly label: string; readonly value: R
 }
 
 function LockerPaymentRow({payment}: {readonly payment: LockerPayment}) {
+  const statusLabel = LOCKER_STATUS_LABELS[payment.status]
+
   return (
     <DataTableRow selected={payment.status === "next"}>
       <DataTableCell tone="muted">{payment.number}</DataTableCell>
@@ -275,9 +282,7 @@ function LockerPaymentRow({payment}: {readonly payment: LockerPayment}) {
         <GramAmount maximumFractionDigits={2} useGrouping value={payment.cumulativeAmount} />
       </DataTableCell>
       <DataTableCell>
-        <span className={`${styles.status} ${styles[`status${capitalize(payment.status)}`]}`}>
-          {capitalize(payment.status)}
-        </span>
+        <span className={`${styles.status} ${styles[`status${statusLabel}`]}`}>{statusLabel}</span>
       </DataTableCell>
     </DataTableRow>
   )

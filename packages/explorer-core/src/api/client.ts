@@ -1302,12 +1302,12 @@ export class TonClient {
     })
   }
 
-  async fundAccount(address: string, amount: number): Promise<string> {
+  async fundAccount(address: string, amount: bigint): Promise<string> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_fundAccount")
     const response = await this.request<FaucetResponse>(url, "Failed to fund account", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({address, amount}),
+      body: `{"address":${JSON.stringify(address)},"amount":${amount.toString()}}`,
     })
 
     if (response.ok === false || response.success === false) {

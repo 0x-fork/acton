@@ -2,9 +2,65 @@ import {describe, expect, test} from "bun:test"
 import {createElement} from "react"
 import {renderToStaticMarkup} from "react-dom/server"
 
-import {TokenAmount, formatTokenAmount} from "../src/components/TokenAmount"
+import {TokenAmount, formatTokenAmount, parseTokenAmount} from "../src/components/TokenAmount"
 
 describe("token amounts", () => {
+  test("parses decimal token amounts into exact raw units", () => {
+    expect({
+      zeroDecimals: parseTokenAmount("42", 0),
+      stringDecimals: parseTokenAmount("1.234567", "6"),
+      leadingFraction: parseTokenAmount(".5", 9),
+      trailingDecimal: parseTokenAmount("12.", 9),
+      zero: parseTokenAmount("0", 9),
+      large: parseTokenAmount("123456789012345678901.123456789012345678", 18),
+    }).toMatchInlineSnapshot(`
+      {
+        "large": 123456789012345678901123456789012345678n,
+        "leadingFraction": 500000000n,
+        "stringDecimals": 1234567n,
+        "trailingDecimal": 12000000000n,
+        "zero": 0n,
+        "zeroDecimals": 42n,
+      }
+    `)
+  })
+
+  test("rejects token amounts that cannot be represented exactly", () => {
+    expect({
+      empty: parseTokenAmount("", 9),
+      exponent: parseTokenAmount("1e9", 9),
+      negative: parseTokenAmount("-1", 9),
+      separatorWithoutDigits: parseTokenAmount(".", 9),
+      fractionWithZeroDecimals: parseTokenAmount("1.", 0),
+      tooPrecise: parseTokenAmount("0.0000001", "6"),
+    }).toMatchInlineSnapshot(`
+      {
+        "empty": undefined,
+        "exponent": undefined,
+        "fractionWithZeroDecimals": undefined,
+        "negative": undefined,
+        "separatorWithoutDigits": undefined,
+        "tooPrecise": undefined,
+      }
+    `)
+  })
+
+  test("uses the same decimal metadata fallback for parsing and formatting", () => {
+    expect({
+      missing: parseTokenAmount("1.5", undefined),
+      invalidString: parseTokenAmount("1.5", "not-a-number"),
+      fractionalNumber: parseTokenAmount("1.5", 1.5),
+      excessive: parseTokenAmount("1.5", 37),
+    }).toMatchInlineSnapshot(`
+      {
+        "excessive": 1500000000n,
+        "fractionalNumber": 1500000000n,
+        "invalidString": 1500000000n,
+        "missing": 1500000000n,
+      }
+    `)
+  })
+
   test("formats exact raw token units without losing precision", () => {
     expect({
       zeroDecimals: formatTokenAmount("42", 0, {symbol: "NFT"}),

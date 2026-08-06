@@ -7,16 +7,11 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import {Checkbox, formatGramAmount, InlineAction, Input, Select} from "@acton/ui"
+import {Checkbox, formatGramAmount, InlineAction, Input, parseGramAmount, Select} from "@acton/ui"
 import {renderTy, type SymTable, type UnionVariant} from "@ton/tolk-abi-to-typescript"
 import {Plus, Trash2} from "lucide-react"
 
-import {
-  abiValueToFormValue,
-  parseGramAsNano,
-  SAMPLE_ADDRESS,
-  sampleAbiValueForTy,
-} from "../../lib/abiValue"
+import {abiValueToFormValue, SAMPLE_ADDRESS, sampleAbiValueForTy} from "../../lib/abiValue"
 import type {TonAddressKind} from "../../lib/tonAddress"
 import {TonAddressInput, type TonAddressSuggestion} from "../TonAddressInput/TonAddressInput"
 import styles from "./AbiValueEditor.module.css"
@@ -99,7 +94,7 @@ function TonCoinsInput({
 
   useEffect(() => {
     setDraft(current => {
-      const currentNano = parseGramAsNano(current)
+      const currentNano = parseGramAmount(current)?.toString()
       return currentNano === nanoValue
         ? current
         : formatGramAmount(nanoValue, {fallback: "", showUnit: false})
@@ -116,7 +111,7 @@ function TonCoinsInput({
         onChange={event => {
           const next = event.target.value
           setDraft(next)
-          const nextNano = parseGramAsNano(next)
+          const nextNano = parseGramAmount(next)?.toString()
           if (nextNano !== undefined) {
             onChange(nextNano)
           }

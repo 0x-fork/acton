@@ -102,10 +102,6 @@ export function toDisplayAddress(
   return parsed ? parsed.toString(getAddressFormatOptions(options)) : undefined
 }
 
-export function toTestnetAddress(address: string): string | undefined {
-  return toDisplayAddress(address, {testOnly: true})
-}
-
 export function normalizeAddress(address: string, options?: AddressFormatOptions): string {
   return toDisplayAddress(address, options) ?? address
 }
@@ -127,8 +123,10 @@ export function toAccountQrAddress(
 
 export function toRawAddress(address: string): string {
   const parsed = parseAddress(address)
-  const rawString = (parsed as {toRawString?: () => string} | undefined)?.toRawString
-  return typeof rawString === "function" ? rawString.call(parsed) : address
+  if (parsed === undefined) {
+    return address
+  }
+  return parsed.toRawString()
 }
 
 export function isSameAddress(a: string, b: string): boolean {

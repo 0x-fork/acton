@@ -20,13 +20,18 @@ import {
 
 import type {TonClient} from "../api/client"
 import styles from "./LockerOverview.module.css"
-import {capitalize} from "./scheduleFormatting"
 import {
   buildVestingSchedule,
   parseVestingData,
   type VestingData,
   type VestingPeriod,
 } from "./vestingSchedule"
+
+const VESTING_STATUS_LABELS = {
+  locked: "Locked",
+  next: "Next",
+  unlocked: "Unlocked",
+} as const
 
 interface VestingOverviewProps {
   readonly address: string
@@ -174,8 +179,8 @@ export const VestingOverview: FC<VestingOverviewProps> = ({address, client, onDa
             {schedule.periods.map(period => (
               <span
                 key={period.number}
-                className={`${styles.progressSegment} ${styles[`progressSegment${capitalize(period.status)}`]}`}
-                title={`Period ${period.number}: ${capitalize(period.status)}`}
+                className={`${styles.progressSegment} ${styles[`progressSegment${VESTING_STATUS_LABELS[period.status]}`]}`}
+                title={`Period ${period.number}: ${VESTING_STATUS_LABELS[period.status]}`}
                 aria-hidden="true"
               />
             ))}
@@ -237,6 +242,8 @@ function VestingMetric({label, value}: {readonly label: string; readonly value: 
 }
 
 function VestingPeriodRow({period}: {readonly period: VestingPeriod}) {
+  const statusLabel = VESTING_STATUS_LABELS[period.status]
+
   return (
     <DataTableRow selected={period.status === "next"}>
       <DataTableCell tone="muted">{period.number}</DataTableCell>
@@ -253,9 +260,7 @@ function VestingPeriodRow({period}: {readonly period: VestingPeriod}) {
         <GramAmount maximumFractionDigits={2} useGrouping value={period.cumulativeAmount} />
       </DataTableCell>
       <DataTableCell>
-        <span className={`${styles.status} ${styles[`status${capitalize(period.status)}`]}`}>
-          {capitalize(period.status)}
-        </span>
+        <span className={`${styles.status} ${styles[`status${statusLabel}`]}`}>{statusLabel}</span>
       </DataTableCell>
     </DataTableRow>
   )

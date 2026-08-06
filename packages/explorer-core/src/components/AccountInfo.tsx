@@ -1,14 +1,17 @@
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-import {Check, Copy, Edit2, QrCode, Star} from "lucide-react"
+import {Check, Edit2, QrCode, Star} from "lucide-react"
 import {QRCodeSVG} from "qrcode.react"
 import {memo, useEffect, useId, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {
+  Button,
   CopyInlineAction,
   formatCountLabel,
   GramAmount,
   humanizeIdentifier,
   InfoPopover,
+  InlineAction,
+  InlineActions,
   Input,
   Popover,
   shortenMiddle,
@@ -131,7 +134,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   >(() => new Map())
   const [tokenMastersLoading, setTokenMastersLoading] = useState(false)
 
-  const [copied, setCopied] = useState(false)
   const [hiddenCollectibleAddresses, setHiddenCollectibleAddresses] = useState<ReadonlySet<string>>(
     () => new Set(),
   )
@@ -185,13 +187,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   }, [jettonWallets, client])
 
   useEffect(() => {
-    if (copied) {
-      const timer = setTimeout(() => setCopied(false), 2000)
-      return () => clearTimeout(timer)
-    }
-  }, [copied])
-
-  useEffect(() => {
     setCustomName(resolvedName || undefined)
   }, [resolvedName])
 
@@ -229,11 +224,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
     } finally {
       setRenameSaving(false)
     }
-  }
-
-  const copyToClipboard = () => {
-    void navigator.clipboard.writeText(displayAddress)
-    setCopied(true)
   }
 
   const handleToggleFavorite = () => {
@@ -386,23 +376,26 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                       }}
                       placeholder="Name this address"
                     />
-                    <button
-                      type="button"
-                      className={styles.renameSaveButton}
+                    <Button
+                      className={styles.renameAction}
+                      disabled={isNameUnchanged}
+                      loading={renameSaving}
                       onClick={() => {
                         void handleSave()
                       }}
-                      disabled={renameSaving || isNameUnchanged}
+                      size="sm"
+                      variant="primary"
                     >
-                      {renameSaving ? "Saving..." : "Save"}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.renameCancelButton}
+                      Save
+                    </Button>
+                    <Button
+                      className={styles.renameAction}
                       onClick={() => setIsEditing(false)}
+                      size="sm"
+                      variant="outline"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -427,16 +420,13 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                   ) : (
                     <span className={styles.customName}>{displayNameText}</span>
                   )}
-                  <Tooltip content="Rename address">
-                    <button
-                      type="button"
-                      className={styles.iconButton}
-                      onClick={handleStartEdit}
-                      aria-label="Rename address"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                  </Tooltip>
+                  <InlineAction
+                    className={styles.addressAction}
+                    icon={<Edit2 />}
+                    label="Rename address"
+                    onClick={handleStartEdit}
+                    size="compact"
+                  />
                 </div>
               </div>
             ) : undefined}
@@ -444,62 +434,54 @@ export const AccountInfo: FC<AccountInfoProps> = ({
             <div className={`${styles.infoRow} ${styles.addressInfoRow}`}>
               <div className={styles.label}>Address</div>
               <div className={styles.rowValue}>
-                <Popover
-                  aria-label="Show address formats"
-                  ariaLabel="Address formats"
-                  className={styles.addressPopover}
-                  content={addressFormats}
-                  maxWidth="min(36rem, calc(100vw - 32px))"
-                  openDelay={150}
-                  placement="bottom"
-                >
-                  <span className={styles.addressValue}>
-                    <span className={styles.addressValueDesktop}>{addressRowText}</span>
-                    <span className={styles.addressValueMobile}>{shortAddress}</span>
-                  </span>
-                </Popover>
-                <span className={styles.addressActions}>
-                  <Tooltip content={favorite ? "Remove from favorites" : "Add to favorites"}>
-                    <button
-                      type="button"
-                      className={`${styles.iconButton} ${favorite ? styles.favoriteButtonActive : ""}`}
-                      onClick={handleToggleFavorite}
-                      aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
-                      aria-pressed={favorite}
-                    >
-                      <Star
-                        size={16}
-                        className={favorite ? styles.favoriteIconActive : undefined}
+                <InlineActions
+                  className={styles.addressActions}
+                  visibility="always"
+                  actions={
+                    <>
+                      <InlineAction
+                        aria-pressed={favorite}
+                        className={`${styles.addressAction} ${favorite ? styles.favoriteButtonActive : ""}`}
+                        icon={<Star className={favorite ? styles.favoriteIconActive : undefined} />}
+                        label={favorite ? "Remove from favorites" : "Add to favorites"}
+                        onClick={handleToggleFavorite}
+                        size="compact"
                       />
-                    </button>
-                  </Tooltip>
-                  {!displayName && !isEditing && (
-                    <Tooltip content="Rename address">
-                      <button
-                        type="button"
-                        className={styles.iconButton}
-                        onClick={handleStartEdit}
-                        aria-label="Rename address"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                    </Tooltip>
-                  )}
-                  <Tooltip content={copied ? "Copied" : "Copy address"}>
-                    <button
-                      type="button"
-                      className={styles.iconButton}
-                      onClick={copyToClipboard}
-                      aria-label={copied ? "Copied" : "Copy address"}
-                    >
-                      {copied ? (
-                        <Check size={16} className={styles.saveIcon} />
-                      ) : (
-                        <Copy size={16} />
+                      {!displayName && !isEditing && (
+                        <InlineAction
+                          className={styles.addressAction}
+                          icon={<Edit2 />}
+                          label="Rename address"
+                          onClick={handleStartEdit}
+                          size="compact"
+                        />
                       )}
-                    </button>
-                  </Tooltip>
-                </span>
+                      <CopyInlineAction
+                        className={styles.addressAction}
+                        copiedIcon={<Check className={styles.saveIcon} />}
+                        copiedLabel="Address copied"
+                        label="Copy address"
+                        size="compact"
+                        value={displayAddress}
+                      />
+                    </>
+                  }
+                >
+                  <Popover
+                    aria-label="Show address formats"
+                    ariaLabel="Address formats"
+                    className={styles.addressPopover}
+                    content={addressFormats}
+                    maxWidth="min(36rem, calc(100vw - 32px))"
+                    openDelay={150}
+                    placement="bottom"
+                  >
+                    <span className={styles.addressValue}>
+                      <span className={styles.addressValueDesktop}>{addressRowText}</span>
+                      <span className={styles.addressValueMobile}>{shortAddress}</span>
+                    </span>
+                  </Popover>
+                </InlineActions>
               </div>
             </div>
 

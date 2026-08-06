@@ -1,9 +1,9 @@
 import {useLocation, useNavigate, useParams} from "react-router"
 import {useCallback, useEffect, useMemo, useReducer, useRef, useState} from "react"
-import type {FC, ReactNode, SetStateAction} from "react"
+import type {FC, SetStateAction} from "react"
 
 import {codeLookupHashHex} from "@acton/transaction-ui"
-import {Button, Dialog, HighlightedCode, RawDataBlock, TokenAmount} from "@acton/ui"
+import {Dialog, HighlightedCode, RawDataBlock, TokenAmount} from "@acton/ui"
 import {ListChecks, ScrollText, UsersRound} from "lucide-react"
 import {Cell} from "@ton/core"
 
@@ -38,6 +38,7 @@ import {
   type AccountDetailsTab,
 } from "../components/AccountDetails"
 import {LockerOverview} from "../components/LockerOverview"
+import {JettonOverview} from "../components/JettonOverview"
 import {
   MultisigOrderActionsTab,
   MultisigOrdersTab,
@@ -46,6 +47,7 @@ import {
   type MultisigDetailsState,
 } from "../components/multisig-details"
 import {NftImage} from "../components/NftImage"
+import {NftOverview} from "../components/NftOverview"
 import {SuspendedAccountOverview} from "../components/SuspendedAccountOverview"
 import {VestingOverview} from "../components/VestingOverview"
 import {
@@ -57,9 +59,8 @@ import {
   getImageSources,
   replaceBrokenImageWithFallback,
 } from "../components/imageFallbacks"
-import {isLockerCodeHash} from "../components/lockerSchedule"
 import {mergeAccountDomains, normalizeAddress, toRawAddress} from "../components/utils"
-import {isVestingCodeHash, type VestingData} from "../components/vestingSchedule"
+import type {VestingData} from "../components/vestingSchedule"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
@@ -71,7 +72,11 @@ import {
   mergeStreamedActions,
   type AccountActionPageCursor,
 } from "./accountActionPagination"
-import {hasAccountContractHint, hasAccountInterface} from "./accountContractTypes"
+import {
+  getAccountContractTypeByCodeHash,
+  hasAccountContractHint,
+  hasAccountInterface,
+} from "./accountContractTypes"
 import styles from "./AccountPage.module.css"
 
 interface AccountPageProps {
@@ -1848,11 +1853,16 @@ export const AccountPage: FC<AccountPageProps> = ({
   )
   const accountUnavailable =
     accountLoadIssue !== undefined && !accountLoading && accountState === undefined
-  const showAccountHeader = accountLoading || Boolean(accountState) || accountUnavailable
-  const isLockerAccount = Boolean(accountState && isLockerCodeHash(accountCodeLookupHash))
-  const isVestingAccount = Boolean(accountState && isVestingCodeHash(accountCodeLookupHash))
+
+  const showAccountHeader = accountLoading || accountState !== undefined || accountUnavailable
+
+  const codeHashContractType = getAccountContractTypeByCodeHash(accountCodeLookupHash)
+
+  const isLockerAccount = codeHashContractType === "locker"
+  const isVestingAccount = codeHashContractType === "vesting"
   const isScheduleAccount = isLockerAccount || isVestingAccount
   const accountSuspended = accountSuspendedUntil !== undefined
+
   const currentMultisigDetails: MultisigDetailsState =
     multisigDetails.status !== "idle" && multisigDetails.address !== formattedAddress
       ? {
@@ -1861,24 +1871,27 @@ export const AccountPage: FC<AccountPageProps> = ({
           kind: isMultisigOrderAccount ? "order" : "wallet",
         }
       : multisigDetails
+
   const multisigOrder =
     currentMultisigDetails.status === "success" && currentMultisigDetails.kind === "order"
       ? currentMultisigDetails.order
       : undefined
-  const hasHeaderContextCard = Boolean(
-    accountState &&
-      (tokenInfo ||
-        currentNftItem ||
-        (nftCollectionName && !currentNftItem) ||
-        isScheduleAccount ||
-        isMultisigAccount ||
-        accountSuspended),
-  )
+
+  const hasHeaderContextCard =
+    accountState !== undefined &&
+    (tokenInfo !== undefined ||
+      currentNftItem !== undefined ||
+      nftCollectionName !== undefined ||
+      isScheduleAccount ||
+      isMultisigAccount ||
+      accountSuspended)
+
   const topSectionClassName = hasHeaderContextCard
     ? isScheduleAccount || isMultisigAccount || accountSuspended
       ? `${styles.topSection} ${styles.topSectionEqual}`
       : styles.topSection
     : `${styles.topSection} ${styles.topSectionSingle}`
+
   const accountInfoDetails =
     isVestingAccount && vestingData
       ? [
@@ -1920,6 +1933,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             },
           ]
         : undefined
+
   const multisigTabs = useMemo<readonly AccountDetailsTab[]>(() => {
     if (isMultisigWalletAccount) {
       return [
@@ -2068,177 +2082,73 @@ export const AccountPage: FC<AccountPageProps> = ({
                       onSignerHoverChange={setHoveredMultisigSignerAddress}
                     />
                   )}
-                  {accountState && tokenInfo && (
-                    <div
-                      className={`${styles.jettonInfo} ${jettonMaster ? styles.jettonMasterInfo : ""}`}
-                    >
-                      <div className={styles.jettonHeader}>
-                        <img
-                          src={tokenImage}
-                          alt={tokenName}
-                          className={styles.jettonImage}
-                          onError={event =>
-                            replaceBrokenImageWithFallback(event, tokenImageSources)
-                          }
-                        />
-                        <div className={styles.jettonHeaderContent}>
-                          <div className={styles.jettonTitle}>
-                            <div className={styles.jettonName}>{tokenName}</div>
-                            {tokenSymbol && (
-                              <div className={styles.jettonSymbol}>{tokenSymbol}</div>
-                            )}
-                          </div>
-                          {jettonMaster && (
-                            <div className={styles.jettonSupply}>
-                              Max.supply:{" "}
-                              <TokenAmount
-                                decimals={tokenDecimals}
-                                symbol={tokenSymbol}
-                                useGrouping
-                                value={jettonMaster.total_supply}
-                              />
-                            </div>
-                          )}
-                          {jettonMaster && (
-                            <button
-                              type="button"
-                              className={styles.jettonMetadataButton}
-                              onClick={() => setJettonMetadataOpen(true)}
-                            >
-                              Metadata
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      {enableJettonMint && jettonMaster?.mintable && jettonMintPath && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className={styles.jettonMintButton}
-                          onClick={() =>
-                            void navigate(
-                              `${jettonMintPath}?jetton=${encodeURIComponent(
-                                toRawAddress(jettonMaster.address),
-                              )}`,
-                            )
-                          }
-                        >
-                          Mint token
-                        </Button>
-                      )}
-                      {!jettonMaster && jettonWalletAccount && jettonWalletMaster && (
-                        <>
-                          <div className={styles.jettonDivider} />
-                          <AccountDetailRows>
-                            <AccountAddressDetailRow
-                              label="Jetton master"
-                              address={jettonWalletAccount.jetton}
-                              onAddressClick={handleSearch}
-                            />
-                            <AccountAddressDetailRow
-                              label="Holder address"
-                              address={jettonWalletAccount.owner}
-                              onAddressClick={handleSearch}
-                            />
-                          </AccountDetailRows>
-                        </>
-                      )}
-                    </div>
+                  {accountState !== undefined && tokenInfo !== undefined && (
+                    <JettonOverview
+                      name={tokenName}
+                      symbol={tokenSymbol}
+                      image={tokenImage}
+                      imageSources={tokenImageSources}
+                      decimals={tokenDecimals}
+                      totalSupply={jettonMaster?.total_supply}
+                      masterAddress={
+                        jettonMaster === undefined && jettonWalletMaster !== undefined
+                          ? jettonWalletAccount?.jetton
+                          : undefined
+                      }
+                      holderAddress={
+                        jettonMaster === undefined && jettonWalletMaster !== undefined
+                          ? jettonWalletAccount?.owner
+                          : undefined
+                      }
+                      onAddressClick={handleSearch}
+                      onMetadataClick={
+                        jettonMaster === undefined ? undefined : () => setJettonMetadataOpen(true)
+                      }
+                      onMint={
+                        enableJettonMint === true &&
+                        jettonMaster?.mintable === true &&
+                        jettonMintPath !== undefined &&
+                        jettonMintPath.length > 0
+                          ? () =>
+                              void navigate(
+                                `${jettonMintPath}?jetton=${encodeURIComponent(
+                                  toRawAddress(jettonMaster.address),
+                                )}`,
+                              )
+                          : undefined
+                      }
+                    />
                   )}
-                  {accountState && currentNftItem && (
-                    <div className={styles.nftPanel}>
-                      <div className={styles.nftPanelHeader}>
-                        <div className={styles.nftPanelHeading}>
-                          <div className={styles.nftPanelTitle}>{nftItemName}</div>
-                          <button
-                            type="button"
-                            className={styles.nftPanelMetadataButton}
-                            onClick={() => setJettonMetadataOpen(true)}
-                          >
-                            Metadata
-                          </button>
-                        </div>
-                      </div>
-                      <div className={styles.nftPanelDivider} />
-                      <div className={styles.nftPanelBody}>
-                        <div className={styles.nftPanelMain}>
-                          <AccountDetailRows>
-                            <AccountAddressDetailRow
-                              label="Owner"
-                              address={nftItemOwnerAddress}
-                              fallback="No owner"
-                              onAddressClick={handleSearch}
-                            />
-                            <AccountAddressDetailRow
-                              label="Collection Address"
-                              address={nftItemCollectionAddress}
-                              fallback="Standalone"
-                              onAddressClick={handleSearch}
-                            />
-                            <AccountTextDetailRow
-                              label="Index"
-                              value={`#${currentNftItem.index}`}
-                            />
-                          </AccountDetailRows>
-                          {nftItemDescription && (
-                            <div className={styles.nftPanelDescription}>{nftItemDescription}</div>
-                          )}
-                        </div>
-                        <div className={styles.nftPanelMedia}>
-                          <NftImage
-                            sources={nftItemImageSources}
-                            alt={nftItemName}
-                            className={styles.nftPanelImage}
-                            blurredClassName={styles.blurredImage}
-                            collectionName={nftItemCollectionName}
-                            blurred={nftItemIsScam}
-                            onNsfw={() => setCurrentNftItem(undefined)}
-                          />
-                          {nftItemIsScam && <span className={styles.nftScamLabel}>SCAM</span>}
-                        </div>
-                      </div>
-                    </div>
+                  {accountState !== undefined && currentNftItem !== undefined && (
+                    <NftOverview
+                      kind="item"
+                      name={nftItemName ?? `NFT #${currentNftItem.index}`}
+                      description={nftItemDescription}
+                      imageSources={nftItemImageSources}
+                      isScam={nftItemIsScam}
+                      ownerAddress={nftItemOwnerAddress}
+                      collectionAddress={nftItemCollectionAddress}
+                      collectionName={nftItemCollectionName}
+                      index={currentNftItem.index}
+                      onAddressClick={handleSearch}
+                      onMetadataClick={() => setJettonMetadataOpen(true)}
+                      onNsfw={() => setCurrentNftItem(undefined)}
+                    />
                   )}
-                  {accountState && nftCollectionName && !currentNftItem && !nftCollectionIsNsfw && (
-                    <div className={styles.nftPanel}>
-                      <div className={styles.nftPanelHeader}>
-                        <div className={styles.nftPanelHeading}>
-                          <div className={styles.nftPanelTitle}>{nftCollectionName}</div>
-                        </div>
-                      </div>
-                      <div className={styles.nftPanelDivider} />
-                      <div className={styles.nftPanelBody}>
-                        <div className={styles.nftPanelMain}>
-                          {collectionSample && (
-                            <AccountDetailRows>
-                              <AccountAddressDetailRow
-                                label="Latest item"
-                                address={collectionSample.address}
-                                onAddressClick={handleSearch}
-                              />
-                            </AccountDetailRows>
-                          )}
-                          {nftCollectionDescription && (
-                            <div className={styles.nftPanelDescription}>
-                              {nftCollectionDescription}
-                            </div>
-                          )}
-                        </div>
-                        <div className={styles.nftPanelMedia}>
-                          <NftImage
-                            sources={nftCollectionImageSources}
-                            alt={nftCollectionName}
-                            className={styles.nftPanelImage}
-                            blurredClassName={styles.blurredImage}
-                            collectionName={nftCollectionName}
-                            blurred={nftCollectionIsScam}
-                          />
-                          {nftCollectionIsScam && <span className={styles.nftScamLabel}>SCAM</span>}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  {accountState !== undefined &&
+                    nftCollectionName !== undefined &&
+                    currentNftItem === undefined &&
+                    !nftCollectionIsNsfw && (
+                      <NftOverview
+                        kind="collection"
+                        name={nftCollectionName}
+                        description={nftCollectionDescription}
+                        imageSources={nftCollectionImageSources}
+                        isScam={nftCollectionIsScam}
+                        latestItemAddress={collectionSample?.address}
+                        onAddressClick={handleSearch}
+                      />
+                    )}
                 </div>
               )}
             </div>
@@ -2462,51 +2372,6 @@ const AccountIssueCard: FC<AccountIssueCardProps> = ({issue}) => (
       </div>
     </div>
   </section>
-)
-
-interface AccountDetailRowsProps {
-  readonly children: ReactNode
-}
-
-const AccountDetailRows: FC<AccountDetailRowsProps> = ({children}) => (
-  <div className={styles.accountDetailRows}>{children}</div>
-)
-
-interface AccountTextDetailRowProps {
-  readonly label: string
-  readonly value: ReactNode
-}
-
-const AccountTextDetailRow: FC<AccountTextDetailRowProps> = ({label, value}) => (
-  <div className={styles.accountDetailRow}>
-    <span className={styles.accountDetailLabel}>{label}</span>
-    <span className={styles.accountDetailValue}>{value}</span>
-  </div>
-)
-
-interface AccountAddressDetailRowProps {
-  readonly label: string
-  readonly address?: string
-  readonly fallback?: string
-  readonly onAddressClick: (address: string) => void
-}
-
-const AccountAddressDetailRow: FC<AccountAddressDetailRowProps> = ({
-  label,
-  address,
-  fallback,
-  onAddressClick,
-}) => (
-  <div className={styles.accountDetailRow}>
-    <span className={styles.accountDetailLabel}>{label}</span>
-    {address ? (
-      <div className={styles.accountDetailAddressValue}>
-        <ExplorerAddressChip address={address} onAddressClick={onAddressClick} variant="plain" />
-      </div>
-    ) : (
-      <span className={styles.accountDetailValue}>{fallback ?? "Unknown"}</span>
-    )}
-  </div>
 )
 
 function getAccountTokenInfo(

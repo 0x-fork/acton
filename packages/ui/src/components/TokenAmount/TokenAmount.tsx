@@ -72,6 +72,35 @@ export function formatTokenAmount(
   return formatTokenAmountValue(value, decimals, options)?.text ?? options.fallback ?? "—"
 }
 
+/**
+ * Parses a non-negative decimal token amount into exact integer raw units.
+ * Decimal metadata follows the same normalization rules as `formatTokenAmount`:
+ * integer numbers and integer strings from 0 through 36 are accepted, and
+ * invalid or missing metadata uses the Jetton-compatible default of 9.
+ *
+ * The parser does not use JavaScript floating-point numbers. It returns
+ * `undefined` for an empty value, a negative value, exponent notation, or a
+ * fractional part that is longer than the token precision.
+ */
+export function parseTokenAmount(value: string, decimals: TokenAmountDecimals): bigint | undefined {
+  const normalized = value.trim()
+  const normalizedDecimals = normalizeTokenDecimals(decimals)
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) return undefined
+
+  const [wholePart = "", fractionPart = ""] = normalized.split(".")
+  if (
+    fractionPart.length > normalizedDecimals ||
+    (normalizedDecimals === 0 && normalized.includes("."))
+  ) {
+    return undefined
+  }
+
+  const scale = 10n ** BigInt(normalizedDecimals)
+  const whole = BigInt(wholePart || "0") * scale
+  const fraction = fractionPart ? BigInt(fractionPart.padEnd(normalizedDecimals, "0")) : 0n
+  return whole + fraction
+}
+
 export function TokenAmount({
   value,
   decimals,

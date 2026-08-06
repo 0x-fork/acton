@@ -28,6 +28,7 @@ import {
   InlineAction,
   InlineButton,
   Input,
+  parseGramAmount,
   Select,
   useToast,
 } from "@acton/ui"
@@ -56,7 +57,7 @@ import {
 } from "@acton/transaction-ui"
 import {useLocation, useNavigate, useSearchParams} from "react-router"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-import {Address, Cell, loadMessage, loadShardAccount, toNano, type ShardAccount} from "@ton/core"
+import {Address, Cell, loadMessage, loadShardAccount, type ShardAccount} from "@ton/core"
 
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
@@ -2360,11 +2361,11 @@ function buildAccountStateOverrides({
     const normalizedLastTransactionLt = entry.lastTransactionLt.trim()
     const normalizedLastTransactionHash = entry.lastTransactionHash.trim()
     if (normalizedBalance) {
-      try {
-        override.balance = toNano(normalizedBalance).toString()
-      } catch {
+      const balance = parseGramAmount(normalizedBalance)
+      if (balance === undefined) {
         throw new Error("Override balance must be a valid GRAM amount")
       }
+      override.balance = balance.toString()
     }
     if (normalizedLastTransactionLt) {
       override.lastTransactionLt = normalizedLastTransactionLt

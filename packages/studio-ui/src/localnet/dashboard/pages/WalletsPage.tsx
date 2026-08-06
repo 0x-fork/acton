@@ -295,10 +295,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                           onCopyAddress={handleCopyAddress}
                         />
                       </DataTableCell>
-                      <DataTableCell
-                        tone="muted"
-                        truncate
-                      >
+                      <DataTableCell tone="muted" truncate>
                         <DateTime
                           fallback={session.lastActivityAt}
                           value={session.lastActivityAt}

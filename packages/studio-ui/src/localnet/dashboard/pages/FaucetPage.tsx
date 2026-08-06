@@ -1,8 +1,8 @@
 import {ArrowUpRight, Check, ChevronDown, Coins, Loader2} from "lucide-react"
-import {Button, Dialog, Input, useToast} from "@acton/ui"
+import {Button, Dialog, Input, parseGramAmount, parseTokenAmount, useToast} from "@acton/ui"
 import {TonAddressInput, type TonAddressSuggestion} from "@acton/transaction-ui"
-import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
+import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import {useSearchParams} from "react-router"
 
 import type {JettonMaster} from "@acton/explorer-core/api/types"
@@ -17,12 +17,10 @@ import {
 import {useAddressFormat} from "@acton/explorer-core/hooks/useNetworkInfo"
 import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
 import {useOptionalWalletRuntime} from "../../wallet/useWalletRuntime"
-import {QUICK_AMOUNTS, TOKEN_PLACEHOLDER_IMAGE} from "../constants"
-import {parseGramAmount} from "../dashboardUtils"
-import {normalizeJettonDecimals, parseJettonAmount} from "../jettonFaucet"
-import usdtLogo from "../assets/usdt-logo.png"
+import usdtLogo from "../../../assets/usdt-logo.png"
 
 import styles from "../DashboardPage.module.css"
+import {TOKEN_PLACEHOLDER_IMAGE} from "@acton/explorer-core/components/imageFallbacks"
 
 interface FaucetPageProps {
   readonly client: TonClient
@@ -79,7 +77,6 @@ export const FaucetPage: FC<FaucetPageProps> = ({
   const minterLookupSequenceRef = useRef(0)
   const minterLookupToastRef = useRef<string | undefined>(undefined)
   const loadedJettonMinterQueryRef = useRef<string | undefined>(undefined)
-  const amountNano = useMemo(() => parseGramAmount(amount), [amount])
   const projectWallets = walletRuntime?.projectWallets ?? []
   const isJettonMode = mode === "jetton"
   const canChooseAsset = jettonFaucetEnabled
@@ -285,7 +282,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({
 
     const trimmedAddress = address.trim()
     const parsedAddress = parseAddress(trimmedAddress)
-    const tonAmountNano = amountNano
+    const tonAmountNano = parseGramAmount(amount)
     if (!parsedAddress) {
       showToast({
         variant: "error",
@@ -294,11 +291,11 @@ export const FaucetPage: FC<FaucetPageProps> = ({
       })
       return
     }
-    if (!isJettonMode && tonAmountNano === undefined) {
+    if (!isJettonMode && (tonAmountNano === undefined || tonAmountNano <= 0n)) {
       showToast({
         variant: "error",
         title: "Invalid amount",
-        description: "Enter a valid amount greater than zero.",
+        description: "Enter a valid amount greater than zero",
       })
       return
     }
@@ -320,7 +317,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({
     }
   }
 
-  async function sendTons(normalized: string, nanoAmount: number) {
+  async function sendTons(normalized: string, nanoAmount: bigint) {
     const recipient = formatAddress(normalized, true, addressFormat)
     const toastId = showToast({
       variant: "loading",
@@ -373,12 +370,12 @@ export const FaucetPage: FC<FaucetPageProps> = ({
 
     try {
       const master = jettonMasters.find(item => isSameAddress(item.address, normalizedMinter))
-      const decimals = normalizeJettonDecimals(master?.jetton_content.decimals)
-      if (parseJettonAmount(amount, decimals) === undefined) {
+      const parsedAmount = parseTokenAmount(amount, master?.jetton_content.decimals)
+      if (parsedAmount === undefined || parsedAmount <= 0n) {
         updateToast(toastId, {
           variant: "error",
           title: "Invalid amount",
-          description: `Enter a valid amount with up to ${decimals} decimal places.`,
+          description: "Enter a valid positive amount for this token",
           durationMs: 8000,
         })
         return
@@ -617,7 +614,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({
           </div>
 
           <div className={styles.quickActions}>
-            {QUICK_AMOUNTS.map(value => (
+            {["1", "5", "20", "100"].map(value => (
               <Button
                 key={value}
                 type="button"

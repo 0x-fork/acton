@@ -6,7 +6,6 @@ import {
   Dictionary,
   ExternalAddress,
   Slice,
-  toNano,
   type DictionaryKey,
   type DictionaryKeyTypes,
   type DictionaryValue,
@@ -41,19 +40,6 @@ export function parseAbiJsonStrict(value: string, fallback: unknown = {}): unkno
 
 export function abiValueToFormValue(value: unknown): unknown {
   return parseAbiJson(stringifyAbiJson(value), null)
-}
-
-export function parseGramAsNano(value: string): string | undefined {
-  const normalized = value.trim()
-  if (!/^(?:\d+|\d*\.\d{0,9})$/.test(normalized) || normalized === ".") {
-    return undefined
-  }
-
-  try {
-    return toNano(normalized).toString()
-  } catch {
-    return undefined
-  }
 }
 
 export function formatAbiAddress(value: unknown): string {

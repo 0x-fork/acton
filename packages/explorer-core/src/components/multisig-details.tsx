@@ -44,7 +44,6 @@ import {
   isMultisigSignerApproved,
   multisigAddressKey,
 } from "./multisigApprovals"
-import {capitalize} from "./scheduleFormatting"
 import {formatAddress} from "./utils"
 
 export type MultisigDetailsState =
@@ -94,6 +93,11 @@ interface MultisigOrdersTabProps extends MultisigTabProps {
 }
 
 const MULTISIG_ORDERS_BATCH_SIZE = 25
+const ORDER_STATUS_LABELS = {
+  executed: "Executed",
+  expired: "Expired",
+  pending: "Pending",
+} as const
 
 export function MultisigOverview({
   state,
@@ -536,12 +540,14 @@ function OverviewMetric({label, value}: {readonly label: string; readonly value:
 }
 
 function OrderStatus({status}: {readonly status: ReturnType<typeof getOrderStatus>}) {
+  const statusLabel = ORDER_STATUS_LABELS[status]
+
   return (
-    <span className={`${styles.status} ${styles[`status${capitalize(status)}`]}`}>
+    <span className={`${styles.status} ${styles[`status${statusLabel}`]}`}>
       {status === "executed" && <Check size={14} aria-hidden="true" />}
       {status === "expired" && <X size={14} aria-hidden="true" />}
       {status === "pending" && <Clock3 size={14} aria-hidden="true" />}
-      {capitalize(status)}
+      {statusLabel}
     </span>
   )
 }
@@ -690,7 +696,12 @@ function MultisigOrderActionDetails({
               "None"
             )}
           </ActionSummaryItem>
-          <ActionSummaryItem label="Value">{formatActionValue(action.value)}</ActionSummaryItem>
+          <ActionSummaryItem label="Value">
+            {formatGramAmount(action.value, {
+              fallback: action.value ?? "—",
+              useGrouping: true,
+            })}
+          </ActionSummaryItem>
           <ActionSummaryItem label="Send mode">
             <SendModeViewer mode={action.send_mode} />
           </ActionSummaryItem>
@@ -829,15 +840,8 @@ function formatActionType(value: string): string {
   return normalized
     .split("_")
     .filter(Boolean)
-    .map(part => capitalize(part))
+    .map(part => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(" ")
-}
-
-function formatActionValue(value: string | null): string {
-  if (value === null) {
-    return "—"
-  }
-  return formatGramAmount(value, {fallback: value, useGrouping: true})
 }
 
 function formatRawValue(value: unknown): string {
