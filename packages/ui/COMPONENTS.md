@@ -673,6 +673,10 @@ coordinated highlight state.
 - `highlighted`: applies the coordinated accent highlight used by AddressChip.
 - `onClick`: optional router integration while preserving a real `href`.
 - The copy action writes the Toncenter block id form `(workchain,shard,seqno)`.
+- The detailed tooltip shows the full block ID, workchain, shard, and seqno.
+  Each value has its own copy action.
+- `title` adds a contextual heading to the detailed tooltip and an accessible
+  label to linked blocks.
 
 ### States To Review Visually
 

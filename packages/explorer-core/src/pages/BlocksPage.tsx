@@ -803,6 +803,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
               <BlockTableSection
                 title="Last shard blocks"
                 blocks={state.shardchainBlocks}
+                blockDisplay="full"
                 isLoading={false}
                 emptyLabel="No shardchain blocks for this masterchain block"
                 showShardFlags
@@ -963,11 +964,20 @@ const BlockDateNavigation: FC<{
 const BlockTableSection: FC<{
   readonly title: string
   readonly blocks: readonly V3Block[]
+  readonly blockDisplay?: "seqno" | "full"
   readonly isLoading: boolean
   readonly emptyLabel: string
   readonly showShardFlags?: boolean
   readonly onOpenBlock: (block: V3Block, event?: ExplorerNavigationClickEvent) => void
-}> = ({title, blocks, isLoading, emptyLabel, showShardFlags = false, onOpenBlock}) => {
+}> = ({
+  title,
+  blocks,
+  blockDisplay = "seqno",
+  isLoading,
+  emptyLabel,
+  showShardFlags = false,
+  onOpenBlock,
+}) => {
   const routes = useExplorerRoutePaths()
 
   if (isLoading) {
@@ -975,11 +985,17 @@ const BlockTableSection: FC<{
   }
 
   return (
-    <DataTable title={title} minWidth={showShardFlags ? "42rem" : "32.5rem"} aria-label={title}>
+    <DataTable
+      title={title}
+      minWidth={blockDisplay === "full" ? "54rem" : showShardFlags ? "42rem" : "32.5rem"}
+      aria-label={title}
+    >
       <DataTableTable aria-label={title} layout="fixed">
         <DataTableHead>
           <DataTableRow>
-            <DataTableHeaderCell columnWidth={showShardFlags ? "20%" : "14rem"}>
+            <DataTableHeaderCell
+              columnWidth={blockDisplay === "full" ? "20rem" : showShardFlags ? "20%" : "14rem"}
+            >
               Block
             </DataTableHeaderCell>
             <DataTableHeaderCell columnWidth={showShardFlags ? "18%" : "8rem"}>
@@ -1020,6 +1036,7 @@ const BlockTableSection: FC<{
                     workchain={block.workchain}
                     shard={block.shard}
                     seqno={block.seqno}
+                    display={blockDisplay}
                     href={routes.blockPath(block.workchain, block.shard, block.seqno)}
                     onClick={event => {
                       event.stopPropagation()
