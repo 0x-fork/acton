@@ -357,6 +357,15 @@ export function TransactionTree({
     }
   }
 
+  const handleExternalOutClick = (parentId: string): void => {
+    const parentTransaction = transactionMap.get(parentId)
+    if (!parentTransaction) return
+
+    forceHideTooltip()
+    setSelectedTransactionIdState(parentId)
+    onTransactionSelect?.(parentTransaction)
+  }
+
   const showEdgeTransactionTooltip = (event: React.MouseEvent, tx: TransactionInfo): void => {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
     triggerRectReference.current = rect
@@ -902,6 +911,7 @@ export function TransactionTree({
     if (nodeDatum.attributes?.isExternalOut) {
       const parentId = nodeDatum.attributes.parentId as string
       const parentTx = transactionMap.get(parentId)
+      const externalOutAriaLabel = `External-out message from transaction ${parentId}`
 
       const externalOutMessage = [...(parentTx?.transaction.outMessages.values() ?? [])].find(
         message => message.info.type === "external-out",
@@ -941,10 +951,21 @@ export function TransactionTree({
 
           <circle
             r={15}
+            role="button"
+            tabIndex={0}
+            aria-label={externalOutAriaLabel}
             fill="transparent"
             stroke="var(--acton-color-border)"
             strokeWidth={1}
-            className={styles.nodeCircleDefault}
+            className={styles.nodeCircle}
+            onClick={() => {
+              handleExternalOutClick(parentId)
+            }}
+            onKeyDown={event => {
+              if (event.key === "Enter" || event.key === " ") {
+                handleExternalOutClick(parentId)
+              }
+            }}
           />
 
           <foreignObject

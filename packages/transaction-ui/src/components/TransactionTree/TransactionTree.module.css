@@ -454,10 +454,6 @@
   border-radius: 50%;
 }
 
-.nodeCircleDefault {
-  cursor: default;
-}
-
 .nodeText {
   pointer-events: none;
 }
