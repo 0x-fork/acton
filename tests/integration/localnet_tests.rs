@@ -8,10 +8,13 @@ use crate::support::localnet::{
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output_preserve_escapes;
 use crate::support::toncenter::{
-    DEPLOYER_WALLET_CONFIG, TON_CONNECT_WALLETS_CONFIG,
+    DEPLOYER_WALLET_CONFIG, TON_CONNECT_WALLETS_CONFIG, append_custom_network,
     append_localnet_with_base_url as append_localnet_network, build_internal_message_boc,
-    extract_canonical_addr_marker, jetton_v1_action_project, nft_v1_action_project,
-    run_localnet_action_project, test_std_addr, with_nft_v1_action_fixtures,
+    extract_canonical_addr_marker, format_captured_requests, jetton_v1_action_project,
+    mocked_config_boc64, mocked_global_version_cell, nft_v1_action_project,
+    run_localnet_action_project, spawn_toncenter_v2_mock_with_capture, test_std_addr,
+    toncenter_v2_block_header_ok_response, toncenter_v2_config_all_ok_response,
+    with_nft_v1_action_fixtures,
 };
 use acton::wallets;
 use base64::Engine;
@@ -961,6 +964,98 @@ fn localnet_manual_mining_time_controls_update_blocks_and_transactions() {
     );
 
     node.stop();
+}
+
+#[test]
+fn localnet_historical_fork_uses_block_config_and_time() {
+    const FORK_SEQNO: u64 = 654_320;
+    const FORK_GEN_UTIME: u32 = 1_700_000_320;
+    const GLOBAL_VERSION: u32 = 777;
+    const GLOBAL_CAPABILITIES: u64 = 0x1234;
+
+    let config_boc64 = mocked_config_boc64(GLOBAL_VERSION, GLOBAL_CAPABILITIES);
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_block_header_ok_response(FORK_SEQNO, FORK_GEN_UTIME),
+        toncenter_v2_config_all_ok_response(&config_boc64),
+        toncenter_v2_block_header_ok_response(FORK_SEQNO, FORK_GEN_UTIME),
+        toncenter_v2_block_header_ok_response(FORK_SEQNO, FORK_GEN_UTIME),
+    ]);
+    let project = ProjectBuilder::new("localnet-historical-fork-snapshot").build();
+    append_custom_network(
+        project.path(),
+        "historical-snapshot",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    let start_fork = |db_path: &str| {
+        project
+            .localnet()
+            .args([
+                "--fork-net",
+                "custom:historical-snapshot",
+                "--fork-block-number",
+            ])
+            .arg(FORK_SEQNO.to_string())
+            .args(["--no-mining", "--mine-empty-blocks", "--db-path"])
+            .arg(db_path)
+            .ready_timeout(Duration::from_secs(5))
+            .start()
+    };
+    let node = start_fork("state/first.sqlite");
+    let config_param = node.get_json("/api/v2/getConfigParam?param=8");
+    let config_param_cell = Boc::decode_base64(
+        config_param["result"]["config"]["bytes"]
+            .as_str()
+            .expect("getConfigParam must return config bytes"),
+    )
+    .expect("config param must be a valid cell");
+    let mine = node.post_json("/acton_mine", &json!({}));
+    let mined_seqno = response_payload(&mine)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let mined_header = node.get_json(&format!(
+        "/api/v2/getBlockHeader?workchain=-1&shard=-9223372036854775808&seqno={mined_seqno}"
+    ));
+    let mined_gen_utime = response_payload(&mined_header)["gen_utime"]
+        .as_u64()
+        .expect("masterchain block header must expose gen_utime") as u32;
+
+    let snapshot = json!({
+        "config": {
+            "request_ok": config_param["ok"].as_bool(),
+            "matches_fork_block": config_param_cell.repr_hash()
+                == mocked_global_version_cell(GLOBAL_VERSION, GLOBAL_CAPABILITIES).repr_hash(),
+        },
+        "time": {
+            "mined_block_uses_fork_clock": (FORK_GEN_UTIME..=FORK_GEN_UTIME + 10).contains(&mined_gen_utime),
+        }
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/localnet_historical_fork_uses_block_config_and_time.summary.json"
+        ),
+    );
+
+    node.stop();
+    let restarted_node = start_fork("state/second.sqlite");
+    restarted_node.stop();
+    mock_handle.join().expect("mock toncenter must finish");
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    fs::write(
+        project.path().join("localnet-fork-snapshot-requests.txt"),
+        format_captured_requests(&captured_requests),
+    )
+    .expect("failed to write localnet fork snapshot request log");
+    assertion().eq(
+        fs::read_to_string(project.path().join("localnet-fork-snapshot-requests.txt"))
+            .expect("failed to read localnet fork snapshot request log"),
+        snapbox::file!(
+            "snapshots/localnet/localnet_historical_fork_uses_block_config_and_time.requests.txt"
+        ),
+    );
 }
 
 #[test]

@@ -6,6 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
+use std::time::{Duration, Instant};
 use tycho_types::boc::Boc;
 use tycho_types::models::{IntAddr, MsgInfo, Transaction};
 
@@ -223,10 +224,35 @@ impl RunningStudio {
                 });
         });
 
+        let url = url_receiver
+            .recv()
+            .expect("Studio test server should publish its URL");
+        let client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_millis(250))
+            .build()
+            .expect("Studio test client should build");
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            if client
+                .get(format!("{url}/api/v1/info"))
+                .send()
+                .is_ok_and(|response| response.status().is_success())
+            {
+                break;
+            }
+            assert!(
+                !thread.is_finished(),
+                "Studio test server stopped before startup"
+            );
+            assert!(
+                Instant::now() < deadline,
+                "Studio test server did not start"
+            );
+            thread::sleep(Duration::from_millis(50));
+        }
+
         Self {
-            url: url_receiver
-                .recv()
-                .expect("Studio test server should publish its URL"),
+            url,
             shutdown: Some(shutdown),
             thread: Some(thread),
         }

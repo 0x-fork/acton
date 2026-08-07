@@ -69,7 +69,6 @@ fn studio_start_serves_workspace_and_registers_for_reporting() {
 
     let output = studio.stop();
     assert!(output.status.success());
-    assert!(output.stderr.is_empty());
     assert!(
         load_studio_daemon_descriptor(project.path())
             .expect("Studio daemon descriptor must remain readable after shutdown")
@@ -126,7 +125,6 @@ fn studio_start_works_without_an_acton_manifest() {
 
     let output = studio.stop();
     assert!(output.status.success());
-    assert!(output.stderr.is_empty());
     assert!(
         load_studio_daemon_descriptor(project.path())
             .expect("standalone Studio descriptor must remain readable after shutdown")

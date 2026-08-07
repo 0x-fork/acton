@@ -24,6 +24,7 @@ use crate::context::{
 use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
+use crate::paths::build_cache_dir;
 use crate::retrace;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
@@ -52,6 +53,7 @@ use std::{fs, process};
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
 use tolk_syntax::{AstNode, HasName, SourceFile};
+use ton_api::{MasterchainSnapshot, TonApiClient};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
     AccountsState, LocalAccountsState, RemoteAccountState, RemoteLibraryCache, RemoteSnapshotCache,
@@ -117,6 +119,8 @@ pub struct TestRunner<'a> {
     mutation_overrides: BTreeMap<String, Cell>,
     remote_cache: RemoteSnapshotCache,
     remote_library_cache: RemoteLibraryCache,
+    fork_snapshot: Option<MasterchainSnapshot>,
+    fork_config_b64: Option<String>,
     fuzz_seed: u64,
     /// Contracts used as `library_ref` dependency. We need to register it for correct
     /// work of dependent contracts.
@@ -139,6 +143,21 @@ impl<'a> TestRunner<'a> {
         };
         let project_root = configured_project_root().to_path_buf();
         let fuzz_seed = config.fuzz_seed.unwrap_or_else(rand::random);
+        let fork_snapshot = config
+            .fork_net
+            .as_ref()
+            .map(|network| {
+                TonApiClient::new(network.clone(), acton_config.custom_networks())?
+                    .get_masterchain_snapshot_cached(
+                        config.fork_block_number,
+                        &build_cache_dir(configured_project_root())
+                            .join(ton_api::MASTERCHAIN_SNAPSHOT_CACHE_SUBDIR),
+                    )
+            })
+            .transpose()?;
+        let fork_config_b64 = fork_snapshot
+            .as_ref()
+            .map(|snapshot| Boc::encode_base64(&snapshot.config));
 
         let mut ref_contracts = BTreeMap::new();
         if let Some(contracts) = acton_config.contracts() {
@@ -201,6 +220,8 @@ impl<'a> TestRunner<'a> {
             ref_contracts,
             remote_cache: RemoteSnapshotCache::new(),
             remote_library_cache: RemoteLibraryCache::new(),
+            fork_snapshot,
+            fork_config_b64,
             fuzz_seed,
         })
     }
@@ -288,8 +309,13 @@ impl<'a> TestRunner<'a> {
     ) -> anyhow::Result<TestResult> {
         let verbosity = self.effective_log_verbosity();
 
-        let now = std::time::SystemTime::now();
-        let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+        let execution_unixtime = if let Some(snapshot) = &self.fork_snapshot {
+            i64::from(snapshot.gen_utime)
+        } else {
+            let now = std::time::SystemTime::now();
+            let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+            duration_since_epoch.as_secs().try_into()?
+        };
 
         let params = RunGetMethodArgs {
             code: Boc::encode_base64(code_cell),
@@ -297,7 +323,7 @@ impl<'a> TestRunner<'a> {
             verbosity,
             libs: Default::default(),
             address: dest_address.to_owned(),
-            unixtime: duration_since_epoch.as_secs().try_into()?,
+            unixtime: execution_unixtime,
             balance: "10".to_owned(),
             rand_seed: "0000000000000000000000000000000000000000000000000000000000000000"
                 .to_owned(),
@@ -307,14 +333,14 @@ impl<'a> TestRunner<'a> {
             extra_currencies: HashMap::new(),
             prev_blocks_info: None,
         };
-        let config_b64: Option<&str> = None;
+        let config_b64 = self.fork_config_b64.as_deref().unwrap_or(DEFAULT_CONFIG);
 
-        let mut emulator = Emulator::new(verbosity, config_b64)?;
+        let mut emulator = Emulator::new(verbosity, Some(config_b64))?;
         let state = match &self.config.fork_net {
             Some(net) => {
                 let remote = RemoteAccountState::new(
                     net.clone(),
-                    self.config.fork_block_number,
+                    self.fork_snapshot.as_ref().map(|snapshot| snapshot.seqno),
                     self.remote_cache.clone(),
                     self.remote_library_cache.clone(),
                     self.config.fork_cache_enabled,
@@ -323,7 +349,10 @@ impl<'a> TestRunner<'a> {
             }
             None => AccountsState::Local(LocalAccountsState::new()),
         };
-        let mut world_state = WorldState::new(state, config_b64)?;
+        let mut world_state = WorldState::new(state, Some(config_b64))?;
+        if let Some(snapshot) = &self.fork_snapshot {
+            world_state.set_now(snapshot.gen_utime);
+        }
 
         // Register all ref dependency to correct work
         for cell in self.ref_contracts.values() {
@@ -388,7 +417,7 @@ impl<'a> TestRunner<'a> {
 
         let (result, captured_stdout, captured_stderr, assert_failure, expected_exit_code) =
             if self.config.debug {
-                let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
+                let mut executor = StepGetExecutor::new(&stack, &params, Some(config_b64))?;
                 ffi::register(&mut executor, &mut ctx);
                 executor.prepare(test.id, &stack)?;
                 let mut replayer =
@@ -417,7 +446,7 @@ impl<'a> TestRunner<'a> {
                 let mut executor = GetExecutor::new(&params)?;
                 ffi::register(&mut executor, &mut ctx);
 
-                let get_result = executor.run_get_method(&stack, &params, Some(DEFAULT_CONFIG))?;
+                let get_result = executor.run_get_method(&stack, &params, Some(config_b64))?;
 
                 dump_trace_if_available(test, &self.config, &mut ctx)?;
 

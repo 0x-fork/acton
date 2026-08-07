@@ -274,6 +274,10 @@ Configures defaults for `acton localnet`.
 | `block-interval-ms` | `integer`  | `500`   | Block production interval in milliseconds when automatic mining is enabled.                                                 |
 | `no-mining`         | `boolean`  | `false` | Disable automatic block production; mine blocks manually with `acton localnet mine` or `/acton_mine`.                       |
 
+The localnet fork uses the network configuration from the resolved masterchain
+block. When `fork-block-number` is set, it also uses that block's Unix time;
+otherwise, the virtual clock starts from the current system Unix time.
+
 Example:
 
 ```acton-toml title="Acton.toml"
@@ -319,6 +323,10 @@ Configures the behavior of `acton test`.
 | `ui`                        | `boolean`  | `false`       | Enable the browser test UI server.                                     |
 | `ui-port`                   | `integer`  | `12344`       | Port for the browser test UI server.                                   |
 | `mutation`                  | `object`   | -             | Configuration for mutation testing (see below).                        |
+
+The test fork uses state and network configuration from the same masterchain
+block. When `fork-block-number` is set, it also uses that block's Unix time;
+otherwise, it uses the current system Unix time.
 
 TON Center API keys are configured through the process environment, not `Acton.toml`: use `TONCENTER_TESTNET_API_KEY` or `TONCENTER_MAINNET_API_KEY` when the built-in fork target needs authentication.
 
