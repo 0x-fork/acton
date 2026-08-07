@@ -902,7 +902,7 @@ const DesktopMoreMenu: FC = () => {
               <span className={styles.desktopMoreItemDescription}>Discover active tokens</span>
             </span>
           </Link>
-          <Link className={styles.desktopMoreItem} to={routes.configPath} onClick={closeMenu}>
+          <Link className={styles.desktopMoreItem} to={routes.configPath()} onClick={closeMenu}>
             <span className={styles.desktopMoreItemCopy}>
               <span className={styles.desktopMoreItemTitle}>Network config</span>
               <span className={styles.desktopMoreItemDescription}>
@@ -1428,6 +1428,7 @@ export const ExplorerApp: FC = () => {
                         }
                       />
                       <Route path="/tokens" element={<TokenCatalogPage client={client} />} />
+                      <Route path="/config/:seqno" element={<ConfigPage client={client} />} />
                       <Route path="/config" element={<ConfigPage client={client} />} />
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />

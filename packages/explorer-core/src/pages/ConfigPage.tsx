@@ -24,6 +24,7 @@ import {
 } from "@acton/ui"
 import {ChevronDown, ExternalLink, Link2, Search} from "lucide-react"
 import {useEffect, useMemo, useState, type FC, type ReactNode} from "react"
+import {useParams} from "react-router"
 
 import type {TonClient} from "../api/client"
 import {
@@ -111,6 +112,9 @@ function tonConfigDocsHref(id: number): string {
 }
 
 export const ConfigPage: FC<ConfigPageProps> = ({client}) => {
+  const {seqno: seqnoParam} = useParams<{seqno?: string}>()
+  const seqno = parseConfigSeqno(seqnoParam)
+  const routes = useExplorerRoutePaths()
   const [loadState, setLoadState] = useState<ConfigLoadState>({status: "loading"})
   const [query, setQuery] = useState("")
 
@@ -119,8 +123,12 @@ export const ConfigPage: FC<ConfigPageProps> = ({client}) => {
 
     const load = async () => {
       setLoadState({status: "loading"})
+      if (seqnoParam !== undefined && seqno === undefined) {
+        setLoadState({status: "error", message: "Invalid configuration block seqno"})
+        return
+      }
       try {
-        const config = await client.getNetworkConfig()
+        const config = await client.getNetworkConfig(seqno)
         if (active) setLoadState({status: "success", config})
       } catch (error) {
         if (active) {
@@ -136,7 +144,7 @@ export const ConfigPage: FC<ConfigPageProps> = ({client}) => {
     return () => {
       active = false
     }
-  }, [client])
+  }, [client, seqno, seqnoParam])
 
   const config = loadState.status === "success" ? loadState.config : undefined
   const visibleParameters = useMemo(() => {
@@ -156,7 +164,13 @@ export const ConfigPage: FC<ConfigPageProps> = ({client}) => {
   return (
     <section className={styles.container}>
       <header className={styles.header}>
-        <ExplorerBreadcrumbs items={[{label: "Config"}]} />
+        <ExplorerBreadcrumbs
+          items={
+            seqno === undefined
+              ? [{label: "Config"}]
+              : [{label: "Config", path: routes.configPath()}, {label: `Block #${seqno}`}]
+          }
+        />
         <Input
           aria-label="Filter configuration parameters"
           className={styles.filter}
@@ -180,6 +194,13 @@ export const ConfigPage: FC<ConfigPageProps> = ({client}) => {
       )}
     </section>
   )
+}
+
+function parseConfigSeqno(value: string | undefined): number | undefined {
+  if (value === undefined || !/^\d+$/.test(value)) return undefined
+
+  const seqno = Number(value)
+  return Number.isSafeInteger(seqno) ? seqno : undefined
 }
 
 function ConfigContent({

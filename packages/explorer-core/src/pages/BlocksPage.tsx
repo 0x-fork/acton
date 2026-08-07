@@ -656,10 +656,10 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
                     variant="outline"
                     size="sm"
                     leadingIcon={<FileJson size={14} />}
-                    disabled={!blockActions.configUrl}
+                    disabled={blockActions.configSeqno === undefined}
                     onClick={() =>
-                      blockActions.configUrl &&
-                      globalThis.open(blockActions.configUrl, "_blank", "noopener,noreferrer")
+                      blockActions.configSeqno !== undefined &&
+                      void navigate(routes.configPath(blockActions.configSeqno))
                     }
                   >
                     Config
@@ -1709,7 +1709,7 @@ function getBlockActions(
   rawBlockNetwork: RawBlockNetwork | undefined,
 ): {
   readonly downloadUrl?: string
-  readonly configUrl?: string
+  readonly configSeqno?: number
   readonly tonscanUrl: string
   readonly toncoinUrl: string
   readonly extendedBlockId: string
@@ -1727,11 +1727,16 @@ function getBlockActions(
     downloadUrl: rawBlockNetwork
       ? `${tonapiOrigin}/v2/blockchain/blocks/${encodeURIComponent(blockId)}/boc`
       : undefined,
-    configUrl: rawBlockNetwork ? `${tonscanOrigin}/config` : undefined,
+    configSeqno: getConfigSeqno(block),
     tonscanUrl: `${tonscanOrigin}/block/${block.workchain}:${block.shard}:${block.seqno}`,
     toncoinUrl: `${toncoinOrigin}/search?workchain=${block.workchain}&shard=${encodeURIComponent(block.shard)}&seqno=${block.seqno}`,
     extendedBlockId: getExtendedBlockId(block),
   }
+}
+
+function getConfigSeqno(block: V3Block): number | undefined {
+  if (block.workchain === -1) return block.seqno
+  return block.master_ref_seqno ?? block.masterchain_block_ref?.seqno
 }
 
 function blockUnixTime(block: V3Block): number | undefined {
