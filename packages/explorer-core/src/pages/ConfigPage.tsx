@@ -161,6 +161,21 @@ export const ConfigPage: FC<ConfigPageProps> = ({client}) => {
     )
   }, [config, query])
 
+  useEffect(() => {
+    if (!config || !globalThis.location.hash) return
+
+    const anchorId = decodeConfigAnchor(globalThis.location.hash)
+    if (!anchorId) return
+
+    const frame = globalThis.requestAnimationFrame(() => {
+      globalThis.document
+        .getElementById(anchorId)
+        ?.scrollIntoView({behavior: "smooth", block: "start"})
+    })
+
+    return () => globalThis.cancelAnimationFrame(frame)
+  }, [config, visibleParameters])
+
   return (
     <section className={styles.container}>
       <header className={styles.header}>
@@ -194,6 +209,15 @@ export const ConfigPage: FC<ConfigPageProps> = ({client}) => {
       )}
     </section>
   )
+}
+
+function decodeConfigAnchor(hash: string): string | undefined {
+  try {
+    const anchorId = decodeURIComponent(hash.slice(1))
+    return anchorId || undefined
+  } catch {
+    return undefined
+  }
 }
 
 function parseConfigSeqno(value: string | undefined): number | undefined {
