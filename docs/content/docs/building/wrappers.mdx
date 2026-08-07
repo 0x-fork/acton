@@ -158,6 +158,23 @@ test-output-dir = "tests"
 output-dir = "wrappers-ts"
 ```
 
+Override any of these fields for one contract by nesting the same tables under
+its contract entry:
+
+```acton-toml title="Acton.toml"
+[contracts.Counter.wrappers.tolk]
+output-dir = "generated/counter"
+generate-test = false
+
+[contracts.Counter.wrappers.typescript]
+output-dir = "app/src/wrappers/counter"
+```
+
+Acton resolves each field independently, so omitted per-contract fields inherit
+the project defaults. CLI output and test options still have the highest
+priority. `acton wrapper --all` applies the resulting settings separately to
+each contract.
+
 See the [build reference](/docs/building/reference#wrappers-section) for all available fields.
 
 ## See also

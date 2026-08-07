@@ -642,6 +642,8 @@ pub struct ContractConfig {
     pub depends: Option<Vec<ContractDependency>>,
     /// Path where the compiled `.boc` should be saved
     pub output: Option<String>,
+    /// Wrapper settings that override the project-level `[wrappers]` defaults for this contract
+    pub wrappers: Option<WrappersConfig>,
 }
 
 impl Default for ActonConfig {
@@ -1748,6 +1750,7 @@ rules-file = "mutation-rules.json"
                         types: None,
                         depends: Some(vec![]),
                         output: None,
+                        wrappers: None,
                     },
                 )]),
             }),
@@ -2256,6 +2259,58 @@ output-dir = "./wrappers-ts"
         assert_eq!(
             config.typescript_wrapper_output_dir(),
             Some("./wrappers-ts")
+        );
+    }
+
+    #[test]
+    fn test_per_contract_wrapper_settings_parsing() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[contracts.counter]
+src = "contracts/Counter.tolk"
+
+[contracts.counter.wrappers.tolk]
+output-dir = "generated/counter"
+generate-test = false
+test-output-dir = "generated-tests/counter"
+
+[contracts.counter.wrappers.typescript]
+output-dir = "generated-ts/counter"
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let wrappers = config
+            .get_contract("counter")
+            .and_then(|contract| contract.wrappers.as_ref())
+            .expect("counter wrapper settings");
+        let tolk = wrappers.tolk.as_ref().expect("Tolk wrapper settings");
+        assert_eq!(tolk.output_dir.as_deref(), Some("generated/counter"));
+        assert_eq!(tolk.generate_test, Some(false));
+        assert_eq!(
+            tolk.test_output_dir.as_deref(),
+            Some("generated-tests/counter")
+        );
+        assert_eq!(
+            wrappers
+                .typescript
+                .as_ref()
+                .and_then(|settings| settings.output_dir.as_deref()),
+            Some("generated-ts/counter")
+        );
+
+        let serialized = toml::to_string(&config).expect("serialize Acton config");
+        let reparsed: ActonConfig = toml::from_str(&serialized).expect("reparse Acton config");
+        assert_eq!(
+            reparsed
+                .get_contract("counter")
+                .and_then(|contract| contract.wrappers.as_ref())
+                .and_then(|wrappers| wrappers.tolk.as_ref())
+                .and_then(|settings| settings.output_dir.as_deref()),
+            Some("generated/counter")
         );
     }
 

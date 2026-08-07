@@ -209,6 +209,14 @@
         "types": {
           "description": "Optional Tolk interface file used to produce ABI for precompiled `.boc` contracts",
           "type": "string"
+        },
+        "wrappers": {
+          "description": "Wrapper settings that override the project-level `[wrappers]` defaults for this contract",
+          "allOf": [
+            {
+              "$ref": "#/definitions/WrappersConfig"
+            }
+          ]
         }
       }
     },
