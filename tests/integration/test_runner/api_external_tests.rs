@@ -336,9 +336,12 @@ get fun `test send external stays local with broadcast flag in tests`() {
     net.enableBroadcast();
     expect(net.isBroadcasting()).toBeTrue();
 
-    val txs = net.sendExternal(
+    val result = net.sendExternal(
         net.createExternalMessage(harness.address, TriggerExternal { id: 9 }),
-    ).unwrap();
+    );
+
+    expect(result.isAccepted()).toBeTrue();
+    val txs = result.unwrap();
 
     expect(txs).toHaveLength(1);
     val tx = txs.at(0).tx.load();

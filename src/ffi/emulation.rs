@@ -614,6 +614,7 @@ fn send_external_message_impl(
         stack.push(external_send_result_tuple(
             broadcast_external_message(ctx, msg)?,
             None,
+            false,
         ));
         return Ok(());
     }
@@ -658,7 +659,7 @@ fn send_external_message_impl(
         TupleItem::big_array_from_items(transaction_cells)
     };
 
-    let result = external_send_result_tuple(transactions, error);
+    let result = external_send_result_tuple(transactions, error, true);
     stack.push(result);
     Ok(())
 }
@@ -693,10 +694,12 @@ fn broadcast_external_message(ctx: &mut Context, msg: Cell) -> anyhow::Result<Tu
 fn external_send_result_tuple(
     transactions: TupleItem,
     error: Option<&FailedSendMessageResult>,
+    acceptance_known: bool,
 ) -> TupleItem {
     TupleItem::Tuple(Tuple(vec![
         transactions,
         error.map_or(TupleItem::Null, external_send_error_tuple),
+        bool_tuple_item(acceptance_known),
     ]))
 }
 

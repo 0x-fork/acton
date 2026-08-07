@@ -125,6 +125,22 @@ fun main() {
 }
 "#;
 
+const EXTERNAL_IS_ACCEPTED_SCRIPT: &str = r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+    val result = net.sendExternal(
+        net.createExternalMessage(wallet.address, createEmptyCell()),
+    );
+
+    net.disableBroadcast();
+    println(result.isAccepted());
+}
+"#;
+
 const DEPLOY_TRACKED_CONTRACT_SCRIPT: &str = r#"
 import "../../lib/build"
 import "../../lib/emulation/network"
@@ -2673,6 +2689,32 @@ fn localnet_script_println_net_send_in_broadcast_shows_synthetic_hint() {
         .assert_snapshot_matches(
             "integration/snapshots/localnet/test_localnet_script_println_net_send_in_broadcast_shows_synthetic_hint.stdout.txt",
         );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_script_is_accepted_rejects_unknown_broadcast_status() {
+    let project = ProjectBuilder::new("localnet-external-is-accepted")
+        .script_file("external_is_accepted", EXTERNAL_IS_ACCEPTED_SCRIPT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/external_is_accepted.tolk")
+        .verify_network("localnet")
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/localnet/test_localnet_script_is_accepted_rejects_unknown_broadcast_status.stdout.txt",
+    );
 
     node.stop();
 }
