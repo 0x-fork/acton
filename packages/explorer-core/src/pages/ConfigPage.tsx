@@ -1,4 +1,5 @@
 import {
+  ByteSize,
   ContentTabs,
   DataTable,
   DataTableBody,
@@ -9,7 +10,9 @@ import {
   DataTableRow,
   DataTableTable,
   DateTime,
+  Duration,
   formatNumberValue,
+  GramAmount,
   InfoPopover,
   Input,
   NumberValue,
@@ -31,9 +34,9 @@ import {
   type ExtraCurrency,
   type FundamentalSmartContract,
   type GlobalVersionConfiguration,
-  type NetworkConfigValue,
   type NetworkConfig,
   type NetworkConfigParameter,
+  type NetworkConfigValue,
   type PrecompiledContractConfiguration,
   type SuspendedAddressesConfiguration,
   type ValidatorConfiguration,
@@ -338,7 +341,7 @@ function ConfigParameterValue({parameter}: {readonly parameter: NetworkConfigPar
   if (parameter.globalId !== undefined) {
     return (
       <div className={styles.parsedValue}>
-        <NumberValue value={parameter.globalId} />
+        <NumberValue className={styles.globalIdValue} value={parameter.globalId} />
       </div>
     )
   }
@@ -521,12 +524,12 @@ function ValidatorSetValue({configuration}: {readonly configuration: ValidatorSe
           {
             id: "utime-since",
             label: "Utime since",
-            value: <NumberValue value={configuration.utimeSince} />,
+            value: <DateTime display="date-time" unit="seconds" value={configuration.utimeSince} />,
           },
           {
             id: "utime-until",
             label: "Utime until",
-            value: <NumberValue value={configuration.utimeUntil} />,
+            value: <DateTime display="date-time" unit="seconds" value={configuration.utimeUntil} />,
           },
           {
             id: "total",
@@ -758,7 +761,7 @@ function BridgeConfigurationValue({configuration}: {readonly configuration: Brid
                 {
                   id: "burn-bridge-fee",
                   label: "Burn bridge fee",
-                  value: <NumberValue value={configuration.burnBridgeFee} />,
+                  value: <GramAmount value={configuration.burnBridgeFee} useGrouping />,
                 },
               ]),
         ]}
@@ -844,19 +847,57 @@ function toConfigValueGridItem(item: NetworkConfigValue, id: string): ConfigValu
   return {
     id,
     label: item.label,
-    value:
-      item.value === undefined ? (
-        "Not available"
-      ) : typeof item.value === "boolean" ? (
-        item.value ? (
-          "Enabled"
-        ) : (
-          "Disabled"
-        )
-      ) : (
-        <NumberValue value={item.value} />
-      ),
+    value: renderConfigValue(item),
   }
+}
+
+function renderConfigValue(item: NetworkConfigValue): ReactNode {
+  if (item.value === undefined) return "Not available"
+  if (typeof item.value === "boolean") return item.value ? "Enabled" : "Disabled"
+
+  if (item.format === "bytes") {
+    return <ByteSize value={typeof item.value === "number" ? item.value : undefined} />
+  }
+  if (item.format === "date") {
+    if (item.value === 0) return "Initial"
+
+    return (
+      <DateTime
+        display="date"
+        unit="seconds"
+        value={typeof item.value === "number" ? item.value : undefined}
+      />
+    )
+  }
+  if (item.format === "duration") {
+    return (
+      <Duration
+        display="readable"
+        value={typeof item.value === "number" ? item.value : undefined}
+      />
+    )
+  }
+  if (item.format === "duration-ms") {
+    return (
+      <Duration
+        display="readable"
+        unit="milliseconds"
+        value={typeof item.value === "number" ? item.value : undefined}
+      />
+    )
+  }
+  if (item.format === "gram") {
+    return <GramAmount value={item.value} useGrouping />
+  }
+  if (item.format === "gram-per-65536") {
+    return <GramAmount value={scaleForwardPrice(item.value)} useGrouping />
+  }
+
+  return <NumberValue value={item.value} />
+}
+
+function scaleForwardPrice(value: bigint | number): bigint | number {
+  return typeof value === "bigint" ? value / 65_536n : Math.trunc(value / 65_536)
 }
 
 function ConfigParameterIdList({ids}: {readonly ids: readonly number[]}) {

@@ -1,5 +1,5 @@
 import {Cell, Dictionary} from "@ton/core"
-import type {ParsedValue} from "@acton/ui"
+import {formatDateTime, type ParsedValue} from "@acton/ui"
 
 import {loadConfigParam, loadConfigParams} from "../cell-inspector/block.tlb.generated"
 
@@ -74,7 +74,16 @@ export interface NetworkConfigValue {
   readonly label: string
   readonly value?: bigint | boolean | number
   readonly children?: readonly NetworkConfigValue[]
+  readonly format?: NetworkConfigValueFormat
 }
+
+export type NetworkConfigValueFormat =
+  | "bytes"
+  | "date"
+  | "duration"
+  | "duration-ms"
+  | "gram"
+  | "gram-per-65536"
 
 export interface NetworkConfigParameter {
   readonly id: number
@@ -536,8 +545,8 @@ function parseConfigurationValues(
   switch (id) {
     case 6:
       return parseTypedConfigurationValues(value, "ConfigParam__6", [
-        {key: "mint_new_price", label: "Mint new price", type: "bigint"},
-        {key: "mint_add_price", label: "Mint add price", type: "bigint"},
+        {key: "mint_new_price", label: "Mint new price", type: "bigint", format: "gram"},
+        {key: "mint_add_price", label: "Mint add price", type: "bigint", format: "gram"},
       ])
     case 11:
       return parseConfigVotingConfigurationValues(value)
@@ -545,21 +554,41 @@ function parseConfigurationValues(
       return parseStoragePricesConfigurationValues(value)
     case 13:
       return parseTypedConfigurationValues(value, "ComplaintPricing", [
-        {key: "deposit", label: "Deposit", type: "bigint"},
-        {key: "bit_price", label: "Bit price", type: "bigint"},
-        {key: "_cell_price", label: "Cell price", type: "bigint"},
+        {key: "deposit", label: "Deposit", type: "bigint", format: "gram"},
+        {key: "bit_price", label: "Bit price", type: "bigint", format: "gram"},
+        {key: "_cell_price", label: "Cell price", type: "bigint", format: "gram"},
       ])
     case 14:
       return parseTypedConfigurationValues(value, "BlockCreateFees", [
-        {key: "masterchain_block_fee", label: "Masterchain block fee", type: "bigint"},
-        {key: "basechain_block_fee", label: "Basechain block fee", type: "bigint"},
+        {
+          key: "masterchain_block_fee",
+          label: "Masterchain block fee",
+          type: "bigint",
+          format: "gram",
+        },
+        {key: "basechain_block_fee", label: "Basechain block fee", type: "bigint", format: "gram"},
       ])
     case 15:
       return parseTypedConfigurationValues(value, "ConfigParam__15", [
-        {key: "validators_elected_for", label: "Validators elected for", type: "number"},
-        {key: "elections_start_before", label: "Elections start before", type: "number"},
-        {key: "elections_end_before", label: "Elections end before", type: "number"},
-        {key: "stake_held_for", label: "Stake held for", type: "number"},
+        {
+          key: "validators_elected_for",
+          label: "Validators elected for",
+          type: "number",
+          format: "duration",
+        },
+        {
+          key: "elections_start_before",
+          label: "Elections start before",
+          type: "number",
+          format: "duration",
+        },
+        {
+          key: "elections_end_before",
+          label: "Elections end before",
+          type: "number",
+          format: "duration",
+        },
+        {key: "stake_held_for", label: "Stake held for", type: "number", format: "duration"},
       ])
     case 16:
       return parseTypedConfigurationValues(value, "ConfigParam__16", [
@@ -569,9 +598,9 @@ function parseConfigurationValues(
       ])
     case 17:
       return parseTypedConfigurationValues(value, "ConfigParam__17", [
-        {key: "min_stake", label: "Min stake", type: "bigint"},
-        {key: "max_stake", label: "Max stake", type: "bigint"},
-        {key: "min_total_stake", label: "Min total stake", type: "bigint"},
+        {key: "min_stake", label: "Min stake", type: "bigint", format: "gram"},
+        {key: "max_stake", label: "Max stake", type: "bigint", format: "gram"},
+        {key: "min_total_stake", label: "Min total stake", type: "bigint", format: "gram"},
         {key: "max_stake_factor", label: "Max stake factor", type: "number"},
       ])
     case 43:
@@ -612,7 +641,7 @@ function parseTypedConfigurationValues(
       return undefined
     }
     if (typeof fieldValue !== "bigint" && typeof fieldValue !== "number") return undefined
-    values.push({label: field.label, value: fieldValue})
+    values.push(createNetworkConfigValue(field.label, fieldValue, field.format))
   }
 
   return values
@@ -650,14 +679,14 @@ function parseConfigVotingConfigurationValues(
 
 function configProposalSetupValues(value: object): readonly NetworkConfigValue[] | undefined {
   return parseRequiredConfigurationFields(value as Record<string, unknown>, [
-    {key: "min_tot_rounds", label: "Min tot rounds", type: "number"},
-    {key: "max_tot_rounds", label: "Max tot rounds", type: "number"},
+    {key: "min_tot_rounds", label: "Min total rounds", type: "number"},
+    {key: "max_tot_rounds", label: "Max total rounds", type: "number"},
     {key: "min_wins", label: "Min wins", type: "number"},
     {key: "max_losses", label: "Max losses", type: "number"},
-    {key: "min_store_sec", label: "Min store sec", type: "number"},
-    {key: "max_store_sec", label: "Max store sec", type: "number"},
-    {key: "bit_price", label: "Bit price", type: "number"},
-    {key: "_cell_price", label: "Cell price", type: "number"},
+    {key: "min_store_sec", label: "Min store sec", type: "number", format: "duration"},
+    {key: "max_store_sec", label: "Max store sec", type: "number", format: "duration"},
+    {key: "bit_price", label: "Bit price", type: "number", format: "gram"},
+    {key: "_cell_price", label: "Cell price", type: "number", format: "gram"},
   ])
 }
 
@@ -674,16 +703,24 @@ function parseStoragePricesConfigurationValues(
     if (typeof storagePrices !== "object" || storagePrices === null) return undefined
 
     const fields = parseRequiredConfigurationFields(storagePrices as Record<string, unknown>, [
-      {key: "utime_since", label: "Utime since", type: "number"},
-      {key: "bit_price_ps", label: "Bit price ps", type: "bigint"},
-      {key: "_cell_price_ps", label: "Cell price ps", type: "bigint"},
-      {key: "mc_bit_price_ps", label: "MC bit price ps", type: "bigint"},
-      {key: "mc_cell_price_ps", label: "MC cell price ps", type: "bigint"},
+      {key: "utime_since", label: "Utime since", type: "number", format: "date"},
+      {key: "bit_price_ps", label: "Bit price ps", type: "bigint", format: "gram"},
+      {key: "_cell_price_ps", label: "Cell price ps", type: "bigint", format: "gram"},
+      {key: "mc_bit_price_ps", label: "MC bit price ps", type: "bigint", format: "gram"},
+      {key: "mc_cell_price_ps", label: "MC cell price ps", type: "bigint", format: "gram"},
     ])
     if (!fields) return undefined
 
     values.push({
-      label: `Storage prices from ${key.toLocaleString("en-US")}`,
+      label:
+        Number(key) === 0
+          ? "Initial storage prices"
+          : `Storage prices from ${formatDateTime(Number(key), {
+              display: "date",
+              locale: "en-US",
+              timeZone: "UTC",
+              unit: "seconds",
+            })}`,
       children: fields,
     })
   }
@@ -698,13 +735,14 @@ function parseRequiredConfigurationFields(
   const values: NetworkConfigValue[] = []
   for (const field of fields) {
     const fieldValue = candidate[field.key]
-    if (field.type === "bigint") {
-      if (typeof fieldValue !== "bigint") return undefined
-      values.push({label: field.label, value: fieldValue})
-    } else {
-      if (typeof fieldValue !== "number") return undefined
-      values.push({label: field.label, value: fieldValue})
+    if (
+      (field.type === "bigint" && typeof fieldValue !== "bigint") ||
+      (field.type === "number" && typeof fieldValue !== "number")
+    ) {
+      return undefined
     }
+    if (typeof fieldValue !== "bigint" && typeof fieldValue !== "number") return undefined
+    values.push(createNetworkConfigValue(field.label, fieldValue, field.format))
   }
   return values
 }
@@ -775,21 +813,28 @@ function parseNestedConfigurationValues(
   return values.length > 0 ? values : undefined
 }
 
-function nestedConfigurationValues(value: unknown): NetworkConfigValue[] {
+function nestedConfigurationValues(
+  value: unknown,
+  inheritedFormat?: NetworkConfigValueFormat,
+): NetworkConfigValue[] {
   if (typeof value !== "object" || value === null) return []
 
+  const record = value as Record<string, unknown>
+  const kind = typeof record.kind === "string" ? record.kind : undefined
   const values: NetworkConfigValue[] = []
-  for (const [key, child] of Object.entries(value)) {
+  for (const [key, child] of Object.entries(record)) {
     if (key === "flags" || key === "kind") continue
 
     const label = humanizeFieldName(key)
+    const fieldFormat = configurationFieldFormat(key)
     const scalar = toNetworkConfigScalar(child)
     if (scalar !== undefined) {
-      values.push({label, value: scalar})
+      const format = configurationValueFormat(kind, key) ?? inheritedFormat
+      values.push(createNetworkConfigValue(label, scalar, format))
       continue
     }
 
-    const children = nestedConfigurationValues(child)
+    const children = nestedConfigurationValues(child, fieldFormat ?? inheritedFormat)
     if (children.length > 0) values.push({label, children})
   }
   return values
@@ -809,6 +854,45 @@ interface ConfigValueField {
   readonly key: string
   readonly label: string
   readonly type: "bigint" | "number"
+  readonly format?: NetworkConfigValueFormat
+}
+
+function createNetworkConfigValue(
+  label: string,
+  value: bigint | boolean | number,
+  format?: NetworkConfigValueFormat,
+): NetworkConfigValue {
+  return {label, value, ...(format === undefined ? {} : {format})}
+}
+
+function configurationValueFormat(
+  kind: string | undefined,
+  key: string,
+): NetworkConfigValueFormat | undefined {
+  if (
+    kind?.startsWith("GasLimitsPrices") &&
+    ["gas_price", "flat_gas_price", "freeze_due_limit", "delete_due_limit"].includes(key)
+  ) {
+    return "gram"
+  }
+
+  if (kind === "MsgForwardPrices" && key === "lump_price") {
+    return "gram"
+  }
+
+  if (kind === "MsgForwardPrices" && ["bit_price", "_cell_price"].includes(key)) {
+    return "gram-per-65536"
+  }
+
+  return configurationFieldFormat(key)
+}
+
+function configurationFieldFormat(key: string): NetworkConfigValueFormat | undefined {
+  const normalizedKey = key.toLowerCase()
+  if (normalizedKey.includes("bytes")) return "bytes"
+  if (normalizedKey.endsWith("_ms")) return "duration-ms"
+  if (normalizedKey.includes("sec")) return "duration"
+  return undefined
 }
 
 function unwrapAnonymousConfigValue(value: unknown): Record<string, unknown> | undefined {
@@ -1055,19 +1139,39 @@ function parseJettonBridgePrices(value: unknown): readonly NetworkConfigValue[] 
   if (prices.kind !== "JettonBridgePrices") return undefined
 
   const fields: readonly ConfigValueField[] = [
-    {key: "bridge_burn_fee", label: "Bridge burn fee", type: "bigint"},
-    {key: "bridge_mint_fee", label: "Bridge mint fee", type: "bigint"},
-    {key: "wallet_min_tons_for_storage", label: "Wallet min tons for storage", type: "bigint"},
-    {key: "wallet_gas_consumption", label: "Wallet gas consumption", type: "bigint"},
-    {key: "minter_min_tons_for_storage", label: "Minter min tons for storage", type: "bigint"},
-    {key: "discover_gas_consumption", label: "Discover gas consumption", type: "bigint"},
+    {key: "bridge_burn_fee", label: "Bridge burn fee", type: "bigint", format: "gram"},
+    {key: "bridge_mint_fee", label: "Bridge mint fee", type: "bigint", format: "gram"},
+    {
+      key: "wallet_min_tons_for_storage",
+      label: "Wallet min GRAM for storage",
+      type: "bigint",
+      format: "gram",
+    },
+    {
+      key: "wallet_gas_consumption",
+      label: "Wallet gas consumption",
+      type: "bigint",
+      format: "gram",
+    },
+    {
+      key: "minter_min_tons_for_storage",
+      label: "Minter min GRAM for storage",
+      type: "bigint",
+      format: "gram",
+    },
+    {
+      key: "discover_gas_consumption",
+      label: "Discover gas consumption",
+      type: "bigint",
+      format: "gram",
+    },
   ]
 
   const values: NetworkConfigValue[] = []
   for (const field of fields) {
     const fieldValue = prices[field.key]
     if (typeof fieldValue !== "bigint") return undefined
-    values.push({label: field.label, value: fieldValue})
+    values.push(createNetworkConfigValue(field.label, fieldValue, field.format))
   }
   return values
 }
@@ -1203,6 +1307,7 @@ function humanizeFieldName(value: string): string {
     mc: "MC",
     smc: "SMC",
     ton: "TON",
+    tot: "total",
     vm: "VM",
   }
   const readable = words.map(word => acronyms[word.toLowerCase()] ?? word.toLowerCase())

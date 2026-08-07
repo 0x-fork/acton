@@ -1,6 +1,10 @@
 import type {HTMLAttributes, ReactNode} from "react"
 
 import {DAY_SECONDS} from "../../lib/time"
+import {CopyInlineAction} from "../InlineActions/InlineActions"
+import {Tooltip, type TooltipPlacement} from "../Tooltip"
+
+import styles from "./Duration.module.css"
 
 export type DurationUnit = "nanoseconds" | "milliseconds" | "seconds"
 export type DurationDisplay =
@@ -32,6 +36,8 @@ export interface DurationProps
   extends Omit<HTMLAttributes<HTMLSpanElement>, "children">,
     DurationFormatOptions {
   readonly fallback?: ReactNode
+  readonly tooltip?: boolean
+  readonly tooltipPlacement?: TooltipPlacement
   readonly value: number | null | undefined
 }
 
@@ -60,13 +66,73 @@ export function Duration({
   maxParts,
   sign,
   unit,
+  tooltip = true,
+  tooltipPlacement = "top",
+  title,
+  className,
+  tabIndex,
   ...props
 }: DurationProps) {
   if (!isDurationValue(value)) return fallback
 
-  return (
-    <span data-visual-dynamic="duration" data-visual-placeholder="<duration>" {...props}>
+  const duration = (
+    <span
+      data-visual-dynamic="duration"
+      data-visual-placeholder="<duration>"
+      {...props}
+      className={
+        [className, tooltip ? styles.trigger : undefined].filter(Boolean).join(" ") || undefined
+      }
+      tabIndex={tooltip ? (tabIndex ?? 0) : tabIndex}
+    >
       {formatDuration(value, {display, locale, maxParts, sign, unit})}
+    </span>
+  )
+
+  return tooltip ? (
+    <Tooltip
+      content={<DurationTooltip heading={title} unit={unit} value={value} />}
+      placement={tooltipPlacement}
+      width="wide"
+    >
+      {duration}
+    </Tooltip>
+  ) : (
+    duration
+  )
+}
+
+function DurationTooltip({
+  heading,
+  unit,
+  value,
+}: {
+  readonly heading?: string
+  readonly unit?: DurationUnit
+  readonly value: number
+}) {
+  const rawValue = String(value)
+  const resolvedUnit = unit ?? "seconds"
+
+  return (
+    <span className={styles.tooltip}>
+      {heading ? <strong>{heading}</strong> : undefined}
+      <span className={styles.tooltipRow}>
+        <span>Raw value</span>
+        <span className={styles.tooltipCopyValue}>
+          <code>{rawValue}</code>
+          <CopyInlineAction
+            copiedLabel="Raw value copied"
+            label="Copy raw value"
+            size="compact"
+            value={rawValue}
+          />
+        </span>
+      </span>
+      <span className={styles.tooltipRow}>
+        <span>Unit</span>
+        <span>{resolvedUnit}</span>
+      </span>
     </span>
   )
 }

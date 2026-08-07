@@ -5,10 +5,12 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
   "address": "-1:5555555555555555555555555555555555555555555555555555555555555555",
   "blockCreateFees": [
     {
+      "format": "gram",
       "label": "Masterchain block fee",
       "value": 1700000000n,
     },
     {
+      "format": "gram",
       "label": "Basechain block fee",
       "value": 1000000000n,
     },
@@ -17,14 +19,17 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
     {
       "children": [
         {
+          "format": "bytes",
           "label": "Underload",
           "value": 15,
         },
         {
+          "format": "bytes",
           "label": "Soft limit",
           "value": 16,
         },
         {
+          "format": "bytes",
           "label": "Hard limit",
           "value": 17,
         },
@@ -95,14 +100,17 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
   ],
   "complaintPricing": [
     {
+      "format": "gram",
       "label": "Deposit",
       "value": 1000000000n,
     },
     {
+      "format": "gram",
       "label": "Bit price",
       "value": 1n,
     },
     {
+      "format": "gram",
       "label": "Cell price",
       "value": 500n,
     },
@@ -114,11 +122,11 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
         {
           "children": [
             {
-              "label": "Min tot rounds",
+              "label": "Min total rounds",
               "value": 2,
             },
             {
-              "label": "Max tot rounds",
+              "label": "Max total rounds",
               "value": 6,
             },
             {
@@ -130,18 +138,22 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
               "value": 5,
             },
             {
+              "format": "duration",
               "label": "Min store sec",
               "value": 1000000,
             },
             {
+              "format": "duration",
               "label": "Max store sec",
               "value": 10000000,
             },
             {
+              "format": "gram",
               "label": "Bit price",
               "value": 1,
             },
             {
+              "format": "gram",
               "label": "Cell price",
               "value": 500,
             },
@@ -156,11 +168,11 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
         {
           "children": [
             {
-              "label": "Min tot rounds",
+              "label": "Min total rounds",
               "value": 4,
             },
             {
-              "label": "Max tot rounds",
+              "label": "Max total rounds",
               "value": 7,
             },
             {
@@ -172,18 +184,22 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
               "value": 5,
             },
             {
+              "format": "duration",
               "label": "Min store sec",
               "value": 5000000,
             },
             {
+              "format": "duration",
               "label": "Max store sec",
               "value": 20000000,
             },
             {
+              "format": "gram",
               "label": "Bit price",
               "value": 2,
             },
             {
+              "format": "gram",
               "label": "Cell price",
               "value": 1000,
             },
@@ -208,10 +224,12 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
       "value": 4,
     },
     {
+      "format": "duration-ms",
       "label": "Next candidate delay ms",
       "value": 5,
     },
     {
+      "format": "duration-ms",
       "label": "Consensus timeout ms",
       "value": 6,
     },
@@ -228,10 +246,12 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
       "value": 9,
     },
     {
+      "format": "bytes",
       "label": "Max block bytes",
       "value": 10,
     },
     {
+      "format": "bytes",
       "label": "Max collated bytes",
       "value": 11,
     },
@@ -264,18 +284,22 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
   },
   "electionTiming": [
     {
+      "format": "duration",
       "label": "Validators elected for",
       "value": 65536,
     },
     {
+      "format": "duration",
       "label": "Elections start before",
       "value": 32768,
     },
     {
+      "format": "duration",
       "label": "Elections end before",
       "value": 8192,
     },
     {
+      "format": "duration",
       "label": "Stake held for",
       "value": 32768,
     },
@@ -297,14 +321,17 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
   ],
   "forwardPrices": [
     {
+      "format": "gram",
       "label": "Lump price",
       "value": 30n,
     },
     {
+      "format": "gram-per-65536",
       "label": "Bit price",
       "value": 31n,
     },
     {
+      "format": "gram-per-65536",
       "label": "Cell price",
       "value": 32n,
     },
@@ -380,26 +407,32 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
     ],
     "prices": [
       {
+        "format": "gram",
         "label": "Bridge burn fee",
         "value": 1n,
       },
       {
+        "format": "gram",
         "label": "Bridge mint fee",
         "value": 2n,
       },
       {
-        "label": "Wallet min tons for storage",
+        "format": "gram",
+        "label": "Wallet min GRAM for storage",
         "value": 3n,
       },
       {
+        "format": "gram",
         "label": "Wallet gas consumption",
         "value": 4n,
       },
       {
-        "label": "Minter min tons for storage",
+        "format": "gram",
+        "label": "Minter min GRAM for storage",
         "value": 5n,
       },
       {
+        "format": "gram",
         "label": "Discover gas consumption",
         "value": 6n,
       },
@@ -414,14 +447,17 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
     {
       "children": [
         {
+          "format": "bytes",
           "label": "Underload",
           "value": 1,
         },
         {
+          "format": "bytes",
           "label": "Soft limit",
           "value": 2,
         },
         {
+          "format": "bytes",
           "label": "Hard limit",
           "value": 3,
         },
@@ -482,6 +518,7 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
     {
       "children": [
         {
+          "format": "bytes",
           "label": "Max bytes",
           "value": 13,
         },
@@ -495,14 +532,17 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
   ],
   "masterchainForwardPrices": [
     {
+      "format": "gram",
       "label": "Lump price",
       "value": 24n,
     },
     {
+      "format": "gram-per-65536",
       "label": "Bit price",
       "value": 25n,
     },
     {
+      "format": "gram-per-65536",
       "label": "Cell price",
       "value": 26n,
     },
@@ -521,6 +561,7 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
   ],
   "masterchainGasPrices": [
     {
+      "format": "gram",
       "label": "Gas price",
       "value": 1n,
     },
@@ -537,10 +578,12 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
       "value": 4n,
     },
     {
+      "format": "gram",
       "label": "Freeze due limit",
       "value": 5n,
     },
     {
+      "format": "gram",
       "label": "Delete due limit",
       "value": 6n,
     },
@@ -651,14 +694,17 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
   ],
   "stakeLimits": [
     {
+      "format": "gram",
       "label": "Min stake",
       "value": 300000000000000n,
     },
     {
+      "format": "gram",
       "label": "Max stake",
       "value": 10000000000000000n,
     },
     {
+      "format": "gram",
       "label": "Min total stake",
       "value": 75000000000000n,
     },
@@ -671,52 +717,62 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
     {
       "children": [
         {
+          "format": "date",
           "label": "Utime since",
           "value": 0,
         },
         {
+          "format": "gram",
           "label": "Bit price ps",
           "value": 1n,
         },
         {
+          "format": "gram",
           "label": "Cell price ps",
           "value": 500n,
         },
         {
+          "format": "gram",
           "label": "MC bit price ps",
           "value": 1000n,
         },
         {
+          "format": "gram",
           "label": "MC cell price ps",
           "value": 500000n,
         },
       ],
-      "label": "Storage prices from 0",
+      "label": "Initial storage prices",
     },
     {
       "children": [
         {
+          "format": "date",
           "label": "Utime since",
           "value": 1777500000,
         },
         {
+          "format": "gram",
           "label": "Bit price ps",
           "value": 0n,
         },
         {
+          "format": "gram",
           "label": "Cell price ps",
           "value": 135n,
         },
         {
+          "format": "gram",
           "label": "MC bit price ps",
           "value": 1000n,
         },
         {
+          "format": "gram",
           "label": "MC cell price ps",
           "value": 500000n,
         },
       ],
-      "label": "Storage prices from 1,777,500,000",
+      "label": "Storage prices from Apr 29, 2026",
     },
   ],
   "suspendedAddresses": {
@@ -764,6 +820,7 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
   },
   "workchainGasPrices": [
     {
+      "format": "gram",
       "label": "Gas price",
       "value": 7n,
     },
@@ -784,10 +841,12 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
       "value": 11n,
     },
     {
+      "format": "gram",
       "label": "Freeze due limit",
       "value": 12n,
     },
     {
+      "format": "gram",
       "label": "Delete due limit",
       "value": 13n,
     },
