@@ -1325,6 +1325,7 @@ const BlockSummaryTable: FC<{
   const genUtime = blockUnixTime(block)
   const workchainName =
     block.workchain === -1 ? "Masterchain" : block.workchain === 0 ? "Basechain" : undefined
+  const shardName = block.shard === MASTERCHAIN_SHARD ? "root shard" : undefined
   const globalIdName =
     block.global_id === -239 ? "Mainnet" : block.global_id === -3 ? "Testnet" : undefined
   const hasGenSoftware =
@@ -1347,7 +1348,21 @@ const BlockSummaryTable: FC<{
             </>
           }
         />
-        <BlockDetailItem label="Shard" value={block.shard} mono />
+        <BlockDetailItem
+          label="Shard"
+          value={
+            <>
+              {block.shard}
+              {shardName ? (
+                <>
+                  {" "}
+                  <span className={styles.blockDetailSecondaryValue}>({shardName})</span>
+                </>
+              ) : null}
+            </>
+          }
+          mono
+        />
         <BlockDetailItem label="Seqno" value={block.seqno.toString()} mono />
         <BlockDetailItem
           label="Global ID"
