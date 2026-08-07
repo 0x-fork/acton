@@ -1,6 +1,7 @@
 import {Cell} from "@ton/core"
 
 import {addressKey, type ExtendedContractABI} from "./compilerAbi"
+import {parseNetworkConfig, type NetworkConfig} from "./config"
 import {
   parseSuspendedAccountsConfig,
   readSuspendedAccountsConfigCache,
@@ -533,6 +534,16 @@ export class TonClient {
     const config = parseSuspendedAccountsConfig(response.config.bytes)
     writeSuspendedAccountsConfigCache(this.v2BaseUrl, config)
     return config
+  }
+
+  async getNetworkConfig(seqno?: number): Promise<NetworkConfig> {
+    const url = this.buildUrl(this.v2BaseUrl, "/getConfigAll")
+    if (seqno !== undefined) {
+      url.searchParams.append("seqno", String(seqno))
+    }
+
+    const response = await this.request<V2ConfigInfo>(url, "Failed to fetch network configuration")
+    return parseNetworkConfig(response.config.bytes)
   }
 
   async resolveDnsWalletAddress(domain: string): Promise<string | undefined> {

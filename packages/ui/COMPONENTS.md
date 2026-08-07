@@ -1864,7 +1864,9 @@ loading rows.
 ```
 
 - `DataTable`: outer frame with optional `title`, `meta`, `actions`, and
-  `minWidth`.
+  `minWidth`. Use `variant="default"` for a standalone table, `variant="nested"`
+  for a compact framed table inside another surface, and
+  `variant="embedded"` for a borderless compact table inside another surface.
 - `DataTableTable`: semantic table element with `layout="fixed"` by default.
 - `DataTableHeaderCell`: header cell with optional `align`, `columnWidth`, and
   `truncate`.

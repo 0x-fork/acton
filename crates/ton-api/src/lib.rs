@@ -1212,6 +1212,16 @@ mod tests {
 
         assert_eq!(cached.gen_utime, Some(snapshot.gen_utime));
         assert_eq!(cached.config.repr_hash(), snapshot.config.repr_hash());
+        let latest_cached = MasterchainSnapshotCacheEntry::new(
+            &network,
+            "http://127.0.0.1:8080/api/v2".to_owned(),
+            &snapshot,
+            None,
+            100,
+        )
+        .into_cached_snapshot()
+        .expect("decode latest snapshot cache");
+        assert_eq!(latest_cached.gen_utime, None);
         assert!(
             read_masterchain_snapshot_cache(
                 &path,
