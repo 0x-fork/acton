@@ -1,3 +1,4 @@
+import {version as bunVersion} from "bun"
 import {describe, expect, setSystemTime, test} from "bun:test"
 import {createElement} from "react"
 import {renderToStaticMarkup} from "react-dom/server"
@@ -14,6 +15,15 @@ import {
 
 const NOW = Date.UTC(2026, 7, 5, 12, 0)
 const DATE = Date.UTC(2026, 7, 5, 10, 30, 15)
+
+// Bun 1.3.14 uses "at" on macOS; the issue reports this fixed in Bun 1.4.0.
+// https://github.com/oven-sh/bun/issues/6056
+const DATE_TIME_SEPARATOR =
+  bunVersion === "1.3.14" && navigator.platform.startsWith("Mac") ? " at " : ", "
+
+function expectedDateTime(date: string, time: string): string {
+  return `${date}${DATE_TIME_SEPARATOR}${time}`
+}
 
 describe("date and time", () => {
   test("formats shared date and time presets", () => {
@@ -75,24 +85,22 @@ describe("date and time", () => {
         timeZone: "UTC",
       }),
       invalid: formatDateTime("not-a-date"),
-    }).toMatchInlineSnapshot(`
-      {
-        "compact": "5 Aug, 10:30",
-        "date": "Aug 5, 2026",
-        "dateDayMonth": "05 Aug 2026",
-        "dateLong": "August 5, 2026",
-        "dateNumeric": "05.08.2026",
-        "dateTime": "Aug 5, 2026 at 10:30",
-        "dateTimeDayMonth": "05 Aug 2026, 10:30",
-        "dateTimeDayMonthShort": "05 Aug, 10:30",
-        "dateTimeNumeric": "05.08.2026, 10:30",
-        "dateTimeNumericSeconds": "05.08.2026, 10:30:15",
-        "dateTimeSeconds": "Aug 5, 2026 at 10:30:15",
-        "invalid": "—",
-        "smartToday": "10:30",
-        "time": "10:30",
-      }
-    `)
+    }).toEqual({
+      compact: "5 Aug, 10:30",
+      date: "Aug 5, 2026",
+      dateDayMonth: "05 Aug 2026",
+      dateLong: "August 5, 2026",
+      dateNumeric: "05.08.2026",
+      dateTime: expectedDateTime("Aug 5, 2026", "10:30"),
+      dateTimeDayMonth: "05 Aug 2026, 10:30",
+      dateTimeDayMonthShort: "05 Aug, 10:30",
+      dateTimeNumeric: "05.08.2026, 10:30",
+      dateTimeNumericSeconds: "05.08.2026, 10:30:15",
+      dateTimeSeconds: expectedDateTime("Aug 5, 2026", "10:30:15"),
+      invalid: "—",
+      smartToday: "10:30",
+      time: "10:30",
+    })
   })
 
   test("always uses the 24-hour clock", () => {
@@ -102,7 +110,7 @@ describe("date and time", () => {
         locale: "en-US",
         timeZone: "UTC",
       }),
-    ).toMatchInlineSnapshot(`"Aug 1, 2026 at 22:40"`)
+    ).toBe(expectedDateTime("Aug 1, 2026", "22:40"))
   })
 
   test("keeps numeric dates stable across locales", () => {
@@ -251,8 +259,8 @@ describe("date and time", () => {
           tooltip: false,
         }),
       ),
-    ).toMatchInlineSnapshot(
-      `"<time data-visual-dynamic="time" data-visual-placeholder="&lt;time&gt;" dateTime="2026-08-05T10:30:15.000Z">Aug 5, 2026 at 10:30</time>"`,
+    ).toBe(
+      `<time data-visual-dynamic="time" data-visual-placeholder="&lt;time&gt;" dateTime="2026-08-05T10:30:15.000Z">${expectedDateTime("Aug 5, 2026", "10:30")}</time>`,
     )
     expect(
       renderToStaticMarkup(
