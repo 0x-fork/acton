@@ -45,6 +45,11 @@ Query blockchain account state through a configured network endpoint.
 verifier ABI metadata when a match is found
 .RE
 .sp
+For one\-off inspection, \fBrpc info\fR and \fBrpc call\fR also accept \fB\-\-abi\fR\&. The path
+can point to compiler ABI JSON emitted by \fBacton build\fR or \fBacton compile\fR, or
+to a \fB\&.tolk\fR interface file such as \fBcontract.types.tolk\fR\&. An explicit ABI has
+priority over code\-hash matching.
+.sp
 The command works without a project manifest for raw remote inspection.
 .sp
 When Acton can resolve a local project and finds a contract with the same
@@ -65,6 +70,13 @@ Show information about a single account.
 \fIaddress\fR
 .RS 4
 Contract address in friendly or raw format.
+.RE
+.sp
+\fB\-\-abi\fR \fIpath\fR
+.RS 4
+Use compiler ABI JSON or a Tolk ABI source instead of automatic ABI matching.
+Tolk sources are compiled with entrypoints disabled, so standalone
+\fB*.types.tolk\fR interface files are accepted.
 .RE
 .sp
 \fB\-\-net\fR \fInetwork\fR
@@ -120,6 +132,13 @@ Get\-method name or numeric TVM method id.
 Arguments to pass to the get\-method.
 .RE
 .sp
+\fB\-\-abi\fR \fIpath\fR
+.RS 4
+Use compiler ABI JSON or a Tolk ABI source instead of automatic ABI matching.
+The explicit ABI controls method lookup, argument parsing, result decoding,
+field comments, and custom exit\-code descriptions.
+.RE
+.sp
 \fB\-\-net\fR \fInetwork\fR
 .RS 4
 Network to query.
@@ -148,8 +167,21 @@ field value.
 Print the raw TonCenter stack without ABI decoding.
 .RE
 .SS "ABI Arguments"
-When Acton finds local, bundled, or verifier ABI metadata for the remote
-contract, get\-method arguments are parsed against that ABI.
+When \fB\-\-abi\fR is provided, Acton loads that file before making the RPC request
+and uses it without comparing the remote code hash. Otherwise, Acton searches
+local, bundled, and verifier ABI metadata for the remote contract. Get\-method
+arguments are parsed against the selected ABI.
+.sp
+Accepted explicit ABI formats are:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'compiler ABI JSON, including files emitted under \fBbuild/abi\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\&.tolk\fR source or interface files, including \fB*.types.tolk\fR; these are
+compiled with no contract entrypoint requirement
+.RE
 .sp
 The \fImethod\fR argument can be either an ABI get\-method name or a numeric TVM
 method id. When the numeric id is present in the ABI, Acton still uses ABI
@@ -360,32 +392,36 @@ or the verifier API.
 Acton attempts to:
 .sp
 .RS 4
-\h'-04' 1.\h'+01'fetch the remote account code cell
+\h'-04' 1.\h'+01'use \fB\-\-abi\fR directly when it is provided to \fBrpc info\fR or \fBrpc call\fR
 .RE
 .sp
 .RS 4
-\h'-04' 2.\h'+01'compute its \fBcode_hash\fR
+\h'-04' 2.\h'+01'otherwise fetch the remote account code cell
 .RE
 .sp
 .RS 4
-\h'-04' 3.\h'+01'compare that hash with locally configured contracts
+\h'-04' 3.\h'+01'compute its \fBcode_hash\fR
 .RE
 .sp
 .RS 4
-\h'-04' 4.\h'+01'fall back to the bundled ABI catalog when there is no local ABI
+\h'-04' 4.\h'+01'compare that hash with locally configured contracts
 .RE
 .sp
 .RS 4
-\h'-04' 5.\h'+01'query the verifier API when no local or bundled ABI matches
+\h'-04' 5.\h'+01'fall back to the bundled ABI catalog when there is no local ABI
 .RE
 .sp
 .RS 4
-\h'-04' 6.\h'+01'cache successful verifier responses for 24 hours and use stale entries
+\h'-04' 6.\h'+01'query the verifier API when no local or bundled ABI matches
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'cache successful verifier responses for 24 hours and use stale entries
 during verifier outages
 .RE
 .sp
 .RS 4
-\h'-04' 7.\h'+01'decode storage and get\-method results with the matched compiler ABI
+\h'-04' 8.\h'+01'decode storage and get\-method results with the selected compiler ABI
 .RE
 .sp
 This means decoding is robust for contracts you control in the current Acton
@@ -402,8 +438,9 @@ Acton sends raw stack arguments instead and prints the raw result stack.
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB1\fR: The address was invalid, the network could not be resolved, the remote
-request failed, raw or ABI argument parsing failed, a named get\-method was not
-found in ABI metadata, or the get\-method returned a non\-zero exit code.
+request failed, an explicit ABI could not be read, parsed, or compiled, raw
+or ABI argument parsing failed, a named get\-method was not found in ABI
+metadata, or the get\-method returned a non\-zero exit code.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -438,7 +475,27 @@ acton rpc info EQC... \-\-net localnet
 .RE
 .sp
 .RS 4
-\h'-04' 4.\h'+01'Call a get\-method with ABI\-parsed arguments:
+\h'-04' 4.\h'+01'Decode account storage with an explicit Tolk interface:
+.sp
+.RS 4
+.nf
+acton rpc info EQC... \-\-abi contracts/Counter.types.tolk \-\-net mainnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Call a get\-method with an explicit compiler ABI JSON file:
+.sp
+.RS 4
+.nf
+acton rpc call EQC... get_wallet_data \-\-abi build/abi/counter.json \-\-net mainnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Call a get\-method with automatically matched ABI metadata:
 .sp
 .RS 4
 .nf
@@ -448,7 +505,7 @@ acton rpc call EQC... get_wallet_data \-\-net mainnet
 .RE
 .sp
 .RS 4
-\h'-04' 5.\h'+01'Call a get\-method by numeric TVM method id:
+\h'-04' 7.\h'+01'Call a get\-method by numeric TVM method id:
 .sp
 .RS 4
 .nf
@@ -458,7 +515,7 @@ acton rpc call EQC... 85143 \-\-net mainnet
 .RE
 .sp
 .RS 4
-\h'-04' 6.\h'+01'Call a get\-method without ABI metadata by passing raw stack arguments:
+\h'-04' 8.\h'+01'Call a get\-method without ABI metadata by passing raw stack arguments:
 .sp
 .RS 4
 .nf
@@ -468,7 +525,7 @@ acton rpc call EQC... 85143 0xff true cell:B5EE9C... \-\-net mainnet
 .RE
 .sp
 .RS 4
-\h'-04' 7.\h'+01'Pass \fBaddr_none\fR to an \fBany_address\fR get\-method argument:
+\h'-04' 9.\h'+01'Pass \fBaddr_none\fR to an \fBany_address\fR get\-method argument:
 .sp
 .RS 4
 .nf
@@ -478,27 +535,27 @@ acton rpc call EQC... accepts_any_address addr_none \-\-net localnet
 .RE
 .sp
 .RS 4
-\h'-04' 8.\h'+01'Use a custom network defined in another manifest:
+\h'-04' 10.\h'+01'Use a custom network defined in another manifest:
+.RE
 .sp
 .RS 4
 .nf
 acton \-\-manifest\-path ../incident/Acton.toml rpc info EQC... \-\-net custom:staging
 .fi
 .RE
-.RE
 .sp
 .RS 4
-\h'-04' 9.\h'+01'Print the latest mainnet masterchain block JSON:
+\h'-04' 11.\h'+01'Print the latest mainnet masterchain block JSON:
+.RE
 .sp
 .RS 4
 .nf
 acton rpc block \-\-net mainnet
 .fi
 .RE
-.RE
 .sp
 .RS 4
-\h'-04' 10.\h'+01'Print the latest mainnet masterchain block number:
+\h'-04' 12.\h'+01'Print the latest mainnet masterchain block number:
 .RE
 .sp
 .RS 4
@@ -508,7 +565,7 @@ acton rpc block\-number \-\-net mainnet
 .RE
 .sp
 .RS 4
-\h'-04' 11.\h'+01'Print a transaction trace from localnet:
+\h'-04' 13.\h'+01'Print a transaction trace from localnet:
 .RE
 .sp
 .RS 4

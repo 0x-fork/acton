@@ -10,7 +10,8 @@ use acton_debug::{PrettyAddressFormat, PrettyRenderOptions, render_unpacked_valu
 use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use log::warn;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
@@ -32,6 +33,12 @@ pub enum RpcCommand {
     Info {
         #[arg(help = "Contract address in friendly or raw format")]
         address: String,
+        #[arg(
+            long,
+            value_name = "PATH",
+            help = "Compiler ABI JSON or Tolk ABI source to use instead of automatic ABI matching"
+        )]
+        abi: Option<PathBuf>,
         #[arg(long, help = "Masterchain block seqno to query account state at")]
         block_number: Option<u64>,
         #[arg(
@@ -50,6 +57,12 @@ pub enum RpcCommand {
         address: String,
         #[arg(help = "Get-method name")]
         method: String,
+        #[arg(
+            long,
+            value_name = "PATH",
+            help = "Compiler ABI JSON or Tolk ABI source to use instead of automatic ABI matching"
+        )]
+        abi: Option<PathBuf>,
         #[arg(
             help = "Arguments to pass to the get-method",
             allow_hyphen_values = true
@@ -128,14 +141,16 @@ pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
     match command {
         RpcCommand::Info {
             address,
+            abi,
             block_number,
             net,
             json,
             raw,
-        } => info::rpc_info_cmd(&address, net, block_number, json, raw),
+        } => info::rpc_info_cmd(&address, abi.as_deref(), net, block_number, json, raw),
         RpcCommand::Call {
             address,
             method,
+            abi,
             args,
             net,
             block_number,
@@ -147,6 +162,7 @@ pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
             &method,
             &args,
             call::RpcCallOptions {
+                abi,
                 net,
                 block_number,
                 json,
@@ -222,6 +238,7 @@ pub(crate) struct ContractMatch {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ContractMatchSource {
+    Explicit,
     Local,
     Catalog,
     Verifier,
@@ -230,11 +247,62 @@ pub(crate) enum ContractMatchSource {
 impl ContractMatchSource {
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
+            Self::Explicit => "explicit",
             Self::Local => "local",
             Self::Catalog => "catalog",
             Self::Verifier => "verifier",
         }
     }
+}
+
+pub(crate) fn load_explicit_contract_match(
+    path: Option<&Path>,
+    config: &ActonConfig,
+) -> anyhow::Result<Option<ContractMatch>> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+
+    let extension = path.extension().and_then(|extension| extension.to_str());
+    let abi = if extension.is_some_and(|extension| extension.eq_ignore_ascii_case("json")) {
+        let bytes = fs::read(path)
+            .with_context(|| format!("Failed to read ABI file {}", path.display()))?;
+        serde_json::from_slice::<ContractABI>(&bytes)
+            .with_context(|| format!("Failed to parse compiler ABI JSON from {}", path.display()))?
+    } else if extension.is_some_and(|extension| extension.eq_ignore_ascii_case("tolk")) {
+        if !path.is_file() {
+            anyhow::bail!("Tolk ABI source not found: {}", path.display());
+        }
+        let compiler = tolk_compiler::Compiler::new(2)
+            .with_allow_no_entrypoint(true)
+            .with_mappings(&config.mappings());
+        match compiler.compile(path, false) {
+            tolk_compiler::CompilerResult::Success(result) => result.abi.ok_or_else(|| {
+                anyhow!(
+                    "Tolk ABI source {} did not produce compiler ABI",
+                    path.display()
+                )
+            })?,
+            tolk_compiler::CompilerResult::Error(error) => {
+                anyhow::bail!(
+                    "Failed to compile Tolk ABI source {}: {}",
+                    path.display(),
+                    error.message.trim_end()
+                );
+            }
+        }
+    } else {
+        anyhow::bail!(
+            "Unsupported ABI file {}: expected a .json or .tolk file",
+            path.display()
+        );
+    };
+
+    Ok(Some(ContractMatch {
+        contract_name: abi.contract_name.clone(),
+        abi: Some(Arc::new(abi)),
+        source: ContractMatchSource::Explicit,
+    }))
 }
 
 pub(super) fn find_local_contract_match(

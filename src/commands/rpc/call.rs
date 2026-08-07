@@ -1,7 +1,7 @@
 use super::{
     find_contract_match_for_code, format_get_method_signature, format_get_method_signature_colored,
-    format_int_address, format_std_address, load_rpc_config, pretty_address_format,
-    resolve_rpc_network,
+    format_int_address, format_std_address, load_explicit_contract_match, load_rpc_config,
+    pretty_address_format, resolve_rpc_network,
 };
 use crate::commands::abi_args::{parse_abi_parameters, parse_number, parse_raw_stack_args};
 use crate::commands::common::error_fmt;
@@ -14,6 +14,7 @@ use anyhow::{Context, anyhow};
 use log::warn;
 use num_traits::ToPrimitive;
 use std::io::{Write, stderr, stdout};
+use std::path::PathBuf;
 use std::process;
 use tolk_compiler::abi::{ABIDeclaration, ABIGetMethod, ABIStructField, ContractABI};
 use tolk_compiler::types_kernel::{TyIdx, calc_width_on_stack};
@@ -25,6 +26,7 @@ use tycho_types::cell::Cell;
 use tycho_types::models::{AnyAddr, IntAddr, StdAddr, StdAddrFormat};
 
 pub(super) struct RpcCallOptions {
+    pub(super) abi: Option<PathBuf>,
     pub(super) net: Option<String>,
     pub(super) block_number: Option<u64>,
     pub(super) json: bool,
@@ -39,6 +41,7 @@ pub(super) fn rpc_call_cmd(
     options: RpcCallOptions,
 ) -> anyhow::Result<()> {
     let RpcCallOptions {
+        abi: abi_path,
         net,
         block_number,
         json,
@@ -51,17 +54,21 @@ pub(super) fn rpc_call_cmd(
 
     let network = resolve_rpc_network(net)?;
     let config = load_rpc_config()?;
+    let explicit_contract_match = load_explicit_contract_match(abi_path.as_deref(), &config)?;
     let client = TonApiClient::new(network.clone(), config.custom_networks())?;
 
     let remote = client
         .get_account_info(block_number, &address.to_string())
         .with_context(|| format!("Failed to fetch account info for {address} from {network}"))?;
     let code = TonApiClient::decode_optional_cell(&remote.code)?;
-    let contract_match = code
-        .as_ref()
-        .map(|code| find_contract_match_for_code(code, &config))
-        .transpose()?
-        .flatten();
+    let contract_match = match explicit_contract_match {
+        Some(contract_match) => Some(contract_match),
+        None => code
+            .as_ref()
+            .map(|code| find_contract_match_for_code(code, &config))
+            .transpose()?
+            .flatten(),
+    };
 
     let abi = contract_match
         .as_ref()

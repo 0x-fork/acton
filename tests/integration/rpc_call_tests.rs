@@ -427,6 +427,57 @@ fn test_rpc_call_uses_verifier_abi_and_cache() {
 }
 
 #[test]
+fn test_rpc_call_uses_explicit_json_abi() {
+    let (project, log_dir, code_boc64) = build_rpc_call_project(
+        "rpc-call-explicit-json-abi-source",
+        RPC_CALL_COUNTER_CONTRACT,
+    );
+    let abi = fs::read_to_string(project.path().join("build/abi/counter.json"))
+        .expect("ABI artifact must exist");
+    let mut abi: JsonValue = serde_json::from_str(&abi).expect("ABI artifact must be valid JSON");
+    abi["contract_name"] = JsonValue::String("ExplicitJsonCounter".to_owned());
+    fs::write(
+        project.path().join("counter.abi.json"),
+        serde_json::to_vec_pretty(&abi).expect("explicit ABI must serialize"),
+    )
+    .expect("explicit ABI must be writable");
+    let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_account_info_with_code_ok_response(
+            1_234_000_000,
+            &code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        ),
+        toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(42.into())], 0),
+    ]);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("currentCounter")
+        .arg("--abi")
+        .arg("counter.abi.json")
+        .arg("--net")
+        .arg("custom:mock")
+        .arg("--json")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_explicit_json_abi.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
+}
+
+#[test]
 fn test_rpc_call_runs_counter_methods_from_localnet() {
     let (project, node, log_dir, counter_address) =
         deploy_counter_to_localnet("rpc-call-localnet-counter-methods");

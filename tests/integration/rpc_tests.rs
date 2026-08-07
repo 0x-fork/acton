@@ -186,6 +186,21 @@ contract Precompiled {
     storage: Storage
 }
 ";
+const EXPLICIT_COUNTER_TYPES: &str = r"
+struct Storage {
+    id: uint32
+    owner: address
+    counter: uint32
+}
+
+get fun currentCounter(): int {
+    return 0;
+}
+
+contract ExplicitCounter {
+    storage: Storage
+}
+";
 #[allow(clippy::significant_drop_tightening)]
 #[test]
 fn test_rpc_info_prints_remote_account_without_local_abi_match() {
@@ -238,6 +253,67 @@ fn test_rpc_info_prints_remote_account_without_local_abi_match() {
         Some("custom-mock-api-key"),
         "rpc info should send TonCenter API keys for custom networks from MOCK_API_KEY",
     );
+}
+
+#[test]
+fn test_rpc_info_uses_explicit_tolk_abi() {
+    let project = ProjectBuilder::new("rpc-info-explicit-tolk-abi")
+        .raw_file("interfaces/counter.types.tolk", EXPLICIT_COUNTER_TYPES)
+        .build();
+    let log_dir = prepare_log_dir(project.path());
+    let (mock_url, mock_handle, _) =
+        spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_ok_response(
+            1_234_000_000,
+            &test_cell_boc64(0xdead_beef),
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        )]);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("info")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("--abi")
+        .arg("interfaces/counter.types.tolk")
+        .arg("--net")
+        .arg("custom:mock")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_info_explicit_tolk_abi.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
+}
+
+#[test]
+fn test_rpc_info_rejects_invalid_explicit_json_abi() {
+    let project = ProjectBuilder::new("rpc-info-invalid-explicit-json-abi")
+        .raw_file("interfaces/broken.abi.json", "{")
+        .build();
+    let log_dir = prepare_log_dir(project.path());
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("info")
+        .arg(RAW_INFO_ADDRESS)
+        .arg("--abi")
+        .arg("interfaces/broken.abi.json")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_info_invalid_explicit_json_abi.stderr.txt",
+        );
 }
 
 #[allow(clippy::significant_drop_tightening)]
