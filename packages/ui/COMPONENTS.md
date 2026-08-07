@@ -616,6 +616,9 @@ owns shortening, copy feedback, focus behavior, and the compact chip visual.
 - `copied`: optional external copied state; the component also owns local feedback.
 - `onCopyAddress`: optional application copy handler. Native clipboard copying is
   used when omitted.
+- `tooltipVariants`: optional caller-owned formatted variants. The detailed
+  tooltip shows each variant followed by the original raw address. Each value
+  has its own copy action.
 
 ### States To Review Visually
 
@@ -625,6 +628,7 @@ owns shortening, copy feedback, focus behavior, and the compact chip visual.
 - Clickable and read-only
 - Copy action on the left and right
 - Highlighted address
+- Detailed formatted and raw address tooltip
 - Keyboard focus and copied feedback
 
 ### Agent Guidance
