@@ -1581,10 +1581,11 @@ pub enum LibraryCommand {
 
 #[derive(Subcommand, Clone)]
 pub enum DocCommand {
-    #[command(about = "Print compiler ABI for a local or bundled contract")]
+    #[command(about = "Print compiler ABI for a contract name or verifier code hash")]
     Abi {
         #[arg(
-            help = "Contract name, local contract id, or bundled catalog name",
+            value_name = "CONTRACT_OR_CODE_HASH",
+            help = "Local or bundled contract name, local contract id, or verifier code hash",
             add = ArgValueCompleter::new(complete_contracts)
         )]
         contract: String,

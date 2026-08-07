@@ -289,7 +289,7 @@ pub(crate) fn find_fallback_contract_match(code_hash: &HashBytes) -> Option<Cont
         });
     }
 
-    match verifier::find_abi(&code_hash) {
+    match find_verifier_abi_by_code_hash(&code_hash) {
         Ok(Some(abi)) => Some(ContractMatch {
             contract_name: abi.contract_name.clone(),
             abi: Some(abi),
@@ -301,6 +301,12 @@ pub(crate) fn find_fallback_contract_match(code_hash: &HashBytes) -> Option<Cont
             None
         }
     }
+}
+
+pub(crate) fn find_verifier_abi_by_code_hash(
+    code_hash: &str,
+) -> anyhow::Result<Option<Arc<ContractABI>>> {
+    verifier::find_abi(code_hash)
 }
 
 pub(crate) fn find_local_contract_by_config_name(

@@ -5,6 +5,7 @@ use super::{
     resolve_rpc_network,
 };
 use crate::commands::common::{error_fmt, format_nanograms};
+use crate::context::code_lookup_hash;
 use acton_config::color::OwoColorize;
 use anyhow::{Context, anyhow};
 use log::warn;
@@ -68,10 +69,15 @@ pub(super) fn rpc_info_cmd(
         Some(_) => "local_code_hash",
         _ => "none",
     };
-    let doc_abi_command = matched_contract
-        .as_ref()
-        .filter(|contract| has_abi && contract.source != ContractMatchSource::Verifier)
-        .map(|_| format_doc_abi_command(&contract_name_plain));
+    let doc_abi_command = matched_contract.as_ref().and_then(|contract| {
+        contract.abi.as_ref()?;
+        let query = if contract.source == ContractMatchSource::Verifier {
+            format!("0x{}", code_lookup_hash(code.as_ref()?))
+        } else {
+            contract.contract_name.clone()
+        };
+        Some(format_doc_abi_command(&query))
+    });
 
     let decoded_storage = match (&data, abi) {
         (Some(data), Some(abi))
