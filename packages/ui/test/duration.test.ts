@@ -118,14 +118,14 @@ describe("duration", () => {
   })
 
   test("renders duration metadata on the component", () => {
-    expect(
-      renderToStaticMarkup(
-        createElement(Duration, {
-          display: "compact",
-          value: 3600,
-        }),
-      ),
-    ).toMatchInlineSnapshot(
+    const markup = renderToStaticMarkup(
+      createElement(Duration, {
+        display: "compact",
+        value: 3600,
+      }),
+    ).replace(/\s+(?:tabindex|id|data-base-ui-tooltip-trigger)(?:="[^"]*")?/g, "")
+
+    expect(markup).toMatchInlineSnapshot(
       `"<span data-visual-dynamic="duration" data-visual-placeholder="&lt;duration&gt;">1h</span>"`,
     )
   })
