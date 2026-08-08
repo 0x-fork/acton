@@ -320,7 +320,7 @@ export function parseNetworkConfig(rawBoc: string): NetworkConfig {
   const rootCell = Cell.fromBase64(rawBoc)
   const {config, configAddress} = readConfigState(rootCell)
   const parameters = [...config]
-    .map(([unsignedId, cell]) => parseConfigParameter(toSignedConfigId(unsignedId), cell))
+    .map(([unsignedId, cell]) => parseConfigParameter(toSignedInt32(unsignedId), cell))
     .sort(compareConfigParameters)
 
   return {
@@ -508,7 +508,7 @@ function parseExtraCurrencies(value: unknown): readonly ExtraCurrency[] | undefi
   if (!(dictionary instanceof Dictionary)) return undefined
 
   return [...dictionary]
-    .map(([id, amount]) => ({id, amount}))
+    .map(([id, amount]) => ({id: toSignedInt32(id), amount}))
     .sort((left, right) => left.id - right.id)
 }
 
@@ -922,7 +922,7 @@ function parseParameterIds(value: unknown, fieldName: string): readonly number[]
   const dictionary = (value as Record<string, unknown>)[fieldName]
   if (!(dictionary instanceof Dictionary)) return undefined
 
-  return [...dictionary].map(([id]) => toSignedConfigId(id)).sort(compareConfigIds)
+  return [...dictionary].map(([id]) => toSignedInt32(id)).sort(compareConfigIds)
 }
 
 function parseFundamentalSmartContracts(
@@ -1176,7 +1176,7 @@ function parseJettonBridgePrices(value: unknown): readonly NetworkConfigValue[] 
   return values
 }
 
-function toSignedConfigId(value: number): number {
+function toSignedInt32(value: number): number {
   return value > 0x7f_ff_ff_ff ? value - 0x1_00_00_00_00 : value
 }
 
@@ -1199,7 +1199,7 @@ function fixedBigintHex(value: bigint): string | undefined {
 
 function addressFromUint288(value: bigint): string {
   const hex = value.toString(16).padStart(72, "0")
-  const workchain = toSignedConfigId(Number.parseInt(hex.slice(0, 8), 16))
+  const workchain = toSignedInt32(Number.parseInt(hex.slice(0, 8), 16))
   return `${workchain}:${hex.slice(8)}`
 }
 

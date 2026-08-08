@@ -21,6 +21,7 @@ import {
   Skeleton,
   SkeletonText,
   TechnicalValue,
+  TokenAmount,
 } from "@acton/ui"
 import {ChevronDown, ExternalLink, Link2, Search} from "lucide-react"
 import {useEffect, useMemo, useState, type FC, type ReactNode} from "react"
@@ -43,6 +44,7 @@ import {
   type ValidatorConfiguration,
   type ValidatorSetConfiguration,
 } from "../api/config"
+import {getExtraCurrencyMetadata} from "../api/extraCurrency"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {GlobalCapabilities} from "../components/GlobalCapabilities"
@@ -510,24 +512,65 @@ function BurningConfigurationValue({
 }
 
 function ExtraCurrenciesValue({currencies}: {readonly currencies: readonly ExtraCurrency[]}) {
+  const routes = useExplorerRoutePaths()
+
   if (currencies.length === 0) {
     return <div className={styles.parsedValue}>No extra currencies configured</div>
   }
 
   return (
     <ConfigValueGrid
-      items={currencies.flatMap(currency => [
-        {
-          id: `currency-${currency.id}-id`,
-          label: "Currency ID",
-          value: <NumberValue value={currency.id} />,
-        },
-        {
-          id: `currency-${currency.id}-amount`,
-          label: "Amount",
-          value: <NumberValue value={currency.amount} />,
-        },
-      ])}
+      items={currencies.map(currency => {
+        const metadata = getExtraCurrencyMetadata(currency.id)
+        const originSource = metadata.origin?.source
+        const originHref =
+          originSource?.kind === "transaction"
+            ? routes.transactionPath(originSource.hash)
+            : originSource?.url
+
+        return {
+          id: `currency-${currency.id}`,
+          label:
+            metadata.origin === undefined ? (
+              metadata.symbol
+            ) : (
+              <span className={styles.extraCurrencyLabel}>
+                {metadata.symbol}
+                <InfoPopover
+                  ariaLabel={`About extra currency ${metadata.symbol}`}
+                  contentClassName={styles.infoContent}
+                >
+                  <p>{metadata.origin.label}</p>
+                  <a href={originHref} target="_blank" rel="noreferrer">
+                    {metadata.origin.linkLabel}
+                    <ExternalLink size={13} aria-hidden="true" />
+                  </a>
+                </InfoPopover>
+              </span>
+            ),
+          wide: true,
+          children: [
+            {
+              id: `currency-${currency.id}-id`,
+              label: "Currency ID",
+              value: <NumberValue value={currency.id} />,
+            },
+            {
+              id: `currency-${currency.id}-amount`,
+              label: "Total supply",
+              value: (
+                <TokenAmount
+                  decimals={metadata.decimals}
+                  rawUnitsLabel="Raw amount"
+                  symbol={metadata.symbol}
+                  useGrouping
+                  value={currency.amount}
+                />
+              ),
+            },
+          ],
+        }
+      })}
     />
   )
 }
@@ -962,7 +1005,7 @@ function ConfigParameterIdList({ids}: {readonly ids: readonly number[]}) {
 }
 
 interface ConfigValueGridItem {
-  readonly label: string
+  readonly label: ReactNode
   readonly value?: ReactNode
   readonly children?: readonly ConfigValueGridItem[]
   readonly wide?: boolean
@@ -988,7 +1031,10 @@ function ConfigValueGrid({
             <div className={styles.configValueGridValue}>{item.value}</div>
           </div>
         ) : (
-          <div key={item.id} className={styles.configValueGridGroup}>
+          <div
+            key={item.id}
+            className={`${styles.configValueGridGroup} ${item.wide ? styles.configValueGridItemWide : ""}`}
+          >
             <span className={styles.configValueGridGroupLabel}>{item.label}</span>
             <ConfigValueGrid items={item.children} nested />
           </div>

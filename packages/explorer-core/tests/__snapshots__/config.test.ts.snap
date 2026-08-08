@@ -311,12 +311,12 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
   },
   "extraCurrencies": [
     {
-      "amount": 666666666666n,
-      "id": 239,
+      "amount": 1000000000000n,
+      "id": -17,
     },
     {
-      "amount": 1000000000000n,
-      "id": 4294967279,
+      "amount": 666666666666n,
+      "id": 239,
     },
   ],
   "forwardPrices": [

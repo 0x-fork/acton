@@ -355,6 +355,12 @@
   line-height: 16px;
 }
 
+.extraCurrencyLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .configValueGridLabel {
   color: var(--acton-color-text-subtle);
   font-size: var(--acton-font-size-xs);
