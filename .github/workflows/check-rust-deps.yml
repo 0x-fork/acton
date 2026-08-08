@@ -12,6 +12,7 @@ on:
       - "**/Cargo.toml"
       - "**/Cargo.lock"
       - "deny.toml"
+      - "!apps/**"
   push:
     branches:
       - master
@@ -22,6 +23,7 @@ on:
       - "**/Cargo.toml"
       - "**/Cargo.lock"
       - "deny.toml"
+      - "!apps/**"
   workflow_dispatch:
 
 concurrency:
