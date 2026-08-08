@@ -76,8 +76,8 @@ interface HistoryPoint {
 
 const LANGUAGE_COLORS: Readonly<Record<string, string>> = {
   func: "var(--acton-color-warning)",
-  tact: "var(--acton-color-accent)",
-  tolk: "var(--acton-color-success)",
+  tact: "var(--acton-color-success)",
+  tolk: "var(--acton-color-accent)",
 }
 const LANGUAGE_LABELS: Readonly<Record<string, string>> = {
   func: "FunC",
