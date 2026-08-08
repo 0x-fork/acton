@@ -667,12 +667,12 @@ fn parameter_signature(parameter: Parameter<'_>, source: &str, inferred: &str) -
 
 fn local_variable_signature(variable: VarDecl<'_>, source: &str, typ: &str) -> Option<String> {
     let declaration = variable.declaration()?;
-    let assignment = declaration.assignment()?;
+    let assignment = declaration.assignment();
     let Some(tolk_syntax::VarDeclPattern::VarDecl(single)) = declaration.pattern() else {
-        return Some(assignment.syntax().text(source).to_owned());
+        return assignment.map(|assignment| assignment.syntax().text(source).to_owned());
     };
     if single.syntax() != variable.syntax() {
-        return Some(assignment.syntax().text(source).to_owned());
+        return assignment.map(|assignment| assignment.syntax().text(source).to_owned());
     }
 
     let name = variable.name()?.text(source);

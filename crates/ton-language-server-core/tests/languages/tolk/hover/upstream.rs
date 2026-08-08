@@ -726,6 +726,23 @@ fn basic_31_local_mutable_variable_documentation() {
 }
 
 #[test]
+fn basic_32_uninitialized_local_variable_documentation() {
+    // Checks local variable documentation before a later assignment.
+    case_tolk_hover(
+        r"
+            fun foo() {
+                var <caret>value: (bool, int);
+                value = (true, 10);
+            }
+        ",
+        expect![[r"
+            ```tolk
+            var value: (bool, int)
+            ```"]],
+    );
+}
+
+#[test]
 fn basic_32_local_tuple_variable_documentation() {
     // Checks Local tuple variable documentation; ported from basic.test.
     case_tolk_hover(
