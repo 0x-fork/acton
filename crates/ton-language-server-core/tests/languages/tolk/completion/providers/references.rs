@@ -146,7 +146,10 @@ fn completes_struct_initializer_fields_in_all_expected_contexts() {
         ",
     )
     .labels(&["enabled", "body"])
-    .check(expect!["<none>"]);
+    .check(expect![[r#"
+        label    kind      detail              edit       text
+        body     Property  : T  of Options     2:22-2:22  body: $1$0
+        enabled  Property  : bool  of Options  2:22-2:22  enabled: $1$0"#]]);
 
     // A default parameter value supplies the short literal's struct type.
     CompletionTest::new(
@@ -1507,6 +1510,85 @@ fn completes_methods_for_all_supported_receiver_expressions() {
     .check(expect![[r#"
         label  kind    detail  edit       text
         touch  Method  (self)  3:36-3:39  touch();$0"#]]);
+}
+
+#[test]
+fn does_not_offer_statement_snippets_inside_object_literal() {
+    // A struct literal inside a call argument is an expression, not a statement position.
+    CompletionTest::new(
+        "
+            struct MessageOptions { mode: int }
+            fun createMessage(options: MessageOptions) {}
+            fun main() {
+                createMessage({
+                    <caret>
+                });
+            }
+        ",
+    )
+    .labels(&[
+        "mode", "assert", "return", "throw", "val", "var", "if", "while", "do-while", "try",
+    ])
+    .check(expect![[r#"
+        label  kind      detail                    edit     text
+        mode   Property  : int  of MessageOptions  4:8-4:8  mode: $1,$0"#]]);
+}
+
+#[test]
+fn completes_create_message_fields_in_object_literal() {
+    CompletionTest::new(
+        "
+            fun main() {
+                createMessage({
+                    <caret>
+                });
+            }
+        ",
+    )
+    .labels(&["bounce", "value", "dest", "body"])
+    .check(expect![[r#"
+        label   kind      detail                                                                              edit     text
+        body    Property  : TBody  of CreateMessageOptions                                                    2:8-2:8  body: $1,$0
+        bounce  Property  : BounceMode | OldBounceMode  of CreateMessageOptions                               2:8-2:8  bounce: $1,$0
+        dest    Property  : address | builder | (int8, uint256) | AutoDeployAddress  of CreateMessageOptions  2:8-2:8  dest: $1,$0
+        value   Property  : coins | (coins, ExtraCurrenciesMap)  of CreateMessageOptions                      2:8-2:8  value: $1,$0"#]]);
+}
+
+#[test]
+fn excludes_initialized_create_message_fields_from_generic_literal() {
+    CompletionTest::new(
+        "
+            fun main() {
+                createMessage({
+                    bounce: BounceMode.NoBounce,
+                    <caret>
+                });
+            }
+        ",
+    )
+    .labels(&["bounce", "value", "dest", "body"])
+    .check(expect![[r#"
+        label  kind      detail                                                                              edit     text
+        body   Property  : TBody  of CreateMessageOptions                                                    3:8-3:8  body: $1,$0
+        dest   Property  : address | builder | (int8, uint256) | AutoDeployAddress  of CreateMessageOptions  3:8-3:8  dest: $1,$0
+        value  Property  : coins | (coins, ExtraCurrenciesMap)  of CreateMessageOptions                      3:8-3:8  value: $1,$0"#]]);
+}
+
+#[test]
+fn completes_fields_through_a_generic_struct_alias() {
+    CompletionTest::new(
+        "
+            struct Options<T> { enabled: bool, body: T }
+            type OptionsAlias<T> = Options<T>
+            fun create<T>(options: OptionsAlias<T>) {}
+            fun main() { create({ <caret> }); }
+        ",
+    )
+    .labels(&["enabled", "body"])
+    .check(expect![[r#"
+        label    kind      detail              edit       text
+        body     Property  : T  of Options     3:22-3:22  body: $1$0
+        enabled  Property  : bool  of Options  3:22-3:22  enabled: $1$0"#]]);
 }
 
 #[test]

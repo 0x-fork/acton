@@ -378,9 +378,24 @@ impl ReferenceCompletionProvider {
         object: ObjectLit<'_>,
     ) -> Option<&'a Symbol> {
         if let Some(ty) = context.type_of_node(object) {
-            let ty = context.snapshot.type_interner.unwrap_alias(ty);
-            if let TyData::Struct { def, .. } = context.snapshot.type_interner.data(ty) {
-                return context.snapshot.project_index.resolve_symbol(*def);
+            let interner = &context.snapshot.type_interner;
+            let mut ty = interner.unwrap_alias(ty);
+            let struct_def = loop {
+                match interner.data(ty) {
+                    TyData::Struct { def, .. } => break Some(*def),
+                    TyData::GenericTypeWithTs { inner_ty, .. }
+                    | TyData::TypeAlias { inner_ty, .. } => {
+                        let next = interner.unwrap_alias(*inner_ty);
+                        if next == ty {
+                            break None;
+                        }
+                        ty = next;
+                    }
+                    _ => break None,
+                }
+            }?;
+            if let Some(symbol) = context.snapshot.project_index.resolve_symbol(struct_def) {
+                return Some(symbol);
             }
         }
 

@@ -210,13 +210,16 @@ impl TolkCompletionContext {
         let Some(mut node) = self.cursor_node() else {
             return false;
         };
+        let mut cursor_context = node;
         loop {
             if node.kind() == "expression_statement" {
-                return has_ancestor(node, "block_statement");
+                return has_ancestor(node, "block_statement")
+                    && matches!(cursor_context.kind(), "identifier");
             }
             if node.kind() == "block_statement" {
                 return false;
             }
+            cursor_context = node;
             let Some(parent) = node.parent() else {
                 return false;
             };
