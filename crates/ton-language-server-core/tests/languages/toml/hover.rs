@@ -225,31 +225,53 @@ fn documents_contract_dependency_union_branches() {
 }
 
 #[test]
-fn documents_dynamic_lint_rule_values() {
+fn documents_lint_rule_values() {
     check_hover(
         "file:///workspace/Acton.toml",
         r#"
             [lint.rules]
-            unused-imports = "<caret>warn"
+            unused-variable = "<caret>warn"
         "#,
         expect![[r#"
             ```toml
-            lint.rules.unused-imports
+            lint.rules.unused-variable
             ```
 
-            Disable the rule
+            **E001: unused-variable**
 
-            Emit warnings for the rule
+            ### What it does
+            Checks for variables and parameters that are declared but never used.
 
-            Treat the rule as an error
+            ### Why is this bad?
+            Unused variables and parameters clutter the code and can be a sign of a bug.
 
-            Lint severity level
+            ### Example
+            ```tolk twoslash
+            fun main() {
+                val x = 1;
+                //  ^ E001: variable is unused
+                println("hello");
+            }
+            ```
 
-            Global lint level for a rule
+            Use instead:
+            ```tolk
+            fun main() {
+                println("hello");
+            }
+            ```
+            Or prefix with an underscore if the variable is intentionally unused:
+            ```tolk
+            fun main() {
+                val _x = 1;
+                println("hello");
+            }
+            ```
 
-            Contract-specific lint overrides
-
-            Lint rule configuration, either a global level or contract-specific overrides
+            ### Behavior notes
+            - Locals prefixed with `_` are intentionally ignored.
+            - The rule also skips type parameters, implicit asm/builtin parameters, and `self`.
+            - Autofix prefixes the declaration identifier with `_`.
 
             - Type: `string`
             - Enum: `"allow" | "warn" | "deny"`"#]],
