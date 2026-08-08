@@ -126,6 +126,56 @@ const CONFIG_PARAMETER_METADATA: Readonly<Record<number, ConfigParameterMetadata
     title: "NFT-owned test slot",
     description: "Test configuration slot controlled by a TON Config Parameter Ownership NFT",
   },
+  // The current value was proposed as part of a live governance test on testnet:
+  // https://actonscan.com/tx/94541e28b2099038c06f23da9ab6fb8cefe6687d1e42bfdda083c1f726f99fda?network=testnet
+  [-1337]: {
+    title: "Governance test slot",
+    description: "Testnet scratch slot used to exercise configuration proposal and voting behavior",
+  },
+  // Created as one batch of independent testnet governance proposals:
+  // https://actonscan.com/tx/24b6a0d289f8acb6e86b69269916e164dd6d993c07917571cf7ee4cde193d3d7?network=testnet
+  // Their values copy the ConfigParam 16 layout while varying max_validators from 31 to 38:
+  // https://github.com/ton-blockchain/ton/blob/686b56a9b4f0b905386ad2a5ff865eca2506457e/crypto/block/block.tlb#L700-L704
+  [-1306]: {
+    title: "Validator proposal test 31",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 31",
+  },
+  [-1305]: {
+    title: "Validator proposal test 32",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 32",
+  },
+  [-1304]: {
+    title: "Validator proposal test 33",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 33",
+  },
+  [-1303]: {
+    title: "Validator proposal test 34",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 34",
+  },
+  [-1302]: {
+    title: "Validator proposal test 35",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 35",
+  },
+  [-1301]: {
+    title: "Validator proposal test 36",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 36",
+  },
+  [-1300]: {
+    title: "Validator proposal test 37",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 37",
+  },
+  [-1299]: {
+    title: "Validator proposal test 38",
+    description:
+      "Testnet governance scratch slot containing validator limits with max validators set to 38",
+  },
   // https://github.com/ton-blockchain/config-with-ownable-params/blob/4d942616389a7327f8ee40b3664b1b08a457a340/config-code.fc#L9-L10
   [-1025]: {
     title: "Custom config slot 2",
@@ -163,6 +213,21 @@ const CONFIG_PARAMETER_METADATA: Readonly<Record<number, ConfigParameterMetadata
   [-236]: {
     title: "ECHIDNA faucet",
     description: "Configures the testnet faucet contract for ECHIDNA extra currency",
+  },
+  // Set to 0xffffffff, then 1, and finally 0 through direct signed configuration updates:
+  // https://actonscan.com/tx/2f4ee3e8ccd5a8408b76c18e126c740adad4246a175885e6114d41811d4bbb69?network=testnet
+  // https://actonscan.com/tx/f9c1fac16a8fbece8e1aaac502cfa454d8ec6c055ceee3a5efce6b78db8185c9?network=testnet
+  // https://actonscan.com/tx/000be59ef8c5b2d1f6f76b977571626adabe44d64411c3294c851dc4fb367e3c?network=testnet
+  [-137]: {
+    title: "Direct config update test",
+    description: "Testnet scratch slot used to exercise signed configuration updates",
+  },
+  // Created through testnet governance voting:
+  // https://actonscan.com/tx/6c675b35b70653a497580add73f12dd67d72d88063982c62193d11d0fe8485e2?network=testnet
+  [-133]: {
+    title: "Governance test slot",
+    description:
+      "Testnet scratch slot containing a ConfigParam 16-shaped value with max validators set to zero",
   },
   // https://t.me/tonstatus/175
   // https://actonscan.com/tx/2d5738520c63a6aeddc8d7ff7f52a19c70b11b9ecbca81acc1408488262358c2?network=mainnet
