@@ -123,6 +123,7 @@ pub struct ServerConfig {
     pub tolk_stdlib_path: Option<PathBuf>,
     pub logging: Option<NativeLoggingConfig>,
     pub enable_profiling: bool,
+    pub server_version: Option<String>,
 }
 
 impl ServerConfig {
@@ -133,6 +134,7 @@ impl ServerConfig {
             tolk_stdlib_path: None,
             logging: None,
             enable_profiling: false,
+            server_version: None,
         }
     }
 }
@@ -324,6 +326,7 @@ where
 pub struct NativeLanguageServer {
     client: Client,
     service: Mutex<LanguageService>,
+    server_version: String,
     fallback_project_root: PathBuf,
     tolk_stdlib_path: Option<PathBuf>,
     workspace: Mutex<Option<NativeWorkspace>>,
@@ -364,9 +367,13 @@ impl NativeWorkspace {
 impl NativeLanguageServer {
     #[must_use]
     pub fn new(client: Client, config: ServerConfig) -> Self {
+        let server_version = config
+            .server_version
+            .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_owned());
         Self {
             client,
             service: Mutex::new(native_language_service(config.enable_profiling)),
+            server_version,
             fallback_project_root: absolute_project_root(config.project_root),
             tolk_stdlib_path: config.tolk_stdlib_path,
             workspace: Mutex::new(None),
@@ -699,7 +706,7 @@ impl LanguageServer for NativeLanguageServer {
             },
             server_info: Some(lsp::ServerInfo {
                 name: "Acton Language Server".to_owned(),
-                version: None,
+                version: Some(self.server_version.clone()),
             }),
         })
     }

@@ -30,6 +30,7 @@ pub async fn ls_cmd(
         tolk_stdlib_path,
         logging,
         enable_profiling,
+        server_version: Some(crate::build_info::LONG_VERSION.to_owned()),
     };
 
     match (port, stdio) {

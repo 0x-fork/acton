@@ -39,6 +39,7 @@ async fn initialize_selects_one_root_and_keeps_partial_indexes_usable() -> anyho
         .map_err(|()| anyhow::anyhow!("cannot convert main file path to URI"))?;
     let mut config = ServerConfig::new(fallback.path());
     config.enable_profiling = true;
+    config.server_version = Some("1.1.0 (test-hash 2026-08-08)".to_owned());
     let (mut client, server) = LspTestClient::start(config).await;
 
     let initialize = client
@@ -152,6 +153,7 @@ async fn initialize_selects_one_root_and_keeps_partial_indexes_usable() -> anyho
     let root = root_uri.as_str().trim_end_matches('/');
     let actual = json!({
         "server": initialize["serverInfo"]["name"],
+        "serverVersion": initialize["serverInfo"]["version"],
         "completionTriggers": initialize["capabilities"]["completionProvider"]["triggerCharacters"],
         "importCompletion": {
             "labelDetails": import_item["labelDetails"],
@@ -191,6 +193,7 @@ async fn initialize_selects_one_root_and_keeps_partial_indexes_usable() -> anyho
           },
           "reopened": "$ROOT/lib.tolk",
           "server": "Acton Language Server",
+          "serverVersion": "1.1.0 (test-hash 2026-08-08)",
           "stdlib": "$ROOT/.acton/tolk-stdlib/common.tolk",
           "stdlibReferences": [
             "$ROOT/main.tolk"
