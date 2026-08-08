@@ -16,6 +16,10 @@
     "name": "Root DNS"
   },
   {
+    "address": "-1:efe71d13860afaa6aeaeaf636f9168487f80f1031b0bf8d939ae49d3ea7f7da0",
+    "name": "Root DNS"
+  },
+  {
     "address": "0:0f65ab9654f51c9b6854253f67dfaa71ce7121978eab127d5bcc15cdd1163fca",
     "name": "Notcoin Voucher Swap 0"
   },

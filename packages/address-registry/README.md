@@ -8,13 +8,21 @@ This package will aggregate and normalize data from:
 - [catchain/address-book](https://github.com/catchain/address-book)
 - the local Acton address list
 
-Add Acton-maintained addresses to `scripts/sources/acton.ts`:
+Add Acton-maintained addresses to the matching network list in
+`scripts/sources/acton.ts`:
 
 ```ts
-export const ACTON_ADDRESSES = [
+export const ACTON_MAINNET_ADDRESSES = [
   {
     address: "EQ...",
     name: "Acton service",
+  },
+] as const satisfies readonly SourceAddress[]
+
+export const ACTON_TESTNET_ADDRESSES = [
+  {
+    address: "kQ...",
+    name: "Acton testnet service",
   },
 ] as const satisfies readonly SourceAddress[]
 ```
