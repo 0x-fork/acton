@@ -9,7 +9,7 @@ export const ACTON_TESTNET_ADDRESSES = [
     name: "Root DNS",
   },
   {
-    address: "kQCSES0хмTZYqcVkgoguhIb8iMEo4cvaEwmIrU5qbQgnN8ftBF",
+    address: "kQCSES0TZYqcVkgoguhIb8iMEo4cvaEwmIrU5qbQgnN8ftBF",
     name: "Testgiver TON Bot",
   },
   {
