@@ -7,7 +7,7 @@ use axum::{
     middleware::{self, from_fn_with_state},
     routing::{get, post},
 };
-use faucet_backend::middlewares::{
+use faucet::middlewares::{
     ACTON_CLIENT_HEADER, DEVICE_UID_HEADER, require_airdrop_headers, require_pow_enabled,
 };
 use reqwest::Url;

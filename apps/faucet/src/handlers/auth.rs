@@ -4,7 +4,7 @@ use axum::{
     http::{HeaderMap, StatusCode, header::AUTHORIZATION},
     response::Redirect,
 };
-use faucet_backend::middlewares::{ClientContext, is_allowed_device_uid};
+use faucet::middlewares::{ClientContext, is_allowed_device_uid};
 use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 use utoipa::ToSchema;

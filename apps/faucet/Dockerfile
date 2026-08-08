@@ -12,7 +12,7 @@ COPY apps/faucet/Cargo.toml apps/faucet/Cargo.lock apps/faucet/rust-toolchain.to
 COPY apps/faucet/crates ./crates
 COPY apps/faucet/src ./src
 
-RUN cargo build --release --locked --bin faucet-backend
+RUN cargo build --release --locked --bin faucet
 
 FROM debian:bookworm-slim AS runtime
 
@@ -23,7 +23,7 @@ RUN apt-get update \
 
 WORKDIR /var/lib/faucet
 
-COPY --from=rust-builder /build/apps/faucet/target/release/faucet-backend /usr/local/bin/faucet-backend
+COPY --from=rust-builder /build/apps/faucet/target/release/faucet /usr/local/bin/faucet
 
 USER faucet
 
@@ -39,4 +39,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget --quiet --output-document=- http://127.0.0.1:3000/health || exit 1
 
 ENTRYPOINT ["tini", "--"]
-CMD ["faucet-backend"]
+CMD ["faucet"]

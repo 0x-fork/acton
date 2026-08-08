@@ -1,5 +1,5 @@
 [package]
-name = "faucet-backend"
+name = "faucet"
 version = { workspace = true }
 publish = { workspace = true }
 authors = { workspace = true }

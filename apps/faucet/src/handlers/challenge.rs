@@ -3,7 +3,7 @@ use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
 };
-use faucet_backend::middlewares::ClientContext;
+use faucet::middlewares::ClientContext;
 use faucet_valkey::{AntifraudModule, CappedEphemeralStoreDecision};
 use real::RealIp;
 use serde::{Deserialize, Serialize};

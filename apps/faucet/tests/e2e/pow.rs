@@ -5,7 +5,7 @@ use axum::{
     middleware::from_fn_with_state,
     routing::post,
 };
-use faucet_backend::middlewares::require_pow_enabled;
+use faucet::middlewares::require_pow_enabled;
 use faucet_config::{
     AntifraudConfig, ClaimRateLimitConfig, Config, DatabaseConfig, DefaultRateLimitConfig,
     FaucetConfig, GitHubAuthConfig, GitHubTierConfig, PowClientConfig, PowConfig, ProxyConfig,

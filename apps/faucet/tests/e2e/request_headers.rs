@@ -5,7 +5,7 @@ use axum::{
     middleware,
     routing::post,
 };
-use faucet_backend::middlewares::require_airdrop_headers;
+use faucet::middlewares::require_airdrop_headers;
 use tower::ServiceExt;
 
 #[tokio::test]
