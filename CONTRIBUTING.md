@@ -408,9 +408,8 @@ just check-security
 
 - Rust dependencies with `cargo deny check`
 - RustSec advisories for `Cargo.lock` with `cargo audit`
-- root/UI workspace dependencies with `bun audit`
+- root workspace dependencies, including the VS Code extension, with `bun audit`
 - `crates/tree-sitter-*` with `yarn npm audit`
-- `crates/ton-language-server-native/editors/code` with `bun audit`
 
 Run this check when your PR changes lockfiles, dependency manifests, or package
 versions for the Rust, root/UI, tree-sitter, or VS Code extension dependency

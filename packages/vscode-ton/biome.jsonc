@@ -1,12 +1,13 @@
 {
-  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
   "root": false,
-  "extends": ["../../../../biome.jsonc"],
+  "extends": "//",
   "files": {
     "includes": ["**", "!dist", "!node_modules", "!*.vsix", "!bun.lock"]
   },
   "linter": {
     "rules": {
+      "preset": "recommended",
       "correctness": {
         "noUndeclaredDependencies": "off",
         "useQwikValidLexicalScope": "off",

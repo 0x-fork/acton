@@ -11,8 +11,7 @@ const userDataPath = path.join("/tmp", `acton-ls-vscode-user-${process.pid}`)
 const extensionsPath = path.join("/tmp", `acton-ls-vscode-ext-${process.pid}`)
 const serverLogPath = path.join("/tmp", `acton-ls-vscode-${process.pid}.log`)
 const actonPath = path.resolve(
-  process.env.ACTON_LS_E2E_BIN ??
-    path.join(extensionDevelopmentPath, "../../../../target/debug/acton"),
+  process.env.ACTON_LS_E2E_BIN ?? path.join(extensionDevelopmentPath, "../../target/debug/acton"),
 )
 
 async function createWorkspace(): Promise<void> {
