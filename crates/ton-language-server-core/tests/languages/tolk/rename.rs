@@ -533,7 +533,9 @@ fn renames_struct_field_from_explicit_object_literal_key() {
 fn escapes_names_that_cannot_start_plain_identifiers() {
     check_rename("fun <caret>foo() {}", "1foo", expect!["fun `1foo`() {}"]);
 
-    check_rename("fun <caret>foo() {}", "", expect!["fun ``() {}"]);
+    check_rename_rejected("fun <caret>foo() {}", "", expect!["not renameable"]);
+    check_rename_rejected("fun <caret>foo() {}", "a`b", expect!["not renameable"]);
+    check_rename_rejected("fun <caret>foo() {}", "`a`b`", expect!["not renameable"]);
 }
 
 #[test]

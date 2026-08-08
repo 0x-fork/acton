@@ -45,9 +45,12 @@ impl TolkWorkspaceEngine {
         let Some(target) = snapshot.rename_target(file_id, offset) else {
             return Ok(None);
         };
+
         snapshot.ensure_renameable(&target.resolved)?;
 
-        let replacement = rename_identifier(new_name);
+        let Some(replacement) = rename_identifier(new_name) else {
+            return Ok(None);
+        };
         let edit = snapshot.workspace_edit(&target.resolved, &replacement);
         Ok((!edit.documents.is_empty()).then_some(edit))
     }
@@ -178,12 +181,25 @@ fn shorthand_replacement(
     })
 }
 
-fn rename_identifier(name: &str) -> String {
-    if is_valid_identifier(name) || name.starts_with('`') && name.ends_with('`') {
-        name.to_owned()
+fn rename_identifier(name: &str) -> Option<String> {
+    if is_valid_identifier(name) || is_valid_quoted_identifier(name) {
+        Some(name.to_owned())
+    } else if !name.is_empty() && !name.contains('`') {
+        Some(format!("`{name}`"))
     } else {
-        format!("`{name}`")
+        None
     }
+}
+
+fn is_valid_quoted_identifier(name: &str) -> bool {
+    let Some(contents) = name
+        .strip_prefix('`')
+        .and_then(|name| name.strip_suffix('`'))
+    else {
+        return false;
+    };
+
+    !contents.is_empty() && !contents.contains('`')
 }
 
 fn is_valid_identifier(name: &str) -> bool {
