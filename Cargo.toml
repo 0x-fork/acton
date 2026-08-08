@@ -14,9 +14,9 @@ license = { workspace = true }
 dist = true
 
 [workspace]
-members = ["apps/actonscan-backend", "crates/*", "xtask"]
+members = ["crates/*", "xtask"]
 
-exclude = []
+exclude = ["apps/"]
 
 [workspace.package]
 version = "1.1.0"
