@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 export type TonExplorer = "actonscan" | "tonscan" | "tonviewer"
 
 export interface TonAddressMatch {

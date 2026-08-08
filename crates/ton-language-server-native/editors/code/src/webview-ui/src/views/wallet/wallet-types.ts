@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 export interface WalletInfo {
   readonly name: string
   readonly address: string

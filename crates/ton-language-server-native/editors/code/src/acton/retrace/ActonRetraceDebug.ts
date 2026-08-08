@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 import * as path from "node:path"
 
 import * as vscode from "vscode"

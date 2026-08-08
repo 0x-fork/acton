@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 import {parseTopLevelTomlTableKeys} from "../toml/acton-toml"
 
 export function parseActonContractIds(content: string): string[] {

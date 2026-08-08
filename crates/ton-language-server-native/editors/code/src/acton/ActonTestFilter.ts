@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 const RUST_REGEX_META_CHARACTERS = /[$()*+.?[\\\]^{|}]/g
 
 export function createActonTestFilterPattern(testNames: readonly string[]): string {

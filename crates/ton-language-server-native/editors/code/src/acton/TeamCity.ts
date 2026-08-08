@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 import {fileURLToPath} from "node:url"
 
 export interface TeamCityTestingStartedMessage {

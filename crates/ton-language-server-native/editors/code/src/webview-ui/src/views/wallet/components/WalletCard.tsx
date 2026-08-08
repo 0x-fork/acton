@@ -1,5 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
 import type React from "react"
 import {useState} from "react"
 import {VscCopy, VscCheck, VscQuestion} from "react-icons/vsc"

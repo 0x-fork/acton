@@ -1,5 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
 import React from "react"
 import {createRoot} from "react-dom/client"
 

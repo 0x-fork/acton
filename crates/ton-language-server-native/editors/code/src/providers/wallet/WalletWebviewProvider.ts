@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 import * as vscode from "vscode"
 
 import {Acton} from "../../acton/Acton"

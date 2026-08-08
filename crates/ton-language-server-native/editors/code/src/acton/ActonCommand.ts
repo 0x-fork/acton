@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 export abstract class ActonCommand {
   protected constructor(public readonly name: string) {}
 

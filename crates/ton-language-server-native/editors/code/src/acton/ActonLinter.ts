@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 import type {ChildProcessWithoutNullStreams} from "node:child_process"
 
 import * as vscode from "vscode"

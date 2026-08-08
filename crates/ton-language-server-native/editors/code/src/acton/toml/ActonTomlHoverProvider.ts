@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 import * as vscode from "vscode"
 
 import {parseTomlAssignmentKey, parseTomlTableHeaderPath} from "./acton-toml"

@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 import * as net from "node:net"
 
 const LOOPBACK_HOST = "127.0.0.1"

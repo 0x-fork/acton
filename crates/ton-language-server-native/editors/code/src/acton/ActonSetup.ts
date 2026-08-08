@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 import * as child_process from "node:child_process"
 import {existsSync} from "node:fs"
 import * as os from "node:os"

@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
 

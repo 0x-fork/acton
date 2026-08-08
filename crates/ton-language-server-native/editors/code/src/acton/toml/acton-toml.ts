@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 import {parse, type TomlTable} from "smol-toml"
 
 export interface TomlAssignmentKey {

@@ -1,6 +1,3 @@
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2026 TON Core
-
 import * as fs from "node:fs/promises"
 import {constants as fsConstants} from "node:fs"
 import * as os from "node:os"
