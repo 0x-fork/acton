@@ -57,9 +57,9 @@ export function createTonAddressExplorerUrl(
   isTestnet: boolean,
 ): string {
   const encodedAddress = encodeURIComponent(address)
-  if (explorer === "actonscan") {
-    const network = isTestnet ? "testnet" : "mainnet"
-    return `https://actonscan.com/address/${encodedAddress}?network=${network}`
+  if (explorer === "tonscan") {
+    const domain = isTestnet ? "testnet.tonscan.org" : "tonscan.org"
+    return `https://${domain}/address/${encodedAddress}`
   }
 
   if (explorer === "tonviewer") {
@@ -67,8 +67,8 @@ export function createTonAddressExplorerUrl(
     return `https://${domain}/${encodedAddress}`
   }
 
-  const domain = isTestnet ? "testnet.tonscan.org" : "tonscan.org"
-  return `https://${domain}/address/${encodedAddress}`
+  const network = isTestnet ? "testnet" : "mainnet"
+  return `https://actonscan.com/address/${encodedAddress}?network=${network}`
 }
 
 function isTestnetUserFriendlyAddress(address: string): boolean {
