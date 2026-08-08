@@ -1407,6 +1407,35 @@ fn completes_methods_for_all_supported_receiver_expressions() {
         label  kind    detail  edit       text
         touch  Method  (self)  2:22-2:25  touch();$0"#]]);
 
+    // A struct literal is an instance expression, so static methods are not offered after it.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.staticOnly() {}
+            fun Foo.touch(self) {}
+            fun main() { (Foo {}).<caret> }
+        ",
+    )
+    .labels(&["staticOnly", "touch"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label  kind    detail  edit       text
+        touch  Method  (self)  3:22-3:22  touch();$0"#]]);
+
+    // Standard-library deserialization helpers are static; a constructed AutoDeployAddress exposes its instance API.
+    CompletionTest::new(
+        "
+            fun main(stateInit: ContractState) {
+                AutoDeployAddress { stateInit }.<caret>
+            }
+        ",
+    )
+    .labels(&["calculateAddress", "fromCell", "fromSlice", "fromTuple"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label             kind    detail           edit       text
+        calculateAddress  Method  (self): address  1:36-1:36  calculateAddress();$0"#]]);
+
     // A function-call result exposes methods from its inferred return type.
     CompletionTest::new(
         "

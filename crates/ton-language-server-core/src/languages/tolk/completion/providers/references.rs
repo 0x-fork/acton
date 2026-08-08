@@ -195,7 +195,9 @@ impl ReferenceCompletionProvider {
                         .filter(|symbol| symbol.is_type())
                 })
         });
-        if let Some(symbol) = static_type {
+        if let Some(symbol) = static_type
+            && !matches!(qualifier, Expr::ObjectLit(_))
+        {
             if matches!(symbol.kind, SymbolKind::Enum { .. }) {
                 Self::collect_type_members(context, symbol, collector);
             }
@@ -209,10 +211,11 @@ impl ReferenceCompletionProvider {
         }
 
         let receiver_ty = context.type_of_node(qualifier)?;
-        if matches!(qualifier, Expr::Instantiation(_)) {
-            Self::collect_methods(context, receiver_ty, false, collector);
+        if matches!(qualifier, Expr::ObjectLit(_)) {
+            Self::collect_methods(context, receiver_ty, true, collector);
             return Some(());
         }
+
         let ty = context.snapshot.type_interner.unwrap_alias(receiver_ty);
         match context.snapshot.type_interner.data(ty) {
             TyData::Struct { def, .. } | TyData::Enum { def, .. } => {
