@@ -76,7 +76,7 @@ pub(super) fn symbol(
 ) -> Option<RankedCompletionItem> {
     let raw_name = semantics::raw_text(context.snapshot, symbol.id.file_id, symbol.name_span)
         .unwrap_or_else(|| symbol.name.to_string());
-    if raw_name.ends_with(DUMMY_IDENTIFIER) || raw_name == "_" {
+    if symbol.name.starts_with("__") || raw_name.ends_with(DUMMY_IDENTIFIER) || raw_name == "_" {
         return None;
     }
     let (kind, category, insertion) = match &symbol.kind {
@@ -155,7 +155,10 @@ pub(super) fn prefixed_enum_member(
     context: &TolkCompletionProviderContext<'_>,
     owner: &Symbol,
     member: &Symbol,
-) -> RankedCompletionItem {
+) -> Option<RankedCompletionItem> {
+    if owner.name.starts_with("__") || member.name.starts_with("__") {
+        return None;
+    }
     let raw_owner = semantics::raw_text(context.snapshot, owner.id.file_id, owner.name_span)
         .unwrap_or_else(|| owner.name.to_string());
     let raw_member = semantics::raw_text(context.snapshot, member.id.file_id, member.name_span)
@@ -164,11 +167,11 @@ pub(super) fn prefixed_enum_member(
     let item = CompletionItem::new(&label, CompletionItemKind::EnumMember)
         .with_filter_text(member.name.as_ref())
         .with_replacement(context.syntax.replacement_range, &label);
-    RankedCompletionItem {
+    Some(RankedCompletionItem {
         item: with_symbol_label_details(item, context, member, true),
         rank: CompletionRank::new(CompletionCategory::Field)
             .with_prefix(&context.syntax.prefix, member.name.as_ref()),
-    }
+    })
 }
 
 pub(super) fn with_symbol_label_details(

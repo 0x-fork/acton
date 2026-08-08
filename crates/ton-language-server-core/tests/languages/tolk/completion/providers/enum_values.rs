@@ -18,6 +18,28 @@ fn completes_prefixed_enum_members_in_expressions() {
 }
 
 #[test]
+fn hides_internal_enum_members() {
+    CompletionTest::new(
+        "
+            enum Mode { __Hidden, Visible }
+            fun main() { val mode = __H<caret>; }
+        ",
+    )
+    .labels(&["Mode.__Hidden"])
+    .check(expect!["<none>"]);
+
+    CompletionTest::new(
+        "
+            enum Mode { __Hidden, Visible }
+            fun main() { val mode = Mode.__<caret>; }
+        ",
+    )
+    .labels(&["__Hidden"])
+    .trigger_character(".")
+    .check(expect!["<none>"]);
+}
+
+#[test]
 fn completes_enum_members_after_the_enum_name() {
     // Qualified enum completion inserts only the member after an existing dot.
     CompletionTest::new(

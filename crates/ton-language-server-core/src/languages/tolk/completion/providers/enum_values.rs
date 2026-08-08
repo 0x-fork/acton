@@ -25,8 +25,9 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for EnumCompletionPro
             };
 
             for member in members.iter() {
-                let candidate = items::prefixed_enum_member(context, symbol, member);
-                collector.add(candidate.item, candidate.rank);
+                if let Some(candidate) = items::prefixed_enum_member(context, symbol, member) {
+                    collector.add(candidate.item, candidate.rank);
+                }
             }
         }
         Some(())

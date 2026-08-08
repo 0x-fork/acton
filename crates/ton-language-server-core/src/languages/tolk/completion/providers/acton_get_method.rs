@@ -31,7 +31,8 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ActonGetMethodCom
             .filter(|file| !file.path.to_string_lossy().contains(".acton"))
             .flat_map(|file| file.decls.iter().map(move |symbol| (file, symbol)))
             .filter(|(_, symbol)| {
-                matches!(symbol.kind, SymbolKind::GetMethod { .. })
+                !symbol.name.starts_with("__")
+                    && matches!(symbol.kind, SymbolKind::GetMethod { .. })
                     && !tolk_syntax::is_test_get_method_name(symbol.name.as_ref())
             })
         {

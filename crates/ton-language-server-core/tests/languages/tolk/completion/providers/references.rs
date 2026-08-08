@@ -1699,6 +1699,18 @@ fn excludes_declaration_names_and_internal_symbols() {
     .labels(&["__hidden"])
     .check(expect!["<none>"]);
 
+    // Internal member names stay hidden from dot completion as well.
+    CompletionTest::new(
+        "
+            struct Foo { __field: int }
+            fun Foo.__method(self) {}
+            fun main(value: Foo) { value.__<caret>; }
+        ",
+    )
+    .labels(&["__field", "__method"])
+    .trigger_character(".")
+    .check(expect!["<none>"]);
+
     // Wildcard locals are never offered as references.
     CompletionTest::new("fun main() { val _ = 10; <caret> }")
         .labels(&["_"])

@@ -327,7 +327,10 @@ impl ReferenceCompletionProvider {
             .map(|field| field.name.as_ref())
             .collect::<FxHashSet<_>>();
         for field in fields {
-            if initialized.iter().any(|name| *name == field.name.as_ref()) || field.is_private {
+            if field.name.starts_with("__")
+                || initialized.iter().any(|name| *name == field.name.as_ref())
+                || field.is_private
+            {
                 continue;
             }
             let raw_name = semantics::raw_text(context.snapshot, field.id.file_id, field.name_span)

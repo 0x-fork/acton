@@ -129,8 +129,9 @@ fn collect_non_type_match_arms(
                 return;
             };
             for member in members {
-                let candidate = items::prefixed_enum_member(context, symbol, member);
-                candidates.add(candidate.item, candidate.rank);
+                if let Some(candidate) = items::prefixed_enum_member(context, symbol, member) {
+                    candidates.add(candidate.item, candidate.rank);
+                }
             }
         }
     }
@@ -187,11 +188,14 @@ fn collect_type_variants(
                 && let SymbolKind::Enum { members } = &symbol.kind
             {
                 for member in members {
+                    if member.name.starts_with("__") {
+                        continue;
+                    }
                     variants.insert(format!("{name}.{}", member.name));
                 }
             }
         }
-        TyData::Struct { name, .. } => {
+        TyData::Struct { name, .. } if !name.starts_with("__") => {
             variants.insert(name.to_string());
         }
         _ => {}
@@ -209,7 +213,10 @@ fn collect_union_variant(
             collect_union_variant(snapshot, ty, variants);
         }
     } else {
-        variants.insert(snapshot.type_interner.format(ty));
+        let variant = snapshot.type_interner.format(ty);
+        if !variant.starts_with("__") {
+            variants.insert(variant);
+        }
     }
 }
 
