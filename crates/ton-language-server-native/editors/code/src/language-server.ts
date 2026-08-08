@@ -1,4 +1,6 @@
-import * as path from "path"
+import {spawn} from "node:child_process"
+import * as path from "node:path"
+import process from "node:process"
 import * as vscode from "vscode"
 import {
   type Executable,
@@ -9,7 +11,15 @@ import {
 } from "vscode-languageclient/node"
 
 import {createClientLog} from "./client-log"
-import process from "node:process"
+import {Acton} from "./acton/Acton"
+import {
+  promptToInstallActonForLanguageServer,
+  promptToUpdateActonForLanguageServer,
+} from "./acton/ActonSetup"
+import {
+  classifyLanguageServerProbeFailure,
+  type LanguageServerStartupIssue,
+} from "./language-server-startup"
 
 let client: LanguageClient | undefined
 let clientCommandsRegistered = false
@@ -17,6 +27,14 @@ let restartOperation: Promise<void> = Promise.resolve()
 
 const typeAtPositionRequest = "tolk.getTypeAtPosition"
 const openFileCommand = "ton.openFile"
+const languageServerStartupMessages = {
+  missing:
+    "The Acton language server could not start because the acton executable was not found. Install Acton or configure its path",
+  unavailable:
+    "The configured Acton executable cannot be launched. Check its permissions or configure another path",
+  unsupported:
+    "This Acton version does not support the language server flags required by the extension. Update Acton to continue",
+} satisfies Record<LanguageServerStartupIssue, string>
 
 interface TypeAtPositionParams {
   textDocument: {uri: string}
@@ -33,9 +51,15 @@ interface TypeAtPositionResponse {
 
 export async function startLanguageServer(context: vscode.ExtensionContext): Promise<void> {
   const config = vscode.workspace.getConfiguration("ton")
-  const serverPath = config.get<string>("acton.path", "acton")
   const serverArgs = resolveServerArgs(config)
   const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+  const serverPath = await Acton.getInstance().getActonPath(cwd)
+
+  const startupIssue = await probeLanguageServer(serverPath, serverArgs, cwd)
+  if (startupIssue) {
+    await handleLanguageServerStartupIssue(startupIssue, cwd, serverPath, serverArgs)
+    return
+  }
 
   const clientOptions: LanguageClientOptions = {
     outputChannel: createClientLog(),
@@ -238,6 +262,84 @@ function launchServer(command: string, args: string[], cwd: string | undefined):
     run,
     debug: run,
   }
+}
+
+function probeLanguageServer(
+  command: string,
+  args: string[],
+  cwd: string | undefined,
+): Promise<LanguageServerStartupIssue | undefined> {
+  const probeArgs = args.includes("--help") ? args : [...args, "--help"]
+
+  return new Promise(resolve => {
+    const child = spawn(command, probeArgs, {
+      cwd,
+      env: {...process.env},
+    })
+    let output = ""
+    let settled = false
+
+    const timeout = setTimeout(() => {
+      child.kill()
+      finish(undefined)
+    }, 5000)
+
+    const finish = (issue: LanguageServerStartupIssue | undefined): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timeout)
+      resolve(issue)
+    }
+
+    child.stdout?.on("data", (data: Buffer) => {
+      output += data.toString()
+    })
+    child.stderr?.on("data", (data: Buffer) => {
+      output += data.toString()
+    })
+    child.once("error", (error: NodeJS.ErrnoException) => {
+      finish(classifyLanguageServerProbeFailure(error.code, null, output))
+    })
+    child.once("close", (exitCode: number | null) => {
+      finish(classifyLanguageServerProbeFailure(undefined, exitCode, output))
+    })
+  })
+}
+
+async function handleLanguageServerStartupIssue(
+  issue: LanguageServerStartupIssue,
+  workingDirectory: string | undefined,
+  serverPath: string,
+  serverArgs: string[],
+): Promise<void> {
+  const message = languageServerStartupMessages[issue]
+
+  const showOutput = (): void => {
+    showLanguageServerOutput(workingDirectory, serverPath, serverArgs)
+  }
+
+  if (issue === "unsupported") {
+    await promptToUpdateActonForLanguageServer(workingDirectory, message, showOutput)
+  } else {
+    await promptToInstallActonForLanguageServer(workingDirectory, message, showOutput)
+  }
+}
+
+function showLanguageServerOutput(
+  workingDirectory: string | undefined,
+  serverPath: string,
+  serverArgs: string[],
+): void {
+  const probeArgs = serverArgs.includes("--help") ? serverArgs : [...serverArgs, "--help"]
+  const terminal = vscode.window.createTerminal({
+    name: "Acton Language Server Output",
+    cwd: workingDirectory,
+    shellPath: serverPath,
+    shellArgs: probeArgs,
+  })
+  terminal.show(true)
 }
 
 async function resolveWorkspaceFile(filePath: string): Promise<vscode.Uri> {

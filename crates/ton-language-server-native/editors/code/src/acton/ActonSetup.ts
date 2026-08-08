@@ -19,6 +19,7 @@ const INSTALL_ACTION = "Install Acton"
 const CONFIGURE_ACTION = "Configure Path"
 const DOCS_ACTION = "Open Installation Guide"
 const OPEN_LOG_ACTION = "Open Log"
+const SHOW_LANGUAGE_SERVER_OUTPUT_ACTION = "Show output"
 const RETRY_ACTION = "Retry"
 const UPDATE_ACTION = "Update now"
 const SKIP_VERSION_ACTION = "Don't show for this version"
@@ -143,6 +144,83 @@ async function promptToInstallActonIfNeeded(): Promise<void> {
     }
   } finally {
     missingActonPromptPending = false
+  }
+}
+
+export async function promptToInstallActonForLanguageServer(
+  workingDirectory: string | undefined,
+  message: string,
+  showOutput: () => void | Promise<void>,
+): Promise<void> {
+  if (missingActonPromptPending || updatePromptPending || installInProgress) {
+    return
+  }
+
+  missingActonPromptPending = true
+  try {
+    const acton = Acton.getInstance()
+    const installScope = workingDirectory
+      ? vscode.Uri.file(workingDirectory)
+      : await acton.findWorkspaceProject()
+    const actions = isInstallerSupported()
+      ? [INSTALL_ACTION, CONFIGURE_ACTION, SHOW_LANGUAGE_SERVER_OUTPUT_ACTION]
+      : [CONFIGURE_ACTION, SHOW_LANGUAGE_SERVER_OUTPUT_ACTION]
+    const selection = await vscode.window.showErrorMessage(message, ...actions)
+
+    switch (selection) {
+      case INSTALL_ACTION: {
+        await installActon(acton, installScope)
+        break
+      }
+      case CONFIGURE_ACTION: {
+        await vscode.commands.executeCommand("workbench.action.openSettings", "ton.acton.path")
+        break
+      }
+      case SHOW_LANGUAGE_SERVER_OUTPUT_ACTION: {
+        await showOutput()
+        break
+      }
+      case undefined: {
+        break
+      }
+    }
+  } finally {
+    missingActonPromptPending = false
+  }
+}
+
+export async function promptToUpdateActonForLanguageServer(
+  workingDirectory: string | undefined,
+  message: string,
+  showOutput: () => void | Promise<void>,
+): Promise<void> {
+  if (updatePromptPending || installInProgress) {
+    return
+  }
+
+  updatePromptPending = true
+  try {
+    const selection = await vscode.window.showErrorMessage(
+      message,
+      UPDATE_ACTION,
+      SHOW_LANGUAGE_SERVER_OUTPUT_ACTION,
+    )
+
+    switch (selection) {
+      case UPDATE_ACTION: {
+        await runActonUpdate(workingDirectory)
+        break
+      }
+      case SHOW_LANGUAGE_SERVER_OUTPUT_ACTION: {
+        await showOutput()
+        break
+      }
+      case undefined: {
+        break
+      }
+    }
+  } finally {
+    updatePromptPending = false
   }
 }
 
@@ -350,7 +428,7 @@ async function showActonUpdatePrompt(
 
     switch (selection) {
       case UPDATE_ACTION: {
-        await Acton.getInstance().execute(new UpdateCommand(), workingDirectory)
+        await runActonUpdate(workingDirectory)
         break
       }
       case SKIP_VERSION_ACTION: {
@@ -372,7 +450,11 @@ async function showActonUpdatePrompt(
   }
 }
 
-async function installActon(acton: Acton, projectUri: vscode.Uri): Promise<void> {
+async function runActonUpdate(workingDirectory: string | undefined): Promise<void> {
+  await Acton.getInstance().execute(new UpdateCommand(), workingDirectory)
+}
+
+async function installActon(acton: Acton, projectUri: vscode.Uri | undefined): Promise<void> {
   if (installInProgress) {
     void vscode.window.showInformationMessage("Acton installation is already running.")
     return
@@ -538,7 +620,7 @@ async function readActonVersion(
 async function showInstallerFailure(
   message: string,
   acton: Acton,
-  projectUri: vscode.Uri,
+  projectUri: vscode.Uri | undefined,
 ): Promise<void> {
   missingActonPromptShown = false
 

@@ -273,7 +273,7 @@ export class Acton {
     return undefined
   }
 
-  private async getActonPath(workingDirectory?: string): Promise<string> {
+  public async getActonPath(workingDirectory?: string): Promise<string> {
     const resolvedPath = await this.resolveActonPath(workingDirectory)
     if (resolvedPath) {
       return resolvedPath
