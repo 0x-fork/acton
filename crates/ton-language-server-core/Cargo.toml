@@ -271,6 +271,11 @@ path = "tests/languages/toml/hover.rs"
 required-features = ["toml"]
 
 [[test]]
+name = "toml_inlay_hints"
+path = "tests/languages/toml/inlay_hints.rs"
+required-features = ["toml"]
+
+[[test]]
 name = "toml_definition"
 path = "tests/languages/toml/definition.rs"
 required-features = ["toml"]

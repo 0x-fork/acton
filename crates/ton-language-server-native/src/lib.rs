@@ -372,7 +372,10 @@ impl NativeLanguageServer {
             .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_owned());
         Self {
             client,
-            service: Mutex::new(native_language_service(config.enable_profiling)),
+            service: Mutex::new(native_language_service(
+                config.enable_profiling,
+                &server_version,
+            )),
             server_version,
             fallback_project_root: absolute_project_root(config.project_root),
             tolk_stdlib_path: config.tolk_stdlib_path,
@@ -1300,7 +1303,7 @@ enum AppliedChanges {
     FullText,
 }
 
-fn native_language_service(enable_profiling: bool) -> LanguageService {
+fn native_language_service(enable_profiling: bool, acton_version: &str) -> LanguageService {
     let mut service = LanguageService::new(LanguageServiceConfig { enable_profiling });
 
     service.register_language(TlbLanguage::new());
@@ -1333,7 +1336,7 @@ fn native_language_service(enable_profiling: bool) -> LanguageService {
         }
     }
 
-    service.register_language(TomlLanguage::new());
+    service.register_language(TomlLanguage::with_acton_version(acton_version));
     service.register_language(TolkLanguage::new());
 
     service
@@ -2420,7 +2423,7 @@ mod tests {
 
     #[test]
     fn registers_acton_toml_support_in_the_native_service() -> anyhow::Result<()> {
-        let mut service = native_language_service(false);
+        let mut service = native_language_service(false, "test-version");
         let uri = DocumentUri::from("file:///workspace/Acton.toml");
         service.open_document(uri.clone(), LanguageId::from("toml"), 1, "")?;
 
@@ -2434,6 +2437,29 @@ mod tests {
 
         assert!(labels.contains(&"package"));
         assert!(labels.contains(&"test"));
+
+        let hint_uri = DocumentUri::from("file:///workspace/project/Acton.toml");
+        service.open_document(
+            hint_uri.clone(),
+            LanguageId::from("toml"),
+            1,
+            "[toolchain]\nacton = \"trunk\"\n",
+        )?;
+        let hints = service.inlay_hints(
+            &hint_uri,
+            Range::new(Position::new(0, 0), Position::new(u32::MAX, u32::MAX)),
+        )?;
+        let rendered = hints
+            .iter()
+            .map(|hint| {
+                format!(
+                    "{}:{} {}",
+                    hint.position.line, hint.position.character, hint.label
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        expect_test::expect!["1:15 installed: test-version"].assert_eq(&rendered);
 
         Ok(())
     }
@@ -2507,7 +2533,7 @@ mod tests {
         let main_source = "import \"lib\"\nfun main(): int { return helper(); }\n";
         fs::write(&main_path, main_source)?;
 
-        let mut service = native_language_service(false);
+        let mut service = native_language_service(false, "test-version");
         let report = prime_workspace_sources(&mut service, dir.path(), None);
         assert_eq!(report.failed, 0);
         let main_uri = DocumentUri::from(file_uri_string(&main_path));
@@ -2545,7 +2571,7 @@ mod tests {
 
         let root_uri = DocumentUri::from(file_uri_string(dir.path()));
         let stdlib_uri = DocumentUri::from(file_uri_string(&stdlib_dir));
-        let mut service = native_language_service(false);
+        let mut service = native_language_service(false, "test-version");
         service.set_workspace_config(
             LanguageId::from(TOLK_LANGUAGE_ID),
             workspace_config(root_uri, None, Some(stdlib_uri), ""),
