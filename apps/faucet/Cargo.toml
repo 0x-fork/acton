@@ -23,7 +23,7 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 anyhow = "1.0.100"
 chrono = { version = "0.4", features = ["serde"] }
-faucet-config = { path = "crates/config" }
+faucet-config = { path = "crates/faucet-config" }
 hex = "0.4.3"
 http = "1"
 ipnet = "2"
@@ -45,10 +45,10 @@ axum-governor = "1"
 base64 = "0.22.1"
 chrono = { workspace = true }
 dotenvy = "0.15.7"
-faucet-antifraud = { path = "crates/antifraud" }
+faucet-antifraud = { path = "crates/faucet-antifraud" }
 faucet-config = { workspace = true }
-faucet-pow = { path = "crates/pow" }
-faucet-valkey = { path = "crates/valkey" }
+faucet-pow = { path = "crates/faucet-pow" }
+faucet-valkey = { path = "crates/faucet-valkey" }
 hex = { workspace = true }
 lazy-limit = "1"
 rand = { workspace = true }
