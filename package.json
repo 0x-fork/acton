@@ -10,17 +10,17 @@
   ],
   "scripts": {
     "build": "bun --filter '*' build",
-    "dev:ui": "bun --filter @acton/ui-gallery dev",
     "dev:studio": "bun --filter @acton/studio-ui dev",
     "dev:test": "bun --filter @acton/test-ui dev",
+    "dev:ui": "bun --filter @acton/ui-gallery dev",
+    "doctor": "CI=1 react-doctor",
     "fmt": "bun --filter '*' fmt",
     "fmt:check": "bun --filter '*' fmt:check",
     "lint": "bun --filter '*' lint",
     "lint:fix": "bun --filter '*' lint:fix",
-    "test:unit": "bun --filter '*' test",
-    "test:e2e:ui": "playwright test --config packages/ui-e2e/playwright.config.ts",
     "test:e2e:test-ui": "playwright test --config packages/test-ui/playwright.config.ts",
-    "doctor": "CI=1 react-doctor"
+    "test:e2e:ui": "playwright test --config packages/ui-e2e/playwright.config.ts",
+    "test:unit": "bun --filter '*' test"
   },
   "overrides": {
     "@ton/core": "^0.63.1",

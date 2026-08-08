@@ -3,6 +3,10 @@ import {expect, mock, test} from "bun:test"
 import {onRequest} from "../functions/api/toncenter/[network]/v3/traces"
 import {installMemoryEdgeCache} from "./toncenterProxyTestUtils"
 
+const mockFetch = (
+  implementation: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+) => Object.assign(mock(implementation), {preconnect: globalThis.fetch.preconnect})
+
 const TRANSACTION_HASH = "a".repeat(64)
 
 test("complete Toncenter traces are cached by network and transaction hash", async () => {
@@ -11,7 +15,7 @@ test("complete Toncenter traces are cached by network and transaction hash", asy
   const upstreamRequests: Array<{readonly url: string; readonly apiKey: string | null}> = []
   const backgroundTasks: Promise<unknown>[] = []
 
-  globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = mockFetch((input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init)
     upstreamRequests.push({
       url: request.url,
@@ -28,7 +32,7 @@ test("complete Toncenter traces are cached by network and transaction hash", asy
         ],
       }),
     )
-  }) as typeof fetch
+  })
 
   const context = {
     request: new Request(
@@ -123,7 +127,7 @@ test("invalid and incomplete trace responses are not cached", async () => {
   const cache = installMemoryEdgeCache()
   let upstreamRequestCount = 0
 
-  globalThis.fetch = mock(() => {
+  globalThis.fetch = mockFetch(() => {
     upstreamRequestCount += 1
     return Promise.resolve(
       Response.json({
@@ -136,7 +140,7 @@ test("invalid and incomplete trace responses are not cached", async () => {
         ],
       }),
     )
-  }) as typeof fetch
+  })
 
   const request = (hash: string) =>
     onRequest({
@@ -203,14 +207,14 @@ test("invalid and incomplete trace responses are not cached", async () => {
 test("Toncenter rate-limit status survives an invalid JSON response", async () => {
   const originalFetch = globalThis.fetch
   const cache = installMemoryEdgeCache()
-  globalThis.fetch = mock(() =>
+  globalThis.fetch = mockFetch(() =>
     Promise.resolve(
       new Response("rate limited", {
         status: 429,
         headers: {"retry-after": "10"},
       }),
     ),
-  ) as typeof fetch
+  )
 
   try {
     const response = await onRequest({

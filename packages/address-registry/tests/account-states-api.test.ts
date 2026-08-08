@@ -11,7 +11,7 @@ test("batches both networks and retries a rate-limited request", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
   let testnetRequests = 0
-  globalThis.fetch = mock(input => {
+  const fetchMock = mock(input => {
     const url = new URL(input.toString())
     requests.push(url)
 
@@ -27,7 +27,8 @@ test("batches both networks and retries a rate-limited request", async () => {
         accounts: url.searchParams.getAll("address").map(address => ({address, status: "active"})),
       }),
     )
-  }) as typeof fetch
+  })
+  globalThis.fetch = Object.assign(fetchMock, {preconnect: originalFetch.preconnect})
 
   try {
     expect(await readNetworkAccountStates(ADDRESSES, "api-key")).toEqual({

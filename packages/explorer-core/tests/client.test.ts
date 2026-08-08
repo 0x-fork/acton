@@ -3,10 +3,14 @@ import {beginCell} from "@ton/core"
 
 import {TonClient} from "../src/api/client"
 
+const mockFetch = (
+  implementation: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+) => Object.assign(mock(implementation), {preconnect: globalThis.fetch.preconnect})
+
 test("address information falls back to the node when the index has no account", async () => {
   const originalFetch = globalThis.fetch
   const requests: string[] = []
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     const url = new URL(input.toString())
     requests.push(url.toString())
     if (url.pathname.endsWith("/addressInformation")) {
@@ -32,7 +36,7 @@ test("address information falls back to the node when the index has no account",
         state: "active",
       },
     })
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -69,7 +73,7 @@ test("address information falls back to the node when the index has no account",
 test("address information does not query the node when indexed state is present", async () => {
   const originalFetch = globalThis.fetch
   const requests: string[] = []
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     requests.push(input.toString())
     return Response.json({
       balance: "42",
@@ -80,7 +84,7 @@ test("address information does not query the node when indexed state is present"
       last_transaction_lt: "10",
       status: "active",
     })
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -117,10 +121,10 @@ test("raw blocks are loaded from the selected TonAPI LiteServer", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
   const blockCell = beginCell().storeUint(0x11_ef_55_aa, 32).endCell()
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     requests.push(new URL(input.toString()))
     return Response.json({data: blockCell.toBoc().toString("hex")})
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -162,12 +166,12 @@ test("wallet DNS lookup returns every domain for the requested address", async (
     "tg-tonloveton.ton",
     "wetrustinton.t.me",
   ] as const
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     requests.push(new URL(input.toString()))
     return Response.json({
       records: domains.map(domain => ({domain})),
     })
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -189,7 +193,7 @@ test("wallet DNS lookup returns every domain for the requested address", async (
 test("multisig requests preserve every address and opt into nested data", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     const url = new URL(input.toString())
     requests.push(url)
     return Response.json(
@@ -197,7 +201,7 @@ test("multisig requests preserve every address and opt into nested data", async 
         ? {multisigs: [], address_book: {}}
         : {orders: [], address_book: {}},
     )
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -221,7 +225,7 @@ test("multisig requests preserve every address and opt into nested data", async 
 test("recent Jetton requests use transfer ordering and batch master lookup", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     const url = new URL(input.toString())
     requests.push(url)
     return Response.json(
@@ -238,7 +242,7 @@ test("recent Jetton requests use transfer ordering and batch master lookup", asy
           }
         : {jetton_masters: [], metadata: {}},
     )
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -274,12 +278,12 @@ test("domain DNS lookup uses the indexed V3 wallet record when available", async
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
   const walletAddress = "EQCIndexedWallet"
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     requests.push(new URL(input.toString()))
     return Response.json({
       records: [{domain: "foundation.ton", dns_wallet: walletAddress}],
     })
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -302,7 +306,7 @@ test("domain DNS lookup falls back to Toncenter V2 when V3 has no records", asyn
   const requests: URL[] = []
   const dnsRoot = "e56754f83426f69b09267bd876ac97c44821345b7e266bd956a7bfbfb98df35c"
   const walletAddress = "EQB8PZ-Cp6UzydbLvjukx1OQL3LmqeYV-tJ3qVMw_mNYgqow"
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     const url = new URL(input.toString())
     requests.push(url)
     if (url.pathname.endsWith("/dns/records")) {
@@ -340,7 +344,7 @@ test("domain DNS lookup falls back to Toncenter V2 when V3 has no records", asyn
         ],
       },
     })
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -362,7 +366,7 @@ test("domain DNS lookup falls back to Toncenter V2 when V3 has no records", asyn
 test("getShardAccountCell reads the unwrapped V2 response", async () => {
   const originalFetch = globalThis.fetch
   const requests: string[] = []
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     requests.push(input.toString())
     return Response.json({
       ok: true,
@@ -371,7 +375,7 @@ test("getShardAccountCell reads the unwrapped V2 response", async () => {
         bytes: "te6cckEBAQEAAgAAAA==",
       },
     })
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -392,7 +396,7 @@ test("getShardAccountCell reads the unwrapped V2 response", async () => {
 test("localnet message submission uses the endpoint for each message type", async () => {
   const originalFetch = globalThis.fetch
   const requests: Array<{readonly url: URL; readonly init?: RequestInit}> = []
-  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(input.toString())
     requests.push({url, init})
     return Response.json({
@@ -401,7 +405,7 @@ test("localnet message submission uses the endpoint for each message type", asyn
         hash: url.pathname.endsWith("/sendBocReturnHash") ? "external-hash" : "internal-hash",
       },
     })
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -442,7 +446,7 @@ test("masterchain shard blocks are resolved from the V2 shard snapshot", async (
     gen_utime: "1783903686",
     tx_count: 0,
   }
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     const url = new URL(input.toString())
     requests.push(url)
     if (url.pathname.endsWith("/getShards")) {
@@ -464,7 +468,7 @@ test("masterchain shard blocks are resolved from the V2 shard snapshot", async (
       })
     }
     return Response.json({blocks: [shardBlock]})
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -497,7 +501,7 @@ test("masterchain shard blocks are resolved from the V2 shard snapshot", async (
 test("account history requests forward the requested sort order", async () => {
   const originalFetch = globalThis.fetch
   const requests: string[] = []
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     const url = new URL(input.toString())
     requests.push(url.toString())
     return Response.json(
@@ -505,7 +509,7 @@ test("account history requests forward the requested sort order", async () => {
         ? {actions: [], address_book: {}, metadata: {}}
         : {transactions: [], address_book: {}},
     )
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -535,7 +539,7 @@ test("account history requests forward the requested sort order", async () => {
 test("account action metadata resolves type-only jetton masters", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     const url = new URL(input.toString())
     requests.push(url)
     if (url.pathname.endsWith("/actions")) {
@@ -571,7 +575,7 @@ test("account action metadata resolves type-only jetton masters", async () => {
       ],
       metadata: {},
     })
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -610,7 +614,7 @@ test("account action metadata resolves type-only jetton masters", async () => {
 test("account action metadata skips master lookup when the symbol is present", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     const url = new URL(input.toString())
     requests.push(url)
     return Response.json({
@@ -627,7 +631,7 @@ test("account action metadata skips master lookup when the symbol is present", a
         },
       },
     })
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -676,12 +680,12 @@ test("account history streaming subscribes to and dispatches transactions and ac
       metadata: {"0:account": {token_info: []}},
     },
   ]
-  globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = mockFetch(async (_input: RequestInfo | URL, init?: RequestInit) => {
     subscriptionBody = String(init?.body ?? "")
     return new Response(streamEvents.map(event => `data: ${JSON.stringify(event)}\n\n`).join(""), {
       headers: {"Content-Type": "text/event-stream"},
     })
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -715,10 +719,10 @@ test("account history streaming subscribes to and dispatches transactions and ac
 test("jetton wallet requests forward pagination options", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     requests.push(new URL(input.toString()))
     return Response.json({jetton_wallets: []})
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -746,7 +750,7 @@ test("jetton wallet requests forward pagination options", async () => {
 test("jetton wallet metadata without content stays unresolved for master lookup", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     requests.push(new URL(input.toString()))
     return Response.json({
       jetton_wallets: [
@@ -767,7 +771,7 @@ test("jetton wallet metadata without content stays unresolved for master lookup"
         },
       },
     })
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -806,10 +810,10 @@ test("jetton wallet metadata without content stays unresolved for master lookup"
 test("NFT item requests forward owner pagination options", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     requests.push(new URL(input.toString()))
     return Response.json({nft_items: []})
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -836,10 +840,10 @@ test("NFT item requests forward owner pagination options", async () => {
 test("transaction lookup requests one full transaction by hash", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     requests.push(new URL(input.toString()))
     return Response.json({transactions: [{hash: "transaction-hash"}], address_book: {}})
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -874,13 +878,13 @@ test("transaction lookup requests one full transaction by hash", async () => {
 test("trace and block lookups can use their same-origin proxies", async () => {
   const originalFetch = globalThis.fetch
   const requests: Array<{readonly url: string; readonly apiKey: string | null}> = []
-  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
     requests.push({
       url: input.toString(),
       apiKey: new Headers(init?.headers).get("X-API-Key"),
     })
     return Response.json({traces: [], address_book: {}, metadata: {}})
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -925,7 +929,7 @@ test("trace and block lookups can use their same-origin proxies", async () => {
 test("block transaction fallback uses the V2 proxy and signed shard cursor", async () => {
   const originalFetch = globalThis.fetch
   let requestUrl = ""
-  globalThis.fetch = mock((input: RequestInfo | URL) => {
+  globalThis.fetch = mockFetch((input: RequestInfo | URL) => {
     requestUrl = input.toString()
     return Promise.resolve(
       Response.json({
@@ -939,7 +943,7 @@ test("block transaction fallback uses the V2 proxy and signed shard cursor", asy
         },
       }),
     )
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -971,7 +975,7 @@ test("block transaction fallback uses the V2 proxy and signed shard cursor", asy
 test("custom networks keep trace and block lookups on their configured APIs", async () => {
   const originalFetch = globalThis.fetch
   const requests: Array<{readonly url: string; readonly apiKey: string | null}> = []
-  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(input.toString())
     requests.push({
       url: url.toString(),
@@ -980,7 +984,7 @@ test("custom networks keep trace and block lookups on their configured APIs", as
     return url.pathname.endsWith("/getShards")
       ? Response.json({ok: true, result: {shards: []}})
       : Response.json({blocks: [], traces: [], transactions: []})
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -1028,10 +1032,10 @@ test("custom networks keep trace and block lookups on their configured APIs", as
 test("message transaction lookup forwards the causal direction", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
-  globalThis.fetch = mock(async input => {
+  globalThis.fetch = mockFetch(async input => {
     requests.push(new URL(input.toString()))
     return Response.json({transactions: [], address_book: {}})
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -1052,7 +1056,7 @@ test("message transaction lookup forwards the causal direction", async () => {
 
 test("NFT pages preserve their raw size while excluding flagged or registered NSFW items", async () => {
   const originalFetch = globalThis.fetch
-  globalThis.fetch = mock(async () =>
+  globalThis.fetch = mockFetch(async () =>
     Response.json({
       nft_items: [
         {
@@ -1112,7 +1116,7 @@ test("NFT pages preserve their raw size while excluding flagged or registered NS
         },
       },
     }),
-  ) as typeof fetch
+  )
 
   try {
     const client = new TonClient({
@@ -1150,7 +1154,7 @@ test("NFT pages preserve their raw size while excluding flagged or registered NS
 test("localnet state and checkpoint methods transfer JSON through the control API", async () => {
   const originalFetch = globalThis.fetch
   const requests: Array<{readonly url: URL; readonly init?: RequestInit}> = []
-  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(input.toString())
     requests.push({url, init})
 
@@ -1191,7 +1195,7 @@ test("localnet state and checkpoint methods transfer JSON through the control AP
         block_seqno: 7,
       },
     })
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({
@@ -1252,10 +1256,10 @@ test("localnet state and checkpoint methods transfer JSON through the control AP
 test("account funding sends exact nanograms beyond the safe integer range", async () => {
   const originalFetch = globalThis.fetch
   let requestBody: string | undefined
-  globalThis.fetch = mock(async (_input, init) => {
+  globalThis.fetch = mockFetch(async (_input, init) => {
     requestBody = String(init?.body)
     return Response.json({success: true, hash: "message-hash"})
-  }) as typeof fetch
+  })
 
   try {
     const client = new TonClient({

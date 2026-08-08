@@ -6,13 +6,17 @@ import {onRequest as onBlocksRequest} from "../functions/api/toncenter/[network]
 import {onRequest as onTransactionsRequest} from "../functions/api/toncenter/[network]/v3/transactions"
 import {installMemoryEdgeCache} from "./toncenterProxyTestUtils"
 
+const mockFetch = (
+  implementation: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
+) => Object.assign(mock(implementation), {preconnect: globalThis.fetch.preconnect})
+
 test("V2 block transaction fallback is normalized, validated, and cached", async () => {
   const originalFetch = globalThis.fetch
   const cache = installMemoryEdgeCache()
   const backgroundTasks: Promise<unknown>[] = []
   const upstreamRequests: string[] = []
 
-  globalThis.fetch = mock((input: RequestInfo | URL) => {
+  globalThis.fetch = mockFetch((input: RequestInfo | URL) => {
     upstreamRequests.push(input.toString())
     return Promise.resolve(
       Response.json({
@@ -26,7 +30,7 @@ test("V2 block transaction fallback is normalized, validated, and cached", async
         },
       }),
     )
-  }) as typeof fetch
+  })
 
   const context = (requestUrl: string) => ({
     request: new Request(requestUrl),
@@ -75,7 +79,7 @@ test("historical Toncenter blocks are normalized and cached for seven days", asy
   const upstreamRequests: Array<{readonly url: string; readonly apiKey: string | null}> = []
   const backgroundTasks: Promise<unknown>[] = []
 
-  globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = mockFetch((input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init)
     upstreamRequests.push({
       url: request.url,
@@ -92,7 +96,7 @@ test("historical Toncenter blocks are normalized and cached for seven days", asy
         ],
       }),
     )
-  }) as typeof fetch
+  })
 
   const context = {
     request: new Request(
@@ -182,7 +186,7 @@ test("latest block lists use a short edge cache and empty results are not cached
   const backgroundTasks: Promise<unknown>[] = []
   let upstreamRequestCount = 0
 
-  globalThis.fetch = mock(() => {
+  globalThis.fetch = mockFetch(() => {
     upstreamRequestCount += 1
     return Promise.resolve(
       Response.json({
@@ -190,7 +194,7 @@ test("latest block lists use a short edge cache and empty results are not cached
           upstreamRequestCount === 1 ? [] : [{workchain: 0, shard: "8000000000000000", seqno: 84}],
       }),
     )
-  }) as typeof fetch
+  })
 
   const context = {
     request: new Request(
@@ -280,7 +284,7 @@ test("block transactions and masterchain shards share the historical cache polic
   const upstreamRequests: Array<{readonly url: string; readonly apiKey: string | null}> = []
   const backgroundTasks: Promise<unknown>[] = []
 
-  globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = mockFetch((input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init)
     upstreamRequests.push({
       url: request.url,
@@ -305,7 +309,7 @@ test("block transactions and masterchain shards share the historical cache polic
             address_book: {},
           }),
     )
-  }) as typeof fetch
+  })
 
   const context = (url: string) => ({
     request: new Request(url),

@@ -122,7 +122,7 @@ const CONFIG_PARAMETER_METADATA: Readonly<Record<number, ConfigParameterMetadata
   // https://actonscan.com/tx/59ac226ac63ba4ecfcf4b9da1a02510fc787cc1f52fdfddb3a2b8f1bf54bbd77?network=testnet
   // Its NFT for parameter 10000 created this slot through the Config contract:
   // https://actonscan.com/tx/54507a083797977b25d761d9a80b0892a3d12f1f958b225dcbd64fba96d6d6f0?network=testnet
-  [-10000]: {
+  [-10_000]: {
     title: "NFT-owned test slot",
     description: "Test configuration slot controlled by a TON Config Parameter Ownership NFT",
   },

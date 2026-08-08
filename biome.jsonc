@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["packages/**"]
+    "includes": ["package.json", "packages/**", "!!crates"]
   },
   "formatter": {
     "enabled": true,
