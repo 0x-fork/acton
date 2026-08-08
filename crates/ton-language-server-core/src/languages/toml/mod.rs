@@ -1,5 +1,7 @@
 mod completion;
+mod definition;
 mod hover;
+mod paths;
 mod schema;
 
 use crate::language::{
@@ -34,6 +36,7 @@ impl LanguagePlugin for TomlLanguage {
     fn capabilities(&self) -> FeatureSet {
         FeatureSet {
             completion: true,
+            definition: true,
             hover: true,
             ..FeatureSet::default()
         }
@@ -67,6 +70,26 @@ impl LanguagePlugin for TomlLanguage {
         let started_at = request.context.profiler.start();
         let result = hover::hover(request.context.document, parsed, request.position);
         request.context.profiler.finish("toml.hover", started_at);
+
+        Ok(result)
+    }
+
+    fn definition(
+        &self,
+        request: crate::language::DefinitionRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::Location>> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TomlParsedDocument>()
+            .context("TOML parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let result = definition::definition(request.context.document, parsed, request.position);
+        request
+            .context
+            .profiler
+            .finish("toml.definition.resolve", started_at);
 
         Ok(result)
     }

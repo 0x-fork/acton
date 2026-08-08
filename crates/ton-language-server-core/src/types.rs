@@ -365,12 +365,27 @@ impl TextEdit {
 pub struct Location {
     pub uri: DocumentUri,
     pub range: Range,
+    /// Range in the source document that produced this definition link.
+    ///
+    /// When present, native LSP adapters can expose the location as a
+    /// `LocationLink`; `None` preserves the regular `Location` response.
+    pub origin_selection_range: Option<Range>,
 }
 
 impl Location {
     #[must_use]
     pub const fn new(uri: DocumentUri, range: Range) -> Self {
-        Self { uri, range }
+        Self {
+            uri,
+            range,
+            origin_selection_range: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_origin_selection_range(mut self, range: Range) -> Self {
+        self.origin_selection_range = Some(range);
+        self
     }
 }
 

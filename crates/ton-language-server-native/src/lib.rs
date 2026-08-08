@@ -1589,6 +1589,17 @@ fn decode_boc(bytes: &[u8]) -> anyhow::Result<tycho_types::cell::Cell> {
 fn locations_to_definition_response(
     locations: Vec<Location>,
 ) -> Option<lsp::GotoDefinitionResponse> {
+    if locations
+        .iter()
+        .any(|location| location.origin_selection_range.is_some())
+    {
+        let links = locations
+            .iter()
+            .filter_map(location_to_lsp_link)
+            .collect::<Vec<_>>();
+        return (!links.is_empty()).then_some(lsp::GotoDefinitionResponse::Link(links));
+    }
+
     match locations.as_slice() {
         [] => None,
         [location] => location_to_lsp(location).map(lsp::GotoDefinitionResponse::Scalar),
@@ -1602,6 +1613,15 @@ fn location_to_lsp(location: &Location) -> Option<lsp::Location> {
     Some(lsp::Location {
         uri: lsp::Url::parse(location.uri.as_str()).ok()?,
         range: range_to_lsp(location.range),
+    })
+}
+
+fn location_to_lsp_link(location: &Location) -> Option<lsp::LocationLink> {
+    Some(lsp::LocationLink {
+        origin_selection_range: location.origin_selection_range.map(range_to_lsp),
+        target_uri: lsp::Url::parse(location.uri.as_str()).ok()?,
+        target_range: range_to_lsp(location.range),
+        target_selection_range: range_to_lsp(location.range),
     })
 }
 
@@ -2414,6 +2434,34 @@ mod tests {
 
         assert!(labels.contains(&"package"));
         assert!(labels.contains(&"test"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn definition_response_uses_location_links_for_origin_ranges() -> anyhow::Result<()> {
+        let uri = DocumentUri::from("file:///workspace/target.tolk");
+        let target_range = Range::new(Position::new(2, 0), Position::new(2, 4));
+        let origin_range = Range::new(Position::new(1, 7), Position::new(1, 29));
+
+        let response =
+            locations_to_definition_response(vec![Location::new(uri.clone(), target_range)])
+                .expect("regular definition response should be present");
+        assert!(matches!(response, lsp::GotoDefinitionResponse::Scalar(_)));
+
+        let response = locations_to_definition_response(vec![
+            Location::new(uri, target_range).with_origin_selection_range(origin_range),
+        ])
+        .expect("linked definition response should be present");
+        let lsp::GotoDefinitionResponse::Link(links) = response else {
+            panic!("expected LocationLink response");
+        };
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].target_range, range_to_lsp(target_range));
+        assert_eq!(
+            links[0].origin_selection_range,
+            Some(range_to_lsp(origin_range))
+        );
 
         Ok(())
     }
