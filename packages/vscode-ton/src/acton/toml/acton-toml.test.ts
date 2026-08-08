@@ -58,4 +58,25 @@ libs = "libs#core"
     })
     expect(parseTomlAssignmentKey("# value = ignored")).toBeNull()
   })
+
+  it("parses assignment keys before multiline string values", () => {
+    const content = `[scripts]
+update-wrapper = """
+acton wrapper Config -o config/wrappers/Config.gen.tolk &&
+acton wrapper Counter -o counter/wrappers/Counter.gen.tolk
+"""
+`
+    const assignment = content.split("\n")[1]
+
+    expect(parseTomlAssignmentKey(assignment)).toEqual({
+      key: "update-wrapper",
+      start: 0,
+      end: 14,
+    })
+    expect(parseTomlAssignmentKey("update-wrapper = '''")).toEqual({
+      key: "update-wrapper",
+      start: 0,
+      end: 14,
+    })
+  })
 })

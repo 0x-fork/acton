@@ -56,14 +56,16 @@ export function parseTomlAssignmentKey(line: string): TomlAssignmentKey | null {
   const equalsIndex = findTomlEquals(line)
   if (equalsIndex === -1) return null
 
-  const toml = parseTomlContent(`${line}\n`)
+  const rawKey = line.slice(0, equalsIndex).trim()
+  if (rawKey === "") return null
+
+  const toml =
+    parseTomlContent(`${line}\n`) ??
+    (isMultilineStringStart(line, equalsIndex) ? parseTomlContent(`${rawKey} = ""\n`) : null)
   if (!toml) return null
 
   const entries = Object.entries(toml)
   if (entries.length !== 1) return null
-
-  const rawKey = line.slice(0, equalsIndex).trim()
-  if (rawKey === "") return null
 
   const start = line.indexOf(rawKey)
   return {
@@ -71,6 +73,11 @@ export function parseTomlAssignmentKey(line: string): TomlAssignmentKey | null {
     start,
     end: start + rawKey.length,
   }
+}
+
+function isMultilineStringStart(line: string, equalsIndex: number): boolean {
+  const value = line.slice(equalsIndex + 1).trimStart()
+  return value.startsWith('"""') || value.startsWith("'''")
 }
 
 function findTomlEquals(line: string): number {
