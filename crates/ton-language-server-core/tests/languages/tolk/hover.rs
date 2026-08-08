@@ -1102,6 +1102,39 @@ fn shows_resolved_import_path() {
 }
 
 #[test]
+fn shows_imported_file_documentation_below_its_path() {
+    let marked = MarkedSource::parse(r#"import "<caret>lib""#);
+    let uri = DocumentUri::from("file:///fixture/main.tolk");
+    let mut service = LanguageService::new(LanguageServiceConfig::default());
+    service.register_language(TolkLanguage::new());
+    service
+        .add_source_file(
+            LANGUAGE_ID,
+            "file:///fixture/lib.tolk",
+            "/// Module for reusable helpers.\n///\n/// Use it from contracts and scripts.\n\nfun helper() {}\n",
+        )
+        .expect("imported file should be added");
+    service
+        .open_document(uri.clone(), LANGUAGE_ID, 1, marked.source().to_owned())
+        .expect("Tolk document should open");
+
+    let actual = service
+        .hover(&uri, marked.marker("caret").position)
+        .expect("hover request should succeed")
+        .expect("import hover should exist")
+        .contents;
+    expect![[r#"
+        ```tolk
+        import "/fixture/lib.tolk"
+        ```
+
+        Module for reusable helpers.
+
+        Use it from contracts and scripts."#]]
+    .assert_eq(&actual);
+}
+
+#[test]
 fn records_hover_profile_spans() {
     let marked = MarkedSource::parse("fun <caret>main() {}\n");
     let uri = DocumentUri::from("file:///fixture/profiled.tolk");

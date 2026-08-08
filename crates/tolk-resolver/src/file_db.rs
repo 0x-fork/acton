@@ -25,6 +25,8 @@ pub struct FileInfo {
     index: Arc<FileIndex>,
     /// The parsed AST and source code.
     source: ast::SourceFile,
+    /// Documentation declared by a leading, standalone doc-comment block.
+    documentation: Option<Arc<str>>,
     /// Pre-computed line offsets for efficient position mapping.
     line_offsets: Vec<usize>,
 }
@@ -48,6 +50,12 @@ impl FileInfo {
     #[must_use]
     pub const fn source(&self) -> &ast::SourceFile {
         &self.source
+    }
+
+    /// Returns documentation declared for the whole file.
+    #[must_use]
+    pub fn documentation(&self) -> Option<&str> {
+        self.documentation.as_deref()
     }
 
     #[must_use]
@@ -263,6 +271,7 @@ impl FileDb {
     /// again just to update resolver indexes.
     pub fn process_source_file(&self, path: PathBuf, file: ast::SourceFile) -> Arc<FileInfo> {
         let content = file.source.clone();
+        let documentation = file.documentation().map(Arc::from);
         let mut line_offsets = vec![0];
         let mut last_offset = 0;
         for line in content.lines() {
@@ -288,6 +297,7 @@ impl FileDb {
                 source_kind,
             )),
             source: file,
+            documentation,
             line_offsets,
         });
 

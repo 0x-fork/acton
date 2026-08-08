@@ -10,7 +10,7 @@ use tolk_resolver::{Resolved, Symbol, SymbolId, SymbolKind};
 use tolk_syntax::{
     Annotation, Assert, AstNode, CatchClause, Contract, ContractField, EnumMember, FunctionLike,
     HasGenericParams, HasName, Import, NumberLit, Parameter, StringLit, StructField, Throw,
-    TopLevel, TryFromNode, Type, TypeAliasUnderlyingType, TypeParameter, VarDecl,
+    TopLevel, TryFromNode, Type, TypeAliasUnderlyingType, TypeParameter, VarDecl, clean_comment,
     parse_tolk_int_literal,
 };
 use tolk_ty::{TyData, TyId, TypeInterner};
@@ -93,7 +93,15 @@ impl TolkResolveSnapshot {
                     .imports_of(file_id)?
                     .into_iter()
                     .find(|import| import.import().span.contains(offset))?;
-                let contents = format!("```tolk\nimport \"{}\"\n```", import.path().display());
+                let mut contents = format!("```tolk\nimport \"{}\"\n```", import.path().display());
+                if let Some(target) = import
+                    .target()
+                    .and_then(|target| self.file_db.get_by_id(target))
+                    && let Some(documentation) = target.documentation()
+                {
+                    contents.push_str("\n\n");
+                    contents.push_str(documentation);
+                }
                 return Some(Hover::new(
                     contents,
                     self.range_for_node(file_id, string.syntax()),
@@ -798,24 +806,6 @@ fn documentation_before(node: tree_sitter::Node<'_>, source: &str) -> String {
         .map(|comment| clean_comment(&comment))
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-fn clean_comment(comment: &str) -> String {
-    if let Some(comment) = comment
-        .strip_prefix("///")
-        .or_else(|| comment.strip_prefix("//"))
-    {
-        return comment.strip_prefix(' ').unwrap_or(comment).to_owned();
-    }
-
-    let comment = comment
-        .strip_prefix("/**")
-        .or_else(|| comment.strip_prefix("/*"))
-        .and_then(|comment| comment.strip_suffix("*/"))
-        .unwrap_or_default();
-    let comment = comment.strip_prefix(' ').unwrap_or(comment);
-
-    comment.strip_suffix(' ').unwrap_or(comment).to_owned()
 }
 
 fn field_documentation<'tree, N>(node: N, source: &str) -> String
