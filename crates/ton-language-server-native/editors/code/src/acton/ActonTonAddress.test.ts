@@ -53,6 +53,20 @@ describe("Acton TON address links", () => {
     expect(
       createTonAddressExplorerUrl(
         "0:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "actonscan",
+        false,
+      ),
+    ).toBe(
+      "https://actonscan.com/address/0%3A0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef?network=mainnet",
+    )
+
+    expect(createTonAddressExplorerUrl("kQabc", "actonscan", true)).toBe(
+      "https://actonscan.com/address/kQabc?network=testnet",
+    )
+
+    expect(
+      createTonAddressExplorerUrl(
+        "0:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         "tonscan",
         false,
       ),
@@ -66,9 +80,10 @@ describe("Acton TON address links", () => {
   })
 
   it("normalizes explorer setting values", () => {
+    expect(normalizeTonExplorer("actonscan")).toBe("actonscan")
     expect(normalizeTonExplorer("tonviewer")).toBe("tonviewer")
     expect(normalizeTonExplorer("tonscan")).toBe("tonscan")
-    expect(normalizeTonExplorer("unknown")).toBe("tonscan")
-    expect(normalizeTonExplorer(undefined)).toBe("tonscan")
+    expect(normalizeTonExplorer("unknown")).toBe("actonscan")
+    expect(normalizeTonExplorer(undefined)).toBe("actonscan")
   })
 })

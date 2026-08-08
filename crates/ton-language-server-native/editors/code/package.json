@@ -316,10 +316,11 @@
           "ton.acton.explorer": {
             "type": "string",
             "enum": [
+              "actonscan",
               "tonscan",
               "tonviewer"
             ],
-            "default": "tonscan",
+            "default": "actonscan",
             "description": "Explorer used for clickable TON addresses in Acton output"
           },
           "ton.acton.updateChecks.enabled": {

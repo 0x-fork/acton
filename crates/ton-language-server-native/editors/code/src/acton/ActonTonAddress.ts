@@ -1,7 +1,7 @@
 //  SPDX-License-Identifier: MIT
 //  Copyright © 2026 TON Core
 
-export type TonExplorer = "tonscan" | "tonviewer"
+export type TonExplorer = "actonscan" | "tonscan" | "tonviewer"
 
 export interface TonAddressMatch {
   readonly address: string
@@ -48,7 +48,7 @@ export function findTonAddressMatches(line: string): TonAddressMatch[] {
 }
 
 export function normalizeTonExplorer(value: string | undefined): TonExplorer {
-  return value === "tonviewer" ? "tonviewer" : "tonscan"
+  return value === "tonscan" || value === "tonviewer" ? value : "actonscan"
 }
 
 export function createTonAddressExplorerUrl(
@@ -57,6 +57,11 @@ export function createTonAddressExplorerUrl(
   isTestnet: boolean,
 ): string {
   const encodedAddress = encodeURIComponent(address)
+  if (explorer === "actonscan") {
+    const network = isTestnet ? "testnet" : "mainnet"
+    return `https://actonscan.com/address/${encodedAddress}?network=${network}`
+  }
+
   if (explorer === "tonviewer") {
     const domain = isTestnet ? "testnet.tonviewer.com" : "tonviewer.com"
     return `https://${domain}/${encodedAddress}`
