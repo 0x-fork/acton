@@ -1,19 +1,21 @@
 use crate::language::{
     CallHierarchyPrepareRequest, CallHierarchyRequest, CodeActionRequest, CodeLensRequest,
-    CompletionRequest, DefinitionRequest, DocumentHighlightRequest, DocumentSymbolRequest,
-    FileRenameRequest, FoldingRangeRequest, FormattingRequest, HoverRequest, InlayHintRequest,
-    LanguagePlugin, ParseRequest, ParsedDocument, PluginContext, PrepareRenameRequest,
-    ReferenceRequest, RenameRequest, SelectionRangeRequest, SemanticTokensRequest,
-    SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceSymbolRequest,
+    CompletionRequest, DefinitionRequest, DiagnosticRequest, DocumentHighlightRequest,
+    DocumentSymbolRequest, FileRenameRequest, FoldingRangeRequest, FormattingRequest, HoverRequest,
+    InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
+    PrepareRenameRequest, ReferenceRequest, RenameRequest, SelectionRangeRequest,
+    SemanticTokensRequest, SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest,
+    WorkspaceSymbolRequest,
 };
 use crate::logging;
 use crate::profiling::Profiler;
 use crate::semantic_tokens::SemanticTokens;
 use crate::types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction, CodeLens,
-    DocumentEdits, DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri, FileRename,
-    FoldingRange, Hover, InlayHint, LanguageId, Location, Position, PrepareRename, Range,
-    SelectionRange, SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    Diagnostic, DocumentEdits, DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri,
+    FileRename, FoldingRange, Hover, InlayHint, LanguageId, Location, Position, PrepareRename,
+    Range, SelectionRange, SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit,
+    WorkspaceSymbol,
 };
 use crate::{CompletionList, CompletionTrigger, TypeAtPosition};
 use std::collections::{BTreeMap, HashMap};
@@ -1487,6 +1489,29 @@ impl LanguageService {
             positions,
         });
         self.profiler.finish("selection_ranges", started_at);
+        result
+    }
+
+    pub fn diagnostics(&mut self, uri: &DocumentUri) -> anyhow::Result<Vec<Diagnostic>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().diagnostics {
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.diagnostics(DiagnosticRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+        });
+        self.profiler.finish("diagnostics", started_at);
         result
     }
 

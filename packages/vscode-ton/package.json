@@ -327,16 +327,6 @@
             "type": "boolean",
             "default": true,
             "description": "Check for Acton CLI updates in Acton projects"
-          },
-          "ton.acton.linter.enabled": {
-            "type": "boolean",
-            "default": true,
-            "description": "Enable Acton linter (runs `acton check` on file changes)"
-          },
-          "ton.acton.linter.debounce": {
-            "type": "number",
-            "default": 100,
-            "description": "Debounce time in milliseconds for the Acton linter"
           }
         }
       }

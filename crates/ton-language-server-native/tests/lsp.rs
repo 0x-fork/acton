@@ -208,6 +208,206 @@ async fn initialize_selects_one_root_and_keeps_partial_indexes_usable() -> anyho
 }
 
 #[tokio::test]
+async fn publishes_linter_diagnostics_on_open_change_and_close() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    fs::write(
+        workspace.path().join("Acton.toml"),
+        "[lint.rules]\nname-case-checker = \"deny\"\n",
+    )?;
+    let main_uri = Url::from_file_path(workspace.path().join("main.tolk"))
+        .map_err(|()| anyhow::anyhow!("cannot convert main file path to URI"))?;
+    let root_uri = Url::from_directory_path(workspace.path())
+        .map_err(|()| anyhow::anyhow!("cannot convert workspace path to URI"))?;
+    let (mut client, server) = LspTestClient::start(ServerConfig::new(workspace.path())).await;
+
+    client
+        .request(
+            "initialize",
+            json!({"processId": null, "rootUri": root_uri, "capabilities": {}}),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    client
+        .notify(
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {
+                    "uri": main_uri,
+                    "languageId": "tolk",
+                    "version": 1,
+                    "text": "fun BadName() {}",
+                }
+            }),
+        )
+        .await?;
+    let after_open = wait_for_published_diagnostics(&mut client, 0).await?;
+    let after_open_count = published_diagnostics_count(&client);
+
+    client
+        .notify(
+            "textDocument/didChange",
+            json!({
+                "textDocument": {"uri": main_uri, "version": 2},
+                "contentChanges": [{"text": "fun goodName() {}"}],
+            }),
+        )
+        .await?;
+    let after_change = wait_for_published_diagnostics(&mut client, after_open_count).await?;
+    let after_change_count = published_diagnostics_count(&client);
+
+    client
+        .notify(
+            "textDocument/didClose",
+            json!({"textDocument": {"uri": main_uri}}),
+        )
+        .await?;
+    let after_close = wait_for_published_diagnostics(&mut client, after_change_count).await?;
+
+    expect![[r#"
+        {
+          "change": {
+            "diagnostics": [],
+            "uri": "$MAIN",
+            "version": 2
+          },
+          "close": {
+            "diagnostics": [],
+            "uri": "$MAIN"
+          },
+          "open": {
+            "diagnostics": [
+              {
+                "code": "S001",
+                "message": "name should be in the expected case\nnot camelCase: `BadName`",
+                "range": {
+                  "end": {
+                    "character": 11,
+                    "line": 0
+                  },
+                  "start": {
+                    "character": 4,
+                    "line": 0
+                  }
+                },
+                "severity": 1,
+                "source": "acton"
+              }
+            ],
+            "uri": "$MAIN",
+            "version": 1
+          }
+        }"#]]
+    .assert_eq(&serde_json::to_string_pretty(&json!({
+        "open": normalize_diagnostic_uri(after_open, &main_uri),
+        "change": normalize_diagnostic_uri(after_change, &main_uri),
+        "close": normalize_diagnostic_uri(after_close, &main_uri),
+    }))?);
+
+    client.shutdown(server).await
+}
+
+#[tokio::test]
+async fn compiler_diagnostics_use_unsaved_document_text() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    fs::write(workspace.path().join("Acton.toml"), "")?;
+    let main_uri = Url::from_file_path(workspace.path().join("new.tolk"))
+        .map_err(|()| anyhow::anyhow!("cannot convert source file path to URI"))?;
+    let root_uri = Url::from_directory_path(workspace.path())
+        .map_err(|()| anyhow::anyhow!("cannot convert workspace path to URI"))?;
+    let mut config = ServerConfig::new(workspace.path());
+    config.enable_profiling = true;
+    let (mut client, server) = LspTestClient::start(config).await;
+
+    client
+        .request(
+            "initialize",
+            json!({"processId": null, "rootUri": root_uri, "capabilities": {}}),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    client
+        .notify(
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {
+                    "uri": main_uri,
+                    "languageId": "tolk",
+                    "version": 1,
+                    "text": "fun helper(): int { val face = \"😀\"; return missingName; }\n",
+                }
+            }),
+        )
+        .await?;
+    let after_open = wait_for_published_diagnostics(&mut client, 0).await?;
+    let after_open_count = published_diagnostics_count(&client);
+
+    client
+        .notify(
+            "textDocument/didChange",
+            json!({
+                "textDocument": {"uri": main_uri, "version": 2},
+                "contentChanges": [{"text": "fun helper(): int { val face = \"😀\"; return 1; }\n"}],
+            }),
+        )
+        .await?;
+    let after_change = wait_for_published_diagnostics(&mut client, after_open_count).await?;
+    let profile = client.request("ton/profile", json!({})).await?;
+
+    let compiler_diagnostics = |publish: &Value| {
+        publish["diagnostics"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|diagnostic| diagnostic["source"] == "tolk-compiler")
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    let actual = json!({
+        "open": compiler_diagnostics(&after_open),
+        "change": compiler_diagnostics(&after_change),
+        "fileExists": workspace.path().join("new.tolk").exists(),
+        "profileCounts": profile["spans"]
+            .as_object()
+            .into_iter()
+            .flatten()
+            .filter(|(name, _)| name.starts_with("tolk.diagnostics.compiler."))
+            .map(|(name, span)| (name.clone(), span["count"].clone()))
+            .collect::<serde_json::Map<_, _>>(),
+    });
+    expect![[r#"
+        {
+          "change": [],
+          "fileExists": false,
+          "open": [
+            {
+              "code": "C001",
+              "message": "undefined symbol `missingName`",
+              "range": {
+                "end": {
+                  "character": 55,
+                  "line": 0
+                },
+                "start": {
+                  "character": 44,
+                  "line": 0
+                }
+              },
+              "severity": 1,
+              "source": "tolk-compiler"
+            }
+          ],
+          "profileCounts": {
+            "tolk.diagnostics.compiler.check": 2,
+            "tolk.diagnostics.compiler.convert": 2,
+            "tolk.diagnostics.compiler.prepare": 2
+          }
+        }"#]]
+    .assert_eq(&serde_json::to_string_pretty(&actual)?);
+
+    client.shutdown(server).await
+}
+
+#[tokio::test]
 async fn call_hierarchy_serves_prepare_incoming_and_outgoing_requests() -> anyhow::Result<()> {
     let workspace = tempfile::tempdir()?;
     fs::write(workspace.path().join("Acton.toml"), "")?;
@@ -892,4 +1092,44 @@ fn log_warning(notification: &Value) -> Option<&str> {
     (notification["method"] == "window/logMessage" && notification["params"]["type"] == 2)
         .then(|| notification["params"]["message"].as_str())
         .flatten()
+}
+
+fn last_published_diagnostics(client: &LspTestClient) -> Option<&Value> {
+    client
+        .notifications()
+        .iter()
+        .rev()
+        .find(|notification| notification["method"] == "textDocument/publishDiagnostics")
+        .map(|notification| &notification["params"])
+}
+
+fn published_diagnostics_count(client: &LspTestClient) -> usize {
+    client
+        .notifications()
+        .iter()
+        .filter(|notification| notification["method"] == "textDocument/publishDiagnostics")
+        .count()
+}
+
+async fn wait_for_published_diagnostics(
+    client: &mut LspTestClient,
+    previous_count: usize,
+) -> anyhow::Result<Value> {
+    for _ in 0..20 {
+        client.request("ton/profile", json!({})).await?;
+        if published_diagnostics_count(client) > previous_count {
+            return last_published_diagnostics(client)
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("missing published diagnostics"));
+        }
+        tokio::task::yield_now().await;
+    }
+    anyhow::bail!("language server did not publish diagnostics")
+}
+
+fn normalize_diagnostic_uri(mut params: Value, uri: &Url) -> Value {
+    if params["uri"] == uri.as_str() {
+        params["uri"] = Value::String("$MAIN".to_owned());
+    }
+    params
 }

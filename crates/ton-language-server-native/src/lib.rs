@@ -22,13 +22,14 @@ use ton_language_server_core::languages::toml::TomlLanguage;
 use ton_language_server_core::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
     CodeActionKind, CodeLens, CompletionItem, CompletionItemKind, CompletionList,
-    CompletionTrigger, CompletionTriggerKind, DocumentHighlight, DocumentHighlightKind,
-    DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename, FoldingRange, Hover, InlayHint,
-    InlayHintCategory, InlayHintKind, InsertTextFormat, LanguageId, LanguageService,
-    LanguageServiceConfig, Location, Position, PrepareRename, ProfileReport, Range,
-    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SelectionRange, SemanticToken,
-    SemanticTokens, SignatureHelp, SignatureInformation, TextEdit, TextIndex, TypeAtPosition,
-    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    CompletionTrigger, CompletionTriggerKind, Diagnostic as CoreDiagnostic,
+    DiagnosticSeverity as CoreDiagnosticSeverity, DiagnosticTag as CoreDiagnosticTag,
+    DocumentHighlight, DocumentHighlightKind, DocumentSymbol, DocumentSymbolKind, DocumentUri,
+    FileRename, FoldingRange, Hover, InlayHint, InlayHintCategory, InlayHintKind, InsertTextFormat,
+    LanguageId, LanguageService, LanguageServiceConfig, Location, Position, PrepareRename,
+    ProfileReport, Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SelectionRange,
+    SemanticToken, SemanticTokens, SignatureHelp, SignatureInformation, TextEdit, TextIndex,
+    TypeAtPosition, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use tower_lsp::jsonrpc;
 use tower_lsp::lsp_types as lsp;
@@ -402,6 +403,46 @@ impl NativeLanguageServer {
             .await;
     }
 
+    async fn publish_diagnostics(&self, uri: &lsp::Url, version: Option<i32>) {
+        let diagnostics = self.with_service(|service| service.diagnostics(&uri.to_core()));
+        match diagnostics {
+            Ok(diagnostics) => {
+                self.client
+                    .publish_diagnostics(
+                        uri.clone(),
+                        diagnostics.into_iter().map(diagnostic_to_lsp).collect(),
+                        version,
+                    )
+                    .await;
+            }
+            Err(error) => self.report_error("document.diagnostics", error).await,
+        }
+    }
+
+    async fn publish_all_tolk_diagnostics(&self) {
+        let uris = self
+            .documents
+            .lock()
+            .map(|documents| {
+                documents
+                    .iter()
+                    .filter(|(_, document)| {
+                        matches!(
+                            &document.kind,
+                            OpenDocumentKind::Language { language_id, .. }
+                                if language_id.as_str() == TOLK_LANGUAGE_ID
+                        )
+                    })
+                    .filter_map(|(uri, _)| lsp::Url::parse(uri).ok())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        for uri in uris {
+            self.publish_diagnostics(&uri, None).await;
+        }
+    }
+
     fn with_service<T>(
         &self,
         f: impl FnOnce(&mut LanguageService) -> anyhow::Result<T>,
@@ -753,7 +794,11 @@ impl LanguageServer for NativeLanguageServer {
             return;
         }
 
-        if let Err(error) = self.client.inlay_hint_refresh().await {
+        let (inlay_refresh, semantic_refresh) = tokio::join!(
+            self.client.inlay_hint_refresh(),
+            self.client.semantic_tokens_refresh()
+        );
+        if let Err(error) = inlay_refresh {
             tracing::debug!(
                 target: "ton_language_server_native",
                 operation = "workspace.inlay_hint.refresh",
@@ -761,7 +806,7 @@ impl LanguageServer for NativeLanguageServer {
                 "client did not accept an inlay hint refresh"
             );
         }
-        if let Err(error) = self.client.semantic_tokens_refresh().await {
+        if let Err(error) = semantic_refresh {
             tracing::debug!(
                 target: "ton_language_server_native",
                 operation = "workspace.semantic_tokens.refresh",
@@ -798,6 +843,7 @@ impl LanguageServer for NativeLanguageServer {
                 updates_workspace_config,
             },
         );
+        let is_language_document = matches!(&kind, OpenDocumentKind::Language { .. });
 
         if let OpenDocumentKind::Language { language_id, .. } = &kind {
             let result = self.with_service(|service| {
@@ -822,6 +868,11 @@ impl LanguageServer for NativeLanguageServer {
                 },
             );
         }
+        if updates_workspace_config {
+            self.publish_all_tolk_diagnostics().await;
+        } else if is_language_document {
+            self.publish_diagnostics(&uri, Some(item.version)).await;
+        }
     }
 
     async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
@@ -834,20 +885,25 @@ impl LanguageServer for NativeLanguageServer {
                 return;
             }
         };
+        let is_language_document = matches!(&change.0, OpenDocumentKind::Language { .. });
+        let updates_workspace_config = change.0.updates_workspace_config();
 
-        if change.0.updates_workspace_config()
+        if updates_workspace_config
             && let Err(error) = self.apply_workspace_config_text(change.1.clone())
         {
             self.report_error("workspace.config.change", error).await;
         }
 
-        match change {
+        let changed = match change {
             (OpenDocumentKind::Language { .. }, full_text, AppliedChanges::FullText) => {
                 let result = self.with_service(|service| {
                     service.change_document(&uri.to_core(), version, full_text)
                 });
                 if let Err(error) = result {
                     self.report_error("document.change", error).await;
+                    false
+                } else {
+                    true
                 }
             }
             (OpenDocumentKind::Language { .. }, _, AppliedChanges::Incremental(edits)) => {
@@ -855,9 +911,19 @@ impl LanguageServer for NativeLanguageServer {
                     .with_service(|service| service.edit_document(&uri.to_core(), version, edits));
                 if let Err(error) = result {
                     self.report_error("document.edit", error).await;
+                    false
+                } else {
+                    true
                 }
             }
-            (OpenDocumentKind::Unsupported, _, _) => {}
+            (OpenDocumentKind::Unsupported, _, _) => false,
+        };
+        if changed {
+            if updates_workspace_config {
+                self.publish_all_tolk_diagnostics().await;
+            } else if is_language_document {
+                self.publish_diagnostics(&uri, Some(version)).await;
+            }
         }
     }
 
@@ -913,6 +979,7 @@ impl LanguageServer for NativeLanguageServer {
                 );
             });
         }
+        self.client.publish_diagnostics(uri, Vec::new(), None).await;
     }
 
     async fn goto_definition(
@@ -1914,6 +1981,33 @@ fn code_action_to_lsp(action: CodeAction) -> anyhow::Result<lsp::CodeActionOrCom
         disabled: None,
         data: None,
     }))
+}
+
+fn diagnostic_to_lsp(diagnostic: CoreDiagnostic) -> lsp::Diagnostic {
+    let severity = match diagnostic.severity {
+        CoreDiagnosticSeverity::Error => lsp::DiagnosticSeverity::ERROR,
+        CoreDiagnosticSeverity::Warning => lsp::DiagnosticSeverity::WARNING,
+        CoreDiagnosticSeverity::Information => lsp::DiagnosticSeverity::INFORMATION,
+        CoreDiagnosticSeverity::Hint => lsp::DiagnosticSeverity::HINT,
+    };
+    let tags = diagnostic
+        .tags
+        .into_iter()
+        .map(|tag| match tag {
+            CoreDiagnosticTag::Unnecessary => lsp::DiagnosticTag::UNNECESSARY,
+            CoreDiagnosticTag::Deprecated => lsp::DiagnosticTag::DEPRECATED,
+        })
+        .collect::<Vec<_>>();
+
+    lsp::Diagnostic {
+        range: range_to_lsp(diagnostic.range),
+        severity: Some(severity),
+        code: diagnostic.code.map(lsp::NumberOrString::String),
+        source: Some(diagnostic.source),
+        message: diagnostic.message,
+        tags: (!tags.is_empty()).then_some(tags),
+        ..lsp::Diagnostic::default()
+    }
 }
 
 const fn folding_range_to_lsp(range: FoldingRange) -> lsp::FoldingRange {

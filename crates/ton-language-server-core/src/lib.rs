@@ -17,9 +17,9 @@ pub use completion::{
 pub use custom::TypeAtPosition;
 pub use language::{
     CallHierarchyPrepareRequest, CallHierarchyRequest, CodeActionRequest, CodeLensRequest,
-    CompletionRequest, DefinitionRequest, DocumentHighlightRequest, DocumentSymbolRequest,
-    FeatureSet, FileRenameRequest, FoldingRangeRequest, FormattingRequest, HoverRequest,
-    InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
+    CompletionRequest, DefinitionRequest, DiagnosticRequest, DocumentHighlightRequest,
+    DocumentSymbolRequest, FeatureSet, FileRenameRequest, FoldingRangeRequest, FormattingRequest,
+    HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
     PrepareRenameRequest, RenameRequest, SelectionRangeRequest, SemanticTokensRequest,
     SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage,
     WorkspaceSymbolRequest,
@@ -40,11 +40,11 @@ pub use service::{LanguageService, LanguageServiceConfig};
 pub use text::TextIndex;
 pub use types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
-    CodeActionKind, CodeLens, Command, DocumentEdits, DocumentHighlight, DocumentHighlightKind,
-    DocumentSnapshot, DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename, FoldingRange,
-    Hover, InlayHint, InlayHintCategory, InlayHintKind, LanguageId, Location, Position,
-    PrepareRename, Range, SelectionRange, SignatureHelp, SignatureInformation, TextEdit,
-    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    CodeActionKind, CodeLens, Command, Diagnostic, DiagnosticSeverity, DiagnosticTag,
+    DocumentEdits, DocumentHighlight, DocumentHighlightKind, DocumentSnapshot, DocumentSymbol,
+    DocumentSymbolKind, DocumentUri, FileRename, FoldingRange, Hover, InlayHint, InlayHintCategory,
+    InlayHintKind, LanguageId, Location, Position, PrepareRename, Range, SelectionRange,
+    SignatureHelp, SignatureInformation, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 
 #[must_use]

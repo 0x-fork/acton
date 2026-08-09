@@ -44,7 +44,10 @@ fn file_uri_path(uri: &str) -> Option<PathBuf> {
     let mut uri = url::Url::parse(uri).ok()?;
     let authority = uri.host_str().map(str::to_owned);
     uri.set_host(None).ok()?;
+    #[cfg(not(target_arch = "wasm32"))]
     let path = uri.to_file_path().ok()?;
+    #[cfg(target_arch = "wasm32")]
+    let path = PathBuf::from(urlencoding::decode(uri.path()).ok()?.as_ref());
 
     if let Some(authority) = authority {
         path.strip_prefix("/")
@@ -277,6 +280,61 @@ impl Range {
     #[must_use]
     pub const fn new(start: Position, end: Position) -> Self {
         Self { start, end }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DiagnosticSeverity {
+    Error,
+    Warning,
+    Information,
+    Hint,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DiagnosticTag {
+    Unnecessary,
+    Deprecated,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Diagnostic {
+    pub range: Range,
+    pub severity: DiagnosticSeverity,
+    pub code: Option<String>,
+    pub source: String,
+    pub message: String,
+    pub tags: Vec<DiagnosticTag>,
+}
+
+impl Diagnostic {
+    #[must_use]
+    pub fn new(
+        range: Range,
+        severity: DiagnosticSeverity,
+        source: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            range,
+            severity,
+            code: None,
+            source: source.into(),
+            message: message.into(),
+            tags: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn with_code(mut self, code: impl Into<String>) -> Self {
+        self.code = Some(code.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_tags(mut self, tags: Vec<DiagnosticTag>) -> Self {
+        self.tags = tags;
+        self
     }
 }
 

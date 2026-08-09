@@ -22,14 +22,17 @@ tolk = [
     "dep:rustc-hash",
     "dep:tolk-analysis",
     "dep:tolk-fmt",
+    "dep:tolk-linter",
     "dep:tolk-resolver",
     "dep:tolk-syntax",
     "dep:tolk-ty",
     "dep:toml",
 ]
+tolk-compiler = ["tolk", "dep:dunce", "dep:tolk-compiler"]
 
 [dependencies]
 anyhow = { workspace = true }
+dunce = { workspace = true, optional = true }
 include_dir = { workspace = true, optional = true }
 rustc-hash = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
@@ -40,7 +43,9 @@ tasm-syntax = { workspace = true, optional = true }
 tlb-syntax = { workspace = true, optional = true }
 tolk-resolver = { workspace = true, optional = true }
 tolk-analysis = { workspace = true, optional = true }
+tolk-compiler = { workspace = true, optional = true }
 tolk-fmt = { workspace = true, optional = true }
+tolk-linter = { workspace = true, optional = true }
 tolk-syntax = { workspace = true, optional = true }
 tolk-ty = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
@@ -50,6 +55,7 @@ ton-syntax = { workspace = true }
 tracing = { workspace = true }
 tree-sitter = { workspace = true }
 url = { workspace = true }
+urlencoding = { workspace = true }
 web-time = { workspace = true }
 
 [dev-dependencies]
@@ -184,6 +190,11 @@ required-features = ["tolk"]
 [[test]]
 name = "tolk_selection_ranges"
 path = "tests/languages/tolk/selection_ranges.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_diagnostics"
+path = "tests/languages/tolk/diagnostics.rs"
 required-features = ["tolk"]
 
 [[test]]

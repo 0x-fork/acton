@@ -10,13 +10,13 @@ use ton_language_server_core::languages::tolk::TolkLanguage;
 use ton_language_server_core::languages::toml::TomlLanguage;
 use ton_language_server_core::{
     CORE_TARGET, CodeAction, CodeActionKind, CodeLens, CompletionItem, CompletionItemKind,
-    CompletionList, CompletionTrigger, CompletionTriggerKind, DocumentHighlight,
-    DocumentHighlightKind, DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename,
-    FoldingRange, Hover, InlayHint, InlayHintKind, InsertTextFormat, LanguageId, LanguageService,
-    Location, LogLevel, Position, PrepareRename, Range, SEMANTIC_TOKEN_MODIFIER_NAMES,
-    SEMANTIC_TOKEN_TYPE_NAMES, SelectionRange, SemanticToken, SemanticTokens, SignatureHelp,
-    SignatureInformation, TextEdit, TypeAtPosition, WorkspaceConfig, WorkspaceEdit,
-    WorkspaceSymbol, render_profile_summary,
+    CompletionList, CompletionTrigger, CompletionTriggerKind, Diagnostic, DiagnosticSeverity,
+    DiagnosticTag, DocumentHighlight, DocumentHighlightKind, DocumentSymbol, DocumentSymbolKind,
+    DocumentUri, FileRename, FoldingRange, Hover, InlayHint, InlayHintKind, InsertTextFormat,
+    LanguageId, LanguageService, Location, LogLevel, Position, PrepareRename, Range,
+    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SelectionRange, SemanticToken,
+    SemanticTokens, SignatureHelp, SignatureInformation, TextEdit, TypeAtPosition, WorkspaceConfig,
+    WorkspaceEdit, WorkspaceSymbol, render_profile_summary,
 };
 use wasm_bindgen::prelude::*;
 
@@ -393,6 +393,17 @@ impl TonLanguageServer {
         serde_wasm_bindgen::to_value(&semantic_tokens_to_lsp(tokens)).map_err(js_error)
     }
 
+    #[wasm_bindgen(js_name = diagnostics)]
+    pub fn diagnostics(&self, uri: String) -> Result<JsValue, JsValue> {
+        let diagnostics = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .diagnostics(&DocumentUri::from(uri))
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&diagnostics_to_lsp(diagnostics)).map_err(js_error)
+    }
+
     #[wasm_bindgen(js_name = inlayHints)]
     pub fn inlay_hints(
         &self,
@@ -731,6 +742,18 @@ struct LspDocumentHighlight {
 }
 
 #[derive(Serialize)]
+struct LspDiagnostic {
+    range: LspRange,
+    severity: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<String>,
+    source: String,
+    message: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    tags: Vec<u8>,
+}
+
+#[derive(Serialize)]
 struct LspCodeLens {
     range: LspRange,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -919,6 +942,32 @@ fn document_highlights_to_lsp(highlights: Vec<DocumentHighlight>) -> Vec<LspDocu
                 DocumentHighlightKind::Read => 2,
                 DocumentHighlightKind::Write => 3,
             }),
+        })
+        .collect()
+}
+
+fn diagnostics_to_lsp(diagnostics: Vec<Diagnostic>) -> Vec<LspDiagnostic> {
+    diagnostics
+        .into_iter()
+        .map(|diagnostic| LspDiagnostic {
+            range: range_to_lsp(diagnostic.range),
+            severity: match diagnostic.severity {
+                DiagnosticSeverity::Error => 1,
+                DiagnosticSeverity::Warning => 2,
+                DiagnosticSeverity::Information => 3,
+                DiagnosticSeverity::Hint => 4,
+            },
+            code: diagnostic.code,
+            source: diagnostic.source,
+            message: diagnostic.message,
+            tags: diagnostic
+                .tags
+                .into_iter()
+                .map(|tag| match tag {
+                    DiagnosticTag::Unnecessary => 1,
+                    DiagnosticTag::Deprecated => 2,
+                })
+                .collect(),
         })
         .collect()
 }

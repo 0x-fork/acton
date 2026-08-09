@@ -1,11 +1,12 @@
 use self::incremental_analysis::{DeclarationChanges, collect_declaration_stamps, imports_changed};
 use crate::language::{
     CallHierarchyPrepareRequest, CallHierarchyRequest, CodeActionRequest, CompletionRequest,
-    DefinitionRequest, DocumentHighlightRequest, DocumentSymbolRequest, FeatureSet,
-    FileRenameRequest, FoldingRangeRequest, FormattingRequest, HoverRequest, InlayHintRequest,
-    LanguagePlugin, ParseRequest, ParsedDocument, PrepareRenameRequest, ReferenceRequest,
-    RenameRequest, SelectionRangeRequest, SemanticTokensRequest, SignatureHelpRequest,
-    TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage, WorkspaceSymbolRequest,
+    DefinitionRequest, DiagnosticRequest, DocumentHighlightRequest, DocumentSymbolRequest,
+    FeatureSet, FileRenameRequest, FoldingRangeRequest, FormattingRequest, HoverRequest,
+    InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PrepareRenameRequest,
+    ReferenceRequest, RenameRequest, SelectionRangeRequest, SemanticTokensRequest,
+    SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage,
+    WorkspaceSymbolRequest,
 };
 use crate::logging;
 use crate::types::{normalize_logical_path, normalize_path};
@@ -18,10 +19,11 @@ use include_dir::{Dir, include_dir};
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use std::any::Any;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tolk_analysis::FileUseFacts;
+use tolk_linter::{LintLevel, Rule, RuleSettingsBuilder};
 use tolk_resolver::{FileDb, FileId, ProjectIndex, ProjectSource, ProjectSourceProvider, Span};
 use tolk_ty::{FileBodyTypes, TypeDb, TypeDbCache, TypeInterner, WorkspaceBodyTypes, infer};
 use tree_sitter::Tree;
@@ -30,6 +32,7 @@ mod call_hierarchy;
 mod code_actions;
 mod completion;
 mod definition;
+mod diagnostics;
 mod document_highlights;
 mod document_symbols;
 mod file_info;
@@ -126,6 +129,7 @@ impl LanguagePlugin for TolkLanguage {
             selection_ranges: true,
             hover: true,
             document_symbols: true,
+            diagnostics: true,
             signature_help: true,
             rename: true,
             type_definition: true,
@@ -328,6 +332,16 @@ impl LanguagePlugin for TolkLanguage {
         let _profile = request.context.profiler.span("tolk.document_symbols");
         let symbols = self.engine.document_symbols(request.context.document);
         Ok(symbols)
+    }
+
+    fn diagnostics(
+        &self,
+        request: DiagnosticRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::Diagnostic>> {
+        let mut profile = request.context.profiler.span("tolk.diagnostics");
+        Ok(self
+            .engine
+            .diagnostics(request.context.document, profile.profiler()))
     }
 
     fn signature_help(
@@ -923,6 +937,8 @@ struct TolkProjectConfig {
     import_mappings: Option<BTreeMap<String, String>>,
     contract_ids: Vec<String>,
     wallet_names: Vec<String>,
+    lint_settings: HashMap<Rule, LintLevel>,
+    contract_lint_settings: BTreeMap<PathBuf, HashMap<Rule, LintLevel>>,
     format_width: usize,
     separate_import_groups: bool,
 }
@@ -936,6 +952,8 @@ impl Default for TolkProjectConfig {
             import_mappings: None,
             contract_ids: Vec::new(),
             wallet_names: Vec::new(),
+            lint_settings: RuleSettingsBuilder::new().build(),
+            contract_lint_settings: BTreeMap::new(),
             format_width: 100,
             separate_import_groups: false,
         }
@@ -965,16 +983,41 @@ impl TolkProjectConfig {
             || PathBuf::from(TOLK_STDLIB_PATH),
             DocumentUri::logical_path,
         );
+        let lint_rules = manifest.lint.rules.as_ref();
+        let lint_settings = build_lint_settings(lint_rules, None);
+        let contract_lint_settings = manifest
+            .contracts
+            .iter()
+            .filter_map(|(name, value)| {
+                let source = value.get("src")?.as_str()?;
+                let source = normalize_path(&project_root.join(source));
+                Some((source, build_lint_settings(lint_rules, Some(name))))
+            })
+            .collect();
         Ok(Self {
             import_mappings: normalize_import_mappings(manifest.import_mappings, &project_root),
             contract_ids: manifest.contracts.keys().cloned().collect(),
             wallet_names: manifest.wallets.keys().cloned().collect(),
+            lint_settings,
+            contract_lint_settings,
             format_width: manifest.fmt.width.unwrap_or(100),
             separate_import_groups: manifest.fmt.separate_import_groups.unwrap_or(false),
             project_root,
             stdlib_path,
             use_embedded_stdlib: config.tolk_stdlib_root_uri().is_none(),
         })
+    }
+
+    fn lint_settings_for(&self, path: &Path) -> HashMap<Rule, LintLevel> {
+        self.contract_lint_settings
+            .get(path)
+            .unwrap_or(&self.lint_settings)
+            .clone()
+    }
+
+    #[cfg(feature = "tolk-compiler")]
+    fn is_contract_root(&self, path: &Path) -> bool {
+        self.contract_lint_settings.contains_key(path)
     }
 }
 
@@ -987,7 +1030,50 @@ struct ActonManifest {
     #[serde(default)]
     wallets: BTreeMap<String, toml::Value>,
     #[serde(default)]
+    lint: LintManifest,
+    #[serde(default)]
     fmt: FormatterManifest,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct LintManifest {
+    rules: Option<LintRules>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct LintRules {
+    #[serde(flatten)]
+    entries: BTreeMap<String, LintEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum LintEntry {
+    Level(LintLevel),
+    Config(BTreeMap<String, LintLevel>),
+}
+
+fn build_lint_settings(
+    rules: Option<&LintRules>,
+    contract_name: Option<&str>,
+) -> HashMap<Rule, LintLevel> {
+    let mut settings = RuleSettingsBuilder::new();
+    let Some(rules) = rules else {
+        return settings.build();
+    };
+
+    settings.apply_rules(rules.entries.iter().filter_map(|(name, entry)| {
+        let LintEntry::Level(level) = entry else {
+            return None;
+        };
+        Some((name, *level))
+    }));
+    if let Some(contract_name) = contract_name
+        && let Some(LintEntry::Config(overrides)) = rules.entries.get(contract_name)
+    {
+        settings.apply_rules(overrides.iter().map(|(name, level)| (name, *level)));
+    }
+    settings.build()
 }
 
 #[derive(Debug, Default, Deserialize)]

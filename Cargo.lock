@@ -5167,6 +5167,7 @@ dependencies = [
  "rustc-hash 2.1.1",
  "serde",
  "serde_json",
+ "tempfile",
  "tolk-source-map",
  "ton-objs",
 ]
@@ -5198,7 +5199,6 @@ dependencies = [
 name = "tolk-linter"
 version = "1.1.0"
 dependencies = [
- "acton-config",
  "dunce",
  "heck 0.5.0",
  "memchr",
@@ -5537,6 +5537,7 @@ name = "ton-language-server-core"
 version = "1.1.0"
 dependencies = [
  "anyhow",
+ "dunce",
  "expect-test",
  "fift-syntax",
  "include_dir",
@@ -5548,7 +5549,9 @@ dependencies = [
  "thiserror 2.0.18",
  "tlb-syntax",
  "tolk-analysis",
+ "tolk-compiler",
  "tolk-fmt",
+ "tolk-linter",
  "tolk-resolver",
  "tolk-syntax",
  "tolk-ty",
@@ -5559,6 +5562,7 @@ dependencies = [
  "tracing",
  "tree-sitter",
  "url",
+ "urlencoding",
  "web-time",
 ]
 

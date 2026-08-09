@@ -4,9 +4,9 @@ use crate::profiling::Profiler;
 use crate::semantic_tokens::SemanticToken;
 use crate::types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction, CodeLens,
-    DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri, FileRename, FoldingRange,
-    Hover, InlayHint, Location, Position, PrepareRename, Range, SelectionRange, SignatureHelp,
-    TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    Diagnostic, DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri, FileRename,
+    FoldingRange, Hover, InlayHint, Location, Position, PrepareRename, Range, SelectionRange,
+    SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -126,6 +126,10 @@ pub struct SelectionRangeRequest<'a> {
 }
 
 pub struct DocumentSymbolRequest<'a> {
+    pub context: PluginContext<'a>,
+}
+
+pub struct DiagnosticRequest<'a> {
     pub context: PluginContext<'a>,
 }
 
@@ -263,6 +267,10 @@ pub trait LanguagePlugin: Send + Sync {
         &self,
         _request: DocumentSymbolRequest<'_>,
     ) -> anyhow::Result<Vec<DocumentSymbol>> {
+        Ok(Vec::new())
+    }
+
+    fn diagnostics(&self, _request: DiagnosticRequest<'_>) -> anyhow::Result<Vec<Diagnostic>> {
         Ok(Vec::new())
     }
 

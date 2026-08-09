@@ -122,6 +122,7 @@ documents.onDidOpen(async event => {
       event.document.getText(),
     ),
   )
+  await publishDocumentDiagnostics(event.document)
 })
 
 documents.onDidChangeContent(async event => {
@@ -134,6 +135,7 @@ documents.onDidChangeContent(async event => {
   await withLanguageServer("textDocument/didChange", server =>
     server.editDocument(event.document.uri, event.document.version, JSON.stringify(changes)),
   )
+  await publishDocumentDiagnostics(event.document)
 })
 
 documents.onDidClose(async event => {
@@ -141,6 +143,7 @@ documents.onDidClose(async event => {
   await withLanguageServer("textDocument/didClose", server =>
     server.closeDocument(event.document.uri),
   )
+  await connection.sendDiagnostics({uri: event.document.uri, diagnostics: []})
 })
 
 connection.onDefinition(async params =>
@@ -358,8 +361,8 @@ connection.onRequest(REMOVE_SOURCE_FILE_REQUEST, async params =>
   }),
 )
 
-connection.onRequest(SET_WORKSPACE_CONFIG_REQUEST, async params =>
-  withLanguageServer(SET_WORKSPACE_CONFIG_REQUEST, server => {
+connection.onRequest(SET_WORKSPACE_CONFIG_REQUEST, async params => {
+  await withLanguageServer(SET_WORKSPACE_CONFIG_REQUEST, server => {
     if (!isRecord(params)) {
       throw new Error("expected { languageId, rootUri, manifestUri?, text } params")
     }
@@ -368,9 +371,10 @@ connection.onRequest(SET_WORKSPACE_CONFIG_REQUEST, async params =>
     const manifestUri = typeof params.manifestUri === "string" ? params.manifestUri : ""
     const text = requiredString(params.text, "text")
     server.setWorkspaceConfigForLanguage(languageId, rootUri, manifestUri, text)
-    return null
-  }),
-)
+  })
+  await publishAllTolkDiagnostics()
+  return null
+})
 
 documents.listen(connection)
 connection.listen()
@@ -384,6 +388,24 @@ async function withLanguageServer<T>(
   } catch (error) {
     throw new Error(`${operation} failed: ${errorText(error)}`)
   }
+}
+
+async function publishDocumentDiagnostics(document: TextDocument): Promise<void> {
+  if (document.languageId !== "tolk") {
+    return
+  }
+  const diagnostics = await withLanguageServer("textDocument/diagnostic", server =>
+    server.diagnostics(document.uri),
+  )
+  await connection.sendDiagnostics({
+    uri: document.uri,
+    version: document.version,
+    diagnostics,
+  })
+}
+
+async function publishAllTolkDiagnostics(): Promise<void> {
+  await Promise.all(documents.all().map(document => publishDocumentDiagnostics(document)))
 }
 
 function errorText(error: unknown): string {
