@@ -614,6 +614,58 @@ async fn compiler_diagnostics_handle_cyrillic_return_type() -> anyhow::Result<()
 }
 
 #[tokio::test]
+async fn compiler_diagnostics_resolve_acton_import_mappings() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    fs::write(
+        workspace.path().join("Acton.toml"),
+        "[import-mappings]\nacton = \".acton\"\n",
+    )?;
+    let mapped_directory = workspace.path().join(".acton/emulation");
+    fs::create_dir_all(&mapped_directory)?;
+    fs::write(
+        mapped_directory.join("network.tolk"),
+        "fun mappedHelper(): int { return 1; }\n",
+    )?;
+    let main_uri = Url::from_file_path(workspace.path().join("main.tolk"))
+        .map_err(|()| anyhow::anyhow!("cannot convert main file path to URI"))?;
+    let root_uri = Url::from_directory_path(workspace.path())
+        .map_err(|()| anyhow::anyhow!("cannot convert workspace path to URI"))?;
+    let (mut client, server) = LspTestClient::start(ServerConfig::new(workspace.path())).await;
+
+    client
+        .request(
+            "initialize",
+            json!({"processId": null, "rootUri": root_uri, "capabilities": {}}),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    client
+        .notify(
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {
+                    "uri": main_uri,
+                    "languageId": "tolk",
+                    "version": 1,
+                    "text": "import \"@acton/emulation/network\"\nfun main(): int { return mappedHelper(); }\n",
+                }
+            }),
+        )
+        .await?;
+    let diagnostics = wait_for_published_diagnostics(&mut client, 0).await?;
+    let compiler_diagnostics = diagnostics["diagnostics"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|diagnostic| diagnostic["source"] == "tolk-compiler")
+        .collect::<Vec<_>>();
+
+    expect![[r"[]"]].assert_eq(&serde_json::to_string_pretty(&compiler_diagnostics)?);
+
+    client.shutdown(server).await
+}
+
+#[tokio::test]
 async fn diagnostic_settings_apply_at_initialization_and_runtime() -> anyhow::Result<()> {
     let workspace = tempfile::tempdir()?;
     fs::write(

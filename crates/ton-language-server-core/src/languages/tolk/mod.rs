@@ -1094,6 +1094,11 @@ fn normalize_import_mappings(
         mappings
             .into_iter()
             .map(|(key, value)| {
+                let key = if key.starts_with('@') {
+                    key
+                } else {
+                    format!("@{key}")
+                };
                 let value_path = Path::new(&value);
                 let normalized_value = if value_path.is_absolute() {
                     normalize_path(value_path)
