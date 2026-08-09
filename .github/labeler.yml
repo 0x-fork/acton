@@ -28,6 +28,8 @@
           - "crates/ton-language-server-native/**"
           - "crates/ton-language-server-wasm/**"
           - "crates/tree-sitter-tolk/**"
+          - "crates/tree-sitter-func/**"
+          - "crates/func-syntax/**"
           - "crates/tree-sitter-fift/**"
           - "crates/tree-sitter-tlb/**"
           - "crates/tree-sitter-tasm/**"

@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use tree_sitter::{Language, Node, Tree, TreeCursor};
 
-use ton_syntax::errors::{ParseError, ParseErrorKind, Span};
+use ton_syntax::errors::{ParseError, ParseErrorKind, Span, truncate_utf8 as truncate};
 
 /// Collects errors for ERROR/MISSING nodes.
 pub(crate) fn collect_errors(
@@ -393,13 +393,4 @@ fn coalesce_errors(errors: Vec<ParseError>) -> Vec<ParseError> {
     }
 
     map.into_values().collect()
-}
-
-fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        return s.to_string();
-    }
-    let mut t = s[..max].to_string();
-    t.push('…');
-    t
 }

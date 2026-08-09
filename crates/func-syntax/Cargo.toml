@@ -1,0 +1,24 @@
+[package]
+name = "func-syntax"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+ton-syntax = { workspace = true }
+tree-sitter = { workspace = true }
+tree-sitter-func = { workspace = true }
+
+[dev-dependencies]
+expect-test = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

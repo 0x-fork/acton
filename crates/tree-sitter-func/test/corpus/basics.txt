@@ -1,0 +1,247 @@
+==================
+Directives and declarations
+==================
+
+#pragma version >=0.4.0
+#include "stdlib.fc";
+global int counter, slice owner;
+const int transfer_op = 0x1234, hash = "AB"H;
+
+---
+
+(source_file
+  (pragma_directive
+    (version_identifier))
+  (import_directive
+    (string_literal))
+  (global_var_declarations
+    (global_var_declaration
+      (primitive_type)
+      (identifier))
+    (global_var_declaration
+      (primitive_type)
+      (identifier)))
+  (constant_declarations
+    (constant_declaration
+      (primitive_type)
+      (identifier)
+      (constant_declaration_value
+        (number_literal)))
+    (constant_declaration
+      (identifier)
+      (constant_declaration_value
+        (number_literal
+          (number_string_literal))))))
+
+==================
+Generic and assembly functions
+==================
+
+forall X -> (X, X) duplicate(X value) inline {
+    return (value, value);
+}
+
+int declared(a, b);
+int asm_add(int x, int y) impure method_id(7) asm(x y -> 0) "ADD";
+
+---
+
+(source_file
+  (function_declaration
+    (type_parameters
+      (type_parameter
+        (type_identifier
+          (type_identifier))))
+    (tensor_type
+      (type_identifier
+        (type_identifier))
+      (type_identifier
+        (type_identifier)))
+    (identifier)
+    (parameter_list
+      (parameter_declaration
+        (type_identifier
+          (type_identifier))
+        (identifier)))
+    (specifiers_list
+      (inline))
+    (block_statement
+      (return_statement
+        (tensor_expression
+          (identifier)
+          (identifier)))))
+  (function_declaration
+    (primitive_type)
+    (identifier)
+    (parameter_list_relaxed
+      (identifier)
+      (identifier)))
+  (function_declaration
+    (primitive_type)
+    (identifier)
+    (parameter_list
+      (parameter_declaration
+        (primitive_type)
+        (identifier))
+      (parameter_declaration
+        (primitive_type)
+        (identifier)))
+    (specifiers_list
+      (impure)
+      (method_id
+        (number_literal)))
+    (asm_function_body
+      (identifier)
+      (identifier)
+      (number_literal)
+      (string_literal))))
+
+==================
+Control flow and local declarations
+==================
+
+() main(int value) {
+    [int left, int right] = [1, 2];
+    while (left < right) {
+        left += 1;
+    }
+    if (value) {
+        repeat 2 { value -= 1; }
+    } else {
+        do { value += 1; } until value > 10;
+    }
+    try {
+        value~touch();
+    } catch (error, arg) {
+        return ();
+    }
+}
+
+---
+
+(source_file
+  (function_declaration
+    (tensor_type)
+    (identifier)
+    (parameter_list
+      (parameter_declaration
+        (primitive_type)
+        (identifier)))
+    (block_statement
+      (expression_statement
+        (local_vars_declaration
+          (tuple_vars_declaration
+            (var_declaration
+              (primitive_type)
+              (identifier))
+            (var_declaration
+              (primitive_type)
+              (identifier))))
+        (typed_tuple
+          (number_literal)
+          (number_literal)))
+      (while_statement
+        (parenthesized_expression
+          (identifier)
+          (identifier))
+        (block_statement
+          (expression_statement
+            (identifier)
+            (number_literal))))
+      (if_statement
+        (parenthesized_expression
+          (identifier))
+        (block_statement
+          (repeat_statement
+            (number_literal)
+            (block_statement
+              (expression_statement
+                (identifier)
+                (number_literal)))))
+        (block_statement
+          (do_while_statement
+            (block_statement
+              (expression_statement
+                (identifier)
+                (number_literal)))
+            (identifier)
+            (number_literal))
+          (empty_statement)))
+      (try_catch_statement
+        (block_statement
+          (expression_statement
+            (identifier))
+          (expression_statement
+            (identifier))
+          (expression_statement
+            (tensor_expression)))
+        (catch_clause
+          (tensor_expression
+            (identifier)
+            (identifier))
+          (block_statement
+            (return_statement
+              (tensor_expression))))))))
+
+==================
+Function, tuple, and placeholder types
+==================
+
+int -> int identity(int -> int f) {
+    return f;
+}
+
+_ use_hole(_ value) {
+    return identity(value);
+}
+
+[int, slice] tuple_identity([int, slice] value) {
+    return value;
+}
+
+---
+
+(source_file
+  (function_declaration
+    (function_type
+      (primitive_type)
+      (primitive_type))
+    (identifier)
+    (parameter_list
+      (parameter_declaration
+        (function_type
+          (primitive_type)
+          (primitive_type))
+        (identifier)))
+    (block_statement
+      (return_statement
+        (identifier))))
+  (function_declaration
+    (hole_type
+      (hole_type))
+    (identifier)
+    (parameter_list
+      (parameter_declaration
+        (hole_type
+          (hole_type))
+        (identifier)))
+    (block_statement
+      (return_statement
+        (function_application
+          (identifier)
+          (parenthesized_expression
+            (identifier))))))
+  (function_declaration
+    (tuple_type
+      (primitive_type)
+      (primitive_type))
+    (identifier)
+    (parameter_list
+      (parameter_declaration
+        (tuple_type
+          (primitive_type)
+          (primitive_type))
+        (identifier)))
+    (block_statement
+      (return_statement
+        (identifier)))))

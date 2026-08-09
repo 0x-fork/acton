@@ -2017,6 +2017,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
 
 [[package]]
+name = "func-syntax"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "expect-test",
+ "serde_json",
+ "ton-syntax",
+ "tree-sitter",
+ "tree-sitter-func",
+]
+
+[[package]]
 name = "function_name"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5992,6 +6004,15 @@ dependencies = [
 [[package]]
 name = "tree-sitter-fift"
 version = "0.1.0"
+dependencies = [
+ "cc",
+ "tree-sitter",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "tree-sitter-func"
+version = "1.1.0"
 dependencies = [
  "cc",
  "tree-sitter",

@@ -612,7 +612,7 @@ Use this as a quick local matrix before pushing:
 | Dependency or lockfile changes (`Cargo.lock`, root `bun.lock`, tree-sitter/code extension package manifests) | `just check-security`                                                                                           |
 | Standard library / docgen inputs (`lib/`, `crates/tolk-compiler/assets/tolk-stdlib`, linter rule metadata)   | `just check` + `acton docgen` and commit generated docs                                                         |
 | Docs site content/config/dependencies (`docs/`)                                                              | `just check-docs`                                                                                               |
-| Tree-sitter grammar (`crates/tree-sitter-*`)                                                                 | `just check` + `just test-tree-sitter-all` (and `just update-test-tree-sitter-tolk` when Tolk snapshots change) |
+| Tree-sitter grammar (`crates/tree-sitter-*`)                                                                 | `just check` + `just test-tree-sitter-all` (and the matching `just update-test-tree-sitter-*` recipe when snapshots change) |
 | Release preparation (maintainers)                                                                            | Follow [RELEASING.md](RELEASING.md)                                                                             |
 
 ## PR requirements

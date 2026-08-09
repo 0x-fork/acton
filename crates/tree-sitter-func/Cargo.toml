@@ -1,0 +1,38 @@
+[package]
+name = "tree-sitter-func"
+description = "FunC grammar for tree-sitter"
+version = { workspace = true }
+authors = [
+  "TON Core",
+  "akifoq"
+]
+license = "MIT"
+readme = "README.md"
+keywords = ["incremental", "parsing", "tree-sitter", "func"]
+categories = ["parser-implementations", "parsing", "text-editors"]
+repository = "https://github.com/ton-blockchain/ton-language-server"
+edition = { workspace = true }
+autoexamples = false
+
+build = "bindings/rust/build.rs"
+include = [
+  "bindings/rust/*",
+  "grammar.js",
+  "queries/*",
+  "src/*",
+  "tree-sitter.json",
+  "/LICENSE",
+]
+
+[lib]
+path = "bindings/rust/lib.rs"
+
+[dependencies]
+tree-sitter-language = { workspace = true }
+
+[build-dependencies]
+cc = { workspace = true }
+tree-sitter-language = { workspace = true }
+
+[dev-dependencies]
+tree-sitter = { workspace = true }

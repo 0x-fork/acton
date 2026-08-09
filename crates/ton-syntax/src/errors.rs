@@ -48,7 +48,7 @@ pub fn collect_errors(source: &Arc<str>, tree: &Tree, language: &Language) -> Ve
             let mut message = if text.is_empty() {
                 "syntax error: unexpected fragment.".to_string()
             } else {
-                format!("syntax error: unexpected `{}`.", truncate(text, 60))
+                format!("syntax error: unexpected `{}`.", truncate_utf8(text, 60))
             };
 
             if !expected.is_empty() {
@@ -119,12 +119,19 @@ fn expected_symbols(language: &Language, state: u16) -> Vec<String> {
     out
 }
 
-fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max {
+/// Truncates a string to at most `max_bytes` without splitting a UTF-8 code point.
+#[must_use]
+pub fn truncate_utf8(s: &str, max_bytes: usize) -> String {
+    if s.len() <= max_bytes {
         return s.to_string();
     }
 
-    let mut t = s[..max].to_string();
+    let mut end = max_bytes;
+    while !s.is_char_boundary(end) {
+        end -= 1;
+    }
+
+    let mut t = s[..end].to_string();
     t.push('…');
     t
 }

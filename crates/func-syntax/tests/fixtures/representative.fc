@@ -1,0 +1,52 @@
+#pragma version >=0.4.0
+#pragma allow-post-modification
+#include "stdlib.fc";
+
+;; declarations
+global int counter, slice owner;
+const int transfer_op = 0x1234, hash = "AB"H;
+
+forall X -> (X, X) duplicate(X value) inline {
+    return (value, value);
+}
+
+int declared(a, b);
+
+() recv_internal(int balance, int msg_value, cell in_msg_full, slice in_msg_body) impure method_id(0) {
+    var cs = in_msg_full.begin_parse();
+    [int left, int right] = [1, 2];
+    (int first, int second) = (left, right);
+    _ ignored = "abc"s;
+    while (counter < 10) {
+        counter += 1;
+    }
+    ifnot (msg_value > 0) {
+        counter = 0;
+    } elseif (balance == 0) {
+        repeat 2 {
+            counter -= 1;
+        }
+    } else {
+        do { counter += 1; } until counter > 10;
+    }
+    try {
+        owner~load_uint(32);
+    } catch (error, arg) {
+        return ();
+    }
+    ;
+}
+
+int -> int identity(int -> int f) {
+    return f;
+}
+
+_ use_hole(_ value) {
+    return duplicate(value);
+}
+
+[int, slice] tuple_identity([int, slice] value) {
+    return value;
+}
+
+int asm_add(int x, int y) inline_ref method_id("asm_add") asm(x y -> 0) "ADD";
