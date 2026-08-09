@@ -230,6 +230,21 @@
       {
         "title": "Editor › Inspections",
         "properties": {
+          "ton.tolk.diagnostics.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable Tolk diagnostics"
+          },
+          "ton.tolk.diagnostics.linter.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable Acton lint diagnostics"
+          },
+          "ton.tolk.diagnostics.compiler.enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable native Tolk compiler diagnostics"
+          },
           "ton.func.inspections.disabled": {
             "type": "array",
             "items": {

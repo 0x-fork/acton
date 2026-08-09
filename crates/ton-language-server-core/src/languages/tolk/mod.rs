@@ -339,9 +339,11 @@ impl LanguagePlugin for TolkLanguage {
         request: DiagnosticRequest<'_>,
     ) -> anyhow::Result<Vec<crate::Diagnostic>> {
         let mut profile = request.context.profiler.span("tolk.diagnostics");
-        Ok(self
-            .engine
-            .diagnostics(request.context.document, profile.profiler()))
+        Ok(self.engine.diagnostics(
+            request.context.document,
+            &request.settings.tolk.diagnostics,
+            profile.profiler(),
+        ))
     }
 
     fn signature_help(

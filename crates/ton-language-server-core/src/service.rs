@@ -17,7 +17,7 @@ use crate::types::{
     Range, SelectionRange, SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit,
     WorkspaceSymbol,
 };
-use crate::{CompletionList, CompletionTrigger, TypeAtPosition};
+use crate::{CompletionList, CompletionTrigger, LanguageServerSettings, TypeAtPosition};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
@@ -34,6 +34,7 @@ struct DocumentState {
 pub struct LanguageService {
     plugins: HashMap<LanguageId, Box<dyn LanguagePlugin>>,
     documents: HashMap<DocumentUri, DocumentState>,
+    settings: LanguageServerSettings,
     profiler: Profiler,
 }
 
@@ -48,8 +49,18 @@ impl LanguageService {
         Self {
             plugins: HashMap::new(),
             documents: HashMap::new(),
+            settings: LanguageServerSettings::default(),
             profiler,
         }
+    }
+
+    pub const fn set_settings(&mut self, settings: LanguageServerSettings) {
+        self.settings = settings;
+    }
+
+    #[must_use]
+    pub const fn settings(&self) -> &LanguageServerSettings {
+        &self.settings
     }
 
     pub fn register_language(&mut self, plugin: impl LanguagePlugin + 'static) {
@@ -1105,7 +1116,7 @@ impl LanguageService {
         }
 
         let started_at = self.profiler.start();
-        let result = plugin.completion(CompletionRequest {
+        let mut result = plugin.completion(CompletionRequest {
             context: PluginContext {
                 document: &state.document,
                 parsed: state.parsed.as_ref(),
@@ -1115,6 +1126,21 @@ impl LanguageService {
             trigger,
         });
         self.profiler.finish("completion", started_at);
+        if state.document.language_id().as_str() == "tolk"
+            && let Ok(completion) = &mut result
+        {
+            let settings = &self.settings.tolk.completion;
+            if !settings.add_imports {
+                completion
+                    .items
+                    .retain(|item| item.additional_text_edits.is_empty());
+            }
+            if !settings.type_aware {
+                for item in &mut completion.items {
+                    item.sort_text = None;
+                }
+            }
+        }
         match &result {
             Ok(completion) => tracing::debug!(
                 target: logging::SERVICE_TARGET,
@@ -1182,6 +1208,11 @@ impl LanguageService {
                 version = state.document.version(),
                 "semantic tokens unsupported by language"
             );
+            return Ok(SemanticTokens::new(Vec::new()));
+        }
+        if state.document.language_id().as_str() == "fift"
+            && !self.settings.fift.semantic_highlighting.enabled
+        {
             return Ok(SemanticTokens::new(Vec::new()));
         }
 
@@ -1272,7 +1303,7 @@ impl LanguageService {
         }
 
         let started_at = self.profiler.start();
-        let result = plugin.inlay_hints(InlayHintRequest {
+        let mut result = plugin.inlay_hints(InlayHintRequest {
             context: PluginContext {
                 document: &state.document,
                 parsed: state.parsed.as_ref(),
@@ -1281,6 +1312,12 @@ impl LanguageService {
             range,
         });
         self.profiler.finish("inlay_hints", started_at);
+        if let Ok(hints) = &mut result {
+            hints.retain(|hint| {
+                self.settings
+                    .inlay_hint_enabled(Some(state.document.language_id()), hint.category)
+            });
+        }
         match &result {
             Ok(hints) => {
                 tracing::info!(
@@ -1510,6 +1547,7 @@ impl LanguageService {
                 parsed: state.parsed.as_ref(),
                 profiler: &mut self.profiler,
             },
+            settings: &self.settings,
         });
         self.profiler.finish("diagnostics", started_at);
         result

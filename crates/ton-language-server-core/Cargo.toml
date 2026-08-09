@@ -13,6 +13,7 @@ license = { workspace = true }
 [features]
 default = ["all-languages"]
 all-languages = ["tlb", "tasm", "fift", "tolk", "toml"]
+schema = ["dep:schemars"]
 tlb = ["dep:tlb-syntax"]
 tasm = ["dep:tasm-syntax"]
 fift = ["dep:fift-syntax"]
@@ -35,6 +36,7 @@ anyhow = { workspace = true }
 dunce = { workspace = true, optional = true }
 include_dir = { workspace = true, optional = true }
 rustc-hash = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

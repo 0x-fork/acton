@@ -307,6 +307,120 @@ async fn publishes_linter_diagnostics_on_open_change_and_close() -> anyhow::Resu
 }
 
 #[tokio::test]
+async fn diagnostic_settings_apply_at_initialization_and_runtime() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    fs::write(
+        workspace.path().join("Acton.toml"),
+        "[lint.rules]\nname-case-checker = \"deny\"\n",
+    )?;
+    let main_uri = Url::from_file_path(workspace.path().join("main.tolk"))
+        .map_err(|()| anyhow::anyhow!("cannot convert main file path to URI"))?;
+    let root_uri = Url::from_directory_path(workspace.path())
+        .map_err(|()| anyhow::anyhow!("cannot convert workspace path to URI"))?;
+    let (mut client, server) = LspTestClient::start(ServerConfig::new(workspace.path())).await;
+
+    client
+        .request(
+            "initialize",
+            json!({
+                "processId": null,
+                "rootUri": root_uri,
+                "capabilities": {},
+                "initializationOptions": {
+                    "tolk": {
+                        "diagnostics": {
+                            "linter": {"enabled": false}
+                        }
+                    }
+                }
+            }),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    client
+        .notify(
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {
+                    "uri": main_uri,
+                    "languageId": "tolk",
+                    "version": 1,
+                    "text": "fun BadName(): int { return missingName; }",
+                }
+            }),
+        )
+        .await?;
+    let compiler_only = wait_for_published_diagnostics(&mut client, 0).await?;
+    let compiler_only_count = published_diagnostics_count(&client);
+
+    client
+        .notify(
+            "workspace/didChangeConfiguration",
+            json!({
+                "settings": {
+                    "ton": {
+                        "tolk": {
+                            "diagnostics": {
+                                "linter": {"enabled": true},
+                                "compiler": {"enabled": false}
+                            }
+                        }
+                    }
+                }
+            }),
+        )
+        .await?;
+    let linter_only = wait_for_published_diagnostics(&mut client, compiler_only_count).await?;
+    let linter_only_count = published_diagnostics_count(&client);
+
+    client
+        .notify(
+            "workspace/didChangeConfiguration",
+            json!({
+                "settings": {
+                    "tolk": {
+                        "diagnostics": {"enabled": false}
+                    }
+                }
+            }),
+        )
+        .await?;
+    let disabled = wait_for_published_diagnostics(&mut client, linter_only_count).await?;
+
+    let diagnostic_ids = |publish: &Value| {
+        publish["diagnostics"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|diagnostic| {
+                format!(
+                    "{}:{}",
+                    diagnostic["source"].as_str().unwrap_or_default(),
+                    diagnostic["code"].as_str().unwrap_or_default()
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    expect![[r#"
+        {
+          "compilerOnly": [
+            "tolk-compiler:C001"
+          ],
+          "disabled": [],
+          "linterOnly": [
+            "acton:S001"
+          ]
+        }"#]]
+    .assert_eq(&serde_json::to_string_pretty(&json!({
+        "compilerOnly": diagnostic_ids(&compiler_only),
+        "linterOnly": diagnostic_ids(&linter_only),
+        "disabled": diagnostic_ids(&disabled),
+    }))?);
+
+    client.shutdown(server).await
+}
+
+#[tokio::test]
 async fn compiler_diagnostics_use_unsaved_document_text() -> anyhow::Result<()> {
     let workspace = tempfile::tempdir()?;
     fs::write(workspace.path().join("Acton.toml"), "")?;

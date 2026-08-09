@@ -2,7 +2,8 @@ use super::file_info::FileInfoExt;
 use super::{TolkProjectConfig, TolkResolveSnapshot, TolkWorkspaceEngine};
 use crate::{
     CodeAction, CodeActionKind, Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentEdits,
-    DocumentSnapshot, Position, Range, TextEdit, WorkspaceEdit, profiling::Profiler,
+    DocumentSnapshot, Position, Range, TextEdit, TolkDiagnosticSettings, WorkspaceEdit,
+    profiling::Profiler,
 };
 use std::collections::BTreeMap;
 use tolk_linter::Checker;
@@ -15,8 +16,12 @@ impl TolkWorkspaceEngine {
     pub(super) fn diagnostics(
         &self,
         document: &DocumentSnapshot,
+        settings: &TolkDiagnosticSettings,
         profiler: &mut Profiler,
     ) -> Vec<Diagnostic> {
+        if !settings.enabled {
+            return Vec::new();
+        }
         #[cfg(not(feature = "tolk-compiler"))]
         let _ = profiler;
         let (snapshot, config) = {
@@ -34,53 +39,59 @@ impl TolkWorkspaceEngine {
         };
 
         #[cfg_attr(not(feature = "tolk-compiler"), allow(unused_mut))]
-        let mut diagnostics = lint_document(&snapshot, &config, file_id)
-            .into_iter()
-            .map(|diagnostic| {
-                let annotation = primary_annotation(&diagnostic.annotations);
-                let range = annotation.map_or_else(
-                    || Range::new(Position::new(0, 0), Position::new(0, 0)),
-                    |annotation| file.range_for_span(annotation.span),
-                );
-                let severity = match diagnostic.severity {
-                    Severity::Fatal | Severity::Error => DiagnosticSeverity::Error,
-                    Severity::Warning => DiagnosticSeverity::Warning,
-                    Severity::Info => DiagnosticSeverity::Information,
-                    Severity::Help => DiagnosticSeverity::Hint,
-                };
-                let code = diagnostic.code;
-                let mut message = diagnostic.message;
-                if let Some(label) = annotation.and_then(|annotation| annotation.message.as_ref())
-                    && label != &message
-                {
-                    message.push('\n');
-                    message.push_str(label);
-                }
-                if let Some(help) = diagnostic.help
-                    && help != message
-                {
-                    message.push('\n');
-                    message.push_str(&help);
-                }
-                let tags = annotation
-                    .into_iter()
-                    .flat_map(|annotation| &annotation.tags)
-                    .map(|tag| match tag {
-                        LintDiagnosticTag::Unnecessary => DiagnosticTag::Unnecessary,
-                        LintDiagnosticTag::Deprecated => DiagnosticTag::Deprecated,
-                    })
-                    .collect();
-                let diagnostic = Diagnostic::new(range, severity, "acton", message).with_tags(tags);
-                match code {
-                    Some(code) => diagnostic.with_code(code),
-                    None => diagnostic,
-                }
-            })
-            .collect::<Vec<_>>();
+        let mut diagnostics = if settings.linter.enabled {
+            lint_document(&snapshot, &config, file_id)
+        } else {
+            Vec::new()
+        }
+        .into_iter()
+        .map(|diagnostic| {
+            let annotation = primary_annotation(&diagnostic.annotations);
+            let range = annotation.map_or_else(
+                || Range::new(Position::new(0, 0), Position::new(0, 0)),
+                |annotation| file.range_for_span(annotation.span),
+            );
+            let severity = match diagnostic.severity {
+                Severity::Fatal | Severity::Error => DiagnosticSeverity::Error,
+                Severity::Warning => DiagnosticSeverity::Warning,
+                Severity::Info => DiagnosticSeverity::Information,
+                Severity::Help => DiagnosticSeverity::Hint,
+            };
+            let code = diagnostic.code;
+            let mut message = diagnostic.message;
+            if let Some(label) = annotation.and_then(|annotation| annotation.message.as_ref())
+                && label != &message
+            {
+                message.push('\n');
+                message.push_str(label);
+            }
+            if let Some(help) = diagnostic.help
+                && help != message
+            {
+                message.push('\n');
+                message.push_str(&help);
+            }
+            let tags = annotation
+                .into_iter()
+                .flat_map(|annotation| &annotation.tags)
+                .map(|tag| match tag {
+                    LintDiagnosticTag::Unnecessary => DiagnosticTag::Unnecessary,
+                    LintDiagnosticTag::Deprecated => DiagnosticTag::Deprecated,
+                })
+                .collect();
+            let diagnostic = Diagnostic::new(range, severity, "acton", message).with_tags(tags);
+            match code {
+                Some(code) => diagnostic.with_code(code),
+                None => diagnostic,
+            }
+        })
+        .collect::<Vec<_>>();
         #[cfg(feature = "tolk-compiler")]
-        diagnostics.extend(compiler_diagnostics(
-            &snapshot, &config, document, &file, profiler,
-        ));
+        if settings.compiler.enabled {
+            diagnostics.extend(compiler_diagnostics(
+                &snapshot, &config, document, &file, profiler,
+            ));
+        }
         diagnostics
     }
 }

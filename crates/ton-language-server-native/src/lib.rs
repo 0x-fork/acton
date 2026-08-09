@@ -25,11 +25,11 @@ use ton_language_server_core::{
     CompletionTrigger, CompletionTriggerKind, Diagnostic as CoreDiagnostic,
     DiagnosticSeverity as CoreDiagnosticSeverity, DiagnosticTag as CoreDiagnosticTag,
     DocumentHighlight, DocumentHighlightKind, DocumentSymbol, DocumentSymbolKind, DocumentUri,
-    FileRename, FoldingRange, Hover, InlayHint, InlayHintCategory, InlayHintKind, InsertTextFormat,
-    LanguageId, LanguageService, LanguageServiceConfig, Location, Position, PrepareRename,
-    ProfileReport, Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SelectionRange,
-    SemanticToken, SemanticTokens, SignatureHelp, SignatureInformation, TextEdit, TextIndex,
-    TypeAtPosition, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    FileRename, FindUsagesScope, FoldingRange, Hover, InlayHint, InlayHintKind, InsertTextFormat,
+    LanguageId, LanguageServerSettings, LanguageService, LanguageServiceConfig, Location, Position,
+    PrepareRename, ProfileReport, Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES,
+    SelectionRange, SemanticToken, SemanticTokens, SignatureHelp, SignatureInformation, TextEdit,
+    TextIndex, TypeAtPosition, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use tower_lsp::jsonrpc;
 use tower_lsp::lsp_types as lsp;
@@ -149,137 +149,6 @@ pub struct NativeLoggingConfig {
     pub level: LogLevel,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct NativeSettings {
-    tolk: TolkSettings,
-    tlb: TlbSettings,
-    fift: FiftSettings,
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct TolkSettings {
-    hints: TolkHintSettings,
-    completion: TolkCompletionSettings,
-    find_usages: FindUsagesSettings,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct TolkHintSettings {
-    disable: bool,
-    types: bool,
-    parameters: bool,
-    show_method_id: bool,
-    constant_values: bool,
-}
-
-impl Default for TolkHintSettings {
-    fn default() -> Self {
-        Self {
-            disable: false,
-            types: true,
-            parameters: true,
-            show_method_id: true,
-            constant_values: true,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct TolkCompletionSettings {
-    type_aware: bool,
-    add_imports: bool,
-}
-
-impl Default for TolkCompletionSettings {
-    fn default() -> Self {
-        Self {
-            type_aware: true,
-            add_imports: true,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default)]
-struct FindUsagesSettings {
-    scope: FindUsagesScope,
-}
-
-impl Default for FindUsagesSettings {
-    fn default() -> Self {
-        Self {
-            scope: FindUsagesScope::Workspace,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-enum FindUsagesScope {
-    #[default]
-    Workspace,
-    Everywhere,
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(default)]
-struct TlbSettings {
-    hints: TlbHintSettings,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct TlbHintSettings {
-    disable: bool,
-    show_constructor_tag: bool,
-}
-
-impl Default for TlbHintSettings {
-    fn default() -> Self {
-        Self {
-            disable: false,
-            show_constructor_tag: true,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct FiftSettings {
-    hints: FiftHintSettings,
-    semantic_highlighting: SemanticHighlightingSettings,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct FiftHintSettings {
-    show_gas_consumption: bool,
-}
-
-impl Default for FiftHintSettings {
-    fn default() -> Self {
-        Self {
-            show_gas_consumption: true,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default)]
-struct SemanticHighlightingSettings {
-    enabled: bool,
-}
-
-impl Default for SemanticHighlightingSettings {
-    fn default() -> Self {
-        Self { enabled: true }
-    }
-}
-
 impl NativeLoggingConfig {
     #[must_use]
     pub fn new(path: impl Into<PathBuf>, level: LogLevel) -> Self {
@@ -336,7 +205,6 @@ pub struct NativeLanguageServer {
     workspace: Mutex<Option<NativeWorkspace>>,
     startup_warnings: Mutex<Vec<String>>,
     documents: Mutex<HashMap<String, OpenDocument>>,
-    settings: Mutex<NativeSettings>,
 }
 
 #[derive(Clone, Debug)]
@@ -386,7 +254,6 @@ impl NativeLanguageServer {
             workspace: Mutex::new(None),
             startup_warnings: Mutex::new(Vec::new()),
             documents: Mutex::new(HashMap::new()),
-            settings: Mutex::new(NativeSettings::default()),
         }
     }
 
@@ -523,11 +390,8 @@ impl NativeLanguageServer {
         }
     }
 
-    fn settings(&self) -> anyhow::Result<NativeSettings> {
-        self.settings
-            .lock()
-            .map(|settings| settings.clone())
-            .map_err(|_| anyhow::anyhow!("language server settings lock poisoned"))
+    fn settings(&self) -> anyhow::Result<LanguageServerSettings> {
+        self.with_service(|service| Ok(service.settings().clone()))
     }
 
     fn document_language_id(&self, uri: &lsp::Url) -> anyhow::Result<Option<LanguageId>> {
@@ -551,14 +415,15 @@ impl NativeLanguageServer {
         Ok(uri.to_core().logical_path() == self.workspace()?.manifest_uri.logical_path())
     }
 
-    fn update_settings(&self, value: Value) -> anyhow::Result<()> {
+    fn update_settings(&self, value: Value) -> anyhow::Result<bool> {
         let value = value.get("ton").cloned().unwrap_or(value);
-        let settings = serde_json::from_value::<NativeSettings>(value)?;
-        *self
-            .settings
-            .lock()
-            .map_err(|_| anyhow::anyhow!("language server settings lock poisoned"))? = settings;
-        Ok(())
+        let settings = serde_json::from_value::<LanguageServerSettings>(value)?;
+        self.with_service(|service| {
+            let diagnostics_changed =
+                service.settings().tolk.diagnostics != settings.tolk.diagnostics;
+            service.set_settings(settings);
+            Ok(diagnostics_changed)
+        })
     }
 
     async fn type_at_position(
@@ -670,6 +535,11 @@ impl LanguageServer for NativeLanguageServer {
         &self,
         params: lsp::InitializeParams,
     ) -> jsonrpc::Result<lsp::InitializeResult> {
+        if let Some(settings) = params.initialization_options.clone()
+            && let Err(error) = self.update_settings(settings)
+        {
+            self.record_startup_warning("workspace.configuration.init", error);
+        }
         self.initialize_workspace(&params).map_err(rpc_error)?;
 
         Ok(lsp::InitializeResult {
@@ -788,10 +658,17 @@ impl LanguageServer for NativeLanguageServer {
     }
 
     async fn did_change_configuration(&self, params: lsp::DidChangeConfigurationParams) {
-        if let Err(error) = self.update_settings(params.settings) {
-            self.report_error("workspace.configuration.change", error)
-                .await;
-            return;
+        let diagnostics_changed = match self.update_settings(params.settings) {
+            Ok(changed) => changed,
+            Err(error) => {
+                self.report_error("workspace.configuration.change", error)
+                    .await;
+                return;
+            }
+        };
+
+        if diagnostics_changed {
+            self.publish_all_tolk_diagnostics().await;
         }
 
         let (inlay_refresh, semantic_refresh) = tokio::join!(
@@ -1133,27 +1010,9 @@ impl LanguageServer for NativeLanguageServer {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position.to_core();
         let trigger = completion_trigger_from_lsp(params.context);
-        let mut completion = self
+        let completion = self
             .with_service(|service| service.completion(&uri.to_core(), position, trigger))
             .map_err(rpc_error)?;
-        if self
-            .document_language_id(&uri)
-            .map_err(rpc_error)?
-            .as_ref()
-            .is_some_and(|language_id| language_id.as_str() == "tolk")
-        {
-            let settings = self.settings().map_err(rpc_error)?.tolk.completion;
-            if !settings.add_imports {
-                completion
-                    .items
-                    .retain(|item| item.additional_text_edits.is_empty());
-            }
-            if !settings.type_aware {
-                for item in &mut completion.items {
-                    item.sort_text = None;
-                }
-            }
-        }
         Ok(Some(lsp::CompletionResponse::List(completion_list_to_lsp(
             completion,
         ))))
@@ -1164,22 +1023,6 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::SemanticTokensParams,
     ) -> jsonrpc::Result<Option<lsp::SemanticTokensResult>> {
         let uri = params.text_document.uri;
-        if self
-            .document_language_id(&uri)
-            .map_err(rpc_error)?
-            .as_ref()
-            .is_some_and(|language_id| language_id.as_str() == "fift")
-            && !self
-                .settings()
-                .map_err(rpc_error)?
-                .fift
-                .semantic_highlighting
-                .enabled
-        {
-            return Ok(Some(lsp::SemanticTokensResult::Tokens(
-                semantic_tokens_to_lsp(SemanticTokens::new(Vec::new())),
-            )));
-        }
         let tokens = self
             .with_service(|service| service.semantic_tokens(&uri.to_core()))
             .map_err(rpc_error)?;
@@ -1194,12 +1037,9 @@ impl LanguageServer for NativeLanguageServer {
     ) -> jsonrpc::Result<Option<Vec<lsp::InlayHint>>> {
         let uri = params.text_document.uri;
         let range = params.range.to_core();
-        let mut hints = self
+        let hints = self
             .with_service(|service| service.inlay_hints(&uri.to_core(), range))
             .map_err(rpc_error)?;
-        let settings = self.settings().map_err(rpc_error)?;
-        let language_id = self.document_language_id(&uri).map_err(rpc_error)?;
-        hints.retain(|hint| inlay_hint_enabled(&settings, language_id.as_ref(), hint.category));
         Ok(Some(hints.into_iter().map(inlay_hint_to_lsp).collect()))
     }
 
@@ -2242,36 +2082,6 @@ fn location_is_in_root(location: &Location, root: &Path) -> bool {
         .is_some_and(|path| path.starts_with(root))
 }
 
-fn inlay_hint_enabled(
-    settings: &NativeSettings,
-    language_id: Option<&LanguageId>,
-    category: InlayHintCategory,
-) -> bool {
-    if language_id.is_some_and(|language_id| language_id.as_str() == "tolk") {
-        let hints = &settings.tolk.hints;
-        return !hints.disable
-            && match category {
-                InlayHintCategory::Type => hints.types,
-                InlayHintCategory::Parameter => hints.parameters,
-                InlayHintCategory::ConstantValue => hints.constant_values,
-                InlayHintCategory::MethodId => hints.show_method_id,
-                InlayHintCategory::ConstructorTag
-                | InlayHintCategory::GasConsumption
-                | InlayHintCategory::Other => true,
-            };
-    }
-    if language_id.is_some_and(|language_id| language_id.as_str() == "tlb") {
-        return !settings.tlb.hints.disable
-            && (category != InlayHintCategory::ConstructorTag
-                || settings.tlb.hints.show_constructor_tag);
-    }
-    if language_id.is_some_and(|language_id| language_id.as_str() == "fift") {
-        return category != InlayHintCategory::GasConsumption
-            || settings.fift.hints.show_gas_consumption;
-    }
-    true
-}
-
 fn is_excluded_workspace_dir(root: &Path, path: &Path) -> bool {
     let name = path.file_name().and_then(|name| name.to_str());
 
@@ -2542,10 +2352,11 @@ const fn level_rank(level: Level) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ton_language_server_core::InlayHintCategory;
 
     #[test]
     fn parses_and_applies_language_feature_settings() -> anyhow::Result<()> {
-        let settings = serde_json::from_value::<NativeSettings>(serde_json::json!({
+        let settings = serde_json::from_value::<LanguageServerSettings>(serde_json::json!({
             "tolk": {
                 "hints": {
                     "types": false,
@@ -2554,7 +2365,12 @@ mod tests {
                     "constantValues": false
                 },
                 "completion": {"typeAware": false, "addImports": false},
-                "findUsages": {"scope": "everywhere"}
+                "findUsages": {"scope": "everywhere"},
+                "diagnostics": {
+                    "enabled": true,
+                    "linter": {"enabled": false},
+                    "compiler": {"enabled": false}
+                }
             },
             "tlb": {"hints": {"showConstructorTag": false}},
             "fift": {
@@ -2566,39 +2382,18 @@ mod tests {
         let tlb = LanguageId::from("tlb");
         let fift = LanguageId::from("fift");
 
-        assert!(!inlay_hint_enabled(
-            &settings,
-            Some(&tolk),
-            InlayHintCategory::Type
-        ));
-        assert!(inlay_hint_enabled(
-            &settings,
-            Some(&tolk),
-            InlayHintCategory::Parameter
-        ));
-        assert!(!inlay_hint_enabled(
-            &settings,
-            Some(&tolk),
-            InlayHintCategory::MethodId
-        ));
-        assert!(!inlay_hint_enabled(
-            &settings,
-            Some(&tolk),
-            InlayHintCategory::ConstantValue
-        ));
-        assert!(!inlay_hint_enabled(
-            &settings,
-            Some(&tlb),
-            InlayHintCategory::ConstructorTag
-        ));
-        assert!(!inlay_hint_enabled(
-            &settings,
-            Some(&fift),
-            InlayHintCategory::GasConsumption
-        ));
+        assert!(!settings.inlay_hint_enabled(Some(&tolk), InlayHintCategory::Type));
+        assert!(settings.inlay_hint_enabled(Some(&tolk), InlayHintCategory::Parameter));
+        assert!(!settings.inlay_hint_enabled(Some(&tolk), InlayHintCategory::MethodId));
+        assert!(!settings.inlay_hint_enabled(Some(&tolk), InlayHintCategory::ConstantValue));
+        assert!(!settings.inlay_hint_enabled(Some(&tlb), InlayHintCategory::ConstructorTag));
+        assert!(!settings.inlay_hint_enabled(Some(&fift), InlayHintCategory::GasConsumption));
         assert!(!settings.tolk.completion.type_aware);
         assert!(!settings.tolk.completion.add_imports);
         assert_eq!(settings.tolk.find_usages.scope, FindUsagesScope::Everywhere);
+        assert!(settings.tolk.diagnostics.enabled);
+        assert!(!settings.tolk.diagnostics.linter.enabled);
+        assert!(!settings.tolk.diagnostics.compiler.enabled);
         assert!(!settings.fift.semantic_highlighting.enabled);
 
         Ok(())

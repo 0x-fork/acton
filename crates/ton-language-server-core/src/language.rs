@@ -131,6 +131,7 @@ pub struct DocumentSymbolRequest<'a> {
 
 pub struct DiagnosticRequest<'a> {
     pub context: PluginContext<'a>,
+    pub settings: &'a crate::LanguageServerSettings,
 }
 
 pub struct SignatureHelpRequest<'a> {

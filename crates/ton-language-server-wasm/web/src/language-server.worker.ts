@@ -53,8 +53,11 @@ const getLanguageServer = async () => {
   return languageServerPromise
 }
 
-connection.onInitialize(async (): Promise<InitializeResult> => {
+connection.onInitialize(async (params): Promise<InitializeResult> => {
   const server = await getLanguageServer()
+  if (params.initializationOptions !== undefined) {
+    server.setSettings(languageServerSettings(params.initializationOptions))
+  }
   return {
     capabilities: {
       definitionProvider: true,
@@ -111,6 +114,17 @@ connection.onInitialize(async (): Promise<InitializeResult> => {
       textDocumentSync: TextDocumentSyncKind.Incremental,
     },
   }
+})
+
+connection.onDidChangeConfiguration(async params => {
+  await withLanguageServer("workspace/didChangeConfiguration", server =>
+    server.setSettings(languageServerSettings(params.settings)),
+  )
+  await publishAllTolkDiagnostics()
+  await Promise.allSettled([
+    connection.sendRequest("workspace/inlayHint/refresh"),
+    connection.sendRequest("workspace/semanticTokens/refresh"),
+  ])
 })
 
 documents.onDidOpen(async event => {
@@ -433,6 +447,13 @@ function errorText(error: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
+}
+
+function languageServerSettings(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) {
+    return {}
+  }
+  return isRecord(value.ton) ? value.ton : value
 }
 
 function requiredString(value: unknown, name: string): string {

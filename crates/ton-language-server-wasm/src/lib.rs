@@ -13,10 +13,10 @@ use ton_language_server_core::{
     CompletionList, CompletionTrigger, CompletionTriggerKind, Diagnostic, DiagnosticSeverity,
     DiagnosticTag, DocumentHighlight, DocumentHighlightKind, DocumentSymbol, DocumentSymbolKind,
     DocumentUri, FileRename, FoldingRange, Hover, InlayHint, InlayHintKind, InsertTextFormat,
-    LanguageId, LanguageService, Location, LogLevel, Position, PrepareRename, Range,
-    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SelectionRange, SemanticToken,
-    SemanticTokens, SignatureHelp, SignatureInformation, TextEdit, TypeAtPosition, WorkspaceConfig,
-    WorkspaceEdit, WorkspaceSymbol, render_profile_summary,
+    LanguageId, LanguageServerSettings, LanguageService, Location, LogLevel, Position,
+    PrepareRename, Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SelectionRange,
+    SemanticToken, SemanticTokens, SignatureHelp, SignatureInformation, TextEdit, TypeAtPosition,
+    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol, render_profile_summary,
 };
 use wasm_bindgen::prelude::*;
 
@@ -121,6 +121,16 @@ impl TonLanguageServer {
                 WorkspaceConfig::new(DocumentUri::from(root_uri), manifest_uri, manifest_text),
             )
             .map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = setSettings)]
+    pub fn set_settings(&self, settings: JsValue) -> Result<(), JsValue> {
+        let settings = serde_wasm_bindgen::from_value::<LanguageServerSettings>(settings)?;
+        self.service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .set_settings(settings);
+        Ok(())
     }
 
     #[wasm_bindgen(js_name = setLogLevel)]

@@ -33,4 +33,5 @@ indicatif = { workspace = true }
 sha2 = { workspace = true }
 tempfile = { workspace = true }
 tolk-linter = { workspace = true }
+ton-language-server-core = { path = "../crates/ton-language-server-core", default-features = false, features = ["schema", "tolk"] }
 parse-changelog = { version = "0.6.15", default-features = false }

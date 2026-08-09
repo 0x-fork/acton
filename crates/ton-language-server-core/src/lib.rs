@@ -5,6 +5,7 @@ mod logging;
 mod profiling;
 mod semantic_tokens;
 mod service;
+mod settings;
 mod text;
 mod types;
 
@@ -37,6 +38,11 @@ pub use semantic_tokens::{
     SemanticTokenType, SemanticTokens, SemanticTokensBuilder,
 };
 pub use service::{LanguageService, LanguageServiceConfig};
+pub use settings::{
+    DiagnosticProviderSettings, FiftHintSettings, FiftSettings, FindUsagesScope,
+    FindUsagesSettings, LanguageServerSettings, SemanticHighlightingSettings, TlbHintSettings,
+    TlbSettings, TolkCompletionSettings, TolkDiagnosticSettings, TolkHintSettings, TolkSettings,
+};
 pub use text::TextIndex;
 pub use types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
