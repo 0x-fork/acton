@@ -1050,6 +1050,13 @@ function configurationValueFormat(
     return "gram-per-65536"
   }
 
+  if (
+    kind?.startsWith("CatchainConfig") &&
+    ["mc_catchain_lifetime", "shard_catchain_lifetime", "shard_validators_lifetime"].includes(key)
+  ) {
+    return "duration"
+  }
+
   return configurationFieldFormat(key)
 }
 
