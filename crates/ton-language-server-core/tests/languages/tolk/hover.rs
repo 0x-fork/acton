@@ -310,6 +310,26 @@ fn shows_contract_and_contract_field_documentation() {
 }
 
 #[test]
+fn shows_contract_field_documentation_while_value_is_incomplete() {
+    case_tolk_hover(
+        r#"
+            contract Demo {
+                /// Custom storage docs.
+                <caret>storage:
+            }
+        "#,
+        expect![[r#"
+            ```tolk
+            contract Demo
+            storage
+            ```
+            Defines the persistent storage structure for the contract. This field usually points to a struct type.
+
+            Custom storage docs."#]],
+    );
+}
+
+#[test]
 fn shows_documentation_for_all_contract_header_fields() {
     case_tolk_hover(
         r#"
