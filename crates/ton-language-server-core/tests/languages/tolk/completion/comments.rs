@@ -20,9 +20,9 @@ fn disables_completion_in_documentation_line_comments() {
 
 #[test]
 fn disables_completion_in_block_comments() {
-    check_disabled("/* com<caret>ment */\nfun main() {}");
-    check_disabled("fun main() { /* com<caret>ment */ }");
-    check_disabled("fun main() {} /* com<caret>ment */");
+    check_disabled("/* comment <caret> text */\nfun main() {}");
+    check_disabled("fun main() { /* comment <caret> text */ }");
+    check_disabled("fun main() {} /* comment <caret> text */");
 }
 
 #[test]

@@ -150,7 +150,7 @@ function registerBocWatcher(bocDecompilerProvider: BocDecompilerProvider): FileS
   bocWatcher.onDidChange((uri: vscode.Uri) => {
     const decompileUri = uri.with({
       scheme: BocDecompilerProvider.scheme,
-      path: uri.path + ".decompiled.tasm",
+      path: `${uri.path}.decompiled.tasm`,
     })
 
     const openDocument = vscode.workspace.textDocuments.find(
@@ -165,7 +165,7 @@ function registerBocWatcher(bocDecompilerProvider: BocDecompilerProvider): FileS
   bocWatcher.onDidDelete((uri: vscode.Uri) => {
     const decompileUri = uri.with({
       scheme: BocDecompilerProvider.scheme,
-      path: uri.path + ".decompiled.tasm",
+      path: `${uri.path}.decompiled.tasm`,
     })
 
     const openDocument = vscode.workspace.textDocuments.find(
@@ -180,7 +180,7 @@ function registerBocWatcher(bocDecompilerProvider: BocDecompilerProvider): FileS
   bocWatcher.onDidCreate((uri: vscode.Uri) => {
     const decompileUri = uri.with({
       scheme: BocDecompilerProvider.scheme,
-      path: uri.path + ".decompiled.tasm",
+      path: `${uri.path}.decompiled.tasm`,
     })
 
     const openDocument = vscode.workspace.textDocuments.find(
