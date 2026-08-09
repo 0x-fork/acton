@@ -307,6 +307,69 @@ async fn publishes_linter_diagnostics_on_open_change_and_close() -> anyhow::Resu
 }
 
 #[tokio::test]
+async fn compiler_diagnostics_handle_cyrillic_return_type() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    fs::write(workspace.path().join("Acton.toml"), "")?;
+    let main_uri = Url::from_file_path(workspace.path().join("main.tolk"))
+        .map_err(|()| anyhow::anyhow!("cannot convert main file path to URI"))?;
+    let root_uri = Url::from_directory_path(workspace.path())
+        .map_err(|()| anyhow::anyhow!("cannot convert workspace path to URI"))?;
+    let (mut client, server) = LspTestClient::start(ServerConfig::new(workspace.path())).await;
+
+    client
+        .request(
+            "initialize",
+            json!({"processId": null, "rootUri": root_uri, "capabilities": {}}),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    client
+        .notify(
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {
+                    "uri": main_uri,
+                    "languageId": "tolk",
+                    "version": 1,
+                    "text": "fun name(): ж asm \"\"",
+                }
+            }),
+        )
+        .await?;
+    let initial_diagnostic_count = published_diagnostics_count(&client);
+    let diagnostics = wait_for_published_diagnostics(&mut client, initial_diagnostic_count).await?;
+
+    let compiler_diagnostics = diagnostics["diagnostics"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|diagnostic| diagnostic["source"] == "tolk-compiler")
+        .collect::<Vec<_>>();
+    expect![[r#"
+        [
+          {
+            "code": "C001",
+            "message": "failed to parse",
+            "range": {
+              "end": {
+                "character": 13,
+                "line": 0
+              },
+              "start": {
+                "character": 12,
+                "line": 0
+              }
+            },
+            "severity": 1,
+            "source": "tolk-compiler"
+          }
+        ]"#]]
+    .assert_eq(&serde_json::to_string_pretty(&compiler_diagnostics)?);
+
+    client.shutdown(server).await
+}
+
+#[tokio::test]
 async fn diagnostic_settings_apply_at_initialization_and_runtime() -> anyhow::Result<()> {
     let workspace = tempfile::tempdir()?;
     fs::write(

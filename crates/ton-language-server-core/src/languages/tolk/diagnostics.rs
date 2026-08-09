@@ -170,7 +170,8 @@ fn compiler_error_range(
     file: &tolk_resolver::FileInfo,
     range: &tolk_compiler::CompilerErrorRange,
 ) -> Range {
-    let source_len = file.source().source.len();
+    let source = file.source().source.as_ref();
+    let source_len = source.len();
     let offset = |line: usize, column: usize| {
         file.line_offsets()
             .get(line.saturating_sub(1))
@@ -179,9 +180,18 @@ fn compiler_error_range(
             .saturating_add(column.saturating_sub(1))
             .min(source_len)
     };
+    // Malformed non-ASCII tokens can make compiler ranges split a UTF-8 code point.
+    let mut start = offset(range.start_line_no, range.start_char_no);
+    while !source.is_char_boundary(start) {
+        start = start.saturating_sub(1);
+    }
+    let mut end = offset(range.end_line_no, range.end_char_no);
+    while !source.is_char_boundary(end) {
+        end = end.saturating_add(1).min(source_len);
+    }
     file.range_for_span(tolk_resolver::Span {
-        start: offset(range.start_line_no, range.start_char_no) as u32,
-        end: offset(range.end_line_no, range.end_char_no) as u32,
+        start: start as u32,
+        end: end as u32,
     })
 }
 
