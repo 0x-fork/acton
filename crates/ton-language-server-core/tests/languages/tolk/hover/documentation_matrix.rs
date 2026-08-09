@@ -1,10 +1,7 @@
 #![allow(clippy::needless_raw_string_hashes)]
 
-#[path = "../../../support.rs"]
-mod support;
-
+use super::support::MarkedSource;
 use expect_test::{Expect, expect};
-use support::MarkedSource;
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{DocumentUri, LanguageService, LanguageServiceConfig};
 

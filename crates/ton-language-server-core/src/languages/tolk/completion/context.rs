@@ -22,12 +22,16 @@ impl TolkCompletionContext {
         document: &DocumentSnapshot,
         parsed: &tolk_syntax::SourceFile,
         position: Position,
-    ) -> anyhow::Result<Self> {
-        let (prefix, replacement_range) = identifier_prefix(document, position);
+    ) -> anyhow::Result<Option<Self>> {
         let offset = document
             .text_index()
             .position_to_offset(document.text(), position)
             .min(document.text().len());
+        if is_in_comment(parsed, offset) {
+            return Ok(None);
+        }
+
+        let (prefix, replacement_range) = identifier_prefix(document, position);
         let insertion_position = document
             .text_index()
             .offset_to_position(document.text(), offset);
@@ -75,7 +79,7 @@ impl TolkCompletionContext {
         let suffix = &document.text()[replacement_end..];
         let next = suffix.trim_start();
 
-        Ok(Self {
+        Ok(Some(Self {
             source_file,
             offset,
             prefix,
@@ -83,7 +87,7 @@ impl TolkCompletionContext {
             after_dot,
             before_paren: next.starts_with('('),
             before_semicolon: next.starts_with(';'),
-        })
+        }))
     }
 
     pub(super) fn source(&self) -> &str {
@@ -415,6 +419,20 @@ impl TolkCompletionContext {
         (value.start_byte() <= cursor.start_byte() && cursor.end_byte() <= value.end_byte())
             .then_some(field)
     }
+}
+
+fn is_in_comment(parsed: &tolk_syntax::SourceFile, offset: usize) -> bool {
+    let Some(probe) = offset.checked_sub(1) else {
+        return false;
+    };
+    let Some(node) = parsed
+        .tree
+        .root_node()
+        .named_descendant_for_byte_range(probe, probe)
+    else {
+        return false;
+    };
+    node.kind() == "comment"
 }
 
 fn has_ancestor(mut node: Node<'_>, kind: &str) -> bool {
