@@ -1,5 +1,6 @@
 import {
   ByteSize,
+  BooleanValue,
   ContentTabs,
   DataTable,
   DataTableBody,
@@ -17,6 +18,7 @@ import {
   Input,
   NumberValue,
   ParsedValueView,
+  Percentage,
   RawDataBlock,
   Skeleton,
   SkeletonText,
@@ -627,12 +629,12 @@ function ValidatorSetValue({configuration}: {readonly configuration: ValidatorSe
           },
           {
             id: "total",
-            label: "Total",
+            label: "Total validators",
             value: <NumberValue value={configuration.total} />,
           },
           {
             id: "main",
-            label: "Main",
+            label: "Masterchain validators",
             value: <NumberValue value={configuration.main} />,
           },
           ...(configuration.totalWeight === undefined
@@ -646,15 +648,29 @@ function ValidatorSetValue({configuration}: {readonly configuration: ValidatorSe
               ]),
         ]}
       />
-      <ValidatorList validators={configuration.validators} />
+      <ValidatorList
+        mainValidators={configuration.main}
+        validators={configuration.validators}
+        totalWeight={configuration.totalWeight}
+      />
     </div>
   )
 }
 
 const VALIDATOR_PREVIEW_COUNT = 7
 
-function ValidatorList({validators}: {readonly validators: readonly ValidatorConfiguration[]}) {
+function ValidatorList({
+  mainValidators,
+  validators,
+  totalWeight,
+}: {
+  readonly mainValidators: number
+  readonly validators: readonly ValidatorConfiguration[]
+  readonly totalWeight?: bigint
+}) {
   const [expanded, setExpanded] = useState(false)
+  const effectiveTotalWeight =
+    totalWeight ?? validators.reduce((sum, validator) => sum + validator.weight, 0n)
   const hasMore = validators.length > VALIDATOR_PREVIEW_COUNT
   const visibleValidators = expanded
     ? validators
@@ -662,19 +678,20 @@ function ValidatorList({validators}: {readonly validators: readonly ValidatorCon
 
   return (
     <div className={styles.validatorList}>
-      <DataTable minWidth="42rem" variant="nested">
+      <DataTable minWidth="50rem" variant="nested">
         <DataTableTable aria-label="Validators">
           <DataTableHead>
             <DataTableRow>
               <DataTableHeaderCell columnWidth="3.5rem">#</DataTableHeaderCell>
               <DataTableHeaderCell>Public key</DataTableHeaderCell>
               <DataTableHeaderCell>ADNL</DataTableHeaderCell>
-              <DataTableHeaderCell columnWidth="13rem">Weight</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="8rem">Masterchain</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="13rem">Weight share</DataTableHeaderCell>
             </DataTableRow>
           </DataTableHead>
           <DataTableBody>
             {visibleValidators.length === 0 ? (
-              <DataTableEmpty colSpan={4}>No validators configured</DataTableEmpty>
+              <DataTableEmpty colSpan={5}>No validators configured</DataTableEmpty>
             ) : (
               visibleValidators.map(validator => (
                 <DataTableRow key={validator.index}>
@@ -692,17 +709,28 @@ function ValidatorList({validators}: {readonly validators: readonly ValidatorCon
                   <DataTableCell className={styles.validatorHash} truncate>
                     <TechnicalValue
                       copyLabel="validator ADNL address"
-                      endLength={5}
+                      endLength={10}
                       fallback="—"
-                      startLength={5}
+                      startLength={10}
                       value={validator.adnlAddress}
                     />
                   </DataTableCell>
+                  <DataTableCell>
+                    <BooleanValue value={validator.index < mainValidators} />
+                  </DataTableCell>
                   <DataTableCell className={styles.validatorWeight}>
-                    <ConfigTechnicalNumberValue
-                      copyLabel="validator weight"
-                      value={validator.weight}
-                    />
+                    <Tooltip
+                      content={`${formatNumberValue(validator.weight)} of ${formatNumberValue(effectiveTotalWeight)}`}
+                    >
+                      <span className={styles.validatorWeightShare}>
+                        <Percentage
+                          maximumFractionDigits={3}
+                          minimumFractionDigits={2}
+                          total={Number(effectiveTotalWeight)}
+                          value={validator.weight}
+                        />
+                      </span>
+                    </Tooltip>
                   </DataTableCell>
                 </DataTableRow>
               ))

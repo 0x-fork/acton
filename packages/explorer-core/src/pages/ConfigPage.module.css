@@ -276,6 +276,11 @@
   white-space: nowrap;
 }
 
+.validatorWeightShare {
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+}
+
 .validatorListFade {
   position: absolute;
   z-index: 1;
