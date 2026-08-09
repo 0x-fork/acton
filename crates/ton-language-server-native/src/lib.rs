@@ -20,7 +20,8 @@ use ton_language_server_core::languages::tolk::{
 };
 use ton_language_server_core::languages::toml::TomlLanguage;
 use ton_language_server_core::{
-    CodeAction, CodeActionKind, CodeLens, CompletionItem, CompletionItemKind, CompletionList,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
+    CodeActionKind, CodeLens, CompletionItem, CompletionItemKind, CompletionList,
     CompletionTrigger, CompletionTriggerKind, DocumentHighlight, DocumentHighlightKind,
     DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename, FoldingRange, Hover, InlayHint,
     InlayHintCategory, InlayHintKind, InsertTextFormat, LanguageId, LanguageService,
@@ -652,6 +653,7 @@ impl LanguageServer for NativeLanguageServer {
                 definition_provider: Some(lsp::OneOf::Left(true)),
                 type_definition_provider: Some(lsp::TypeDefinitionProviderCapability::Simple(true)),
                 references_provider: Some(lsp::OneOf::Left(true)),
+                call_hierarchy_provider: Some(lsp::CallHierarchyServerCapability::Simple(true)),
                 document_highlight_provider: Some(lsp::OneOf::Left(true)),
                 completion_provider: Some(lsp::CompletionOptions {
                     resolve_provider: Some(false),
@@ -953,6 +955,58 @@ impl LanguageServer for NativeLanguageServer {
             });
         }
         Ok(Some(locations.iter().filter_map(location_to_lsp).collect()))
+    }
+
+    async fn prepare_call_hierarchy(
+        &self,
+        params: lsp::CallHierarchyPrepareParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::CallHierarchyItem>>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position.to_core();
+        let item = self
+            .with_service(|service| service.prepare_call_hierarchy(&uri.to_core(), position))
+            .map_err(rpc_error)?;
+        Ok(item.and_then(|item| call_hierarchy_item_to_lsp(item).map(|item| vec![item])))
+    }
+
+    async fn incoming_calls(
+        &self,
+        params: lsp::CallHierarchyIncomingCallsParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::CallHierarchyIncomingCall>>> {
+        let uri = params.item.uri;
+        let position = params.item.selection_range.start.to_core();
+        let Some(language_id) = self.document_language_id(&uri).map_err(rpc_error)? else {
+            return Ok(Some(Vec::new()));
+        };
+        let calls = self
+            .with_service(|service| service.incoming_calls(&language_id, &uri.to_core(), position))
+            .map_err(rpc_error)?;
+        Ok(Some(
+            calls
+                .into_iter()
+                .filter_map(call_hierarchy_incoming_call_to_lsp)
+                .collect(),
+        ))
+    }
+
+    async fn outgoing_calls(
+        &self,
+        params: lsp::CallHierarchyOutgoingCallsParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::CallHierarchyOutgoingCall>>> {
+        let uri = params.item.uri;
+        let position = params.item.selection_range.start.to_core();
+        let Some(language_id) = self.document_language_id(&uri).map_err(rpc_error)? else {
+            return Ok(Some(Vec::new()));
+        };
+        let calls = self
+            .with_service(|service| service.outgoing_calls(&language_id, &uri.to_core(), position))
+            .map_err(rpc_error)?;
+        Ok(Some(
+            calls
+                .into_iter()
+                .filter_map(call_hierarchy_outgoing_call_to_lsp)
+                .collect(),
+        ))
     }
 
     async fn formatting(
@@ -1872,6 +1926,37 @@ fn document_symbol_to_lsp(symbol: DocumentSymbol) -> lsp::DocumentSymbol {
                 .collect()
         }),
     }
+}
+
+fn call_hierarchy_item_to_lsp(item: CallHierarchyItem) -> Option<lsp::CallHierarchyItem> {
+    Some(lsp::CallHierarchyItem {
+        name: item.name,
+        kind: document_symbol_kind_to_lsp(item.kind),
+        tags: None,
+        detail: item.detail,
+        uri: lsp::Url::parse(item.uri.as_str()).ok()?,
+        range: range_to_lsp(item.range),
+        selection_range: range_to_lsp(item.selection_range),
+        data: None,
+    })
+}
+
+fn call_hierarchy_incoming_call_to_lsp(
+    call: CallHierarchyIncomingCall,
+) -> Option<lsp::CallHierarchyIncomingCall> {
+    Some(lsp::CallHierarchyIncomingCall {
+        from: call_hierarchy_item_to_lsp(call.from)?,
+        from_ranges: call.from_ranges.into_iter().map(range_to_lsp).collect(),
+    })
+}
+
+fn call_hierarchy_outgoing_call_to_lsp(
+    call: CallHierarchyOutgoingCall,
+) -> Option<lsp::CallHierarchyOutgoingCall> {
+    Some(lsp::CallHierarchyOutgoingCall {
+        to: call_hierarchy_item_to_lsp(call.to)?,
+        from_ranges: call.from_ranges.into_iter().map(range_to_lsp).collect(),
+    })
 }
 
 fn workspace_symbol_to_lsp(symbol: WorkspaceSymbol) -> Option<lsp::SymbolInformation> {

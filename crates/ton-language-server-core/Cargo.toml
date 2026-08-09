@@ -247,6 +247,11 @@ path = "tests/languages/tolk/references.rs"
 required-features = ["tolk"]
 
 [[test]]
+name = "tolk_call_hierarchy"
+path = "tests/languages/tolk/call_hierarchy.rs"
+required-features = ["tolk"]
+
+[[test]]
 name = "tolk_semantic_tokens"
 path = "tests/languages/tolk/semantic_tokens.rs"
 required-features = ["tolk"]

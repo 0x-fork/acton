@@ -1,18 +1,19 @@
 use crate::language::{
-    CodeActionRequest, CodeLensRequest, CompletionRequest, DefinitionRequest,
-    DocumentHighlightRequest, DocumentSymbolRequest, FileRenameRequest, FoldingRangeRequest,
-    FormattingRequest, HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest,
-    ParsedDocument, PluginContext, PrepareRenameRequest, ReferenceRequest, RenameRequest,
-    SemanticTokensRequest, SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest,
-    WorkspaceSymbolRequest,
+    CallHierarchyPrepareRequest, CallHierarchyRequest, CodeActionRequest, CodeLensRequest,
+    CompletionRequest, DefinitionRequest, DocumentHighlightRequest, DocumentSymbolRequest,
+    FileRenameRequest, FoldingRangeRequest, FormattingRequest, HoverRequest, InlayHintRequest,
+    LanguagePlugin, ParseRequest, ParsedDocument, PluginContext, PrepareRenameRequest,
+    ReferenceRequest, RenameRequest, SemanticTokensRequest, SignatureHelpRequest,
+    TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceSymbolRequest,
 };
 use crate::logging;
 use crate::profiling::Profiler;
 use crate::semantic_tokens::SemanticTokens;
 use crate::types::{
-    CodeAction, CodeLens, DocumentEdits, DocumentHighlight, DocumentSnapshot, DocumentSymbol,
-    DocumentUri, FileRename, FoldingRange, Hover, InlayHint, LanguageId, Location, Position,
-    PrepareRename, Range, SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction, CodeLens,
+    DocumentEdits, DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri, FileRename,
+    FoldingRange, Hover, InlayHint, LanguageId, Location, Position, PrepareRename, Range,
+    SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use crate::{CompletionList, CompletionTrigger, TypeAtPosition};
 use std::collections::{BTreeMap, HashMap};
@@ -947,6 +948,80 @@ impl LanguageService {
                 );
             }
         }
+        result
+    }
+
+    pub fn prepare_call_hierarchy(
+        &mut self,
+        uri: &DocumentUri,
+        position: Position,
+    ) -> anyhow::Result<Option<CallHierarchyItem>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().call_hierarchy {
+            return Ok(None);
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.prepare_call_hierarchy(CallHierarchyPrepareRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            position,
+        });
+        self.profiler.finish("call_hierarchy.prepare", started_at);
+        result
+    }
+
+    pub fn incoming_calls(
+        &mut self,
+        language_id: &LanguageId,
+        uri: &DocumentUri,
+        position: Position,
+    ) -> anyhow::Result<Vec<CallHierarchyIncomingCall>> {
+        let Some(plugin) = self.plugins.get(language_id) else {
+            anyhow::bail!("unsupported language '{language_id}'");
+        };
+        if !plugin.capabilities().call_hierarchy {
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.incoming_calls(CallHierarchyRequest {
+            uri,
+            position,
+            profiler: &mut self.profiler,
+        });
+        self.profiler.finish("call_hierarchy.incoming", started_at);
+        result
+    }
+
+    pub fn outgoing_calls(
+        &mut self,
+        language_id: &LanguageId,
+        uri: &DocumentUri,
+        position: Position,
+    ) -> anyhow::Result<Vec<CallHierarchyOutgoingCall>> {
+        let Some(plugin) = self.plugins.get(language_id) else {
+            anyhow::bail!("unsupported language '{language_id}'");
+        };
+        if !plugin.capabilities().call_hierarchy {
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.outgoing_calls(CallHierarchyRequest {
+            uri,
+            position,
+            profiler: &mut self.profiler,
+        });
+        self.profiler.finish("call_hierarchy.outgoing", started_at);
         result
     }
 

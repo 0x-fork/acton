@@ -16,12 +16,12 @@ pub use completion::{
 };
 pub use custom::TypeAtPosition;
 pub use language::{
-    CodeActionRequest, CodeLensRequest, CompletionRequest, DefinitionRequest,
-    DocumentHighlightRequest, DocumentSymbolRequest, FeatureSet, FileRenameRequest,
-    FoldingRangeRequest, FormattingRequest, HoverRequest, InlayHintRequest, LanguagePlugin,
-    ParseRequest, ParsedDocument, PluginContext, PrepareRenameRequest, RenameRequest,
-    SemanticTokensRequest, SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest,
-    WorkspaceLanguage, WorkspaceSymbolRequest,
+    CallHierarchyPrepareRequest, CallHierarchyRequest, CodeActionRequest, CodeLensRequest,
+    CompletionRequest, DefinitionRequest, DocumentHighlightRequest, DocumentSymbolRequest,
+    FeatureSet, FileRenameRequest, FoldingRangeRequest, FormattingRequest, HoverRequest,
+    InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
+    PrepareRenameRequest, RenameRequest, SemanticTokensRequest, SignatureHelpRequest,
+    TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage, WorkspaceSymbolRequest,
 };
 pub use logging::{
     CORE_TARGET, EDIT_TARGET, FIFT_TARGET, LogLevel, LoggingConfig, ParseLogLevelError,
@@ -38,11 +38,12 @@ pub use semantic_tokens::{
 pub use service::{LanguageService, LanguageServiceConfig};
 pub use text::TextIndex;
 pub use types::{
-    CodeAction, CodeActionKind, CodeLens, Command, DocumentEdits, DocumentHighlight,
-    DocumentHighlightKind, DocumentSnapshot, DocumentSymbol, DocumentSymbolKind, DocumentUri,
-    FileRename, FoldingRange, Hover, InlayHint, InlayHintCategory, InlayHintKind, LanguageId,
-    Location, Position, PrepareRename, Range, SignatureHelp, SignatureInformation, TextEdit,
-    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
+    CodeActionKind, CodeLens, Command, DocumentEdits, DocumentHighlight, DocumentHighlightKind,
+    DocumentSnapshot, DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename, FoldingRange,
+    Hover, InlayHint, InlayHintCategory, InlayHintKind, LanguageId, Location, Position,
+    PrepareRename, Range, SignatureHelp, SignatureInformation, TextEdit, WorkspaceConfig,
+    WorkspaceEdit, WorkspaceSymbol,
 };
 
 #[must_use]

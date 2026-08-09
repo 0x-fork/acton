@@ -3,9 +3,10 @@ use crate::custom::TypeAtPosition;
 use crate::profiling::Profiler;
 use crate::semantic_tokens::SemanticToken;
 use crate::types::{
-    CodeAction, CodeLens, DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri,
-    FileRename, FoldingRange, Hover, InlayHint, Location, Position, PrepareRename, Range,
-    SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction, CodeLens,
+    DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri, FileRename, FoldingRange,
+    Hover, InlayHint, Location, Position, PrepareRename, Range, SignatureHelp, TextEdit,
+    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -17,6 +18,7 @@ pub struct FeatureSet {
     pub document_symbols: bool,
     pub diagnostics: bool,
     pub references: bool,
+    pub call_hierarchy: bool,
     pub hover: bool,
     pub code_lens: bool,
     pub folding_ranges: bool,
@@ -91,6 +93,17 @@ pub struct ReferenceRequest<'a> {
     pub context: PluginContext<'a>,
     pub position: Position,
     pub include_declaration: bool,
+}
+
+pub struct CallHierarchyPrepareRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub position: Position,
+}
+
+pub struct CallHierarchyRequest<'a> {
+    pub uri: &'a DocumentUri,
+    pub position: Position,
+    pub profiler: &'a mut Profiler,
 }
 
 pub struct HoverRequest<'a> {
@@ -194,6 +207,27 @@ pub trait LanguagePlugin: Send + Sync {
     }
 
     fn references(&self, _request: ReferenceRequest<'_>) -> anyhow::Result<Vec<Location>> {
+        Ok(Vec::new())
+    }
+
+    fn prepare_call_hierarchy(
+        &self,
+        _request: CallHierarchyPrepareRequest<'_>,
+    ) -> anyhow::Result<Option<CallHierarchyItem>> {
+        Ok(None)
+    }
+
+    fn incoming_calls(
+        &self,
+        _request: CallHierarchyRequest<'_>,
+    ) -> anyhow::Result<Vec<CallHierarchyIncomingCall>> {
+        Ok(Vec::new())
+    }
+
+    fn outgoing_calls(
+        &self,
+        _request: CallHierarchyRequest<'_>,
+    ) -> anyhow::Result<Vec<CallHierarchyOutgoingCall>> {
         Ok(Vec::new())
     }
 

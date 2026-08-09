@@ -1,11 +1,11 @@
 use self::incremental_analysis::{DeclarationChanges, collect_declaration_stamps, imports_changed};
 use crate::language::{
-    CodeActionRequest, CompletionRequest, DefinitionRequest, DocumentHighlightRequest,
-    DocumentSymbolRequest, FeatureSet, FileRenameRequest, FoldingRangeRequest, FormattingRequest,
-    HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument,
-    PrepareRenameRequest, ReferenceRequest, RenameRequest, SemanticTokensRequest,
-    SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage,
-    WorkspaceSymbolRequest,
+    CallHierarchyPrepareRequest, CallHierarchyRequest, CodeActionRequest, CompletionRequest,
+    DefinitionRequest, DocumentHighlightRequest, DocumentSymbolRequest, FeatureSet,
+    FileRenameRequest, FoldingRangeRequest, FormattingRequest, HoverRequest, InlayHintRequest,
+    LanguagePlugin, ParseRequest, ParsedDocument, PrepareRenameRequest, ReferenceRequest,
+    RenameRequest, SemanticTokensRequest, SignatureHelpRequest, TypeAtPositionRequest,
+    TypeDefinitionRequest, WorkspaceLanguage, WorkspaceSymbolRequest,
 };
 use crate::logging;
 use crate::types::{normalize_logical_path, normalize_path};
@@ -26,6 +26,7 @@ use tolk_resolver::{FileDb, FileId, ProjectIndex, ProjectSource, ProjectSourcePr
 use tolk_ty::{FileBodyTypes, TypeDb, TypeDbCache, TypeInterner, WorkspaceBodyTypes, infer};
 use tree_sitter::Tree;
 
+mod call_hierarchy;
 mod code_actions;
 mod completion;
 mod definition;
@@ -116,6 +117,7 @@ impl LanguagePlugin for TolkLanguage {
         FeatureSet {
             definition: true,
             references: true,
+            call_hierarchy: true,
             completion: true,
             semantic_tokens: true,
             inlay_hints: true,
@@ -220,6 +222,32 @@ impl LanguagePlugin for TolkLanguage {
             "resolved Tolk references"
         );
         Ok(locations)
+    }
+
+    fn prepare_call_hierarchy(
+        &self,
+        request: CallHierarchyPrepareRequest<'_>,
+    ) -> anyhow::Result<Option<crate::CallHierarchyItem>> {
+        let _profile = request.context.profiler.span("tolk.call_hierarchy.prepare");
+        Ok(self
+            .engine
+            .prepare_call_hierarchy(request.context.document, request.position))
+    }
+
+    fn incoming_calls(
+        &self,
+        request: CallHierarchyRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::CallHierarchyIncomingCall>> {
+        let _profile = request.profiler.span("tolk.call_hierarchy.incoming");
+        Ok(self.engine.incoming_calls(request.uri, request.position))
+    }
+
+    fn outgoing_calls(
+        &self,
+        request: CallHierarchyRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::CallHierarchyOutgoingCall>> {
+        let _profile = request.profiler.span("tolk.call_hierarchy.outgoing");
+        Ok(self.engine.outgoing_calls(request.uri, request.position))
     }
 
     fn semantic_tokens(

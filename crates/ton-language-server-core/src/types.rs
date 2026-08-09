@@ -603,6 +603,28 @@ pub struct DocumentSymbol {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CallHierarchyItem {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: DocumentSymbolKind,
+    pub uri: DocumentUri,
+    pub range: Range,
+    pub selection_range: Range,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CallHierarchyIncomingCall {
+    pub from: CallHierarchyItem,
+    pub from_ranges: Vec<Range>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CallHierarchyOutgoingCall {
+    pub to: CallHierarchyItem,
+    pub from_ranges: Vec<Range>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WorkspaceSymbol {
     pub name: String,
     pub kind: DocumentSymbolKind,

@@ -208,6 +208,148 @@ async fn initialize_selects_one_root_and_keeps_partial_indexes_usable() -> anyho
 }
 
 #[tokio::test]
+async fn call_hierarchy_serves_prepare_incoming_and_outgoing_requests() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    fs::write(workspace.path().join("Acton.toml"), "")?;
+    fs::write(
+        workspace.path().join("lib.tolk"),
+        "fun helper(): int { return 1; }\nfun fromLib(): int { return helper(); }\n",
+    )?;
+    let main_source = concat!(
+        "import \"lib\"\n",
+        "fun caller(): int { return helper() + helper(); }\n",
+    );
+    let main_path = workspace.path().join("main.tolk");
+    fs::write(&main_path, main_source)?;
+
+    let root_uri = Url::from_directory_path(workspace.path())
+        .map_err(|()| anyhow::anyhow!("cannot convert workspace path to URI"))?;
+    let main_uri = Url::from_file_path(&main_path)
+        .map_err(|()| anyhow::anyhow!("cannot convert main file path to URI"))?;
+    let (mut client, server) = LspTestClient::start(ServerConfig::new(workspace.path())).await;
+    let initialize = client
+        .request(
+            "initialize",
+            json!({
+                "processId": null,
+                "rootUri": root_uri,
+                "capabilities": {},
+            }),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    client
+        .notify(
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {
+                    "uri": main_uri,
+                    "languageId": "tolk",
+                    "version": 1,
+                    "text": main_source,
+                }
+            }),
+        )
+        .await?;
+
+    let caller_items = client
+        .request(
+            "textDocument/prepareCallHierarchy",
+            text_document_position(&main_uri, 1, 5),
+        )
+        .await?;
+    let caller = caller_items
+        .as_array()
+        .and_then(|items| items.first())
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("missing caller hierarchy item"))?;
+    let outgoing = client
+        .request("callHierarchy/outgoingCalls", json!({"item": caller}))
+        .await?;
+
+    let helper_items = client
+        .request(
+            "textDocument/prepareCallHierarchy",
+            text_document_position(&main_uri, 1, 29),
+        )
+        .await?;
+    let helper = helper_items
+        .as_array()
+        .and_then(|items| items.first())
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("missing helper hierarchy item"))?;
+    let incoming = client
+        .request("callHierarchy/incomingCalls", json!({"item": helper}))
+        .await?;
+
+    let root = root_uri.as_str().trim_end_matches('/');
+    let item_label = |item: &Value| {
+        format!(
+            "{}@{}",
+            item["name"].as_str().unwrap_or("<missing>"),
+            item["uri"]
+                .as_str()
+                .unwrap_or("<missing>")
+                .replace(root, "$ROOT"),
+        )
+    };
+    let call_ranges = |call: &Value| {
+        call["fromRanges"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|range| format!("{}:{}", range["start"]["line"], range["start"]["character"]))
+            .collect::<Vec<_>>()
+    };
+    let actual = json!({
+        "capability": initialize["capabilities"]["callHierarchyProvider"],
+        "caller": item_label(&caller),
+        "helper": item_label(&helper),
+        "incoming": incoming.as_array().into_iter().flatten().map(|call| json!({
+            "from": item_label(&call["from"]),
+            "ranges": call_ranges(call),
+        })).collect::<Vec<_>>(),
+        "outgoing": outgoing.as_array().into_iter().flatten().map(|call| json!({
+            "to": item_label(&call["to"]),
+            "ranges": call_ranges(call),
+        })).collect::<Vec<_>>(),
+    });
+    expect![[r#"
+        {
+          "caller": "caller@$ROOT/main.tolk",
+          "capability": true,
+          "helper": "helper@$ROOT/lib.tolk",
+          "incoming": [
+            {
+              "from": "fromLib@$ROOT/lib.tolk",
+              "ranges": [
+                "1:28"
+              ]
+            },
+            {
+              "from": "caller@$ROOT/main.tolk",
+              "ranges": [
+                "1:27",
+                "1:38"
+              ]
+            }
+          ],
+          "outgoing": [
+            {
+              "ranges": [
+                "1:27",
+                "1:38"
+              ],
+              "to": "helper@$ROOT/lib.tolk"
+            }
+          ]
+        }"#]]
+    .assert_eq(&serde_json::to_string_pretty(&actual)?);
+
+    client.shutdown(server).await
+}
+
+#[tokio::test]
 async fn formatting_errors_are_reported_as_request_failures() -> anyhow::Result<()> {
     let workspace = tempfile::tempdir()?;
     fs::write(workspace.path().join("Acton.toml"), "")?;
