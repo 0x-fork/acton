@@ -8,10 +8,10 @@ use tolk_analysis::{
 use tolk_resolver::resolve_index::{LocalDef, LocalDefKind};
 use tolk_resolver::{Resolved, Symbol, SymbolId, SymbolKind};
 use tolk_syntax::{
-    Annotation, Assert, AstNode, CatchClause, Contract, ContractField, EnumMember, FunctionLike,
-    HasGenericParams, HasName, Import, NumberLit, Parameter, StringLit, StructField, Throw,
-    TopLevel, TryFromNode, Type, TypeAliasUnderlyingType, TypeParameter, VarDecl, clean_comment,
-    parse_tolk_int_literal,
+    Annotation, Assert, AstNode, CatchClause, Contract, ContractField, EnumMember, Expr,
+    FunctionLike, HasGenericParams, HasName, Import, NumberLit, Parameter, StringLit, StructField,
+    Throw, TopLevel, TryFromNode, Type, TypeAliasUnderlyingType, TypeParameter, Unary, VarDecl,
+    clean_comment,
 };
 use tolk_ty::{TyData, TyId, TypeInterner};
 
@@ -105,6 +105,15 @@ impl TolkResolveSnapshot {
                 return Some(Hover::new(
                     contents,
                     self.range_for_node(file_id, string.syntax()),
+                ));
+            }
+            if let Ok(unary) = Unary::try_from_node(node)
+                && let Some(Expr::NumberLit(number)) = unary.argument()
+                && let Some(contents) = exit_code_hover(number, source)
+            {
+                return Some(Hover::new(
+                    contents,
+                    self.range_for_node(file_id, unary.syntax()),
                 ));
             }
             if let Ok(number) = NumberLit::try_from_node(node)
@@ -402,11 +411,22 @@ impl SerializationSizeContext for TolkResolveSnapshot {
 }
 
 fn exit_code_hover(number: NumberLit<'_>, source: &str) -> Option<String> {
-    let parent = number.syntax().parent()?;
+    let number_parent = number.syntax().parent()?;
+    let (expression, value) = if let Ok(unary) = Unary::try_from_node(number_parent)
+        && unary.operator_name(source) == "-"
+        && unary
+            .argument()
+            .is_some_and(|argument| argument.syntax() == number.syntax())
+    {
+        (unary.syntax(), number.parse_i32(source)?.checked_neg()?)
+    } else {
+        (number.syntax(), number.parse_i32(source)?)
+    };
+    let parent = expression.parent()?;
     let is_exit_code = if let Ok(statement) = Throw::try_from_node(parent) {
-        statement.expr()?.syntax() == number.syntax()
+        statement.expr()?.syntax() == expression
     } else if let Ok(statement) = Assert::try_from_node(parent) {
-        statement.expr()?.syntax() == number.syntax()
+        statement.expr()?.syntax() == expression
     } else {
         false
     };
@@ -414,7 +434,6 @@ fn exit_code_hover(number: NumberLit<'_>, source: &str) -> Option<String> {
         return None;
     }
 
-    let value = parse_tolk_int_literal(number.text(source))?.parse_i32()?;
     let (origin, description) = exit_code_info(value)?;
     Some(format!(
         "{description}\n\n**Phase**: {origin}\n\nLearn more about exit codes in documentation: \
