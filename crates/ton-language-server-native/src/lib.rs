@@ -4,7 +4,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -45,6 +45,9 @@ const TASM_SPEC_JSON: &str = include_str!("../../tasm-core/spec/tvm-specificatio
 pub const TOLK_TYPE_AT_POSITION_REQUEST: &str = "tolk.getTypeAtPosition";
 pub const PROFILE_REQUEST: &str = "ton/profile";
 pub const DISASSEMBLE_REQUEST: &str = "ton/disassemble";
+const WATCHED_FILES_REGISTRATION_ID: &str = "ton-language-server-watched-files";
+const WATCHED_SOURCE_FILES_GLOB: &str = "**/*.{tolk,tasm,fif,fift,tlb}";
+const WATCHED_MANIFEST_FILES_GLOB: &str = "**/Acton.toml";
 
 trait ToCore {
     type Core;
@@ -205,6 +208,7 @@ pub struct NativeLanguageServer {
     workspace: Mutex<Option<NativeWorkspace>>,
     startup_warnings: Mutex<Vec<String>>,
     documents: Mutex<HashMap<String, OpenDocument>>,
+    supports_dynamic_file_watching: AtomicBool,
 }
 
 #[derive(Clone, Debug)]
@@ -254,7 +258,29 @@ impl NativeLanguageServer {
             workspace: Mutex::new(None),
             startup_warnings: Mutex::new(Vec::new()),
             documents: Mutex::new(HashMap::new()),
+            supports_dynamic_file_watching: AtomicBool::new(false),
         }
+    }
+
+    async fn register_file_watchers(&self) -> anyhow::Result<()> {
+        let register_options =
+            serde_json::to_value(lsp::DidChangeWatchedFilesRegistrationOptions {
+                watchers: [WATCHED_SOURCE_FILES_GLOB, WATCHED_MANIFEST_FILES_GLOB]
+                    .into_iter()
+                    .map(|pattern| lsp::FileSystemWatcher {
+                        glob_pattern: lsp::GlobPattern::String(pattern.to_owned()),
+                        kind: None,
+                    })
+                    .collect(),
+            })?;
+        self.client
+            .register_capability(vec![lsp::Registration {
+                id: WATCHED_FILES_REGISTRATION_ID.to_owned(),
+                method: "workspace/didChangeWatchedFiles".to_owned(),
+                register_options: Some(register_options),
+            }])
+            .await?;
+        Ok(())
     }
 
     async fn report_error(&self, operation: &'static str, error: impl ToString) {
@@ -535,6 +561,15 @@ impl LanguageServer for NativeLanguageServer {
         &self,
         params: lsp::InitializeParams,
     ) -> jsonrpc::Result<lsp::InitializeResult> {
+        let supports_dynamic_file_watching = params
+            .capabilities
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.did_change_watched_files)
+            .and_then(|capabilities| capabilities.dynamic_registration)
+            .unwrap_or(false);
+        self.supports_dynamic_file_watching
+            .store(supports_dynamic_file_watching, Ordering::Relaxed);
         if let Some(settings) = params.initialization_options.clone()
             && let Err(error) = self.update_settings(settings)
         {
@@ -631,6 +666,13 @@ impl LanguageServer for NativeLanguageServer {
     }
 
     async fn initialized(&self, _: lsp::InitializedParams) {
+        if self.supports_dynamic_file_watching.load(Ordering::Relaxed)
+            && let Err(error) = self.register_file_watchers().await
+        {
+            self.report_error("workspace.files.watch.register", error)
+                .await;
+        }
+
         let project_root = self.workspace().map_or_else(
             |_| self.fallback_project_root.clone(),
             |workspace| workspace.project_root,

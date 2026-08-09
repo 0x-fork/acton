@@ -8,6 +8,63 @@ use ton_language_server_native::ServerConfig;
 use tower_lsp::lsp_types::Url;
 
 #[tokio::test]
+async fn dynamically_registers_workspace_file_watchers() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    fs::write(workspace.path().join("Acton.toml"), "")?;
+    let root_uri = Url::from_directory_path(workspace.path())
+        .map_err(|()| anyhow::anyhow!("cannot convert workspace path to URI"))?;
+    let (mut client, server) = LspTestClient::start(ServerConfig::new(workspace.path())).await;
+
+    client
+        .request(
+            "initialize",
+            json!({
+                "processId": null,
+                "rootUri": root_uri,
+                "capabilities": {
+                    "workspace": {
+                        "didChangeWatchedFiles": {
+                            "dynamicRegistration": true
+                        }
+                    }
+                }
+            }),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    let registration = client.receive_server_request().await?;
+
+    expect![[r#"
+        {
+          "method": "client/registerCapability",
+          "params": {
+            "registrations": [
+              {
+                "id": "ton-language-server-watched-files",
+                "method": "workspace/didChangeWatchedFiles",
+                "registerOptions": {
+                  "watchers": [
+                    {
+                      "globPattern": "**/*.{tolk,tasm,fif,fift,tlb}"
+                    },
+                    {
+                      "globPattern": "**/Acton.toml"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }"#]]
+    .assert_eq(&serde_json::to_string_pretty(&json!({
+        "method": registration["method"],
+        "params": registration["params"],
+    }))?);
+
+    client.shutdown(server).await
+}
+
+#[tokio::test]
 async fn initialize_selects_one_root_and_keeps_partial_indexes_usable() -> anyhow::Result<()> {
     let fallback = tempfile::tempdir()?;
     let workspace = tempfile::tempdir()?;
