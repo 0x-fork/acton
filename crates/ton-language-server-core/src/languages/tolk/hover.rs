@@ -526,12 +526,13 @@ fn struct_signature(structure: tolk_syntax::Struct<'_>, source: &str) -> Option<
         .filter_map(|field| struct_field_signature(field, source))
         .map(|field| format!("    {field}"))
         .collect::<Vec<_>>();
-    let body = if fields.is_empty() {
-        "{}".to_owned()
-    } else {
-        format!("{{\n{}\n}}", fields.join("\n"))
-    };
-    Some(format!("struct {prefix}{name}{type_parameters} {body}"))
+    if fields.is_empty() {
+        return Some(format!("struct {prefix}{name}{type_parameters}"));
+    }
+    Some(format!(
+        "struct {prefix}{name}{type_parameters} {{\n{}\n}}",
+        fields.join("\n")
+    ))
 }
 
 fn struct_field_signature(field: StructField<'_>, source: &str) -> Option<String> {
