@@ -398,14 +398,14 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
   ],
   "jettonBridge": {
     "bridgeAddress": "-1:b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
-    "externalChainAddress": "0xb3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3",
+    "externalChain": "Ethereum",
+    "externalChainAddress": "0xb3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3",
     "kind": "jetton",
     "oracleAddress": "-1:b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
     "oracles": [
       {
-        "index": 0,
-        "key": "0x0000000000000000000000000000000000000000000000000000000000000033",
-        "value": "0x0000000000000000000000000000000000000000000000000000000000000044",
+        "address": "-1:0000000000000000000000000000000000000000000000000000000000000033",
+        "externalAddress": "0x0000000000000000000000000000000000000044",
       },
     ],
     "prices": [
@@ -593,14 +593,14 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
   ],
   "oracleBridge": {
     "bridgeAddress": "-1:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
-    "externalChainAddress": "0xa3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3",
+    "externalChain": "Ethereum",
+    "externalChainAddress": "0xa3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3",
     "kind": "oracle",
     "oracleAddress": "-1:a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2",
     "oracles": [
       {
-        "index": 0,
-        "key": "0x0000000000000000000000000000000000000000000000000000000000000011",
-        "value": "0x0000000000000000000000000000000000000000000000000000000000000022",
+        "address": "-1:0000000000000000000000000000000000000000000000000000000000000011",
+        "externalAddress": "0x0000000000000000000000000000000000000022",
       },
     ],
   },

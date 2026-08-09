@@ -1,7 +1,12 @@
-import {Cell, Dictionary} from "@ton/core"
+import {Address, Cell, Dictionary} from "@ton/core"
 import {formatDateTime, type ParsedValue} from "@acton/ui"
 
-import {loadConfigParam, loadConfigParams} from "../cell-inspector/block.tlb.generated"
+import {
+  type JettonBridgeParams,
+  loadConfigParam,
+  loadConfigParams,
+  type OracleBridgeParams,
+} from "../cell-inspector/block.tlb.generated"
 
 export const TON_CONFIG_DOCS_URL = "https://docs.ton.org/foundations/config"
 
@@ -54,13 +59,15 @@ export interface SuspendedAddressesConfiguration {
 }
 
 export interface BridgeOracle {
-  readonly index: number
-  readonly key: string
-  readonly value: string
+  readonly address: string
+  readonly externalAddress: string
 }
+
+export type BridgeExternalChain = "BSC" | "Ethereum" | "Polygon"
 
 export interface BridgeConfiguration {
   readonly kind: "oracle" | "jetton"
+  readonly externalChain: BridgeExternalChain
   readonly bridgeAddress: string
   readonly oracleAddress: string
   readonly oracles: readonly BridgeOracle[]
@@ -453,12 +460,12 @@ const CONFIG_PARAMETER_METADATA: Readonly<Record<number, ConfigParameterMetadata
     description: "Oracle bridge parameters for the Polygon bridge",
   },
   79: {
-    title: "TON jetton bridge",
-    description: "Jetton bridge parameters for the legacy TON bridge",
+    title: "Ethereum jetton bridge",
+    description: "Jetton bridge parameters for the Ethereum to TON token bridge",
   },
   81: {
-    title: "Ethereum jetton bridge",
-    description: "Jetton bridge parameters for the Ethereum bridge",
+    title: "Binance Smart Chain jetton bridge",
+    description: "Jetton bridge parameters for the BNB Smart Chain to TON token bridge",
   },
   82: {
     title: "Polygon jetton bridge",
@@ -1238,71 +1245,112 @@ function parseSuspendedAddresses(value: unknown): SuspendedAddressesConfiguratio
 
 function parseBridgeConfiguration(id: number, value: unknown): BridgeConfiguration | undefined {
   const candidate = unwrapAnonymousConfigValue(value)
-  if (!candidate) return undefined
+  const externalChain = bridgeExternalChain(id)
+  if (!candidate || !externalChain) return undefined
 
-  if (id >= 71 && id <= 73 && candidate.kind === "OracleBridgeParams") {
-    const bridgeAddress = parseHashAddress(candidate.bridge_address)
-    const oracleAddress = parseHashAddress(candidate.oracle_mutlisig_address)
-    const oracles = parseBridgeOracles(candidate.oracles)
-    const externalChainAddress = parseFixedHex(candidate.external_chain_address)
-    if (!bridgeAddress || !oracleAddress || !oracles || !externalChainAddress) return undefined
-
-    return {
-      kind: "oracle",
-      bridgeAddress,
-      oracleAddress,
-      oracles,
-      externalChainAddress,
-    }
+  if (isOracleBridgeParams(candidate)) {
+    return parseOracleBridgeConfiguration(candidate, externalChain)
   }
 
-  if (id !== 79 && id !== 81 && id !== 82) return undefined
-  if (typeof candidate.kind !== "string" || !candidate.kind.startsWith("JettonBridgeParams_")) {
-    return undefined
-  }
+  return isJettonBridgeParams(candidate)
+    ? parseJettonBridgeConfiguration(candidate, externalChain)
+    : undefined
+}
 
-  const bridgeAddress = parseHashAddress(candidate.bridge_address)
-  const oracleAddress = parseHashAddress(candidate.oracles_address)
-  const oracles = parseBridgeOracles(candidate.oracles)
-  if (!bridgeAddress || !oracleAddress || !oracles) return undefined
+function isOracleBridgeParams(value: unknown): value is OracleBridgeParams {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as {readonly kind?: unknown}).kind === "OracleBridgeParams"
+  )
+}
 
-  const externalChainAddress =
-    candidate.external_chain_address === undefined
-      ? undefined
-      : parseFixedHex(candidate.external_chain_address)
-  if (candidate.external_chain_address !== undefined && !externalChainAddress) return undefined
+function isJettonBridgeParams(value: unknown): value is JettonBridgeParams {
+  if (typeof value !== "object" || value === null) return false
 
-  const stateFlags = candidate.state_flags
-  if (typeof stateFlags !== "number") return undefined
+  const kind = (value as {readonly kind?: unknown}).kind
+  return (
+    kind === "JettonBridgeParams_jetton_bridge_params_v0" ||
+    kind === "JettonBridgeParams_jetton_bridge_params_v1"
+  )
+}
 
-  const burnBridgeFee = candidate.burn_bridge_fee
-  const prices = parseJettonBridgePrices(candidate.prices)
-  if (burnBridgeFee !== undefined && typeof burnBridgeFee !== "bigint") return undefined
-  if (candidate.prices !== undefined && !prices) return undefined
+function parseOracleBridgeConfiguration(
+  value: OracleBridgeParams,
+  externalChain: BridgeExternalChain,
+): BridgeConfiguration | undefined {
+  const bridgeAddress = parseHashAddress(value.bridge_address)
+  const oracleAddress = parseHashAddress(value.oracle_mutlisig_address)
+  const oracles = parseBridgeOracles(value.oracles)
+  const externalChainAddress = parseEvmAddress(value.external_chain_address)
+  if (!bridgeAddress || !oracleAddress || !oracles || !externalChainAddress) return undefined
 
   return {
-    kind: "jetton",
+    kind: "oracle",
+    externalChain,
     bridgeAddress,
     oracleAddress,
     oracles,
-    ...(externalChainAddress === undefined ? {} : {externalChainAddress}),
-    stateFlags,
-    ...(burnBridgeFee === undefined ? {} : {burnBridgeFee}),
-    ...(prices === undefined ? {} : {prices}),
+    externalChainAddress,
   }
 }
 
-function parseBridgeOracles(value: unknown): readonly BridgeOracle[] | undefined {
-  if (!(value instanceof Dictionary)) return undefined
+function parseJettonBridgeConfiguration(
+  value: JettonBridgeParams,
+  externalChain: BridgeExternalChain,
+): BridgeConfiguration | undefined {
+  const bridgeAddress = parseHashAddress(value.bridge_address)
+  const oracleAddress = parseHashAddress(value.oracles_address)
+  const oracles = parseBridgeOracles(value.oracles)
+  if (!bridgeAddress || !oracleAddress || !oracles) return undefined
 
+  const common = {
+    kind: "jetton",
+    externalChain,
+    bridgeAddress,
+    oracleAddress,
+    oracles,
+    stateFlags: value.state_flags,
+  } as const
+
+  if (value.kind === "JettonBridgeParams_jetton_bridge_params_v0") {
+    return {...common, burnBridgeFee: value.burn_bridge_fee}
+  }
+
+  const externalChainAddress = parseEvmAddress(value.external_chain_address)
+  const prices = parseJettonBridgePrices(value.prices)
+  if (!externalChainAddress || !prices) return undefined
+
+  return {...common, externalChainAddress, prices}
+}
+
+function parseBridgeOracles(
+  value: Dictionary<bigint, bigint>,
+): readonly BridgeOracle[] | undefined {
   const oracles: BridgeOracle[] = []
-  for (const [index, [key, oracleValue]] of [...value].entries()) {
-    const formattedKey = fixedBigintHex(key)
-    const formattedValue = typeof oracleValue === "bigint" ? fixedBigintHex(oracleValue) : undefined
-    if (!formattedKey || !formattedValue) return undefined
-    oracles.push({index, key: formattedKey, value: formattedValue})
+  for (const [addressHash, externalAddressValue] of value) {
+    const address = masterchainAddressFromBigint(addressHash)
+    const externalAddress = evmAddressFromBigint(externalAddressValue)
+    if (!address || !externalAddress) return undefined
+    oracles.push({address, externalAddress})
   }
   return oracles
+}
+
+function bridgeExternalChain(id: number): BridgeExternalChain | undefined {
+  switch (id) {
+    case 71:
+    case 79:
+      return "Ethereum"
+    case 72:
+    case 81:
+      return "BSC"
+    case 73:
+    case 82:
+      return "Polygon"
+    default:
+      return undefined
+  }
 }
 
 function parseJettonBridgePrices(value: unknown): readonly NetworkConfigValue[] | undefined {
@@ -1354,20 +1402,34 @@ function toSignedInt32(value: number): number {
 }
 
 function masterchainAddress(bytes: Uint8Array): string {
-  return `-1:${bytesToHex(bytes)}`
+  return new Address(-1, Buffer.from(bytes)).toRawString()
 }
 
 function parseHashAddress(value: unknown): string | undefined {
   return value instanceof Uint8Array && value.length === 32 ? masterchainAddress(value) : undefined
 }
 
-function parseFixedHex(value: unknown): string | undefined {
-  return value instanceof Uint8Array && value.length === 32 ? `0x${bytesToHex(value)}` : undefined
+function parseEvmAddress(value: unknown): string | undefined {
+  if (!(value instanceof Uint8Array) || value.length !== 32) return undefined
+  if (value.subarray(0, 12).some(byte => byte !== 0)) return undefined
+  return `0x${bytesToHex(value.subarray(12))}`
 }
 
 function fixedBigintHex(value: bigint): string | undefined {
+  if (value < 0n) return undefined
   const hex = value.toString(16)
   return hex.length <= 64 ? `0x${hex.padStart(64, "0")}` : undefined
+}
+
+function evmAddressFromBigint(value: bigint): string | undefined {
+  if (value < 0n) return undefined
+  const hex = value.toString(16)
+  return hex.length <= 40 ? `0x${hex.padStart(40, "0")}` : undefined
+}
+
+function masterchainAddressFromBigint(value: bigint): string | undefined {
+  const hex = fixedBigintHex(value)
+  return hex === undefined ? undefined : masterchainAddress(Buffer.from(hex.slice(2), "hex"))
 }
 
 function addressFromUint288(value: bigint): string {

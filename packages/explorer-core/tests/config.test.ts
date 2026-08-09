@@ -382,7 +382,7 @@ describe("network configuration parser", () => {
       bridge_address: Buffer.alloc(32, 0xa1),
       oracle_mutlisig_address: Buffer.alloc(32, 0xa2),
       oracles: oracleEntries,
-      external_chain_address: Buffer.alloc(32, 0xa3),
+      external_chain_address: Buffer.concat([Buffer.alloc(12), Buffer.alloc(20, 0xa3)]),
     }
     config.set(71, beginCell().store(storeOracleBridgeParams(oracleBridge)).endCell())
 
@@ -403,7 +403,7 @@ describe("network configuration parser", () => {
         minter_min_tons_for_storage: 5n,
         discover_gas_consumption: 6n,
       },
-      external_chain_address: Buffer.alloc(32, 0xb3),
+      external_chain_address: Buffer.concat([Buffer.alloc(12), Buffer.alloc(20, 0xb3)]),
     }
     config.set(79, beginCell().store(storeJettonBridgeParams(jettonBridge)).endCell())
     const fundamentalContracts = Dictionary.empty<bigint, true>()

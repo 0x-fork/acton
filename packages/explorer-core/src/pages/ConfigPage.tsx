@@ -871,7 +871,7 @@ function BridgeConfigurationValue({configuration}: {readonly configuration: Brid
             : [
                 {
                   id: "external-chain-address",
-                  label: "External chain address",
+                  label: `${configuration.externalChain} bridge address`,
                   value: (
                     <TechnicalValue
                       value={configuration.externalChainAddress}
@@ -915,12 +915,21 @@ function BridgeConfigurationValue({configuration}: {readonly configuration: Brid
           ]}
         />
       )}
-      <BridgeOracleTable oracles={configuration.oracles} />
+      <BridgeOracleTable
+        externalChain={configuration.externalChain}
+        oracles={configuration.oracles}
+      />
     </div>
   )
 }
 
-function BridgeOracleTable({oracles}: {readonly oracles: readonly BridgeOracle[]}) {
+function BridgeOracleTable({
+  externalChain,
+  oracles,
+}: {
+  readonly externalChain: BridgeConfiguration["externalChain"]
+  readonly oracles: readonly BridgeOracle[]
+}) {
   return (
     <DataTable
       className={styles.tableInset}
@@ -932,34 +941,25 @@ function BridgeOracleTable({oracles}: {readonly oracles: readonly BridgeOracle[]
       <DataTableTable aria-label="Bridge oracles">
         <DataTableHead>
           <DataTableRow>
-            <DataTableHeaderCell columnWidth="3.5rem">#</DataTableHeaderCell>
-            <DataTableHeaderCell>Key</DataTableHeaderCell>
-            <DataTableHeaderCell>Value</DataTableHeaderCell>
+            <DataTableHeaderCell>TON address</DataTableHeaderCell>
+            <DataTableHeaderCell>{externalChain} address</DataTableHeaderCell>
           </DataTableRow>
         </DataTableHead>
         <DataTableBody>
           {oracles.length === 0 ? (
-            <DataTableEmpty colSpan={3}>No oracles configured</DataTableEmpty>
+            <DataTableEmpty colSpan={2}>No oracles configured</DataTableEmpty>
           ) : (
             oracles.map(oracle => (
-              <DataTableRow key={oracle.index}>
-                <DataTableCell className={styles.validatorIndex} tone="muted">
-                  {oracle.index + 1}
+              <DataTableRow key={oracle.address}>
+                <DataTableCell className={styles.validatorHash} truncate>
+                  <ConfigAddressValue address={oracle.address} shorten />
                 </DataTableCell>
                 <DataTableCell className={styles.validatorHash} truncate>
                   <TechnicalValue
-                    copyLabel="oracle key"
+                    copyLabel={`${externalChain} oracle address`}
                     endLength={8}
                     startLength={8}
-                    value={oracle.key}
-                  />
-                </DataTableCell>
-                <DataTableCell className={styles.validatorHash} truncate>
-                  <TechnicalValue
-                    copyLabel="oracle value"
-                    endLength={8}
-                    startLength={8}
-                    value={oracle.value}
+                    value={oracle.externalAddress}
                   />
                 </DataTableCell>
               </DataTableRow>
