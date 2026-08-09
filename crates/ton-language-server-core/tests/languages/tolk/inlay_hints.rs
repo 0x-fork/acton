@@ -348,6 +348,22 @@ fn evaluates_compile_time_functions_and_skips_cycles() {
 }
 
 #[test]
+fn skips_value_hints_for_signed_number_literals() {
+    case_tolk_inlay_hints(
+        r"
+            const NEGATIVE_LITERAL = -1
+            const POSITIVE_LITERAL = +1
+            const COMPUTED_NEGATIVE = 0 - 1
+        ",
+        full_document_range(),
+        expect![[r#"
+            const NEGATIVE_LITERAL/* : int */ = -1
+            const POSITIVE_LITERAL/* : int */ = +1
+            const COMPUTED_NEGATIVE/* : int */ = 0 - 1/* = -0x1 */"#]],
+    );
+}
+
+#[test]
 fn evaluates_constants_like_tolk_compiler() {
     case_tolk_inlay_hints(
         r#"
@@ -387,12 +403,12 @@ fn evaluates_constants_like_tolk_compiler() {
         "#,
         full_document_range(),
         expect![[r#"
-            const NEG_DIV/* : int */ = -5 / 2/* = 0x-3 */
+            const NEG_DIV/* : int */ = -5 / 2/* = -0x3 */
             const NEG_MOD/* : int */ = -5 % 2/* = 1 (0x1) */
-            const POS_NEG_DIV/* : int */ = 5 / -2/* = 0x-3 */
-            const POS_NEG_MOD/* : int */ = 5 % -2/* = 0x-1 */
+            const POS_NEG_DIV/* : int */ = 5 / -2/* = -0x3 */
+            const POS_NEG_MOD/* : int */ = 5 % -2/* = -0x1 */
             const NEG_NEG_DIV/* : int */ = -5 / -2/* = 2 (0x2) */
-            const NEG_NEG_MOD/* : int */ = -5 % -2/* = 0x-1 */
+            const NEG_NEG_MOD/* : int */ = -5 % -2/* = -0x1 */
             const INT_AND/* : bool */ = 2 && 3/* = true */
             const INT_OR/* : bool */ = 0 || -1/* = true */
             const BOOL_AND/* : bool */ = true & false/* = false */
@@ -404,7 +420,7 @@ fn evaluates_constants_like_tolk_compiler() {
 
             const NANOTONS/* : coins */ = ton("1.5")/* = 1500000000 (0x59682F00) */
             const GRAMS/* : coins */ = grams(/* floatString: */"1.5")/* = 1500000000 (0x59682F00) */
-            const NEGATIVE_GRAMS/* : coins */ = grams(/* floatString: */"-1.5")/* = 0x-59682F00 */
+            const NEGATIVE_GRAMS/* : coins */ = grams(/* floatString: */"-1.5")/* = -0x59682F00 */
             const ONE_NANOGRAM/* : coins */ = grams(/* floatString: */"0.000000001")/* = 1 (0x1) */
             const PLUS_GRAMS/* : coins */ = grams(/* floatString: */"+321.123456798")/* = 0x4AC473171E */
             const PADDED_GRAMS/* : coins */ = grams(/* floatString: */"0001.1000")/* = 1100000000 (0x4190AB00) */
@@ -435,7 +451,7 @@ fn evaluates_operators_and_casts() {
         full_document_range(),
         expect![[r#"
             const ARITHMETIC/* : int */ = ((1 + 2) * 3 << 2) | 1/* = 37 (0x25) */
-            const NEGATIVE/* : int */ = -(ARITHMETIC + 1)/* = 0x-26 */
+            const NEGATIVE/* : int */ = -(ARITHMETIC + 1)/* = -0x26 */
             const LOGIC/* : bool */ = !false && ARITHMETIC >= 37/* = true */
             const CASTED/* : int */ = (0x10 as int) + 1/* = 17 (0x11) */"#]],
     );
