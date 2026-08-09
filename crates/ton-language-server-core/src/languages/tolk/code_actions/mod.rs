@@ -83,14 +83,7 @@ impl TolkCodeActionContext<'_> {
     where
         N: TryFromNode<'tree>,
     {
-        let mut node = self.cursor_node()?;
-
-        loop {
-            if let Ok(typed) = N::try_from_node(node) {
-                return Some(typed);
-            }
-            node = node.parent()?;
-        }
+        self.cursor_node()?.ancestor_as()
     }
 
     fn text_of<'tree, N>(&self, node: N) -> &str

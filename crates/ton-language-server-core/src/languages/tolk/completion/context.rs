@@ -345,20 +345,13 @@ impl TolkCompletionContext {
 
     pub(super) fn ancestor_as<'tree, T>(&'tree self) -> Option<T>
     where
-        T: TryFromNode<'tree> + tolk_syntax::HasTreeSitterKind,
+        T: TryFromNode<'tree>,
     {
-        let node = self.ancestor(T::TREE_SITTER_KIND)?;
-        T::try_from_node(node).ok()
+        self.cursor_node()?.ancestor_as()
     }
 
     pub(super) fn ancestor_base_function(&self) -> Option<tolk_syntax::BaseFunction<'_>> {
-        let mut node = self.cursor_node()?;
-        loop {
-            if let Ok(function) = tolk_syntax::BaseFunction::try_from_node(node) {
-                return Some(function);
-            }
-            node = node.parent()?;
-        }
+        self.cursor_node()?.ancestor_as()
     }
 
     pub(super) fn parent_as<'tree, T>(&'tree self) -> Option<T>
@@ -374,15 +367,7 @@ impl TolkCompletionContext {
     }
 
     pub(super) fn annotation_owner(&self) -> Option<tolk_syntax::AnnotatedDeclaration<'_>> {
-        let mut node = self.cursor_node()?;
-
-        loop {
-            if let Ok(owner) = tolk_syntax::AnnotatedDeclaration::try_from_node(node) {
-                return Some(owner);
-            }
-
-            node = node.parent()?;
-        }
+        self.cursor_node()?.ancestor_as()
     }
 
     fn has_ancestor(&self, kind: &str) -> bool {

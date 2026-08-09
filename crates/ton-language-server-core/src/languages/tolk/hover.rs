@@ -311,7 +311,7 @@ impl TolkResolveSnapshot {
                 local_variable_signature(variable, source, &ty)?
             }
             LocalDefKind::Catch => {
-                let _catch = ancestor_as::<CatchClause<'_>>(node)?;
+                let _catch = node.ancestor_as::<CatchClause<'_>>()?;
                 format!("catch ({})", local.name)
             }
             LocalDefKind::TypeParameter => {
@@ -753,18 +753,6 @@ fn type_parameter_owner_signature(owner: TopLevel<'_>, source: &str) -> Option<S
         TopLevel::TypeAlias(alias) => format!("type {}", alias.name()?.text(source)),
         _ => return None,
     })
-}
-
-fn ancestor_as<'tree, N>(mut node: tree_sitter::Node<'tree>) -> Option<N>
-where
-    N: TryFromNode<'tree>,
-{
-    loop {
-        if let Ok(result) = N::try_from_node(node) {
-            return Some(result);
-        }
-        node = node.parent()?;
-    }
 }
 
 fn join_documentation(first: String, second: String) -> String {
