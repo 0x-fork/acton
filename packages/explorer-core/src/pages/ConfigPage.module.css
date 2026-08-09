@@ -406,6 +406,16 @@
   height: 14px;
 }
 
+.configParameterIdTooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.configParameterIdTooltip strong {
+  font-weight: var(--acton-font-weight-semibold);
+}
+
 .configParameterIdEmpty {
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);

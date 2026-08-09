@@ -22,6 +22,7 @@ import {
   SkeletonText,
   TechnicalValue,
   TokenAmount,
+  Tooltip,
 } from "@acton/ui"
 import {ChevronDown, ExternalLink, Link2, Search} from "lucide-react"
 import {useEffect, useMemo, useState, type FC, type ReactNode} from "react"
@@ -35,6 +36,7 @@ import {
   type BridgeOracle,
   type ExtraCurrency,
   type FundamentalSmartContract,
+  getConfigParameterMetadata,
   type GlobalVersionConfiguration,
   type NetworkConfig,
   type NetworkConfigParameter,
@@ -344,11 +346,13 @@ function ConfigParameterCard({parameter}: {readonly parameter: NetworkConfigPara
 function ConfigParameterAnchor({
   id,
   className,
+  tooltip,
 }: {
   readonly id: number
   readonly className?: string
+  readonly tooltip?: ReactNode
 }) {
-  return (
+  const anchor = (
     <a
       className={`${styles.parameterAnchor} ${className ?? ""}`}
       href={`#config-parameter-${id}`}
@@ -358,6 +362,8 @@ function ConfigParameterAnchor({
       <Link2 className={styles.parameterAnchorIcon} size={16} aria-hidden="true" />
     </a>
   )
+
+  return tooltip === undefined ? anchor : <Tooltip content={tooltip}>{anchor}</Tooltip>
 }
 
 function ConfigParameterValue({parameter}: {readonly parameter: NetworkConfigParameter}) {
@@ -994,11 +1000,24 @@ function ConfigParameterIdList({ids}: {readonly ids: readonly number[]}) {
       {ids.length === 0 ? (
         <li className={styles.configParameterIdEmpty}>No parameters configured</li>
       ) : (
-        ids.map(id => (
-          <li key={id} className={styles.configParameterIdItem}>
-            <ConfigParameterAnchor id={id} className={styles.configParameterIdAnchor} />
-          </li>
-        ))
+        ids.map(id => {
+          const metadata = getConfigParameterMetadata(id)
+
+          return (
+            <li key={id} className={styles.configParameterIdItem}>
+              <ConfigParameterAnchor
+                id={id}
+                className={styles.configParameterIdAnchor}
+                tooltip={
+                  <span className={styles.configParameterIdTooltip}>
+                    <strong>{metadata.title}</strong>
+                    <span>{metadata.description}</span>
+                  </span>
+                }
+              />
+            </li>
+          )
+        })
       )}
     </ul>
   )
