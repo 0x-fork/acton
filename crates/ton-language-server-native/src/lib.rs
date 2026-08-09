@@ -15,7 +15,9 @@ use tokio::net::TcpListener;
 use ton_language_server_core::languages::fift::FiftLanguage;
 use ton_language_server_core::languages::tasm::{STACK_EFFECT_CODE_LENS_COMMAND, TasmLanguage};
 use ton_language_server_core::languages::tlb::TlbLanguage;
-use ton_language_server_core::languages::tolk::{LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage};
+use ton_language_server_core::languages::tolk::{
+    FormattingError, LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage,
+};
 use ton_language_server_core::languages::toml::TomlLanguage;
 use ton_language_server_core::{
     CodeAction, CodeActionKind, CodeLens, CompletionItem, CompletionItemKind, CompletionList,
@@ -960,7 +962,7 @@ impl LanguageServer for NativeLanguageServer {
         let uri = params.text_document.uri;
         let edits = self
             .with_service(|service| service.formatting(&uri.to_core(), None))
-            .map_err(rpc_error)?;
+            .map_err(formatting_rpc_error)?;
         Ok(Some(edits.into_iter().map(text_edit_to_lsp).collect()))
     }
 
@@ -972,7 +974,7 @@ impl LanguageServer for NativeLanguageServer {
         let range = params.range.to_core();
         let edits = self
             .with_service(|service| service.formatting(&uri.to_core(), Some(range)))
-            .map_err(rpc_error)?;
+            .map_err(formatting_rpc_error)?;
         Ok(Some(edits.into_iter().map(text_edit_to_lsp).collect()))
     }
 
@@ -1995,6 +1997,16 @@ const fn range_to_lsp(range: Range) -> lsp::Range {
 
 fn rpc_error(error: impl ToString) -> jsonrpc::Error {
     let mut rpc_error = jsonrpc::Error::internal_error();
+    rpc_error.message = error.to_string().into();
+    rpc_error
+}
+
+fn formatting_rpc_error(error: anyhow::Error) -> jsonrpc::Error {
+    let Some(error) = error.downcast_ref::<FormattingError>() else {
+        return rpc_error(error);
+    };
+
+    let mut rpc_error = jsonrpc::Error::new(jsonrpc::ErrorCode::ServerError(-32803));
     rpc_error.message = error.to_string().into();
     rpc_error
 }

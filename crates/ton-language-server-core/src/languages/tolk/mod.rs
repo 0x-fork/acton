@@ -59,6 +59,10 @@ const TOLK_BUILTIN_SOURCE: &str = include_str!(concat!(
 static TOLK_STDLIB_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/../tolk-compiler/assets/tolk-stdlib");
 
+#[derive(Debug, thiserror::Error)]
+#[error(transparent)]
+pub struct FormattingError(#[from] tolk_fmt::FormatError);
+
 #[derive(Clone, Debug)]
 pub struct TolkLanguage {
     engine: Arc<TolkWorkspaceEngine>,
@@ -568,7 +572,8 @@ impl TolkWorkspaceEngine {
                 separate_import_groups,
                 range,
             },
-        )?;
+        )
+        .map_err(FormattingError::from)?;
         if formatted == document.text() {
             return Ok(Vec::new());
         }

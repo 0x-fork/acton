@@ -34,6 +34,7 @@ include_dir = { workspace = true, optional = true }
 rustc-hash = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
 fift-syntax = { workspace = true, optional = true }
 tasm-syntax = { workspace = true, optional = true }
 tlb-syntax = { workspace = true, optional = true }

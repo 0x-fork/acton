@@ -33,6 +33,18 @@ impl LspTestClient {
     }
 
     pub(crate) async fn request(&mut self, method: &str, params: Value) -> anyhow::Result<Value> {
+        let message = self.request_response(method, params).await?;
+        if let Some(error) = message.get("error") {
+            anyhow::bail!("request {method} failed: {error}");
+        }
+        Ok(message.get("result").cloned().unwrap_or(Value::Null))
+    }
+
+    pub(crate) async fn request_response(
+        &mut self,
+        method: &str,
+        params: Value,
+    ) -> anyhow::Result<Value> {
         let id = self.next_request_id;
         self.next_request_id += 1;
         let mut message = json!({
@@ -50,10 +62,7 @@ impl LspTestClient {
             if message.get("id").and_then(Value::as_u64) == Some(id)
                 && message.get("method").is_none()
             {
-                if let Some(error) = message.get("error") {
-                    anyhow::bail!("request {method} failed: {error}");
-                }
-                return Ok(message.get("result").cloned().unwrap_or(Value::Null));
+                return Ok(message);
             }
             if let (Some(request_id), Some(_)) = (message.get("id"), message.get("method")) {
                 self.write_message(&json!({

@@ -208,6 +208,95 @@ async fn initialize_selects_one_root_and_keeps_partial_indexes_usable() -> anyho
 }
 
 #[tokio::test]
+async fn formatting_errors_are_reported_as_request_failures() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    fs::write(workspace.path().join("Acton.toml"), "")?;
+    let file_uri = Url::from_file_path(workspace.path().join("main.tolk"))
+        .map_err(|()| anyhow::anyhow!("cannot convert file path to URI"))?;
+    let root_uri = Url::from_directory_path(workspace.path())
+        .map_err(|()| anyhow::anyhow!("cannot convert workspace path to URI"))?;
+    let mut config = ServerConfig::new(workspace.path());
+    config.enable_profiling = true;
+    let (mut client, server) = LspTestClient::start(config).await;
+
+    client
+        .request(
+            "initialize",
+            json!({
+                "processId": null,
+                "rootUri": root_uri,
+                "capabilities": {},
+            }),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    client
+        .notify(
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {
+                    "uri": file_uri,
+                    "languageId": "tolk",
+                    "version": 1,
+                    "text": "fun main( {\n",
+                }
+            }),
+        )
+        .await?;
+
+    let response = client
+        .request_response(
+            "textDocument/formatting",
+            json!({
+                "textDocument": {"uri": file_uri},
+                "options": {"tabSize": 4, "insertSpaces": true},
+            }),
+        )
+        .await?;
+    let range_response = client
+        .request_response(
+            "textDocument/rangeFormatting",
+            json!({
+                "textDocument": {"uri": file_uri},
+                "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 0, "character": 0},
+                },
+                "options": {"tabSize": 4, "insertSpaces": true},
+            }),
+        )
+        .await?;
+    let profile = client.request("ton/profile", json!({})).await?;
+    let actual = json!({
+        "document": {
+            "code": response["error"]["code"],
+            "message": response["error"]["message"],
+        },
+        "range": {
+            "code": range_response["error"]["code"],
+            "message": range_response["error"]["message"],
+        },
+        "serverStillResponds": profile.is_object(),
+    });
+
+    expect![[r#"
+        {
+          "document": {
+            "code": -32803,
+            "message": "Cannot format code with syntax error"
+          },
+          "range": {
+            "code": -32803,
+            "message": "Cannot format code with syntax error"
+          },
+          "serverStillResponds": true
+        }"#]]
+    .assert_eq(&serde_json::to_string_pretty(&actual)?);
+
+    client.shutdown(server).await
+}
+
+#[tokio::test]
 async fn rename_keeps_open_document_changes_addressable() -> anyhow::Result<()> {
     let workspace = tempfile::tempdir()?;
     fs::write(workspace.path().join("Acton.toml"), "")?;
