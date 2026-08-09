@@ -49,8 +49,9 @@ pub use types::{
     CodeActionKind, CodeLens, Command, Diagnostic, DiagnosticSeverity, DiagnosticTag,
     DocumentEdits, DocumentHighlight, DocumentHighlightKind, DocumentSnapshot, DocumentSymbol,
     DocumentSymbolKind, DocumentUri, FileRename, FoldingRange, Hover, InlayHint, InlayHintCategory,
-    InlayHintKind, LanguageId, Location, Position, PrepareRename, Range, SelectionRange,
-    SignatureHelp, SignatureInformation, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    InlayHintKind, InlayHintLabel, InlayHintLabelPart, LanguageId, Location, Position,
+    PrepareRename, Range, SelectionRange, SignatureHelp, SignatureInformation, TextEdit,
+    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 
 #[must_use]

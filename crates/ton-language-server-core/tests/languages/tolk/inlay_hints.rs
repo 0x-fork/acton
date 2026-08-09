@@ -45,7 +45,8 @@ fn source_with_inline_hints(source: &str, hints: &[InlayHint]) -> String {
         .enumerate()
         .map(|(order, hint)| {
             let offset = index.position_to_offset(source, hint.position);
-            let label = hint.label.trim();
+            let label_text = hint.label.text();
+            let label = label_text.trim();
             let text = if label.starts_with("/*") && label.ends_with("*/") {
                 label.to_owned()
             } else {

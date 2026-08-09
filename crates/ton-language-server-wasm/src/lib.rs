@@ -12,11 +12,11 @@ use ton_language_server_core::{
     CORE_TARGET, CodeAction, CodeActionKind, CodeLens, CompletionItem, CompletionItemKind,
     CompletionList, CompletionTrigger, CompletionTriggerKind, Diagnostic, DiagnosticSeverity,
     DiagnosticTag, DocumentHighlight, DocumentHighlightKind, DocumentSymbol, DocumentSymbolKind,
-    DocumentUri, FileRename, FoldingRange, Hover, InlayHint, InlayHintKind, InsertTextFormat,
-    LanguageId, LanguageServerSettings, LanguageService, Location, LogLevel, Position,
-    PrepareRename, Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SelectionRange,
-    SemanticToken, SemanticTokens, SignatureHelp, SignatureInformation, TextEdit, TypeAtPosition,
-    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol, render_profile_summary,
+    DocumentUri, FileRename, FoldingRange, Hover, InlayHint, InlayHintKind, InlayHintLabel,
+    InsertTextFormat, LanguageId, LanguageServerSettings, LanguageService, Location, LogLevel,
+    Position, PrepareRename, Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES,
+    SelectionRange, SemanticToken, SemanticTokens, SignatureHelp, SignatureInformation, TextEdit,
+    TypeAtPosition, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol, render_profile_summary,
 };
 use wasm_bindgen::prelude::*;
 
@@ -789,7 +789,7 @@ struct LspSemanticTokens {
 #[serde(rename_all = "camelCase")]
 struct LspInlayHint {
     position: LspPosition,
-    label: String,
+    label: LspInlayHintLabel,
     #[serde(skip_serializing_if = "Option::is_none")]
     kind: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -798,6 +798,20 @@ struct LspInlayHint {
     text_edits: Option<Vec<LspTextEdit>>,
     padding_left: bool,
     padding_right: bool,
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+enum LspInlayHintLabel {
+    String(String),
+    Parts(Vec<LspInlayHintLabelPart>),
+}
+
+#[derive(Serialize)]
+struct LspInlayHintLabelPart {
+    value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    location: Option<LspLocation>,
 }
 
 #[derive(Serialize)]
@@ -930,16 +944,17 @@ struct LspPosition {
 }
 
 fn locations_to_lsp(locations: Vec<Location>) -> Vec<LspLocation> {
-    locations
-        .into_iter()
-        .map(|location| LspLocation {
-            uri: location.uri.as_str().to_owned(),
-            range: LspRange {
-                start: position_to_lsp(location.range.start),
-                end: position_to_lsp(location.range.end),
-            },
-        })
-        .collect()
+    locations.into_iter().map(location_to_lsp).collect()
+}
+
+fn location_to_lsp(location: Location) -> LspLocation {
+    LspLocation {
+        uri: location.uri.as_str().to_owned(),
+        range: LspRange {
+            start: position_to_lsp(location.range.start),
+            end: position_to_lsp(location.range.end),
+        },
+    }
 }
 
 fn document_highlights_to_lsp(highlights: Vec<DocumentHighlight>) -> Vec<LspDocumentHighlight> {
@@ -1099,25 +1114,39 @@ fn semantic_tokens_to_lsp(tokens: SemanticTokens) -> LspSemanticTokens {
 fn inlay_hints_to_lsp(hints: Vec<InlayHint>) -> Vec<LspInlayHint> {
     hints
         .into_iter()
-        .map(|hint| LspInlayHint {
-            position: position_to_lsp(hint.position),
-            label: hint.label,
-            kind: hint.kind.map(|kind| match kind {
-                InlayHintKind::Type => 1,
-                InlayHintKind::Parameter => 2,
-            }),
-            tooltip: hint.tooltip,
-            text_edits: (!hint.text_edits.is_empty()).then(|| {
-                hint.text_edits
-                    .into_iter()
-                    .map(|edit| LspTextEdit {
-                        range: range_to_lsp(edit.range),
-                        new_text: edit.new_text,
-                    })
-                    .collect()
-            }),
-            padding_left: hint.padding_left,
-            padding_right: hint.padding_right,
+        .map(|hint| {
+            let label = match hint.label {
+                InlayHintLabel::Parts(parts) => LspInlayHintLabel::Parts(
+                    parts
+                        .into_iter()
+                        .map(|part| LspInlayHintLabelPart {
+                            value: part.value,
+                            location: part.location.map(location_to_lsp),
+                        })
+                        .collect(),
+                ),
+                InlayHintLabel::String(label) => LspInlayHintLabel::String(label),
+            };
+            LspInlayHint {
+                position: position_to_lsp(hint.position),
+                label,
+                kind: hint.kind.map(|kind| match kind {
+                    InlayHintKind::Type => 1,
+                    InlayHintKind::Parameter => 2,
+                }),
+                tooltip: hint.tooltip,
+                text_edits: (!hint.text_edits.is_empty()).then(|| {
+                    hint.text_edits
+                        .into_iter()
+                        .map(|edit| LspTextEdit {
+                            range: range_to_lsp(edit.range),
+                            new_text: edit.new_text,
+                        })
+                        .collect()
+                }),
+                padding_left: hint.padding_left,
+                padding_right: hint.padding_right,
+            }
         })
         .collect()
 }
@@ -1382,6 +1411,51 @@ mod tests {
                     }
                 }]
             })
+        );
+    }
+
+    #[test]
+    fn inlay_hint_label_parts_serialize_with_individual_locations() {
+        let location = Location::new(
+            DocumentUri::from("file:///workspace/types.tolk"),
+            Range::new(Position::new(2, 7), Position::new(2, 14)),
+        );
+        let mut hint = InlayHint::new(
+            Position::new(5, 13),
+            ": map<int, Storage>",
+            InlayHintKind::Type,
+        );
+        hint.label = InlayHintLabel::Parts(vec![
+            ton_language_server_core::InlayHintLabelPart::plain(": map<int, "),
+            ton_language_server_core::InlayHintLabelPart::linked("Storage", location),
+            ton_language_server_core::InlayHintLabelPart::plain(">"),
+        ]);
+
+        let value = serde_json::to_value(inlay_hints_to_lsp(vec![hint]))
+            .expect("LSP inlay hint payload should be serializable");
+
+        assert_eq!(
+            value,
+            json!([{
+                "position": { "line": 5, "character": 13 },
+                "label": [
+                    { "value": ": map<int, " },
+                    {
+                        "value": "Storage",
+                        "location": {
+                            "uri": "file:///workspace/types.tolk",
+                            "range": {
+                                "start": { "line": 2, "character": 7 },
+                                "end": { "line": 2, "character": 14 }
+                            }
+                        }
+                    },
+                    { "value": ">" }
+                ],
+                "kind": 1,
+                "paddingLeft": false,
+                "paddingRight": false
+            }])
         );
     }
 }

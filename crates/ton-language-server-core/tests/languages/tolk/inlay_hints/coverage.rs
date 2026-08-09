@@ -22,7 +22,7 @@ fn check(source: &str, expect: Expect) {
                     Some(ton_language_server_core::InlayHintKind::Parameter) => "parameter",
                     None => "none",
                 };
-                format!("{kind}:{}", hint.label.trim())
+                format!("{kind}:{}", hint.label.text().trim())
             })
             .collect::<Vec<_>>()
             .join("\n")

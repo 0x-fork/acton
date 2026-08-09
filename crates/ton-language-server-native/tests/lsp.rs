@@ -65,6 +65,193 @@ async fn dynamically_registers_workspace_file_watchers() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
+async fn tolk_inlay_hints_link_types_and_parameters_to_declarations() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    fs::write(workspace.path().join("Acton.toml"), "")?;
+    let source = concat!(
+        "struct Payload { value: int }\n",
+        "struct map<K, V> {}\n",
+        "fun createPayload(): Payload { return { value: 1 }; }\n",
+        "fun createPayloadMap(): map<int, Payload> asm \"\";\n",
+        "fun consumePayload(payload: Payload) {}\n",
+        "fun main() {\n",
+        "    val value = createPayload();\n",
+        "    val values = createPayloadMap();\n",
+        "    consumePayload(createPayload());\n",
+        "}\n",
+    );
+    let main_path = workspace.path().join("main.tolk");
+    fs::write(&main_path, source)?;
+    let main_uri = Url::from_file_path(main_path)
+        .map_err(|()| anyhow::anyhow!("cannot convert main file path to URI"))?;
+    let root_uri = Url::from_directory_path(workspace.path())
+        .map_err(|()| anyhow::anyhow!("cannot convert workspace path to URI"))?;
+    let (mut client, server) = LspTestClient::start(ServerConfig::new(workspace.path())).await;
+
+    client
+        .request(
+            "initialize",
+            json!({"processId": null, "rootUri": root_uri, "capabilities": {}}),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    client
+        .notify(
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {
+                    "uri": main_uri,
+                    "languageId": "tolk",
+                    "version": 1,
+                    "text": source,
+                }
+            }),
+        )
+        .await?;
+    let hints = client
+        .request(
+            "textDocument/inlayHint",
+            json!({
+                "textDocument": {"uri": main_uri},
+                "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 9, "character": 1},
+                }
+            }),
+        )
+        .await?;
+
+    let mut clickable = hints
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|hint| hint["label"].as_array())
+        .map(|parts| {
+            let label = parts
+                .iter()
+                .filter_map(|part| part["value"].as_str())
+                .collect::<String>();
+            json!({
+                "label": label,
+                "parts": parts.iter().map(|part| json!({
+                    "value": part["value"],
+                    "target": part.get("location").map(|location| json!({
+                        "sameDocument": location["uri"] == main_uri.as_str(),
+                        "range": location["range"],
+                    })),
+                })).collect::<Vec<_>>(),
+            })
+        })
+        .collect::<Vec<_>>();
+    clickable.sort_by(|left, right| left["label"].as_str().cmp(&right["label"].as_str()));
+    expect![[r#"
+        [
+          {
+            "label": ": Payload",
+            "parts": [
+              {
+                "target": null,
+                "value": ": "
+              },
+              {
+                "target": {
+                  "range": {
+                    "end": {
+                      "character": 14,
+                      "line": 0
+                    },
+                    "start": {
+                      "character": 7,
+                      "line": 0
+                    }
+                  },
+                  "sameDocument": true
+                },
+                "value": "Payload"
+              }
+            ]
+          },
+          {
+            "label": ": map<int, Payload>",
+            "parts": [
+              {
+                "target": null,
+                "value": ": "
+              },
+              {
+                "target": {
+                  "range": {
+                    "end": {
+                      "character": 10,
+                      "line": 1
+                    },
+                    "start": {
+                      "character": 7,
+                      "line": 1
+                    }
+                  },
+                  "sameDocument": true
+                },
+                "value": "map"
+              },
+              {
+                "target": null,
+                "value": "<int, "
+              },
+              {
+                "target": {
+                  "range": {
+                    "end": {
+                      "character": 14,
+                      "line": 0
+                    },
+                    "start": {
+                      "character": 7,
+                      "line": 0
+                    }
+                  },
+                  "sameDocument": true
+                },
+                "value": "Payload"
+              },
+              {
+                "target": null,
+                "value": ">"
+              }
+            ]
+          },
+          {
+            "label": "payload:",
+            "parts": [
+              {
+                "target": {
+                  "range": {
+                    "end": {
+                      "character": 26,
+                      "line": 4
+                    },
+                    "start": {
+                      "character": 19,
+                      "line": 4
+                    }
+                  },
+                  "sameDocument": true
+                },
+                "value": "payload"
+              },
+              {
+                "target": null,
+                "value": ":"
+              }
+            ]
+          }
+        ]"#]]
+    .assert_eq(&serde_json::to_string_pretty(&clickable)?);
+
+    client.shutdown(server).await
+}
+
+#[tokio::test]
 async fn initialize_selects_one_root_and_keeps_partial_indexes_usable() -> anyhow::Result<()> {
     let fallback = tempfile::tempdir()?;
     let workspace = tempfile::tempdir()?;

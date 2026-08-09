@@ -25,11 +25,12 @@ use ton_language_server_core::{
     CompletionTrigger, CompletionTriggerKind, Diagnostic as CoreDiagnostic,
     DiagnosticSeverity as CoreDiagnosticSeverity, DiagnosticTag as CoreDiagnosticTag,
     DocumentHighlight, DocumentHighlightKind, DocumentSymbol, DocumentSymbolKind, DocumentUri,
-    FileRename, FindUsagesScope, FoldingRange, Hover, InlayHint, InlayHintKind, InsertTextFormat,
-    LanguageId, LanguageServerSettings, LanguageService, LanguageServiceConfig, Location, Position,
-    PrepareRename, ProfileReport, Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES,
-    SelectionRange, SemanticToken, SemanticTokens, SignatureHelp, SignatureInformation, TextEdit,
-    TextIndex, TypeAtPosition, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    FileRename, FindUsagesScope, FoldingRange, Hover, InlayHint, InlayHintKind, InlayHintLabel,
+    InsertTextFormat, LanguageId, LanguageServerSettings, LanguageService, LanguageServiceConfig,
+    Location, Position, PrepareRename, ProfileReport, Range, SEMANTIC_TOKEN_MODIFIER_NAMES,
+    SEMANTIC_TOKEN_TYPE_NAMES, SelectionRange, SemanticToken, SemanticTokens, SignatureHelp,
+    SignatureInformation, TextEdit, TextIndex, TypeAtPosition, WorkspaceConfig, WorkspaceEdit,
+    WorkspaceSymbol,
 };
 use tower_lsp::jsonrpc;
 use tower_lsp::lsp_types as lsp;
@@ -1798,9 +1799,23 @@ fn semantic_tokens_to_lsp(tokens: SemanticTokens) -> lsp::SemanticTokens {
 }
 
 fn inlay_hint_to_lsp(hint: InlayHint) -> lsp::InlayHint {
+    let label = match hint.label {
+        InlayHintLabel::Parts(parts) => lsp::InlayHintLabel::LabelParts(
+            parts
+                .into_iter()
+                .map(|part| lsp::InlayHintLabelPart {
+                    value: part.value,
+                    tooltip: None,
+                    location: part.location.as_ref().and_then(location_to_lsp),
+                    command: None,
+                })
+                .collect(),
+        ),
+        InlayHintLabel::String(label) => lsp::InlayHintLabel::String(label),
+    };
     lsp::InlayHint {
         position: position_to_lsp(hint.position),
-        label: lsp::InlayHintLabel::String(hint.label),
+        label,
         kind: hint.kind.map(|kind| match kind {
             InlayHintKind::Type => lsp::InlayHintKind::TYPE,
             InlayHintKind::Parameter => lsp::InlayHintKind::PARAMETER,
