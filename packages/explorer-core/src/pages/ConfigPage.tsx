@@ -26,7 +26,7 @@ import {
 } from "@acton/ui"
 import {ChevronDown, ExternalLink, Link2, Search} from "lucide-react"
 import {useEffect, useMemo, useState, type FC, type ReactNode} from "react"
-import {useParams} from "react-router"
+import {Link, useLocation, useParams} from "react-router"
 
 import type {TonClient} from "../api/client"
 import {
@@ -716,7 +716,7 @@ function ValidatorList({validators}: {readonly validators: readonly ValidatorCon
       {hasMore ? (
         <button
           type="button"
-          className={styles.validatorShowMore}
+          className={`${styles.validatorShowMore} ${expanded ? styles.validatorShowLess : ""}`}
           aria-expanded={expanded}
           onClick={() => setExpanded(value => !value)}
         >
@@ -738,6 +738,8 @@ function SuspendedAddressesValue({
   readonly configuration: SuspendedAddressesConfiguration
 }) {
   const [expanded, setExpanded] = useState(false)
+  const routes = useExplorerRoutePaths()
+  const {search} = useLocation()
   const hasMore = configuration.addresses.length > VALIDATOR_PREVIEW_COUNT
   const visibleAddresses = expanded
     ? configuration.addresses
@@ -752,6 +754,18 @@ function SuspendedAddressesValue({
             label: "Suspended until",
             value: (
               <DateTime display="compact" unit="seconds" value={configuration.suspendedUntil} />
+            ),
+          },
+          {
+            id: "suspended-addresses-page",
+            label: "Suspended addresses page",
+            value: (
+              <Link
+                className={styles.configValueLink}
+                to={{pathname: routes.suspendedAddressesPath, search}}
+              >
+                Open overview
+              </Link>
             ),
           },
         ]}
@@ -789,7 +803,7 @@ function SuspendedAddressesValue({
         {hasMore ? (
           <button
             type="button"
-            className={styles.validatorShowMore}
+            className={`${styles.validatorShowMore} ${expanded ? styles.validatorShowLess : ""}`}
             aria-expanded={expanded}
             onClick={() => setExpanded(value => !value)}
           >
