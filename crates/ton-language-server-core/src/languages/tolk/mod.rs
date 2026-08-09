@@ -4,8 +4,8 @@ use crate::language::{
     DefinitionRequest, DocumentHighlightRequest, DocumentSymbolRequest, FeatureSet,
     FileRenameRequest, FoldingRangeRequest, FormattingRequest, HoverRequest, InlayHintRequest,
     LanguagePlugin, ParseRequest, ParsedDocument, PrepareRenameRequest, ReferenceRequest,
-    RenameRequest, SemanticTokensRequest, SignatureHelpRequest, TypeAtPositionRequest,
-    TypeDefinitionRequest, WorkspaceLanguage, WorkspaceSymbolRequest,
+    RenameRequest, SelectionRangeRequest, SemanticTokensRequest, SignatureHelpRequest,
+    TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage, WorkspaceSymbolRequest,
 };
 use crate::logging;
 use crate::types::{normalize_logical_path, normalize_path};
@@ -42,6 +42,7 @@ mod inlay_hints;
 mod references;
 mod rename;
 mod resolution;
+mod selection_ranges;
 mod semantic_tokens;
 mod signature_help;
 mod syntax;
@@ -122,6 +123,7 @@ impl LanguagePlugin for TolkLanguage {
             semantic_tokens: true,
             inlay_hints: true,
             folding_ranges: true,
+            selection_ranges: true,
             hover: true,
             document_symbols: true,
             signature_help: true,
@@ -296,6 +298,19 @@ impl LanguagePlugin for TolkLanguage {
             parsed.source_file.tree.root_node(),
         );
         Ok(ranges)
+    }
+
+    fn selection_ranges(
+        &self,
+        request: SelectionRangeRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::SelectionRange>> {
+        let parsed = request.context.parsed.as_tolk()?;
+        let _profile = request.context.profiler.span("tolk.selection_ranges");
+        Ok(selection_ranges::selection_ranges(
+            request.context.document,
+            parsed.source_file.tree.root_node(),
+            request.positions,
+        ))
     }
 
     fn hover(&self, request: HoverRequest<'_>) -> anyhow::Result<Option<crate::Hover>> {

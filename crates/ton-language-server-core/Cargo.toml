@@ -182,6 +182,11 @@ path = "tests/languages/tolk/folding.rs"
 required-features = ["tolk"]
 
 [[test]]
+name = "tolk_selection_ranges"
+path = "tests/languages/tolk/selection_ranges.rs"
+required-features = ["tolk"]
+
+[[test]]
 name = "tolk_hover"
 path = "tests/languages/tolk/hover.rs"
 required-features = ["tolk"]

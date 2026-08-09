@@ -85,6 +85,7 @@ connection.onInitialize(async (): Promise<InitializeResult> => {
         resolveProvider: false,
       },
       foldingRangeProvider: true,
+      selectionRangeProvider: true,
       documentSymbolProvider: true,
       workspaceSymbolProvider: true,
       signatureHelpProvider: {
@@ -248,6 +249,12 @@ connection.onCodeAction(async params =>
 connection.onFoldingRanges(async params =>
   withLanguageServer("textDocument/foldingRange", server =>
     server.foldingRanges(params.textDocument.uri),
+  ),
+)
+
+connection.onSelectionRanges(async params =>
+  withLanguageServer("textDocument/selectionRange", server =>
+    server.selectionRanges(params.textDocument.uri, params.positions),
   ),
 )
 

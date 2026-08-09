@@ -350,6 +350,89 @@ async fn call_hierarchy_serves_prepare_incoming_and_outgoing_requests() -> anyho
 }
 
 #[tokio::test]
+async fn selection_ranges_advertise_capability_and_preserve_position_order() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    fs::write(workspace.path().join("Acton.toml"), "")?;
+    let source = "fun main() { val face = \"😀\"; return face; }\n";
+    let main_path = workspace.path().join("main.tolk");
+    fs::write(&main_path, source)?;
+
+    let root_uri = Url::from_directory_path(workspace.path())
+        .map_err(|()| anyhow::anyhow!("cannot convert workspace path to URI"))?;
+    let main_uri = Url::from_file_path(&main_path)
+        .map_err(|()| anyhow::anyhow!("cannot convert main file path to URI"))?;
+    let (mut client, server) = LspTestClient::start(ServerConfig::new(workspace.path())).await;
+    let initialize = client
+        .request(
+            "initialize",
+            json!({
+                "processId": null,
+                "rootUri": root_uri,
+                "capabilities": {},
+            }),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    client
+        .notify(
+            "textDocument/didOpen",
+            json!({
+                "textDocument": {
+                    "uri": main_uri,
+                    "languageId": "tolk",
+                    "version": 1,
+                    "text": source,
+                }
+            }),
+        )
+        .await?;
+
+    let ranges = client
+        .request(
+            "textDocument/selectionRange",
+            json!({
+                "textDocument": {"uri": main_uri},
+                "positions": [
+                    {"line": 0, "character": 37},
+                    {"line": 0, "character": 4},
+                ],
+            }),
+        )
+        .await?;
+
+    let actual = json!({
+        "provider": initialize["capabilities"]["selectionRangeProvider"],
+        "results": ranges
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(selection_range_chain)
+            .collect::<Vec<_>>(),
+    });
+    expect![[r#"
+        {
+          "provider": true,
+          "results": [
+            [
+              "0:37-0:41",
+              "0:30-0:41",
+              "0:11-0:44",
+              "0:0-0:44",
+              "0:0-1:0"
+            ],
+            [
+              "0:4-0:8",
+              "0:0-0:44",
+              "0:0-1:0"
+            ]
+          ]
+        }"#]]
+    .assert_eq(&serde_json::to_string_pretty(&actual)?);
+
+    client.shutdown(server).await
+}
+
+#[tokio::test]
 async fn formatting_errors_are_reported_as_request_failures() -> anyhow::Result<()> {
     let workspace = tempfile::tempdir()?;
     fs::write(workspace.path().join("Acton.toml"), "")?;
@@ -775,6 +858,21 @@ fn text_document_position(uri: &Url, line: u32, character: u32) -> Value {
         "textDocument": {"uri": uri},
         "position": {"line": line, "character": character},
     })
+}
+
+fn selection_range_chain(value: &Value) -> Vec<String> {
+    let mut ranges = Vec::new();
+    let mut current = Some(value);
+    while let Some(range) = current {
+        let start = &range["range"]["start"];
+        let end = &range["range"]["end"];
+        ranges.push(format!(
+            "{}:{}-{}:{}",
+            start["line"], start["character"], end["line"], end["character"]
+        ));
+        current = range.get("parent");
+    }
+    ranges
 }
 
 fn normalized_definition_uri(definition: &Value, root: &str) -> String {

@@ -20,8 +20,9 @@ pub use language::{
     CompletionRequest, DefinitionRequest, DocumentHighlightRequest, DocumentSymbolRequest,
     FeatureSet, FileRenameRequest, FoldingRangeRequest, FormattingRequest, HoverRequest,
     InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
-    PrepareRenameRequest, RenameRequest, SemanticTokensRequest, SignatureHelpRequest,
-    TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage, WorkspaceSymbolRequest,
+    PrepareRenameRequest, RenameRequest, SelectionRangeRequest, SemanticTokensRequest,
+    SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage,
+    WorkspaceSymbolRequest,
 };
 pub use logging::{
     CORE_TARGET, EDIT_TARGET, FIFT_TARGET, LogLevel, LoggingConfig, ParseLogLevelError,
@@ -42,8 +43,8 @@ pub use types::{
     CodeActionKind, CodeLens, Command, DocumentEdits, DocumentHighlight, DocumentHighlightKind,
     DocumentSnapshot, DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename, FoldingRange,
     Hover, InlayHint, InlayHintCategory, InlayHintKind, LanguageId, Location, Position,
-    PrepareRename, Range, SignatureHelp, SignatureInformation, TextEdit, WorkspaceConfig,
-    WorkspaceEdit, WorkspaceSymbol,
+    PrepareRename, Range, SelectionRange, SignatureHelp, SignatureInformation, TextEdit,
+    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 
 #[must_use]

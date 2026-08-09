@@ -5,8 +5,8 @@ use crate::semantic_tokens::SemanticToken;
 use crate::types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction, CodeLens,
     DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri, FileRename, FoldingRange,
-    Hover, InlayHint, Location, Position, PrepareRename, Range, SignatureHelp, TextEdit,
-    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    Hover, InlayHint, Location, Position, PrepareRename, Range, SelectionRange, SignatureHelp,
+    TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -22,6 +22,7 @@ pub struct FeatureSet {
     pub hover: bool,
     pub code_lens: bool,
     pub folding_ranges: bool,
+    pub selection_ranges: bool,
     pub completion: bool,
     pub semantic_tokens: bool,
     pub inlay_hints: bool,
@@ -117,6 +118,11 @@ pub struct CodeLensRequest<'a> {
 
 pub struct FoldingRangeRequest<'a> {
     pub context: PluginContext<'a>,
+}
+
+pub struct SelectionRangeRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub positions: &'a [Position],
 }
 
 pub struct DocumentSymbolRequest<'a> {
@@ -243,6 +249,13 @@ pub trait LanguagePlugin: Send + Sync {
         &self,
         _request: FoldingRangeRequest<'_>,
     ) -> anyhow::Result<Vec<FoldingRange>> {
+        Ok(Vec::new())
+    }
+
+    fn selection_ranges(
+        &self,
+        _request: SelectionRangeRequest<'_>,
+    ) -> anyhow::Result<Vec<SelectionRange>> {
         Ok(Vec::new())
     }
 

@@ -3,8 +3,8 @@ use crate::language::{
     CompletionRequest, DefinitionRequest, DocumentHighlightRequest, DocumentSymbolRequest,
     FileRenameRequest, FoldingRangeRequest, FormattingRequest, HoverRequest, InlayHintRequest,
     LanguagePlugin, ParseRequest, ParsedDocument, PluginContext, PrepareRenameRequest,
-    ReferenceRequest, RenameRequest, SemanticTokensRequest, SignatureHelpRequest,
-    TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceSymbolRequest,
+    ReferenceRequest, RenameRequest, SelectionRangeRequest, SemanticTokensRequest,
+    SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceSymbolRequest,
 };
 use crate::logging;
 use crate::profiling::Profiler;
@@ -13,7 +13,7 @@ use crate::types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction, CodeLens,
     DocumentEdits, DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri, FileRename,
     FoldingRange, Hover, InlayHint, LanguageId, Location, Position, PrepareRename, Range,
-    SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    SelectionRange, SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use crate::{CompletionList, CompletionTrigger, TypeAtPosition};
 use std::collections::{BTreeMap, HashMap};
@@ -1459,6 +1459,34 @@ impl LanguageService {
                 );
             }
         }
+        result
+    }
+
+    pub fn selection_ranges(
+        &mut self,
+        uri: &DocumentUri,
+        positions: &[Position],
+    ) -> anyhow::Result<Vec<SelectionRange>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().selection_ranges {
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.selection_ranges(SelectionRangeRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            positions,
+        });
+        self.profiler.finish("selection_ranges", started_at);
         result
     }
 

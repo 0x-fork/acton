@@ -14,9 +14,9 @@ use ton_language_server_core::{
     DocumentHighlightKind, DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename,
     FoldingRange, Hover, InlayHint, InlayHintKind, InsertTextFormat, LanguageId, LanguageService,
     Location, LogLevel, Position, PrepareRename, Range, SEMANTIC_TOKEN_MODIFIER_NAMES,
-    SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens, SignatureHelp, SignatureInformation,
-    TextEdit, TypeAtPosition, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
-    render_profile_summary,
+    SEMANTIC_TOKEN_TYPE_NAMES, SelectionRange, SemanticToken, SemanticTokens, SignatureHelp,
+    SignatureInformation, TextEdit, TypeAtPosition, WorkspaceConfig, WorkspaceEdit,
+    WorkspaceSymbol, render_profile_summary,
 };
 use wasm_bindgen::prelude::*;
 
@@ -500,6 +500,21 @@ impl TonLanguageServer {
         serde_wasm_bindgen::to_value(&folding_ranges_to_lsp(ranges)).map_err(js_error)
     }
 
+    #[wasm_bindgen(js_name = selectionRanges)]
+    pub fn selection_ranges(&self, uri: String, positions: JsValue) -> Result<JsValue, JsValue> {
+        let positions = serde_wasm_bindgen::from_value::<Vec<DocumentChangePosition>>(positions)?
+            .into_iter()
+            .map(|position| Position::new(position.line, position.character))
+            .collect::<Vec<_>>();
+        let ranges = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .selection_ranges(&DocumentUri::from(uri), &positions)
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&selection_ranges_to_lsp(ranges)).map_err(js_error)
+    }
+
     #[wasm_bindgen(js_name = documentSymbols)]
     pub fn document_symbols(&self, uri: String) -> Result<JsValue, JsValue> {
         let symbols = self
@@ -769,6 +784,13 @@ struct LspFoldingRange {
     end_line: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     end_character: Option<u32>,
+}
+
+#[derive(Serialize)]
+struct LspSelectionRange {
+    range: LspRange,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parent: Option<Box<LspSelectionRange>>,
 }
 
 #[derive(Serialize)]
@@ -1074,6 +1096,19 @@ fn folding_ranges_to_lsp(ranges: Vec<FoldingRange>) -> Vec<LspFoldingRange> {
             end_character: range.end_character,
         })
         .collect()
+}
+
+fn selection_ranges_to_lsp(ranges: Vec<SelectionRange>) -> Vec<LspSelectionRange> {
+    ranges.into_iter().map(selection_range_to_lsp).collect()
+}
+
+fn selection_range_to_lsp(range: SelectionRange) -> LspSelectionRange {
+    LspSelectionRange {
+        range: range_to_lsp(range.range),
+        parent: range
+            .parent
+            .map(|parent| Box::new(selection_range_to_lsp(*parent))),
+    }
 }
 
 fn document_symbols_to_lsp(symbols: Vec<DocumentSymbol>) -> Vec<LspDocumentSymbol> {

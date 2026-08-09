@@ -26,9 +26,9 @@ use ton_language_server_core::{
     DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename, FoldingRange, Hover, InlayHint,
     InlayHintCategory, InlayHintKind, InsertTextFormat, LanguageId, LanguageService,
     LanguageServiceConfig, Location, Position, PrepareRename, ProfileReport, Range,
-    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
-    SignatureHelp, SignatureInformation, TextEdit, TextIndex, TypeAtPosition, WorkspaceConfig,
-    WorkspaceEdit, WorkspaceSymbol,
+    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SelectionRange, SemanticToken,
+    SemanticTokens, SignatureHelp, SignatureInformation, TextEdit, TextIndex, TypeAtPosition,
+    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use tower_lsp::jsonrpc;
 use tower_lsp::lsp_types as lsp;
@@ -677,6 +677,7 @@ impl LanguageServer for NativeLanguageServer {
                     resolve_provider: Some(false),
                 }),
                 folding_range_provider: Some(lsp::FoldingRangeProviderCapability::Simple(true)),
+                selection_range_provider: Some(lsp::SelectionRangeProviderCapability::Simple(true)),
                 document_symbol_provider: Some(lsp::OneOf::Left(true)),
                 workspace_symbol_provider: Some(lsp::OneOf::Left(true)),
                 code_action_provider: Some(lsp::CodeActionProviderCapability::Options(
@@ -1155,6 +1156,24 @@ impl LanguageServer for NativeLanguageServer {
             .with_service(|service| service.folding_ranges(&uri.to_core()))
             .map_err(rpc_error)?;
         Ok(Some(ranges.into_iter().map(folding_range_to_lsp).collect()))
+    }
+
+    async fn selection_range(
+        &self,
+        params: lsp::SelectionRangeParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::SelectionRange>>> {
+        let uri = params.text_document.uri;
+        let positions = params
+            .positions
+            .iter()
+            .map(ToCore::to_core)
+            .collect::<Vec<_>>();
+        let ranges = self
+            .with_service(|service| service.selection_ranges(&uri.to_core(), &positions))
+            .map_err(rpc_error)?;
+        Ok(Some(
+            ranges.into_iter().map(selection_range_to_lsp).collect(),
+        ))
     }
 
     async fn document_symbol(
@@ -1905,6 +1924,15 @@ const fn folding_range_to_lsp(range: FoldingRange) -> lsp::FoldingRange {
         end_character: range.end_character,
         kind: None,
         collapsed_text: None,
+    }
+}
+
+fn selection_range_to_lsp(range: SelectionRange) -> lsp::SelectionRange {
+    lsp::SelectionRange {
+        range: range_to_lsp(range.range),
+        parent: range
+            .parent
+            .map(|parent| Box::new(selection_range_to_lsp(*parent))),
     }
 }
 

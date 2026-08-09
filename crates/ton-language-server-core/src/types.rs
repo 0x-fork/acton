@@ -281,6 +281,19 @@ impl Range {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SelectionRange {
+    pub range: Range,
+    pub parent: Option<Box<Self>>,
+}
+
+impl SelectionRange {
+    #[must_use]
+    pub const fn new(range: Range, parent: Option<Box<Self>>) -> Self {
+        Self { range, parent }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextEdit {
     pub range: Range,
     pub new_text: String,
