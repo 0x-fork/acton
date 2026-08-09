@@ -30,6 +30,12 @@ These addresses are not fixtures and their balances or recent history can change
 | --- | --- | --- |
 | [`0:8000000000000000:86786720`](https://actonscan.com/block/0/8000000000000000/86786720?network=mainnet) | Block with 533 transactions, useful for checking the v2 fallback and uninterrupted incremental transaction loading | 2026-08-06 |
 
+## Mainnet configuration blocks
+
+| Block | What to verify | Last checked |
+| --- | --- | --- |
+| [`-1:8000000000000000:84965023`](https://actonscan.com/block/-1/8000000000000000/84965023?network=mainnet) | Masterchain block whose configuration contains ConfigParam 36 (`Next validator set`), useful for checking historical validator set rendering | 2026-08-10 |
+
 ## Mainnet ConfigParam 8 history
 
 `ConfigParam 8` contains the network's global protocol version and a bitmask of enabled capabilities. Closed ranges below are inclusive; an open end means that the value is still active.
