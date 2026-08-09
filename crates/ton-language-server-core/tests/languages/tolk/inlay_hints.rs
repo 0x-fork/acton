@@ -246,6 +246,7 @@ fn suppresses_redundant_parameter_hints() {
             fun sameName(value: int): void {}
             fun sameField(sender: int): void {}
             fun sameCall(sender: int): void {}
+            fun sameNotNull(payload: Payload): void {}
             fun shortName(x: int): void {}
             fun stringArg(constString: int): void {}
             fun objectArg(payload: Payload): void {}
@@ -257,6 +258,7 @@ fn suppresses_redundant_parameter_hints() {
                 sameName(value);
                 sameField(payload.sender);
                 sameCall(sender());
+                sameNotNull(payload!);
                 shortName(1);
                 stringArg(1);
                 objectArg(Payload { sender: 1, value: 2 });
@@ -274,6 +276,7 @@ fn suppresses_redundant_parameter_hints() {
             fun sameName(value: int): void {}
             fun sameField(sender: int): void {}
             fun sameCall(sender: int): void {}
+            fun sameNotNull(payload: Payload): void {}
             fun shortName(x: int): void {}
             fun stringArg(constString: int): void {}
             fun objectArg(payload: Payload): void {}
@@ -285,6 +288,7 @@ fn suppresses_redundant_parameter_hints() {
                 sameName(value);
                 sameField(payload.sender);
                 sameCall(sender());
+                sameNotNull(payload!);
                 shortName(1);
                 stringArg(1);
                 objectArg(Payload { sender: 1, value: 2 });

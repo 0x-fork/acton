@@ -389,6 +389,13 @@ fn collect_call_parameter_hints(
         {
             continue;
         }
+        if let Expr::NotNull(not_null) = expression
+            && not_null
+                .inner()
+                .is_some_and(|inner| inner.text(source) == name)
+        {
+            continue;
+        }
 
         builder.add_hint(InlayHint::new(
             builder.position_for_offset(argument.syntax().start_byte()),
