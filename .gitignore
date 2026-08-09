@@ -33,8 +33,6 @@ Thumbs.db
 
 .env
 .worktree/
-apps/actonscan-backend/data/
-
 gen/
 *.mnemonic
 wallets.toml
