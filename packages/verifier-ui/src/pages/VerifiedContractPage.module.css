@@ -19,6 +19,17 @@
   line-height: 1.25;
 }
 
+.empty-state > h1 {
+  margin-top: 14px;
+}
+
+.codeHash {
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-mono);
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
 .empty-state,
 .loading-state {
   padding: 28px;

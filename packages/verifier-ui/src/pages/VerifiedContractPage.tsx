@@ -430,9 +430,8 @@ function UnverifiedContract({
       <StatusPill verified={false} />
       <h1>Contract is not verified</h1>
       <p>
-        This target resolves to code hash{" "}
-        <TechnicalValue copyLabel="code hash" value={data.code_hash} />, but there is no stored
-        source bundle for it
+        This target resolves to code hash <code className={styles.codeHash}>{data.code_hash}</code>,
+        but there is no stored source bundle for it
       </p>
       {address && (
         <dl className={detailsStyles.summaryGrid}>
