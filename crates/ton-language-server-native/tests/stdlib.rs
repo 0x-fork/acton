@@ -19,10 +19,11 @@ fn resolves_project_and_explicit_stdlib_paths() -> anyhow::Result<()> {
     let automatic = resolve_tolk_stdlib_root(project.path(), None)?;
     let missing_automatic = resolve_tolk_stdlib_root(project_without_stdlib.path(), None)?;
     let explicit = resolve_tolk_stdlib_root(project.path(), Some(explicit_stdlib))?;
+    let relative = resolve_tolk_stdlib_root(project.path(), Some(".acton/tolk-stdlib".into()))?;
     let invalid = resolve_tolk_stdlib_root(project.path(), Some(project.path().join("missing")))
         .expect_err("a missing explicit stdlib must be rejected");
     let actual = format!(
-        "automatic={}\nmissing automatic={}\nexplicit={}\ninvalid={}",
+        "automatic={}\nmissing automatic={}\nexplicit={}\nrelative={}\ninvalid={}",
         automatic
             .as_deref()
             .and_then(|path| path.strip_prefix(project_root).ok())
@@ -31,6 +32,10 @@ fn resolves_project_and_explicit_stdlib_paths() -> anyhow::Result<()> {
             .as_deref()
             .is_none_or(std::path::Path::is_dir),
         explicit
+            .as_deref()
+            .and_then(|path| path.strip_prefix(project_root).ok())
+            .map_or_else(String::new, |path| path.display().to_string()),
+        relative
             .as_deref()
             .and_then(|path| path.strip_prefix(project_root).ok())
             .map_or_else(String::new, |path| path.display().to_string()),
@@ -43,6 +48,7 @@ fn resolves_project_and_explicit_stdlib_paths() -> anyhow::Result<()> {
         automatic=.acton/tolk-stdlib
         missing automatic=true
         explicit=custom-stdlib
+        relative=.acton/tolk-stdlib
         invalid=Tolk stdlib path is not a directory: $ROOT/missing"]]
     .assert_eq(&actual);
     Ok(())

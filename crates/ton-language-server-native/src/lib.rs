@@ -219,25 +219,35 @@ struct NativeWorkspace {
     manifest_uri: DocumentUri,
     tolk_stdlib_root: Option<PathBuf>,
     tolk_stdlib_root_uri: Option<DocumentUri>,
+    stdlib_warning: Option<String>,
 }
 
 impl NativeWorkspace {
-    fn new(project_root: PathBuf, tolk_stdlib_path: Option<PathBuf>) -> anyhow::Result<Self> {
+    fn new(project_root: PathBuf, tolk_stdlib_path: Option<PathBuf>) -> Self {
         let project_root = absolute_project_root(project_root);
         let root_uri = DocumentUri::from(file_uri_string(&project_root));
-        let manifest_uri = DocumentUri::from(file_uri_string(&project_root.join("Acton.toml")));
-        let tolk_stdlib_root = resolve_tolk_stdlib_root(&project_root, tolk_stdlib_path)?;
+        let manifest_path = project_root.join("Acton.toml");
+        let manifest_uri = DocumentUri::from(file_uri_string(&manifest_path));
+        let manifest_dir = manifest_path
+            .parent()
+            .expect("Acton.toml path must have a parent");
+        let (tolk_stdlib_root, stdlib_warning) =
+            match resolve_tolk_stdlib_root(manifest_dir, tolk_stdlib_path) {
+                Ok(path) => (path, None),
+                Err(error) => (None, Some(error.to_string())),
+            };
         let tolk_stdlib_root_uri = tolk_stdlib_root
             .as_ref()
             .map(|path| DocumentUri::from(file_uri_string(path)));
 
-        Ok(Self {
+        Self {
             project_root,
             root_uri,
             manifest_uri,
             tolk_stdlib_root,
             tolk_stdlib_root_uri,
-        })
+            stdlib_warning,
+        }
     }
 }
 
@@ -367,7 +377,10 @@ impl NativeLanguageServer {
         }
 
         let project_root = project_root_from_initialize(params, &self.fallback_project_root)?;
-        let workspace = NativeWorkspace::new(project_root, self.tolk_stdlib_path.clone())?;
+        let workspace = NativeWorkspace::new(project_root, self.tolk_stdlib_path.clone());
+        if let Some(warning) = workspace.stdlib_warning.as_deref() {
+            self.record_startup_warning("workspace.stdlib.init", warning);
+        }
 
         self.with_service(|service| {
             if let Err(error) = apply_initial_workspace_config(
@@ -2188,17 +2201,22 @@ fn project_root_from_initialize(
 }
 
 pub fn resolve_tolk_stdlib_root(
-    project_root: &Path,
+    manifest_dir: &Path,
     stdlib_path: Option<PathBuf>,
 ) -> anyhow::Result<Option<PathBuf>> {
     if let Some(path) = stdlib_path {
+        let path = if path.is_absolute() {
+            path
+        } else {
+            manifest_dir.join(path)
+        };
         if !path.is_dir() {
             anyhow::bail!("Tolk stdlib path is not a directory: {}", path.display());
         }
-        return Ok(Some(absolute_project_root(path)));
+        return Ok(Some(path));
     }
 
-    let candidates = default_tolk_stdlib_candidates(project_root);
+    let candidates = default_tolk_stdlib_candidates(manifest_dir);
     if let Some(path) = candidates.iter().find(|path| path.is_dir()) {
         return Ok(Some(absolute_project_root(path.clone())));
     }
@@ -2623,6 +2641,26 @@ mod tests {
             DocumentUri::from(file_uri_string(&lib_path))
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_explicit_stdlib_does_not_prevent_workspace_startup() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir()?;
+        fs::write(dir.path().join("Acton.toml"), "")?;
+
+        let workspace = NativeWorkspace::new(
+            dir.path().to_path_buf(),
+            Some(PathBuf::from(".acton/tolk-stdlib")),
+        );
+
+        assert!(workspace.tolk_stdlib_root.is_none());
+        assert!(
+            workspace
+                .stdlib_warning
+                .as_deref()
+                .is_some_and(|warning| warning.contains(".acton/tolk-stdlib"))
+        );
         Ok(())
     }
 
