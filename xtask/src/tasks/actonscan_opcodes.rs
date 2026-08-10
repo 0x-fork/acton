@@ -136,6 +136,12 @@ pub(crate) fn run(args: ActonscanOpcodesArgs) -> Result<()> {
         .filter(|entry| entry.opcode != 0)
         .map(|entry| entry.messages)
         .sum::<u64>();
+    let unknown_messages = shown_messages.saturating_sub(known_messages);
+    let unknown_messages_percent = if shown_messages == 0 {
+        0.0
+    } else {
+        unknown_messages as f64 * 100.0 / shown_messages as f64
+    };
 
     println!();
     println!(
@@ -143,8 +149,7 @@ pub(crate) fn run(args: ActonscanOpcodesArgs) -> Result<()> {
         shown_opcodes.saturating_sub(known_opcodes)
     );
     println!(
-        "shown messages: {shown_messages} ({known_messages} known, {} unknown)",
-        shown_messages.saturating_sub(known_messages)
+        "shown messages: {shown_messages} ({known_messages} known, {unknown_messages} unknown, {unknown_messages_percent:.2}% unknown)"
     );
 
     if returned_opcodes < snapshot.matching_opcodes {
