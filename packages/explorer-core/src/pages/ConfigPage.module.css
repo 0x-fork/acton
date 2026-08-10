@@ -255,6 +255,30 @@
   outline-offset: 2px;
 }
 
+.externalAccountLink {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--acton-space-1);
+  color: var(--acton-color-accent);
+  text-decoration: none;
+}
+
+.externalAccountLink:hover {
+  color: var(--acton-color-accent-hover);
+  text-decoration: underline;
+}
+
+.externalAccountLink:focus-visible {
+  border-radius: var(--acton-radius-control-sm);
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.externalAccountLink svg {
+  flex: 0 0 auto;
+}
+
 .validatorSetValue {
   background: var(--acton-color-surface);
 }

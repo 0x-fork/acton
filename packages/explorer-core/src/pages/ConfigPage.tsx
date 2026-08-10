@@ -2,6 +2,7 @@ import {
   ByteSize,
   BooleanValue,
   ContentTabs,
+  CopyInlineAction,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -15,6 +16,7 @@ import {
   formatNumberValue,
   GramAmount,
   InfoPopover,
+  InlineActions,
   Input,
   NumberValue,
   ParsedValueView,
@@ -53,8 +55,10 @@ import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {GlobalCapabilities} from "../components/GlobalCapabilities"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
+import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
 import styles from "./ConfigPage.module.css"
+import {getExternalAccountExplorerLink} from "./configExternalAccount"
 
 interface ConfigPageProps {
   readonly client: TonClient
@@ -873,9 +877,10 @@ function BridgeConfigurationValue({configuration}: {readonly configuration: Brid
                   id: "external-chain-address",
                   label: `${configuration.externalChain} bridge address`,
                   value: (
-                    <TechnicalValue
-                      value={configuration.externalChainAddress}
+                    <ExternalAccountValue
+                      address={configuration.externalChainAddress}
                       copyLabel="external chain address"
+                      externalChain={configuration.externalChain}
                       shorten={false}
                     />
                   ),
@@ -955,11 +960,10 @@ function BridgeOracleTable({
                   <ConfigAddressValue address={oracle.address} shorten />
                 </DataTableCell>
                 <DataTableCell className={styles.validatorHash} truncate>
-                  <TechnicalValue
+                  <ExternalAccountValue
+                    address={oracle.externalAddress}
                     copyLabel={`${externalChain} oracle address`}
-                    endLength={8}
-                    startLength={8}
-                    value={oracle.externalAddress}
+                    externalChain={externalChain}
                   />
                 </DataTableCell>
               </DataTableRow>
@@ -968,6 +972,62 @@ function BridgeOracleTable({
         </DataTableBody>
       </DataTableTable>
     </DataTable>
+  )
+}
+
+function ExternalAccountValue({
+  address,
+  copyLabel,
+  externalChain,
+  shorten = true,
+}: {
+  readonly address: string
+  readonly copyLabel: string
+  readonly externalChain: BridgeConfiguration["externalChain"]
+  readonly shorten?: boolean
+}) {
+  const {network} = useNetworkInfo()
+  const explorer = getExternalAccountExplorerLink(externalChain, network.id === "testnet", address)
+  if (explorer === undefined) {
+    return (
+      <TechnicalValue
+        copyLabel={copyLabel}
+        endLength={8}
+        shorten={shorten}
+        startLength={8}
+        value={address}
+      />
+    )
+  }
+
+  return (
+    <InlineActions
+      actions={
+        <CopyInlineAction
+          copiedLabel={`${copyLabel} copied`}
+          label={`Copy ${copyLabel}`}
+          size="compact"
+          value={address}
+        />
+      }
+    >
+      <a
+        aria-label={`Open ${externalChain} account ${address} in ${explorer.name}`}
+        className={styles.externalAccountLink}
+        href={explorer.href}
+        target="_blank"
+        rel="noreferrer"
+      >
+        <TechnicalValue
+          copyable={false}
+          endLength={8}
+          shorten={shorten}
+          startLength={8}
+          value={address}
+        />
+        <ExternalLink size={12} aria-hidden="true" />
+      </a>
+    </InlineActions>
   )
 }
 
