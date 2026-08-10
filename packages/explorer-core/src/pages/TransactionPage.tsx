@@ -101,6 +101,7 @@ export const parseTransactionTraceTabType = (
 
 const MAX_TRACE_TREE_FLOW_WIDTH = 1800
 const WIDE_TRACE_TREE_TRANSACTION_THRESHOLD = 7
+const TRACE_TABLE_PREVIEW_LIMIT = 10
 
 const normalizeTransactionReference = (reference: string): string => {
   return hashToHex(reference) ?? reference.trim().toLowerCase()
@@ -1049,16 +1050,25 @@ export function TransactionTraceView({
     tx => transactionHashHex(tx).toLowerCase() === hash.toLowerCase(),
   )
   const selectedTransactionId = selectedTraceTransaction?.id
-  const decodedMessageNamesByTransactionHash = useMemo(() => {
-    const names = new Map<string, string>()
-    for (const tx of traces) {
-      const parsedBody = decodeTransactionMessageBody(tx, contracts, [], compilerAbisByCodeHash)
-      if (parsedBody && parsedBody.opcode === undefined) {
-        names.set(transactionHashHex(tx).toLowerCase(), parsedBody.name)
+  const resolveDecodedMessageNames = useCallback(
+    (actions: readonly V3Action[]): ReadonlyMap<string, string> => {
+      const names = new Map<string, string>()
+      const visibleTransactionReferences = new Set(
+        actions.flatMap(action => action.transactions.map(normalizeTransactionReference)),
+      )
+      for (const tx of traces) {
+        if (!transactionReferenceKeys(tx).some(key => visibleTransactionReferences.has(key))) {
+          continue
+        }
+        const parsedBody = decodeTransactionMessageBody(tx, contracts, [], compilerAbisByCodeHash)
+        if (parsedBody && parsedBody.opcode === undefined) {
+          names.set(transactionHashHex(tx).toLowerCase(), parsedBody.name)
+        }
       }
-    }
-    return names
-  }, [compilerAbisByCodeHash, contracts, traces])
+      return names
+    },
+    [compilerAbisByCodeHash, contracts, traces],
+  )
   const actionHighlightedTransactionIds = useMemo(() => {
     if (!hoveredAction) {
       return undefined
@@ -1177,18 +1187,21 @@ export function TransactionTraceView({
                 <div className={styles.tabContent}>
                   {activeTab === "value-flow" && (
                     <ValueFlowTable
+                      key={`value-flow:${hash}`}
                       items={valueFlow}
                       contracts={contracts}
                       onContractClick={onContractClick}
                       className={styles.valueFlowPanel}
+                      previewLimit={TRACE_TABLE_PREVIEW_LIMIT}
                     />
                   )}
 
                   {activeTab === "event-overview" && showEventOverview && (
                     <ActionHistoryTable
+                      key={`actions:${hash}`}
                       actions={traceActions}
                       actionMetadata={traceActionMetadata}
-                      decodedMessageNamesByTransactionHash={decodedMessageNamesByTransactionHash}
+                      resolveDecodedMessageNames={resolveDecodedMessageNames}
                       ownerAddress={traceAddress}
                       client={client}
                       nowSeconds={nowSeconds}
@@ -1197,6 +1210,7 @@ export function TransactionTraceView({
                       interactiveRows={false}
                       mobileCards
                       className={styles.valueFlowPanel}
+                      previewLimit={TRACE_TABLE_PREVIEW_LIMIT}
                       onAddressClick={onContractClick}
                       onActionHoverChange={onActionHoverChange}
                     />

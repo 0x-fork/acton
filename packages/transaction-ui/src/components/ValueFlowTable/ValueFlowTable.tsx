@@ -1,3 +1,4 @@
+import {useMemo, useState} from "react"
 import type React from "react"
 import {
   ContractChip,
@@ -25,6 +26,7 @@ export interface ValueFlowTableProps {
   readonly onContractClick?: (address: string) => void
   readonly emptyState?: string
   readonly className?: string
+  readonly previewLimit?: number
 }
 
 export function ValueFlowTable({
@@ -33,32 +35,53 @@ export function ValueFlowTable({
   onContractClick,
   emptyState = "No value flow data",
   className,
+  previewLimit,
 }: ValueFlowTableProps): React.JSX.Element {
+  const [previewExpanded, setPreviewExpanded] = useState(false)
   const totalFee = items.reduce((sum, item) => sum + item.fee, 0n)
   const showTotal = items.length > 1
   const assets = collectAssets(items)
   const numericColumnWidth = "12rem"
-  const sortedItems = items.toSorted((left, right) => {
-    const leftLetter = contracts.get(left.address)?.letter
-    const rightLetter = contracts.get(right.address)?.letter
+  const sortedItems = useMemo(
+    () =>
+      items.toSorted((left, right) => {
+        const leftLetter = contracts.get(left.address)?.letter
+        const rightLetter = contracts.get(right.address)?.letter
 
-    if (leftLetter && rightLetter) {
-      return leftLetter.localeCompare(rightLetter)
-    }
-    if (leftLetter) {
-      return -1
-    }
-    if (rightLetter) {
-      return 1
-    }
+        if (leftLetter && rightLetter) {
+          return leftLetter.localeCompare(rightLetter)
+        }
+        if (leftLetter) {
+          return -1
+        }
+        if (rightLetter) {
+          return 1
+        }
 
-    return left.address.localeCompare(right.address)
-  })
+        return left.address.localeCompare(right.address)
+      }),
+    [contracts, items],
+  )
+  const normalizedPreviewLimit =
+    previewLimit !== undefined && previewLimit > 0 ? Math.floor(previewLimit) : undefined
+  const hasPreview =
+    normalizedPreviewLimit !== undefined && sortedItems.length > normalizedPreviewLimit
+  const visibleItems =
+    hasPreview && !previewExpanded ? sortedItems.slice(0, normalizedPreviewLimit + 1) : sortedItems
 
   return (
     <DataTable
       className={`${styles.root} ${className ?? ""}`}
       minWidth={`var(--value-flow-table-min-width, ${20 + (assets.length + 2) * 12}rem)`}
+      preview={
+        hasPreview
+          ? {
+              expanded: previewExpanded,
+              itemLabel: "accounts",
+              onExpandedChange: setPreviewExpanded,
+            }
+          : undefined
+      }
     >
       <DataTableTable className={styles.table} aria-label="Value flow" rowDividers={false}>
         <DataTableHead>
@@ -83,10 +106,10 @@ export function ValueFlowTable({
           </DataTableRow>
         </DataTableHead>
         <DataTableBody>
-          {sortedItems.length === 0 ? (
+          {visibleItems.length === 0 ? (
             <DataTableEmpty colSpan={3 + assets.length}>{emptyState}</DataTableEmpty>
           ) : (
-            sortedItems.map(item => (
+            visibleItems.map(item => (
               <DataTableRow key={item.address}>
                 <DataTableCell className={styles.accountCell}>
                   <ContractChip
@@ -134,7 +157,7 @@ export function ValueFlowTable({
             ))
           )}
         </DataTableBody>
-        {showTotal && (
+        {showTotal && (!hasPreview || previewExpanded) && (
           <DataTableFooter>
             <DataTableRow>
               <DataTableCell colSpan={2 + assets.length} />

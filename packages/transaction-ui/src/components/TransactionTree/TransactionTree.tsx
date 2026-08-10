@@ -46,6 +46,8 @@ import {SmartTooltip} from "./SmartTooltip"
 import styles from "./TransactionTree.module.css"
 import {useTooltip} from "./useTooltip"
 
+const EAGER_MESSAGE_BODY_DECODE_TRANSACTION_LIMIT = 50
+
 interface EdgeTransactionTooltipData {
   readonly fromAddress: string | undefined
   readonly fromLabel: string | undefined
@@ -325,6 +327,8 @@ export function TransactionTree({
   const treeContainerRef = useRef<HTMLDivElement | null>(null)
   const treeWrapperRef = useRef<HTMLDivElement | null>(null)
   const [treeLayout, setTreeLayout] = useState<TreeLayout>(INITIAL_TREE_LAYOUT)
+  const shouldDecodeMessageBodies =
+    transactions.length <= EAGER_MESSAGE_BODY_DECODE_TRANSACTION_LIMIT
 
   const rootTransactions = useMemo(() => {
     return transactions
@@ -499,12 +503,9 @@ export function TransactionTree({
               inMessage?.info.type === "internal" ? inMessage.info.value.coins : undefined,
             )
 
-      const parsedBody = decodeTransactionMessageBody(
-        tx,
-        contracts,
-        allContracts,
-        compilerAbisByCodeHash,
-      )
+      const parsedBody = shouldDecodeMessageBodies
+        ? decodeTransactionMessageBody(tx, contracts, allContracts, compilerAbisByCodeHash)
+        : undefined
       const opcode = getTransactionOpcode(tx.transaction, parsedBody)
       const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
       const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts, parsedBody)
@@ -715,6 +716,7 @@ export function TransactionTree({
     highlightedTransactionIds,
     allContracts,
     compilerAbisByCodeHash,
+    shouldDecodeMessageBodies,
     originatingTransaction,
     omittedTransactionCount,
     transactions,

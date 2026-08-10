@@ -1974,7 +1974,9 @@ function getActionTraceLoadMoreLabel(state: ActionTraceLoadMoreState): string {
 interface ActionHistoryTableProps {
   readonly actions: readonly V3Action[]
   readonly actionMetadata?: V3Metadata
-  readonly decodedMessageNamesByTransactionHash?: ReadonlyMap<string, string>
+  readonly resolveDecodedMessageNames?: (
+    actions: readonly V3Action[],
+  ) => ReadonlyMap<string, string>
   readonly ownerAddress: string
   readonly client: TonClient
   readonly nowSeconds: number
@@ -1984,6 +1986,7 @@ interface ActionHistoryTableProps {
   readonly showTimeColumn?: boolean
   readonly interactiveRows?: boolean
   readonly mobileCards?: boolean
+  readonly previewLimit?: number
   readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
   readonly onActionHoverChange?: (action: V3Action | undefined) => void
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
@@ -1994,7 +1997,7 @@ const EMPTY_DECODED_MESSAGE_NAMES_BY_TRANSACTION_HASH: ReadonlyMap<string, strin
 export function ActionHistoryTable({
   actions,
   actionMetadata = {},
-  decodedMessageNamesByTransactionHash = EMPTY_DECODED_MESSAGE_NAMES_BY_TRANSACTION_HASH,
+  resolveDecodedMessageNames,
   ownerAddress,
   client,
   nowSeconds,
@@ -2004,11 +2007,29 @@ export function ActionHistoryTable({
   showTimeColumn = true,
   interactiveRows = true,
   mobileCards = false,
+  previewLimit,
   onAddressClick,
   onActionHoverChange,
   onTransactionClick,
 }: ActionHistoryTableProps): JSX.Element {
-  const actionAddresses = useMemo(() => collectActionMessageNameAddresses(actions), [actions])
+  const [previewExpanded, setPreviewExpanded] = useState(false)
+  const normalizedPreviewLimit =
+    previewLimit !== undefined && previewLimit > 0 ? Math.floor(previewLimit) : undefined
+  const hasPreview = normalizedPreviewLimit !== undefined && actions.length > normalizedPreviewLimit
+  const visibleActions = useMemo(
+    () => (hasPreview && !previewExpanded ? actions.slice(0, normalizedPreviewLimit + 1) : actions),
+    [actions, hasPreview, normalizedPreviewLimit, previewExpanded],
+  )
+  const decodedMessageNamesByTransactionHash = useMemo(
+    () =>
+      resolveDecodedMessageNames?.(visibleActions) ??
+      EMPTY_DECODED_MESSAGE_NAMES_BY_TRANSACTION_HASH,
+    [resolveDecodedMessageNames, visibleActions],
+  )
+  const actionAddresses = useMemo(
+    () => collectActionMessageNameAddresses(visibleActions),
+    [visibleActions],
+  )
   const metadataRegistry = useMetadataRegistry()
   const messageNamesByAddress = useMessageNamesByAddress({
     client,
@@ -2018,14 +2039,14 @@ export function ActionHistoryTable({
   const rows = useMemo(
     () =>
       buildHistoryActionRows(
-        actions,
+        visibleActions,
         ownerAddress,
         actionMetadata,
         messageNamesByAddress,
         decodedMessageNamesByTransactionHash,
       ),
     [
-      actions,
+      visibleActions,
       actionMetadata,
       decodedMessageNamesByTransactionHash,
       messageNamesByAddress,
@@ -2037,6 +2058,15 @@ export function ActionHistoryTable({
     <DataTable
       className={`${className ?? ""} ${mobileCards ? styles.mobileCardTable : ""}`}
       minWidth={showTimeColumn ? "48rem" : "42rem"}
+      preview={
+        hasPreview
+          ? {
+              expanded: previewExpanded,
+              itemLabel: "actions",
+              onExpandedChange: setPreviewExpanded,
+            }
+          : undefined
+      }
     >
       <DataTableTable aria-label="Event overview" layout="auto" rowDividers={false}>
         <DataTableHead>

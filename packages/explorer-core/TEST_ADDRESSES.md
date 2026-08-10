@@ -77,6 +77,7 @@ The early `v0 -> v1 -> v0 -> v1` rollback means this history cannot be found saf
 
 | Transaction | What to verify | Last checked |
 | --- | --- | --- |
+| [`8199e63661cc9db0764d81403d17679e154aa24a725b632f6936402a2442319e`](https://actonscan.com/tx/8199e63661cc9db0764d81403d17679e154aa24a725b632f6936402a2442319e?network=mainnet) | Large trace with 240 actions and 241 transactions, useful for checking that Actions and Value Flow start with 10 full rows plus one faded preview row, remain responsive, and reveal the full table and Value Flow total on demand | 2026-08-10 |
 | [`1d0aac90eae0914432710b859d6d4c6bb42aa36141f29fe00165cc240cc17a87`](https://actonscan.com/tx/1d0aac90eae0914432710b859d6d4c6bb42aa36141f29fe00165cc240cc17a87?network=mainnet) | Opening Actions in the transaction details reproduces `Cannot parse stack:` | 2026-08-02 |
 
 ## Testnet
