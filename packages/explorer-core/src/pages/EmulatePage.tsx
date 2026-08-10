@@ -22,6 +22,7 @@ import {
   ContentTabs,
   CopyButton,
   Dialog,
+  DialogActions,
   DateTime,
   formatDateTime,
   formatGramAmount,
@@ -1989,7 +1990,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
           {stateOverrideAccountCount === 1 ? " override is" : " overrides are"} not written to
           localnet, so the resulting transaction may differ from the emulation.
         </p>
-        <div className={styles.sendConfirmationActions}>
+        <DialogActions>
           <Button type="button" variant="secondary" onClick={() => setSendConfirmationOpen(false)}>
             Cancel
           </Button>
@@ -2003,7 +2004,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
           >
             Send without overrides
           </Button>
-        </div>
+        </DialogActions>
       </div>
     </Dialog>
   )

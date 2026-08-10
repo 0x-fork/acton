@@ -35,13 +35,6 @@
   flex: 0 0 auto;
 }
 
-.modalActions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
 .walletAddressCell,
 .sessionDappCell {
   min-width: 0;
@@ -358,10 +351,6 @@
   white-space: pre-wrap;
 }
 
-.cellSignDialogContent .modalActions {
-  flex: 0 0 auto;
-}
-
 .permissionItem,
 .messageItem {
   display: flex;
@@ -507,11 +496,6 @@
 @media (max-width: 720px) {
   .cellSignDialog {
     height: calc(100dvh - var(--acton-space-3) - var(--acton-space-3));
-  }
-
-  .modalActions {
-    align-items: stretch;
-    flex-direction: column;
   }
 
   .metaRow {

@@ -157,13 +157,6 @@
   line-height: 1.55;
 }
 
-.sendConfirmationActions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--acton-space-2);
-}
-
 .builderGrid {
   display: grid;
   grid-template-columns: minmax(280px, 0.74fr) minmax(420px, 1.26fr);

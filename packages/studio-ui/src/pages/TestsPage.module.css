@@ -250,7 +250,6 @@ svg[data-status="failed"] {
 }
 
 .outputDialogContent {
-  padding: 0;
   overflow: hidden;
 }
 

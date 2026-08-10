@@ -1,16 +1,18 @@
 import {Dialog as DialogBase} from "@base-ui/react/dialog"
 import {X} from "lucide-react"
-import type {CSSProperties, ReactNode} from "react"
+import type {ComponentPropsWithoutRef, CSSProperties, ReactNode} from "react"
 
 import {cx} from "../../lib/cx"
 import {useTheme} from "../Theme/ThemeProvider"
 import styles from "./Dialog.module.css"
 
 export interface DialogProps {
+  readonly busy?: boolean
   readonly children: ReactNode
   readonly className?: string
   readonly closeLabel?: string
   readonly contentClassName?: string
+  readonly contentPadding?: "default" | "none"
   readonly description?: ReactNode
   readonly dismissible?: boolean
   readonly leadingIcon?: ReactNode
@@ -21,10 +23,12 @@ export interface DialogProps {
 }
 
 export function Dialog({
+  busy = false,
   children,
   className,
   closeLabel = "Close dialog",
   contentClassName,
+  contentPadding = "default",
   description,
   dismissible = true,
   leadingIcon,
@@ -34,8 +38,9 @@ export function Dialog({
   title,
 }: DialogProps) {
   const {theme} = useTheme()
+  const canDismiss = dismissible && !busy
   const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen || dismissible) {
+    if (nextOpen || canDismiss) {
       onOpenChange(nextOpen)
     }
   }
@@ -48,6 +53,7 @@ export function Dialog({
           <DialogBase.Popup
             className={cx(styles.popup, className)}
             data-theme={theme}
+            aria-busy={busy || undefined}
             style={
               maxWidth === undefined
                 ? undefined
@@ -66,17 +72,45 @@ export function Dialog({
                   </DialogBase.Description>
                 )}
               </div>
-              {dismissible && (
+              {canDismiss && (
                 <DialogBase.Close className={styles.closeButton} aria-label={closeLabel}>
                   <X size={18} aria-hidden="true" />
                 </DialogBase.Close>
               )}
             </header>
-            <div className={cx(styles.content, contentClassName)}>{children}</div>
+            <div
+              className={cx(
+                styles.content,
+                contentPadding === "none" && styles.contentPaddingNone,
+                contentClassName,
+              )}
+            >
+              {children}
+            </div>
           </DialogBase.Popup>
         </DialogBase.Viewport>
       </DialogBase.Portal>
     </DialogBase.Root>
+  )
+}
+
+export interface DialogActionsProps extends ComponentPropsWithoutRef<"footer"> {
+  readonly stackOnMobile?: boolean
+}
+
+export function DialogActions({
+  children,
+  className,
+  stackOnMobile = false,
+  ...props
+}: DialogActionsProps) {
+  return (
+    <footer
+      className={cx(styles.actions, stackOnMobile && styles.actionsStackOnMobile, className)}
+      {...props}
+    >
+      {children}
+    </footer>
   )
 }
 

@@ -1,9 +1,7 @@
-import {Button, Dialog} from "@acton/ui"
+import {Button, Dialog, DialogActions} from "@acton/ui"
 import {Square} from "lucide-react"
 
 import type {StudioEnvironment} from "../studioApi"
-
-import styles from "./StopEnvironmentDialog.module.css"
 
 interface StopEnvironmentDialogProps {
   readonly environment: StudioEnvironment | undefined
@@ -24,10 +22,10 @@ export function StopEnvironmentDialog({
       onOpenChange={onOpenChange}
       title={environment ? `Stop ${environment.name}` : "Stop environment"}
       description="The RPC endpoint will remain unavailable until you restart this environment"
-      dismissible={!loading}
+      busy={loading}
       maxWidth="28rem"
     >
-      <div className={styles.actions}>
+      <DialogActions>
         <Button
           type="button"
           variant="secondary"
@@ -45,7 +43,7 @@ export function StopEnvironmentDialog({
         >
           Stop environment
         </Button>
-      </div>
+      </DialogActions>
     </Dialog>
   )
 }

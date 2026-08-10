@@ -166,6 +166,7 @@ export function TestsPage({
         title="Runner output"
         description="Captured output from this test run"
         maxWidth="min(52rem, calc(100vw - 32px))"
+        contentPadding="none"
         contentClassName={styles.outputDialogContent}
       >
         {selectedRun ? <RunOutput output={output} status={selectedRun.status} /> : null}

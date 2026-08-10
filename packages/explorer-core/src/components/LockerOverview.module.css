@@ -199,10 +199,6 @@
   line-height: 16px;
 }
 
-.dialogContent {
-  padding: 0;
-}
-
 .status {
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);

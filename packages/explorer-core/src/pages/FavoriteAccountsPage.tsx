@@ -7,6 +7,7 @@ import {
   Checkbox,
   DateTime,
   Dialog,
+  DialogActions,
   InlineAction,
   InlineActions,
   Pagination,
@@ -587,7 +588,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
       <Dialog
         open={importDialogOpen}
         onOpenChange={handleImportDialogChange}
-        dismissible={!importing}
+        busy={importing}
         title="Import favorites"
         description="Choose which sections to add to this browser"
         leadingIcon={<Upload size={18} />}
@@ -637,7 +638,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
               <Info size={14} aria-hidden="true" />
               <span>Selected sections will be merged with existing data</span>
             </div>
-            <div className={styles.importActions}>
+            <DialogActions className={styles.importActions}>
               <Button
                 variant="outline"
                 disabled={importing}
@@ -653,7 +654,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
               >
                 Import selected
               </Button>
-            </div>
+            </DialogActions>
           </>
         )}
       </Dialog>

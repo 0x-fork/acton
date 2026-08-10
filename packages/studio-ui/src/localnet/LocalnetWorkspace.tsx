@@ -1,6 +1,6 @@
 import {Navigate, Route, Routes, useLocation} from "react-router"
 import {Check, KeyRound, ShieldCheck} from "lucide-react"
-import {Dialog, Input} from "@acton/ui"
+import {Dialog, DialogActions, Input} from "@acton/ui"
 import {
   Suspense,
   lazy,
@@ -794,7 +794,7 @@ const LocalnetAuthOverlay: FC<LocalnetAuthOverlayProps> = ({
           onChange={event => setDraftToken(event.target.value)}
         />
 
-        <div className={styles.authActions}>
+        <DialogActions className={styles.authActions}>
           <button
             type="submit"
             className={`${styles.authActionButton} ${styles.authPrimaryButton}`}
@@ -815,7 +815,7 @@ const LocalnetAuthOverlay: FC<LocalnetAuthOverlayProps> = ({
               Clear stored token
             </button>
           )}
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   )

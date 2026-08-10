@@ -1,9 +1,7 @@
-import {Button, Dialog} from "@acton/ui"
+import {Button, Dialog, DialogActions} from "@acton/ui"
 import {Trash2} from "lucide-react"
 
 import type {StudioEnvironment} from "../../../studioApi"
-
-import styles from "./DeleteEnvironmentDialog.module.css"
 
 interface DeleteEnvironmentDialogProps {
   readonly environment: StudioEnvironment | undefined
@@ -24,10 +22,10 @@ export function DeleteEnvironmentDialog({
       onOpenChange={onOpenChange}
       title={environment ? `Delete ${environment.name}` : "Delete environment"}
       description="This permanently deletes the environment and all of its saved data"
-      dismissible={!loading}
+      busy={loading}
       maxWidth="28rem"
     >
-      <div className={styles.actions}>
+      <DialogActions>
         <Button
           type="button"
           variant="secondary"
@@ -45,7 +43,7 @@ export function DeleteEnvironmentDialog({
         >
           Delete environment
         </Button>
-      </div>
+      </DialogActions>
     </Dialog>
   )
 }

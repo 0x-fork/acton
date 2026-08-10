@@ -12,6 +12,7 @@ import {
   DataTableTable,
   DateTime,
   Dialog,
+  DialogActions,
   Duration,
   formatDuration,
   formatNumberValue,
@@ -646,7 +647,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           title="Advance time"
           className={styles.dashboardDialog}
           maxWidth={420}
-          dismissible={!isAdvancingTime}
+          busy={isAdvancingTime}
           closeLabel="Close time control"
           onOpenChange={open => {
             if (!open) closeTimeAdvanceModal()
@@ -730,7 +731,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               </div>
             )}
 
-            <div className={styles.timeModalActions}>
+            <DialogActions stackOnMobile>
               <Button
                 type="button"
                 variant="outline"
@@ -747,7 +748,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               >
                 {isAdvancingTime ? "Advancing..." : "Advance"}
               </Button>
-            </div>
+            </DialogActions>
           </form>
         </Dialog>
       ) : undefined}

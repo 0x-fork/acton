@@ -15,6 +15,7 @@ import {
 import {
   Button,
   Dialog,
+  DialogActions,
   formatByteSize,
   formatNumberValue,
   InlineButton,
@@ -495,7 +496,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
         description="This replaces the current node state and clears all checkpoints"
         className={styles.dashboardDialog}
         maxWidth={460}
-        dismissible={busyAction !== "load-state"}
+        busy={busyAction === "load-state"}
         closeLabel="Cancel loading state"
         onOpenChange={open => {
           if (!open) closeStateConfirmation()
@@ -511,7 +512,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
               </span>
             </div>
           </div>
-          <div className={styles.timeModalActions}>
+          <DialogActions stackOnMobile>
             <Button
               variant="outline"
               disabled={busyAction === "load-state"}
@@ -527,7 +528,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
             >
               Load state
             </Button>
-          </div>
+          </DialogActions>
         </div>
       </Dialog>
 
@@ -537,7 +538,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
         description="This replaces the current node state; the checkpoint remains available"
         className={styles.dashboardDialog}
         maxWidth={460}
-        dismissible={busyAction !== "restore-checkpoint"}
+        busy={busyAction === "restore-checkpoint"}
         closeLabel="Cancel checkpoint restore"
         onOpenChange={open => {
           if (!open && busyAction !== "restore-checkpoint") setCheckpointToRestore(undefined)
@@ -551,7 +552,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
               <span>Block {checkpointToRestore?.block_seqno}</span>
             </div>
           </div>
-          <div className={styles.timeModalActions}>
+          <DialogActions stackOnMobile>
             <Button
               variant="outline"
               disabled={busyAction === "restore-checkpoint"}
@@ -567,7 +568,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
             >
               Restore
             </Button>
-          </div>
+          </DialogActions>
         </div>
       </Dialog>
     </>

@@ -10,6 +10,7 @@ import {
   DataTableSkeletonRows,
   DataTableTable,
   Dialog,
+  DialogActions,
   InlineAction,
   useToast,
 } from "@acton/ui"
@@ -289,10 +290,10 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
             : "Remove contract from Studio?"
         }
         description="Only the Studio registry entry will be removed. The on-chain contract, source files, and ABI will not be changed."
-        dismissible={!deleting}
+        busy={deleting}
         maxWidth="30rem"
       >
-        <div className={styles.dialogActions}>
+        <DialogActions>
           <Button
             type="button"
             variant="secondary"
@@ -310,7 +311,7 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
           >
             Remove from Studio
           </Button>
-        </div>
+        </DialogActions>
       </Dialog>
     </>
   )

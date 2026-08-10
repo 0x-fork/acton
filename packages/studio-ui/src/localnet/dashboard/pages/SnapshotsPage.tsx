@@ -11,6 +11,7 @@ import {
   DataTableTable,
   DateTime,
   Dialog,
+  DialogActions,
   Duration,
   Input,
   InlineAction,
@@ -419,7 +420,7 @@ const SnapshotDialog: FC<SnapshotDialogProps> = ({
       }}
       title={title}
       description={description}
-      dismissible={!loading}
+      busy={loading}
       maxWidth="30rem"
     >
       {state?.kind === "create" ? (
@@ -431,7 +432,7 @@ const SnapshotDialog: FC<SnapshotDialogProps> = ({
           onChange={event => onNameChange(event.target.value)}
         />
       ) : undefined}
-      <div className={styles.dialogActions}>
+      <DialogActions className={styles.dialogActions}>
         <Button variant="secondary" disabled={loading} onClick={onClose}>
           Cancel
         </Button>
@@ -446,7 +447,7 @@ const SnapshotDialog: FC<SnapshotDialogProps> = ({
               ? "Delete snapshot"
               : "Create snapshot"}
         </Button>
-      </div>
+      </DialogActions>
     </Dialog>
   )
 }

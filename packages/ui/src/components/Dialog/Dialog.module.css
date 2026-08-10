@@ -124,6 +124,19 @@
   overflow: auto;
 }
 
+.contentPaddingNone {
+  padding: 0;
+}
+
+.actions {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--acton-space-2);
+}
+
 @media (max-width: 620px) {
   .viewport {
     padding: var(--acton-space-3);
@@ -139,6 +152,15 @@
 
   .content {
     padding: 0 var(--acton-space-4) var(--acton-space-4);
+  }
+
+  .contentPaddingNone {
+    padding: 0;
+  }
+
+  .actionsStackOnMobile {
+    flex-direction: column-reverse;
+    align-items: stretch;
   }
 }
 

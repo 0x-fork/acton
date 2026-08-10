@@ -1,4 +1,4 @@
-import {Button, Dialog, Input, useToast} from "@acton/ui"
+import {Button, Dialog, DialogActions, Input, useToast} from "@acton/ui"
 import {useEffect, useState} from "react"
 import type {FormEvent} from "react"
 
@@ -62,6 +62,7 @@ export function EditContractNameDialog({
       title="Edit contract name"
       description="Set the name shown throughout Studio"
       maxWidth={460}
+      busy={submitting}
       onOpenChange={onOpenChange}
     >
       <form className={styles.form} onSubmit={handleSubmit}>
@@ -72,7 +73,7 @@ export function EditContractNameDialog({
           placeholder={contract?.abiName ?? "Counter"}
           onChange={event => setName(event.target.value)}
         />
-        <div className={styles.actions}>
+        <DialogActions stackOnMobile className={styles.actions}>
           <Button
             type="button"
             variant="secondary"
@@ -84,7 +85,7 @@ export function EditContractNameDialog({
           <Button type="submit" variant="primary" loading={submitting} disabled={nameUnchanged}>
             Save name
           </Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   )

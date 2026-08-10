@@ -206,7 +206,7 @@ export const VestingOverview: FC<VestingOverviewProps> = ({address, client, onDa
         description={`${schedule.totalPeriods} vesting periods`}
         closeLabel="Close payment schedule"
         maxWidth="64rem"
-        contentClassName={styles.dialogContent}
+        contentPadding="none"
       >
         <DataTable minWidth="52rem">
           <DataTableTable aria-label="Vesting payment schedule">

@@ -1,4 +1,4 @@
-import {Button, Checkbox, Dialog, Input} from "@acton/ui"
+import {Button, Checkbox, Dialog, DialogActions, Input} from "@acton/ui"
 import {Play} from "lucide-react"
 import {type FormEvent, useEffect, useState} from "react"
 
@@ -79,8 +79,8 @@ export function RunTestsDialog({open, onOpenChange, onStarted}: RunTestsDialogPr
       title="Run tests"
       description="Start the same Acton test command used by the CLI"
       maxWidth="42rem"
-      dismissible={!isSubmitting}
-      contentClassName={styles.dialogContent}
+      busy={isSubmitting}
+      contentPadding="none"
     >
       <form className={styles.form} onSubmit={event => void handleSubmit(event)}>
         <Input
@@ -135,7 +135,7 @@ export function RunTestsDialog({open, onOpenChange, onStarted}: RunTestsDialogPr
           </div>
         ) : null}
 
-        <footer className={styles.actions}>
+        <DialogActions>
           <Button
             type="button"
             variant="secondary"
@@ -152,7 +152,7 @@ export function RunTestsDialog({open, onOpenChange, onStarted}: RunTestsDialogPr
           >
             Run tests
           </Button>
-        </footer>
+        </DialogActions>
       </form>
     </Dialog>
   )

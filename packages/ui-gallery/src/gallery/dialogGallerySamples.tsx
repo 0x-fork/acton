@@ -1,4 +1,4 @@
-import {Button, Dialog, HighlightedCode, RawDataBlock} from "@acton/ui"
+import {Button, Dialog, DialogActions, HighlightedCode, RawDataBlock} from "@acton/ui"
 import {useState} from "react"
 
 import styles from "./dialogGallery.module.css"
@@ -63,6 +63,11 @@ export function DialogGallerySamples() {
               copyLabel="metadata JSON"
               customContent={<HighlightedCode value={metadataJson} language="json" />}
             />
+            <DialogActions>
+              <Button variant="outline" onClick={() => setStandardOpen(false)}>
+                Close
+              </Button>
+            </DialogActions>
           </div>
         </Dialog>
       </article>
@@ -87,6 +92,11 @@ export function DialogGallerySamples() {
               <li key={entry}>{entry}</li>
             ))}
           </ol>
+          <DialogActions>
+            <Button variant="outline" onClick={() => setScrollingOpen(false)}>
+              Close
+            </Button>
+          </DialogActions>
         </Dialog>
       </article>
     </div>

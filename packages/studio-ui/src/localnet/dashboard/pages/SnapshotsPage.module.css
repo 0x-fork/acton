@@ -184,7 +184,6 @@
 }
 
 .actions,
-.dialogActions,
 .loadError {
   display: flex;
   align-items: center;
@@ -210,7 +209,6 @@
 }
 
 .dialogActions {
-  justify-content: flex-end;
   margin-top: 20px;
 }
 

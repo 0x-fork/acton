@@ -1,6 +1,14 @@
 import {Check, Copy, KeyRound, Shield} from "lucide-react"
 import {TlbCellViewer} from "@acton/transaction-ui"
-import {Button, Dialog, GramAmount, RawDataBlock, shortenMiddle, useToast} from "@acton/ui"
+import {
+  Button,
+  Dialog,
+  DialogActions,
+  GramAmount,
+  RawDataBlock,
+  shortenMiddle,
+  useToast,
+} from "@acton/ui"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 import type {
@@ -710,7 +718,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           maxWidth={520}
           closeLabel="Close request"
           contentClassName={styles.modalContent}
-          dismissible={!isSubmitting}
+          busy={isSubmitting}
           onOpenChange={open => {
             if (!open) void handleRejectConnect()
           }}
@@ -775,7 +783,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
             })}
           </div>
 
-          <div className={styles.modalActions}>
+          <DialogActions stackOnMobile>
             <Button
               variant="outline"
               onClick={() => void handleRejectConnect()}
@@ -790,7 +798,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
             >
               Connect
             </Button>
-          </div>
+          </DialogActions>
         </Dialog>
       )}
 
@@ -803,7 +811,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           maxWidth={520}
           closeLabel="Close request"
           contentClassName={styles.modalContent}
-          dismissible={!isSubmitting}
+          busy={isSubmitting}
           onOpenChange={open => {
             if (!open) void handleRejectTransaction()
           }}
@@ -841,7 +849,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
             ))}
           </div>
 
-          <div className={styles.modalActions}>
+          <DialogActions stackOnMobile>
             <Button
               variant="outline"
               onClick={() => void handleRejectTransaction()}
@@ -856,7 +864,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
             >
               Approve
             </Button>
-          </div>
+          </DialogActions>
         </Dialog>
       )}
 
@@ -873,7 +881,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
           contentClassName={`${styles.modalContent} ${
             pendingSignDataRequest.preview.data.type === "cell" ? styles.cellSignDialogContent : ""
           }`}
-          dismissible={!isSubmitting}
+          busy={isSubmitting}
           onOpenChange={open => {
             if (!open) void handleRejectSignData()
           }}
@@ -882,7 +890,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
             <SignRequestPreview preview={pendingSignDataRequest.preview.data} />
           </div>
 
-          <div className={styles.modalActions}>
+          <DialogActions stackOnMobile>
             <Button
               variant="outline"
               onClick={() => void handleRejectSignData()}
@@ -897,7 +905,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
             >
               Sign
             </Button>
-          </div>
+          </DialogActions>
         </Dialog>
       )}
     </WalletRuntimeContext.Provider>

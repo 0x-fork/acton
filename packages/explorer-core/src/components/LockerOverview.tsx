@@ -232,7 +232,7 @@ export const LockerOverview: FC<LockerOverviewProps> = ({address, client}) => {
         description={`${schedule.totalPeriods} scheduled unlocks`}
         closeLabel="Close payment schedule"
         maxWidth="58rem"
-        contentClassName={styles.dialogContent}
+        contentPadding="none"
       >
         <DataTable minWidth="44rem">
           <DataTableTable aria-label="Locker payment schedule">

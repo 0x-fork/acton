@@ -2,6 +2,7 @@ import {
   Button,
   Checkbox,
   Dialog,
+  DialogActions,
   Disclosure,
   InlineAction,
   Input,
@@ -225,7 +226,8 @@ export function CreateEnvironmentDialog({
       onOpenChange={onOpenChange}
       title="Create environment"
       maxWidth="60rem"
-      dismissible={!isSubmitting}
+      busy={isSubmitting}
+      contentPadding="none"
       contentClassName={styles.dialogContent}
     >
       <form className={styles.form} onSubmit={event => void handleSubmit(event)}>
@@ -368,7 +370,7 @@ export function CreateEnvironmentDialog({
           )}
         </div>
 
-        <footer className={styles.formActions}>
+        <DialogActions className={styles.formActions}>
           <Button
             type="button"
             variant="secondary"
@@ -385,7 +387,7 @@ export function CreateEnvironmentDialog({
           >
             Create environment
           </Button>
-        </footer>
+        </DialogActions>
       </form>
     </Dialog>
   )

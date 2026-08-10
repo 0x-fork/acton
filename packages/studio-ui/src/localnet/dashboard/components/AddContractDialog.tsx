@@ -1,4 +1,4 @@
-import {Button, Dialog, Input, useToast} from "@acton/ui"
+import {Button, Dialog, DialogActions, Input, useToast} from "@acton/ui"
 import {useEffect, useState} from "react"
 import type {FormEvent} from "react"
 
@@ -71,6 +71,7 @@ export function AddContractDialog({client, open, onAdded, onOpenChange}: AddCont
       title="Add contract"
       description="Add a deployed contract from this environment"
       maxWidth={520}
+      busy={submitting}
       onOpenChange={onOpenChange}
     >
       <form className={styles.form} onSubmit={handleSubmit}>
@@ -90,7 +91,7 @@ export function AddContractDialog({client, open, onAdded, onOpenChange}: AddCont
           placeholder="Counter"
           onChange={event => setName(event.target.value)}
         />
-        <div className={styles.actions}>
+        <DialogActions stackOnMobile className={styles.actions}>
           <Button
             type="button"
             variant="secondary"
@@ -102,7 +103,7 @@ export function AddContractDialog({client, open, onAdded, onOpenChange}: AddCont
           <Button type="submit" variant="primary" loading={submitting} disabled={!address.trim()}>
             Add contract
           </Button>
-        </div>
+        </DialogActions>
       </form>
     </Dialog>
   )

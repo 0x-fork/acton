@@ -1647,7 +1647,7 @@ Status: ready
 Import:
 
 ```tsx
-import { Dialog } from "@acton/ui";
+import { Button, Dialog, DialogActions } from "@acton/ui";
 ```
 
 Use Dialog for modal content that needs focus trapping, Escape and outside-click
@@ -1659,6 +1659,14 @@ the modal frame and scroll behavior while callers own the domain content.
 ```tsx
 <Dialog open={open} onOpenChange={setOpen} title="Metadata" maxWidth="42rem">
   <MetadataDetails />
+  <DialogActions>
+    <Button variant="outline" onClick={() => setOpen(false)}>
+      Cancel
+    </Button>
+    <Button variant="primary" onClick={saveMetadata}>
+      Save
+    </Button>
+  </DialogActions>
 </Dialog>
 ```
 
@@ -1667,9 +1675,15 @@ the modal frame and scroll behavior while callers own the domain content.
 - `open` and `onOpenChange`: controlled state, including Escape, close-button,
   and outside-press changes.
 - `maxWidth`: caps the shared responsive popup width.
+- `busy`: sets `aria-busy` and blocks Escape, outside press, and the standard
+  close action while an operation is running.
+- `contentPadding`: use `"none"` when the caller owns a flush or independently
+  scrolling content layout.
 - `contentClassName`: caller-owned content layout hook; keep the shared header,
   close button, surface, and backdrop unchanged.
 - `closeLabel`: accessible label for the standard close action.
+- `DialogActions`: shared footer alignment for dialog buttons. Set
+  `stackOnMobile` when full-width mobile actions are easier to use.
 
 ### States To Review Visually
 
@@ -1685,6 +1699,10 @@ the modal frame and scroll behavior while callers own the domain content.
 - Keep dialog contents in existing domain components such as RawDataBlock,
   DataTable, and AddressChip.
 - Do not add another close button or backdrop inside the caller content.
+- Use `DialogActions` for confirmation and workflow buttons instead of local
+  flexbox footer styles.
+- Pass async mutation state through `busy`; keep the relevant action button's
+  own loading state for progress feedback.
 - Use Popover for compact anchored context; use Dialog for modal inspection or
   workflows.
 
