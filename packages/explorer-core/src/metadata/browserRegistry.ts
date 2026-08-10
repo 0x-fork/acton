@@ -8,6 +8,7 @@ import {unverifiedSourceResponse} from "./nullRegistry"
 import type {
   CompilerAbiRegistration,
   ExplorerMetadataRegistry,
+  RegisteredAddressName,
   RegisteredCompilerAbi,
   RegisteredSource,
   SourceRegistration,
@@ -62,6 +63,10 @@ export class BrowserMetadataRegistry implements ExplorerMetadataRegistry {
     return Object.fromEntries(
       addresses.map(address => [address, names.get(addressKey(address)) ?? undefined]),
     )
+  }
+
+  async listAddressNames(): Promise<readonly RegisteredAddressName[]> {
+    return [...readAddressNames(this.namespace)].map(([address, name]) => ({address, name}))
   }
 
   async setAddressName(address: string, name: string | undefined): Promise<void> {

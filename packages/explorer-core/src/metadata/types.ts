@@ -23,6 +23,11 @@ export interface RegisteredSource {
   readonly savedAt: number
 }
 
+export interface RegisteredAddressName {
+  readonly address: string
+  readonly name: string
+}
+
 export interface ExplorerMetadataRegistry {
   readonly canWriteAddressNames: boolean
   readonly canWriteCompilerAbis: boolean
@@ -30,6 +35,7 @@ export interface ExplorerMetadataRegistry {
 
   getAddressNames(addresses: readonly string[]): Promise<Record<string, string | undefined>>
   setAddressName(address: string, name: string | undefined): Promise<void>
+  listAddressNames?(): Promise<readonly RegisteredAddressName[]>
 
   getCompilerAbis(
     codeHashes: readonly string[],

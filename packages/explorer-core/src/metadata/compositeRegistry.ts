@@ -5,6 +5,7 @@ import {NullMetadataRegistry, unverifiedSourceResponse} from "./nullRegistry"
 import type {
   CompilerAbiRegistration,
   ExplorerMetadataRegistry,
+  RegisteredAddressName,
   RegisteredCompilerAbi,
   RegisteredSource,
   SourceRegistration,
@@ -46,6 +47,24 @@ export class CompositeMetadataRegistry implements ExplorerMetadataRegistry {
       result[address] = undefined
     }
     return result
+  }
+
+  async listAddressNames(): Promise<readonly RegisteredAddressName[]> {
+    const namesByAddress = new Map<string, string>()
+    for (const registry of this.registries) {
+      if (!registry.listAddressNames) {
+        continue
+      }
+
+      const entries = await registry.listAddressNames().catch(() => [])
+      for (const entry of entries) {
+        if (!namesByAddress.has(entry.address)) {
+          namesByAddress.set(entry.address, entry.name)
+        }
+      }
+    }
+
+    return [...namesByAddress].map(([address, name]) => ({address, name}))
   }
 
   setAddressName(address: string, name: string | undefined): Promise<void> {

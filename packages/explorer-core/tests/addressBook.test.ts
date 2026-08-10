@@ -1,6 +1,6 @@
 import {describe, expect, test} from "bun:test"
 
-import {resolveAddressName} from "../src/hooks/useAddressBook"
+import {resolveAddressName, searchAddressNames} from "../src/hooks/useAddressBook"
 
 describe("address name resolution", () => {
   test("prefers a custom name over the registry and TON DNS", () => {
@@ -13,5 +13,18 @@ describe("address name resolution", () => {
 
   test("falls back to TON DNS", () => {
     expect(resolveAddressName(undefined, undefined, "monk.t.me")).toBe("monk.t.me")
+  })
+
+  test("finds user-defined local names", () => {
+    expect(
+      searchAddressNames(
+        [
+          {address: "0:custom", name: "Treasury wallet"},
+          {address: "0:other", name: "Operations"},
+        ],
+        "treasury",
+        6,
+      ),
+    ).toEqual([{address: "0:custom", name: "Treasury wallet"}])
   })
 })

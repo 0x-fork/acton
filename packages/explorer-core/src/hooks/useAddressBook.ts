@@ -83,6 +83,7 @@ export const AddressBookProvider: FC<{
   const pendingBatchRef = useRef(new Map<string, PendingNameRequest>())
   const batchScheduledRef = useRef(false)
   const [version, setVersion] = useState(0)
+  const [storedAddressNames, setStoredAddressNames] = useState<readonly RegistryNameMatch[]>([])
 
   const getNameSources = useCallback(
     (address: string): AddressNameSources => {
@@ -118,6 +119,34 @@ export const AddressBookProvider: FC<{
     (address: string, name: AddressName) => updateNames([[address, name]]),
     [updateNames],
   )
+
+  useEffect(() => {
+    let isActive = true
+    if (!metadataRegistry.listAddressNames) {
+      setStoredAddressNames([])
+      return
+    }
+
+    void metadataRegistry
+      .listAddressNames()
+      .then(entries => {
+        if (!isActive) return
+        const matches = entries
+          .filter(entry => entry.address && entry.name.trim())
+          .map(entry => ({address: entry.address, name: entry.name.trim()}))
+        setStoredAddressNames(matches)
+        updateNames(matches.map(entry => [entry.address, entry.name] as const))
+      })
+      .catch(() => {
+        if (isActive) {
+          setStoredAddressNames([])
+        }
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [metadataRegistry, updateNames])
 
   const updateDomains = useCallback(
     (addressBook: Readonly<Record<string, AddressBookDomainRow>>) => {
@@ -184,7 +213,13 @@ export const AddressBookProvider: FC<{
   const setAddressName = useCallback(
     async (address: string, name: string) => {
       await metadataRegistry.setAddressName(address, name || undefined)
-      updateName(address, name || undefined)
+      const nextName = name.trim() || undefined
+      updateName(address, nextName)
+      setStoredAddressNames(current => {
+        const key = normalizeKey(address)
+        const withoutAddress = current.filter(entry => normalizeKey(entry.address) !== key)
+        return nextName ? [{address, name: nextName}, ...withoutAddress] : withoutAddress
+      })
     },
     [metadataRegistry, updateName],
   )
@@ -228,31 +263,16 @@ export const AddressBookProvider: FC<{
 
   const searchRegistryNames = useCallback(
     (query: string, limit = 6) => {
-      const normalizedQuery = normalizeNameQuery(query)
-      if (normalizedQuery.length < 2 || limit <= 0) {
-        return []
+      const namesByAddress = new Map<string, RegistryNameMatch>()
+      for (const account of registryAddresses) {
+        namesByAddress.set(normalizeKey(account.address), account)
       }
-
-      return registryAddresses
-        .map(account => {
-          const normalizedName = normalizeNameQuery(account.name)
-          if (!normalizedName.includes(normalizedQuery)) {
-            return undefined
-          }
-
-          return {
-            account,
-            score: getNameMatchScore(normalizedName, normalizedQuery),
-          }
-        })
-        .filter((entry): entry is {readonly account: RegistryNameMatch; readonly score: number} =>
-          Boolean(entry),
-        )
-        .sort((a, b) => a.score - b.score || a.account.name.localeCompare(b.account.name))
-        .slice(0, limit)
-        .map(entry => entry.account)
+      for (const entry of storedAddressNames) {
+        namesByAddress.set(normalizeKey(entry.address), entry)
+      }
+      return searchAddressNames([...namesByAddress.values()], query, limit)
     },
-    [registryAddresses],
+    [registryAddresses, storedAddressNames],
   )
 
   const value = useMemo(
@@ -324,6 +344,36 @@ export const useAddressNameSources = (address: string): AddressNameSources => {
 
 function normalizeNameQuery(value: string): string {
   return value.trim().toLocaleLowerCase()
+}
+
+export function searchAddressNames(
+  entries: readonly RegistryNameMatch[],
+  query: string,
+  limit: number,
+): readonly RegistryNameMatch[] {
+  const normalizedQuery = normalizeNameQuery(query)
+  if (normalizedQuery.length < 2 || limit <= 0) {
+    return []
+  }
+
+  return entries
+    .map(entry => {
+      const normalizedName = normalizeNameQuery(entry.name)
+      if (!normalizedName.includes(normalizedQuery)) {
+        return undefined
+      }
+
+      return {
+        entry,
+        score: getNameMatchScore(normalizedName, normalizedQuery),
+      }
+    })
+    .filter((entry): entry is {readonly entry: RegistryNameMatch; readonly score: number} =>
+      Boolean(entry),
+    )
+    .sort((a, b) => a.score - b.score || a.entry.name.localeCompare(b.entry.name))
+    .slice(0, limit)
+    .map(entry => entry.entry)
 }
 
 function getNameMatchScore(normalizedName: string, normalizedQuery: string): number {
