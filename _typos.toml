@@ -34,6 +34,7 @@ extend-ignore-re = [
   "\\balse\\b",
   "\\b(?:test-)?ba-stdlib-[A-Za-z0-9-]+\\b",
   "[dD]arcula",
+  "BA",
   "Ba",
   "Inferrable",
   "readed",

@@ -10,11 +10,15 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[lib]
+test = false
+doctest = false
+
 [dependencies]
 anyhow = { workspace = true }
 ton-syntax = { workspace = true }
 tree-sitter = { workspace = true }
-tree-sitter-func = { workspace = true }
+tree-sitter-func = { path = "../tree-sitter-func" }
 
 [dev-dependencies]
 expect-test = { workspace = true }

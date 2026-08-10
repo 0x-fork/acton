@@ -1,4 +1,3 @@
-import {version as bunVersion} from "bun"
 import {describe, expect, setSystemTime, test} from "bun:test"
 import {createElement} from "react"
 import {renderToStaticMarkup} from "react-dom/server"
@@ -16,10 +15,16 @@ import {
 const NOW = Date.UTC(2026, 7, 5, 12, 0)
 const DATE = Date.UTC(2026, 7, 5, 10, 30, 15)
 
-// Bun 1.3.14 uses "at" on macOS; the issue reports this fixed in Bun 1.4.0.
-// https://github.com/oven-sh/bun/issues/6056
-const DATE_TIME_SEPARATOR =
-  bunVersion === "1.3.14" && navigator.platform.startsWith("Mac") ? " at " : ", "
+const DATE_TIME_SEPARATOR = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  hourCycle: "h23",
+  timeStyle: "short",
+  timeZone: "UTC",
+})
+  .format(DATE)
+  .includes(" at ")
+  ? " at "
+  : ", "
 
 function expectedDateTime(date: string, time: string): string {
   return `${date}${DATE_TIME_SEPARATOR}${time}`

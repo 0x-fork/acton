@@ -42,9 +42,6 @@ tolk-source-map = { path = "crates/tolk-source-map" }
 ton-emulator = { path = "crates/ton-emulator" }
 ton-executor = { path = "crates/ton-executor" }
 tolk-syntax = { path = "crates/tolk-syntax" }
-func-syntax = { path = "crates/func-syntax" }
-func-resolver = { path = "crates/func-resolver" }
-func-ty = { path = "crates/func-ty" }
 tasm-syntax = { path = "crates/tasm-syntax" }
 fift-syntax = { path = "crates/fift-syntax" }
 toml-syntax = { path = "crates/toml-syntax" }
@@ -72,7 +69,6 @@ ton-language-server-core = { path = "crates/ton-language-server-core" }
 ton-language-server-native = { path = "crates/ton-language-server-native" }
 ton-indexer-contracts = { path = "crates/ton-indexer-contracts" }
 tree-sitter-tolk = { path = "crates/tree-sitter-tolk" }
-tree-sitter-func = { path = "crates/tree-sitter-func" }
 tree-sitter-tasm = { path = "crates/tree-sitter-tasm" }
 tree-sitter-fift = { path = "crates/tree-sitter-fift" }
 tree-sitter-tlb = { path = "crates/tree-sitter-tlb" }

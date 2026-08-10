@@ -10,13 +10,16 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[lib]
+test = false
+doctest = false
+
 [dependencies]
-func-resolver = { workspace = true }
+func-resolver = { path = "../func-resolver" }
 tree-sitter = { workspace = true }
 
 [dev-dependencies]
 expect-test = { workspace = true }
-func-syntax = { workspace = true }
 
 [lints]
 workspace = true

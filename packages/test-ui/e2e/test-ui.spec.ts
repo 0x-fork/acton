@@ -384,15 +384,22 @@ const openUnionStorageDiff = async (page: Page) => {
     for (const transactionIndex of Array.from({length: transactionCount}).keys()) {
       await transactions.nth(transactionIndex).click()
 
-      const storageToggle = page.getByRole("button", {name: "Show storage state change"})
-      if ((await storageToggle.count()) === 0) {
+      const storageToggle = page.getByRole("button", {name: /show storage state change/i})
+      const hasStorageToggle = await storageToggle
+        .first()
+        .waitFor({state: "visible", timeout: 1000})
+        .then(
+          () => true,
+          () => false,
+        )
+      if (!hasStorageToggle) {
         continue
       }
 
       await storageToggle.first().click()
       const storageDiff = page.getByTestId("storage-diff-details")
+      await expect(storageDiff).toBeVisible()
       if ((await storageDiff.getByText("ActiveStorage", {exact: true}).count()) > 0) {
-        await expect(storageDiff).toBeVisible()
         return storageDiff
       }
     }

@@ -2089,12 +2089,15 @@ export function ActionHistoryTable({
     () => (hasPreview && !previewExpanded ? actions.slice(0, visiblePreviewLimit + 1) : actions),
     [actions, hasPreview, previewExpanded, visiblePreviewLimit],
   )
-  const decodedMessageNamesByTransactionHash = useMemo(
-    () =>
+  const [decodedMessageNamesByTransactionHash, setDecodedMessageNamesByTransactionHash] = useState<
+    ReadonlyMap<string, string>
+  >(EMPTY_DECODED_MESSAGE_NAMES_BY_TRANSACTION_HASH)
+  useEffect(() => {
+    setDecodedMessageNamesByTransactionHash(
       resolveDecodedMessageNames?.(visibleActions) ??
-      EMPTY_DECODED_MESSAGE_NAMES_BY_TRANSACTION_HASH,
-    [resolveDecodedMessageNames, visibleActions],
-  )
+        EMPTY_DECODED_MESSAGE_NAMES_BY_TRANSACTION_HASH,
+    )
+  }, [resolveDecodedMessageNames, visibleActions])
   const actionAddresses = useMemo(
     () => collectActionMessageNameAddresses(visibleActions),
     [visibleActions],

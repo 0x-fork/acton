@@ -179,16 +179,23 @@ test("external-out graph node selects its parent transaction", async ({fanoutGra
   await openFanoutGraphScenario(page, scenario)
 
   const selectedNode = page.locator('circle[aria-label^="Transaction "][aria-pressed="true"]')
-  const selectedParent = await selectedNode.getAttribute("aria-label")
   const externalOutNode = page.getByRole("button", {
     name: /^External-out message from transaction /,
   })
 
   await expect(externalOutNode).toBeVisible()
+  const externalOutLabel = await externalOutNode.getAttribute("aria-label")
+  const parentTransactionId = externalOutLabel?.replace(
+    "External-out message from transaction ",
+    "",
+  )
+  if (!parentTransactionId) {
+    throw new Error("External-out node does not identify its parent transaction")
+  }
   await externalOutNode.click()
 
   await expect(page.getByText("Message Route", {exact: true})).toBeVisible()
-  await expect(selectedNode).toHaveAttribute("aria-label", selectedParent ?? "")
+  await expect(selectedNode).toHaveAttribute("aria-label", `Transaction ${parentTransactionId}`)
 
   await page
     .getByRole("button", {name: /^Transaction /})

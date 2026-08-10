@@ -321,13 +321,13 @@ fn basic_11_struct_documentation_without_body() {
         ",
         expect![[r"
             ```tolk
-            struct Foo {}
+            struct Foo
             ```
             **Size:** 0 bits.
             
             ---
             ```tolk
-            struct Bar {}
+            struct Bar
             ```
             **Size:** 0 bits.
             
