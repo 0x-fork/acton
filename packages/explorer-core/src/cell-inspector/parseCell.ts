@@ -128,11 +128,15 @@ export function parseCell(
   // Exotic roots have their own TON serialization and must not be interpreted
   // as ordinary comments, messages, or block.tlb values. Keep their exact raw
   // structure available to the inspector instead of reporting a false match.
-  // The custom TL-B runtime also rejects exotic roots, so its failure falls
-  // back to the same raw view even when custom parsing is authoritative.
+  // The custom TL-B runtime also rejects exotic roots, so skip it and explain
+  // why the raw view is used when a schema was entered.
   if (selectedRoot.isExotic) {
-    const customResult = parseCustomTlb()
-    if (customResult) return customResult
+    if (options.customTlb.trim().length > 0) {
+      accumulatedWarnings.push({
+        code: "custom-tlb-error",
+        message: "Custom TL-B does not support exotic roots; showing raw cell structure",
+      })
+    }
     return {
       status: "unknown",
       parser: "raw-cell-tree",

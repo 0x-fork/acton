@@ -283,7 +283,12 @@ describe("Cell Inspector parser pipeline", () => {
     expect(customResult).toMatchObject({
       status: "unknown",
       parser: "raw-cell-tree",
-      warnings: [{code: "custom-tlb-error"}],
+      warnings: [
+        {
+          code: "custom-tlb-error",
+          message: "Custom TL-B does not support exotic roots; showing raw cell structure",
+        },
+      ],
     })
   })
 })

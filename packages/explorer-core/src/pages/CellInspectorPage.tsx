@@ -369,10 +369,9 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
 }) => (
   <section className={styles.inputPanel}>
     <label className={`${styles.textareaField} ${styles.cellField}`} htmlFor="cell-inspector-input">
-      <span className={`${styles.fieldLabel} ${styles.cellFieldLabel}`}>Cell</span>
-      <span className={styles.fieldHint}>Paste Base64, hex, a ton:// URL, or an explorer link</span>
       <textarea
         id="cell-inspector-input"
+        aria-label="Cell input"
         className={styles.cellInput}
         value={input}
         onChange={event => onInputChange(event.target.value)}
@@ -381,6 +380,7 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
         autoCapitalize="off"
         autoComplete="off"
       />
+      <span className={styles.fieldHint}>Paste Base64, hex, a ton:// URL, or an explorer link</span>
     </label>
 
     <div className={styles.optionsGrid}>
