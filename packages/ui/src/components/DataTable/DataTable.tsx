@@ -10,11 +10,18 @@ export type DataTableCellTone = "default" | "muted" | "strong" | "subtle"
 export type DataTableLayout = "auto" | "fixed"
 export type DataTableVariant = "default" | "embedded" | "nested"
 
+export interface DataTablePreview {
+  readonly expanded: boolean
+  readonly itemLabel: string
+  readonly onExpandedChange: (expanded: boolean) => void
+}
+
 export type DataTableProps = Readonly<
   Omit<ComponentPropsWithRef<"section">, "title"> & {
     readonly actions?: ReactNode
     readonly meta?: ReactNode
     readonly minWidth?: CSSProperties["minWidth"]
+    readonly preview?: DataTablePreview
     readonly title?: ReactNode
     readonly titleId?: string
     readonly variant?: DataTableVariant
@@ -110,6 +117,7 @@ export function DataTable({
   className,
   meta,
   minWidth = "42rem",
+  preview,
   ref,
   style,
   title,
@@ -146,6 +154,25 @@ export function DataTable({
           </div>
         ) : undefined}
         {children}
+        {preview ? (
+          <>
+            {preview.expanded ? null : <div className={styles.previewFade} aria-hidden="true" />}
+            <button
+              type="button"
+              className={cx(styles.previewToggle, preview.expanded && styles.previewToggleExpanded)}
+              aria-expanded={preview.expanded}
+              aria-label={`${preview.expanded ? "Show less" : "Show more"} ${preview.itemLabel}`}
+              onClick={() => preview.onExpandedChange(!preview.expanded)}
+            >
+              {preview.expanded ? "Show less" : "Show more"}
+              <ChevronDown
+                className={preview.expanded ? styles.previewChevronExpanded : undefined}
+                size={18}
+                aria-hidden="true"
+              />
+            </button>
+          </>
+        ) : undefined}
       </div>
     </section>
   )

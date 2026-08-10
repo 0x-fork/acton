@@ -1845,6 +1845,11 @@ loading rows.
   title="Startup wallets"
   actions={<InlineButton>Refresh</InlineButton>}
   minWidth="54rem"
+  preview={{
+    expanded,
+    itemLabel: "wallets",
+    onExpandedChange: setExpanded,
+  }}
 >
   <DataTableTable aria-label="Startup wallets">
     <DataTableHead>
@@ -1868,9 +1873,12 @@ loading rows.
 ```
 
 - `DataTable`: outer frame with optional `title`, `meta`, `actions`, and
-  `minWidth`. Use `variant="default"` for a standalone table, `variant="nested"`
-  for a compact framed table inside another surface, and
-  `variant="embedded"` for a borderless compact table inside another surface.
+  `minWidth`. The optional `preview` renders a centered `Show more` control over
+  a faded final row and `Show less` below the expanded table; callers remain
+  responsible for passing only the visible rows. Use
+  `variant="default"` for a standalone table, `variant="nested"` for a compact
+  framed table inside another surface, and `variant="embedded"` for a
+  borderless compact table inside another surface.
 - `DataTableTable`: semantic table element with `layout="fixed"` by default.
 - `DataTableHeaderCell`: header cell with optional `align`, `columnWidth`, and
   `truncate`.
@@ -1889,6 +1897,7 @@ loading rows.
 - Standalone table with title action
 - Title metadata and row action
 - Footer controls inside `DataTableFooter`
+- Centered preview control open and closed
 - Empty table body
 - Loading rows with right-aligned skeleton cells
 - Collapsible group row open and closed
@@ -1900,6 +1909,9 @@ loading rows.
 - Keep domain-specific rendering inside cells: address chips, badges, links,
   copy buttons, balance summaries, and formatted hashes.
 - Use `minWidth` when technical columns need horizontal scrolling.
+- Use `preview` for a compact first-N view instead of duplicating fade and
+  disclosure controls in feature CSS. Include one row after the visible limit
+  as the faded preview row.
 - Use `DataTableGroupRow` for collapsible table sections such as treasury
   deploys; do not hand-roll a div between table rows.
 - Mark the rows revealed by that group with `DataTableRow groupChild` so the
