@@ -1,5 +1,5 @@
 import * as React from "react"
-import {useEffect, useRef, useState} from "react"
+import {useState} from "react"
 import {
   buildStorageDiff,
   BooleanValue,
@@ -119,7 +119,11 @@ function renderSectionCopyActions(
   )
 }
 
-export function TransactionDetails({
+export function TransactionDetails(props: TransactionDetailsProps): React.JSX.Element {
+  return <TransactionDetailsContent key={props.tx.id} {...props} />
+}
+
+function TransactionDetailsContent({
   tx,
   contracts,
   compilerAbisByCodeHash,
@@ -143,7 +147,6 @@ export function TransactionDetails({
   const [loadActionsError, setLoadActionsError] = useState<string | undefined>()
   const [isLoadingStorage, setIsLoadingStorage] = useState(false)
   const [loadStorageError, setLoadStorageError] = useState<string | undefined>()
-  const currentTxIdRef = useRef(tx.id)
   const renderCodeCellDetails = React.useCallback(
     (cell: ParsedCodeCell) => (
       <CodeCellDetails
@@ -154,17 +157,6 @@ export function TransactionDetails({
     ),
     [resolveVerifiedSourceByCodeHash, verifiedSourcesByCodeHash],
   )
-
-  useEffect(() => {
-    currentTxIdRef.current = tx.id
-    setShowActions(false)
-    setShowStateInitCode(false)
-    setLoadedActions(undefined)
-    setIsLoadingActions(false)
-    setLoadActionsError(undefined)
-    setIsLoadingStorage(false)
-    setLoadStorageError(undefined)
-  }, [tx.id])
 
   const description = tx.transaction.description
   if (description.type !== "generic" && description.type !== "tick-tock") {
@@ -344,15 +336,10 @@ export function TransactionDetails({
       return
     }
 
-    const requestedTxId = tx.id
     setIsLoadingActions(true)
     setLoadActionsError(undefined)
     try {
       const nextActions = await loadActions(tx)
-      if (currentTxIdRef.current !== requestedTxId) {
-        return
-      }
-
       if (nextActions.outActions.length === 0) {
         setLoadActionsError("No actions returned by retrace")
         return
@@ -361,15 +348,9 @@ export function TransactionDetails({
       setLoadedActions(nextActions)
       setShowActions(true)
     } catch (error) {
-      if (currentTxIdRef.current !== requestedTxId) {
-        return
-      }
-
       setLoadActionsError(error instanceof Error ? error.message : "Failed to load actions")
     } finally {
-      if (currentTxIdRef.current === requestedTxId) {
-        setIsLoadingActions(false)
-      }
+      setIsLoadingActions(false)
     }
   }
 
@@ -378,26 +359,15 @@ export function TransactionDetails({
       return
     }
 
-    const requestedTxId = tx.id
     setIsLoadingStorage(true)
     setLoadStorageError(undefined)
     try {
       await loadActions(tx)
-      if (currentTxIdRef.current !== requestedTxId) {
-        return
-      }
-
       setExpandedStorageLt(tx.lt)
     } catch (error) {
-      if (currentTxIdRef.current !== requestedTxId) {
-        return
-      }
-
       setLoadStorageError(error instanceof Error ? error.message : "Failed to load storage")
     } finally {
-      if (currentTxIdRef.current === requestedTxId) {
-        setIsLoadingStorage(false)
-      }
+      setIsLoadingStorage(false)
     }
   }
 

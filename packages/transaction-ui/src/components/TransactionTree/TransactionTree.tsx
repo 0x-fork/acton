@@ -1,6 +1,14 @@
 import type {Address} from "@ton/core"
 import type React from "react"
-import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
+import {
+  memo,
+  useCallback,
+  useDeferredValue,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import {
   buildStorageDiff,
   formatOpcode,
@@ -47,6 +55,7 @@ import styles from "./TransactionTree.module.css"
 import {useTooltip} from "./useTooltip"
 
 const EAGER_MESSAGE_BODY_DECODE_TRANSACTION_LIMIT = 50
+const MemoizedTransactionDetails = memo(TransactionDetails)
 
 interface EdgeTransactionTooltipData {
   readonly fromAddress: string | undefined
@@ -92,7 +101,7 @@ function SystemSourceTooltipContent({trigger}: {readonly trigger?: string}): Rea
 }
 
 interface TransactionTreeProps {
-  readonly transactions: TransactionInfo[]
+  readonly transactions: readonly TransactionInfo[]
   readonly contracts: Map<string, ContractData>
   readonly compilerAbisByCodeHash?: ReadonlyMap<string, ContractData["abi"]>
   readonly verifiedSourcesByCodeHash?: ReadonlyMap<string, ContractVerifiedSource>
@@ -142,6 +151,44 @@ const TREE_PADDING = {top: 8, right: 32, bottom: 8, left: 50} as const
 const TREE_DETAILS_GAP = 15
 const TREE_EDGE_LABEL = {width: 150, height: 64, failedHeight: 84, x: -180, y: -40} as const
 const TREE_ACCOUNT_LABEL_MAX_LENGTH = 20
+const TREE_SCALE_EXTENT = {min: 1, max: 1} as const
+
+const getTreeLinkPath = ({source, target}: TreeLinkDatum): string => {
+  const attributes = target.data.attributes ?? {}
+  if (attributes.isFirst) {
+    return "M"
+      .concat(source.y.toString(), ",")
+      .concat(source.x.toString(), "V")
+      .concat((target.x + 10).toString(), "a10 10 0 0 1 10 -10H")
+      .concat((target.y - 18).toString())
+  }
+  if (attributes.isLast) {
+    return "M"
+      .concat(source.y.toString(), ",")
+      .concat(source.x.toString(), "V")
+      .concat((target.x - 10).toString(), "a10 10 0 0 0 10 10H")
+      .concat((target.y - 18).toString())
+  }
+  return "M"
+    .concat(source.y.toString(), ",")
+    .concat(source.x.toString(), "V")
+    .concat(target.x.toString(), "H")
+    .concat((target.y - 18).toString())
+}
+
+const getTreeLinkClass = ({source, target}: TreeLinkDatum): string => {
+  const attributes = target.data.attributes
+  if (attributes?.isTraceGap || source.data.attributes?.isTraceGap) {
+    return `${styles.edgeStyle} ${styles.edgeStyleTraceGap}`
+  }
+  if (attributes?.withInitCode) {
+    return `${styles.edgeStyle} ${styles.edgeStyleWithInit}`
+  }
+  if (attributes?.isBounced) {
+    return `${styles.edgeStyle} ${styles.edgeStyleBounced}`
+  }
+  return styles.edgeStyle
+}
 const ACTION_HIGHLIGHT_SCROLL_DELAY_MS = 200
 
 const INITIAL_TREE_LAYOUT: TreeLayout = {
@@ -152,6 +199,37 @@ const INITIAL_TREE_LAYOUT: TreeLayout = {
     y: TREE_MIN_SIZE.height / 2,
   },
 }
+
+interface TransactionTreeCanvasProps {
+  readonly data: RawNodeDatum
+  readonly translate: TreeLayout["translate"]
+  readonly renderNode: (props: CustomNodeElementProps) => React.JSX.Element
+}
+
+const TransactionTreeCanvas = memo(function TransactionTreeCanvas({
+  data,
+  translate,
+  renderNode,
+}: TransactionTreeCanvasProps): React.JSX.Element {
+  return (
+    <Tree
+      data={data}
+      orientation="horizontal"
+      pathFunc={getTreeLinkPath}
+      nodeSize={TREE_NODE_SIZE}
+      separation={TREE_SEPARATION}
+      renderCustomNodeElement={renderNode}
+      pathClassFunc={getTreeLinkClass}
+      translate={translate}
+      zoom={1}
+      enableLegacyTransitions={false}
+      collapsible={false}
+      zoomable={false}
+      draggable={false}
+      scaleExtent={TREE_SCALE_EXTENT}
+    />
+  )
+})
 
 function EdgeTransactionTooltipContent({
   data,
@@ -286,7 +364,7 @@ function NodeTransactionTooltipContent({
   )
 }
 
-export function TransactionTree({
+function TransactionTreeComponent({
   transactions,
   contracts,
   compilerAbisByCodeHash,
@@ -320,12 +398,14 @@ export function TransactionTree({
     calculateOptimalPosition,
   } = useTooltip()
 
-  const [selectedTransactionIdState, setSelectedTransactionIdState] = useState<string | undefined>(
+  const [expandedTransactionId, setExpandedTransactionId] = useState<string | undefined>(
     selectedTransactionId,
   )
+  const expandedTransactionIdRef = useRef(selectedTransactionId)
   const triggerRectReference = useRef<DOMRect | undefined>(undefined)
   const treeContainerRef = useRef<HTMLDivElement | null>(null)
   const treeWrapperRef = useRef<HTMLDivElement | null>(null)
+  const selectedNodeRef = useRef<SVGGElement | null>(null)
   const [treeLayout, setTreeLayout] = useState<TreeLayout>(INITIAL_TREE_LAYOUT)
   const shouldDecodeMessageBodies =
     transactions.length <= EAGER_MESSAGE_BODY_DECODE_TRANSACTION_LIMIT
@@ -347,137 +427,216 @@ export function TransactionTree({
     return map
   }, [originatingTransaction, transactions])
 
-  const handleNodeClick = (id: string): void => {
-    const transaction = transactionMap.get(id)
-    if (!transaction) return
-
-    forceHideTooltip()
-
-    if (selectedTransactionIdState === id) {
-      setSelectedTransactionIdState(undefined)
-    } else {
-      setSelectedTransactionIdState(id)
-      onTransactionSelect?.(transaction)
+  // react-d3-tree calls the node renderer for every node whenever its callback changes.
+  // Keep event-only dependencies behind a committed ref so route changes and tooltip state do
+  // not invalidate the structural canvas, while handlers still observe the latest props.
+  const eventContextRef = useRef({
+    transactionMap,
+    contracts,
+    onContractClick,
+    onTransactionSelect,
+    onTraceGapLoad,
+    renderAddressChip,
+  })
+  useLayoutEffect(() => {
+    eventContextRef.current = {
+      transactionMap,
+      contracts,
+      onContractClick,
+      onTransactionSelect,
+      onTraceGapLoad,
+      renderAddressChip,
     }
-  }
+  }, [
+    contracts,
+    onContractClick,
+    onTraceGapLoad,
+    onTransactionSelect,
+    renderAddressChip,
+    transactionMap,
+  ])
 
-  const handleExternalOutClick = (parentId: string): void => {
-    const parentTransaction = transactionMap.get(parentId)
-    if (!parentTransaction) return
+  const updateExpandedTransaction = useCallback((id: string | undefined): void => {
+    expandedTransactionIdRef.current = id
+    setExpandedTransactionId(id)
+  }, [])
 
-    forceHideTooltip()
-    setSelectedTransactionIdState(parentId)
-    onTransactionSelect?.(parentTransaction)
-  }
+  const handleNodeClick = useCallback(
+    (id: string): void => {
+      const {transactionMap: currentTransactionMap, onTransactionSelect: selectTransaction} =
+        eventContextRef.current
+      const transaction = currentTransactionMap.get(id)
+      if (!transaction) return
 
-  const showEdgeTransactionTooltip = (event: React.MouseEvent, tx: TransactionInfo): void => {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-    triggerRectReference.current = rect
+      forceHideTooltip()
+      if (expandedTransactionIdRef.current === id) {
+        updateExpandedTransaction(undefined)
+        return
+      }
 
-    const computePhase = getTransactionComputePhase(tx.transaction)
-    const sourceLabel = getTransactionSourceLabel(tx.transaction)
-    const sourceAddress =
-      sourceLabel === undefined && tx.transaction.inMessage?.info.src
-        ? tx.transaction.inMessage.info.src.toString()
-        : undefined
+      updateExpandedTransaction(id)
+      selectTransaction?.(transaction)
+    },
+    [forceHideTooltip, updateExpandedTransaction],
+  )
 
-    const tooltipData: EdgeTransactionTooltipData = {
-      fromAddress: sourceAddress,
-      fromLabel: sourceLabel,
-      computePhase: {
-        success: computePhase?.type === "vm" ? computePhase.success : true,
-        exitCode: computePhase?.type === "vm" ? computePhase.exitCode : undefined,
-        gasUsed: computePhase?.type === "vm" ? computePhase.gasUsed : undefined,
-        vmSteps: computePhase?.type === "vm" ? computePhase.vmSteps : undefined,
-      },
-      fees: {
-        gasFees: computePhase?.type === "vm" ? computePhase.gasFees : undefined,
-        totalFees: tx.transaction.totalFees.coins,
-      },
-      sentTotal: [...tx.transaction.outMessages.values()].reduce(
-        (accumulator: bigint, message) =>
-          accumulator + (message.info.type === "internal" ? message.info.value.coins : 0n),
-        0n,
-      ),
-    }
+  const handleExternalOutClick = useCallback(
+    (parentId: string): void => {
+      const {transactionMap: currentTransactionMap, onTransactionSelect: selectTransaction} =
+        eventContextRef.current
+      const parentTransaction = currentTransactionMap.get(parentId)
+      if (!parentTransaction || expandedTransactionIdRef.current === parentId) return
 
-    showTooltip({
-      x: rect.left,
-      y: rect.top,
-      content: (
-        <EdgeTransactionTooltipContent data={tooltipData} renderAddressChip={renderAddressChip} />
-      ),
-    })
-  }
+      forceHideTooltip()
+      updateExpandedTransaction(parentId)
+      selectTransaction?.(parentTransaction)
+    },
+    [forceHideTooltip, updateExpandedTransaction],
+  )
 
-  const showNodeTransactionTooltip = (event: React.MouseEvent, tx: TransactionInfo): void => {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-    triggerRectReference.current = rect
+  const handleTraceGapLoad = useCallback((): void => {
+    eventContextRef.current.onTraceGapLoad?.()
+  }, [])
 
-    const contractAddress = tx.address ? tx.address.toString() : undefined
-    const isCreated =
-      tx.transaction.oldStatus === "non-existing" && tx.transaction.endStatus === "active"
-    const isDestroyed =
-      tx.transaction.oldStatus === "active" && tx.transaction.endStatus === "non-existing"
-    const contractTypeName = tx.contractName ?? tx.contractAbi?.contract_name?.trim() ?? "unknown"
+  const showEdgeTransactionTooltip = useCallback(
+    (event: React.MouseEvent, transactionId: string): void => {
+      const {transactionMap: currentTransactionMap, renderAddressChip: renderCurrentAddressChip} =
+        eventContextRef.current
+      const tx = currentTransactionMap.get(transactionId)
+      if (!tx) return
 
-    const tooltipData: NodeTransactionTooltipData = {
-      contract: {
-        typeName: contractTypeName,
-        address: contractAddress,
-      },
-      account: {
-        isCreated,
-        isDestroyed,
-      },
-      storageDiff: buildStorageDiff(tx.parsedStorageBefore, tx.parsedStorageAfter),
-    }
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+      triggerRectReference.current = rect
 
-    showTooltip({
-      x: rect.left,
-      y: rect.top,
-      content: (
-        <NodeTransactionTooltipContent
-          data={tooltipData}
-          contracts={contracts}
-          onContractClick={onContractClick}
-          renderAddressChip={renderAddressChip}
-        />
-      ),
-    })
-  }
+      const computePhase = getTransactionComputePhase(tx.transaction)
+      const sourceLabel = getTransactionSourceLabel(tx.transaction)
+      const sourceAddress =
+        sourceLabel === undefined && tx.transaction.inMessage?.info.src
+          ? tx.transaction.inMessage.info.src.toString()
+          : undefined
 
-  const showSourceContractTooltip = (event: React.MouseEvent, address: string): void => {
-    const trigger = event.currentTarget as SVGGElement
-    const rect =
-      trigger.querySelector<SVGCircleElement>(":scope > circle")?.getBoundingClientRect() ??
-      trigger.getBoundingClientRect()
-    const contract = contracts.get(address)
-    triggerRectReference.current = rect
+      const tooltipData: EdgeTransactionTooltipData = {
+        fromAddress: sourceAddress,
+        fromLabel: sourceLabel,
+        computePhase: {
+          success: computePhase?.type === "vm" ? computePhase.success : true,
+          exitCode: computePhase?.type === "vm" ? computePhase.exitCode : undefined,
+          gasUsed: computePhase?.type === "vm" ? computePhase.gasUsed : undefined,
+          vmSteps: computePhase?.type === "vm" ? computePhase.vmSteps : undefined,
+        },
+        fees: {
+          gasFees: computePhase?.type === "vm" ? computePhase.gasFees : undefined,
+          totalFees: tx.transaction.totalFees.coins,
+        },
+        sentTotal: [...tx.transaction.outMessages.values()].reduce(
+          (accumulator: bigint, message) =>
+            accumulator + (message.info.type === "internal" ? message.info.value.coins : 0n),
+          0n,
+        ),
+      }
 
-    showTooltip({
-      x: rect.left,
-      y: rect.top,
-      content: (
-        <NodeTransactionTooltipContent
-          data={{
-            contract: {
-              typeName: contract?.abi?.contract_name?.trim() || "unknown",
-              address,
-            },
-            account: {
-              isCreated: false,
-              isDestroyed: false,
-            },
-            storageDiff: undefined,
-          }}
-          contracts={contracts}
-          onContractClick={onContractClick}
-          renderAddressChip={renderAddressChip}
-        />
-      ),
-    })
-  }
+      showTooltip({
+        x: rect.left,
+        y: rect.top,
+        content: (
+          <EdgeTransactionTooltipContent
+            data={tooltipData}
+            renderAddressChip={renderCurrentAddressChip}
+          />
+        ),
+      })
+    },
+    [showTooltip],
+  )
+
+  const showNodeTransactionTooltip = useCallback(
+    (event: React.MouseEvent, transactionId: string): void => {
+      const {
+        transactionMap: currentTransactionMap,
+        contracts: currentContracts,
+        onContractClick: handleContractClick,
+        renderAddressChip: renderCurrentAddressChip,
+      } = eventContextRef.current
+      const tx = currentTransactionMap.get(transactionId)
+      if (!tx) return
+
+      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+      triggerRectReference.current = rect
+
+      const contractAddress = tx.address ? tx.address.toString() : undefined
+      const isCreated =
+        tx.transaction.oldStatus === "non-existing" && tx.transaction.endStatus === "active"
+      const isDestroyed =
+        tx.transaction.oldStatus === "active" && tx.transaction.endStatus === "non-existing"
+      const contractTypeName = tx.contractName ?? tx.contractAbi?.contract_name?.trim() ?? "unknown"
+
+      const tooltipData: NodeTransactionTooltipData = {
+        contract: {
+          typeName: contractTypeName,
+          address: contractAddress,
+        },
+        account: {
+          isCreated,
+          isDestroyed,
+        },
+        storageDiff: buildStorageDiff(tx.parsedStorageBefore, tx.parsedStorageAfter),
+      }
+
+      showTooltip({
+        x: rect.left,
+        y: rect.top,
+        content: (
+          <NodeTransactionTooltipContent
+            data={tooltipData}
+            contracts={currentContracts}
+            onContractClick={handleContractClick}
+            renderAddressChip={renderCurrentAddressChip}
+          />
+        ),
+      })
+    },
+    [showTooltip],
+  )
+
+  const showSourceContractTooltip = useCallback(
+    (event: React.MouseEvent, address: string): void => {
+      const {
+        contracts: currentContracts,
+        onContractClick: handleContractClick,
+        renderAddressChip: renderCurrentAddressChip,
+      } = eventContextRef.current
+      const trigger = event.currentTarget as SVGGElement
+      const rect =
+        trigger.querySelector<SVGCircleElement>(":scope > circle")?.getBoundingClientRect() ??
+        trigger.getBoundingClientRect()
+      const contract = currentContracts.get(address)
+      triggerRectReference.current = rect
+
+      showTooltip({
+        x: rect.left,
+        y: rect.top,
+        content: (
+          <NodeTransactionTooltipContent
+            data={{
+              contract: {
+                typeName: contract?.abi?.contract_name?.trim() || "unknown",
+                address,
+              },
+              account: {
+                isCreated: false,
+                isDestroyed: false,
+              },
+              storageDiff: undefined,
+            }}
+            contracts={currentContracts}
+            onContractClick={handleContractClick}
+            renderAddressChip={renderCurrentAddressChip}
+          />
+        ),
+      })
+    },
+    [showTooltip],
+  )
 
   const treeData: RawNodeDatum = useMemo<RawNodeDatum>(() => {
     const convertTransactionToNode = (tx: TransactionInfo): RawNodeDatum => {
@@ -521,25 +680,27 @@ export function TransactionTree({
 
       const lt = tx.lt
       const id = tx.id
-      const isSelected = selectedTransactionIdState === id
       const isActionHighlighted = highlightedTransactionIds?.has(id) ?? false
 
-      const hasExternalOut = [...tx.transaction.outMessages.values()].some(outMessage => {
+      const externalOutMessage = [...tx.transaction.outMessages.values()].find(outMessage => {
         return outMessage.info.type === "external-out"
       })
 
-      const externalOutChildren = hasExternalOut
-        ? [
-            {
-              name: "",
-              attributes: {
-                isExternalOut: true,
-                parentId: id,
+      const externalOutChildren =
+        externalOutMessage?.info.type === "external-out"
+          ? [
+              {
+                name: "",
+                attributes: {
+                  isExternalOut: true,
+                  parentId: id,
+                  destination: externalOutMessage.info.dest?.toString() ?? "External",
+                  createdLt: externalOutMessage.info.createdLt.toString(),
+                },
+                children: [],
               },
-              children: [],
-            },
-          ]
-        : []
+            ]
+          : []
 
       return {
         name: addressName,
@@ -559,7 +720,6 @@ export function TransactionTree({
           withInitCode,
           isBounced,
           contractLetter,
-          isSelected,
           isActionHighlighted,
         },
         children: [...tx.children.map(it => convertTransactionToNode(it)), ...externalOutChildren],
@@ -712,7 +872,6 @@ export function TransactionTree({
   }, [
     rootTransactions,
     contracts,
-    selectedTransactionIdState,
     highlightedTransactionIds,
     allContracts,
     compilerAbisByCodeHash,
@@ -722,213 +881,288 @@ export function TransactionTree({
     transactions,
   ])
 
-  const renderCustomNodeElement = ({nodeDatum}: CustomNodeElementProps): React.JSX.Element => {
-    if (nodeDatum.attributes?.isRoot === "hidden") {
-      return <g />
-    }
+  const canLoadTraceGap = onTraceGapLoad !== undefined
+  const renderCustomNodeElement = useCallback(
+    ({nodeDatum}: CustomNodeElementProps): React.JSX.Element => {
+      if (nodeDatum.attributes?.isRoot === "hidden") {
+        return <g />
+      }
 
-    if (
-      nodeDatum.attributes?.isRoot === "source" ||
-      nodeDatum.attributes?.isRoot === "system" ||
-      nodeDatum.attributes?.isRoot === "root"
-    ) {
-      const isSystemSource = nodeDatum.attributes.isRoot === "system"
-      const isTraceGapContinuation = nodeDatum.attributes.isTraceGapContinuation === true
-      const systemTrigger = nodeDatum.attributes.systemTrigger as string | undefined
-      const sourceAddress = nodeDatum.attributes.sourceAddress as string | undefined
-      const sourceLabel = isSystemSource
-        ? `System${systemTrigger ? ` · ${systemTrigger}` : ""}`
-        : nodeDatum.name
+      if (
+        nodeDatum.attributes?.isRoot === "source" ||
+        nodeDatum.attributes?.isRoot === "system" ||
+        nodeDatum.attributes?.isRoot === "root"
+      ) {
+        const isSystemSource = nodeDatum.attributes.isRoot === "system"
+        const isTraceGapContinuation = nodeDatum.attributes.isTraceGapContinuation === true
+        const systemTrigger = nodeDatum.attributes.systemTrigger as string | undefined
+        const sourceAddress = nodeDatum.attributes.sourceAddress as string | undefined
+        const sourceLabel = isSystemSource
+          ? `System${systemTrigger ? ` · ${systemTrigger}` : ""}`
+          : nodeDatum.name
 
-      return (
-        // biome-ignore lint/a11y/noStaticElementInteractions: Hover only reveals explanatory context for this SVG node.
-        <g
-          className={`${styles.rootNode} ${isSystemSource ? styles.systemRootNode : ""} ${
-            isTraceGapContinuation ? styles.traceGapContinuationNode : ""
-          }`}
-          onMouseEnter={event => {
-            if (isSystemSource) {
-              const rect = event.currentTarget.getBoundingClientRect()
-              triggerRectReference.current = rect
-              showTooltip({
-                x: rect.left,
-                y: rect.top,
-                content: <SystemSourceTooltipContent trigger={systemTrigger} />,
-              })
-            } else if (isTraceGapContinuation && sourceAddress) {
-              showSourceContractTooltip(event, sourceAddress)
-            }
-          }}
-          onMouseLeave={() => {
-            if (isSystemSource || isTraceGapContinuation) hideTooltip()
-          }}
-        >
-          <title>{sourceLabel}</title>
-          <circle
-            r={15}
-            fill="var(--acton-color-surface)"
-            stroke="var(--acton-color-text)"
-            strokeWidth={1.5}
-            className={styles.rootCircle}
-          />
-          {isSystemSource ? (
-            <text
-              fill="var(--acton-color-text)"
-              strokeWidth="0"
-              x="0"
-              y="3.5"
-              fontSize="9"
-              fontWeight="bold"
-              letterSpacing="0.25"
-              textAnchor="middle"
-              className={styles.nodeText}
+        return (
+          // biome-ignore lint/a11y/noStaticElementInteractions: Hover only reveals explanatory context for this SVG node.
+          <g
+            className={`${styles.rootNode} ${isSystemSource ? styles.systemRootNode : ""} ${
+              isTraceGapContinuation ? styles.traceGapContinuationNode : ""
+            }`}
+            onMouseEnter={event => {
+              if (isSystemSource) {
+                const rect = event.currentTarget.getBoundingClientRect()
+                triggerRectReference.current = rect
+                showTooltip({
+                  x: rect.left,
+                  y: rect.top,
+                  content: <SystemSourceTooltipContent trigger={systemTrigger} />,
+                })
+              } else if (isTraceGapContinuation && sourceAddress) {
+                showSourceContractTooltip(event, sourceAddress)
+              }
+            }}
+            onMouseLeave={() => {
+              if (isSystemSource || isTraceGapContinuation) hideTooltip()
+            }}
+          >
+            <title>{sourceLabel}</title>
+            <circle
+              r={15}
+              fill="var(--acton-color-surface)"
+              stroke="var(--acton-color-text)"
+              strokeWidth={1.5}
+              className={styles.rootCircle}
+            />
+            {isSystemSource ? (
+              <text
+                fill="var(--acton-color-text)"
+                strokeWidth="0"
+                x="0"
+                y="3.5"
+                fontSize="9"
+                fontWeight="bold"
+                letterSpacing="0.25"
+                textAnchor="middle"
+                className={styles.nodeText}
+              >
+                SYS
+              </text>
+            ) : (
+              <text
+                fill="var(--acton-color-text)"
+                strokeWidth="0"
+                x="0"
+                y="5"
+                fontSize="14"
+                fontWeight="bold"
+                textAnchor="middle"
+                className={styles.nodeText}
+              >
+                {(nodeDatum.attributes?.contractLetter as string) || "?"}
+              </text>
+            )}
+            {isTraceGapContinuation && (
+              <foreignObject
+                width={TREE_EDGE_LABEL.width}
+                height={TREE_EDGE_LABEL.height}
+                x={TREE_EDGE_LABEL.x}
+                y={TREE_EDGE_LABEL.y}
+              >
+                <div className={styles.edgeText} role="note">
+                  <div className={styles.topText}>
+                    <p className={styles.edgeTextTitle} aria-label={nodeDatum.name}>
+                      {shortenMiddle(nodeDatum.name, {maxLength: TREE_ACCOUNT_LABEL_MAX_LENGTH})}
+                    </p>
+                    <p className={styles.edgeTextContent}>—</p>
+                  </div>
+                  <div className={styles.bottomText}>
+                    <p className={styles.edgeTextContent}>—</p>
+                  </div>
+                </div>
+              </foreignObject>
+            )}
+          </g>
+        )
+      }
+
+      if (nodeDatum.attributes?.isTraceGap) {
+        const omittedLabel = nodeDatum.attributes.omittedLabel as string
+
+        return (
+          <g className={styles.traceGapNode}>
+            <title>Trace unavailable · {omittedLabel}</title>
+            <circle
+              r={15}
+              fill="var(--acton-color-surface)"
+              stroke="var(--acton-color-warning)"
+              strokeWidth={1.5}
+              strokeDasharray="2 2"
+            />
+            <g>
+              <circle
+                cx={-5}
+                cy={0}
+                r={1.8}
+                style={{fill: "var(--acton-color-warning)", stroke: "none"}}
+              />
+              <circle
+                cx={0}
+                cy={0}
+                r={1.8}
+                style={{fill: "var(--acton-color-warning)", stroke: "none"}}
+              />
+              <circle
+                cx={5}
+                cy={0}
+                r={1.8}
+                style={{fill: "var(--acton-color-warning)", stroke: "none"}}
+              />
+            </g>
+            <foreignObject
+              width={TREE_EDGE_LABEL.width}
+              height={traceGapError ? 96 : TREE_EDGE_LABEL.height}
+              x={TREE_EDGE_LABEL.x}
+              y={TREE_EDGE_LABEL.y}
             >
-              SYS
-            </text>
-          ) : (
-            <text
-              fill="var(--acton-color-text)"
-              strokeWidth="0"
-              x="0"
-              y="5"
-              fontSize="14"
-              fontWeight="bold"
-              textAnchor="middle"
-              className={styles.nodeText}
+              <div className={`${styles.edgeText} ${styles.traceGapLabel}`}>
+                <div className={styles.topText}>
+                  <p className={`${styles.edgeTextTitle} ${styles.traceGapTitle}`}>
+                    Trace unavailable
+                  </p>
+                  <p className={`${styles.edgeTextContent} ${styles.traceGapCount}`}>
+                    {omittedLabel}
+                  </p>
+                </div>
+                {canLoadTraceGap && (
+                  <div className={`${styles.bottomText} ${styles.traceGapAction}`}>
+                    <InlineButton
+                      variant="utility"
+                      className={styles.traceGapButton}
+                      leadingIcon={
+                        traceGapActionLabel === "Restore path" ? (
+                          <Route size={11} />
+                        ) : (
+                          <GitBranch size={11} />
+                        )
+                      }
+                      disabled={traceGapLoading}
+                      aria-busy={traceGapLoading || undefined}
+                      title={
+                        traceGapActionLabel === "Restore path"
+                          ? "Restore up to 10 causal transactions from Toncenter"
+                          : "Load up to 10 more transactions from Toncenter"
+                      }
+                      onClick={event => {
+                        event.stopPropagation()
+                        handleTraceGapLoad()
+                      }}
+                    >
+                      {traceGapLoading ? "Loading…" : (traceGapActionLabel ?? "Load 10")}
+                    </InlineButton>
+                  </div>
+                )}
+                {traceGapError && (
+                  <p className={styles.traceGapError} role="alert">
+                    {traceGapError}
+                  </p>
+                )}
+              </div>
+            </foreignObject>
+          </g>
+        )
+      }
+
+      if (nodeDatum.attributes?.isExternalOut) {
+        const parentId = nodeDatum.attributes.parentId as string
+        const externalOutAriaLabel = `External-out message from transaction ${parentId}`
+        const externalOutDestination = nodeDatum.attributes.destination as string
+        const createdLt = nodeDatum.attributes.createdLt as string
+
+        return (
+          <g>
+            <foreignObject
+              width="4"
+              height="6"
+              x="-20"
+              y="-3"
+              className={styles.foreignObjectContainer}
             >
-              {(nodeDatum.attributes?.contractLetter as string) || "?"}
-            </text>
-          )}
-          {isTraceGapContinuation && (
+              <svg
+                width="4"
+                height="6"
+                viewBox="0 0 4 5"
+                xmlns="http://www.w3.org/2000/svg"
+                className={styles.iconSvg}
+              >
+                <title>External Out</title>
+                <path
+                  d="M0.400044 0.549983C0.648572 0.218612 1.11867 0.151455 1.45004 0.399983L3.45004 1.89998C3.6389 2.04162 3.75004 2.26392 3.75004 2.49998C3.75004 2.73605 3.6389 2.95834 3.45004 3.09998L1.45004 4.59998C1.11867 4.84851 0.648572 4.78135 0.400044 4.44998C0.151516 4.11861 0.218673 3.64851 0.550044 3.39998L1.75004 2.49998L0.550044 1.59998C0.218673 1.35145 0.151516 0.881354 0.400044 0.549983Z"
+                  fill="var(--acton-color-text-subtle)"
+                ></path>
+              </svg>
+            </foreignObject>
+
+            <circle
+              r={15}
+              role="button"
+              tabIndex={0}
+              aria-label={externalOutAriaLabel}
+              fill="transparent"
+              stroke="var(--acton-color-border)"
+              strokeWidth={1}
+              className={styles.nodeCircle}
+              onClick={() => {
+                handleExternalOutClick(parentId)
+              }}
+              onKeyDown={event => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault()
+                  handleExternalOutClick(parentId)
+                }
+              }}
+            />
+
             <foreignObject
               width={TREE_EDGE_LABEL.width}
               height={TREE_EDGE_LABEL.height}
               x={TREE_EDGE_LABEL.x}
               y={TREE_EDGE_LABEL.y}
             >
-              <div className={styles.edgeText} role="note">
+              <div className={styles.edgeText}>
                 <div className={styles.topText}>
-                  <p className={styles.edgeTextTitle} aria-label={nodeDatum.name}>
-                    {shortenMiddle(nodeDatum.name, {maxLength: TREE_ACCOUNT_LABEL_MAX_LENGTH})}
-                  </p>
-                  <p className={styles.edgeTextContent}>—</p>
+                  <p className={styles.edgeTextTitle}>{externalOutDestination}</p>
+                  <p className={styles.edgeTextContent}>Lt: {createdLt}</p>
                 </div>
                 <div className={styles.bottomText}>
-                  <p className={styles.edgeTextContent}>—</p>
+                  <p className={styles.edgeTextContent}>Type: external-out</p>
                 </div>
               </div>
             </foreignObject>
-          )}
-        </g>
-      )
-    }
-
-    if (nodeDatum.attributes?.isTraceGap) {
-      const omittedLabel = nodeDatum.attributes.omittedLabel as string
-
-      return (
-        <g className={styles.traceGapNode}>
-          <title>Trace unavailable · {omittedLabel}</title>
-          <circle
-            r={15}
-            fill="var(--acton-color-surface)"
-            stroke="var(--acton-color-warning)"
-            strokeWidth={1.5}
-            strokeDasharray="2 2"
-          />
-          <g>
-            <circle
-              cx={-5}
-              cy={0}
-              r={1.8}
-              style={{fill: "var(--acton-color-warning)", stroke: "none"}}
-            />
-            <circle
-              cx={0}
-              cy={0}
-              r={1.8}
-              style={{fill: "var(--acton-color-warning)", stroke: "none"}}
-            />
-            <circle
-              cx={5}
-              cy={0}
-              r={1.8}
-              style={{fill: "var(--acton-color-warning)", stroke: "none"}}
-            />
           </g>
-          <foreignObject
-            width={TREE_EDGE_LABEL.width}
-            height={traceGapError ? 96 : TREE_EDGE_LABEL.height}
-            x={TREE_EDGE_LABEL.x}
-            y={TREE_EDGE_LABEL.y}
-          >
-            <div className={`${styles.edgeText} ${styles.traceGapLabel}`}>
-              <div className={styles.topText}>
-                <p className={`${styles.edgeTextTitle} ${styles.traceGapTitle}`}>
-                  Trace unavailable
-                </p>
-                <p className={`${styles.edgeTextContent} ${styles.traceGapCount}`}>
-                  {omittedLabel}
-                </p>
-              </div>
-              {onTraceGapLoad && (
-                <div className={`${styles.bottomText} ${styles.traceGapAction}`}>
-                  <InlineButton
-                    variant="utility"
-                    className={styles.traceGapButton}
-                    leadingIcon={
-                      traceGapActionLabel === "Restore path" ? (
-                        <Route size={11} />
-                      ) : (
-                        <GitBranch size={11} />
-                      )
-                    }
-                    disabled={traceGapLoading}
-                    aria-busy={traceGapLoading || undefined}
-                    title={
-                      traceGapActionLabel === "Restore path"
-                        ? "Restore up to 10 causal transactions from Toncenter"
-                        : "Load up to 10 more transactions from Toncenter"
-                    }
-                    onClick={event => {
-                      event.stopPropagation()
-                      onTraceGapLoad()
-                    }}
-                  >
-                    {traceGapLoading ? "Loading…" : (traceGapActionLabel ?? "Load 10")}
-                  </InlineButton>
-                </div>
-              )}
-              {traceGapError && (
-                <p className={styles.traceGapError} role="alert">
-                  {traceGapError}
-                </p>
-              )}
-            </div>
-          </foreignObject>
-        </g>
-      )
-    }
+        )
+      }
 
-    if (nodeDatum.attributes?.isExternalOut) {
-      const parentId = nodeDatum.attributes.parentId as string
-      const parentTx = transactionMap.get(parentId)
-      const externalOutAriaLabel = `External-out message from transaction ${parentId}`
-
-      const externalOutMessage = [...(parentTx?.transaction.outMessages.values() ?? [])].find(
-        message => message.info.type === "external-out",
-      )
-      const externalOutDestination =
-        externalOutMessage?.info.type === "external-out"
-          ? (externalOutMessage.info.dest?.toString() ?? "External")
-          : "External"
-      const createdLt =
-        externalOutMessage?.info.type === "external-out"
-          ? externalOutMessage.info.createdLt.toString()
-          : ""
+      const opcode = (nodeDatum.attributes?.opcode as string | undefined) ?? "empty opcode"
+      const id = nodeDatum.attributes?.id as string
+      const isActionHighlighted = nodeDatum.attributes?.isActionHighlighted as boolean
+      const exitCode = (nodeDatum.attributes?.exitCode as string | undefined) ?? "0"
+      const hasFailureDetails = exitCode !== "0"
+      const successMark = nodeDatum.attributes?.success as string | undefined
+      const isFailed = successMark !== "✓"
+      const nodeCircleClassName = [
+        styles.nodeCircle,
+        isActionHighlighted ? styles.nodeCircleActionHighlighted : undefined,
+      ]
+        .filter(Boolean)
+        .join(" ")
+      const transactionNodeClassName = [
+        isFailed ? styles.transactionNodeFailed : undefined,
+        isActionHighlighted ? styles.transactionNodeActionHighlighted : undefined,
+      ]
+        .filter(Boolean)
+        .join(" ")
 
       return (
-        <g>
+        <g data-transaction-id={id} className={transactionNodeClassName}>
           <foreignObject
             width="4"
             height="6"
@@ -943,245 +1177,163 @@ export function TransactionTree({
               xmlns="http://www.w3.org/2000/svg"
               className={styles.iconSvg}
             >
-              <title>External Out</title>
+              <title>Incoming Message</title>
               <path
                 d="M0.400044 0.549983C0.648572 0.218612 1.11867 0.151455 1.45004 0.399983L3.45004 1.89998C3.6389 2.04162 3.75004 2.26392 3.75004 2.49998C3.75004 2.73605 3.6389 2.95834 3.45004 3.09998L1.45004 4.59998C1.11867 4.84851 0.648572 4.78135 0.400044 4.44998C0.151516 4.11861 0.218673 3.64851 0.550044 3.39998L1.75004 2.49998L0.550044 1.59998C0.218673 1.35145 0.151516 0.881354 0.400044 0.549983Z"
                 fill="var(--acton-color-text-subtle)"
               ></path>
             </svg>
           </foreignObject>
-
           <circle
             r={15}
             role="button"
             tabIndex={0}
-            aria-label={externalOutAriaLabel}
-            fill="transparent"
-            stroke="var(--acton-color-border)"
-            strokeWidth={1}
-            className={styles.nodeCircle}
+            aria-label={`Transaction ${id}`}
+            aria-pressed={false}
+            fill={
+              isActionHighlighted
+                ? "var(--transaction-tree-action-highlight-fill)"
+                : isFailed
+                  ? "var(--transaction-tree-failed-node-fill)"
+                  : "var(--acton-color-surface)"
+            }
+            stroke={
+              isActionHighlighted
+                ? "var(--transaction-tree-action-highlight-stroke)"
+                : isFailed
+                  ? "var(--transaction-tree-failed-node-stroke)"
+                  : "var(--acton-color-text)"
+            }
+            strokeWidth={isActionHighlighted || isFailed ? 2 : 1.5}
             onClick={() => {
-              handleExternalOutClick(parentId)
+              handleNodeClick(id)
             }}
             onKeyDown={event => {
               if (event.key === "Enter" || event.key === " ") {
-                handleExternalOutClick(parentId)
+                event.preventDefault()
+                handleNodeClick(id)
               }
             }}
+            onMouseEnter={event => {
+              showNodeTransactionTooltip(event, id)
+            }}
+            onMouseLeave={() => {
+              hideTooltip()
+            }}
+            className={nodeCircleClassName}
           />
 
+          <text
+            fill={
+              isActionHighlighted
+                ? "var(--transaction-tree-action-highlight-text)"
+                : isFailed
+                  ? "var(--transaction-tree-failed-node-text)"
+                  : "var(--acton-color-text)"
+            }
+            strokeWidth="0"
+            x="0"
+            y="5"
+            fontSize="14"
+            fontWeight="bold"
+            textAnchor="middle"
+            className={styles.nodeText}
+          >
+            {nodeDatum.attributes?.contractLetter as string}
+          </text>
+          {isFailed && (
+            // biome-ignore lint/a11y/noAriaHiddenOnFocusable: This failure badge is purely decorative.
+            <g className={styles.failedBadge} aria-hidden="true">
+              <circle
+                cx={10}
+                cy={10}
+                r={5.4}
+                fill="var(--transaction-tree-failed-badge-fill)"
+                stroke="var(--transaction-tree-failed-badge-stroke)"
+                strokeWidth={0.75}
+              />
+              <rect
+                x={9.05}
+                y={6.5}
+                width={1.9}
+                height={4.4}
+                rx={0.95}
+                strokeWidth={0}
+                fill="var(--transaction-tree-failed-badge-text)"
+                stroke="var(--transaction-tree-failed-badge-mark-stroke)"
+              />
+              <circle
+                cx={10}
+                cy={12.7}
+                r={0.9}
+                strokeWidth={0}
+                fill="var(--transaction-tree-failed-badge-text)"
+                stroke="var(--transaction-tree-failed-badge-mark-stroke)"
+              />
+            </g>
+          )}
           <foreignObject
             width={TREE_EDGE_LABEL.width}
-            height={TREE_EDGE_LABEL.height}
+            height={hasFailureDetails ? TREE_EDGE_LABEL.failedHeight : TREE_EDGE_LABEL.height}
             x={TREE_EDGE_LABEL.x}
             y={TREE_EDGE_LABEL.y}
           >
-            <div className={styles.edgeText}>
+            <div
+              className={styles.edgeText}
+              role="note"
+              onMouseEnter={event => {
+                showEdgeTransactionTooltip(event, id)
+              }}
+              onMouseLeave={() => {
+                hideTooltip()
+              }}
+            >
               <div className={styles.topText}>
-                <p className={styles.edgeTextTitle}>{externalOutDestination}</p>
-                <p className={styles.edgeTextContent}>Lt: {createdLt}</p>
+                <p className={styles.edgeTextTitle} aria-label={nodeDatum.name}>
+                  {shortenMiddle(nodeDatum.name, {maxLength: TREE_ACCOUNT_LABEL_MAX_LENGTH})}
+                </p>
+                {nodeDatum.attributes?.value && (
+                  <p className={styles.edgeTextContent}>{nodeDatum.attributes.value as string}</p>
+                )}
               </div>
               <div className={styles.bottomText}>
-                <p className={styles.edgeTextContent}>Type: external-out</p>
+                <p className={styles.edgeTextContent}>{opcode}</p>
+                {hasFailureDetails && (
+                  <p className={styles.edgeTextContent}>
+                    Exit: {exitCode} | Success: {successMark === "✓" ? "true" : "false"}
+                  </p>
+                )}
               </div>
             </div>
           </foreignObject>
         </g>
       )
-    }
+    },
+    [
+      canLoadTraceGap,
+      handleExternalOutClick,
+      handleNodeClick,
+      handleTraceGapLoad,
+      hideTooltip,
+      showEdgeTransactionTooltip,
+      showNodeTransactionTooltip,
+      showSourceContractTooltip,
+      showTooltip,
+      traceGapActionLabel,
+      traceGapError,
+      traceGapLoading,
+    ],
+  )
 
-    const opcode = (nodeDatum.attributes?.opcode as string | undefined) ?? "empty opcode"
-    const isSelected = nodeDatum.attributes?.isSelected as boolean
-    const id = nodeDatum.attributes?.id as string
-    const tx = transactionMap.get(id)
-    const isActionHighlighted = nodeDatum.attributes?.isActionHighlighted as boolean
-    const exitCode = (nodeDatum.attributes?.exitCode as string | undefined) ?? "0"
-    const hasFailureDetails = exitCode !== "0"
-    const successMark = nodeDatum.attributes?.success as string | undefined
-    const isFailed = successMark !== "✓"
-    const nodeCircleClassName = [
-      styles.nodeCircle,
-      isSelected ? styles.nodeCircleSelected : undefined,
-      isActionHighlighted ? styles.nodeCircleActionHighlighted : undefined,
-    ]
-      .filter(Boolean)
-      .join(" ")
+  useLayoutEffect(() => {
+    updateExpandedTransaction(selectedTransactionId)
+  }, [selectedTransactionId, updateExpandedTransaction])
 
-    return (
-      <g>
-        <foreignObject
-          width="4"
-          height="6"
-          x="-20"
-          y="-3"
-          className={styles.foreignObjectContainer}
-        >
-          <svg
-            width="4"
-            height="6"
-            viewBox="0 0 4 5"
-            xmlns="http://www.w3.org/2000/svg"
-            className={styles.iconSvg}
-          >
-            <title>Incoming Message</title>
-            <path
-              d="M0.400044 0.549983C0.648572 0.218612 1.11867 0.151455 1.45004 0.399983L3.45004 1.89998C3.6389 2.04162 3.75004 2.26392 3.75004 2.49998C3.75004 2.73605 3.6389 2.95834 3.45004 3.09998L1.45004 4.59998C1.11867 4.84851 0.648572 4.78135 0.400044 4.44998C0.151516 4.11861 0.218673 3.64851 0.550044 3.39998L1.75004 2.49998L0.550044 1.59998C0.218673 1.35145 0.151516 0.881354 0.400044 0.549983Z"
-              fill="var(--acton-color-text-subtle)"
-            ></path>
-          </svg>
-        </foreignObject>
-        <circle
-          r={15}
-          role="button"
-          tabIndex={0}
-          aria-label={`Transaction ${id}`}
-          fill={
-            isActionHighlighted
-              ? "var(--transaction-tree-action-highlight-fill)"
-              : isFailed
-                ? "var(--transaction-tree-failed-node-fill)"
-                : isSelected
-                  ? "var(--acton-color-text)"
-                  : "var(--acton-color-surface)"
-          }
-          stroke={
-            isActionHighlighted
-              ? "var(--transaction-tree-action-highlight-stroke)"
-              : isFailed
-                ? "var(--transaction-tree-failed-node-stroke)"
-                : "var(--acton-color-text)"
-          }
-          strokeWidth={isActionHighlighted || isFailed ? 2 : 1.5}
-          onClick={() => {
-            handleNodeClick(id)
-          }}
-          onKeyDown={event => {
-            if (event.key === "Enter" || event.key === " ") {
-              handleNodeClick(id)
-            }
-          }}
-          onMouseEnter={event => {
-            if (!tx) return
-            showNodeTransactionTooltip(event, tx)
-          }}
-          onMouseLeave={() => {
-            hideTooltip()
-          }}
-          className={nodeCircleClassName}
-        />
-
-        <text
-          fill={
-            isActionHighlighted
-              ? "var(--transaction-tree-action-highlight-text)"
-              : isFailed
-                ? "var(--transaction-tree-failed-node-text)"
-                : isSelected
-                  ? "var(--acton-color-surface)"
-                  : "var(--acton-color-text)"
-          }
-          strokeWidth="0"
-          x="0"
-          y="5"
-          fontSize="14"
-          fontWeight="bold"
-          textAnchor="middle"
-          className={styles.nodeText}
-        >
-          {nodeDatum.attributes?.contractLetter as string}
-        </text>
-        {isFailed && (
-          // biome-ignore lint/a11y/noAriaHiddenOnFocusable: This failure badge is purely decorative.
-          <g className={styles.failedBadge} aria-hidden="true">
-            <circle
-              cx={10}
-              cy={10}
-              r={5.4}
-              fill="var(--transaction-tree-failed-badge-fill)"
-              stroke="var(--transaction-tree-failed-badge-stroke)"
-              strokeWidth={0.75}
-            />
-            <rect
-              x={9.05}
-              y={6.5}
-              width={1.9}
-              height={4.4}
-              rx={0.95}
-              strokeWidth={0}
-              fill="var(--transaction-tree-failed-badge-text)"
-              stroke="var(--transaction-tree-failed-badge-mark-stroke)"
-            />
-            <circle
-              cx={10}
-              cy={12.7}
-              r={0.9}
-              strokeWidth={0}
-              fill="var(--transaction-tree-failed-badge-text)"
-              stroke="var(--transaction-tree-failed-badge-mark-stroke)"
-            />
-          </g>
-        )}
-        <foreignObject
-          width={TREE_EDGE_LABEL.width}
-          height={hasFailureDetails ? TREE_EDGE_LABEL.failedHeight : TREE_EDGE_LABEL.height}
-          x={TREE_EDGE_LABEL.x}
-          y={TREE_EDGE_LABEL.y}
-        >
-          <div
-            className={styles.edgeText}
-            role="note"
-            onMouseEnter={event => {
-              if (!tx) return
-              showEdgeTransactionTooltip(event, tx)
-            }}
-            onMouseLeave={() => {
-              hideTooltip()
-            }}
-          >
-            <div className={styles.topText}>
-              <p className={styles.edgeTextTitle} aria-label={nodeDatum.name}>
-                {shortenMiddle(nodeDatum.name, {maxLength: TREE_ACCOUNT_LABEL_MAX_LENGTH})}
-              </p>
-              {nodeDatum.attributes?.value && (
-                <p className={styles.edgeTextContent}>{nodeDatum.attributes.value as string}</p>
-              )}
-            </div>
-            <div className={styles.bottomText}>
-              <p className={styles.edgeTextContent}>{opcode}</p>
-              {hasFailureDetails && (
-                <p className={styles.edgeTextContent}>
-                  Exit: {exitCode} | Success: {successMark === "✓" ? "true" : "false"}
-                </p>
-              )}
-            </div>
-          </div>
-        </foreignObject>
-      </g>
-    )
-  }
-
-  const getDynamicPathClass = ({source, target}: TreeLinkDatum): string => {
-    const attributes = target.data.attributes
-    if (attributes?.isTraceGap || source.data.attributes?.isTraceGap) {
-      return `${styles.edgeStyle} ${styles.edgeStyleTraceGap}`
-    }
-    if (attributes?.withInitCode) {
-      return `${styles.edgeStyle} ${styles.edgeStyleWithInit}`
-    }
-    if (attributes?.isBounced) {
-      return `${styles.edgeStyle} ${styles.edgeStyleBounced}`
-    }
-
-    return styles.edgeStyle
-  }
-
-  useEffect(() => {
-    setSelectedTransactionIdState(selectedTransactionId)
-  }, [selectedTransactionId])
-
-  const selectedTransaction = useMemo(() => {
-    return selectedTransactionIdState ? transactionMap.get(selectedTransactionIdState) : undefined
-  }, [selectedTransactionIdState, transactionMap])
+  const deferredExpandedTransactionId = useDeferredValue(expandedTransactionId)
+  const selectedTransaction =
+    deferredExpandedTransactionId === expandedTransactionId && deferredExpandedTransactionId
+      ? transactionMap.get(deferredExpandedTransactionId)
+      : undefined
 
   useLayoutEffect(() => {
     const wrapper = treeWrapperRef.current
@@ -1229,18 +1381,32 @@ export function TransactionTree({
   useLayoutEffect(() => {
     const container = treeContainerRef.current
     const wrapper = treeWrapperRef.current
-    const selectedId = selectedTransactionIdState
+    const selectedId = expandedTransactionId
+    selectedNodeRef.current?.classList.remove(styles.transactionNodeSelected)
+    selectedNodeRef.current
+      ?.querySelector<SVGCircleElement>('circle[aria-label^="Transaction "]')
+      ?.setAttribute("aria-pressed", "false")
+    selectedNodeRef.current = null
+
     if (!container || !wrapper || !selectedId) {
       return
     }
 
-    const selectedNode = [
-      ...wrapper.querySelectorAll<SVGCircleElement>('circle[aria-label^="Transaction "]'),
-    ].find(node => node.getAttribute("aria-label") === `Transaction ${selectedId}`)
-
-    if (!selectedNode) {
+    // react-d3-tree invalidates every Node when its data changes. Selection is a visual overlay,
+    // so update only the matching SVG group and keep the structural tree data immutable.
+    const selectedNodeGroup = wrapper.querySelector<SVGGElement>(
+      `g[data-transaction-id="${CSS.escape(selectedId)}"]`,
+    )
+    const selectedNode = selectedNodeGroup?.querySelector<SVGCircleElement>(
+      'circle[aria-label^="Transaction "]',
+    )
+    if (!selectedNodeGroup || !selectedNode) {
       return
     }
+
+    selectedNodeGroup.classList.add(styles.transactionNodeSelected)
+    selectedNode.setAttribute("aria-pressed", "true")
+    selectedNodeRef.current = selectedNodeGroup
 
     const containerRect = container.getBoundingClientRect()
     const nodeRect = selectedNode.getBoundingClientRect()
@@ -1262,7 +1428,7 @@ export function TransactionTree({
     if (Math.abs(container.scrollLeft - nextScrollLeft) > 1) {
       container.scrollTo({left: nextScrollLeft})
     }
-  }, [selectedTransactionIdState, treeLayout])
+  }, [expandedTransactionId, renderCustomNodeElement, treeData, treeLayout])
 
   useLayoutEffect(() => {
     const container = treeContainerRef.current
@@ -1328,40 +1494,10 @@ export function TransactionTree({
           ref={treeWrapperRef}
           style={{width: `${treeLayout.width}px`}}
         >
-          <Tree
+          <TransactionTreeCanvas
             data={treeData}
-            orientation="horizontal"
-            pathFunc={event => {
-              const t = event.target.data.attributes ?? {}
-              return t.isFirst
-                ? "M"
-                    .concat(event.source.y.toString(), ",")
-                    .concat(event.source.x.toString(), "V")
-                    .concat((event.target.x + 10).toString(), "a10 10 0 0 1 10 -10H")
-                    .concat((event.target.y - 18).toString())
-                : t.isLast
-                  ? "M"
-                      .concat(event.source.y.toString(), ",")
-                      .concat(event.source.x.toString(), "V")
-                      .concat((event.target.x - 10).toString(), "a10 10 0 0 0 10 10H")
-                      .concat((event.target.y - 18).toString())
-                  : "M"
-                      .concat(event.source.y.toString(), ",")
-                      .concat(event.source.x.toString(), "V")
-                      .concat(event.target.x.toString(), "H")
-                      .concat((event.target.y - 18).toString())
-            }}
-            nodeSize={TREE_NODE_SIZE}
-            separation={TREE_SEPARATION}
-            renderCustomNodeElement={renderCustomNodeElement}
-            pathClassFunc={getDynamicPathClass}
             translate={treeLayout.translate}
-            zoom={1}
-            enableLegacyTransitions={false}
-            collapsible={false}
-            zoomable={false}
-            draggable={false}
-            scaleExtent={{min: 1, max: 1}}
+            renderNode={renderCustomNodeElement}
           />
           {tooltip && triggerRectReference.current && (
             <SmartTooltip
@@ -1383,7 +1519,7 @@ export function TransactionTree({
       {selectedTransaction && (
         <div className={styles.transactionDetails}>
           <div className={styles.transactionDetailsCard}>
-            <TransactionDetails
+            <MemoizedTransactionDetails
               tx={selectedTransaction}
               contracts={contracts}
               compilerAbisByCodeHash={compilerAbisByCodeHash}
@@ -1404,6 +1540,8 @@ export function TransactionTree({
     </div>
   )
 }
+
+export const TransactionTree = memo(TransactionTreeComponent)
 
 function formatAddress(address: Address | undefined, contracts: Map<string, ContractData>): string {
   if (!address) {

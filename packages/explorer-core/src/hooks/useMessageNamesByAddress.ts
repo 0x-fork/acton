@@ -57,7 +57,7 @@ export function useMessageNamesByAddress({
 
     const loadMessageNames = async () => {
       if (requestedAddresses.length === 0) {
-        setCompilerAbiByAddress(new Map())
+        setCompilerAbiByAddress(current => (current.size === 0 ? current : new Map()))
         return
       }
 

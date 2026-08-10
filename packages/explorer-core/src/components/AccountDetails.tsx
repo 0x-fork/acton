@@ -1,7 +1,7 @@
 import {
-  Fragment,
   Suspense,
   lazy,
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -1785,6 +1785,178 @@ interface ActionHistoryRowsProps {
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
 }
 
+interface ActionHistoryRowViewProps {
+  readonly row: HistoryActionRow
+  readonly nowSeconds: number
+  readonly timeFormat: AccountTimeFormat
+  readonly isAddressHovered: boolean
+  readonly isHighlighted: boolean
+  readonly continuesTrace: boolean
+  readonly continuesFromTrace: boolean
+  readonly traceLoadMore?: ActionTraceLoadMoreState
+  readonly showTimeColumn: boolean
+  readonly interactiveRows: boolean
+  readonly standardTable: boolean
+  readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
+  readonly onAddressHoverChange: (address: string | undefined) => void
+  readonly onActionHoverChange?: (action: V3Action | undefined) => void
+  readonly onLoadMoreActionTrace?: (traceId: string) => void
+  readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
+}
+
+const ActionHistoryRowView = memo(function ActionHistoryRowView({
+  row: {action, info},
+  nowSeconds,
+  timeFormat,
+  isAddressHovered,
+  isHighlighted,
+  continuesTrace,
+  continuesFromTrace,
+  traceLoadMore,
+  showTimeColumn,
+  interactiveRows,
+  standardTable,
+  onAddressClick,
+  onAddressHoverChange,
+  onActionHoverChange,
+  onLoadMoreActionTrace,
+  onTransactionClick,
+}: ActionHistoryRowViewProps): JSX.Element {
+  const canOpenTransaction =
+    interactiveRows && info.transactionHash !== undefined && onTransactionClick !== undefined
+  const ActionIcon = getHistoryActionIcon(action, info)
+  const Cell = standardTable ? DataTableCell : "td"
+  const rowContent = (
+    <>
+      {showTimeColumn && (
+        <Cell className={`${styles.time} ${styles.timeColumn}`} data-mobile-area="time">
+          {!continuesFromTrace && (
+            <TransactionTime nowSeconds={nowSeconds} timeFormat={timeFormat} utime={info.utime} />
+          )}
+        </Cell>
+      )}
+      <Cell className={styles.actionColumn} data-mobile-area="action">
+        <div className={styles.action}>
+          <ActionIcon className={styles.actionIcon} aria-hidden="true" />
+          <span
+            className={`${styles.actionText} ${styles.opcode}`}
+            title={action.type ?? info.actionLabel}
+          >
+            {info.actionLabel}
+          </span>
+        </div>
+      </Cell>
+      <Cell data-mobile-area="address">
+        <div className={styles.addressWrapper}>
+          {info.relationLabel && (
+            <span className={styles.addressRelation}>{info.relationLabel}</span>
+          )}
+          {info.address ? (
+            <ExplorerAddressChip
+              address={info.address}
+              fallback={info.displayAddressFallback}
+              highlighted={isAddressHovered}
+              onAddressClick={onAddressClick}
+              onHoverAddressChange={onAddressHoverChange}
+            />
+          ) : (
+            <span className={styles.addressFallback}>{info.displayAddressFallback}</span>
+          )}
+        </div>
+      </Cell>
+      <Cell className={styles.technicalColumn} data-mobile-area="technical">
+        <HistoryTechnicalCell technicalLabel={info.technicalLabel} />
+      </Cell>
+      <Cell className={styles.valueContainer} data-mobile-area="value">
+        <div className={styles.historyValueStack}>
+          {info.valueLines.map((line, lineIndex) => (
+            <HistoryValueCellLine
+              key={`${info.rowKey}:value:${lineIndex}`}
+              line={line}
+              onAddressClick={onAddressClick}
+            />
+          ))}
+        </div>
+      </Cell>
+    </>
+  )
+
+  const rowClassName = standardTable
+    ? `${isHighlighted ? styles.newTransactionRow : ""}`
+    : `${styles.row} ${interactiveRows ? "" : styles.rowStatic} ${
+        canOpenTransaction ? styles.clickableRow : ""
+      } ${isHighlighted ? styles.newTransactionRow : ""} ${
+        continuesTrace ? styles.actionChainContinues : ""
+      } ${continuesFromTrace ? styles.actionChainContinuation : ""}`
+  const rowProps = {
+    className: rowClassName,
+    onClick: canOpenTransaction
+      ? (event: MouseEvent<HTMLTableRowElement>) => {
+          if (info.transactionHash) onTransactionClick(info.transactionHash, event)
+        }
+      : undefined,
+    tabIndex: canOpenTransaction ? 0 : undefined,
+    onKeyDown: canOpenTransaction
+      ? (event: ReactKeyboardEvent<HTMLTableRowElement>) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault()
+            event.currentTarget.click()
+          }
+        }
+      : undefined,
+    onMouseEnter: onActionHoverChange ? () => onActionHoverChange(action) : undefined,
+    onMouseLeave: onActionHoverChange ? () => onActionHoverChange(undefined) : undefined,
+  }
+
+  const actionRow = standardTable ? (
+    <DataTableRow interactive={canOpenTransaction} {...rowProps}>
+      {rowContent}
+    </DataTableRow>
+  ) : (
+    <tr {...rowProps}>{rowContent}</tr>
+  )
+
+  const traceId = action.trace_id?.trim()
+  if (!traceId || !traceLoadMore?.hasMore || !onLoadMoreActionTrace) {
+    return actionRow
+  }
+
+  return (
+    <>
+      {actionRow}
+      <tr className={styles.actionTraceLoadMoreRow}>
+        <td colSpan={showTimeColumn ? 5 : 4}>
+          <div className={styles.actionTraceLoadMore}>
+            {traceLoadMore.error ? (
+              <span className={styles.actionTraceLoadMoreError} role="alert">
+                {traceLoadMore.error}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              className={styles.actionTraceLoadMoreText}
+              disabled={traceLoadMore.loading}
+              onClick={event => {
+                event.stopPropagation()
+                onLoadMoreActionTrace(traceId)
+              }}
+            >
+              {traceLoadMore.loading
+                ? "Loading actions..."
+                : traceLoadMore.error
+                  ? "Retry loading actions"
+                  : getActionTraceLoadMoreLabel(traceLoadMore)}
+              {!traceLoadMore.loading && !traceLoadMore.error ? (
+                <ChevronDown size={14} aria-hidden="true" />
+              ) : null}
+            </button>
+          </div>
+        </td>
+      </tr>
+    </>
+  )
+})
+
 export function ActionHistoryRows({
   rows,
   nowSeconds,
@@ -1803,154 +1975,39 @@ export function ActionHistoryRows({
 
   return (
     <>
-      {rows.map(({action, info}, index) => {
+      {rows.map((row, index) => {
+        const {action, info} = row
         const isAddressHovered =
           hoveredAddress && info.address ? isSameAddress(info.address, hoveredAddress) : false
         const isHighlighted =
           highlightedTransactionHashSet !== undefined &&
           info.transactionHashes.some(hash => highlightedTransactionHashSet.has(hash))
-        const canOpenTransaction =
-          interactiveRows && info.transactionHash !== undefined && onTransactionClick !== undefined
-        const ActionIcon = getHistoryActionIcon(action, info)
         const continuesTrace = isSameActionTrace(action, rows[index + 1]?.action)
         const continuesFromTrace = isSameActionTrace(rows[index - 1]?.action, action)
-        const Cell = standardTable ? DataTableCell : "td"
-        const rowContent = (
-          <>
-            {showTimeColumn && (
-              <Cell className={`${styles.time} ${styles.timeColumn}`} data-mobile-area="time">
-                {!continuesFromTrace && (
-                  <TransactionTime
-                    nowSeconds={nowSeconds}
-                    timeFormat={timeFormat}
-                    utime={info.utime}
-                  />
-                )}
-              </Cell>
-            )}
-            <Cell className={styles.actionColumn} data-mobile-area="action">
-              <div className={styles.action}>
-                <ActionIcon className={styles.actionIcon} aria-hidden="true" />
-                <span
-                  className={`${styles.actionText} ${styles.opcode}`}
-                  title={action.type ?? info.actionLabel}
-                >
-                  {info.actionLabel}
-                </span>
-              </div>
-            </Cell>
-            <Cell data-mobile-area="address">
-              <div className={styles.addressWrapper}>
-                {info.relationLabel && (
-                  <span className={styles.addressRelation}>{info.relationLabel}</span>
-                )}
-                {info.address ? (
-                  <ExplorerAddressChip
-                    address={info.address}
-                    fallback={info.displayAddressFallback}
-                    highlighted={isAddressHovered}
-                    onAddressClick={onAddressClick}
-                    onHoverAddressChange={setHoveredAddress}
-                  />
-                ) : (
-                  <span className={styles.addressFallback}>{info.displayAddressFallback}</span>
-                )}
-              </div>
-            </Cell>
-            <Cell className={styles.technicalColumn} data-mobile-area="technical">
-              <HistoryTechnicalCell technicalLabel={info.technicalLabel} />
-            </Cell>
-            <Cell className={styles.valueContainer} data-mobile-area="value">
-              <div className={styles.historyValueStack}>
-                {info.valueLines.map((line, lineIndex) => (
-                  <HistoryValueCellLine
-                    key={`${info.rowKey}:value:${lineIndex}`}
-                    line={line}
-                    onAddressClick={onAddressClick}
-                  />
-                ))}
-              </div>
-            </Cell>
-          </>
-        )
-
-        const rowClassName = standardTable
-          ? `${isHighlighted ? styles.newTransactionRow : ""}`
-          : `${styles.row} ${interactiveRows ? "" : styles.rowStatic} ${
-              canOpenTransaction ? styles.clickableRow : ""
-            } ${isHighlighted ? styles.newTransactionRow : ""} ${
-              continuesTrace ? styles.actionChainContinues : ""
-            } ${continuesFromTrace ? styles.actionChainContinuation : ""}`
-        const rowProps = {
-          className: rowClassName,
-          onClick: canOpenTransaction
-            ? (event: MouseEvent<HTMLTableRowElement>) => {
-                if (info.transactionHash) onTransactionClick(info.transactionHash, event)
-              }
-            : undefined,
-          tabIndex: canOpenTransaction ? 0 : undefined,
-          onKeyDown: canOpenTransaction
-            ? (event: ReactKeyboardEvent<HTMLTableRowElement>) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault()
-                  event.currentTarget.click()
-                }
-              }
-            : undefined,
-          onMouseEnter: onActionHoverChange ? () => onActionHoverChange(action) : undefined,
-          onMouseLeave: onActionHoverChange ? () => onActionHoverChange(undefined) : undefined,
-        }
-
-        const actionRow = standardTable ? (
-          <DataTableRow key={info.rowKey} interactive={canOpenTransaction} {...rowProps}>
-            {rowContent}
-          </DataTableRow>
-        ) : (
-          <tr key={info.rowKey} {...rowProps}>
-            {rowContent}
-          </tr>
-        )
-
         const traceId = action.trace_id?.trim()
         const traceLoadMore =
           !standardTable && !continuesTrace && traceId ? actionTracesLoadMore[traceId] : undefined
-        if (!traceId || !traceLoadMore?.hasMore || !onLoadMoreActionTrace) {
-          return actionRow
-        }
 
         return (
-          <Fragment key={info.rowKey}>
-            {actionRow}
-            <tr className={styles.actionTraceLoadMoreRow}>
-              <td colSpan={showTimeColumn ? 5 : 4}>
-                <div className={styles.actionTraceLoadMore}>
-                  {traceLoadMore.error ? (
-                    <span className={styles.actionTraceLoadMoreError} role="alert">
-                      {traceLoadMore.error}
-                    </span>
-                  ) : null}
-                  <button
-                    type="button"
-                    className={styles.actionTraceLoadMoreText}
-                    disabled={traceLoadMore.loading}
-                    onClick={event => {
-                      event.stopPropagation()
-                      onLoadMoreActionTrace(traceId)
-                    }}
-                  >
-                    {traceLoadMore.loading
-                      ? "Loading actions..."
-                      : traceLoadMore.error
-                        ? "Retry loading actions"
-                        : getActionTraceLoadMoreLabel(traceLoadMore)}
-                    {!traceLoadMore.loading && !traceLoadMore.error ? (
-                      <ChevronDown size={14} aria-hidden="true" />
-                    ) : null}
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </Fragment>
+          <ActionHistoryRowView
+            key={info.rowKey}
+            row={row}
+            nowSeconds={nowSeconds}
+            timeFormat={timeFormat}
+            isAddressHovered={isAddressHovered}
+            isHighlighted={isHighlighted}
+            continuesTrace={continuesTrace}
+            continuesFromTrace={continuesFromTrace}
+            traceLoadMore={traceLoadMore}
+            showTimeColumn={showTimeColumn}
+            interactiveRows={interactiveRows}
+            standardTable={standardTable}
+            onAddressClick={onAddressClick}
+            onAddressHoverChange={setHoveredAddress}
+            onActionHoverChange={onActionHoverChange}
+            onLoadMoreActionTrace={onLoadMoreActionTrace}
+            onTransactionClick={onTransactionClick}
+          />
         )
       })}
     </>
@@ -1971,7 +2028,7 @@ function getActionTraceLoadMoreLabel(state: ActionTraceLoadMoreState): string {
   return `Load ${state.loadCount} more out of ${remainingCount}`
 }
 
-interface ActionHistoryTableProps {
+interface ActionHistoryTableBaseProps {
   readonly actions: readonly V3Action[]
   readonly actionMetadata?: V3Metadata
   readonly resolveDecodedMessageNames?: (
@@ -1979,24 +2036,31 @@ interface ActionHistoryTableProps {
   ) => ReadonlyMap<string, string>
   readonly ownerAddress: string
   readonly client: TonClient
-  readonly nowSeconds: number
   readonly timeFormat?: AccountTimeFormat
   readonly emptyState?: string
   readonly className?: string
-  readonly showTimeColumn?: boolean
   readonly interactiveRows?: boolean
   readonly mobileCards?: boolean
   readonly previewLimit?: number
+  readonly resolveMessageNames?: boolean
   readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
   readonly onActionHoverChange?: (action: V3Action | undefined) => void
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
 }
 
+type ActionHistoryTableProps = ActionHistoryTableBaseProps &
+  (
+    | {readonly showTimeColumn: false; readonly nowSeconds?: never}
+    | {readonly showTimeColumn?: true; readonly nowSeconds: number}
+  )
+
 const EMPTY_DECODED_MESSAGE_NAMES_BY_TRANSACTION_HASH: ReadonlyMap<string, string> = new Map()
+const EMPTY_ACTION_MESSAGE_NAME_ADDRESSES: readonly string[] = []
+const EMPTY_ACTION_METADATA: V3Metadata = {}
 
 export function ActionHistoryTable({
   actions,
-  actionMetadata = {},
+  actionMetadata = EMPTY_ACTION_METADATA,
   resolveDecodedMessageNames,
   ownerAddress,
   client,
@@ -2008,17 +2072,22 @@ export function ActionHistoryTable({
   interactiveRows = true,
   mobileCards = false,
   previewLimit,
+  resolveMessageNames = true,
   onAddressClick,
   onActionHoverChange,
   onTransactionClick,
 }: ActionHistoryTableProps): JSX.Element {
-  const [previewExpanded, setPreviewExpanded] = useState(false)
+  const [visiblePreviewPages, setVisiblePreviewPages] = useState(1)
   const normalizedPreviewLimit =
     previewLimit !== undefined && previewLimit > 0 ? Math.floor(previewLimit) : undefined
   const hasPreview = normalizedPreviewLimit !== undefined && actions.length > normalizedPreviewLimit
+  const visiblePreviewLimit = normalizedPreviewLimit
+    ? normalizedPreviewLimit * visiblePreviewPages
+    : actions.length
+  const previewExpanded = visiblePreviewLimit >= actions.length
   const visibleActions = useMemo(
-    () => (hasPreview && !previewExpanded ? actions.slice(0, normalizedPreviewLimit + 1) : actions),
-    [actions, hasPreview, normalizedPreviewLimit, previewExpanded],
+    () => (hasPreview && !previewExpanded ? actions.slice(0, visiblePreviewLimit + 1) : actions),
+    [actions, hasPreview, previewExpanded, visiblePreviewLimit],
   )
   const decodedMessageNamesByTransactionHash = useMemo(
     () =>
@@ -2034,25 +2103,50 @@ export function ActionHistoryTable({
   const messageNamesByAddress = useMessageNamesByAddress({
     client,
     metadataRegistry,
-    addresses: actionAddresses,
+    addresses: resolveMessageNames ? actionAddresses : EMPTY_ACTION_MESSAGE_NAME_ADDRESSES,
   })
-  const rows = useMemo(
+  const rowCache = useMemo(
     () =>
-      buildHistoryActionRows(
-        visibleActions,
-        ownerAddress,
-        actionMetadata,
-        messageNamesByAddress,
-        decodedMessageNamesByTransactionHash,
-      ),
-    [
-      visibleActions,
-      actionMetadata,
-      decodedMessageNamesByTransactionHash,
-      messageNamesByAddress,
-      ownerAddress,
-    ],
+      new WeakMap<
+        V3Action,
+        {
+          readonly decodedMessageName: string | undefined
+          readonly index: number
+          readonly row: HistoryActionRow
+        }
+      >(),
+    [actionMetadata, messageNamesByAddress, ownerAddress],
   )
+  const rows = useMemo(() => {
+    return visibleActions.map((action, index) => {
+      const decodedMessageName = getDecodedMessageName(action, decodedMessageNamesByTransactionHash)
+      const cached = rowCache.get(action)
+      if (cached?.index === index && cached.decodedMessageName === decodedMessageName) {
+        return cached.row
+      }
+
+      const row = {
+        action,
+        info: getHistoryActionInfo(
+          action,
+          ownerAddress,
+          actionMetadata,
+          messageNamesByAddress,
+          decodedMessageNamesByTransactionHash,
+          index,
+        ),
+      } satisfies HistoryActionRow
+      rowCache.set(action, {decodedMessageName, index, row})
+      return row
+    })
+  }, [
+    visibleActions,
+    actionMetadata,
+    decodedMessageNamesByTransactionHash,
+    messageNamesByAddress,
+    ownerAddress,
+    rowCache,
+  ])
 
   return (
     <DataTable
@@ -2063,7 +2157,9 @@ export function ActionHistoryTable({
           ? {
               expanded: previewExpanded,
               itemLabel: "actions",
-              onExpandedChange: setPreviewExpanded,
+              onExpandedChange: expanded => {
+                setVisiblePreviewPages(current => (expanded ? current + 1 : 1))
+              },
             }
           : undefined
       }
@@ -2086,7 +2182,7 @@ export function ActionHistoryTable({
           ) : (
             <ActionHistoryRows
               rows={rows}
-              nowSeconds={nowSeconds}
+              nowSeconds={nowSeconds ?? 0}
               timeFormat={timeFormat}
               showTimeColumn={showTimeColumn}
               interactiveRows={interactiveRows}
@@ -2363,9 +2459,7 @@ function getHistoryActionInfo(
   const transactionHashes = action.transactions.filter(isNonEmptyString)
   const normalizedTransactionHashes = transactionHashes.map(hashToHex).filter(isNonEmptyString)
   const transactionHash = normalizedTransactionHashes[0]
-  const decodedMessageName = normalizedTransactionHashes
-    .map(hash => decodedMessageNamesByTransactionHash.get(hash.toLowerCase()))
-    .find(isNonEmptyString)
+  const decodedMessageName = getDecodedMessageName(action, decodedMessageNamesByTransactionHash)
   const technicalLabel = getHistoryActionTechnicalLabel(action, messageNamesByAddress)
 
   return {
@@ -2386,6 +2480,17 @@ function getHistoryActionInfo(
         : technicalLabel,
     valueLines: display.valueLines,
   }
+}
+
+function getDecodedMessageName(
+  action: V3Action,
+  decodedMessageNamesByTransactionHash: ReadonlyMap<string, string>,
+): string | undefined {
+  return action.transactions
+    .map(hashToHex)
+    .filter(isNonEmptyString)
+    .map(hash => decodedMessageNamesByTransactionHash.get(hash.toLowerCase()))
+    .find(isNonEmptyString)
 }
 
 function buildHistoryActionRows(

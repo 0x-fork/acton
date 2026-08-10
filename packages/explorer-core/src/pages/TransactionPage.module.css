@@ -284,6 +284,16 @@
   --trace-line-color: var(--acton-color-text-subtle);
 }
 
+.transactionPreviewToggle {
+  display: flex;
+  justify-content: center;
+  padding: var(--acton-space-4);
+}
+
+.transactionPreviewToggleButton {
+  color: var(--acton-color-accent);
+}
+
 .skeletonOverviewTable {
   display: flex;
   flex-direction: column;

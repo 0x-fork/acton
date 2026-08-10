@@ -20,7 +20,6 @@ interface UseTooltipReturn {
   readonly showTooltip: (data: Omit<TooltipData, "id">) => void
   readonly hideTooltip: (force?: boolean) => void
   readonly forceHideTooltip: () => void
-  readonly isTooltipHovered: boolean
   readonly setIsTooltipHovered: (hovered: boolean) => void
   readonly calculateOptimalPosition: (
     triggerRect: DOMRect,
@@ -31,7 +30,7 @@ interface UseTooltipReturn {
 
 export function useTooltip(): UseTooltipReturn {
   const [tooltip, setTooltip] = useState<TooltipData | undefined>()
-  const [isTooltipHovered, setIsTooltipHovered] = useState(false)
+  const isTooltipHoveredRef = useRef(false)
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const tooltipIdRef = useRef(0)
 
@@ -134,32 +133,32 @@ export function useTooltip(): UseTooltipReturn {
 
   const hideTooltip = useCallback(
     (force = false) => {
-      if (!force && isTooltipHovered) {
+      if (!force && isTooltipHoveredRef.current) {
         return
       }
 
       clearHideTimeout()
       hideTimeoutRef.current = setTimeout(() => {
         setTooltip(undefined)
-        setIsTooltipHovered(false)
+        isTooltipHoveredRef.current = false
       }, 0)
     },
-    [isTooltipHovered, clearHideTimeout],
+    [clearHideTimeout],
   )
 
   const forceHideTooltip = useCallback(() => {
     clearHideTimeout()
     setTooltip(undefined)
-    setIsTooltipHovered(false)
+    isTooltipHoveredRef.current = false
   }, [clearHideTimeout])
 
   const setIsTooltipHoveredWithClear = useCallback(
     (hovered: boolean) => {
       if (hovered) {
         clearHideTimeout()
-        setIsTooltipHovered(true)
+        isTooltipHoveredRef.current = true
       } else {
-        setIsTooltipHovered(false)
+        isTooltipHoveredRef.current = false
         hideTooltip(true)
       }
     },
@@ -177,7 +176,6 @@ export function useTooltip(): UseTooltipReturn {
     showTooltip,
     hideTooltip,
     forceHideTooltip,
-    isTooltipHovered,
     setIsTooltipHovered: setIsTooltipHoveredWithClear,
     calculateOptimalPosition,
   }

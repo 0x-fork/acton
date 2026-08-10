@@ -178,9 +178,7 @@ test("external-out graph node selects its parent transaction", async ({fanoutGra
 
   await openFanoutGraphScenario(page, scenario)
 
-  const selectedNode = page.locator(
-    'circle[aria-label^="Transaction "][class*="nodeCircleSelected"]',
-  )
+  const selectedNode = page.locator('circle[aria-label^="Transaction "][aria-pressed="true"]')
   const selectedParent = await selectedNode.getAttribute("aria-label")
   const externalOutNode = page.getByRole("button", {
     name: /^External-out message from transaction /,

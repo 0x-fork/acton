@@ -1,5 +1,5 @@
-import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
-import type {ComponentProps, CSSProperties, FC, JSX} from "react"
+import {memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
+import type {ComponentProps, CSSProperties, FC, JSX, ReactNode} from "react"
 import {
   type ContractVerifiedSource,
   type ContractData,
@@ -14,7 +14,7 @@ import {
   decodeStorageShardAccount,
   type ValueFlowItem,
 } from "@acton/transaction-ui"
-import {DateTime, formatCountLabel, InlineAction, Tooltip} from "@acton/ui"
+import {DateTime, formatCountLabel, InlineAction, InlineButton, Tooltip} from "@acton/ui"
 import {
   AlertCircle,
   ArrowLeft,
@@ -101,7 +101,36 @@ export const parseTransactionTraceTabType = (
 
 const MAX_TRACE_TREE_FLOW_WIDTH = 1800
 const WIDE_TRACE_TREE_TRANSACTION_THRESHOLD = 7
+const ACTION_TREE_HIGHLIGHT_TRANSACTION_THRESHOLD = 50
+const ACTION_ABI_ENRICHMENT_TRANSACTION_LIMIT = 50
 const TRACE_TABLE_PREVIEW_LIMIT = 10
+const EMPTY_BACKEND_CONTRACTS = [] as const
+const EMPTY_TRACE_ACTIONS: readonly V3Action[] = []
+const EMPTY_TRACE_ACTION_METADATA: V3Metadata = {}
+const DEFAULT_TRACE_STATUS_LABELS = {
+  success: "Confirmed transaction",
+  error: "Failed transaction",
+} as const
+const MemoizedActionHistoryTable = memo(ActionHistoryTable)
+
+const RetainedTabPanel: FC<{
+  readonly active: boolean
+  readonly children: ReactNode
+}> = ({active, children}) => {
+  const [hasBeenActive, setHasBeenActive] = useState(active)
+
+  useEffect(() => {
+    if (active) {
+      setHasBeenActive(true)
+    }
+  }, [active])
+
+  if (!active && !hasBeenActive) {
+    return null
+  }
+
+  return <div hidden={!active}>{children}</div>
+}
 
 const normalizeTransactionReference = (reference: string): string => {
   return hashToHex(reference) ?? reference.trim().toLowerCase()
@@ -134,10 +163,17 @@ export const transactionExecutionCodeHash = (tx: TransactionInfo): string | unde
   tx.transaction.inMessage?.init?.code?.hash().toString("hex") ??
   tx.codeHashAfter
 
-const transactionReferenceKeys = (tx: TransactionInfo): readonly string[] => {
-  return [tx.id, transactionHashHex(tx), tx.lt, tx.transaction.lt.toString()].map(
-    normalizeTransactionReference,
-  )
+const transactionReferenceKeys = (
+  tx: TransactionInfo,
+  transactionHash = transactionHashHex(tx),
+): readonly string[] => {
+  return [
+    ...new Set(
+      [tx.id, transactionHash, tx.lt, tx.transaction.lt.toString()].map(
+        normalizeTransactionReference,
+      ),
+    ),
+  ]
 }
 
 interface TraceTransactionNodeProps {
@@ -145,6 +181,7 @@ interface TraceTransactionNodeProps {
   readonly contracts: Map<string, ContractData>
   readonly compilerAbisByCodeHash: ReadonlyMap<string, ContractData["abi"]>
   readonly verifiedSourcesByCodeHash: ReadonlyMap<string, ContractVerifiedSource>
+  readonly visibleTransactionIds?: ReadonlySet<string>
   readonly isIntermediateSibling?: boolean
   readonly onContractClick: (address: string) => void
   readonly getBlockPath: (blockRef: TransactionBlockRef) => string | undefined
@@ -335,9 +372,14 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     readonly isLoading: boolean
     readonly error?: string
   }>({isLoading: false})
-  const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
   const fetchNameRef = useRef(fetchName)
   const addressFormatRef = useRef(addressFormat)
+  const navigationRef = useRef({
+    hash,
+    search: searchParams.toString(),
+    routes,
+    navigate,
+  })
   const loadedActionsByHashRef = useRef(new Map<string, LoadedTransactionActions>())
   const stateChangesRequestedHashRef = useRef<string | undefined>(undefined)
   const traceLookupHashRef = useRef(traceLookupHash)
@@ -357,84 +399,116 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   // react-doctor-disable-next-line react-doctor/no-ref-current-in-render -- keeps async trace loading scoped to the latest trace lookup
   traceLookupHashRef.current = traceLookupHash
 
-  const handleContractClick = (address: string, event?: ExplorerNavigationClickEvent) => {
-    openExplorerPath(navigate, routes.addressPath(address), event)
-  }
-  const handleBlockClick = (
-    blockRef: TransactionBlockRef,
-    event?: ExplorerNavigationClickEvent,
-  ) => {
-    openExplorerPath(navigate, blockPath(blockRef), event)
-  }
+  useLayoutEffect(() => {
+    navigationRef.current = {
+      hash,
+      search: searchParams.toString(),
+      routes,
+      navigate,
+    }
+  }, [hash, navigate, routes, searchParams])
 
-  const handleActiveTabChange = (tab: TransactionTraceTabType) => {
-    setActiveTab(tab)
-    setHoveredAction(undefined)
-    setSearchParams(
-      currentSearchParams => {
-        const nextSearchParams = new URLSearchParams(currentSearchParams)
-        nextSearchParams.set("tab", tab)
-        return nextSearchParams
-      },
-      {replace: true},
-    )
-  }
+  const handleContractClick = useCallback(
+    (address: string, event?: ExplorerNavigationClickEvent) => {
+      const {navigate: currentNavigate, routes: currentRoutes} = navigationRef.current
+      openExplorerPath(currentNavigate, currentRoutes.addressPath(address), event)
+    },
+    [],
+  )
+  const handleBlockClick = useCallback(
+    (blockRef: TransactionBlockRef, event?: ExplorerNavigationClickEvent) => {
+      openExplorerPath(navigationRef.current.navigate, blockPath(blockRef), event)
+    },
+    [],
+  )
 
-  const handleRetrace = (txHash: string) => {
+  const handleActiveTabChange = useCallback(
+    (tab: TransactionTraceTabType) => {
+      setActiveTab(tab)
+      setHoveredAction(undefined)
+      setSearchParams(
+        currentSearchParams => {
+          const nextSearchParams = new URLSearchParams(currentSearchParams)
+          nextSearchParams.set("tab", tab)
+          return nextSearchParams
+        },
+        {replace: true},
+      )
+    },
+    [setSearchParams],
+  )
+
+  const handleRetrace = useCallback((txHash: string) => {
     setExpandedRetraceHash(txHash)
     setRetraceAttempt(currentAttempt => currentAttempt + 1)
-  }
+  }, [])
 
-  const handleEmulate = (tx: TransactionInfo, messageName: string | undefined) => {
-    const message = tx.transaction.inMessage
-    if (!message) {
-      return
-    }
+  const handleEmulate = useCallback(
+    (tx: TransactionInfo, messageName: string | undefined) => {
+      const message = tx.transaction.inMessage
+      if (!message) {
+        return
+      }
 
-    const sourceAbi =
-      message.info.type === "internal" ? contracts.get(message.info.src.toString())?.abi : undefined
-    const state = createEmulateNavigationState(
-      message,
-      {destination: tx.contractAbi, source: sourceAbi},
-      traceOverview?.masterchainSeqnoStart,
-      messageName,
-    )
-    const payloadId = saveEmulateNavigationPayload(state.emulatePayload)
-    if (!payloadId) {
-      void navigate(routes.emulatePath, {state})
-      return
-    }
+      const sourceAbi =
+        message.info.type === "internal"
+          ? contracts.get(message.info.src.toString())?.abi
+          : undefined
+      const state = createEmulateNavigationState(
+        message,
+        {destination: tx.contractAbi, source: sourceAbi},
+        traceOverview?.masterchainSeqnoStart,
+        messageName,
+      )
+      const payloadId = saveEmulateNavigationPayload(state.emulatePayload)
+      if (!payloadId) {
+        const {navigate: currentNavigate, routes: currentRoutes} = navigationRef.current
+        void currentNavigate(currentRoutes.emulatePath, {state})
+        return
+      }
 
-    const emulateUrl = new URL(routes.emulatePath, globalThis.location.origin)
-    emulateUrl.searchParams.set(EMULATE_HANDOFF_QUERY_PARAM, payloadId)
-    const networkParam = new URLSearchParams(globalThis.location.search).get("network")
-    if (networkParam) {
-      emulateUrl.searchParams.set("network", networkParam)
-    }
-    globalThis.open(emulateUrl.toString(), "_blank", "noopener,noreferrer")
-  }
+      const {routes: currentRoutes, search} = navigationRef.current
+      const emulateUrl = new URL(currentRoutes.emulatePath, globalThis.location.origin)
+      emulateUrl.searchParams.set(EMULATE_HANDOFF_QUERY_PARAM, payloadId)
+      const networkParam = new URLSearchParams(search).get("network")
+      if (networkParam) {
+        emulateUrl.searchParams.set("network", networkParam)
+      }
+      globalThis.open(emulateUrl.toString(), "_blank", "noopener,noreferrer")
+    },
+    [contracts, traceOverview?.masterchainSeqnoStart],
+  )
 
-  const handleCloseRetrace = () => {
-    setExpandedRetraceHash(undefined)
-    if (openRetraceOnLoad) {
-      void navigate(routes.transactionPath(hash), {replace: true})
-    }
-  }
+  const handleCloseRetrace = useCallback(
+    (txHash: string) => {
+      setExpandedRetraceHash(undefined)
+      if (openRetraceOnLoad) {
+        const {navigate: currentNavigate, routes: currentRoutes} = navigationRef.current
+        void currentNavigate(currentRoutes.transactionPath(txHash), {replace: true})
+      }
+    },
+    [openRetraceOnLoad],
+  )
 
   const handleTransactionSelect = useCallback(
     (tx: TransactionInfo) => {
       const txHash = transactionHashHex(tx)
-      if (txHash.toLowerCase() === hash.toLowerCase()) {
+      const {
+        hash: currentHash,
+        navigate: currentNavigate,
+        routes: currentRoutes,
+        search,
+      } = navigationRef.current
+      if (txHash.toLowerCase() === currentHash.toLowerCase()) {
         return
       }
 
-      const search = searchParams.toString()
       const path = openRetraceOnLoad
-        ? routes.transactionTracePath(txHash)
-        : routes.transactionPath(txHash)
-      void navigate(search ? `${path}?${search}` : path)
+        ? currentRoutes.transactionTracePath(txHash)
+        : currentRoutes.transactionPath(txHash)
+      void currentNavigate(search ? `${path}?${search}` : path)
     },
-    [hash, navigate, openRetraceOnLoad, routes, searchParams],
+    [openRetraceOnLoad],
   )
 
   const handleToggleFavorite = useCallback(() => {
@@ -489,18 +563,6 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   useEffect(() => {
     setActiveTab(parseTransactionTraceTabType(searchParams.get("tab"), supportsTraceActions))
   }, [searchParams, supportsTraceActions])
-
-  useEffect(() => {
-    if (activeTab !== "event-overview" || traceActions.length === 0) {
-      return
-    }
-
-    const updateNow = () => setNowSeconds(Math.floor(Date.now() / 1000))
-    updateNow()
-
-    const interval = globalThis.setInterval(updateNow, 5000)
-    return () => globalThis.clearInterval(interval)
-  }, [activeTab, traceActions.length])
 
   useEffect(() => {
     if (!hash || traceLookupHash.toLowerCase() === hash.toLowerCase() || selectedTraceTransaction) {
@@ -807,6 +869,78 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     }
   }, [activeTab, network, traceLookupHash, traces.length])
 
+  const renderSelectedTransactionMessageRouteAction = useCallback(
+    (tx: TransactionInfo, messageName: string | undefined): JSX.Element => {
+      const txHash = transactionHashHex(tx)
+      const isRetraceOpen = expandedRetraceHash === txHash
+
+      return (
+        <span className={styles.messageRouteActions}>
+          <Tooltip
+            content={isRetraceOpen ? "Close transaction debugger" : "Open transaction debugger"}
+          >
+            <button
+              type="button"
+              className={`${styles.retraceInlineButton} ${isRetraceOpen ? styles.retraceInlineButtonActive : ""}`}
+              onClick={() => handleRetrace(txHash)}
+              aria-expanded={isRetraceOpen}
+            >
+              <Bug size={14} />
+              Debug
+            </button>
+          </Tooltip>
+          {tx.transaction.inMessage ? (
+            <Tooltip content="Open and edit this message in Emulate">
+              <button
+                type="button"
+                className={styles.retraceInlineButton}
+                onClick={() => handleEmulate(tx, messageName)}
+              >
+                <FlaskConical size={14} />
+                Edit &amp; emulate
+              </button>
+            </Tooltip>
+          ) : null}
+        </span>
+      )
+    },
+    [expandedRetraceHash, handleEmulate, handleRetrace],
+  )
+
+  const renderSelectedTransactionExtra = useCallback(
+    (tx: TransactionInfo): JSX.Element | null => {
+      const txHash = transactionHashHex(tx)
+      if (expandedRetraceHash !== txHash) {
+        return null
+      }
+
+      return (
+        <div className={styles.selectedRetraceSection}>
+          <TransactionRetracePanel
+            key={`${txHash}:${retraceAttempt}`}
+            metadataRegistry={metadataRegistry}
+            txHash={txHash}
+            codeHash={transactionExecutionCodeHash(tx)}
+            contractAbi={tx.contractAbi}
+            contracts={contracts}
+            onClose={() => handleCloseRetrace(txHash)}
+            onContractClick={handleContractClick}
+            onResult={handleRetraceResult}
+          />
+        </div>
+      )
+    },
+    [
+      contracts,
+      expandedRetraceHash,
+      handleCloseRetrace,
+      handleContractClick,
+      handleRetraceResult,
+      metadataRegistry,
+      retraceAttempt,
+    ],
+  )
+
   if (loading) {
     return showLoadingSkeleton ? (
       <TransactionTraceSkeleton activeTab={activeTab} showEventOverview={supportsTraceActions} />
@@ -827,70 +961,11 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
 
   const traceAddress = traces[0]?.address?.toString() ?? ""
   const traceAddressDisplay = normalizeAddress(traceAddress, addressFormat)
-  const renderSelectedTransactionMessageRouteAction = (
-    tx: TransactionInfo,
-    messageName: string | undefined,
-  ): JSX.Element => {
-    const txHash = transactionHashHex(tx)
-    const isRetraceOpen = expandedRetraceHash === txHash
-
-    return (
-      <span className={styles.messageRouteActions}>
-        <Tooltip
-          content={isRetraceOpen ? "Close transaction debugger" : "Open transaction debugger"}
-        >
-          <button
-            type="button"
-            className={`${styles.retraceInlineButton} ${isRetraceOpen ? styles.retraceInlineButtonActive : ""}`}
-            onClick={() => handleRetrace(txHash)}
-            aria-expanded={isRetraceOpen}
-          >
-            <Bug size={14} />
-            Debug
-          </button>
-        </Tooltip>
-        {tx.transaction.inMessage ? (
-          <Tooltip content="Open and edit this message in Emulate">
-            <button
-              type="button"
-              className={styles.retraceInlineButton}
-              onClick={() => handleEmulate(tx, messageName)}
-            >
-              <FlaskConical size={14} />
-              Edit &amp; emulate
-            </button>
-          </Tooltip>
-        ) : null}
-      </span>
-    )
-  }
-
-  const renderSelectedTransactionExtra = (tx: TransactionInfo): JSX.Element | null => {
-    const txHash = transactionHashHex(tx)
-    if (expandedRetraceHash !== txHash) {
-      return null
-    }
-
-    return (
-      <div className={styles.selectedRetraceSection}>
-        <TransactionRetracePanel
-          key={`${txHash}:${retraceAttempt}`}
-          metadataRegistry={metadataRegistry}
-          txHash={txHash}
-          codeHash={transactionExecutionCodeHash(tx)}
-          contractAbi={tx.contractAbi}
-          contracts={contracts}
-          onClose={handleCloseRetrace}
-          onContractClick={handleContractClick}
-          onResult={handleRetraceResult}
-        />
-      </div>
-    )
-  }
 
   return (
     <TransactionTraceView
       client={client}
+      traceKey={traceOverview?.traceId ?? traceLookupHash}
       hash={hash}
       traces={traces}
       contracts={contracts}
@@ -909,7 +984,6 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       traceGapLoading={traceGapLoading}
       traceGapError={traceGapError}
       hoveredAction={hoveredAction}
-      nowSeconds={nowSeconds}
       breadcrumbs={[
         {
           label: traceAddressDisplay,
@@ -946,6 +1020,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
 
 export interface TransactionTraceViewProps {
   readonly client?: TonClient
+  readonly traceKey: string
   readonly hash: string
   readonly traces: readonly TransactionInfo[]
   readonly contracts: Map<string, ContractData>
@@ -968,7 +1043,6 @@ export interface TransactionTraceViewProps {
     readonly error: string
   }
   readonly hoveredAction?: V3Action
-  readonly nowSeconds?: number
   readonly breadcrumbs?: ComponentProps<typeof ExplorerBreadcrumbs>["items"]
   readonly isFavorite?: boolean
   readonly stateChangesLoading?: boolean
@@ -993,7 +1067,16 @@ export interface TransactionTraceViewProps {
   ) => JSX.Element
 }
 
+type TransactionTraceSessionProps = Omit<TransactionTraceViewProps, "traceKey">
+
 export function TransactionTraceView({
+  traceKey,
+  ...sessionProps
+}: TransactionTraceViewProps): JSX.Element {
+  return <TransactionTraceSession key={traceKey} {...sessionProps} />
+}
+
+function TransactionTraceSession({
   client,
   hash,
   traces,
@@ -1003,8 +1086,8 @@ export function TransactionTraceView({
   valueFlow,
   activeTab,
   supportsTraceActions = false,
-  traceActions = [],
-  traceActionMetadata = {},
+  traceActions = EMPTY_TRACE_ACTIONS,
+  traceActionMetadata = EMPTY_TRACE_ACTION_METADATA,
   traceOverview,
   traceWarning,
   originatingTransaction,
@@ -1012,12 +1095,8 @@ export function TransactionTraceView({
   traceGapActionLabel,
   traceGapLoading = false,
   traceGapError,
-  statusLabels = {
-    success: "Confirmed transaction",
-    error: "Failed transaction",
-  },
+  statusLabels = DEFAULT_TRACE_STATUS_LABELS,
   hoveredAction,
-  nowSeconds = Math.floor(Date.now() / 1000),
   breadcrumbs,
   isFavorite = false,
   stateChangesLoading = false,
@@ -1034,58 +1113,102 @@ export function TransactionTraceView({
   resolveVerifiedSourceByCodeHash,
   renderSelectedTransactionExtra,
   renderSelectedTransactionMessageRouteAction,
-}: TransactionTraceViewProps): JSX.Element {
+}: TransactionTraceSessionProps): JSX.Element {
   const [hoveredShardTransactionIds, setHoveredShardTransactionIds] = useState<
     ReadonlySet<string> | undefined
   >()
   const {flowMetrics: treeFlowMetrics, rootRef: treeSectionRef} =
     useAvailableFlowMetrics<HTMLDivElement>(MAX_TRACE_TREE_FLOW_WIDTH)
-  const rootTraceTransactions = [...traces]
-    .filter(tx => !tx.parent)
-    .sort(compareTransactionInfoByLt)
+  const rootTraceTransactions = useMemo(
+    () => [...traces].filter(tx => !tx.parent).sort(compareTransactionInfoByLt),
+    [traces],
+  )
+  const traceTransactionsByReference = useMemo(() => {
+    const index = new Map<
+      string,
+      Array<{readonly transaction: TransactionInfo; readonly hash: string}>
+    >()
+    for (const transaction of traces) {
+      const transactionHash = transactionHashHex(transaction).toLowerCase()
+      const entry = {transaction, hash: transactionHash}
+      for (const reference of transactionReferenceKeys(transaction, transactionHash)) {
+        const entries = index.get(reference)
+        if (entries) {
+          entries.push(entry)
+        } else {
+          index.set(reference, [entry])
+        }
+      }
+    }
+    return index
+  }, [traces])
+  const traceTransactionByHash = useMemo(() => {
+    const index = new Map<string, TransactionInfo>()
+    for (const transaction of traces) {
+      index.set(transactionHashHex(transaction).toLowerCase(), transaction)
+    }
+    return index
+  }, [traces])
   const firstTrace = rootTraceTransactions[0] ?? traces[0]
   const traceSucceeded = isTraceSuccessful(traces, traceActions)
   const traceAddress = firstTrace?.address?.toString() ?? ""
-  const selectedTraceTransaction = traces.find(
-    tx => transactionHashHex(tx).toLowerCase() === hash.toLowerCase(),
-  )
+  const selectedTraceTransaction = traceTransactionByHash.get(hash.toLowerCase())
   const selectedTransactionId = selectedTraceTransaction?.id
-  const resolveDecodedMessageNames = useCallback(
-    (actions: readonly V3Action[]): ReadonlyMap<string, string> => {
+  const actionTreeHighlightEnabled = traces.length < ACTION_TREE_HIGHLIGHT_TRANSACTION_THRESHOLD
+  const resolveDecodedMessageNames = useMemo(() => {
+    const decodedNameByTransactionId = new Map<string, string | undefined>()
+
+    return (actions: readonly V3Action[]): ReadonlyMap<string, string> => {
       const names = new Map<string, string>()
-      const visibleTransactionReferences = new Set(
-        actions.flatMap(action => action.transactions.map(normalizeTransactionReference)),
-      )
-      for (const tx of traces) {
-        if (!transactionReferenceKeys(tx).some(key => visibleTransactionReferences.has(key))) {
-          continue
-        }
-        const parsedBody = decodeTransactionMessageBody(tx, contracts, [], compilerAbisByCodeHash)
-        if (parsedBody && parsedBody.opcode === undefined) {
-          names.set(transactionHashHex(tx).toLowerCase(), parsedBody.name)
+      const visitedTransactionIds = new Set<string>()
+      for (const action of actions) {
+        for (const reference of action.transactions) {
+          const entries = traceTransactionsByReference.get(normalizeTransactionReference(reference))
+          for (const entry of entries ?? []) {
+            const tx = entry.transaction
+            if (visitedTransactionIds.has(tx.id)) {
+              continue
+            }
+            visitedTransactionIds.add(tx.id)
+
+            if (!decodedNameByTransactionId.has(tx.id)) {
+              const parsedBody = decodeTransactionMessageBody(
+                tx,
+                contracts,
+                EMPTY_BACKEND_CONTRACTS,
+                compilerAbisByCodeHash,
+              )
+              decodedNameByTransactionId.set(
+                tx.id,
+                parsedBody?.opcode === undefined ? parsedBody?.name : undefined,
+              )
+            }
+
+            const decodedName = decodedNameByTransactionId.get(tx.id)
+            if (decodedName) {
+              names.set(entry.hash, decodedName)
+            }
+          }
         }
       }
       return names
-    },
-    [compilerAbisByCodeHash, contracts, traces],
-  )
+    }
+  }, [compilerAbisByCodeHash, contracts, traceTransactionsByReference])
   const actionHighlightedTransactionIds = useMemo(() => {
-    if (!hoveredAction) {
+    if (!actionTreeHighlightEnabled || !hoveredAction) {
       return undefined
     }
 
-    const actionTransactionReferences = new Set(
-      hoveredAction.transactions.map(normalizeTransactionReference),
-    )
     const highlightedIds = new Set<string>()
-    for (const tx of traces) {
-      if (transactionReferenceKeys(tx).some(key => actionTransactionReferences.has(key))) {
-        highlightedIds.add(tx.id)
+    for (const reference of hoveredAction.transactions) {
+      const entries = traceTransactionsByReference.get(normalizeTransactionReference(reference))
+      for (const entry of entries ?? []) {
+        highlightedIds.add(entry.transaction.id)
       }
     }
 
     return highlightedIds.size > 0 ? highlightedIds : undefined
-  }, [hoveredAction, traces])
+  }, [actionTreeHighlightEnabled, hoveredAction, traceTransactionsByReference])
   const highlightedTransactionIds = useMemo(() => {
     if (!actionHighlightedTransactionIds) {
       return hoveredShardTransactionIds
@@ -1112,16 +1235,16 @@ export function TransactionTraceView({
       "--trace-tree-flow-offset": `${treeFlowMetrics.offset}px`,
     } as CSSProperties
   }, [isWideTraceTree, treeFlowMetrics])
-  const renderTraceAddressChip = (
-    address: string,
-    options: {readonly shorten: boolean},
-  ): JSX.Element => (
-    <ExplorerAddressChip
-      address={address}
-      onAddressClick={onContractClick}
-      resolveName={false}
-      shorten={options.shorten}
-    />
+  const renderTraceAddressChip = useCallback(
+    (address: string, options: {readonly shorten: boolean}): JSX.Element => (
+      <ExplorerAddressChip
+        address={address}
+        onAddressClick={onContractClick}
+        resolveName={false}
+        shorten={options.shorten}
+      />
+    ),
+    [onContractClick],
   )
   const showEventOverview = supportsTraceActions && client !== undefined
 
@@ -1187,7 +1310,6 @@ export function TransactionTraceView({
                 <div className={styles.tabContent}>
                   {activeTab === "value-flow" && (
                     <ValueFlowTable
-                      key={`value-flow:${hash}`}
                       items={valueFlow}
                       contracts={contracts}
                       onContractClick={onContractClick}
@@ -1196,24 +1318,33 @@ export function TransactionTraceView({
                     />
                   )}
 
-                  {activeTab === "event-overview" && showEventOverview && (
-                    <ActionHistoryTable
-                      key={`actions:${hash}`}
-                      actions={traceActions}
-                      actionMetadata={traceActionMetadata}
-                      resolveDecodedMessageNames={resolveDecodedMessageNames}
-                      ownerAddress={traceAddress}
-                      client={client}
-                      nowSeconds={nowSeconds}
-                      emptyState="No actions found"
-                      showTimeColumn={false}
-                      interactiveRows={false}
-                      mobileCards
-                      className={styles.valueFlowPanel}
-                      previewLimit={TRACE_TABLE_PREVIEW_LIMIT}
-                      onAddressClick={onContractClick}
-                      onActionHoverChange={onActionHoverChange}
-                    />
+                  {showEventOverview && (
+                    <RetainedTabPanel active={activeTab === "event-overview"}>
+                      <MemoizedActionHistoryTable
+                        actions={traceActions}
+                        actionMetadata={traceActionMetadata}
+                        resolveDecodedMessageNames={
+                          traces.length < ACTION_ABI_ENRICHMENT_TRANSACTION_LIMIT
+                            ? resolveDecodedMessageNames
+                            : undefined
+                        }
+                        resolveMessageNames={
+                          traces.length < ACTION_ABI_ENRICHMENT_TRANSACTION_LIMIT
+                        }
+                        ownerAddress={traceAddress}
+                        client={client}
+                        emptyState="No actions found"
+                        showTimeColumn={false}
+                        interactiveRows={false}
+                        mobileCards
+                        className={styles.valueFlowPanel}
+                        previewLimit={TRACE_TABLE_PREVIEW_LIMIT}
+                        onAddressClick={onContractClick}
+                        onActionHoverChange={
+                          actionTreeHighlightEnabled ? onActionHoverChange : undefined
+                        }
+                      />
+                    </RetainedTabPanel>
                   )}
 
                   {activeTab === "state-changes" && (
@@ -1229,22 +1360,19 @@ export function TransactionTraceView({
                   )}
 
                   {activeTab === "transactions" && (
-                    <div className={styles.detailsList}>
-                      {rootTraceTransactions.map(tx => (
-                        <TraceTransactionNode
-                          key={tx.id}
-                          tx={tx}
-                          contracts={contracts}
-                          compilerAbisByCodeHash={compilerAbisByCodeHash}
-                          verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
-                          onContractClick={onContractClick}
-                          getBlockPath={getBlockPath}
-                          onBlockClick={onBlockClick}
-                          loadActions={loadActions}
-                          resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
-                        />
-                      ))}
-                    </div>
+                    <TraceTransactionList
+                      transactions={rootTraceTransactions}
+                      transactionCount={traces.length}
+                      previewLimit={TRACE_TABLE_PREVIEW_LIMIT}
+                      contracts={contracts}
+                      compilerAbisByCodeHash={compilerAbisByCodeHash}
+                      verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
+                      onContractClick={onContractClick}
+                      getBlockPath={getBlockPath}
+                      onBlockClick={onBlockClick}
+                      loadActions={loadActions}
+                      resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+                    />
                   )}
 
                   {activeTab === "details" && traceOverview && (
@@ -1271,11 +1399,11 @@ export function TransactionTraceView({
               style={treeSectionStyle}
             >
               <TransactionTree
-                transactions={[...traces]}
+                transactions={traces}
                 contracts={contracts}
                 compilerAbisByCodeHash={compilerAbisByCodeHash}
                 verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
-                allContracts={[]}
+                allContracts={EMPTY_BACKEND_CONTRACTS}
                 selectedTransactionId={selectedTransactionId}
                 highlightedTransactionIds={highlightedTransactionIds}
                 originatingTransaction={originatingTransaction}
@@ -1587,11 +1715,83 @@ function TraceTreeSkeleton(): JSX.Element {
   )
 }
 
+type TraceTransactionListProps = Omit<
+  TraceTransactionNodeProps,
+  "isIntermediateSibling" | "tx" | "visibleTransactionIds"
+> & {
+  readonly transactions: readonly TransactionInfo[]
+  readonly transactionCount: number
+  readonly previewLimit: number
+}
+
+const TraceTransactionList: FC<TraceTransactionListProps> = ({
+  transactions,
+  transactionCount,
+  previewLimit,
+  contracts,
+  compilerAbisByCodeHash,
+  verifiedSourcesByCodeHash,
+  onContractClick,
+  getBlockPath,
+  onBlockClick,
+  loadActions,
+  resolveVerifiedSourceByCodeHash,
+}) => {
+  const normalizedPreviewLimit = Math.max(1, Math.floor(previewLimit))
+  const [visibleCount, setVisibleCount] = useState(normalizedPreviewLimit)
+  const hasMore = transactionCount > visibleCount
+  const visibleTransactionIds = useMemo(
+    () => (hasMore ? collectVisibleTraceTransactionIds(transactions, visibleCount) : undefined),
+    [hasMore, transactions, visibleCount],
+  )
+
+  return (
+    <>
+      <div className={styles.detailsList}>
+        {transactions
+          .filter(tx => visibleTransactionIds?.has(tx.id) ?? true)
+          .map(tx => (
+            <TraceTransactionNode
+              key={tx.id}
+              tx={tx}
+              contracts={contracts}
+              compilerAbisByCodeHash={compilerAbisByCodeHash}
+              verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
+              visibleTransactionIds={visibleTransactionIds}
+              onContractClick={onContractClick}
+              getBlockPath={getBlockPath}
+              onBlockClick={onBlockClick}
+              loadActions={loadActions}
+              resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+            />
+          ))}
+      </div>
+      {hasMore ? (
+        <div className={styles.transactionPreviewToggle}>
+          <InlineButton
+            variant="utility"
+            className={styles.transactionPreviewToggleButton}
+            aria-label={`Show ${Math.min(normalizedPreviewLimit, transactionCount - visibleCount)} more transactions`}
+            onClick={() =>
+              setVisibleCount(currentCount =>
+                Math.min(transactionCount, currentCount + normalizedPreviewLimit),
+              )
+            }
+          >
+            Show more
+          </InlineButton>
+        </div>
+      ) : null}
+    </>
+  )
+}
+
 const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
   tx,
   contracts,
   compilerAbisByCodeHash,
   verifiedSourcesByCodeHash,
+  visibleTransactionIds,
   isIntermediateSibling = false,
   onContractClick,
   getBlockPath,
@@ -1602,7 +1802,13 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
   const cardRef = useRef<HTMLDivElement>(null)
   const childrenRef = useRef<HTMLDivElement>(null)
   const [connectorHeight, setConnectorHeight] = useState(24)
-  const children = useMemo(() => [...tx.children].sort(compareTransactionInfoByLt), [tx.children])
+  const children = useMemo(
+    () =>
+      [...tx.children]
+        .sort(compareTransactionInfoByLt)
+        .filter(child => visibleTransactionIds?.has(child.id) ?? true),
+    [tx.children, visibleTransactionIds],
+  )
 
   useLayoutEffect(() => {
     if (children.length === 0) {
@@ -1669,7 +1875,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
             contracts={contracts}
             compilerAbisByCodeHash={compilerAbisByCodeHash}
             verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
-            allContracts={[]}
+            allContracts={EMPTY_BACKEND_CONTRACTS}
             onContractClick={onContractClick}
             getBlockPath={getBlockPath}
             onBlockClick={onBlockClick}
@@ -1696,11 +1902,12 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
         <div ref={childrenRef} className={styles.traceChildren}>
           {children.map((child, index) => (
             <TraceTransactionNode
-              key={child.lt}
+              key={child.id}
               tx={child}
               contracts={contracts}
               compilerAbisByCodeHash={compilerAbisByCodeHash}
               verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
+              visibleTransactionIds={visibleTransactionIds}
               isIntermediateSibling={index < children.length - 1}
               onContractClick={onContractClick}
               getBlockPath={getBlockPath}
@@ -1713,6 +1920,36 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
       )}
     </div>
   )
+}
+
+function collectVisibleTraceTransactionIds(
+  transactions: readonly TransactionInfo[],
+  limit: number,
+): ReadonlySet<string> {
+  const visibleIds = new Set<string>()
+
+  const visit = (tx: TransactionInfo): void => {
+    if (visibleIds.size >= limit) {
+      return
+    }
+
+    visibleIds.add(tx.id)
+    for (const child of [...tx.children].sort(compareTransactionInfoByLt)) {
+      visit(child)
+      if (visibleIds.size >= limit) {
+        break
+      }
+    }
+  }
+
+  for (const tx of transactions) {
+    visit(tx)
+    if (visibleIds.size >= limit) {
+      break
+    }
+  }
+
+  return visibleIds
 }
 
 function compareTransactionInfoByLt(left: TransactionInfo, right: TransactionInfo): number {

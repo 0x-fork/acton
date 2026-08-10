@@ -37,7 +37,7 @@ export function ValueFlowTable({
   className,
   previewLimit,
 }: ValueFlowTableProps): React.JSX.Element {
-  const [previewExpanded, setPreviewExpanded] = useState(false)
+  const [visiblePreviewPages, setVisiblePreviewPages] = useState(1)
   const totalFee = items.reduce((sum, item) => sum + item.fee, 0n)
   const showTotal = items.length > 1
   const assets = collectAssets(items)
@@ -66,8 +66,12 @@ export function ValueFlowTable({
     previewLimit !== undefined && previewLimit > 0 ? Math.floor(previewLimit) : undefined
   const hasPreview =
     normalizedPreviewLimit !== undefined && sortedItems.length > normalizedPreviewLimit
+  const visiblePreviewLimit = normalizedPreviewLimit
+    ? normalizedPreviewLimit * visiblePreviewPages
+    : sortedItems.length
+  const previewExpanded = visiblePreviewLimit >= sortedItems.length
   const visibleItems =
-    hasPreview && !previewExpanded ? sortedItems.slice(0, normalizedPreviewLimit + 1) : sortedItems
+    hasPreview && !previewExpanded ? sortedItems.slice(0, visiblePreviewLimit + 1) : sortedItems
 
   return (
     <DataTable
@@ -78,7 +82,9 @@ export function ValueFlowTable({
           ? {
               expanded: previewExpanded,
               itemLabel: "accounts",
-              onExpandedChange: setPreviewExpanded,
+              onExpandedChange: expanded => {
+                setVisiblePreviewPages(current => (expanded ? current + 1 : 1))
+              },
             }
           : undefined
       }

@@ -2013,6 +2013,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
       <div className={`${styles.page} ${styles.pageReady}`}>
         <section className={styles.resultSection} aria-label="Emulation result">
           <TransactionTraceView
+            traceKey={state.result.trace.trace_id}
             hash={selectedTraceHash}
             traces={state.enrichment.transactions}
             contracts={contracts}
