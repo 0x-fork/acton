@@ -922,9 +922,9 @@ function readCellQuery(): string | null {
 
 function cellQueryValue(result: CellInspectorParseResult): string | undefined {
   return result.status !== "error" &&
-    result.bocBase64 &&
-    result.bocBase64.length <= MAX_CELL_QUERY_LENGTH
-    ? result.bocBase64
+    result.bocHex &&
+    result.bocHex.length <= MAX_CELL_QUERY_LENGTH
+    ? result.bocHex
     : undefined
 }
 

@@ -98,7 +98,7 @@
 .tlbInput {
   resize: vertical;
   padding: 12px 13px;
-  font-family: var(--acton-font-family-mono);
+  font-family: var(--acton-font-mono);
   font-size: var(--acton-font-size-xs);
   line-height: 1.55;
 }
