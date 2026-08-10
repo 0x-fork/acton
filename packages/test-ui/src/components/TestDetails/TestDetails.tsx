@@ -465,7 +465,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
       map.set(addrStr, {
         displayName: backendContract?.display_name ?? name ?? fmt.formatAddress(addrStr),
         address,
-        letter: existing?.letter ?? String.fromCodePoint(65 + (map.size % 26)),
+        letter: existing?.letter ?? fmt.formatContractLetter(map.size),
         abi: backendContract?.abi ?? existing?.abi,
       })
     }

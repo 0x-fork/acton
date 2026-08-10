@@ -1,6 +1,7 @@
 import {
   buildValueFlowItems,
   decodeStorageDataCell,
+  fmt,
   type ContractData,
   type ContractVerifiedSource,
   type TransactionInfo,
@@ -129,7 +130,7 @@ export async function enrichTraceTransactions({
   const contracts = new Map<string, ContractData>()
   await Promise.all(
     traceAddressOrder.map(async (addr, index) => {
-      const letter = String.fromCodePoint(65 + index)
+      const letter = fmt.formatContractLetter(index)
       const displayAddr = normalizeAddress(addr, addressFormat)
       const customName = await fetchName(addr)
       const addressCodeHash =
