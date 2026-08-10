@@ -9,9 +9,6 @@ function ExplorerToolHeader({title}: {readonly title: string}) {
   return (
     <section className={`${styles.container} ${styles.toolHeader}`}>
       <ExplorerBreadcrumbs items={[{label: title}]} />
-      <header className={styles.hero}>
-        <h1 className={styles.title}>{title}</h1>
-      </header>
     </section>
   )
 }
