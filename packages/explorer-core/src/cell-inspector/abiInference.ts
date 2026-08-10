@@ -20,7 +20,10 @@ export function inferAbiByOpcode(
   cell: Cell,
   candidates: readonly AbiInferenceCandidate[],
 ): AbiInferenceResult {
-  if (cell.bits.length < 32) return {}
+  // Exotic cells (for example library references) do not expose an ordinary
+  // message opcode. `beginParse()` rejects them unless explicitly allowed,
+  // so keep ABI inference on the ordinary-cell path only.
+  if (cell.isExotic || cell.bits.length < 32) return {}
 
   const opcode = cell.beginParse().loadUint(32)
   const groups = new Map<

@@ -125,6 +125,29 @@ export function parseCell(
     return undefined
   }
 
+  // Exotic roots have their own TON serialization and must not be interpreted
+  // as ordinary comments, messages, or block.tlb values. Keep their exact raw
+  // structure available to the inspector instead of reporting a false match.
+  // The custom TL-B runtime also rejects exotic roots, so its failure falls
+  // back to the same raw view even when custom parsing is authoritative.
+  if (selectedRoot.isExotic) {
+    const customResult = parseCustomTlb()
+    if (customResult) return customResult
+    return {
+      status: "unknown",
+      parser: "raw-cell-tree",
+      data: toSerializable(rawForest.roots[0] ?? rawForest),
+      provenance: {
+        engine: "raw-cell-tree",
+        label: "Raw exotic cell structure",
+        source: "fallback",
+        confidence: confidence(0.3, ["Exotic roots are shown as raw cell structure"]),
+      },
+      warnings: accumulatedWarnings,
+      ...shared,
+    }
+  }
+
   if (options.customTlbAuthoritative) {
     const customResult = parseCustomTlb()
     if (customResult) return customResult
@@ -155,7 +178,7 @@ export function parseCell(
     }
   }
 
-  if (options.abi) {
+  if (options.abi && !selectedRoot.isExotic) {
     const decodedAbi = decodeCellWithAbi(selectedRoot, options.abi)
     const abiConsumptionComplete = decodedAbi?.consumption?.complete !== false
     if (

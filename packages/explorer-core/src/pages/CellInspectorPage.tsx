@@ -487,11 +487,13 @@ async function inspectCell({
   }
 
   const normalized = parser.decodeCellInput(input, {rootIndex})
-  const candidates = normalized.ok
-    ? parser.collectCellHashCandidates([normalized.decoded.selectedRoot])
-    : []
-  let resolution = await resolveAbi({metadataRegistry, candidates})
-  if (!resolution.abi && normalized.ok) {
+  const selectedRootIsExotic = normalized.ok && normalized.decoded.selectedRoot.isExotic
+  const candidates =
+    normalized.ok && !selectedRootIsExotic
+      ? parser.collectCellHashCandidates([normalized.decoded.selectedRoot])
+      : []
+  let resolution = selectedRootIsExotic ? {} : await resolveAbi({metadataRegistry, candidates})
+  if (!resolution.abi && normalized.ok && !selectedRootIsExotic) {
     resolution = parser.inferAbiByOpcode(normalized.decoded.selectedRoot, abiCandidates)
   }
   const result = resolution.abi
@@ -921,9 +923,7 @@ function readCellQuery(): string | null {
 }
 
 function cellQueryValue(result: CellInspectorParseResult): string | undefined {
-  return result.status !== "error" &&
-    result.bocHex &&
-    result.bocHex.length <= MAX_CELL_QUERY_LENGTH
+  return result.status !== "error" && result.bocHex && result.bocHex.length <= MAX_CELL_QUERY_LENGTH
     ? result.bocHex
     : undefined
 }

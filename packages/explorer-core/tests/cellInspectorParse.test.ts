@@ -238,4 +238,52 @@ describe("Cell Inspector parser pipeline", () => {
       value: {kind: "scalar", value: "40000000"},
     })
   })
+
+  test("keeps exotic library references inspectable", () => {
+    const bocHex =
+      "b5ee9c720101010100230008420212bebb0dc8e202b7e26f721e2547e16bb9ebaec934f657d19f22e76d62bec878"
+    const [decodedRoot] = Cell.fromBoc(Buffer.from(bocHex, "hex"))
+
+    expect(decodedRoot?.isExotic).toBe(true)
+    expect(inferAbiByOpcode(decodedRoot, [])).toEqual({})
+
+    const result = parseCell(bocHex, {
+      rootIndex: 0,
+      strict: true,
+      maxDepth: 4,
+      customTlb: "",
+    })
+
+    expect(result).toMatchObject({
+      status: "unknown",
+      parser: "raw-cell-tree",
+      provenance: {label: "Raw exotic cell structure"},
+      raw: {
+        roots: [
+          {
+            exotic: true,
+            type: "library-reference",
+          },
+        ],
+      },
+      cell: {
+        bits: 264,
+        refs: 0,
+        rootCount: 1,
+      },
+    })
+
+    const customResult = parseCell(bocHex, {
+      rootIndex: 0,
+      strict: true,
+      maxDepth: 4,
+      customTlb: "_ value:# = ExoticValue;",
+      customTlbAuthoritative: true,
+    })
+    expect(customResult).toMatchObject({
+      status: "unknown",
+      parser: "raw-cell-tree",
+      warnings: [{code: "custom-tlb-error"}],
+    })
+  })
 })
