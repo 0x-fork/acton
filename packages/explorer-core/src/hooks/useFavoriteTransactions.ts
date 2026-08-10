@@ -56,7 +56,13 @@ export function useFavoriteTransactions() {
     [namespace],
   )
 
-  return {favorites, isFavorite, setFavorite, toggleFavorite}
+  const importFavorites = useCallback(
+    (incoming: readonly FavoriteTransaction[]) =>
+      favoriteTransactionsStore.merge(namespace, incoming),
+    [namespace],
+  )
+
+  return {favorites, isFavorite, setFavorite, toggleFavorite, importFavorites}
 }
 
 export function parseFavoriteTransactions(raw: string | null): readonly FavoriteTransaction[] {

@@ -41,6 +41,7 @@ export interface RegistryNameMatch {
 }
 
 interface AddressBookContextValue {
+  readonly localAddressNames: readonly RegistryNameMatch[]
   readonly getNameSources: (address: string) => AddressNameSources
   readonly getCachedName: (address: string) => AddressName | undefined
   readonly fetchName: (address: string) => Promise<AddressName>
@@ -277,6 +278,7 @@ export const AddressBookProvider: FC<{
 
   const value = useMemo(
     () => ({
+      localAddressNames: storedAddressNames,
       getNameSources,
       getCachedName,
       fetchName,
@@ -291,6 +293,7 @@ export const AddressBookProvider: FC<{
       fetchName,
       getCachedName,
       getNameSources,
+      storedAddressNames,
       prefetchNames,
       searchRegistryNames,
       setAddressName,

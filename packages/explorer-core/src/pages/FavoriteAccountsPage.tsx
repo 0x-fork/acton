@@ -1,9 +1,12 @@
 import {useEffect, useRef, useState} from "react"
-import type {FC} from "react"
+import type {ChangeEvent, FC} from "react"
 import {Link} from "react-router"
 import {
   BlockChip,
+  Button,
+  Checkbox,
   DateTime,
+  Dialog,
   InlineAction,
   InlineActions,
   Pagination,
@@ -11,7 +14,7 @@ import {
   useClientPagination,
   useToast,
 } from "@acton/ui"
-import {Star, Trash2} from "lucide-react"
+import {Download, Info, Star, Trash2, TriangleAlert, Upload} from "lucide-react"
 
 import type {TonClient} from "../api/client"
 import {loadJettonWalletsWithMasters, sortJettonWalletsByAmount} from "../api/jettonWallets"
@@ -20,12 +23,17 @@ import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {WalletAccountSummary, type AccountBalanceState} from "../components/WalletAccountSummary"
 import {normalizeAddress, toRawAddress} from "../components/utils"
+import {
+  createFavoritesBundle,
+  parseFavoritesBundle,
+  type FavoritesBundle,
+} from "../hooks/favoritesBundle"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useFavoriteAccounts, type FavoriteAccount} from "../hooks/useFavoriteAccounts"
 import {useFavoriteBlocks, type FavoriteBlock} from "../hooks/useFavoriteBlocks"
 import {useFavoriteTransactions, type FavoriteTransaction} from "../hooks/useFavoriteTransactions"
-import {useAddressFormat} from "../hooks/useNetworkInfo"
+import {useAddressFormat, useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
 
 import styles from "./FavoriteAccountsPage.module.css"
@@ -36,20 +44,61 @@ interface FavoriteAccountsPageProps {
 
 type BalancesByAddress = Readonly<Record<string, AccountBalanceState>>
 type TokensByAddress = Readonly<Record<string, readonly JettonWallet[]>>
+type BundleSection = "accounts" | "blocks" | "transactions" | "addressNames"
+type BundleSelection = Readonly<Record<BundleSection, boolean>>
+
+const BUNDLE_SECTIONS: readonly {
+  readonly key: BundleSection
+  readonly label: string
+  readonly description: string
+}[] = [
+  {key: "accounts", label: "Accounts", description: "Favorite account addresses and saved times"},
+  {key: "blocks", label: "Blocks", description: "Favorite block references and saved times"},
+  {
+    key: "transactions",
+    label: "Transactions",
+    description: "Favorite transaction hashes and saved times",
+  },
+  {
+    key: "addressNames",
+    label: "Local contract names",
+    description: "Names saved in this browser for contract addresses",
+  },
+]
+
+const EMPTY_BUNDLE_SELECTION: BundleSelection = {
+  accounts: false,
+  blocks: false,
+  transactions: false,
+  addressNames: false,
+}
 
 export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) => {
   const routes = useExplorerRoutePaths()
   const addressFormat = useAddressFormat()
+  const {network} = useNetworkInfo()
   const openPath = useOpenExplorerPath()
-  const {favorites, setFavorite} = useFavoriteAccounts()
-  const {favorites: favoriteBlocks, setFavorite: setFavoriteBlock} = useFavoriteBlocks()
-  const {favorites: favoriteTransactions, setFavorite: setFavoriteTransaction} =
-    useFavoriteTransactions()
-  const {prefetchNames} = useAddressBook()
+  const {favorites, importFavorites: importAccountFavorites, setFavorite} = useFavoriteAccounts()
+  const {
+    favorites: favoriteBlocks,
+    importFavorites: importBlockFavorites,
+    setFavorite: setFavoriteBlock,
+  } = useFavoriteBlocks()
+  const {
+    favorites: favoriteTransactions,
+    importFavorites: importTransactionFavorites,
+    setFavorite: setFavoriteTransaction,
+  } = useFavoriteTransactions()
+  const {localAddressNames, prefetchNames, setAddressName} = useAddressBook()
   const {showToast} = useToast()
   const [balancesByAddress, setBalancesByAddress] = useState<BalancesByAddress>({})
   const [tokensByAddress, setTokensByAddress] = useState<TokensByAddress>({})
   const [tokensLoading, setTokensLoading] = useState(false)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importBundle, setImportBundle] = useState<FavoritesBundle>()
+  const [importSelection, setImportSelection] = useState<BundleSelection>(EMPTY_BUNDLE_SELECTION)
+  const [importing, setImporting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const accountDataRequestRef = useRef(0)
   const accountPagination = useClientPagination(favorites)
   const blockPagination = useClientPagination(favoriteBlocks)
@@ -181,6 +230,97 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
     })
   }
 
+  const handleExport = () => {
+    const bundle = createFavoritesBundle({
+      network: network.id,
+      accounts: favorites,
+      blocks: favoriteBlocks,
+      transactions: favoriteTransactions,
+      addressNames: localAddressNames,
+    })
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], {type: "application/json"})
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `acton-favorites-${network.id}-${formatFilenameDate(new Date())}.json`
+    document.body.append(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    showToast({title: "Favorites exported", variant: "success"})
+  }
+
+  const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+
+    try {
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error("The selected file is larger than 5 MB")
+      }
+      const bundle = parseFavoritesBundle(await file.text())
+      const selection = getBundleSelection(bundle)
+      if (!hasSelectedBundleData(selection)) {
+        throw new Error("The bundle does not contain importable data")
+      }
+      setImportBundle(bundle)
+      setImportSelection(selection)
+      setImportDialogOpen(true)
+    } catch (error) {
+      showToast({
+        title: "Import failed",
+        description: error instanceof Error ? error.message : "Could not read the favorites bundle",
+        variant: "error",
+      })
+    }
+  }
+
+  const handleImport = async () => {
+    if (importing || !importBundle || !hasSelectedBundleData(importSelection)) return
+
+    setImporting(true)
+    try {
+      if (importSelection.accounts) {
+        importAccountFavorites(importBundle.accounts)
+      }
+      if (importSelection.blocks) {
+        importBlockFavorites(importBundle.blocks)
+      }
+      if (importSelection.transactions) {
+        importTransactionFavorites(importBundle.transactions)
+      }
+      if (importSelection.addressNames) {
+        for (const entry of importBundle.addressNames) {
+          await setAddressName(entry.address, entry.name)
+        }
+      }
+
+      setImportDialogOpen(false)
+      setImportBundle(undefined)
+      setImportSelection(EMPTY_BUNDLE_SELECTION)
+      showToast({title: "Favorites imported", variant: "success"})
+    } catch (error) {
+      showToast({
+        title: "Import failed",
+        description:
+          error instanceof Error ? error.message : "Could not import the favorites bundle",
+        variant: "error",
+      })
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const handleImportDialogChange = (open: boolean) => {
+    if (importing && !open) return
+    setImportDialogOpen(open)
+    if (!open) {
+      setImportBundle(undefined)
+      setImportSelection(EMPTY_BUNDLE_SELECTION)
+    }
+  }
+
   const hasFavorites =
     favorites.length > 0 || favoriteBlocks.length > 0 || favoriteTransactions.length > 0
 
@@ -190,6 +330,31 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
       <header className={styles.hero}>
         <div>
           <h1 className={styles.title}>Favorites</h1>
+        </div>
+        <div className={styles.heroActions}>
+          <input
+            ref={fileInputRef}
+            className={styles.hiddenFileInput}
+            type="file"
+            accept="application/json,.json"
+            aria-label="Import favorites JSON"
+            onChange={event => void handleImportFile(event)}
+          />
+          <Button
+            size="sm"
+            leadingIcon={<Upload size={15} />}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Import JSON
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            leadingIcon={<Download size={15} />}
+            onClick={handleExport}
+          >
+            Export JSON
+          </Button>
         </div>
       </header>
 
@@ -418,10 +583,108 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
           />
         </section>
       )}
+
+      <Dialog
+        open={importDialogOpen}
+        onOpenChange={handleImportDialogChange}
+        dismissible={!importing}
+        title="Import favorites"
+        description="Choose which sections to add to this browser"
+        leadingIcon={<Upload size={18} />}
+        maxWidth={560}
+        contentClassName={styles.importDialogContent}
+      >
+        {importBundle && (
+          <>
+            <div className={styles.importNetworkRow}>
+              <span className={styles.importNetworkLabel}>Network</span>
+              <strong className={styles.importNetworkBadge}>
+                {formatBundleNetwork(importBundle.network)}
+              </strong>
+            </div>
+            {importBundle.network !== network.id && (
+              <div className={styles.importWarning}>
+                <TriangleAlert size={17} aria-hidden="true" />
+                <span>
+                  This bundle was exported from {formatBundleNetwork(importBundle.network)}.
+                  Selected data will be added to {formatBundleNetwork(network.id)}
+                </span>
+              </div>
+            )}
+            <div className={styles.importSections}>
+              {BUNDLE_SECTIONS.map(section => {
+                const count = importBundle[section.key].length
+                return (
+                  <Checkbox
+                    key={section.key}
+                    className={styles.importSection}
+                    checked={importSelection[section.key]}
+                    disabled={count === 0}
+                    label={section.label}
+                    count={count}
+                    description={section.description}
+                    onChange={event =>
+                      setImportSelection(current => ({
+                        ...current,
+                        [section.key]: event.target.checked,
+                      }))
+                    }
+                  />
+                )
+              })}
+            </div>
+            <div className={styles.importSummaryHint}>
+              <Info size={14} aria-hidden="true" />
+              <span>Selected sections will be merged with existing data</span>
+            </div>
+            <div className={styles.importActions}>
+              <Button
+                variant="outline"
+                disabled={importing}
+                onClick={() => handleImportDialogChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                disabled={!hasSelectedBundleData(importSelection)}
+                loading={importing}
+                onClick={() => void handleImport()}
+              >
+                Import selected
+              </Button>
+            </div>
+          </>
+        )}
+      </Dialog>
     </section>
   )
 }
 
 function positiveTime(value: number | undefined): number | undefined {
   return value !== undefined && Number.isFinite(value) && value > 0 ? value : undefined
+}
+
+function getBundleSelection(bundle: FavoritesBundle): BundleSelection {
+  return {
+    accounts: bundle.accounts.length > 0,
+    blocks: bundle.blocks.length > 0,
+    transactions: bundle.transactions.length > 0,
+    addressNames: bundle.addressNames.length > 0,
+  }
+}
+
+function hasSelectedBundleData(selection: BundleSelection): boolean {
+  return Object.values(selection).some(Boolean)
+}
+
+function formatBundleNetwork(network: string): string {
+  return network ? `${network[0].toUpperCase()}${network.slice(1)}` : network
+}
+
+function formatFilenameDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
 }

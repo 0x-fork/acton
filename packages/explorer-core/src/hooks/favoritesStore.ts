@@ -17,6 +17,7 @@ interface FavoritesCacheEntry<T> {
 
 export interface FavoritesStore<T extends FavoriteRecord> {
   readonly empty: readonly T[]
+  readonly merge: (namespace: string, favorites: readonly T[]) => void
   readonly parse: (raw: string | null) => readonly T[]
   readonly read: (namespace: string) => readonly T[]
   readonly subscribe: (namespace: string, onStoreChange: () => void) => () => void
@@ -91,6 +92,13 @@ export function createFavoritesStore<T extends FavoriteRecord>(
     globalThis.dispatchEvent?.(new CustomEvent(options.changeEvent, {detail: {namespace}}))
   }
 
+  const merge = (namespace: string, favorites: readonly T[]): void => {
+    if (favorites.length === 0) {
+      return
+    }
+    write(namespace, [...favorites, ...read(namespace)])
+  }
+
   const subscribe = (namespace: string, onStoreChange: () => void): (() => void) => {
     const handleLocalChange = (event: Event) => {
       const detail = (event as CustomEvent<{readonly namespace?: string}>).detail
@@ -114,5 +122,5 @@ export function createFavoritesStore<T extends FavoriteRecord>(
     }
   }
 
-  return {empty, parse, read, subscribe, write}
+  return {empty, merge, parse, read, subscribe, write}
 }

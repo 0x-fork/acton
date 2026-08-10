@@ -56,7 +56,12 @@ export function useFavoriteBlocks() {
     [namespace],
   )
 
-  return {favorites, isFavorite, setFavorite, toggleFavorite}
+  const importFavorites = useCallback(
+    (incoming: readonly FavoriteBlock[]) => favoriteBlocksStore.merge(namespace, incoming),
+    [namespace],
+  )
+
+  return {favorites, isFavorite, setFavorite, toggleFavorite, importFavorites}
 }
 
 export function parseFavoriteBlocks(raw: string | null): readonly FavoriteBlock[] {

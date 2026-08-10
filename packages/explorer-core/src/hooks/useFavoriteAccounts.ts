@@ -54,11 +54,17 @@ export function useFavoriteAccounts() {
     [namespace],
   )
 
+  const importFavorites = useCallback(
+    (incoming: readonly FavoriteAccount[]) => favoriteAccountsStore.merge(namespace, incoming),
+    [namespace],
+  )
+
   return {
     favorites,
     isFavorite,
     setFavorite,
     toggleFavorite,
+    importFavorites,
   }
 }
 
