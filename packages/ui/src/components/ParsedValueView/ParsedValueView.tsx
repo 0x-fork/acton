@@ -223,6 +223,9 @@ function ParsedScalarValue({
             >
               <InlineAction
                 label={isCodeOpen ? "Hide code" : "Show code"}
+                title={
+                  isCodeOpen ? "Hide decoded code for this cell" : "Show decoded code for this cell"
+                }
                 size="compact"
                 icon={<FileCode2 />}
                 aria-expanded={isCodeOpen}
@@ -232,6 +235,7 @@ function ParsedScalarValue({
           {canInspectCell && (
             <InlineAction
               label="Inspect cell"
+              title="Open this cell in the Cell Inspector"
               size="compact"
               icon={<Binary />}
               onClick={() => onCellInspect(cellBoc)}
@@ -242,6 +246,7 @@ function ParsedScalarValue({
               value={value.rawValue}
               label="Copy raw value"
               copiedLabel="Raw value copied"
+              title="Copy this cell's raw BoC as hex"
               size="compact"
               icon={<Copy />}
               copiedIcon={<Check />}

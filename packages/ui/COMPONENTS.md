@@ -286,7 +286,8 @@ row item.
 - `size="compact"` uses a 16px control with an 11px icon for tight chips and
   metadata values.
 - `CopyInlineAction` copies `value`, switches to `copiedIcon`, updates the
-  accessible label/title, and resets after 2000ms by default.
+  accessible label, and resets after 2000ms by default. Use `title` when the
+  tooltip should explain the copied value in more detail.
 - `CopyInlineAction` uses copy/check icons by default; pass `icon` and
   `copiedIcon` only when the surrounding domain needs different symbols.
 - `variant="danger"` gives destructive actions the shared danger color and

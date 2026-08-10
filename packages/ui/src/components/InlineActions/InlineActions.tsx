@@ -30,6 +30,7 @@ export type CopyInlineActionProps = Readonly<
     readonly onCopyError?: (error: unknown) => void
     readonly resetDelay?: number
     readonly stopPropagation?: boolean
+    readonly title?: string
     readonly value: string
   }
 >
@@ -101,6 +102,7 @@ export function CopyInlineAction({
   onCopyError,
   resetDelay = 2000,
   stopPropagation = true,
+  title,
   value,
   ...props
 }: CopyInlineActionProps) {
@@ -117,7 +119,7 @@ export function CopyInlineAction({
       {...props}
       type="button"
       label={currentLabel}
-      title={currentLabel}
+      title={title ?? currentLabel}
       icon={isCopied ? copiedIcon : icon}
       onClick={event => void handleClick(event)}
     />

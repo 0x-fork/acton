@@ -1457,7 +1457,7 @@ function toParsedValue(value: unknown, fieldName?: string): ParsedValue {
       kind: "scalar",
       typeName: "Cell",
       value: `${value.bits.length} bits, ${value.refs.length} refs`,
-      rawValue: value.toBoc().toString("base64"),
+      rawValue: value.toBoc().toString("hex"),
     }
   }
 
