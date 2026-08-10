@@ -72,6 +72,7 @@ export interface TransactionDetailsProps {
   readonly verifiedSourcesByCodeHash?: ReadonlyMap<string, ContractVerifiedSource>
   readonly resolveVerifiedSourceByCodeHash?: ResolveVerifiedSourceByCodeHash
   readonly allContracts: readonly BackendContractInfo[]
+  readonly onCellInspect?: (boc: string) => void
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
   readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
@@ -130,6 +131,7 @@ function TransactionDetailsContent({
   verifiedSourcesByCodeHash,
   resolveVerifiedSourceByCodeHash,
   allContracts,
+  onCellInspect,
   onContractClick,
   renderSourceLocation,
   loadActions,
@@ -534,6 +536,7 @@ function TransactionDetailsContent({
                 key={tx.lt}
                 parsedBody={parsedBody}
                 contracts={contracts}
+                onCellInspect={onCellInspect}
                 onContractClick={onContractClick}
                 renderCodeCellDetails={renderCodeCellDetails}
               />
@@ -593,6 +596,7 @@ function TransactionDetailsContent({
                               <ParsedValueView
                                 value={parsedStateInitData.value}
                                 contracts={contracts}
+                                onCellInspect={onCellInspect}
                                 onContractClick={onContractClick}
                                 fallbackTypeName={parsedStateInitData.name}
                                 renderCodeCellDetails={renderCodeCellDetails}
@@ -692,6 +696,7 @@ function TransactionDetailsContent({
               <ParsedValueDiffView
                 diff={storageDiff}
                 contracts={contracts}
+                onCellInspect={onCellInspect}
                 onContractClick={onContractClick}
                 renderCodeCellDetails={renderCodeCellDetails}
               />

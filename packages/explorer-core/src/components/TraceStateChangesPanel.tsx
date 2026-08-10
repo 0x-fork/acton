@@ -29,6 +29,7 @@ interface TraceStateChangesPanelProps {
   readonly resolveVerifiedSourceByCodeHash?: ResolveVerifiedSourceByCodeHash
   readonly isLoading?: boolean
   readonly error?: string
+  readonly onCellInspect?: (boc: string) => void
   readonly onContractClick: (address: string, event?: ExplorerNavigationClickEvent) => void
 }
 
@@ -45,6 +46,7 @@ export const TraceStateChangesPanel: FC<TraceStateChangesPanelProps> = ({
   resolveVerifiedSourceByCodeHash,
   isLoading = false,
   error,
+  onCellInspect,
   onContractClick,
 }) => {
   const items = buildTraceStateChangeItems(transactions)
@@ -106,6 +108,7 @@ export const TraceStateChangesPanel: FC<TraceStateChangesPanelProps> = ({
               <ParsedValueDiffView
                 diff={item.storageDiff}
                 contracts={contracts}
+                onCellInspect={onCellInspect}
                 onContractClick={onContractClick}
                 renderCodeCellDetails={(cell: ParsedCodeCell) => (
                   <CodeCellDetails

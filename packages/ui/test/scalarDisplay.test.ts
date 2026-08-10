@@ -6,6 +6,22 @@ import {buildStorageDiff} from "../src/components/ParsedValueDiffView/buildStora
 import {ParsedValueView} from "../src/components/ParsedValueView/ParsedValueView"
 
 describe("ParsedValueView", () => {
+  test("renders a Cell Inspector action for parsed cells", () => {
+    const markup = renderToStaticMarkup(
+      createElement(ParsedValueView, {
+        value: {
+          kind: "scalar",
+          value: "Cell 012345…abcdef",
+          rawValue: "b5ee9c72",
+          typeName: "Cell",
+        },
+        onCellInspect: () => undefined,
+      }),
+    )
+
+    expect(markup).toContain('aria-label="Inspect cell"')
+  })
+
   test("renders only uint256 map keys as hexadecimal", () => {
     const markup = renderToStaticMarkup(
       createElement(ParsedValueView, {

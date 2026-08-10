@@ -183,6 +183,7 @@ interface TraceTransactionNodeProps {
   readonly verifiedSourcesByCodeHash: ReadonlyMap<string, ContractVerifiedSource>
   readonly visibleTransactionIds?: ReadonlySet<string>
   readonly isIntermediateSibling?: boolean
+  readonly onCellInspect?: (boc: string) => void
   readonly onContractClick: (address: string) => void
   readonly getBlockPath: (blockRef: TransactionBlockRef) => string | undefined
   readonly onBlockClick: (
@@ -478,6 +479,19 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     },
     [contracts, traceOverview?.masterchainSeqnoStart],
   )
+
+  const handleCellInspect = useCallback((cell: string) => {
+    const {routes: currentRoutes, search} = navigationRef.current
+    const currentSearchParams = new URLSearchParams(search)
+    const cellUrl = new URL(currentRoutes.cellPath, globalThis.location.origin)
+    cellUrl.searchParams.set("cell", cell)
+    const networkParam = currentSearchParams.get("network")
+    if (networkParam) {
+      cellUrl.searchParams.set("network", networkParam)
+    }
+
+    globalThis.open(cellUrl.toString(), "_blank", "noopener,noreferrer")
+  }, [])
 
   const handleCloseRetrace = useCallback(
     (txHash: string) => {
@@ -1005,6 +1019,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       stateChangesError={currentStateChangesStatus?.error}
       onTabChange={handleActiveTabChange}
       onActionHoverChange={setHoveredAction}
+      onCellInspect={handleCellInspect}
       onContractClick={handleContractClick}
       onTransactionSelect={handleTransactionSelect}
       onTraceGapLoad={partialTraceState ? handleTraceGapLoad : undefined}
@@ -1049,6 +1064,7 @@ export interface TransactionTraceViewProps {
   readonly stateChangesError?: string
   readonly onTabChange: (tab: TransactionTraceTabType) => void
   readonly onActionHoverChange?: (action: V3Action | undefined) => void
+  readonly onCellInspect?: (boc: string) => void
   readonly onContractClick: (address: string, event?: ExplorerNavigationClickEvent) => void
   readonly onTransactionSelect?: (tx: TransactionInfo) => void
   readonly onTraceGapLoad?: () => void
@@ -1103,6 +1119,7 @@ function TransactionTraceSession({
   stateChangesError,
   onTabChange,
   onActionHoverChange,
+  onCellInspect,
   onContractClick,
   onTransactionSelect,
   onTraceGapLoad,
@@ -1355,6 +1372,7 @@ function TransactionTraceSession({
                       resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
                       isLoading={stateChangesLoading}
                       error={stateChangesError}
+                      onCellInspect={onCellInspect}
                       onContractClick={onContractClick}
                     />
                   )}
@@ -1367,6 +1385,7 @@ function TransactionTraceSession({
                       contracts={contracts}
                       compilerAbisByCodeHash={compilerAbisByCodeHash}
                       verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
+                      onCellInspect={onCellInspect}
                       onContractClick={onContractClick}
                       getBlockPath={getBlockPath}
                       onBlockClick={onBlockClick}
@@ -1411,6 +1430,7 @@ function TransactionTraceSession({
                 traceGapActionLabel={traceGapActionLabel}
                 traceGapLoading={traceGapLoading}
                 traceGapError={traceGapError}
+                onCellInspect={onCellInspect}
                 onContractClick={onContractClick}
                 onTransactionSelect={onTransactionSelect}
                 onTraceGapLoad={onTraceGapLoad}
@@ -1731,6 +1751,7 @@ const TraceTransactionList: FC<TraceTransactionListProps> = ({
   contracts,
   compilerAbisByCodeHash,
   verifiedSourcesByCodeHash,
+  onCellInspect,
   onContractClick,
   getBlockPath,
   onBlockClick,
@@ -1758,6 +1779,7 @@ const TraceTransactionList: FC<TraceTransactionListProps> = ({
               compilerAbisByCodeHash={compilerAbisByCodeHash}
               verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
               visibleTransactionIds={visibleTransactionIds}
+              onCellInspect={onCellInspect}
               onContractClick={onContractClick}
               getBlockPath={getBlockPath}
               onBlockClick={onBlockClick}
@@ -1793,6 +1815,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
   verifiedSourcesByCodeHash,
   visibleTransactionIds,
   isIntermediateSibling = false,
+  onCellInspect,
   onContractClick,
   getBlockPath,
   onBlockClick,
@@ -1876,6 +1899,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
             compilerAbisByCodeHash={compilerAbisByCodeHash}
             verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
             allContracts={EMPTY_BACKEND_CONTRACTS}
+            onCellInspect={onCellInspect}
             onContractClick={onContractClick}
             getBlockPath={getBlockPath}
             onBlockClick={onBlockClick}
@@ -1909,6 +1933,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
               verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
               visibleTransactionIds={visibleTransactionIds}
               isIntermediateSibling={index < children.length - 1}
+              onCellInspect={onCellInspect}
               onContractClick={onContractClick}
               getBlockPath={getBlockPath}
               onBlockClick={onBlockClick}

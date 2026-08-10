@@ -1,5 +1,5 @@
 import {useId, useState, type ReactNode} from "react"
-import {Check, Copy, FileCode2} from "lucide-react"
+import {Binary, Check, Copy, FileCode2} from "lucide-react"
 
 import {ContractChip, type ContractReferenceOptions} from "../ContractChip/ContractChip"
 import {CountValue} from "../CountValue/CountValue"
@@ -21,11 +21,12 @@ export interface ParsedValueViewProps extends ContractReferenceOptions {
   readonly value: ParsedValue
   readonly fallbackTypeName?: string
   readonly fieldName?: string
+  readonly onCellInspect?: (boc: string) => void
   readonly renderCodeCellDetails?: (cell: ParsedCodeCell) => ReactNode
 }
 
 type ParsedValueContext = ContractReferenceOptions &
-  Pick<ParsedValueViewProps, "renderCodeCellDetails">
+  Pick<ParsedValueViewProps, "onCellInspect" | "renderCodeCellDetails">
 
 const LARGE_COLLECTION_THRESHOLD = 8
 
@@ -93,6 +94,7 @@ function ParsedValueRow({
   contracts,
   formatAddress,
   onContractClick,
+  onCellInspect,
   renderCodeCellDetails,
 }: ParsedValueContext & {readonly label: string; readonly value: ParsedValue}) {
   const isLargeCollection =
@@ -110,6 +112,7 @@ function ParsedValueRow({
           contracts={contracts}
           formatAddress={formatAddress}
           onContractClick={onContractClick}
+          onCellInspect={onCellInspect}
           renderCodeCellDetails={renderCodeCellDetails}
           fieldName={label}
         />
@@ -123,6 +126,7 @@ function ParsedMapEntry({
   contracts,
   formatAddress,
   onContractClick,
+  onCellInspect,
   renderCodeCellDetails,
 }: ParsedValueContext & {readonly entry: ParsedValueMapEntry}) {
   return (
@@ -135,6 +139,7 @@ function ParsedMapEntry({
             contracts={contracts}
             formatAddress={formatAddress}
             onContractClick={onContractClick}
+            onCellInspect={onCellInspect}
             renderCodeCellDetails={renderCodeCellDetails}
             fieldName={
               entry.key.kind === "scalar" && entry.key.typeName === "uint256" ? "key" : undefined
@@ -150,6 +155,7 @@ function ParsedMapEntry({
             contracts={contracts}
             formatAddress={formatAddress}
             onContractClick={onContractClick}
+            onCellInspect={onCellInspect}
             renderCodeCellDetails={renderCodeCellDetails}
           />
         </div>
@@ -161,10 +167,12 @@ function ParsedMapEntry({
 function ParsedScalarValue({
   value,
   fieldName,
+  onCellInspect,
   renderCodeCellDetails,
 }: {
   readonly value: Extract<ParsedValue, {readonly kind: "scalar"}>
   readonly fieldName?: string
+  readonly onCellInspect?: (boc: string) => void
   readonly renderCodeCellDetails?: (cell: ParsedCodeCell) => ReactNode
 }) {
   const [isCodeOpen, setIsCodeOpen] = useState(false)
@@ -191,8 +199,10 @@ function ParsedScalarValue({
       ? {bocHex: value.rawValue, fieldName}
       : undefined
   const canShowCode = codeCell !== undefined && renderCodeCellDetails !== undefined
+  const cellBoc = value.typeName === "Cell" ? value.rawValue : undefined
+  const canInspectCell = cellBoc !== undefined && onCellInspect !== undefined
 
-  if (!value.rawValue && !canShowCode) return scalarValue
+  if (!value.rawValue && !canShowCode && !canInspectCell) return scalarValue
 
   return (
     <InlineActions
@@ -219,6 +229,14 @@ function ParsedScalarValue({
               />
             </Popover>
           )}
+          {canInspectCell && (
+            <InlineAction
+              label="Inspect cell"
+              size="compact"
+              icon={<Binary />}
+              onClick={() => onCellInspect(cellBoc)}
+            />
+          )}
           {value.rawValue && (
             <CopyInlineAction
               value={value.rawValue}
@@ -244,9 +262,10 @@ export function ParsedValueView({
   onContractClick,
   fallbackTypeName,
   fieldName,
+  onCellInspect,
   renderCodeCellDetails,
 }: ParsedValueViewProps) {
-  const context = {contracts, formatAddress, onContractClick, renderCodeCellDetails}
+  const context = {contracts, formatAddress, onContractClick, onCellInspect, renderCodeCellDetails}
 
   switch (value.kind) {
     case "null":
@@ -266,6 +285,7 @@ export function ParsedValueView({
         <ParsedScalarValue
           value={value}
           fieldName={fieldName}
+          onCellInspect={onCellInspect}
           renderCodeCellDetails={renderCodeCellDetails}
         />
       )

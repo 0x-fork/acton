@@ -235,6 +235,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
+  const networkSearchParam = searchParams.get("network")
   const routes = useExplorerRoutePaths()
   const {showToast, updateToast} = useToast()
   const [navigationPayload, setNavigationPayload] = useState<EmulateNavigationPayload | undefined>(
@@ -904,6 +905,18 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
       )
     },
     [navigate, routes],
+  )
+
+  const handleCellInspect = useCallback(
+    (cell: string) => {
+      const cellUrl = new URL(routes.cellPath, globalThis.location.origin)
+      cellUrl.searchParams.set("cell", cell)
+      if (networkSearchParam) {
+        cellUrl.searchParams.set("network", networkSearchParam)
+      }
+      globalThis.open(cellUrl.toString(), "_blank", "noopener,noreferrer")
+    },
+    [networkSearchParam, routes.cellPath],
   )
 
   const loadEmulatedActions = useCallback(
@@ -2028,6 +2041,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
               error: "Emulation failed",
             }}
             onTabChange={setActiveTab}
+            onCellInspect={handleCellInspect}
             onContractClick={handleContractClick}
             onBlockClick={handleBlockClick}
             onTransactionSelect={tx => setSelectedHash(transactionHashHex(tx))}

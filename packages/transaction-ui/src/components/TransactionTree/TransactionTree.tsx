@@ -114,6 +114,7 @@ interface TransactionTreeProps {
   readonly traceGapActionLabel?: string
   readonly traceGapLoading?: boolean
   readonly traceGapError?: string
+  readonly onCellInspect?: (boc: string) => void
   readonly onContractClick?: (address: string) => void
   readonly onTransactionSelect?: (tx: TransactionInfo) => void
   readonly onTraceGapLoad?: () => void
@@ -378,6 +379,7 @@ function TransactionTreeComponent({
   traceGapActionLabel,
   traceGapLoading = false,
   traceGapError,
+  onCellInspect,
   onContractClick,
   onTransactionSelect,
   onTraceGapLoad,
@@ -1526,6 +1528,7 @@ function TransactionTreeComponent({
               verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
               resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
               allContracts={allContracts}
+              onCellInspect={onCellInspect}
               onContractClick={onContractClick}
               renderSourceLocation={renderSourceLocation}
               loadActions={loadActions}

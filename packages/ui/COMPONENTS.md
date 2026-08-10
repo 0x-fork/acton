@@ -796,6 +796,9 @@ address, boolean, null, void, array, object, and map nodes recursively.
 - Pass `fieldName` for isolated scalars when field-sensitive hex or coin display
   rules should apply.
 - Pass `rawValue` on a scalar to enable the shared compact copy action.
+- For a scalar with `typeName: "Cell"` and `rawValue`, pass `onCellInspect` to
+  add the shared Cell Inspector action. Keep routing and inspector ownership in
+  the host application.
 - For a scalar with `typeName: "Cell"`, `rawValue`, and a field name containing
   `code` or `cell`, pass `renderCodeCellDetails` to add the shared code-inspector
   action. Keep BoC decoding, source lookup, and disassembly in domain code.

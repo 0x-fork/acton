@@ -14,11 +14,12 @@ import type {ParsedValueDiff, ParsedValueDiffStatus} from "./types"
 export interface ParsedValueDiffViewProps extends ContractReferenceOptions {
   readonly diff: ParsedValueDiff
   readonly fieldName?: string
+  readonly onCellInspect?: ParsedValueViewProps["onCellInspect"]
   readonly renderCodeCellDetails?: ParsedValueViewProps["renderCodeCellDetails"]
 }
 
 type ParsedValueDiffContext = ContractReferenceOptions &
-  Pick<ParsedValueViewProps, "renderCodeCellDetails">
+  Pick<ParsedValueViewProps, "onCellInspect" | "renderCodeCellDetails">
 
 const LARGE_COLLECTION_THRESHOLD = 8
 
@@ -168,10 +169,11 @@ export function ParsedValueDiffView({
   contracts,
   formatAddress,
   onContractClick,
+  onCellInspect,
   renderCodeCellDetails,
 }: ParsedValueDiffViewProps): React.JSX.Element {
   const [showUnchanged, setShowUnchanged] = useState(false)
-  const context = {contracts, formatAddress, onContractClick, renderCodeCellDetails}
+  const context = {contracts, formatAddress, onContractClick, onCellInspect, renderCodeCellDetails}
 
   if (diff.kind === "leaf") {
     if (diff.status === "unchanged") {
