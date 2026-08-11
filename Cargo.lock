@@ -108,6 +108,7 @@ dependencies = [
  "tycho-types",
  "walkdir",
  "xxhash-rust",
+ "zstd",
 ]
 
 [[package]]

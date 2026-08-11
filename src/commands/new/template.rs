@@ -1,39 +1,13 @@
 use clap::ValueEnum;
-use include_dir::{Dir, include_dir};
 use serde::Serialize;
 use std::ffi::OsStr;
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
-static EMPTY_TEMPLATE_DIR: Dir<'static> =
-    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/empty");
-
-static EMPTY_APP_TEMPLATE_DIR: Dir<'static> =
-    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/empty-app");
-
-static COUNTER_TEMPLATE_DIR: Dir<'static> =
-    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/counter");
-
-static COUNTER_APP_TEMPLATE_DIR: Dir<'static> =
-    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/counter-app");
-
-static JETTON_TEMPLATE_DIR: Dir<'static> =
-    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/jetton");
-
-static JETTON_APP_TEMPLATE_DIR: Dir<'static> =
-    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/jetton-app");
-
-static NFT_TEMPLATE_DIR: Dir<'static> =
-    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/nft");
-
-static NFT_APP_TEMPLATE_DIR: Dir<'static> =
-    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/nft-app");
-
-static W5_EXTENSION_TEMPLATE_DIR: Dir<'static> =
-    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/w5-extension");
-
-static W5_EXTENSION_APP_TEMPLATE_DIR: Dir<'static> =
-    include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/w5-extension-app");
+static PROJECT_TEMPLATES_ARCHIVE: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/project-templates.tar.zst"));
 
 const AGENTS_FILE_NAME: &str = "AGENTS.md";
 const NPM_PACKAGE_NAME_PLACEHOLDER: &str = "__ACTON_NPM_PACKAGE_NAME__";
@@ -43,6 +17,11 @@ const AUTHOR_PLACEHOLDER: &str = "__ACTON_AUTHOR__";
 struct TemplateRenderContext<'a> {
     npm_package_name: Option<&'a str>,
     author: Option<&'a str>,
+}
+
+struct EmbeddedTemplateFile {
+    path: PathBuf,
+    contents: Vec<u8>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -127,8 +106,8 @@ pub(super) struct ExtraScript {
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct ProjectScaffold {
-    base_dir: &'static Dir<'static>,
-    app_overlay_dir: Option<&'static Dir<'static>>,
+    base_dir: &'static str,
+    app_overlay_dir: Option<&'static str>,
     layout: ProjectLayout,
     contracts: &'static [ContractTemplate],
     deploy_script: &'static str,
@@ -276,7 +255,7 @@ const W5_EXTENSION_CONTRACTS: [ContractTemplate; 2] = [
 ];
 
 const EMPTY_SCAFFOLD: ProjectScaffold = ProjectScaffold {
-    base_dir: &EMPTY_TEMPLATE_DIR,
+    base_dir: "empty",
     app_overlay_dir: None,
     layout: ProjectLayout::Standard,
     contracts: &EMPTY_CONTRACTS,
@@ -285,8 +264,8 @@ const EMPTY_SCAFFOLD: ProjectScaffold = ProjectScaffold {
 };
 
 const EMPTY_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
-    base_dir: &EMPTY_TEMPLATE_DIR,
-    app_overlay_dir: Some(&EMPTY_APP_TEMPLATE_DIR),
+    base_dir: "empty",
+    app_overlay_dir: Some("empty-app"),
     layout: ProjectLayout::App,
     contracts: &EMPTY_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
@@ -294,7 +273,7 @@ const EMPTY_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
 };
 
 const COUNTER_SCAFFOLD: ProjectScaffold = ProjectScaffold {
-    base_dir: &COUNTER_TEMPLATE_DIR,
+    base_dir: "counter",
     app_overlay_dir: None,
     layout: ProjectLayout::Standard,
     contracts: &COUNTER_CONTRACTS,
@@ -303,8 +282,8 @@ const COUNTER_SCAFFOLD: ProjectScaffold = ProjectScaffold {
 };
 
 const COUNTER_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
-    base_dir: &COUNTER_TEMPLATE_DIR,
-    app_overlay_dir: Some(&COUNTER_APP_TEMPLATE_DIR),
+    base_dir: "counter",
+    app_overlay_dir: Some("counter-app"),
     layout: ProjectLayout::App,
     contracts: &COUNTER_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
@@ -312,7 +291,7 @@ const COUNTER_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
 };
 
 const JETTON_SCAFFOLD: ProjectScaffold = ProjectScaffold {
-    base_dir: &JETTON_TEMPLATE_DIR,
+    base_dir: "jetton",
     app_overlay_dir: None,
     layout: ProjectLayout::Standard,
     contracts: &JETTON_CONTRACTS,
@@ -321,8 +300,8 @@ const JETTON_SCAFFOLD: ProjectScaffold = ProjectScaffold {
 };
 
 const JETTON_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
-    base_dir: &JETTON_TEMPLATE_DIR,
-    app_overlay_dir: Some(&JETTON_APP_TEMPLATE_DIR),
+    base_dir: "jetton",
+    app_overlay_dir: Some("jetton-app"),
     layout: ProjectLayout::App,
     contracts: &JETTON_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
@@ -386,7 +365,7 @@ const NFT_EXTRA_SCRIPTS: &[ExtraScript] = &[
 ];
 
 const NFT_SCAFFOLD: ProjectScaffold = ProjectScaffold {
-    base_dir: &NFT_TEMPLATE_DIR,
+    base_dir: "nft",
     app_overlay_dir: None,
     layout: ProjectLayout::Standard,
     contracts: &NFT_CONTRACTS,
@@ -395,8 +374,8 @@ const NFT_SCAFFOLD: ProjectScaffold = ProjectScaffold {
 };
 
 const NFT_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
-    base_dir: &NFT_TEMPLATE_DIR,
-    app_overlay_dir: Some(&NFT_APP_TEMPLATE_DIR),
+    base_dir: "nft",
+    app_overlay_dir: Some("nft-app"),
     layout: ProjectLayout::App,
     contracts: &NFT_CONTRACTS,
     deploy_script: "scripts/deploy-collection.tolk",
@@ -417,7 +396,7 @@ const W5_EXTENSION_EXTRA_SCRIPTS: &[ExtraScript] = &[
 ];
 
 const W5_EXTENSION_SCAFFOLD: ProjectScaffold = ProjectScaffold {
-    base_dir: &W5_EXTENSION_TEMPLATE_DIR,
+    base_dir: "w5-extension",
     app_overlay_dir: None,
     layout: ProjectLayout::Standard,
     contracts: &W5_EXTENSION_CONTRACTS,
@@ -426,8 +405,8 @@ const W5_EXTENSION_SCAFFOLD: ProjectScaffold = ProjectScaffold {
 };
 
 const W5_EXTENSION_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
-    base_dir: &W5_EXTENSION_TEMPLATE_DIR,
-    app_overlay_dir: Some(&W5_EXTENSION_APP_TEMPLATE_DIR),
+    base_dir: "w5-extension",
+    app_overlay_dir: Some("w5-extension-app"),
     layout: ProjectLayout::App,
     contracts: &W5_EXTENSION_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
@@ -625,7 +604,7 @@ pub fn extract_standalone_app_scaffold(
     npm_package_name: &str,
 ) -> std::io::Result<()> {
     extract_template_dir(
-        &EMPTY_APP_TEMPLATE_DIR,
+        "empty-app",
         target_dir,
         false,
         true,
@@ -696,37 +675,23 @@ pub(super) fn scaffold_file_paths(scaffold: ProjectScaffold, include_agents: boo
     paths
 }
 
-fn template_files(dir: &Dir<'static>) -> Vec<PathBuf> {
-    let mut paths = dir
-        .files()
-        .map(|file| file.path().to_path_buf())
-        .collect::<Vec<_>>();
-
-    for subdir in dir.dirs() {
-        paths.extend(template_files(subdir));
-    }
-
-    paths
+fn template_files(template_dir: &str) -> Vec<PathBuf> {
+    files_in_template(template_dir)
+        .map(|(path, _)| path.to_path_buf())
+        .collect()
 }
 
 fn extract_base_for_app_layout(
-    dir: &Dir<'static>,
+    template_dir: &str,
     base_path: &Path,
     render_context: TemplateRenderContext<'_>,
 ) -> std::io::Result<()> {
-    for entry in dir.entries() {
-        if let Some(subdir) = entry.as_dir() {
-            extract_base_for_app_layout(subdir, base_path, render_context)?;
+    for (path, contents) in files_in_template(template_dir) {
+        let Some(remapped) = remap_for_app_layout(path) else {
             continue;
-        }
-
-        if let Some(file) = entry.as_file() {
-            let Some(remapped) = remap_for_app_layout(entry.path()) else {
-                continue;
-            };
-            let target = base_path.join(remapped);
-            write_template_file(&target, entry.path(), file.contents(), render_context)?;
-        }
+        };
+        let target = base_path.join(remapped);
+        write_template_file(&target, path, contents, render_context)?;
     }
     Ok(())
 }
@@ -749,37 +714,64 @@ fn remap_for_app_layout(path: &Path) -> Option<PathBuf> {
 }
 
 fn extract_template_dir(
-    dir: &Dir<'static>,
+    template_dir: &str,
     base_path: &Path,
     include_agents: bool,
     skip_wrappers_ts: bool,
     render_context: TemplateRenderContext<'_>,
 ) -> std::io::Result<()> {
-    for entry in dir.entries() {
-        if should_skip_entry(entry.path(), include_agents, skip_wrappers_ts) {
+    for (path, contents) in files_in_template(template_dir) {
+        if should_skip_entry(path, include_agents, skip_wrappers_ts) {
             continue;
         }
 
-        let path = base_path.join(entry.path());
-
-        if let Some(subdir) = entry.as_dir() {
-            fs::create_dir_all(&path)?;
-            extract_template_dir(
-                subdir,
-                base_path,
-                include_agents,
-                skip_wrappers_ts,
-                render_context,
-            )?;
-            continue;
-        }
-
-        if let Some(file) = entry.as_file() {
-            write_template_file(&path, entry.path(), file.contents(), render_context)?;
-        }
+        let target = base_path.join(path);
+        write_template_file(&target, path, contents, render_context)?;
     }
 
     Ok(())
+}
+
+fn files_in_template(
+    template_dir: &str,
+) -> impl Iterator<Item = (&'static Path, &'static [u8])> + '_ {
+    embedded_template_files().iter().filter_map(move |file| {
+        let path = file.path.strip_prefix(template_dir).ok()?;
+        Some((path, file.contents.as_slice()))
+    })
+}
+
+fn embedded_template_files() -> &'static [EmbeddedTemplateFile] {
+    static FILES: OnceLock<Vec<EmbeddedTemplateFile>> = OnceLock::new();
+
+    FILES.get_or_init(|| {
+        let decoder = zstd::stream::read::Decoder::new(PROJECT_TEMPLATES_ARCHIVE)
+            .expect("embedded project templates must be valid zstd");
+        let mut archive = tar::Archive::new(decoder);
+        let entries = archive
+            .entries()
+            .expect("embedded project templates must be a valid tar archive");
+        let mut files = Vec::new();
+
+        for entry in entries {
+            let mut entry = entry.expect("embedded project template entry must be valid");
+            if !entry.header().entry_type().is_file() {
+                continue;
+            }
+
+            let path = entry
+                .path()
+                .expect("embedded project template path must be valid")
+                .into_owned();
+            let mut contents = Vec::new();
+            entry
+                .read_to_end(&mut contents)
+                .expect("embedded project template contents must be readable");
+            files.push(EmbeddedTemplateFile { path, contents });
+        }
+
+        files
+    })
 }
 
 fn write_template_file(

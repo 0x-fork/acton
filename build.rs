@@ -2,13 +2,14 @@ use chrono::Utc;
 use std::env;
 use std::ffi::OsStr;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=ACTON_RELEASE_CHANNEL");
 
     compress_man();
+    compress_project_templates();
     let pkg_version = env::var("CARGO_PKG_VERSION").expect("CARGO_PKG_VERSION must be set");
 
     let output = Command::new("git")
@@ -48,6 +49,70 @@ fn main() {
     };
     println!("cargo:rustc-env=ACTON_SHORT_VERSION={short_version}");
     println!("cargo:rustc-env=ACTON_LONG_VERSION={short_version} ({git_hash} {build_date})");
+}
+
+fn compress_project_templates() {
+    const TEMPLATE_NAMES: &[&str] = &[
+        "empty",
+        "empty-app",
+        "counter",
+        "counter-app",
+        "jetton",
+        "jetton-app",
+        "nft",
+        "nft-app",
+        "w5-extension",
+        "w5-extension-app",
+    ];
+
+    let templates_dir = Path::new("src/commands/new/templates");
+    println!("cargo:rerun-if-changed={}", templates_dir.display());
+
+    let out_path = Path::new(&env::var("OUT_DIR").expect("OUT_DIR must be set"))
+        .join("project-templates.tar.zst");
+    let dst = fs::File::create(out_path).expect("failed to create project templates archive");
+    let encoder = zstd::stream::write::Encoder::new(dst, 19)
+        .expect("failed to create project templates encoder");
+    let mut archive = tar::Builder::new(encoder);
+    archive.mode(tar::HeaderMode::Deterministic);
+
+    for template_name in TEMPLATE_NAMES {
+        let template_dir = templates_dir.join(template_name);
+        let mut files = Vec::new();
+        collect_files(&template_dir, &mut files);
+        files.sort();
+
+        for path in files {
+            println!("cargo:rerun-if-changed={}", path.display());
+            let archive_path = path
+                .strip_prefix(templates_dir)
+                .expect("template must be inside templates directory");
+            archive
+                .append_path_with_name(&path, archive_path)
+                .expect("failed to append project template file");
+        }
+    }
+
+    let encoder = archive
+        .into_inner()
+        .expect("failed to finish project templates archive");
+    encoder
+        .finish()
+        .expect("failed to finish project templates compression");
+}
+
+fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) {
+    let entries =
+        fs::read_dir(dir).unwrap_or_else(|err| panic!("failed to read {}: {err}", dir.display()));
+
+    for entry in entries {
+        let path = entry.expect("failed to read template entry").path();
+        if path.is_dir() {
+            collect_files(&path, files);
+        } else if path.is_file() {
+            files.push(path);
+        }
+    }
 }
 
 fn compress_man() {
