@@ -90,7 +90,8 @@ const MAX_DEPLOYMENT_SUBMISSION_BODY_BYTES: usize = 4 * 1024 * 1024;
 const TONCENTER_API_KEY_HEADER: &str = "x-api-key";
 
 #[cfg(not(debug_assertions))]
-static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../../packages/studio-ui/dist");
+static UI_DIR: Dir<'static> =
+    include_dir!("$CARGO_MANIFEST_DIR/../../packages/studio-ui/dist/.embedded");
 
 #[derive(Clone, Debug)]
 pub struct StudioWorkspace {
@@ -1615,7 +1616,7 @@ async fn embedded_ui(uri: Uri) -> Response {
         .unwrap_or_else(|| StatusCode::NOT_FOUND.into_response())
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(any(not(debug_assertions), test))]
 fn ui_file_response(path: &str, contents: &'static [u8]) -> Response {
     let content_type = match path.rsplit_once('.').map(|(_, extension)| extension) {
         Some("css") => "text/css; charset=utf-8",
@@ -1630,7 +1631,39 @@ fn ui_file_response(path: &str, contents: &'static [u8]) -> Response {
         _ => "application/octet-stream",
     };
 
-    ([("content-type", content_type)], contents).into_response()
+    (
+        [
+            ("content-type", content_type),
+            ("content-encoding", "gzip"),
+            ("vary", "Accept-Encoding"),
+        ],
+        contents,
+    )
+        .into_response()
+}
+
+#[cfg(test)]
+mod embedded_ui_tests {
+    use expect_test::expect;
+
+    use super::ui_file_response;
+
+    #[test]
+    fn response_identifies_embedded_gzip_asset() {
+        let response = ui_file_response("assets/app.js", b"compressed asset");
+        let headers = response.headers();
+        let actual = format!(
+            "content-type: {}\ncontent-encoding: {}\nvary: {}",
+            headers["content-type"].to_str().unwrap(),
+            headers["content-encoding"].to_str().unwrap(),
+            headers["vary"].to_str().unwrap(),
+        );
+
+        expect![[r"content-type: text/javascript; charset=utf-8
+content-encoding: gzip
+vary: Accept-Encoding"]]
+        .assert_eq(&actual);
+    }
 }
 
 #[cfg(test)]
