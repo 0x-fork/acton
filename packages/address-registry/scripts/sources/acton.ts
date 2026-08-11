@@ -1,7 +1,26 @@
 import type {AddressSource, SourceAddress} from "./shared.ts"
 import {parseSourceAddresses} from "./shared.ts"
 
-export const ACTON_MAINNET_ADDRESSES = [] as const satisfies readonly SourceAddress[]
+export const ACTON_MAINNET_ADDRESSES = [
+  // https://github.com/ton-blockchain/token-bridge/blob/63c9d57fee76d7f7e1bb9e39d6c8f56ba4affa97/src/utils/constants.ts#L16
+  {
+    address: "Ef-ozmw2qoulNrKlqDMJimwY-a41I9y0Q_CsOHF9rdjEEaOi",
+    name: "Ethereum Bridge V2 Multisig",
+  },
+  {
+    address: "Ef-3TdlZP5vY6qLFFCESWKDqOMcSUuv4djYlFLx3QsjfrU6p",
+    name: "Ethereum Bridge Multisig",
+  },
+  {
+    address: "Ef_FD4kDZsgfXEaQxoPYlMKUCnZ__0famrsKSjwSXUmWv3tA",
+    name: "BSC Bridge Multisig",
+  },
+  // https://telegra.ph/July-2025-update-proposal-06-30
+  {
+    address: "Ef_q19o4m94xfF-yhYB85Qe6rTHDX-VTSzxBh4XpAfZMaOvk",
+    name: "BTC Teleport Coordinator",
+  },
+] as const satisfies readonly SourceAddress[]
 
 export const ACTON_TESTNET_ADDRESSES = [
   {

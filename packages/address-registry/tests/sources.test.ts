@@ -62,9 +62,9 @@ describe("source address validation", () => {
 })
 
 describe("Acton address networks", () => {
-  test("mainnet list is empty", () => {
+  test("mainnet list has the expected size", () => {
     // Think carefully before adding a mainnet address; prefer an upstream registry when possible.
-    expect(ACTON_MAINNET_ADDRESSES).toHaveLength(0)
+    expect(ACTON_MAINNET_ADDRESSES).toHaveLength(4)
   })
 
   test("mainnet list contains only mainnet friendly addresses", () => {
