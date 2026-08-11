@@ -51,6 +51,7 @@ import {
   type ValidatorSetConfiguration,
 } from "../api/config"
 import {getExtraCurrencyMetadata} from "../api/extraCurrency"
+import {getPrecompiledContractMetadata} from "../api/precompiledContract"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {GlobalCapabilities} from "../components/GlobalCapabilities"
@@ -1229,27 +1230,54 @@ function PrecompiledContractsTable({
           {contracts.length === 0 ? (
             <DataTableEmpty colSpan={3}>No precompiled contracts configured</DataTableEmpty>
           ) : (
-            contracts.map(contract => (
-              <DataTableRow key={contract.codeHash}>
-                <DataTableCell className={styles.validatorIndex} tone="muted">
-                  {contract.index + 1}
-                </DataTableCell>
-                <DataTableCell className={styles.validatorHash} truncate>
-                  <TechnicalValue
-                    copyLabel="precompiled contract code hash"
-                    endLength={8}
-                    startLength={8}
-                    value={contract.codeHash}
-                  />
-                </DataTableCell>
-                <DataTableCell className={styles.validatorWeight}>
-                  <ConfigTechnicalNumberValue
-                    copyLabel="precompiled contract gas usage"
-                    value={contract.gasUsage}
-                  />
-                </DataTableCell>
-              </DataTableRow>
-            ))
+            contracts.map(contract => {
+              const metadata = getPrecompiledContractMetadata(contract.codeHash)
+
+              return (
+                <DataTableRow key={contract.codeHash}>
+                  <DataTableCell className={styles.validatorIndex} tone="muted">
+                    {contract.index + 1}
+                  </DataTableCell>
+                  <DataTableCell className={styles.validatorHash} truncate>
+                    <span className={styles.precompiledContractHash}>
+                      <TechnicalValue
+                        copyLabel="precompiled contract code hash"
+                        endLength={8}
+                        startLength={8}
+                        value={contract.codeHash}
+                      />
+                      <InfoPopover
+                        ariaLabel={`About ${metadata.title}`}
+                        contentClassName={styles.infoContent}
+                      >
+                        <p>
+                          <strong>{metadata.title}</strong>
+                        </p>
+                        <p>{metadata.description}</p>
+                        {metadata.verifiedContractUrl === undefined ? null : (
+                          <a href={metadata.verifiedContractUrl} target="_blank" rel="noreferrer">
+                            View verified contract
+                            <ExternalLink size={13} aria-hidden="true" />
+                          </a>
+                        )}
+                        {metadata.sourceUrl === undefined ? null : (
+                          <a href={metadata.sourceUrl} target="_blank" rel="noreferrer">
+                            View contract source
+                            <ExternalLink size={13} aria-hidden="true" />
+                          </a>
+                        )}
+                      </InfoPopover>
+                    </span>
+                  </DataTableCell>
+                  <DataTableCell className={styles.validatorWeight}>
+                    <ConfigTechnicalNumberValue
+                      copyLabel="precompiled contract gas usage"
+                      value={contract.gasUsage}
+                    />
+                  </DataTableCell>
+                </DataTableRow>
+              )
+            })
           )}
         </DataTableBody>
       </DataTableTable>
