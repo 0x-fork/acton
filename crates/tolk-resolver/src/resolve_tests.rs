@@ -1131,10 +1131,10 @@ mod tests {
                 }
             ",
             expect![[r"
-                uint128 -> Global(uintN at common.tolk:3513-3518)
-                int32 -> Global(intN at common.tolk:3237-3241)
-                bits256 -> Global(bitsN at common.tolk:5114-5119)
-                bytes32 -> Global(bytesN at common.tolk:5204-5210)
+                uint128 -> Global(uintN at common.tolk:3511-3516)
+                int32 -> Global(intN at common.tolk:3236-3240)
+                bits256 -> Global(bitsN at common.tolk:5108-5113)
+                bytes32 -> Global(bytesN at common.tolk:5198-5204)
             "]],
         );
     }

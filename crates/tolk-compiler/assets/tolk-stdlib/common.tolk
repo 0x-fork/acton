@@ -2025,4 +2025,3 @@ fun slice.skipMessageQueryId(mutate self): self
 @deprecated("use `createMessage` instead of composing messages manually")
 fun builder.storeMessageQueryId(mutate self, queryId: int): self
     asm(queryId self) "64 STU"
-
