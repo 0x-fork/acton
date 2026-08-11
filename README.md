@@ -2,10 +2,9 @@
 
 <img align="right" src="docs/public/logo-light.svg" height="150px" alt="Acton logo" />
 
-Acton is an all-in-one TON smart contract development toolkit written in Rust.
-It combines project scaffolding, build, testing, scripting, wallet and network
-operations, verification, linting, formatting, debugging, and low-level VM
-tooling in one CLI.
+Acton is an end-to-end platform for building TON dApps. It guides projects from
+the first smart contract to a live application and supports every step along
+the way.
 
 Built for **humans**. Perfect for **AI**.
 
@@ -13,15 +12,57 @@ Built for **humans**. Perfect for **AI**.
 
 <br clear="right" />
 
-## Why Acton
+## Act on-chain: one platform for every step
 
-- Single CLI for the full contract lifecycle: create, build, test, debug,
-  deploy, verify.
-- Native speed (Rust-based toolchain and test runtime).
-- Tolk-first workflow with built-in wrappers, testing utilities, and scripts.
-- Ready for dApp development with project templates and automatically generated TypeScript wrappers.
-- Fast test runner with fork mode, gas snapshots, coverage, mutation, fuzz testing, and the browser Test UI.
-- Browser test UI for failed tests, traces, logs, and coverage inspection.
+- **Start a project.** Scaffold a new application or bring an existing one
+  under a single `Acton.toml` project model for contracts, dependencies,
+  networks, scripts, tests, and generated artifacts.
+- **Write contracts.** Work in
+  [VS Code-based editors](https://marketplace.visualstudio.com/items?itemName=ton-core.vscode-ton)
+  or [JetBrains IDEs](https://plugins.jetbrains.com/plugin/23382-ton) with
+  first-class Acton integration, backed by the bundled Tolk compiler and
+  standard libraries, formatter, linter, and a built-in language server for
+  Tolk, TL-B, and Fift/TASM.
+- **Build contracts.** Dependency-aware compilation, caching, generated Tolk
+  wrappers, and BoC-backed artifacts keep multi-contract projects fast and
+  reproducible.
+- **Test behavior.** Write tests in Tolk and execute complete transaction chains
+  locally. Cover internal and external message flows, reproduce scenarios from
+  pinned Mainnet or Testnet state, and strengthen the suite with fuzzing,
+  mutation testing, and coverage.
+- **Optimize costs.** After tests pass, use gas snapshots, per-function reports,
+  and the `bench` module to find expensive code and measure the impact of
+  optimizations.
+- **Debug failures.** Open a failed test in the browser Test UI, or retrace an
+  on-chain transaction locally. Source maps connect contract code to VM logs,
+  storage changes, actions, and value flow.
+- **Build the dApp.** Once the contracts are tested, generate TypeScript
+  wrappers and connect them to the client application.
+- **Run locally.** Start `acton localnet` to run the contracts and client
+  together on a fast simulated TON network, with an optional fork when you need
+  state from a public network. You keep full control over network state and
+  block production, and can run the same environment in CI.
+- **Move beyond simulation.** When `acton localnet` is not enough, use Localton
+  to start real TON nodes and the supporting network stack on your computer,
+  then test the dApp locally before moving to Testnet.
+- **Work visually.** Acton Studio brings test history, local environments,
+  explorer views, wallets, and message simulation into one browser workspace
+  for developing and debugging the entire dApp.
+- **Deploy to Testnet.** Run the same scripts you tested locally and fund the
+  deployment wallet with
+  [`acton wallet airdrop`](https://ton-blockchain.github.io/acton/docs/wallets/#fund-a-wallet-on-testnet)
+  or use the [Actonscan faucet](https://testnet.actonscan.com/faucet).
+- **Operate on-chain.** Wallet management, TON Connect approvals, on-chain
+  libraries, custom networks, and explorer integration keep ongoing network
+  operations in the same toolchain.
+- **Verify and understand on-chain activity.** The
+  [Acton Verifier](https://actonscan.com/verified?network=mainnet) publishes and
+  checks contract source, the indexer processes network data, and
+  [Actonscan](https://actonscan.com/) makes activity easy to follow on any
+  network, including local environments.
+- **Automate delivery.** CI-ready JSON, SARIF, GitHub, GitLab, and JUnit output,
+  saved traces, and Docker workflows make the same development loop usable in
+  automation.
 
 ## Install
 
