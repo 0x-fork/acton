@@ -674,7 +674,6 @@ pub fn print_method_declaration<'a>(ctx: &Context<'_>, m: &Method) -> Option<RcD
 pub fn print_get_method_declaration<'a>(ctx: &Context, g: &GetMethod) -> Option<RcDoc<'a>> {
     let name = g.name()?;
     let parameters: Vec<_> = g.parameters().collect();
-    let body = g.body()?;
 
     let mut parts = vec![];
     if let Some(annotations) = g.annotations() {
@@ -695,11 +694,14 @@ pub fn print_get_method_declaration<'a>(ctx: &Context, g: &GetMethod) -> Option<
         parts.push(types::print_type(ctx, &ret)?);
     }
 
-    if should_print_inline_function_body(ctx, &body) {
-        parts.push(RcDoc::space());
-        parts.push(print_function_body(ctx, &body)?);
-    } else {
-        parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
+    if let Some(body) = g.body() {
+        if should_print_inline_function_body(ctx, &body) {
+            parts.push(RcDoc::space());
+            parts.push(print_function_body(ctx, &body)?);
+        } else {
+            parts
+                .push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
+        }
     }
 
     Some(RcDoc::concat(parts))

@@ -9,6 +9,9 @@ fn indexes_declaration_and_contract_documentation() {
 /// Function docs.
 fun answer(): int { return 42; }
 
+/// Getter docs.
+get fun balance(): int
+
 /// Struct docs.
 struct State {
     /// Count docs.
@@ -52,6 +55,7 @@ contract Counter {
 
     expect![[r"
         answer: Function docs.
+        balance: Getter docs.
         State: Struct docs.
         State.count: Count docs.
         State.owner: Owner docs.

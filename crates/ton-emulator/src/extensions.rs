@@ -118,10 +118,17 @@ pub unsafe fn with_tuple(ptr: *const c_char, f: impl FnOnce(&mut Tuple)) -> *con
             .cast_const();
     };
 
-    let mut tuple = Boc::decode_base64(boc)
-        .ok()
-        .and_then(|c| tvm_ffi::serde::parse_tuple(&c).ok())
-        .unwrap_or_else(Tuple::empty);
+    let mut tuple = match Boc::decode_base64(boc) {
+        Ok(cell) => tvm_ffi::serde::parse_tuple(&cell).unwrap_or_else(|error| {
+            eprintln!("failed to parse extension stack tuple: {error:#}");
+            eprintln!("extension stack BoC: {boc}");
+            Tuple::empty()
+        }),
+        Err(error) => {
+            eprintln!("failed to decode extension stack BoC: {error:#}");
+            Tuple::empty()
+        }
+    };
 
     f(&mut tuple);
 

@@ -1124,6 +1124,33 @@ fn test_get_method_without_fun() {
 }
 
 #[test]
+fn test_get_method_without_body() {
+    check(
+        "@pure\nget balance(index:int): int",
+        expect![[r"
+                @pure
+                get fun balance(index: int): int"]],
+    );
+}
+
+#[test]
+fn test_get_method_without_body_or_signature() {
+    check_without_trees("get seqno", expect!["get fun seqno()"]);
+}
+
+#[test]
+fn test_get_method_without_body_preserves_multiline_parameters() {
+    check(
+        "get item(\nindex:int,\nfallback:slice\n): slice?",
+        expect![[r"
+                get fun item(
+                    index: int,
+                    fallback: slice,
+                ): slice?"]],
+    );
+}
+
+#[test]
 fn test_get_method_with_annotations() {
     check(
         "@pure\nget fun value(): int { return 42; }",

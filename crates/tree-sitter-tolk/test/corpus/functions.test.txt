@@ -359,6 +359,54 @@ fun inc(x: int, by: int = 1+C) {}
     (block_statement)))
 
 ========================================================================
+Get method declaration without a body
+========================================================================
+
+get fun balance(): int
+get owner(): address
+@method_id(1)
+get explicit
+get item(index: int, fallback: slice): slice?
+get fun live(): int { return 1; }
+
+------------------------------------------------------------------------
+
+(source_file
+  (get_method_declaration
+    (identifier)
+    (parameter_list)
+    (type_identifier))
+  (get_method_declaration
+    (identifier)
+    (parameter_list)
+    (type_identifier))
+  (get_method_declaration
+    (annotation_list
+      (annotation
+        (annotation_name)
+        (annotation_arguments
+          (number_literal))))
+    (identifier))
+  (get_method_declaration
+    (identifier)
+    (parameter_list
+      (parameter_declaration
+        (identifier)
+        (type_identifier))
+      (parameter_declaration
+        (identifier)
+        (type_identifier)))
+    (nullable_type
+      (type_identifier)))
+  (get_method_declaration
+    (identifier)
+    (parameter_list)
+    (type_identifier)
+    (block_statement
+      (return_statement
+        (number_literal)))))
+
+========================================================================
 Assembly functions
 ========================================================================
 
