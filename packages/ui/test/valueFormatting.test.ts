@@ -95,12 +95,16 @@ describe("shared value formatting", () => {
     expect({
       bytes: formatByteSize(512),
       kilobytes: formatByteSize(1536),
+      kilobytesInput: formatByteSize(1.5, {unit: "kilobytes"}),
       megabytes: formatByteSize(12 * 1024 * 1024),
+      gigabytesInput: formatByteSize(2, {unit: "gigabytes"}),
       terabytes: formatByteSize(1.25 * 1024 ** 4),
     }).toMatchInlineSnapshot(`
       {
         "bytes": "512 B",
+        "gigabytesInput": "2 GB",
         "kilobytes": "1.5 KB",
+        "kilobytesInput": "1.5 KB",
         "megabytes": "12 MB",
         "terabytes": "1.3 TB",
       }
@@ -171,7 +175,7 @@ describe("shared value formatting", () => {
   test("renders semantic value components", () => {
     expect({
       boolean: renderToStaticMarkup(createElement(BooleanValue, {value: true})),
-      bytes: renderToStaticMarkup(createElement(ByteSize, {value: 1536})),
+      bytes: renderToStaticMarkup(createElement(ByteSize, {value: 1536, tooltip: false})),
       count: renderToStaticMarkup(createElement(CountValue, {value: 2, singular: "transaction"})),
       number: renderToStaticMarkup(createElement(NumberValue, {value: "12345678901234567"})),
       percentage: renderToStaticMarkup(createElement(Percentage, {value: "12.5"})),
