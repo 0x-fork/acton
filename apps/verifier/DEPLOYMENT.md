@@ -2,7 +2,9 @@
 
 This document describes how to deploy the verifier backend as a Docker service on a server.
 
-The Docker image contains the verifier backend, Node.js, the static compiler worker packages, Git, and OpenSSH. It does not run a TON node by itself. The verifier needs a TonCenter-compatible API endpoint only when resolving a contract address to its current code hash.
+The Docker image contains the verifier backend, Node.js, the compiler worker,
+Git, and OpenSSH. It does not run a TON node. The verifier always needs a
+TonCenter v3 endpoint for TON testnet payment verification.
 
 ## Architecture
 
@@ -10,6 +12,8 @@ At runtime the service needs:
 
 - Verifier HTTP backend exposed on port `3000`.
 - TonCenter-compatible API endpoint for address-to-code-hash resolution.
+- Testnet wallet address that receives verification payments.
+- SQLite payment ledger that prevents transaction replay.
 - Git source repository for verified source bundles.
 - SQLite registry index for fast reads, rebuilt from Git when stale or missing.
 - Git credentials that allow pushing to the source repository.
@@ -39,6 +43,7 @@ Recommended server setup:
 - Linux VM with at least 2 CPU cores and 2 GB RAM
 - Persistent Docker volume for `/var/lib/verifier/source-repo`
 - Persistent Docker volume for `/var/lib/verifier/registry-index`
+- Persistent Docker volume for `/var/lib/verifier/payment-ledger`
 - Firewall allowing inbound traffic only to the reverse proxy or to port `3000` if exposing directly
 - Secrets managed through environment files, Docker secrets, or your orchestrator
 
@@ -108,11 +113,14 @@ sudo install -m 600 /dev/null /opt/ton-verifier/verifier.env
 Example `/opt/ton-verifier/verifier.env`:
 
 ```bash
-VERIFIER_NETWORK=mainnet
+VERIFIER_NETWORK=testnet
 VERIFIER_LOG_LEVEL=info
 VERIFIER_API_KEY=
-VERIFIER_TONCENTER_BASE_URL=https://toncenter.com
+VERIFIER_TONCENTER_BASE_URL=https://testnet.toncenter.com
 VERIFIER_TONCENTER_API_KEY=
+VERIFIER_PAYMENT_ADDRESS="0:<64-hex-character-testnet-wallet-address>"
+VERIFIER_PAYMENT_MIN_AMOUNT_NANO=500000000
+VERIFIER_PAYMENT_LEDGER_PATH=/var/lib/verifier/payment-ledger/payment-ledger.sqlite3
 
 SOURCE_REPOSITORY_URL=git@github.com:i582/test-verify-repo.git
 SOURCE_REPOSITORY_STORAGE_ROOT=sources
@@ -128,32 +136,39 @@ VERIFIER_REGISTRY_INDEX_PATH=/var/lib/verifier/registry-index/registry-index.sql
 `VERIFIER_API_KEY` protects the optional `verified_at` field on
 `POST /api/v1/verify`; clients pass it in the `X-Verifier-Key` header.
 
-For testnet:
-
-```bash
-VERIFIER_NETWORK=testnet
-VERIFIER_TONCENTER_BASE_URL=https://testnet.toncenter.com
-```
-
-For a localnet/lightnode on the Docker host:
-
-```bash
-VERIFIER_NETWORK=localnet
-VERIFIER_TONCENTER_BASE_URL=http://host.docker.internal:5412
-```
+The payment verifier supports only TON testnet. `VERIFIER_PAYMENT_ADDRESS` must
+use the raw basechain form `0:<64 hex characters>`. The minimum amount is in
+nanoGRAM and must be more than zero. This example sets the amount to
+`0.5 GRAM`.
 
 ## Configure GitHub Source Storage
 
 Use a dedicated repository for source storage. The verifier only needs push access to that repository.
+
+Prepare the repository from the monorepo root before the first deployment:
+
+```bash
+git clone 'git@github.com:i582/test-verify-repo.git' source-repo
+apps/verifier/scripts/prepare-source-repository.sh config.toml
+git -C source-repo push origin HEAD:main
+```
+
+Set `source_repository.path` in `config.toml` to the cloned `source-repo`
+directory before you run the preparation script. The script creates the
+required root commit and `.gitattributes` rule.
 
 Recommended authentication is an SSH deploy key with write access:
 
 ```bash
 sudo install -m 700 -d /opt/ton-verifier/secrets
 sudo install -m 600 source_repo_key /opt/ton-verifier/secrets/source_repo_key
+sudo chown 1000:1000 /opt/ton-verifier/secrets/source_repo_key
 ```
 
-The key should match:
+The container runs as user ID `1000`. Make sure that this user can read the
+mounted key. Use the equivalent ownership rule for your secret manager.
+
+The key must match:
 
 ```bash
 SOURCE_REPOSITORY_URL=git@github.com:i582/test-verify-repo.git
@@ -178,6 +193,7 @@ services:
     volumes:
       - source-repo:/var/lib/verifier/source-repo
       - registry-index:/var/lib/verifier/registry-index
+      - payment-ledger:/var/lib/verifier/payment-ledger
       - /opt/ton-verifier/secrets/source_repo_key:/run/secrets/source_repo_key:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -197,6 +213,7 @@ services:
 volumes:
   source-repo:
   registry-index:
+  payment-ledger:
 ```
 
 Start the service:
@@ -220,6 +237,20 @@ Expected health response:
 ```json
 { "ok": true }
 ```
+
+During startup recovery, `/healthz` returns `503` with this response:
+
+```json
+{ "ok": false, "payment_recovery": "rebuilding" }
+```
+
+The server scans the complete payment-wallet history before it becomes ready.
+It marks every funded protocol payment as consumed. It also preserves all
+known replay records. A failed scan retries with an exponential delay.
+
+One payment permits at most three verification claims. The limit includes a
+claim that resumes after an expired processing lease. Later claims fail as
+used without another TonCenter request.
 
 ## Systemd Wrapper
 
@@ -273,6 +304,11 @@ location / {
 
 Keep direct port `3000` closed to the public internet if the reverse proxy is the public entrypoint.
 
+Configure rate limits in the reverse proxy. A useful initial policy permits 10
+ticket requests and two verification uploads per source IP each minute. Return
+`429` when a client exceeds the limit, and tune the values from production
+traffic. Keep `/healthz` outside this limit.
+
 ## Smoke Test
 
 Check service health:
@@ -293,19 +329,32 @@ Fetch the OpenAPI schema:
 curl -sS 'http://127.0.0.1:3000/api/v1/openapi.json'
 ```
 
-Submit a verification request:
+Request a payment ticket:
+
+```bash
+curl -sS -X POST http://127.0.0.1:3000/api/v1/take-ticket \
+  -H 'Content-Type: application/json' \
+  -d '{"code_hash":"<code_hash>"}'
+```
+
+If the response status is `payment_required`, send the returned amount and
+comment to the returned testnet address. Wait for the finalized recipient
+transaction hash.
+
+Submit a verification request with that transaction hash:
 
 ```bash
 curl -sS -X POST http://127.0.0.1:3000/api/v1/verify \
-  -F code_hash=<code_hash> \
+  -F 'code_hash=<code_hash>' \
+  -F 'tx_hash=<recipient-transaction-hash>' \
   -F language=tolk \
-  -F 'compile_params={"compiler_version":"1.4.1"}' \
+  -F 'compile_params={"compiler_version":"1.4.2"}' \
   -F 'sources=[{"path":"main.tolk","is_entrypoint":true},{"path":"imports/math.tolk","is_entrypoint":false}]' \
   -F 'files=@./main.tolk;filename=main.tolk' \
   -F 'files=@./imports/math.tolk;filename=imports/math.tolk'
 ```
 
-Successful response should contain:
+The successful response contains:
 
 ```json
 {
@@ -370,7 +419,13 @@ The SQLite registry index volume is useful for fast restarts, but it is not the
 source of truth. If the index volume is lost, the service rebuilds it from the
 Git source repository.
 
-The Docker `source-repo` volume is a local clone. The authoritative source storage should be the remote Git repository after every successful push.
+The payment ledger is also derived state. If this volume is lost, the service
+rebuilds it from TON testnet history and marks all funded protocol payments as
+used. Keeping or backing up this volume does not skip the full startup history
+scan.
+
+The Docker `source-repo` volume is a local clone. The remote Git repository is
+the authoritative source storage after every successful push.
 
 ## Troubleshooting
 
@@ -412,14 +467,14 @@ Common causes:
 
 Check:
 
-- `VERIFIER_NETWORK` matches the target network.
+- `VERIFIER_NETWORK` is `testnet`.
 - `VERIFIER_TONCENTER_BASE_URL` is reachable from inside the container.
 - `VERIFIER_TONCENTER_API_KEY` is set if your endpoint requires it.
 
 Connectivity check:
 
 ```bash
-docker compose exec verifier node -e "fetch(process.env.VERIFIER_TONCENTER_BASE_URL + '/api/v2/jsonRPC').catch(e=>{console.error(e); process.exit(1)})"
+docker compose exec verifier node -e "const u=new URL('/api/v3/transactions',process.env.VERIFIER_TONCENTER_BASE_URL);u.searchParams.set('account',process.env.VERIFIER_PAYMENT_ADDRESS);u.searchParams.set('limit','1');fetch(u,{headers:{'X-API-Key':process.env.VERIFIER_TONCENTER_API_KEY||''}}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(()=>console.log('ok')).catch(e=>{console.error(e);process.exit(1)})"
 ```
 
 ### Compiler fails
@@ -460,9 +515,25 @@ Binding to `127.0.0.1:3000` inside the container will not expose the service cor
 
 ## Operational Notes
 
+- Run one write-capable verifier instance for each payment wallet. SQLite does
+  not coordinate payment claims or startup recovery across replicas.
 - Keep only one verifier instance writing to the same Git checkout. The current Git storage lock is process-local.
+- Treat the configured TonCenter provider as trusted for payment data and
+  finality. The provider sees the payment address, wallet-history reads, and
+  transaction hashes.
+- Before changing the payment address or increasing the minimum amount, stop
+  ticket issuance at the reverse proxy. Keep `/verify` available for an
+  announced grace interval. Then deploy the new configuration. Quotes have no
+  server-side expiry, so payments submitted after this interval are discarded.
+- Recovery scans only the configured payment address. Keep the address stable
+  unless the deployment intentionally invalidates old outstanding payments.
 - Use a dedicated Git repository for source storage.
 - Do not bake deploy keys into the image.
 - Prefer SSH deploy keys scoped to one repository.
 - Use a reverse proxy for TLS and request size limits.
+- Add rate limits for `/api/v1/take-ticket` and `/api/v1/verify`. Testnet GRAM
+  alone does not stop a funded attacker.
+- Do not submit secrets in source files. Git and the source API publish every
+  accepted source bundle.
 - Monitor logs for failed Git pushes, compiler errors, and TonCenter API errors.
+- Monitor `/healthz` for payment-history recovery failures.

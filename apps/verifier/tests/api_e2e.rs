@@ -1,5 +1,7 @@
 mod support;
 
+use std::sync::Arc;
+
 use axum::{
     body::{Body, to_bytes},
     http::{Method, Request, StatusCode, header},
@@ -9,14 +11,22 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 use verifier::app;
 use verifier::compilers::CompileGeneratedSource;
+use verifier::payment::{
+    OnchainPaymentVerifier, PaymentAttemptOutcome, PaymentError, PaymentLedger, PaymentVerifier,
+};
 use verifier::source_storage::SourceMapData;
 
 use support::{
-    app_state, app_state_with_api_key, failing_compiler_app_state,
-    failing_source_storage_app_state, file_part, get, mapped_compiler_app_state, owned_file_part,
-    owned_text_part, post_verify, post_verify_with_api_key, recording_app_state,
-    recording_source_storage_app_state, recording_source_storage_app_state_with_generated_sources,
-    recording_source_storage_app_state_with_source_map_data, response_json, text_part,
+    PAYMENT_ADDRESS, PAYMENT_TX_HASH, StaticPaymentBlockchainClient, app_state,
+    app_state_with_api_key, fail_once_source_storage_app_state, failing_compiler_app_state,
+    failing_compiler_app_state_with_payment_outcomes, failing_source_storage_app_state,
+    failing_source_storage_app_state_with_payment_outcomes, file_part, get,
+    mapped_compiler_app_state, owned_file_part, owned_text_part, payment_error_app_state,
+    payment_transaction, post_verify, post_verify_with_api_key, post_verify_without_payment,
+    recording_app_state, recording_payment_app_state, recording_source_storage_app_state,
+    recording_source_storage_app_state_with_generated_sources,
+    recording_source_storage_app_state_with_source_map_data, recovering_payment_app_state,
+    response_json, text_part, timing_out_compiler_app_state_with_payment_outcomes,
     unverified_app_state,
 };
 
@@ -47,6 +57,44 @@ const SOURCES_ALIASED_FILES: &str = r#"[
   {"path":"contracts/lib.tolk","is_entrypoint":false}
 ]"#;
 
+async fn post_take_ticket(
+    state: verifier::state::AppState,
+    code_hash: &str,
+) -> axum::response::Response {
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri("/api/v1/take-ticket")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(json!({"code_hash": code_hash}).to_string()))
+        .expect("POST /api/v1/take-ticket request should be valid");
+
+    app::router_with_state(state)
+        .oneshot(request)
+        .await
+        .expect("router should handle POST /api/v1/take-ticket request")
+}
+
+fn valid_verify_parts() -> Vec<support::MultipartPart> {
+    vec![
+        text_part("code_hash", CODE_HASH_ONE),
+        text_part("language", "tolk"),
+        text_part("compile_params", COMPILE_PARAMS_TOLK),
+        text_part("sources", SOURCES_MAIN),
+        file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+    ]
+}
+
+fn response_statuses(operation: &Value) -> Vec<String> {
+    let mut statuses = operation["responses"]
+        .as_object()
+        .expect("OpenAPI operation responses should be an object")
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    statuses.sort();
+    statuses
+}
+
 #[tokio::test]
 async fn healthz_returns_ok() {
     let response = get(app_state(&[], CODE_HASH_ONE), "/healthz").await;
@@ -55,6 +103,204 @@ async fn healthz_returns_ok() {
 
     let body = response_json::<Value>(response).await;
     assert_eq!(body, json!({"ok": true}));
+}
+
+#[tokio::test]
+async fn healthz_reports_payment_history_recovery() {
+    let response = get(recovering_payment_app_state(CODE_HASH_ONE), "/healthz").await;
+
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"ok": false, "payment_recovery": "rebuilding"})
+    );
+}
+
+#[tokio::test]
+async fn take_ticket_returns_a_testnet_payment_bound_to_the_code_hash() {
+    let response = post_take_ticket(app_state(&[], CODE_HASH_ONE), CODE_HASH_ONE_BASE64).await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({
+            "status": "payment_required",
+            "code_hash": CODE_HASH_ONE,
+            "payment_address": "0:1111111111111111111111111111111111111111111111111111111111111111",
+            "amount_nano": "10000000",
+            "comment": format!("acton-verify:v1:{CODE_HASH_ONE}")
+        })
+    );
+}
+
+#[tokio::test]
+async fn take_ticket_rejects_an_invalid_code_hash() {
+    let response = post_take_ticket(app_state(&[], CODE_HASH_ONE), "not-a-code-hash").await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "code_hash must contain exactly 64 hexadecimal characters"})
+    );
+}
+
+#[tokio::test]
+async fn take_ticket_waits_for_payment_history_recovery() {
+    let response =
+        post_take_ticket(recovering_payment_app_state(CODE_HASH_ONE), CODE_HASH_ONE).await;
+
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "payment_recovery_in_progress: payment history is still being recovered"})
+    );
+}
+
+#[tokio::test]
+async fn verify_requires_a_payment_for_unverified_code() {
+    let response = post_verify_without_payment(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::PAYMENT_REQUIRED);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "missing required field: tx_hash"})
+    );
+}
+
+#[tokio::test]
+async fn verify_rejects_an_invalid_payment_transaction_hash() {
+    let response = post_verify_without_payment(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            text_part("tx_hash", "123"),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({
+            "error": "payment_tx_hash_invalid: transaction hash must be 64 hexadecimal characters or a 32-byte base64 value"
+        })
+    );
+}
+
+#[tokio::test]
+async fn verify_rejects_an_invalid_direct_code_hash_before_claiming_payment() {
+    let response = post_verify_without_payment(
+        payment_error_app_state(CODE_HASH_ONE, PaymentError::AlreadyUsed),
+        vec![
+            text_part("code_hash", "not-a-code-hash"),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            text_part("tx_hash", PAYMENT_TX_HASH),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "code_hash must contain exactly 64 hexadecimal characters"})
+    );
+}
+
+#[tokio::test]
+async fn verify_maps_payment_failures_to_stable_http_contracts() {
+    let cases = [
+        (
+            PaymentError::TransactionNotFound,
+            StatusCode::PAYMENT_REQUIRED,
+            "payment_not_found: transaction was not found on TON testnet".to_owned(),
+        ),
+        (
+            PaymentError::InvalidTransaction,
+            StatusCode::PAYMENT_REQUIRED,
+            "payment_invalid: transaction is not a finalized incoming payment".to_owned(),
+        ),
+        (
+            PaymentError::InsufficientAmount {
+                expected: 1_000_000,
+                actual: 999_999,
+            },
+            StatusCode::PAYMENT_REQUIRED,
+            "payment_insufficient: expected at least 1000000 nanoGRAM, received 999999".to_owned(),
+        ),
+        (
+            PaymentError::CodeHashMismatch,
+            StatusCode::PAYMENT_REQUIRED,
+            "payment_code_hash_mismatch: transaction comment does not match the requested code hash"
+                .to_owned(),
+        ),
+        (
+            PaymentError::AlreadyUsed,
+            StatusCode::CONFLICT,
+            "payment_used: transaction has already been used".to_owned(),
+        ),
+        (
+            PaymentError::InProgress,
+            StatusCode::CONFLICT,
+            "payment_in_progress: transaction is already being processed".to_owned(),
+        ),
+    ];
+
+    for (payment_error, expected_status, expected_error) in cases {
+        let response = post_verify(
+            payment_error_app_state(CODE_HASH_ONE, payment_error),
+            valid_verify_parts(),
+        )
+        .await;
+
+        assert_eq!(response.status(), expected_status, "{expected_error}");
+        assert_eq!(
+            response_json::<Value>(response).await,
+            json!({"error": expected_error})
+        );
+    }
+}
+
+#[tokio::test]
+async fn take_ticket_skips_payment_for_already_verified_code() {
+    let state = app_state(&[], CODE_HASH_ONE);
+    let verify_response = post_verify(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+    assert_eq!(verify_response.status(), StatusCode::OK);
+
+    let response = post_take_ticket(state, CODE_HASH_ONE).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json::<Value>(response).await;
+    assert_eq!(body["status"], "already_verified");
+    assert_eq!(body["code_hash"], CODE_HASH_ONE);
+    assert!(body["source_bundle_hash"].is_string());
+    assert!(body["storage_revision"].is_string());
+    assert!(body.get("payment_address").is_none());
 }
 
 #[tokio::test]
@@ -94,6 +340,7 @@ async fn openapi_json_documents_verifier_api() {
 
     let body = response_json::<Value>(response).await;
     assert_eq!(body["openapi"], "3.1.0");
+    assert!(body["paths"]["/api/v1/take-ticket"].is_object());
     assert!(body["paths"]["/api/v1/verify"].is_object());
     assert!(body["paths"]["/api/v1/last_verified"].is_object());
     assert!(body["paths"]["/api/v1/statistics"].is_object());
@@ -106,6 +353,16 @@ async fn openapi_json_documents_verifier_api() {
     assert!(body["components"]["schemas"]["VerificationStatisticsResponse"].is_object());
     assert!(body["components"]["schemas"]["VerificationStatisticsHistoryResponse"].is_object());
     assert!(body["components"]["schemas"]["SourceFileResponse"].is_object());
+
+    let take_ticket = &body["paths"]["/api/v1/take-ticket"]["post"];
+    let verify = &body["paths"]["/api/v1/verify"]["post"];
+    assert_eq!(take_ticket["operationId"], "take_ticket");
+    assert_eq!(verify["operationId"], "verify");
+    assert_eq!(response_statuses(take_ticket), ["200", "400", "502", "503"]);
+    assert_eq!(
+        response_statuses(verify),
+        ["200", "400", "401", "402", "404", "409", "502", "503"]
+    );
 }
 
 #[tokio::test]
@@ -1172,8 +1429,9 @@ async fn verify_stores_generated_sources_on_hash_match() {
 
 #[tokio::test]
 async fn verify_stores_source_bundle_on_hash_match() {
+    let state = app_state(&[], CODE_HASH_ONE);
     let response = post_verify(
-        app_state(&[], CODE_HASH_ONE),
+        state.clone(),
         vec![
             text_part("code_hash", CODE_HASH_ONE),
             text_part("language", "tolk"),
@@ -1198,6 +1456,21 @@ async fn verify_stores_source_bundle_on_hash_match() {
             .all(|byte| byte.is_ascii_hexdigit())
     );
     assert_eq!(body.storage_revision.as_deref(), Some("mock-revision"));
+
+    let source_response = get(
+        state,
+        &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
+    )
+    .await;
+    assert_eq!(source_response.status(), StatusCode::OK);
+    let source = response_json::<VerificationSourceResponse>(source_response).await;
+    assert_eq!(
+        source
+            .bundle
+            .and_then(|bundle| bundle.payment_tx_hash)
+            .as_deref(),
+        Some("a07d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394b")
+    );
 }
 
 #[tokio::test]
@@ -1222,7 +1495,31 @@ async fn verify_does_not_store_source_bundle_on_hash_mismatch() {
 }
 
 #[tokio::test]
-async fn verify_returns_bad_gateway_when_source_storage_fails() {
+async fn deterministic_mismatch_consumes_the_payment() {
+    let (state, outcomes) = recording_payment_app_state(CODE_HASH_TWO);
+    let response = post_verify(
+        state,
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        *outcomes
+            .lock()
+            .expect("payment outcomes mutex should not be poisoned"),
+        [PaymentAttemptOutcome::Consumed]
+    );
+}
+
+#[tokio::test]
+async fn verify_hides_nonretryable_source_storage_failure() {
     let response = post_verify(
         failing_source_storage_app_state(&[], CODE_HASH_ONE),
         vec![
@@ -1236,7 +1533,75 @@ async fn verify_returns_bad_gateway_when_source_storage_fails() {
     .await;
 
     assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
-    assert_error_contains(response, "source storage failed").await;
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "internal verifier error"})
+    );
+}
+
+#[tokio::test]
+async fn transient_source_storage_failure_keeps_the_payment_retryable() {
+    let (state, outcomes) = failing_source_storage_app_state_with_payment_outcomes(CODE_HASH_ONE);
+    let response = post_verify(
+        state,
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let body = response_json::<Value>(response).await;
+    assert_eq!(
+        body,
+        json!({"error": "verification_retryable: source storage is temporarily unavailable"})
+    );
+    assert!(!body.to_string().contains("source storage failed"));
+    assert_eq!(
+        *outcomes
+            .lock()
+            .expect("payment outcomes mutex should not be poisoned"),
+        [PaymentAttemptOutcome::Retryable]
+    );
+}
+
+#[tokio::test]
+async fn retryable_storage_failure_allows_a_second_request_with_the_same_payment() {
+    let (state, recorded_requests) =
+        fail_once_source_storage_app_state(CODE_HASH_ONE, CODE_HASH_ONE).await;
+
+    let first_response = post_verify(state.clone(), valid_verify_parts()).await;
+    assert_eq!(first_response.status(), StatusCode::BAD_GATEWAY);
+    let first_body = response_json::<Value>(first_response).await;
+    assert_eq!(
+        first_body,
+        json!({"error": "verification_retryable: source storage is temporarily unavailable"})
+    );
+    assert!(
+        !first_body
+            .to_string()
+            .contains("source storage internal test details")
+    );
+
+    let second_response = post_verify(state, valid_verify_parts()).await;
+    assert_eq!(second_response.status(), StatusCode::OK);
+    assert_eq!(
+        response_json::<VerifyResponse>(second_response)
+            .await
+            .verification_result,
+        "match"
+    );
+    assert_eq!(
+        recorded_requests
+            .lock()
+            .expect("recorded source storage requests mutex should not be poisoned")
+            .len(),
+        2
+    );
 }
 
 #[tokio::test]
@@ -1260,6 +1625,81 @@ async fn verify_returns_bad_request_when_compilation_fails() {
         error.contains("Tolk syntax error at main.tolk:1:5"),
         "expected error to contain compiler details, got {body}"
     );
+}
+
+#[tokio::test]
+async fn deterministic_compiler_failure_consumes_the_payment() {
+    let (state, outcomes) =
+        failing_compiler_app_state_with_payment_outcomes("Tolk syntax error at main.tolk:1:5");
+    let response = post_verify(state, valid_verify_parts()).await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "Tolk syntax error at main.tolk:1:5"})
+    );
+    assert_eq!(
+        *outcomes
+            .lock()
+            .expect("payment outcomes mutex should not be poisoned"),
+        [PaymentAttemptOutcome::Consumed]
+    );
+}
+
+#[tokio::test]
+async fn internal_compiler_failure_is_hidden_and_consumes_the_payment() {
+    let (state, outcomes) = timing_out_compiler_app_state_with_payment_outcomes(12_345);
+    let response = post_verify(state, valid_verify_parts()).await;
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    let body = response_json::<Value>(response).await;
+    assert_eq!(body, json!({"error": "internal verifier error"}));
+    assert!(!body.to_string().contains("12_345"));
+    assert!(!body.to_string().contains("12345"));
+    assert_eq!(
+        *outcomes
+            .lock()
+            .expect("payment outcomes mutex should not be poisoned"),
+        [PaymentAttemptOutcome::Consumed]
+    );
+}
+
+#[tokio::test]
+async fn restart_rebuilds_consumed_payments_from_file_backed_history() {
+    let directory = tempfile::tempdir().expect("temporary ledger directory should be created");
+    let ledger_path = directory.path().join("payments.sqlite3");
+    let transaction = payment_transaction(PAYMENT_TX_HASH, CODE_HASH_ONE);
+
+    let first_server = OnchainPaymentVerifier::new(
+        Arc::new(StaticPaymentBlockchainClient::new(None, Vec::new())),
+        PaymentLedger::open(&ledger_path).expect("file-backed payment ledger should open"),
+        PAYMENT_ADDRESS.to_owned(),
+        1_000_000,
+    );
+    first_server
+        .recover()
+        .await
+        .expect("initial empty recovery should succeed");
+    drop(first_server);
+
+    let restarted_server = OnchainPaymentVerifier::new(
+        Arc::new(StaticPaymentBlockchainClient::new(
+            Some(transaction.clone()),
+            vec![transaction],
+        )),
+        PaymentLedger::open(&ledger_path).expect("file-backed payment ledger should reopen"),
+        PAYMENT_ADDRESS.to_owned(),
+        1_000_000,
+    );
+    restarted_server
+        .recover()
+        .await
+        .expect("restart recovery should rebuild payment history");
+
+    assert!(matches!(
+        restarted_server.claim(PAYMENT_TX_HASH, CODE_HASH_ONE).await,
+        Err(PaymentError::AlreadyUsed)
+    ));
 }
 
 #[tokio::test]
@@ -1972,6 +2412,7 @@ struct VerificationSourceResponse {
 #[derive(Debug, Deserialize)]
 struct VerifiedSourceBundle {
     source_bundle_hash: String,
+    payment_tx_hash: Option<String>,
     verified_at: u64,
     entrypoint: String,
     compiler: VerifiedCompiler,
