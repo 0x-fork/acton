@@ -329,6 +329,23 @@ mod tests {
     }
 
     #[test]
+    fn test_get_method_without_body() {
+        check_definition(
+            r"
+                type MyInt = builtin;
+                const DEFAULT: MyInt = 1;
+
+                get fun foo(value: <caret>MyInt = <caret>DEFAULT): <caret>MyInt
+            ",
+            expect![[r"
+                MyInt -> Global(MyInt at test.tolk:22-27)
+                DEFAULT -> Global(DEFAULT at test.tolk:61-68)
+                MyInt -> Global(MyInt at test.tolk:22-27)
+            "]],
+        );
+    }
+
+    #[test]
     fn test_match() {
         check_definition(
             r"

@@ -100,6 +100,19 @@ get method_id(): int {}"#,
 }
 
 #[test]
+fn shows_bodyless_get_methods_in_source_order() {
+    case_document_symbols(
+        r"get balance(owner: address): coins
+get fun seqno
+fun main() {}",
+        expect![[r"
+            get balance(owner: address): coins (Event) [0:0-0:34]
+            get seqno() (Event) [1:0-1:13]
+            main() (Function) [2:0-2:13]"]],
+    );
+}
+
+#[test]
 fn shows_generic_function_and_inferred_value_details() {
     case_document_symbols(
         r"const ANSWER = 42;
