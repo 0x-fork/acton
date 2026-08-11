@@ -1,12 +1,11 @@
-import {mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs"
 import path from "node:path"
 import {createRequire} from "node:module"
-import {constants, gzipSync} from "node:zlib"
 
 import react from "@vitejs/plugin-react"
-import {defineConfig, type Plugin} from "vite"
+import {defineConfig} from "vite"
 import {nodePolyfills} from "vite-plugin-node-polyfills"
 
+import {gzipEmbeddedAssets} from "../ui/vite/embeddedAssets.ts"
 import {themeBootstrap} from "../ui/vite/themeBootstrap.ts"
 
 const require = createRequire(import.meta.url)
@@ -23,7 +22,7 @@ export default defineConfig({
         Buffer: true,
       },
     }),
-    embeddedAssets(outputDirectory),
+    gzipEmbeddedAssets(outputDirectory),
   ],
   resolve: {
     alias: {
@@ -48,37 +47,3 @@ export default defineConfig({
     port: 3015,
   },
 })
-
-function embeddedAssets(buildDirectory: string): Plugin {
-  const embeddedDirectory = path.join(buildDirectory, ".embedded")
-
-  return {
-    name: "acton-studio-embedded-assets",
-    apply: "build",
-    closeBundle() {
-      rmSync(embeddedDirectory, {recursive: true, force: true})
-      const sourceFiles = [...filesIn(buildDirectory)]
-
-      for (const sourceFile of sourceFiles) {
-        const outputFile = path.join(embeddedDirectory, path.relative(buildDirectory, sourceFile))
-        mkdirSync(path.dirname(outputFile), {recursive: true})
-        writeFileSync(
-          outputFile,
-          gzipSync(readFileSync(sourceFile), {level: constants.Z_BEST_COMPRESSION}),
-        )
-      }
-    },
-  }
-}
-
-function* filesIn(directory: string): Generator<string> {
-  for (const entry of readdirSync(directory, {withFileTypes: true})) {
-    const entryPath = path.join(directory, entry.name)
-
-    if (entry.isDirectory()) {
-      yield* filesIn(entryPath)
-    } else if (entry.isFile()) {
-      yield entryPath
-    }
-  }
-}

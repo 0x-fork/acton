@@ -5,10 +5,12 @@ import react from "@vitejs/plugin-react"
 import {defineConfig, type PluginOption} from "vite"
 import {nodePolyfills} from "vite-plugin-node-polyfills"
 
+import {gzipEmbeddedAssets} from "../ui/vite/embeddedAssets.ts"
 import {themeBootstrap} from "../ui/vite/themeBootstrap.ts"
 
 const require = createRequire(import.meta.url)
 const nodePolyfillsRoot = path.dirname(path.dirname(require.resolve("vite-plugin-node-polyfills")))
+const outputDirectory = path.resolve(import.meta.dirname, "dist")
 
 export default defineConfig({
   plugins: [
@@ -20,6 +22,7 @@ export default defineConfig({
         Buffer: true,
       },
     }) as PluginOption,
+    gzipEmbeddedAssets(outputDirectory),
   ],
   resolve: {
     alias: {
@@ -31,7 +34,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "dist",
+    outDir: outputDirectory,
     emptyOutDir: true,
   },
   server: {

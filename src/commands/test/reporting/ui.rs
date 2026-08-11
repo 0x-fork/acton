@@ -23,7 +23,7 @@ use tower_http::services::ServeDir;
 
 // Static directory containing UI assets, embedded into the binary during release builds.
 #[cfg(not(debug_assertions))]
-static UI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/packages/test-ui/dist");
+static UI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/packages/test-ui/dist/.embedded");
 
 #[cfg(target_os = "macos")]
 static OPEN_CHROME_SCRIPT: &str = include_str!(concat!(
@@ -276,26 +276,64 @@ async fn handle_embedded_ui(uri: axum::http::Uri) -> impl IntoResponse {
     let path = if path.is_empty() { "index.html" } else { path };
 
     if let Some(file) = UI_DIR.get_file(path) {
-        // Map common file extensions to their respective MIME types.
-        let content_type = match path.split('.').last() {
-            Some("html") => "text/html",
-            Some("js") => "application/javascript",
-            Some("css") => "text/css",
-            Some("svg") => "image/svg+xml",
-            Some("png") => "image/png",
-            Some("json") => "application/json",
-            _ => "application/octet-stream",
-        };
-        return (([("content-type", content_type)]), file.contents()).into_response();
+        return embedded_ui_response(path, file.contents());
     }
 
     // fallback to index.html for SPA routing.
     // this allows browser refreshes on sub-routes to work correctly
     if let Some(index) = UI_DIR.get_file("index.html") {
-        return (([("content-type", "text/html")]), index.contents()).into_response();
+        return embedded_ui_response("index.html", index.contents());
     }
 
     StatusCode::NOT_FOUND.into_response()
+}
+
+#[cfg(any(not(debug_assertions), test))]
+fn embedded_ui_response(path: &str, contents: &'static [u8]) -> Response {
+    let content_type = match path.rsplit('.').next() {
+        Some("html") => "text/html",
+        Some("js") => "application/javascript",
+        Some("css") => "text/css",
+        Some("svg") => "image/svg+xml",
+        Some("png") => "image/png",
+        Some("json") => "application/json",
+        _ => "application/octet-stream",
+    };
+
+    (
+        [
+            ("content-type", content_type),
+            ("content-encoding", "gzip"),
+            ("vary", "Accept-Encoding"),
+        ],
+        contents,
+    )
+        .into_response()
+}
+
+#[cfg(test)]
+mod embedded_ui_tests {
+    use expect_test::expect;
+
+    use super::embedded_ui_response;
+
+    #[test]
+    fn response_identifies_embedded_gzip_asset() {
+        let response = embedded_ui_response("assets/app.js", b"compressed asset");
+
+        expect![[r"
+            content-type: application/javascript
+            content-encoding: gzip
+            vary: Accept-Encoding"]]
+        .assert_eq(
+            &response
+                .headers()
+                .iter()
+                .map(|(name, value)| format!("{name}: {}", value.to_str().unwrap()))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+    }
 }
 
 async fn handle_api_reports(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
