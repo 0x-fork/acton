@@ -5,6 +5,7 @@ import {parseNetworkConfig} from "../src/api/config"
 import {
   storeConfigVotingSetup,
   storeJettonBridgeParams,
+  storeNewConsensusConfigAll,
   storeOracleBridgeParams,
   storePrecompiledContractsConfig,
   storeSizeLimitsConfig,
@@ -13,6 +14,7 @@ import {
   storeValidatorSet,
   type ConfigVotingSetup,
   type JettonBridgeParams,
+  type NewConsensusConfigAll,
   type OracleBridgeParams,
   type PrecompiledContractsConfig,
   type PrecompiledSmc,
@@ -27,6 +29,9 @@ describe("network configuration parser", () => {
   test("parses a direct getConfigAll dictionary and keeps signed extension IDs", () => {
     const config = Dictionary.empty<number, Cell>()
     config.set(0, beginCell().storeBuffer(Buffer.alloc(32, 0x55)).endCell())
+    config.set(1, beginCell().storeBuffer(Buffer.alloc(32, 0x11)).endCell())
+    config.set(2, beginCell().storeBuffer(Buffer.alloc(32, 0x22)).endCell())
+    config.set(4, beginCell().storeBuffer(Buffer.alloc(32, 0x44)).endCell())
     config.set(
       5,
       beginCell()
@@ -37,6 +42,7 @@ describe("network configuration parser", () => {
         .storeUint(2, 32)
         .endCell(),
     )
+    config.set(6, beginCell().storeCoins(1_000_000_000n).storeCoins(2_000_000_000n).endCell())
     const extraCurrencies = Dictionary.empty<number, bigint>()
     extraCurrencies.set(239, 666_666_666_666n)
     extraCurrencies.set(4_294_967_279, 1_000_000_000_000n)
@@ -107,6 +113,7 @@ describe("network configuration parser", () => {
       },
     }
     config.set(11, beginCell().store(storeConfigVotingSetup(configVotingSetup)).endCell())
+    config.set(12, beginCell().storeBit(0).endCell())
     const storagePriceEntries = Dictionary.empty<number, StoragePrices>()
     storagePriceEntries.set(0, {
       kind: "StoragePrices",
@@ -295,6 +302,22 @@ describe("network configuration parser", () => {
         .storeUint(13, 32)
         .endCell(),
     )
+    const consensusExtension: NewConsensusConfigAll = {
+      kind: "NewConsensusConfigAll",
+      mc: {
+        kind: "Maybe_just",
+        value: {
+          kind: "NewConsensusConfig_simplex_config_v2",
+          flags: 0,
+          protocol_version: 1,
+          use_quic: {kind: "Bool", value: true},
+          slots_per_leader_window: 4,
+          noncritical_params: Dictionary.empty<number, number>(),
+        },
+      },
+      shard: {kind: "Maybe_nothing"},
+    }
+    config.set(30, beginCell().store(storeNewConsensusConfigAll(consensusExtension)).endCell())
     const previousValidators = Dictionary.empty<number, ValidatorDescr>()
     previousValidators.set(0, {
       kind: "ValidatorDescr_validator_addr",
@@ -334,6 +357,25 @@ describe("network configuration parser", () => {
       list: currentValidators,
     }
     config.set(34, beginCell().store(storeValidatorSet(currentValidatorSet)).endCell())
+
+    const nextValidators = Dictionary.empty<number, ValidatorDescr>()
+    nextValidators.set(0, {
+      kind: "ValidatorDescr_validator_addr",
+      public_key: {kind: "SigPubKey", pubkey: Buffer.alloc(32, 0xa1)},
+      weight: 500n,
+      adnl_addr: Buffer.alloc(32, 0x03),
+    })
+    const nextValidatorSet: ValidatorSet = {
+      kind: "ValidatorSet_validators_ext",
+      utime_since: 1_786_138_376,
+      utime_until: 1_786_203_912,
+      total: 1,
+      main: 1,
+      total_weight: 500n,
+      list: nextValidators,
+    }
+    config.set(36, beginCell().store(storeValidatorSet(nextValidatorSet)).endCell())
+
     const sizeLimits: SizeLimitsConfig = {
       kind: "SizeLimitsConfig_size_limits_config_v2",
       max_msg_bits: 2_097_152,
@@ -374,7 +416,6 @@ describe("network configuration parser", () => {
       45,
       beginCell().store(storePrecompiledContractsConfig(precompiledContractsConfig)).endCell(),
     )
-
     const oracleEntries = Dictionary.empty<bigint, bigint>()
     oracleEntries.set(0x11n, 0x22n)
     const oracleBridge: OracleBridgeParams = {
@@ -385,6 +426,14 @@ describe("network configuration parser", () => {
       external_chain_address: Buffer.concat([Buffer.alloc(12), Buffer.alloc(20, 0xa3)]),
     }
     config.set(71, beginCell().store(storeOracleBridgeParams(oracleBridge)).endCell())
+    const bscOracleBridge: OracleBridgeParams = {
+      kind: "OracleBridgeParams",
+      bridge_address: Buffer.alloc(32, 0xc1),
+      oracle_mutlisig_address: Buffer.alloc(32, 0xc2),
+      oracles: oracleEntries,
+      external_chain_address: Buffer.concat([Buffer.alloc(12), Buffer.alloc(20, 0xc3)]),
+    }
+    config.set(72, beginCell().store(storeOracleBridgeParams(bscOracleBridge)).endCell())
 
     const jettonOracleEntries = Dictionary.empty<bigint, bigint>()
     jettonOracleEntries.set(0x33n, 0x44n)
@@ -406,6 +455,13 @@ describe("network configuration parser", () => {
       external_chain_address: Buffer.concat([Buffer.alloc(12), Buffer.alloc(20, 0xb3)]),
     }
     config.set(79, beginCell().store(storeJettonBridgeParams(jettonBridge)).endCell())
+    const bscJettonBridge: JettonBridgeParams = {
+      ...jettonBridge,
+      bridge_address: Buffer.alloc(32, 0xd1),
+      oracles_address: Buffer.alloc(32, 0xd2),
+      external_chain_address: Buffer.concat([Buffer.alloc(12), Buffer.alloc(20, 0xd3)]),
+    }
+    config.set(81, beginCell().store(storeJettonBridgeParams(bscJettonBridge)).endCell())
     const fundamentalContracts = Dictionary.empty<bigint, true>()
     fundamentalContracts.set(0x1234n, true)
     config.set(
@@ -432,10 +488,15 @@ describe("network configuration parser", () => {
     const parsed = parseNetworkConfig(root.endCell().toBoc().toString("base64"))
     const version = parsed.parameters.find(parameter => parameter.id === 8)
     const configAddressParameter = parsed.parameters.find(parameter => parameter.id === 0)
+    const electorAddressParameter = parsed.parameters.find(parameter => parameter.id === 1)
+    const minterAddressParameter = parsed.parameters.find(parameter => parameter.id === 2)
+    const rootDnsAddressParameter = parsed.parameters.find(parameter => parameter.id === 4)
     const burning = parsed.parameters.find(parameter => parameter.id === 5)
+    const mintingPrices = parsed.parameters.find(parameter => parameter.id === 6)
     const extraCurrencyParameter = parsed.parameters.find(parameter => parameter.id === 7)
     const globalVersion = parsed.parameters.find(parameter => parameter.id === 8)
     const configVoting = parsed.parameters.find(parameter => parameter.id === 11)
+    const workchains = parsed.parameters.find(parameter => parameter.id === 12)
     const storagePrices = parsed.parameters.find(parameter => parameter.id === 18)
     const mandatory = parsed.parameters.find(parameter => parameter.id === 9)
     const critical = parsed.parameters.find(parameter => parameter.id === 10)
@@ -453,13 +514,17 @@ describe("network configuration parser", () => {
     const forwardPrices = parsed.parameters.find(parameter => parameter.id === 25)
     const catchain = parsed.parameters.find(parameter => parameter.id === 28)
     const consensus = parsed.parameters.find(parameter => parameter.id === 29)
+    const consensusExtensionParameter = parsed.parameters.find(parameter => parameter.id === 30)
     const previousValidatorSetParameter = parsed.parameters.find(parameter => parameter.id === 32)
     const currentValidatorSetParameter = parsed.parameters.find(parameter => parameter.id === 34)
+    const nextValidatorSetParameter = parsed.parameters.find(parameter => parameter.id === 36)
     const sizeLimitsParameter = parsed.parameters.find(parameter => parameter.id === 43)
     const suspendedAddressParameter = parsed.parameters.find(parameter => parameter.id === 44)
     const precompiledParameter = parsed.parameters.find(parameter => parameter.id === 45)
     const oracleBridgeParameter = parsed.parameters.find(parameter => parameter.id === 71)
+    const bscOracleBridgeParameter = parsed.parameters.find(parameter => parameter.id === 72)
     const jettonBridgeParameter = parsed.parameters.find(parameter => parameter.id === 79)
+    const bscJettonBridgeParameter = parsed.parameters.find(parameter => parameter.id === 81)
     const fundamental = parsed.parameters.find(parameter => parameter.id === 31)
     const extension = parsed.parameters.find(parameter => parameter.id === -1)
 
@@ -467,10 +532,15 @@ describe("network configuration parser", () => {
       address: parsed.configAddress,
       ids: parsed.parameters.map(parameter => parameter.id),
       configAddressParameter: configAddressParameter?.address,
+      electorAddressParameter: electorAddressParameter?.address,
+      minterAddressParameter: minterAddressParameter?.address,
+      rootDnsAddressParameter: rootDnsAddressParameter?.address,
       burning: burning?.burningConfiguration,
+      mintingPrices: mintingPrices?.configurationValues,
       extraCurrencies: extraCurrencyParameter?.extraCurrencies,
       globalVersion: globalVersion?.globalVersion,
       configVoting: configVoting?.configurationValues,
+      workchains: workchains?.parsedValue,
       storagePrices: storagePrices?.configurationValues,
       mandatory: mandatory?.parameterIds,
       critical: critical?.parameterIds,
@@ -488,13 +558,17 @@ describe("network configuration parser", () => {
       forwardPrices: forwardPrices?.configurationValues,
       catchain: catchain?.configurationValues,
       consensus: consensus?.configurationValues,
+      consensusExtension: consensusExtensionParameter?.parsedValue,
       previousValidatorSet: previousValidatorSetParameter?.validatorSet,
       currentValidatorSet: currentValidatorSetParameter?.validatorSet,
+      nextValidatorSet: nextValidatorSetParameter?.validatorSet,
       sizeLimits: sizeLimitsParameter?.configurationValues,
       suspendedAddresses: suspendedAddressParameter?.suspendedAddresses,
       precompiledContracts: precompiledParameter?.precompiledContracts,
       oracleBridge: oracleBridgeParameter?.bridgeConfiguration,
+      bscOracleBridge: bscOracleBridgeParameter?.bridgeConfiguration,
       jettonBridge: jettonBridgeParameter?.bridgeConfiguration,
+      bscJettonBridge: bscJettonBridgeParameter?.bridgeConfiguration,
       fundamental: fundamental?.fundamentalSmartContracts,
       version: version?.parsedValue,
       extension: extension

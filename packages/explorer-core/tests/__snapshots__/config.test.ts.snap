@@ -71,6 +71,65 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
       "label": "LT delta",
     },
   ],
+  "bscJettonBridge": {
+    "bridgeAddress": "-1:d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1",
+    "externalChain": "BSC",
+    "externalChainAddress": "0xd3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3",
+    "kind": "jetton",
+    "oracleAddress": "-1:d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2",
+    "oracles": [
+      {
+        "address": "-1:0000000000000000000000000000000000000000000000000000000000000033",
+        "externalAddress": "0x0000000000000000000000000000000000000044",
+      },
+    ],
+    "prices": [
+      {
+        "format": "gram",
+        "label": "Bridge burn fee",
+        "value": 1n,
+      },
+      {
+        "format": "gram",
+        "label": "Bridge mint fee",
+        "value": 2n,
+      },
+      {
+        "format": "gram",
+        "label": "Wallet min GRAM for storage",
+        "value": 3n,
+      },
+      {
+        "format": "gram",
+        "label": "Wallet gas consumption",
+        "value": 4n,
+      },
+      {
+        "format": "gram",
+        "label": "Minter min GRAM for storage",
+        "value": 5n,
+      },
+      {
+        "format": "gram",
+        "label": "Discover gas consumption",
+        "value": 6n,
+      },
+    ],
+    "stateFlags": 1,
+  },
+  "bscOracleBridge": {
+    "bridgeAddress": "-1:c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1",
+    "externalChain": "BSC",
+    "externalChainAddress": "0xc3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+    "kind": "oracle",
+    "oracleAddress": "-1:c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2",
+    "oracles": [
+      {
+        "address": "-1:0000000000000000000000000000000000000000000000000000000000000011",
+        "externalAddress": "0x0000000000000000000000000000000000000022",
+      },
+    ],
+  },
   "burning": {
     "blackholeAddress": "-1:6666666666666666666666666666666666666666666666666666666666666666",
     "feeBurnDenom": 2,
@@ -267,6 +326,86 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
       "value": 13,
     },
   ],
+  "consensusExtension": {
+    "entries": [
+      {
+        "key": "MC",
+        "value": {
+          "entries": [
+            {
+              "key": "Value",
+              "value": {
+                "entries": [
+                  {
+                    "key": "Flags",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "0",
+                    },
+                  },
+                  {
+                    "key": "Protocol version",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "1",
+                    },
+                  },
+                  {
+                    "key": "Use quic",
+                    "value": {
+                      "entries": [
+                        {
+                          "key": "Value",
+                          "value": {
+                            "kind": "boolean",
+                            "value": true,
+                          },
+                        },
+                      ],
+                      "kind": "object",
+                      "typeName": "Bool",
+                    },
+                  },
+                  {
+                    "key": "Slots per leader window",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "4",
+                    },
+                  },
+                  {
+                    "key": "Noncritical params",
+                    "value": {
+                      "entries": [],
+                      "kind": "map",
+                      "typeName": "dictionary",
+                    },
+                  },
+                ],
+                "kind": "object",
+                "typeName": "New consensus config simplex config",
+              },
+            },
+          ],
+          "kind": "object",
+          "typeName": "Maybe just",
+        },
+      },
+      {
+        "key": "Shard",
+        "value": {
+          "entries": [],
+          "kind": "object",
+          "typeName": "Maybe nothing",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "New consensus config all",
+  },
   "critical": [
     8,
     31,
@@ -307,6 +446,7 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
       "value": 32768,
     },
   ],
+  "electorAddressParameter": "-1:1111111111111111111111111111111111111111111111111111111111111111",
   "extension": {
     "description": "Address of the testnet NFT collection representing ownership of configuration slots",
     "hasRawHex": true,
@@ -365,12 +505,17 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
   "hasRootRawHex": true,
   "ids": [
     0,
+    1,
+    2,
+    4,
     5,
+    6,
     7,
     8,
     9,
     10,
     11,
+    12,
     13,
     14,
     15,
@@ -386,14 +531,18 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
     25,
     28,
     29,
+    30,
     31,
     32,
     34,
+    36,
     43,
     44,
     45,
     71,
+    72,
     79,
+    81,
     -1,
   ],
   "jettonBridge": {
@@ -591,6 +740,34 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
       "value": 6n,
     },
   ],
+  "minterAddressParameter": "-1:2222222222222222222222222222222222222222222222222222222222222222",
+  "mintingPrices": [
+    {
+      "format": "gram",
+      "label": "Mint new price",
+      "value": 1000000000n,
+    },
+    {
+      "format": "gram",
+      "label": "Mint add price",
+      "value": 2000000000n,
+    },
+  ],
+  "nextValidatorSet": {
+    "main": 1,
+    "total": 1,
+    "totalWeight": 500n,
+    "utimeSince": 1786138376,
+    "utimeUntil": 1786203912,
+    "validators": [
+      {
+        "adnlAddress": "0303030303030303030303030303030303030303030303030303030303030303",
+        "index": 0,
+        "publicKey": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+        "weight": 500n,
+      },
+    ],
+  },
   "oracleBridge": {
     "bridgeAddress": "-1:a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
     "externalChain": "Ethereum",
@@ -637,6 +814,7 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
       },
     ],
   },
+  "rootDnsAddressParameter": "-1:4444444444444444444444444444444444444444444444444444444444444444",
   "sizeLimits": [
     {
       "label": "Max msg bits",
@@ -854,5 +1032,19 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
       "value": 13n,
     },
   ],
+  "workchains": {
+    "entries": [
+      {
+        "key": "Workchains",
+        "value": {
+          "entries": [],
+          "kind": "map",
+          "typeName": "dictionary",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": undefined,
+  },
 }
 `;
