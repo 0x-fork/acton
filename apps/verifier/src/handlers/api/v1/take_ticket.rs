@@ -12,7 +12,7 @@ use crate::{
 
 #[utoipa::path(
     post,
-    path = "/api/v1/take-ticket",
+    path = "/api/v1/take_ticket",
     operation_id = "take_ticket",
     request_body = TakeTicketRequest,
     responses(

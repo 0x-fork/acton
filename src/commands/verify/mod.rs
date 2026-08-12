@@ -946,7 +946,7 @@ struct UploadPart {
 fn take_new_verifier_ticket(code_hash: &str) -> anyhow::Result<Option<NewVerifierPaymentQuote>> {
     println!("  {} Requesting verification ticket", "→".blue().bold());
     let backend = new_verifier_backend();
-    let ticket_url = format!("{backend}/api/v1/take-ticket");
+    let ticket_url = format!("{backend}/api/v1/take_ticket");
     let client = build_verify_http_client()
         .context("Failed to create HTTP client for new verifier backend")?;
     let response = client

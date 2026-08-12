@@ -107,7 +107,7 @@ requests the ticket. The backend then uses the address as a consistency check.
 If the address changes code before submission, verification fails before the
 payment claim.
 
-`POST /api/v1/take-ticket` accepts a code hash. If the code hash is verified,
+`POST /api/v1/take_ticket` accepts a code hash. If the code hash is verified,
 the endpoint returns the stored bundle metadata. No payment is necessary.
 
 For new code, the endpoint returns:
@@ -162,7 +162,7 @@ The startup scan ignores payments below the configured minimum. These payments
 cannot authorize verification. Payments without the protocol comment also
 cannot authorize verification.
 
-During recovery, `/healthz` and `/take-ticket` return `503`. The server retries
+During recovery, `/healthz` and `/take_ticket` return `503`. The server retries
 a failed scan with an exponential delay of up to 30 seconds.
 
 For unverified code, `/verify` also returns `503` before it claims the payment.
@@ -276,7 +276,7 @@ not expose a base64 source-content field.
 ## Submission Flow
 
 1. Acton compiles the local contract and computes its code hash.
-2. Acton sends the code hash to `/take-ticket`.
+2. Acton sends the code hash to `/take_ticket`.
 3. If the code hash is verified, Acton stops successfully without payment.
 4. For new code, the backend returns a testnet payment quote.
 5. Acton gets wallet approval and sends the payment with the exact comment.
@@ -307,7 +307,7 @@ To check whether an address uses verified code:
 Current public endpoints:
 
 ```text
-POST /api/v1/take-ticket
+POST /api/v1/take_ticket
 POST /api/v1/verify
 GET /api/v1/openapi.json
 GET /healthz

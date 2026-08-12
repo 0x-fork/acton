@@ -20,7 +20,7 @@ pub fn router() -> Router<AppState> {
             get(verification::statistics_history_handler),
         )
         .route("/abi", get(verification::abi_handler))
-        .route("/take-ticket", post(take_ticket::handler))
+        .route("/take_ticket", post(take_ticket::handler))
         .route("/verify", post(verify::handler))
         .route("/verification/status", get(verification::status_handler))
         .route("/verification/source", get(verification::source_handler))

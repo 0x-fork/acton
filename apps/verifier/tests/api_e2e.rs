@@ -63,15 +63,15 @@ async fn post_take_ticket(
 ) -> axum::response::Response {
     let request = Request::builder()
         .method(Method::POST)
-        .uri("/api/v1/take-ticket")
+        .uri("/api/v1/take_ticket")
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(json!({"code_hash": code_hash}).to_string()))
-        .expect("POST /api/v1/take-ticket request should be valid");
+        .expect("POST /api/v1/take_ticket request should be valid");
 
     app::router_with_state(state)
         .oneshot(request)
         .await
-        .expect("router should handle POST /api/v1/take-ticket request")
+        .expect("router should handle POST /api/v1/take_ticket request")
 }
 
 fn valid_verify_parts() -> Vec<support::MultipartPart> {
@@ -357,7 +357,7 @@ async fn openapi_json_documents_verifier_api() {
 
     let body = response_json::<Value>(response).await;
     assert_eq!(body["openapi"], "3.1.0");
-    assert!(body["paths"]["/api/v1/take-ticket"].is_object());
+    assert!(body["paths"]["/api/v1/take_ticket"].is_object());
     assert!(body["paths"]["/api/v1/verify"].is_object());
     assert!(body["paths"]["/api/v1/last_verified"].is_object());
     assert!(body["paths"]["/api/v1/statistics"].is_object());
@@ -371,7 +371,7 @@ async fn openapi_json_documents_verifier_api() {
     assert!(body["components"]["schemas"]["VerificationStatisticsHistoryResponse"].is_object());
     assert!(body["components"]["schemas"]["SourceFileResponse"].is_object());
 
-    let take_ticket = &body["paths"]["/api/v1/take-ticket"]["post"];
+    let take_ticket = &body["paths"]["/api/v1/take_ticket"]["post"];
     let verify = &body["paths"]["/api/v1/verify"]["post"];
     assert_eq!(take_ticket["operationId"], "take_ticket");
     assert_eq!(verify["operationId"], "verify");

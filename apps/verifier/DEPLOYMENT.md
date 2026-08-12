@@ -332,7 +332,7 @@ curl -sS 'http://127.0.0.1:3000/api/v1/openapi.json'
 Request a payment ticket:
 
 ```bash
-curl -sS -X POST http://127.0.0.1:3000/api/v1/take-ticket \
+curl -sS -X POST http://127.0.0.1:3000/api/v1/take_ticket \
   -H 'Content-Type: application/json' \
   -d '{"code_hash":"<code_hash>"}'
 ```
@@ -531,7 +531,7 @@ Binding to `127.0.0.1:3000` inside the container will not expose the service cor
 - Do not bake deploy keys into the image.
 - Prefer SSH deploy keys scoped to one repository.
 - Use a reverse proxy for TLS and request size limits.
-- Add rate limits for `/api/v1/take-ticket` and `/api/v1/verify`. Testnet GRAM
+- Add rate limits for `/api/v1/take_ticket` and `/api/v1/verify`. Testnet GRAM
   alone does not stop a funded attacker.
 - Do not submit secrets in source files. Git and the source API publish every
   accepted source bundle.

@@ -938,7 +938,7 @@ fn test_verify_new_verifier_sends_new_api_payload_and_reports_success() {
         .expect("captured verifier requests mutex poisoned");
     assert_eq!(captured.len(), 2, "expected ticket and verify requests");
     assert_eq!(captured[0].method, "POST");
-    assert_eq!(captured[0].path, "/api/v1/take-ticket");
+    assert_eq!(captured[0].path, "/api/v1/take_ticket");
     assert_eq!(captured[1].method, "POST");
     assert_eq!(captured[1].path, "/api/v1/verify");
     let ticket_body = String::from_utf8_lossy(&captured[0].body);
@@ -1018,7 +1018,7 @@ fn test_verify_new_verifier_stops_when_code_is_already_verified() {
         .lock()
         .expect("captured verifier requests mutex poisoned");
     assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take-ticket");
+    assert_eq!(captured[0].path, "/api/v1/take_ticket");
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -1047,7 +1047,7 @@ fn test_verify_new_verifier_dry_run_formats_payment_without_sending_it() {
         .lock()
         .expect("captured verifier requests mutex poisoned");
     assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take-ticket");
+    assert_eq!(captured[0].path, "/api/v1/take_ticket");
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -1085,7 +1085,7 @@ fn test_verify_new_verifier_rejects_a_ticket_for_another_code_hash() {
         .lock()
         .expect("captured verifier requests mutex poisoned");
     assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take-ticket");
+    assert_eq!(captured[0].path, "/api/v1/take_ticket");
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -1123,7 +1123,7 @@ fn test_verify_new_verifier_rejects_a_ticket_with_a_wrong_payment_comment() {
         .lock()
         .expect("captured verifier requests mutex poisoned");
     assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take-ticket");
+    assert_eq!(captured[0].path, "/api/v1/take_ticket");
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -1161,7 +1161,7 @@ fn test_verify_new_verifier_rejects_a_non_basechain_payment_address() {
         .lock()
         .expect("captured verifier requests mutex poisoned");
     assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take-ticket");
+    assert_eq!(captured[0].path, "/api/v1/take_ticket");
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -1266,7 +1266,7 @@ fn test_verify_new_verifier_address_option_rejects_mismatched_deployed_code_hash
         .lock()
         .expect("captured verifier requests mutex poisoned");
     assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take-ticket");
+    assert_eq!(captured[0].path, "/api/v1/take_ticket");
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -1349,7 +1349,7 @@ fn test_verify_new_verifier_reports_http_error_body() {
         .lock()
         .expect("captured verifier requests mutex poisoned");
     assert_eq!(captured.len(), 2, "expected ticket and verify requests");
-    assert_eq!(captured[0].path, "/api/v1/take-ticket");
+    assert_eq!(captured[0].path, "/api/v1/take_ticket");
     assert_eq!(captured[1].path, "/api/v1/verify");
 }
 
@@ -1379,7 +1379,7 @@ fn test_verify_new_verifier_rejects_an_invalid_payment_transaction_hash() {
         .lock()
         .expect("captured verifier requests mutex poisoned");
     assert_eq!(captured.len(), 1, "expected only the ticket request");
-    assert_eq!(captured[0].path, "/api/v1/take-ticket");
+    assert_eq!(captured[0].path, "/api/v1/take_ticket");
 }
 
 #[test]

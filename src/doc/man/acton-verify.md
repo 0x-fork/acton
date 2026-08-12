@@ -133,7 +133,7 @@ on-chain code-hash comparison against the target address before upload.
 With `--new`, the process is:
 
 1. Compile the local contract and compute its code hash.
-2. Request a ticket from `/api/v1/take-ticket`.
+2. Request a ticket from `/api/v1/take_ticket`.
 3. Stop successfully if the code hash is already verified.
 4. Get wallet approval for the returned testnet amount and address.
 5. Send the payment with the returned code-hash comment.

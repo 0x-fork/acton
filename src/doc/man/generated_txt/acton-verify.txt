@@ -127,7 +127,7 @@ PROCESS
 
        1. Compile the local contract and compute its code hash.
 
-       2. Request a ticket from /api/v1/take-ticket.
+       2. Request a ticket from /api/v1/take_ticket.
 
        3. Stop successfully if the code hash is already verified.
 
@@ -323,4 +323,3 @@ SEE ALSO
 
        o  Wallet management guide
           <https://ton-blockchain.github.io/acton/docs/wallets>
-
