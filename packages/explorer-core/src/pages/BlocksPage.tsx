@@ -761,21 +761,21 @@ const BlockDateNavigation: FC<{
   const [isOpen, setIsOpen] = useState(false)
   const [dateValue, setDateValue] = useState("")
   const [minDateValue, setMinDateValue] = useState(() =>
-    formatDateTimeLocalInput(MIN_BLOCK_UNIX_TIME),
+    formatDateTimeLocalInput(MIN_BLOCK_UNIX_TIME, {unit: "seconds"}),
   )
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string>()
 
   useEffect(() => {
     let isActive = true
-    setMinDateValue(formatDateTimeLocalInput(MIN_BLOCK_UNIX_TIME))
+    setMinDateValue(formatDateTimeLocalInput(MIN_BLOCK_UNIX_TIME, {unit: "seconds"}))
 
     const loadEarliestBlockTime = async () => {
       try {
         const response = await client.getBlocks({workchain: -1, limit: 1, sort: "asc"})
         const unixTime = response.blocks[0] && blockUnixTime(response.blocks[0])
         if (isActive && unixTime !== undefined) {
-          setMinDateValue(formatDateTimeLocalInput(unixTime))
+          setMinDateValue(formatDateTimeLocalInput(unixTime, {unit: "seconds"}))
         }
       } catch {
         // Fall back to the minimum value supported by the block timestamp format.
@@ -795,7 +795,7 @@ const BlockDateNavigation: FC<{
     if (nextOpen && currentBlock) {
       const unixTime = blockUnixTime(currentBlock)
       if (unixTime !== undefined) {
-        setDateValue(formatDateTimeLocalInput(unixTime))
+        setDateValue(formatDateTimeLocalInput(unixTime, {unit: "seconds"}))
       }
     }
   }
