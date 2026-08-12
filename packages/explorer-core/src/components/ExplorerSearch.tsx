@@ -294,7 +294,7 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
       onSubmit={handleSearch}
       onValueChange={nextInput => {
         searchRequestIdRef.current += 1
-        setInput(nextInput)
+        setInput(recoverSearchValueFromUrl(nextInput) ?? nextInput)
         if (isInvalid) {
           setIsInvalid(false)
         }
@@ -306,7 +306,7 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
   )
 }
 
-function resolveSearchTarget(
+export function resolveSearchTarget(
   value: string,
   addressFormat: AddressFormatOptions,
   routes: ExplorerRoutes,
@@ -316,15 +316,39 @@ function resolveSearchTarget(
     return undefined
   }
 
-  const block = parseBlockSearchQuery(trimmed)
-  if (block) {
-    return {
-      displayValue: formatToncenterBlockId(block),
-      path: routes.blockPath(block.workchain, block.shard, block.seqno),
+  const directTarget = resolveSearchValueTarget(trimmed, addressFormat, routes, true)
+  if (directTarget) {
+    return directTarget
+  }
+
+  return recoverFromUrlPath(trimmed, pathSegment =>
+    resolveSearchValueTarget(pathSegment, addressFormat, routes, false),
+  )
+}
+
+export function recoverSearchValueFromUrl(value: string): string | undefined {
+  return recoverFromUrlPath(value.trim(), pathSegment => {
+    return parseAddress(pathSegment) || hashToHex(pathSegment) ? pathSegment : undefined
+  })
+}
+
+function resolveSearchValueTarget(
+  value: string,
+  addressFormat: AddressFormatOptions,
+  routes: ExplorerRoutes,
+  allowBlock: boolean,
+): SearchTarget | undefined {
+  if (allowBlock) {
+    const block = parseBlockSearchQuery(value)
+    if (block) {
+      return {
+        displayValue: formatToncenterBlockId(block),
+        path: routes.blockPath(block.workchain, block.shard, block.seqno),
+      }
     }
   }
 
-  const parsedAddress = parseAddress(trimmed)
+  const parsedAddress = parseAddress(value)
   if (parsedAddress) {
     const displayAddress = parsedAddress.toString(addressFormat)
     return {
@@ -333,7 +357,7 @@ function resolveSearchTarget(
     }
   }
 
-  const transactionHash = hashToHex(trimmed)
+  const transactionHash = hashToHex(value)
   if (transactionHash) {
     return {
       displayValue: transactionHash,
@@ -341,6 +365,46 @@ function resolveSearchTarget(
     }
   }
 
+  return undefined
+}
+
+function parseUrlPathSegments(value: string): readonly string[] {
+  const normalizedValue = value.includes("://") ? value : `http://${value}`
+
+  let url: URL
+  try {
+    url = new URL(normalizedValue)
+  } catch {
+    return []
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return []
+  }
+
+  return url.pathname
+    .split("/")
+    .filter(Boolean)
+    .flatMap(segment => {
+      try {
+        return [decodeURIComponent(segment)]
+      } catch {
+        return []
+      }
+    })
+}
+
+function recoverFromUrlPath<T>(
+  value: string,
+  recover: (pathSegment: string) => T | undefined,
+): T | undefined {
+  const pathSegments = parseUrlPathSegments(value)
+  for (let index = pathSegments.length - 1; index >= 0; index -= 1) {
+    const result = recover(pathSegments[index])
+    if (result !== undefined) {
+      return result
+    }
+  }
   return undefined
 }
 
