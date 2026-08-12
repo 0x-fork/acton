@@ -542,7 +542,7 @@ pub async fn post_verify_with_api_key(
     parts: Vec<MultipartPart>,
     api_key: &str,
 ) -> Response {
-    post_verify_request(state, parts, Some(api_key), true).await
+    post_verify_request(state, parts, Some(api_key), false).await
 }
 
 async fn post_verify_request(

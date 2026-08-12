@@ -178,6 +178,23 @@ async fn verify_requires_a_payment_for_unverified_code() {
 }
 
 #[tokio::test]
+async fn verify_skips_payment_with_a_valid_api_key() {
+    let state = app_state_with_api_key(&[], CODE_HASH_ONE, API_KEY);
+    let response = post_verify_with_api_key(state.clone(), valid_verify_parts(), API_KEY).await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let response = get(
+        state,
+        &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
+    )
+    .await;
+    let body = response_json::<VerificationSourceResponse>(response).await;
+    let bundle = body.bundle.expect("verified bundle should exist");
+    assert_eq!(bundle.payment_tx_hash, None);
+}
+
+#[tokio::test]
 async fn verify_rejects_an_invalid_payment_transaction_hash() {
     let response = post_verify_without_payment(
         app_state(&[], CODE_HASH_ONE),

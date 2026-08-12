@@ -49,7 +49,7 @@ const MAX_SOURCE_PATH_CHARS: usize = 128;
     responses(
         (status = 200, description = "Verification completed", body = VerifyResponse),
         (status = 400, description = "Invalid verification request or compilation failure", body = crate::error::ErrorResponse),
-        (status = 401, description = "A valid API key is required to set verified_at", body = crate::error::ErrorResponse),
+        (status = 401, description = "A valid API key is required to set verified_at or skip payment", body = crate::error::ErrorResponse),
         (status = 402, description = "Payment is missing or invalid", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
         (status = 409, description = "Payment is already used or in progress", body = crate::error::ErrorResponse),
@@ -57,7 +57,7 @@ const MAX_SOURCE_PATH_CHARS: usize = 128;
         (status = 503, description = "Payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),
     params(
-        ("X-Verifier-Key" = Option<String>, Header, description = "API key required only when verified_at is provided")
+        ("X-Verifier-Key" = Option<String>, Header, description = "API key used to authorize verified_at and verification without payment")
     ),
     tag = "verification"
 )]
@@ -158,13 +158,12 @@ async fn handle_multipart(
         }
     }
 
-    if verified_at.is_some()
-        && !state.api_key_matches(
-            headers
-                .get(API_KEY_HEADER)
-                .and_then(|value| value.to_str().ok()),
-        )
-    {
+    let has_valid_api_key = state.api_key_matches(
+        headers
+            .get(API_KEY_HEADER)
+            .and_then(|value| value.to_str().ok()),
+    );
+    if verified_at.is_some() && !has_valid_api_key {
         return Err(ApiError::unauthorized(
             "a valid API key is required to set verified_at".to_owned(),
         ));
@@ -215,7 +214,7 @@ async fn handle_multipart(
         }));
     }
 
-    let payment_claim = if verified_at.is_some() {
+    let payment_claim = if has_valid_api_key {
         None
     } else {
         let tx_hash = non_empty_text(tx_hash).ok_or_else(|| {
