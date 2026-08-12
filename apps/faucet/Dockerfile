@@ -34,6 +34,7 @@ RUN apt-get update \
 WORKDIR /var/lib/faucet
 
 COPY --from=rust-builder /build/apps/faucet/target/release/faucet /usr/local/bin/faucet
+COPY --chown=faucet:faucet apps/faucet/build/.env.production ./.env
 
 USER faucet
 
