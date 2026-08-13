@@ -4,12 +4,10 @@ use uuid::Uuid;
 
 pub async fn enter_request_span(mut request: Request, next: Next) -> Response {
     let request_id = Uuid::new_v4();
-    let method = request.method().clone();
-    let uri = request.uri().clone();
     request.extensions_mut().insert(request_id);
 
     next.run(request)
-        .instrument(info_span!("request", %request_id, %method, %uri))
+        .instrument(info_span!("request", %request_id))
         .await
 }
 
