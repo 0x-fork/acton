@@ -5,7 +5,10 @@ services:
     env_file:
       - ./.env
     environment:
+      DATABASE_URL: "sqlite:///data/db.sqlite"
       VALKEY_URI: "redis://redis:6379"
+    volumes:
+      - faucet-data:/data
     depends_on:
       redis:
         condition: service_healthy
@@ -27,4 +30,5 @@ services:
     restart: unless-stopped
 
 volumes:
+  faucet-data:
   redis-data:

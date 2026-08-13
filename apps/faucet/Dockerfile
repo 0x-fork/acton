@@ -26,10 +26,14 @@ LABEL org.opencontainers.image.title="faucet" \
       org.opencontainers.image.version="${BUILD_VERSION}" \
       org.opencontainers.image.revision="${VCS_REF}"
 
+RUN groupadd --gid 10001 faucet \
+    && useradd --uid 10001 --gid faucet --create-home --home-dir /var/lib/faucet --shell /usr/sbin/nologin --no-log-init faucet
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl3 libsqlite3-0 tini wget \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd --system --uid 10001 --create-home --home-dir /var/lib/faucet faucet
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir /data && chown faucet:faucet /data
 
 WORKDIR /var/lib/faucet
 
@@ -38,7 +42,7 @@ COPY --chown=faucet:faucet apps/faucet/build/.env.production ./.env
 
 USER faucet
 
-ENV DATABASE_URL=sqlite:./db.sqlite \
+ENV DATABASE_URL=sqlite:///data/db.sqlite \
     HOST=0.0.0.0 \
     PORT=3000 \
     LOG_LEVEL=info \
