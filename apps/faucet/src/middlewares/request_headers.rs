@@ -1,3 +1,5 @@
+use std::fmt;
+
 use axum::{
     extract::Request,
     http::{HeaderName, HeaderValue, StatusCode, header::USER_AGENT},
@@ -15,6 +17,28 @@ const DEFAULT_DEVICE_UID: &str = "default";
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClientContext {
     pub device_uid: String,
+    pub client_kind: AirdropClient,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AirdropClient {
+    Acton,
+    Actonscan,
+}
+
+impl AirdropClient {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Acton => "acton",
+            Self::Actonscan => "actonscan",
+        }
+    }
+}
+
+impl fmt::Display for AirdropClient {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
 }
 
 pub async fn require_airdrop_headers(mut request: Request, next: Next) -> Response {
@@ -22,22 +46,28 @@ pub async fn require_airdrop_headers(mut request: Request, next: Next) -> Respon
     let user_agent = headers.get(USER_AGENT);
     let browser_client = headers.get(&ACTON_CLIENT_HEADER);
     let device_uid = headers.get(&DEVICE_UID_HEADER);
-    let is_client_allowed = user_agent.is_some_and(is_allowed_user_agent)
-        || browser_client.is_some_and(is_allowed_browser_client);
+    let client_kind = if browser_client.is_some_and(is_allowed_browser_client) {
+        Some(AirdropClient::Actonscan)
+    } else if user_agent.is_some_and(is_allowed_user_agent) {
+        Some(AirdropClient::Acton)
+    } else {
+        None
+    };
     let is_device_uid_allowed = device_uid.is_some_and(is_allowed_device_uid_header);
 
-    if is_client_allowed && is_device_uid_allowed {
+    if let (Some(client_kind), true) = (client_kind, is_device_uid_allowed) {
         let device_uid = device_uid
             .and_then(|value| value.to_str().ok())
             .expect("validated device UID must be UTF-8")
             .to_string();
-        request
-            .extensions_mut()
-            .insert(ClientContext { device_uid });
+        request.extensions_mut().insert(ClientContext {
+            device_uid,
+            client_kind,
+        });
         return next.run(request).await;
     }
 
-    if !is_client_allowed {
+    if client_kind.is_none() {
         debug!(
             user_agent = header_value(user_agent),
             browser_client = header_value(browser_client),

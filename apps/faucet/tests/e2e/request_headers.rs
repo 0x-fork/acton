@@ -1,11 +1,11 @@
 use axum::{
-    Router,
+    Extension, Router,
     body::{Body, to_bytes},
     http::{Method, Request, StatusCode, header::USER_AGENT},
     middleware,
     routing::post,
 };
-use faucet::middlewares::require_airdrop_headers;
+use faucet::middlewares::{ClientContext, require_airdrop_headers};
 use tower::ServiceExt;
 
 #[tokio::test]
@@ -13,7 +13,7 @@ async fn requires_airdrop_headers_on_protected_route() {
     let response = request_with_headers(Some("acton/0.1.0"), None, Some("default")).await;
 
     assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(response_body(response).await, "ok");
+    assert_eq!(response_body(response).await, "acton");
 
     let response = request_with_headers(
         Some("acton/0.1.0"),
@@ -68,6 +68,7 @@ async fn requires_airdrop_headers_on_protected_route() {
 async fn allows_actonscan_browser_client_header() {
     let response = request_with_headers(None, Some("actonscan/1.0.0"), Some("default")).await;
     assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response_body(response).await, "actonscan");
 
     let response = request_with_headers(None, Some("actonscan/"), Some("default")).await;
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -82,7 +83,12 @@ async fn request_with_headers(
     device_uid: Option<&str>,
 ) -> axum::response::Response {
     let app = Router::new()
-        .route("/challenge", post(|| async { "ok" }))
+        .route(
+            "/challenge",
+            post(|Extension(client): Extension<ClientContext>| async move {
+                client.client_kind.as_str()
+            }),
+        )
         .route_layer(middleware::from_fn(require_airdrop_headers));
 
     let mut request = Request::builder().method(Method::POST).uri("/challenge");

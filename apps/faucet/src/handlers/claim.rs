@@ -88,6 +88,7 @@ pub(super) async fn create_claim(
         address = %payload.address,
         client_ip = %client_ip.ip(),
         device_uid = %client.device_uid,
+        client = %client.client_kind,
         "Received faucet claim request"
     );
 
