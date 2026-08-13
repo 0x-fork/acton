@@ -58,7 +58,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync"] }
 ton = "0.1.4"
 toncenter = { path = "crates/toncenter" }
 tower = "0.5"
@@ -66,6 +66,7 @@ tower-http = { version = "0.6", features = ["cors"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
+uuid = { version = "1.18", features = ["v4"] }
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }

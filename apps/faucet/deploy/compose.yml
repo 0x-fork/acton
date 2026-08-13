@@ -14,6 +14,7 @@ services:
     ports:
       # Keep direct access local so only the host reverse proxy can supply client IP headers.
       - "127.0.0.1:${FAUCET_PUBLIC_PORT:-3000}:3000"
+    stop_grace_period: 1m
     restart: unless-stopped
 
   redis:

@@ -1,7 +1,7 @@
 use anyhow::Context;
 use apalis::layers::WorkerBuilderExt;
 use apalis::prelude::json::JsonCodec;
-use apalis::prelude::{Data, WorkerBuilder};
+use apalis::prelude::{Data, WorkerBuilder, WorkerError};
 use apalis_sqlite::{CompactType, Config as SqliteConfig, HookCallbackListener, SqliteStorage};
 use axum::{
     extract::{ConnectInfo, Request, State},
@@ -25,6 +25,7 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
+use tokio::sync::watch;
 use ton::block_tlb::{CommonMsgInfo, CommonMsgInfoInt, CurrencyCollection, Msg};
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
@@ -33,6 +34,7 @@ use ton::ton_core::types::tlb_core::TLBCoins;
 use toncenter::ToncenterClient;
 use tower::ServiceBuilder;
 use tracing::{error, info, warn};
+use uuid::Uuid;
 use wallet::Wallet;
 
 mod address;
@@ -145,18 +147,12 @@ async fn main() -> anyhow::Result<()> {
 
     let worker_state = shared_state.clone();
 
-    let worker = WorkerBuilder::new("claim-worker")
+    let worker_name = format!("claim-worker-{}", Uuid::new_v4());
+    let worker = WorkerBuilder::new(&worker_name)
         .backend(storage)
         .concurrency(1)
         .data(worker_state)
         .build(send_claim);
-
-    tokio::spawn(async move {
-        info!("Starting claim worker");
-        if let Err(err) = worker.run().await {
-            error!(error = %err, "Worker failed");
-        }
-    });
 
     let frontend_url = shared_state
         .config
@@ -178,18 +174,74 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
         .context("Failed to bind TCP listener")?;
+
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+    let worker_shutdown_rx = shutdown_rx.clone();
+    let worker_shutdown_tx = shutdown_tx.clone();
+    let worker_future = async move {
+        info!(worker = %worker_name, "Starting claim worker");
+        let result = worker
+            .run_until(async move {
+                wait_for_shutdown(worker_shutdown_rx).await;
+                Ok::<(), WorkerError>(())
+            })
+            .await;
+
+        let _ = worker_shutdown_tx.send(true);
+        match result {
+            Ok(()) => {
+                info!(worker = %worker_name, "Claim worker stopped");
+                Ok(())
+            }
+            Err(err) => {
+                error!(worker = %worker_name, error = %err, "Worker failed");
+                Err(err).context("Claim worker failed")
+            }
+        }
+    };
+
+    let signal_shutdown_tx = shutdown_tx.clone();
+    tokio::spawn(async move {
+        shutdown_signal().await;
+        let _ = signal_shutdown_tx.send(true);
+    });
+
     info!("Listening on {}", bind_addr);
     info!("Started Faucet server");
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .with_graceful_shutdown(shutdown_signal())
-    .await
-    .context("HTTP server exited with error")?;
+    let server_shutdown_tx = shutdown_tx;
+    let server_future = async move {
+        let result = axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .with_graceful_shutdown(wait_for_shutdown(shutdown_rx))
+        .await;
+
+        let shutdown_requested = *server_shutdown_tx.borrow();
+        let _ = server_shutdown_tx.send(true);
+        result.context("HTTP server exited with error")?;
+
+        if !shutdown_requested {
+            anyhow::bail!("HTTP server stopped unexpectedly");
+        }
+
+        Ok(())
+    };
+
+    let (server_result, worker_result) = tokio::join!(server_future, worker_future);
+    server_result?;
     info!("Stopped Faucet server");
+    worker_result?;
 
     Ok(())
+}
+
+async fn wait_for_shutdown(mut shutdown: watch::Receiver<bool>) {
+    while !*shutdown.borrow() {
+        if shutdown.changed().await.is_err() {
+            return;
+        }
+    }
 }
 
 fn default_rate_limit_rule(config: &DefaultRateLimitConfig) -> RuleConfig {
