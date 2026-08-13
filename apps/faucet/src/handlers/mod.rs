@@ -107,18 +107,21 @@ fn openapi() -> utoipa::openapi::OpenApi {
 )]
 struct ApiDoc;
 
-pub(crate) fn airdrop_cors_layer(frontend_url: &str) -> anyhow::Result<CorsLayer> {
-    let frontend_url = Url::parse(frontend_url)
-        .map_err(|error| anyhow::anyhow!("Invalid frontend URL: {error}"))?;
-    let frontend_origin = HeaderValue::from_str(&frontend_url.origin().ascii_serialization())
-        .map_err(|error| anyhow::anyhow!("Invalid frontend origin: {error}"))?;
+pub(crate) fn airdrop_cors_layer(frontend_url: Option<&str>) -> anyhow::Result<CorsLayer> {
     let mut origins = vec![
         HeaderValue::from_static("https://actonscan.com"),
         HeaderValue::from_static("http://localhost:3007"),
         HeaderValue::from_static("http://127.0.0.1:3007"),
     ];
-    if !origins.contains(&frontend_origin) {
-        origins.push(frontend_origin);
+    if let Some(frontend_url) = frontend_url {
+        let frontend_url = Url::parse(frontend_url)
+            .map_err(|error| anyhow::anyhow!("Invalid frontend URL: {error}"))?;
+        let frontend_origin =
+            HeaderValue::from_str(&frontend_url.origin().ascii_serialization())
+                .map_err(|error| anyhow::anyhow!("Invalid frontend origin: {error}"))?;
+        if !origins.contains(&frontend_origin) {
+            origins.push(frontend_origin);
+        }
     }
 
     Ok(CorsLayer::new()
@@ -195,10 +198,7 @@ mod tests {
         let app = Router::new()
             .route("/challenge", post(|| async { "ok" }))
             .route_layer(middleware::from_fn(always_rate_limited))
-            .layer(
-                airdrop_cors_layer("https://actonscan.com/faucet")
-                    .expect("valid CORS configuration"),
-            );
+            .layer(airdrop_cors_layer(None).expect("valid CORS configuration"));
         let request = Request::builder()
             .method(Method::OPTIONS)
             .uri("/challenge")
@@ -242,10 +242,7 @@ mod tests {
     async fn rejects_unknown_browser_origin() {
         let app = Router::new()
             .route("/challenge", post(|| async { "ok" }))
-            .layer(
-                airdrop_cors_layer("https://actonscan.com/faucet")
-                    .expect("valid CORS configuration"),
-            );
+            .layer(airdrop_cors_layer(None).expect("valid CORS configuration"));
         let request = Request::builder()
             .method(Method::OPTIONS)
             .uri("/challenge")
@@ -270,7 +267,7 @@ mod tests {
         let app = Router::new()
             .route("/auth/exchange", post(|| async { "ok" }))
             .layer(
-                airdrop_cors_layer("https://staging.example.com/faucet?network=testnet")
+                airdrop_cors_layer(Some("https://staging.example.com/faucet?network=testnet"))
                     .expect("valid CORS configuration"),
             );
         let request = Request::builder()

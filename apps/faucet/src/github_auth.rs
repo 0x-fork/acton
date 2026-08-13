@@ -140,8 +140,10 @@ impl From<anyhow::Error> for AuthError {
 
 impl GitHubAuth {
     pub(crate) fn new(config: GitHubAuthConfig, valkey: ValkeyStore) -> anyhow::Result<Self> {
-        validate_redirect_url("GITHUB_CALLBACK_URL", &config.callback_url)?;
-        validate_redirect_url("GITHUB_FRONTEND_URL", &config.frontend_url)?;
+        if config.enabled {
+            validate_redirect_url("GITHUB_CALLBACK_URL", &config.callback_url)?;
+            validate_redirect_url("GITHUB_FRONTEND_URL", &config.frontend_url)?;
+        }
         let client = Client::builder()
             .connect_timeout(Duration::from_secs(5))
             .timeout(Duration::from_secs(15))

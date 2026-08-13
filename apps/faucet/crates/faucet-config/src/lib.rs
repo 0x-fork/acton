@@ -285,11 +285,8 @@ impl Config {
                 enabled: github_auth_enabled,
                 client_id: optional_env("GITHUB_CLIENT_ID"),
                 client_secret: optional_env("GITHUB_CLIENT_SECRET"),
-                callback_url: std::env::var("GITHUB_CALLBACK_URL").unwrap_or_else(|_| {
-                    "https://faucet.acton.monster/auth/github/callback".to_string()
-                }),
-                frontend_url: std::env::var("GITHUB_FRONTEND_URL")
-                    .unwrap_or_else(|_| "https://actonscan.com/faucet".to_string()),
+                callback_url: optional_env("GITHUB_CALLBACK_URL").unwrap_or_default(),
+                frontend_url: optional_env("GITHUB_FRONTEND_URL").unwrap_or_default(),
                 oauth_max_pending_states: parse_env_number("GITHUB_OAUTH_MAX_PENDING_STATES", 256),
                 state_ttl_seconds: parse_env_number("GITHUB_STATE_TTL_SECONDS", 600),
                 grant_ttl_seconds: parse_env_number("GITHUB_GRANT_TTL_SECONDS", 120),
@@ -368,6 +365,14 @@ impl Config {
         anyhow::ensure!(
             self.github_auth.client_secret.is_some(),
             "GITHUB_CLIENT_SECRET must be set when GitHub authentication is enabled"
+        );
+        anyhow::ensure!(
+            !self.github_auth.callback_url.is_empty(),
+            "GITHUB_CALLBACK_URL must be set when GitHub authentication is enabled"
+        );
+        anyhow::ensure!(
+            !self.github_auth.frontend_url.is_empty(),
+            "GITHUB_FRONTEND_URL must be set when GitHub authentication is enabled"
         );
         anyhow::ensure!(
             self.github_auth.oauth_max_pending_states > 0,
@@ -792,6 +797,33 @@ mod tests {
             validation_error(&config),
             "GitHub authentication requires the successful claim window"
         );
+    }
+
+    #[test]
+    fn requires_redirect_urls_when_github_auth_is_enabled() {
+        let mut config = valid_config();
+        config.github_auth.callback_url.clear();
+        assert_eq!(
+            validation_error(&config),
+            "GITHUB_CALLBACK_URL must be set when GitHub authentication is enabled"
+        );
+
+        let mut config = valid_config();
+        config.github_auth.frontend_url.clear();
+        assert_eq!(
+            validation_error(&config),
+            "GITHUB_FRONTEND_URL must be set when GitHub authentication is enabled"
+        );
+    }
+
+    #[test]
+    fn allows_missing_redirect_urls_when_github_auth_is_disabled() {
+        let mut config = valid_config();
+        config.github_auth.enabled = false;
+        config.github_auth.callback_url.clear();
+        config.github_auth.frontend_url.clear();
+
+        config.validate().unwrap();
     }
 
     #[test]

@@ -51,6 +51,7 @@ pub const LONG_VERSION: &str = env!("FAUCET_LONG_VERSION");
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
     logger::init_tracing();
+    info!("Starting Faucet server");
     let config = Config::from_env().context("Failed to load config")?;
 
     let bind_addr = format!("{}:{}", config.server.host, config.server.port);
@@ -67,6 +68,13 @@ async fn main() -> anyhow::Result<()> {
             header = %config.server.proxy.header,
             ips = ?config.server.proxy.ips,
             "Trusted proxy support enabled"
+        );
+    }
+    if config.github_auth.enabled {
+        info!(
+            callback_url = %config.github_auth.callback_url,
+            frontend_url = %config.github_auth.frontend_url,
+            "GitHub authentication enabled"
         );
     }
 
@@ -150,8 +158,13 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let cors = handlers::airdrop_cors_layer(&shared_state.config.github_auth.frontend_url)
-        .context("Failed to configure browser CORS")?;
+    let frontend_url = shared_state
+        .config
+        .github_auth
+        .enabled
+        .then_some(shared_state.config.github_auth.frontend_url.as_str());
+    let cors =
+        handlers::airdrop_cors_layer(frontend_url).context("Failed to configure browser CORS")?;
     let proxy = shared_state.config.server.proxy.clone();
     let app = handlers::router(shared_state)
         .layer(
@@ -162,10 +175,11 @@ async fn main() -> anyhow::Result<()> {
         // Preflight requests must not consume the stricter per-claim rate limit.
         .layer(cors);
 
-    info!("Listening on {}", bind_addr);
     let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
         .context("Failed to bind TCP listener")?;
+    info!("Listening on {}", bind_addr);
+    info!("Started Faucet server");
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
@@ -173,6 +187,7 @@ async fn main() -> anyhow::Result<()> {
     .with_graceful_shutdown(shutdown_signal())
     .await
     .context("HTTP server exited with error")?;
+    info!("Stopped Faucet server");
 
     Ok(())
 }
