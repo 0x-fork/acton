@@ -12,7 +12,7 @@ pub fn init_tracing() {
             .json()
             .flatten_event(true)
             .with_current_span(true)
-            .with_span_list(true)
+            .with_span_list(false)
             .boxed(),
 
         _ => fmt::layer().boxed(),
