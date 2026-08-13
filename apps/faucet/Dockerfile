@@ -30,7 +30,7 @@ RUN groupadd --gid 10001 faucet \
     && useradd --uid 10001 --gid faucet --create-home --home-dir /var/lib/faucet --shell /usr/sbin/nologin --no-log-init faucet
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates libssl3 libsqlite3-0 tini wget \
+    && apt-get install -y --no-install-recommends ca-certificates libssl3 libsqlite3-0 sqlite3 tini wget \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /data && chown faucet:faucet /data
