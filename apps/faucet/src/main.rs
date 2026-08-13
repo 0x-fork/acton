@@ -3,14 +3,10 @@ use apalis::layers::WorkerBuilderExt;
 use apalis::prelude::json::JsonCodec;
 use apalis::prelude::{Data, WorkerBuilder, WorkerError};
 use apalis_sqlite::{CompactType, Config as SqliteConfig, HookCallbackListener, SqliteStorage};
-use axum::{
-    extract::{ConnectInfo, Request, State},
-    middleware::{self, Next},
-    response::Response,
-};
+use axum::middleware;
 use axum_governor::GovernorLayer;
 use faucet_antifraud::Antifraud;
-use faucet_config::{ClaimRateLimitConfig, Config, DefaultRateLimitConfig, ProxyConfig};
+use faucet_config::{ClaimRateLimitConfig, Config, DefaultRateLimitConfig};
 use faucet_pow::Pow;
 use faucet_valkey::{
     AmountWindowDecision, AntifraudModule, SentAmountWindowDecision, SuccessfulClaimWindowDecision,
@@ -19,7 +15,6 @@ use faucet_valkey::{
 use github_auth::GitHubAuth;
 use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
-use real::RealIp;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -33,9 +28,11 @@ use ton::ton_core::types::TonAddress;
 use ton::ton_core::types::tlb_core::TLBCoins;
 use toncenter::ToncenterClient;
 use tower::ServiceBuilder;
-use tracing::{Instrument, error, info, info_span, warn};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 use wallet::Wallet;
+
+use faucet::middlewares::{enter_request_span, insert_client_ip};
 
 mod address;
 mod antifraud_subject;
@@ -245,17 +242,6 @@ async fn wait_for_shutdown(mut shutdown: watch::Receiver<bool>) {
     }
 }
 
-async fn enter_request_span(mut request: Request, next: Next) -> Response {
-    let request_id = Uuid::new_v4();
-    let method = request.method().clone();
-    let uri = request.uri().clone();
-    request.extensions_mut().insert(request_id);
-
-    next.run(request)
-        .instrument(info_span!("request", %request_id, %method, %uri))
-        .await
-}
-
 fn default_rate_limit_rule(config: &DefaultRateLimitConfig) -> RuleConfig {
     RuleConfig::new(
         Duration::seconds(config.window_seconds),
@@ -300,39 +286,6 @@ async fn shutdown_signal() {
     }
 
     info!("Shutting down gracefully...");
-}
-
-async fn insert_client_ip(
-    State(proxy): State<ProxyConfig>,
-    mut request: Request,
-    next: Next,
-) -> Response {
-    let client_ip = client_ip(&request, &proxy);
-    request.extensions_mut().insert(RealIp(client_ip));
-    next.run(request).await
-}
-
-fn client_ip(request: &Request, proxy: &ProxyConfig) -> std::net::IpAddr {
-    let Some(peer_ip) = request
-        .extensions()
-        .get::<ConnectInfo<SocketAddr>>()
-        .map(|connect_info| connect_info.0.ip())
-    else {
-        return std::net::Ipv4Addr::LOCALHOST.into();
-    };
-
-    if proxy.enabled
-        && proxy.ips.iter().any(|network| network.contains(&peer_ip))
-        && let Some(forwarded_ip) = request
-            .headers()
-            .get(proxy.header.as_str())
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.trim().parse().ok())
-    {
-        return forwarded_ip;
-    }
-
-    peer_ip
 }
 
 #[derive(Clone)]
@@ -906,103 +859,4 @@ fn build_message(
     let message = Msg::new(CommonMsgInfo::Int(message_info), message_body);
 
     Ok(message.to_cell()?)
-}
-
-#[cfg(test)]
-mod tests {
-    use axum::{
-        body::Body,
-        extract::{ConnectInfo, Request},
-        http::HeaderName,
-    };
-    use faucet_config::ProxyConfig;
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-
-    use super::client_ip;
-
-    fn trusted_proxy(enabled: bool, header: &str) -> ProxyConfig {
-        ProxyConfig {
-            enabled,
-            header: header.to_string(),
-            ips: vec![IpAddr::V4(Ipv4Addr::new(172, 18, 0, 1)).into()],
-        }
-    }
-
-    fn request_from(peer_ip: IpAddr, header: &str, forwarded_ip: &str) -> Request {
-        let mut request = Request::builder()
-            .header(
-                HeaderName::from_bytes(header.as_bytes()).unwrap(),
-                forwarded_ip,
-            )
-            .body(Body::empty())
-            .unwrap();
-        request
-            .extensions_mut()
-            .insert(ConnectInfo(SocketAddr::new(peer_ip, 12345)));
-        request
-    }
-
-    #[test]
-    fn ignores_forwarded_ip_when_proxy_headers_are_disabled() {
-        let peer_ip = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
-        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
-        let proxy = trusted_proxy(false, "X-Real-IP");
-
-        assert_eq!(client_ip(&request, &proxy), peer_ip);
-    }
-
-    #[test]
-    fn ignores_forwarded_ip_from_untrusted_public_peer() {
-        let peer_ip = IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10));
-        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
-        let proxy = trusted_proxy(true, "X-Real-IP");
-
-        assert_eq!(client_ip(&request, &proxy), peer_ip);
-    }
-
-    #[test]
-    fn accepts_forwarded_ip_from_explicitly_trusted_proxy() {
-        let peer_ip = IpAddr::V4(Ipv4Addr::new(172, 18, 0, 1));
-        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
-        let proxy = trusted_proxy(true, "X-Real-IP");
-
-        assert_eq!(
-            client_ip(&request, &proxy),
-            IpAddr::V4(Ipv4Addr::new(198, 51, 100, 20))
-        );
-    }
-
-    #[test]
-    fn accepts_forwarded_ip_from_trusted_proxy_network() {
-        let peer_ip = IpAddr::V4(Ipv4Addr::new(192, 168, 100, 42));
-        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
-        let mut proxy = trusted_proxy(true, "X-Real-IP");
-        proxy.ips = vec!["192.168.100.0/24".parse().unwrap()];
-
-        assert_eq!(
-            client_ip(&request, &proxy),
-            IpAddr::V4(Ipv4Addr::new(198, 51, 100, 20))
-        );
-    }
-
-    #[test]
-    fn ignores_forwarded_ip_from_unlisted_private_peer() {
-        let peer_ip = IpAddr::V4(Ipv4Addr::new(172, 18, 0, 2));
-        let request = request_from(peer_ip, "X-Real-IP", "198.51.100.20");
-        let proxy = trusted_proxy(true, "X-Real-IP");
-
-        assert_eq!(client_ip(&request, &proxy), peer_ip);
-    }
-
-    #[test]
-    fn accepts_ip_from_configured_proxy_header() {
-        let peer_ip = IpAddr::V4(Ipv4Addr::new(172, 18, 0, 1));
-        let request = request_from(peer_ip, "CF-Connecting-IP", "198.51.100.30");
-        let proxy = trusted_proxy(true, "CF-Connecting-IP");
-
-        assert_eq!(
-            client_ip(&request, &proxy),
-            IpAddr::V4(Ipv4Addr::new(198, 51, 100, 30))
-        );
-    }
 }
