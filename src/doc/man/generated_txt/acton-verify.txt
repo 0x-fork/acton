@@ -323,3 +323,4 @@ SEE ALSO
 
        o  Wallet management guide
           <https://ton-blockchain.github.io/acton/docs/wallets>
+
