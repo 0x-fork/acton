@@ -15,9 +15,11 @@ use real::RealIp;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct CreateClaim {
+    pub(crate) request_id: String,
     pub(crate) address: String,
     pub(crate) challenge: String,
     pub(crate) nonce: u64,
@@ -79,6 +81,7 @@ type ClaimLimitResult = Result<(), (StatusCode, Json<ErrorResponse>)>;
 )]
 pub(super) async fn create_claim(
     State(mut state): State<AppState>,
+    Extension(request_id): Extension<Uuid>,
     Extension(client): Extension<ClientContext>,
     Extension(client_ip): Extension<RealIp>,
     headers: HeaderMap,
@@ -192,6 +195,7 @@ pub(super) async fn create_claim(
     state
         .storage
         .push(CreateClaim {
+            request_id: request_id.to_string(),
             address,
             challenge: payload.challenge,
             nonce: payload.nonce,
@@ -400,6 +404,7 @@ mod tests {
     #[test]
     fn keeps_queued_claims_from_before_github_limits_compatible() {
         let claim: CreateClaim = serde_json::from_value(json!({
+            "request_id": "71a92124-6380-4654-9282-852e8eb4464b",
             "address": "0:abc",
             "challenge": "challenge",
             "nonce": 42,
@@ -407,6 +412,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(claim.github_user_id, None);
+        assert_eq!(claim.request_id, "71a92124-6380-4654-9282-852e8eb4464b");
         assert_eq!(claim.tier, FaucetTier::Guest);
         assert_eq!(claim.max_requests, 0);
         assert_eq!(claim.client_window_subject, None);

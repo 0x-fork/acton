@@ -33,7 +33,7 @@ use ton::ton_core::types::TonAddress;
 use ton::ton_core::types::tlb_core::TLBCoins;
 use toncenter::ToncenterClient;
 use tower::ServiceBuilder;
-use tracing::{error, info, warn};
+use tracing::{Instrument, error, info, info_span, warn};
 use uuid::Uuid;
 use wallet::Wallet;
 
@@ -165,6 +165,7 @@ async fn main() -> anyhow::Result<()> {
     let app = handlers::router(shared_state)
         .layer(
             ServiceBuilder::new()
+                .layer(middleware::from_fn(enter_request_span))
                 .layer(middleware::from_fn_with_state(proxy, insert_client_ip))
                 .layer(GovernorLayer::default()),
         )
@@ -242,6 +243,17 @@ async fn wait_for_shutdown(mut shutdown: watch::Receiver<bool>) {
             return;
         }
     }
+}
+
+async fn enter_request_span(mut request: Request, next: Next) -> Response {
+    let request_id = Uuid::new_v4();
+    let method = request.method().clone();
+    let uri = request.uri().clone();
+    request.extensions_mut().insert(request_id);
+
+    next.run(request)
+        .instrument(info_span!("request", %request_id, %method, %uri))
+        .await
 }
 
 fn default_rate_limit_rule(config: &DefaultRateLimitConfig) -> RuleConfig {
@@ -356,6 +368,11 @@ impl AppState {
     }
 }
 
+#[tracing::instrument(
+    name = "claim",
+    skip_all,
+    fields(request_id = %task.request_id)
+)]
 async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<()> {
     let wallet = state.wallet.as_ref();
     let client = state.client.as_ref();
