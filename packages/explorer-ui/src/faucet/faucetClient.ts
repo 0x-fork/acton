@@ -1,4 +1,4 @@
-const DEFAULT_FAUCET_URL = "https://faucet.acton.monster/"
+const DEFAULT_FAUCET_URL = "https://faucet.ton.org"
 const DEFAULT_MAX_SOLVE_TTL_SECONDS = 60
 const DEFAULT_MAX_NONCE_ATTEMPTS = 1_000_000_000
 const FAUCET_CLIENT_HEADER = "actonscan/1.0.0"
