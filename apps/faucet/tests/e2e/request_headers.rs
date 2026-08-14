@@ -77,6 +77,39 @@ async fn allows_actonscan_browser_client_header() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
+#[tokio::test]
+async fn normalizes_device_uid_before_inserting_client_context() {
+    let app = Router::new()
+        .route(
+            "/challenge",
+            post(|Extension(client): Extension<ClientContext>| async move { client.device_uid }),
+        )
+        .route_layer(middleware::from_fn(require_airdrop_headers));
+
+    for (device_uid, expected) in [
+        (
+            "87C4BC1848A84471997203EE530D2FDA",
+            "87c4bc1848a84471997203ee530d2fda",
+        ),
+        (
+            "550E8400-E29B-41D4-A716-446655440000",
+            "550e8400e29b41d4a716446655440000",
+        ),
+    ] {
+        let request = Request::builder()
+            .method(Method::POST)
+            .uri("/challenge")
+            .header(USER_AGENT, "acton/0.1.0")
+            .header("x-device-uid", device_uid)
+            .body(Body::empty())
+            .unwrap();
+        let response = app.clone().oneshot(request).await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response_body(response).await, expected);
+    }
+}
+
 async fn request_with_headers(
     user_agent: Option<&str>,
     acton_client: Option<&str>,

@@ -35,7 +35,7 @@ pub(crate) fn client_subnet(ip: IpAddr, ipv4_prefix_length: u32) -> String {
 }
 
 pub(crate) fn device_uid(device_uid: &str) -> String {
-    format!("device-uid:{}", device_uid.to_ascii_lowercase())
+    format!("device-uid:{device_uid}")
 }
 
 fn ipv4_subnet(ip: Ipv4Addr, prefix_length: u32) -> String {
@@ -108,9 +108,9 @@ mod tests {
     }
 
     #[test]
-    fn builds_case_normalized_device_subject() {
+    fn builds_device_subject() {
         assert_eq!(
-            device_uid("550E8400-E29B-41D4-A716-446655440000"),
+            device_uid("550e8400-e29b-41d4-a716-446655440000"),
             "device-uid:550e8400-e29b-41d4-a716-446655440000"
         );
     }

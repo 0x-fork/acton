@@ -53,13 +53,15 @@ pub async fn require_airdrop_headers(mut request: Request, next: Next) -> Respon
     } else {
         None
     };
+
     let is_device_uid_allowed = device_uid.is_some_and(is_allowed_device_uid_header);
 
     if let (Some(client_kind), true) = (client_kind, is_device_uid_allowed) {
         let device_uid = device_uid
             .and_then(|value| value.to_str().ok())
-            .expect("validated device UID must be UTF-8")
-            .to_string();
+            .expect("validated device UID must be UTF-8");
+
+        let device_uid = normalize_device_uid(device_uid);
         request.extensions_mut().insert(ClientContext {
             device_uid,
             client_kind,
@@ -109,6 +111,10 @@ fn is_allowed_device_uid_header(value: &HeaderValue) -> bool {
     value.to_str().is_ok_and(is_allowed_device_uid)
 }
 
+fn normalize_device_uid(value: &str) -> String {
+    value.replace('-', "").to_ascii_lowercase()
+}
+
 fn header_value(value: Option<&HeaderValue>) -> &str {
     match value {
         Some(value) => value.to_str().unwrap_or("<non-utf8>"),
@@ -120,7 +126,7 @@ fn header_value(value: Option<&HeaderValue>) -> &str {
 mod tests {
     use super::{
         is_allowed_browser_client, is_allowed_device_uid, is_allowed_device_uid_header,
-        is_allowed_user_agent,
+        is_allowed_user_agent, normalize_device_uid,
     };
 
     #[test]
@@ -173,6 +179,18 @@ mod tests {
             &"550E8400-E29B-41D4-A716-446655440000".parse().unwrap()
         ));
         assert!(is_allowed_device_uid("default"));
+    }
+
+    #[test]
+    fn normalizes_device_uid_to_compact_lowercase() {
+        assert_eq!(
+            normalize_device_uid("D70CA712-E7EB-5652-A9E4-A2287107D8A0"),
+            "d70ca712e7eb5652a9e4a2287107d8a0"
+        );
+        assert_eq!(
+            normalize_device_uid("DB5DD24BA13CBA68DD36FBA46A1FE2B0"),
+            "db5dd24ba13cba68dd36fba46a1fe2b0"
+        );
     }
 
     #[test]
