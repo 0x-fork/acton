@@ -1,6 +1,6 @@
 [package]
 name = "tree-sitter-fift"
-description = "Fift grammar for tree-sitter"
+description = "Fift grammar generated with Tree-sitter"
 version = "0.1.0"
 authors = [
   "TON Core",
@@ -10,7 +10,7 @@ license = "MIT"
 readme = "README.md"
 keywords = ["incremental", "parsing", "tree-sitter", "fift"]
 categories = ["parser-implementations", "parsing", "text-editors"]
-repository = "https://github.com/ton-blockchain/ton-language-server"
+repository = "https://github.com/ton-blockchain/acton"
 edition = "2021"
 autoexamples = false
 
@@ -29,11 +29,13 @@ path = "bindings/rust/lib.rs"
 doctest = false
 
 [dependencies]
-tree-sitter-language = { workspace = true }
+tree-sitter-language.workspace = true
 
 [build-dependencies]
-cc = { workspace = true }
-tree-sitter-language = { workspace = true }
+cc.workspace = true
 
 [dev-dependencies]
-tree-sitter = { workspace = true }
+tree-sitter.workspace = true
+
+[lints.clippy]
+const_is_empty = "allow"

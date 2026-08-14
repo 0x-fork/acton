@@ -23,12 +23,13 @@ permissions: { }
 jobs:
   tree-sitter-grammars:
     name: Test tree-sitter-${{ matrix.language }} grammar
-    runs-on: ubicloud-standard-4-ubuntu-2204
+    runs-on: ubicloud-standard-4-ubuntu-2404
     strategy:
       fail-fast: false
       matrix:
         language:
           - fift
+          - func
           - tasm
           - tlb
           - tolk
@@ -53,12 +54,14 @@ jobs:
 
       - name: Install dependencies
         working-directory: crates/tree-sitter-${{ matrix.language }}
-        run: yarn install --immutable --check-cache --check-resolutions
+        run: |
+          npm ci
+          npm rebuild tree-sitter-cli --ignore-scripts=false
 
       - name: Build
         working-directory: crates/tree-sitter-${{ matrix.language }}
-        run: yarn tree-sitter generate
+        run: npx tree-sitter generate
 
       - name: Test parsers
         working-directory: crates/tree-sitter-${{ matrix.language }}
-        run: yarn tree-sitter test
+        run: npx tree-sitter test
