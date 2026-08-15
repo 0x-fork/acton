@@ -238,7 +238,10 @@ function TransactionDetailsContent({
     })()
   const messageBodyBocHex = inMessage ? formatCellBocHex(inMessage.body) : undefined
   const messageBocHex = inMessage ? formatMessageBocHex(inMessage) : undefined
-  const messageHashHex = inMessage ? formatMessageHashHex(inMessage) : undefined
+  // Prefer the data source's in-message hash; hashing the re-serialized
+  // message is a fallback that can diverge from the on-chain cell.
+  const messageHashHex =
+    tx.inMessageHash ?? (inMessage ? formatMessageHashHex(inMessage) : undefined)
   const stateInitCode = inMessage?.init?.code ?? undefined
   const stateInitData = inMessage?.init?.data ?? undefined
   const stateInitBocHex = inMessage?.init ? formatStateInitBocHex(inMessage.init) : undefined
@@ -488,6 +491,48 @@ function TransactionDetailsContent({
                 <div className={styles.multiColumnItemTitle}>Created Lt</div>
                 <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
                   {inMessage.info.createdLt.toString()}
+                </div>
+              </div>
+              {messageHashHex && (
+                <div className={styles.multiColumnItem}>
+                  <div className={styles.multiColumnItemTitle}>Hash</div>
+                  <div className={styles.multiColumnItemValue}>
+                    <TechnicalValue
+                      copyLabel="message hash"
+                      endLength={3}
+                      startLength={3}
+                      value={messageHashHex}
+                      copyVisibility="always"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isTickTock && inMessage && inMessage.info.type === "external-in" && (
+        <div className={styles.labeledSectionRow}>
+          <div className={styles.labeledSectionTitle}>In Message</div>
+
+          <div className={styles.labeledSectionContent}>
+            <div className={styles.multiColumnRow}>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Created At</div>
+                <DateTime
+                  className={`${styles.multiColumnItemValue} ${styles.timestampValue}`}
+                  data-visual-dynamic="timestamp"
+                  data-visual-placeholder="<timestamp>"
+                  display="date-time-numeric-seconds"
+                  unit="seconds"
+                  value={tx.transaction.now}
+                />
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Created Lt</div>
+                <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
+                  {tx.transaction.lt.toString()}
                 </div>
               </div>
               {messageHashHex && (
