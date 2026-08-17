@@ -8,7 +8,7 @@ use crate::AppState;
 
 #[derive(Debug, Eq, PartialEq, Serialize, ToSchema)]
 pub(super) struct StatsResponse {
-    total_sent_nanograms: u64,
+    total_sent_nanocoins: u64,
     antifraud: AntifraudStatsResponse,
 }
 
@@ -53,7 +53,7 @@ pub(super) async fn get_stats(State(state): State<AppState>) -> StatsResult {
 impl From<FaucetStats> for StatsResponse {
     fn from(stats: FaucetStats) -> Self {
         Self {
-            total_sent_nanograms: stats.total_sent_nanograms,
+            total_sent_nanocoins: stats.total_sent_nanocoins,
             antifraud: AntifraudStatsResponse {
                 wallet_balance: stats.antifraud.wallet_balance,
                 sent_amount_window: stats.antifraud.sent_amount_window,
@@ -74,7 +74,7 @@ mod tests {
     #[test]
     fn serializes_stats_response() {
         let response = StatsResponse::from(FaucetStats {
-            total_sent_nanograms: 1_500_000_000,
+            total_sent_nanocoins: 1_500_000_000,
             antifraud: AntifraudStats {
                 wallet_balance: 2,
                 sent_amount_window: 3,
@@ -86,7 +86,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(response).unwrap(),
             json!({
-                "total_sent_nanograms": 1_500_000_000_u64,
+                "total_sent_nanocoins": 1_500_000_000_u64,
                 "antifraud": {
                     "wallet_balance": 2,
                     "sent_amount_window": 3,

@@ -19,8 +19,7 @@ const RECORD_SUCCESSFUL_CLAIM_SCRIPT: &str = include_str!("../scripts/record_suc
 const STORE_CAPPED_EPHEMERAL_SCRIPT: &str = include_str!("../scripts/store_capped_ephemeral.lua");
 const TAKE_CAPPED_EPHEMERAL_SCRIPT: &str = include_str!("../scripts/take_capped_ephemeral.lua");
 
-// Keep the existing key so deployments retain their accumulated stats.
-const TOTAL_SENT_NANOGRAMS_KEY: &str = "faucet:stats:sent-nanotons";
+const TOTAL_SENT_NANOCOINS_KEY: &str = "faucet:stats:sent-nanocoins";
 const ANTIFRAUD_TRIGGER_COUNT_KEY_PREFIX: &str = "faucet:stats:antifraud";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -41,7 +40,7 @@ pub struct AntifraudStats {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct FaucetStats {
-    pub total_sent_nanograms: u64,
+    pub total_sent_nanocoins: u64,
     pub antifraud: AntifraudStats,
 }
 
@@ -133,7 +132,7 @@ impl ValkeyStore {
     pub async fn add_sent_amount(&self, amount: u64) -> anyhow::Result<u64> {
         let mut connection = self.connection.clone();
         redis::cmd("INCRBY")
-            .arg(TOTAL_SENT_NANOGRAMS_KEY)
+            .arg(TOTAL_SENT_NANOCOINS_KEY)
             .arg(amount)
             .query_async(&mut connection)
             .await
@@ -246,7 +245,7 @@ impl ValkeyStore {
     pub async fn get_stats(&self) -> anyhow::Result<FaucetStats> {
         let mut connection = self.connection.clone();
         let values: Vec<Option<u64>> = redis::cmd("MGET")
-            .arg(TOTAL_SENT_NANOGRAMS_KEY)
+            .arg(TOTAL_SENT_NANOCOINS_KEY)
             .arg(antifraud_trigger_count_key(AntifraudModule::WalletBalance))
             .arg(antifraud_trigger_count_key(
                 AntifraudModule::SentAmountWindow,
@@ -263,7 +262,7 @@ impl ValkeyStore {
         let value = |index| values.get(index).copied().flatten().unwrap_or_default();
 
         Ok(FaucetStats {
-            total_sent_nanograms: value(0),
+            total_sent_nanocoins: value(0),
             antifraud: AntifraudStats {
                 wallet_balance: value(1),
                 sent_amount_window: value(2),

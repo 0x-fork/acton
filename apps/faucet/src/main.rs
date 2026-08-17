@@ -360,11 +360,11 @@ async fn send_claim(task: CreateClaim, state: Data<AppState>) -> anyhow::Result<
                 record_successful_claim(&state, &task).await;
                 record_sent_subnet_amount(&state, &task, amount).await;
                 match state.valkey.add_sent_amount(amount).await {
-                    Ok(total_sent_nanograms) => {
+                    Ok(total_sent_nanocoins) => {
                         info!(
                             address = %task.address,
                             amount,
-                            total_sent_nanograms,
+                            total_sent_nanocoins,
                             "Recorded sent amount in Valkey"
                         );
                     }
@@ -451,7 +451,7 @@ async fn can_process_subnet_amount_window(
             info!(
                 address = %task.address,
                 subject,
-                current_sent_nanograms = current,
+                current_sent_nanocoins = current,
                 attempted_amount = attempted,
                 max_amount = max,
                 window_seconds,
@@ -472,7 +472,7 @@ async fn can_process_subnet_amount_window(
             warn!(
                 address = %task.address,
                 subject,
-                current_sent_nanograms = current,
+                current_sent_nanocoins = current,
                 attempted_amount = attempted,
                 max_amount = max,
                 window_seconds,
@@ -502,7 +502,7 @@ async fn record_sent_subnet_amount(state: &AppState, task: &CreateClaim, amount:
                 address = %task.address,
                 subject,
                 amount,
-                sent_in_window_nanograms = total,
+                sent_in_window_nanocoins = total,
                 window_seconds = window.window_seconds,
                 "Recorded sent amount for subnet in Valkey"
             );
@@ -759,7 +759,7 @@ async fn wait_for_sent_amount_window(
                 info!(
                     address = %address,
                     amount,
-                    reserved_total_nanograms = reservation.total,
+                    reserved_total_nanocoins = reservation.total,
                     max_amount = reservation.max,
                     window_seconds = reservation.window_seconds,
                     "Reserved sent amount sliding window"
@@ -781,7 +781,7 @@ async fn wait_for_sent_amount_window(
                 }
                 warn!(
                     address = %address,
-                    current_sent_nanograms = current,
+                    current_sent_nanocoins = current,
                     attempted_amount = attempted,
                     max_amount = max,
                     window_seconds,

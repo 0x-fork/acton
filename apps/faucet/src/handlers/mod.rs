@@ -73,7 +73,7 @@ fn openapi() -> utoipa::openapi::OpenApi {
     info(
         title = "TON Testnet Faucet API",
         version = "0.1.0",
-        description = "API for requesting testnet TON from the Acton faucet."
+        description = "API for requesting testnet GRAM from the Acton faucet."
     ),
     paths(
         auth::status,
@@ -100,7 +100,7 @@ fn openapi() -> utoipa::openapi::OpenApi {
         crate::github_auth::FaucetTier
     )),
     tags(
-        (name = "faucet", description = "Proof-of-work challenge and testnet TON claim endpoints"),
+        (name = "faucet", description = "Proof-of-work challenge and testnet GRAM claim endpoints"),
         (name = "authentication", description = "Optional GitHub authentication for higher faucet limits"),
         (name = "statistics", description = "Aggregate faucet usage statistics")
     )

@@ -257,7 +257,7 @@ async fn check_subnet_amount_window(
         }) => {
             info!(
                 subject,
-                current_sent_nanograms = current,
+                current_sent_nanocoins = current,
                 attempted_amount = attempted,
                 max_amount = max,
                 window_seconds,
@@ -277,7 +277,7 @@ async fn check_subnet_amount_window(
                 .await;
             warn!(
                 subject,
-                current_sent_nanograms = current,
+                current_sent_nanocoins = current,
                 attempted_amount = attempted,
                 max_amount = max,
                 window_seconds,

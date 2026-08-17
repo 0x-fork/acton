@@ -3,7 +3,7 @@ use http::HeaderName;
 use ipnet::IpNet;
 use std::{net::IpAddr, str::FromStr};
 
-const NANOGRAMS_PER_GRAM: u64 = 1_000_000_000;
+const NANOCOINS_PER_GRAM: u64 = 1_000_000_000;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -206,11 +206,7 @@ impl Config {
             faucet: FaucetConfig {
                 mnemonic: std::env::var("FAUCET_MNEMONIC")
                     .context("FAUCET_MNEMONIC must be set")?,
-                amount: parse_env_nanograms(
-                    "FAUCET_AMOUNT_NANOGRAMS",
-                    "FAUCET_AMOUNT_NANOTONS",
-                    1_000_000,
-                ),
+                amount: parse_env_grams("FAUCET_AMOUNT_NANOCOINS", 1_000_000),
                 message: std::env::var("FAUCET_MESSAGE")
                     .unwrap_or_else(|_| "Testnet faucet".to_string()),
             },
@@ -238,26 +234,23 @@ impl Config {
                 enabled: parse_env_bool("ANTIFRAUD_ENABLED", true),
                 wallet_balance: WalletBalanceCheckConfig {
                     enabled: parse_env_bool("ANTIFRAUD_WALLET_BALANCE_ENABLED", true),
-                    max_wallet_balance: parse_env_nanograms(
-                        "ANTIFRAUD_WALLET_BALANCE_MAX_NANOGRAMS",
-                        "ANTIFRAUD_WALLET_BALANCE_MAX_NANOTONS",
+                    max_wallet_balance: parse_env_grams(
+                        "ANTIFRAUD_WALLET_BALANCE_MAX_NANOCOINS",
                         25_000_000_000,
                     ),
                 },
                 sent_amount_window: SentAmountWindowCheckConfig {
                     enabled: parse_env_bool("ANTIFRAUD_SENT_AMOUNT_WINDOW_ENABLED", true),
-                    max_amount: parse_env_nanograms(
-                        "ANTIFRAUD_SENT_AMOUNT_WINDOW_MAX_NANOGRAMS",
-                        "ANTIFRAUD_SENT_AMOUNT_WINDOW_MAX_NANOTONS",
+                    max_amount: parse_env_grams(
+                        "ANTIFRAUD_SENT_AMOUNT_WINDOW_MAX_NANOCOINS",
                         10_000_000_000,
                     ),
                     window_seconds: parse_env_number("ANTIFRAUD_SENT_AMOUNT_WINDOW_SECONDS", 60),
                 },
                 subnet_amount_window: SubnetAmountWindowCheckConfig {
                     enabled: parse_env_bool("ANTIFRAUD_SUBNET_AMOUNT_WINDOW_ENABLED", true),
-                    max_amount: parse_env_nanograms(
-                        "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_MAX_NANOGRAMS",
-                        "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_MAX_NANOTONS",
+                    max_amount: parse_env_grams(
+                        "ANTIFRAUD_SUBNET_AMOUNT_WINDOW_MAX_NANOCOINS",
                         32_000_000_000,
                     ),
                     ipv4_prefix_length: parse_env_number(
@@ -444,22 +437,18 @@ where
     value.replace('_', "").parse().ok()
 }
 
-fn parse_env_nanograms(name: &str, legacy_name: &str, default: u64) -> u64 {
+fn parse_env_grams(name: &str, default: u64) -> u64 {
     std::env::var(name)
-        .or_else(|_| std::env::var(legacy_name))
         .ok()
-        .and_then(|value| parse_nanograms(&value))
+        .and_then(|value| parse_grams(&value))
         .unwrap_or(default)
 }
 
-fn parse_nanograms(value: &str) -> Option<u64> {
+fn parse_grams(value: &str) -> Option<u64> {
     let value = value.trim();
     let normalized = value.to_ascii_lowercase();
 
-    if let Some(gram_amount) = normalized
-        .strip_suffix("gram")
-        .or_else(|| normalized.strip_suffix("ton"))
-    {
+    if let Some(gram_amount) = normalized.strip_suffix("gram") {
         parse_gram_amount(gram_amount)
     } else {
         parse_number(value)
@@ -472,9 +461,9 @@ fn parse_gram_amount(value: &str) -> Option<u64> {
         return None;
     }
 
-    let nanograms = grams * NANOGRAMS_PER_GRAM as f64;
-    let rounded = nanograms.round();
-    if (nanograms - rounded).abs() > 0.000_001 || rounded > u64::MAX as f64 {
+    let nanocoins = grams * NANOCOINS_PER_GRAM as f64;
+    let rounded = nanocoins.round();
+    if (nanocoins - rounded).abs() > 0.000_001 || rounded > u64::MAX as f64 {
         return None;
     }
 
@@ -514,11 +503,11 @@ fn parse_bool(value: &str) -> Option<bool> {
 mod tests {
     use super::{
         AntifraudConfig, ClaimRateLimitConfig, Config, DatabaseConfig, DefaultRateLimitConfig,
-        FaucetConfig, GitHubAuthConfig, GitHubTierConfig, NANOGRAMS_PER_GRAM, PowClientConfig,
+        FaucetConfig, GitHubAuthConfig, GitHubTierConfig, NANOCOINS_PER_GRAM, PowClientConfig,
         PowConfig, ProxyConfig, RateLimitConfig, SentAmountWindowCheckConfig, ServerConfig,
         SubnetAmountWindowCheckConfig, SuccessfulClaimWindowCheckConfig, ToncenterConfig,
-        ValkeyConfig, WalletBalanceCheckConfig, WorkerConfig, parse_bool, parse_ip_list,
-        parse_nanograms, parse_number,
+        ValkeyConfig, WalletBalanceCheckConfig, WorkerConfig, parse_bool, parse_grams,
+        parse_ip_list, parse_number,
     };
     use ipnet::IpNet;
 
@@ -642,30 +631,23 @@ mod tests {
     }
 
     #[test]
-    fn parses_nanograms() {
-        assert_eq!(parse_nanograms("500_000_000"), Some(500_000_000));
-        assert_eq!(parse_nanograms("1GRAM"), Some(NANOGRAMS_PER_GRAM));
-        assert_eq!(parse_nanograms("10GRAM"), Some(10 * NANOGRAMS_PER_GRAM));
-        assert_eq!(parse_nanograms("1gram"), Some(NANOGRAMS_PER_GRAM));
-        assert_eq!(parse_nanograms("0.5GRAM"), Some(500_000_000));
-        assert_eq!(parse_nanograms(".25gram"), Some(250_000_000));
-        assert_eq!(parse_nanograms("1e-9GRAM"), Some(1));
-        assert_eq!(parse_nanograms("1.000000001GRAM"), Some(1_000_000_001));
+    fn parses_grams() {
+        assert_eq!(parse_grams("500_000_000"), Some(500_000_000));
+        assert_eq!(parse_grams("1GRAM"), Some(NANOCOINS_PER_GRAM));
+        assert_eq!(parse_grams("10GRAM"), Some(10 * NANOCOINS_PER_GRAM));
+        assert_eq!(parse_grams("1gram"), Some(NANOCOINS_PER_GRAM));
+        assert_eq!(parse_grams("0.5GRAM"), Some(500_000_000));
+        assert_eq!(parse_grams(".25gram"), Some(250_000_000));
+        assert_eq!(parse_grams("1e-9GRAM"), Some(1));
+        assert_eq!(parse_grams("1.000000001GRAM"), Some(1_000_000_001));
     }
 
     #[test]
-    fn parses_legacy_ton_suffix() {
-        assert_eq!(parse_nanograms("1TON"), Some(NANOGRAMS_PER_GRAM));
-        assert_eq!(parse_nanograms("10TON"), Some(10 * NANOGRAMS_PER_GRAM));
-        assert_eq!(parse_nanograms("0.5ton"), Some(500_000_000));
-    }
-
-    #[test]
-    fn rejects_invalid_nanogram_values() {
-        assert_eq!(parse_nanograms(""), None);
-        assert_eq!(parse_nanograms("GRAM"), None);
-        assert_eq!(parse_nanograms("1.0000000001GRAM"), None);
-        assert_eq!(parse_nanograms("oneGRAM"), None);
+    fn rejects_invalid_gram_values() {
+        assert_eq!(parse_grams(""), None);
+        assert_eq!(parse_grams("GRAM"), None);
+        assert_eq!(parse_grams("1.0000000001GRAM"), None);
+        assert_eq!(parse_grams("oneGRAM"), None);
     }
 
     #[test]
