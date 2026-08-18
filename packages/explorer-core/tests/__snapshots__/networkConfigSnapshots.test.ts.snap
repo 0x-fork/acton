@@ -7568,11 +7568,15 @@ exports[`real network configuration snapshots parses testnet config at mastercha
       "title": "Precompiled contracts",
     },
     {
-      "description": "No public description or typed parser is available for this parameter; inspect its raw cell",
+      "description": "Validator registry contract, per-validator collator limit, and optional replacement code hash",
       "hasParsedValue": true,
       "hasRawHex": true,
       "id": 46,
-      "title": "Undocumented parameter",
+      "title": "Validator registry",
+      "validatorRegistry": {
+        "contractAddress": "-1:9234809b5b02186e833d082b8a3dbb8225b230ba74a9c06ef24cf334c7a01a34",
+        "maxCollatorsPerValidator": 5,
+      },
     },
     {
       "bridgeConfiguration": {

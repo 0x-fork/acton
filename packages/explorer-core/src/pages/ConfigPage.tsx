@@ -48,6 +48,7 @@ import {
   type PrecompiledContractConfiguration,
   type SuspendedAddressesConfiguration,
   type ValidatorConfiguration,
+  type ValidatorRegistryConfiguration,
   type ValidatorSetConfiguration,
 } from "../api/config"
 import {getExtraCurrencyMetadata} from "../api/extraCurrency"
@@ -289,6 +290,7 @@ function ConfigParameterCard({parameter}: {readonly parameter: NetworkConfigPara
     parameter.parameterIds !== undefined ||
     parameter.fundamentalSmartContracts !== undefined ||
     parameter.precompiledContracts !== undefined ||
+    parameter.validatorRegistry !== undefined ||
     parameter.validatorSet !== undefined ||
     parameter.suspendedAddresses !== undefined ||
     parameter.bridgeConfiguration !== undefined
@@ -420,6 +422,10 @@ function ConfigParameterValue({parameter}: {readonly parameter: NetworkConfigPar
 
   if (parameter.precompiledContracts !== undefined) {
     return <PrecompiledContractsTable contracts={parameter.precompiledContracts} />
+  }
+
+  if (parameter.validatorRegistry !== undefined) {
+    return <ValidatorRegistryValue configuration={parameter.validatorRegistry} />
   }
 
   if (parameter.validatorSet !== undefined) {
@@ -601,6 +607,45 @@ function GlobalVersionValue({configuration}: {readonly configuration: GlobalVers
           id: "capabilities",
           label: "Capabilities",
           value: <GlobalCapabilities value={configuration.capabilities} />,
+        },
+      ]}
+    />
+  )
+}
+
+function ValidatorRegistryValue({
+  configuration,
+}: {
+  readonly configuration: ValidatorRegistryConfiguration
+}) {
+  return (
+    <ConfigValueGrid
+      items={[
+        {
+          id: "validator-registry-address",
+          label: "Registry contract",
+          value: <ConfigAddressValue address={configuration.contractAddress} />,
+          wide: true,
+        },
+        {
+          id: "max-collators-per-validator",
+          label: "Max collators per validator",
+          value: <NumberValue value={configuration.maxCollatorsPerValidator} />,
+        },
+        {
+          id: "validator-registry-new-code-hash",
+          label: "New code hash",
+          value:
+            configuration.newCodeHash === undefined ? (
+              "Not configured"
+            ) : (
+              <TechnicalValue
+                copyLabel="validator registry new code hash"
+                shorten={false}
+                value={configuration.newCodeHash}
+              />
+            ),
+          wide: true,
         },
       ]}
     />

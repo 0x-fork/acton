@@ -11,6 +11,7 @@ import {
   storeSizeLimitsConfig,
   storeStoragePrices,
   storeSuspendedAddressList,
+  storeValRegistryConfig,
   storeValidatorSet,
   type ConfigVotingSetup,
   type JettonBridgeParams,
@@ -21,6 +22,7 @@ import {
   type SizeLimitsConfig,
   type StoragePrices,
   type SuspendedAddressList,
+  type ValRegistryConfig,
   type ValidatorDescr,
   type ValidatorSet,
 } from "../src/cell-inspector/block.tlb.generated"
@@ -416,6 +418,13 @@ describe("network configuration parser", () => {
       45,
       beginCell().store(storePrecompiledContractsConfig(precompiledContractsConfig)).endCell(),
     )
+    const validatorRegistry: ValRegistryConfig = {
+      kind: "ValRegistryConfig",
+      contract_address: Buffer.alloc(32, 0xe1),
+      max_collators_per_validator: 8,
+      new_code_hash: {kind: "Maybe_just", value: 0xe2n},
+    }
+    config.set(46, beginCell().store(storeValRegistryConfig(validatorRegistry)).endCell())
     const oracleEntries = Dictionary.empty<bigint, bigint>()
     oracleEntries.set(0x11n, 0x22n)
     const oracleBridge: OracleBridgeParams = {
@@ -521,6 +530,7 @@ describe("network configuration parser", () => {
     const sizeLimitsParameter = parsed.parameters.find(parameter => parameter.id === 43)
     const suspendedAddressParameter = parsed.parameters.find(parameter => parameter.id === 44)
     const precompiledParameter = parsed.parameters.find(parameter => parameter.id === 45)
+    const validatorRegistryParameter = parsed.parameters.find(parameter => parameter.id === 46)
     const oracleBridgeParameter = parsed.parameters.find(parameter => parameter.id === 71)
     const bscOracleBridgeParameter = parsed.parameters.find(parameter => parameter.id === 72)
     const jettonBridgeParameter = parsed.parameters.find(parameter => parameter.id === 79)
@@ -565,6 +575,7 @@ describe("network configuration parser", () => {
       sizeLimits: sizeLimitsParameter?.configurationValues,
       suspendedAddresses: suspendedAddressParameter?.suspendedAddresses,
       precompiledContracts: precompiledParameter?.precompiledContracts,
+      validatorRegistry: validatorRegistryParameter?.validatorRegistry,
       oracleBridge: oracleBridgeParameter?.bridgeConfiguration,
       bscOracleBridge: bscOracleBridgeParameter?.bridgeConfiguration,
       jettonBridge: jettonBridgeParameter?.bridgeConfiguration,

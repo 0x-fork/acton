@@ -539,6 +539,7 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
     43,
     44,
     45,
+    46,
     71,
     72,
     79,
@@ -977,6 +978,11 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
       "value": 75,
     },
   ],
+  "validatorRegistry": {
+    "contractAddress": "-1:e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+    "maxCollatorsPerValidator": 8,
+    "newCodeHash": "0x00000000000000000000000000000000000000000000000000000000000000e2",
+  },
   "version": {
     "entries": [
       {

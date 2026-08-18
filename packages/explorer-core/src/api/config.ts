@@ -21,6 +21,12 @@ export interface PrecompiledContractConfiguration {
   readonly gasUsage: bigint
 }
 
+export interface ValidatorRegistryConfiguration {
+  readonly contractAddress: string
+  readonly maxCollatorsPerValidator: number
+  readonly newCodeHash?: string
+}
+
 export interface BurningConfiguration {
   readonly blackholeAddress?: string
   readonly feeBurnNum: number
@@ -107,6 +113,7 @@ export interface NetworkConfigParameter {
   readonly parameterIds?: readonly number[]
   readonly fundamentalSmartContracts?: readonly FundamentalSmartContract[]
   readonly precompiledContracts?: readonly PrecompiledContractConfiguration[]
+  readonly validatorRegistry?: ValidatorRegistryConfiguration
   readonly validatorSet?: ValidatorSetConfiguration
   readonly suspendedAddresses?: SuspendedAddressesConfiguration
   readonly bridgeConfiguration?: BridgeConfiguration
@@ -447,6 +454,11 @@ const CONFIG_PARAMETER_METADATA: Readonly<Record<number, ConfigParameterMetadata
     title: "Precompiled contracts",
     description: "Contracts executed by protocol precompiles with configured gas costs",
   },
+  46: {
+    title: "Validator registry",
+    description:
+      "Validator registry contract, per-validator collator limit, and optional replacement code hash",
+  },
   71: {
     title: "Ethereum bridge",
     description: "Oracle bridge parameters for the Ethereum bridge",
@@ -586,6 +598,7 @@ function parseConfigParameter(id: number, cell: Cell): NetworkConfigParameter {
           ? parseParameterIds(parsed, "critical_params")
           : undefined
     const precompiledContracts = id === 45 ? parsePrecompiledContracts(parsed) : undefined
+    const validatorRegistry = id === 46 ? parseValidatorRegistry(parsed) : undefined
     const validatorSet = parseValidatorSet(id, parsed)
     const suspendedAddresses = id === 44 ? parseSuspendedAddresses(parsed) : undefined
     const bridgeConfiguration = parseBridgeConfiguration(id, parsed)
@@ -602,6 +615,7 @@ function parseConfigParameter(id: number, cell: Cell): NetworkConfigParameter {
       ...(parameterIds === undefined ? {} : {parameterIds}),
       ...(id === 31 ? {fundamentalSmartContracts: parseFundamentalSmartContracts(parsed)} : {}),
       ...(precompiledContracts === undefined ? {} : {precompiledContracts}),
+      ...(validatorRegistry === undefined ? {} : {validatorRegistry}),
       ...(validatorSet === undefined ? {} : {validatorSet}),
       ...(suspendedAddresses === undefined ? {} : {suspendedAddresses}),
       ...(bridgeConfiguration === undefined ? {} : {bridgeConfiguration}),
@@ -1154,6 +1168,38 @@ function parsePrecompiledContracts(
   }
 
   return contracts
+}
+
+function parseValidatorRegistry(value: unknown): ValidatorRegistryConfiguration | undefined {
+  const candidate = unwrapAnonymousConfigValue(value)
+  if (
+    candidate?.kind !== "ValRegistryConfig" ||
+    typeof candidate.max_collators_per_validator !== "number"
+  ) {
+    return undefined
+  }
+
+  const contractAddress = parseHashAddress(candidate.contract_address)
+  if (!contractAddress) return undefined
+
+  const maybeCodeHash = candidate.new_code_hash
+  if (typeof maybeCodeHash !== "object" || maybeCodeHash === null) return undefined
+
+  const codeHash = maybeCodeHash as Record<string, unknown>
+  let newCodeHash: string | undefined
+  if (codeHash.kind === "Maybe_just") {
+    if (typeof codeHash.value !== "bigint") return undefined
+    newCodeHash = fixedBigintHex(codeHash.value)
+    if (!newCodeHash) return undefined
+  } else if (codeHash.kind !== "Maybe_nothing") {
+    return undefined
+  }
+
+  return {
+    contractAddress,
+    maxCollatorsPerValidator: candidate.max_collators_per_validator,
+    ...(newCodeHash === undefined ? {} : {newCodeHash}),
+  }
 }
 
 const VALIDATOR_SET_FIELDS: Readonly<Record<number, string>> = {
