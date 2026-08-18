@@ -7569,10 +7569,9 @@ exports[`real network configuration snapshots parses testnet config at mastercha
     },
     {
       "description": "No public description or typed parser is available for this parameter; inspect its raw cell",
-      "hasParsedValue": false,
+      "hasParsedValue": true,
       "hasRawHex": true,
       "id": 46,
-      "parseError": "Expected one of "ConfigParam__", "ConfigParam__1", "ConfigParam__2", "ConfigParam__3", "ConfigParam__4", "ConfigParam__5", "ConfigParam__6", "ConfigParam__7", "ConfigParam__8", "ConfigParam__9", "ConfigParam__10", "ConfigParam__11", "ConfigParam__12", "ConfigParam__13", "ConfigParam__14", "ConfigParam__15", "ConfigParam__16", "ConfigParam__17", "ConfigParam__18", "ConfigParam__19", "ConfigParam_config_mc_gas_prices", "ConfigParam_config_gas_prices", "ConfigParam_config_mc_block_limits", "ConfigParam_config_block_limits", "ConfigParam_config_mc_fwd_prices", "ConfigParam_config_fwd_prices", "ConfigParam__26", "ConfigParam__27", "ConfigParam__28", "ConfigParam__29", "ConfigParam__30", "ConfigParam__31", "ConfigParam__32", "ConfigParam__33", "ConfigParam__34", "ConfigParam__35", "ConfigParam__36", "ConfigParam__37", "ConfigParam__38", "ConfigParam__39", "ConfigParam__40", "ConfigParam__41", "ConfigParam__42", "ConfigParam__43", "ConfigParam__44", "ConfigParam__45", "ConfigParam__46" in loading "ConfigParam", but data does not satisfy any constructor",
       "title": "Undocumented parameter",
     },
     {
