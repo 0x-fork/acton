@@ -3,7 +3,7 @@ import type {FC, ImgHTMLAttributes, SyntheticEvent} from "react"
 
 import {isRegisteredNsfwNft} from "../nftSafetyRegistry"
 
-import {TOKEN_PLACEHOLDER_IMAGE} from "./imageFallbacks"
+import {TOKEN_PLACEHOLDER_IMAGE, deduplicateImageSources} from "./imageFallbacks"
 
 interface NftImageProps
   extends Omit<ImgHTMLAttributes<HTMLImageElement>, "onError" | "src" | "srcSet"> {
@@ -70,7 +70,7 @@ export const NftImage: FC<NftImageProps> = ({
   alt = "",
   ...imageProps
 }) => {
-  const sourcesKey = sources.join("\u0000")
+  const sourcesKey = deduplicateImageSources(sources).join("\u0000")
   const onNsfwRef = useRef(onNsfw)
   // react-doctor-disable-next-line react-doctor/no-ref-current-in-render -- keeps NSFW detection on the latest callback without restarting image verification
   onNsfwRef.current = onNsfw

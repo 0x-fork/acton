@@ -4,7 +4,10 @@ import {
   NFT_CARD_IMAGE_SOURCE_KEYS,
   NFT_COLLECTION_CARD_IMAGE_SOURCE_KEYS,
   NFT_IMAGE_SOURCE_KEYS,
+  TOKEN_PLACEHOLDER_IMAGE,
+  deduplicateImageSources,
   getImageSources,
+  replaceBrokenImageWithFallback,
 } from "../src/components/imageFallbacks"
 
 const imageContent = {
@@ -62,4 +65,41 @@ test("uses larger collection artwork in collection cards", () => {
       "https://images.example/small.png",
     ]
   `)
+})
+
+test("deduplicates a combined image fallback chain", () => {
+  expect(
+    deduplicateImageSources([
+      "https://images.example/small.png",
+      "https://images.example/original.png",
+      "https://images.example/small.png",
+      TOKEN_PLACEHOLDER_IMAGE,
+      "https://images.example/original.png",
+    ]),
+  ).toEqual(["https://images.example/small.png", "https://images.example/original.png"])
+})
+
+test("a duplicated fallback chain reaches the placeholder instead of restarting", () => {
+  const image = {
+    src: "https://images.example/small.png",
+    getAttribute: () => image.src,
+  }
+  const event = {currentTarget: image} as unknown as Parameters<
+    typeof replaceBrokenImageWithFallback
+  >[0]
+  const sources = [
+    "https://images.example/small.png",
+    "https://images.example/original.png",
+    "https://images.example/small.png",
+    "https://images.example/original.png",
+  ]
+
+  replaceBrokenImageWithFallback(event, sources)
+  expect(image.src).toBe("https://images.example/original.png")
+
+  replaceBrokenImageWithFallback(event, sources)
+  expect(image.src).toBe(TOKEN_PLACEHOLDER_IMAGE)
+
+  replaceBrokenImageWithFallback(event, sources)
+  expect(image.src).toBe(TOKEN_PLACEHOLDER_IMAGE)
 })

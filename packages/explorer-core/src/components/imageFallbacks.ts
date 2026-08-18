@@ -38,6 +38,12 @@ export const NFT_COLLECTION_CARD_IMAGE_SOURCE_KEYS = [
   ...NFT_CARD_IMAGE_SOURCE_KEYS,
 ] as const
 
+export function deduplicateImageSources(sources: readonly string[]): string[] {
+  return sources.filter(
+    (source, index) => source !== TOKEN_PLACEHOLDER_IMAGE && sources.indexOf(source) === index,
+  )
+}
+
 export function getImageSources(
   content: Record<string, unknown> | undefined,
   keys: readonly string[] = TOKEN_IMAGE_SOURCE_KEYS,
@@ -69,10 +75,7 @@ export function replaceBrokenImageWithFallback(
     return
   }
 
-  const candidates = [
-    ...sources.filter(source => source !== TOKEN_PLACEHOLDER_IMAGE),
-    TOKEN_PLACEHOLDER_IMAGE,
-  ]
+  const candidates = [...deduplicateImageSources(sources), TOKEN_PLACEHOLDER_IMAGE]
   const currentIndex = currentSource ? candidates.indexOf(currentSource) : -1
   const nextSource = candidates
     .slice(currentIndex >= 0 ? currentIndex + 1 : 0)
