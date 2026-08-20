@@ -80,14 +80,7 @@ Defaults to \fBtestnet\fR\&.
 Use TON Connect wallet approval for the publication transaction.
 .sp
 Supported only with \fB\-\-net mainnet\fR and \fB\-\-net testnet\fR\&. When enabled, Acton
-opens a local TON Connect page and uses the wallet selected in the browser.
-.RE
-.sp
-\fB\-\-tonconnect\-port\fR \fIport\fR
-.RS 4
-Local TON Connect page port.
-.sp
-Defaults to \fB52258\fR\&.
+prints a native QR code and a \fBtc://\fR link.
 .RE
 .sp
 \fB\-\-amount\fR \fIgram\fR
@@ -198,15 +191,8 @@ Cannot be used with \fB\-\-tonconnect\fR\&.
 Use TON Connect wallet approval for the top\-up transaction.
 .sp
 Supported only for libraries stored with \fBnetwork = "mainnet"\fR or
-\fBnetwork = "testnet"\fR\&. When enabled, Acton opens a local TON Connect page and
-uses the wallet selected in the browser.
-.RE
-.sp
-\fB\-\-tonconnect\-port\fR \fIport\fR
-.RS 4
-Local TON Connect page port.
-.sp
-Defaults to \fB52258\fR\&.
+\fBnetwork = "testnet"\fR\&. When enabled, Acton prints a native QR code and a
+\fBtc://\fR link.
 .RE
 .sp
 \fB\-y\fR, \fB\-\-yes\fR

@@ -48,15 +48,9 @@ multiple wallets are available.
 {{#option "`--tonconnect`" }}
 Use TON Connect wallet approval for the verification transaction.
 
-This uses the wallet selected in the browser.
+Acton prints a native TON Connect QR code and a `tc://` link.
 
 Conflicts with `--wallet`.
-{{/option}}
-
-{{#option "`--tonconnect-port` _port_" }}
-Local TON Connect page port.
-
-Defaults to `52258`.
 {{/option}}
 
 {{#option "`--compiler-version` _version_" }}
@@ -242,8 +236,7 @@ With `--new`, do not pass `--net`:
 acton verify Counter --new --tonconnect
 ```
 
-Acton starts a local TON Connect page and opens it in the browser. Use
-`--tonconnect-port` when the default page port is already busy.
+Acton prints a native TON Connect QR code and a `tc://` link.
 
 ## Retries And Failure Hints
 

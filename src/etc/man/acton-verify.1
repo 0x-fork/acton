@@ -46,16 +46,9 @@ multiple wallets are available.
 .RS 4
 Use TON Connect wallet approval for the verification transaction.
 .sp
-This uses the wallet selected in the browser.
+Acton prints a native TON Connect QR code and a \fBtc://\fR link.
 .sp
 Conflicts with \fB\-\-wallet\fR\&.
-.RE
-.sp
-\fB\-\-tonconnect\-port\fR \fIport\fR
-.RS 4
-Local TON Connect page port.
-.sp
-Defaults to \fB52258\fR\&.
 .RE
 .sp
 \fB\-\-compiler\-version\fR \fIversion\fR
@@ -371,8 +364,7 @@ acton verify Counter \-\-new \-\-tonconnect
 .fi
 .RE
 .sp
-Acton starts a local TON Connect page and opens it in the browser. Use
-\fB\-\-tonconnect\-port\fR when the default page port is already busy.
+Acton prints a native TON Connect QR code and a \fBtc://\fR link.
 .SH "RETRIES AND FAILURE HINTS"
 .sp
 .RS 4

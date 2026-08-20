@@ -102,20 +102,12 @@ mode. Conflicting \fB\-\-net\fR and \fB\-\-fork\-net\fR values are rejected.
 .RS 4
 Use TON Connect wallet approval for broadcast messages.
 .sp
-This opens a local browser page, connects a wallet, and sends \fBnet.send(...)\fR
-messages through that wallet instead of loading local wallet mnemonics.
+Acton prints a native TON Connect QR code and a \fBtc://\fR link. It sends
+\fBnet.send(...)\fR messages through that wallet instead of loading local wallet
+mnemonics.
 The TON Connect session is saved under \fBbuild/sessions/tonconnect/<network>.json\fR and
 reused by later runs in the same project. Currently supported only with
 \fB\-\-net mainnet\fR or \fB\-\-net testnet\fR\&.
-.RE
-.sp
-\fB\-\-tonconnect\-port\fR \fIport\fR
-.RS 4
-Local TON Connect page port. Defaults to \fB52258\fR\&.
-.sp
-Acton keeps this port stable so injected wallets can recognize the same local
-dApp on later runs. If the default port is busy, pass another port explicitly
-and keep using the same value for that project.
 .RE
 .sp
 \fB\-\-explorer\fR \fIname\fR

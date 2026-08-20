@@ -39,7 +39,6 @@ pub fn publish_cmd(
     wallet_name: Option<String>,
     net: String,
     tonconnect: bool,
-    tonconnect_port: u16,
     amount_arg: Option<String>,
     yes: bool,
     local: bool,
@@ -105,7 +104,6 @@ pub fn publish_cmd(
         duration_arg.clone(),
         wallet_name.clone(),
         tonconnect,
-        tonconnect_port,
         amount_arg.clone(),
         yes,
         project_root(),
@@ -150,8 +148,7 @@ pub fn publish_cmd(
         format_std_address(&publisher_address, &network).dimmed()
     );
 
-    let sender =
-        prepare_library_sender(&config, &network, wallet_name, tonconnect, tonconnect_port)?;
+    let sender = prepare_library_sender(&config, &network, wallet_name, tonconnect)?;
 
     let (bits, cells) = calculate_cell_size(library_code_cell.as_ref(), &mut HashSet::new());
 
@@ -270,7 +267,6 @@ fn maybe_top_up_tracked_library_before_publish(
     duration_arg: Option<String>,
     wallet_name: Option<String>,
     tonconnect: bool,
-    tonconnect_port: u16,
     amount_arg: Option<String>,
     yes: bool,
     project_root: &Path,
@@ -321,7 +317,6 @@ fn maybe_top_up_tracked_library_before_publish(
         duration_arg,
         wallet_name,
         tonconnect,
-        tonconnect_port,
         amount_arg,
         yes,
         Some(&selected.metadata_path),
@@ -447,7 +442,7 @@ enum LibrarySender {
         wallet: Wallet,
     },
     TonConnect {
-        session: TonConnectSession,
+        session: Box<TonConnectSession>,
         address: StdAddr,
     },
 }
@@ -511,7 +506,7 @@ fn validate_tonconnect_options(
     crate::tonconnect::ensure_supported_network(network)?;
     if wallet_name.is_some() {
         anyhow::bail!(
-            "{} cannot be used with {}; TON Connect uses the wallet selected in the browser",
+            "{} cannot be used with {}; TON Connect uses the externally connected wallet",
             "--wallet".yellow(),
             "--tonconnect".yellow()
         );
@@ -524,11 +519,10 @@ fn prepare_library_sender(
     network: &Network,
     wallet_name: Option<String>,
     tonconnect: bool,
-    tonconnect_port: u16,
 ) -> anyhow::Result<LibrarySender> {
     if tonconnect {
         let storage_path = crate::tonconnect::session_storage_path(project_root(), network)?;
-        let session = TonConnectSession::start(tonconnect_port, storage_path)?;
+        let session = TonConnectSession::start(storage_path)?;
         let connected_wallet = session.connect(network)?;
         let address = connected_wallet.address;
         println!(
@@ -536,7 +530,10 @@ fn prepare_library_sender(
             "→".blue().bold(),
             format_std_address(&address, network).dimmed()
         );
-        return Ok(LibrarySender::TonConnect { session, address });
+        return Ok(LibrarySender::TonConnect {
+            session: Box::new(session),
+            address,
+        });
     }
 
     let wallet_name = select_wallet(wallet_name, config)?;
@@ -764,7 +761,6 @@ pub fn topup_cmd(
     duration_arg: Option<String>,
     wallet_name: Option<String>,
     tonconnect: bool,
-    tonconnect_port: u16,
     amount_arg: Option<String>,
     yes: bool,
 ) -> anyhow::Result<()> {
@@ -795,7 +791,6 @@ pub fn topup_cmd(
         duration_arg,
         wallet_name,
         tonconnect,
-        tonconnect_port,
         amount_arg,
         yes,
         None,
@@ -810,15 +805,13 @@ fn topup_library_entry(
     duration_arg: Option<String>,
     wallet_name: Option<String>,
     tonconnect: bool,
-    tonconnect_port: u16,
     amount_arg: Option<String>,
     yes: bool,
     metadata_path: Option<&Path>,
 ) -> anyhow::Result<()> {
     let network = Network::from_str(&lib.network.to_string())?;
     validate_tonconnect_options(tonconnect, wallet_name.as_deref(), &network)?;
-    let sender =
-        prepare_library_sender(config, &network, wallet_name, tonconnect, tonconnect_port)?;
+    let sender = prepare_library_sender(config, &network, wallet_name, tonconnect)?;
 
     let amount_to_send_nanogram = if let Some(amount_str) = amount_arg {
         parse_gram_to_nanogram(&amount_str)?

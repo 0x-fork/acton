@@ -675,13 +675,6 @@ enum Commands {
             help_heading = "Broadcasting"
         )]
         tonconnect: bool,
-        #[arg(
-            long,
-            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
-            help = "Local TON Connect page port",
-            help_heading = "Broadcasting"
-        )]
-        tonconnect_port: u16,
 
         #[arg(
             value_enum,
@@ -873,13 +866,6 @@ enum Commands {
             conflicts_with = "wallet"
         )]
         tonconnect: bool,
-        #[arg(
-            long,
-            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
-            help = "Local TON Connect page port",
-            help_heading = "Broadcasting"
-        )]
-        tonconnect_port: u16,
     },
     #[command(
         about = "Check project Tolk sources for errors",
@@ -1526,13 +1512,6 @@ pub enum LibraryCommand {
             conflicts_with = "wallet"
         )]
         tonconnect: bool,
-        #[arg(
-            long,
-            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
-            help = "Local TON Connect page port",
-            help_heading = "Broadcasting"
-        )]
-        tonconnect_port: u16,
         #[arg(long, help = "Amount of GRAM to send for publication")]
         amount: Option<String>,
         #[arg(short, long, help = "Skip confirmation prompts")]
@@ -1590,13 +1569,6 @@ pub enum LibraryCommand {
             conflicts_with = "wallet"
         )]
         tonconnect: bool,
-        #[arg(
-            long,
-            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
-            help = "Local TON Connect page port",
-            help_heading = "Broadcasting"
-        )]
-        tonconnect_port: u16,
         #[arg(
             long,
             help = "Amount of GRAM to send (overrides duration-based calculation)"
@@ -2440,7 +2412,6 @@ fn main() {
             no_fork_cache,
             net,
             tonconnect,
-            tonconnect_port,
             explorer,
             show_bodies,
         } => match commands::common::validate_cli_verbosity(verbose) {
@@ -2459,7 +2430,6 @@ fn main() {
                 explorer,
                 show_bodies,
                 tonconnect,
-                tonconnect_port,
             ),
             Err(err) => Err(err),
         },
@@ -2566,7 +2536,6 @@ fn main() {
             compiler_version,
             dry_run,
             tonconnect,
-            tonconnect_port,
             new_verifier,
             payment_tx_hash,
         } => verify_cmd(
@@ -2579,7 +2548,6 @@ fn main() {
             new_verifier,
             payment_tx_hash,
             tonconnect,
-            tonconnect_port,
         ),
         Commands::Library { command } => match command {
             LibraryCommand::Publish {
@@ -2589,7 +2557,6 @@ fn main() {
                 wallet,
                 net,
                 tonconnect,
-                tonconnect_port,
                 amount,
                 yes,
                 local,
@@ -2601,7 +2568,6 @@ fn main() {
                 wallet,
                 net,
                 tonconnect,
-                tonconnect_port,
                 amount,
                 yes,
                 local,
@@ -2627,18 +2593,9 @@ fn main() {
                 duration,
                 wallet,
                 tonconnect,
-                tonconnect_port,
                 amount,
                 yes,
-            } => commands::library::topup_cmd(
-                name,
-                duration,
-                wallet,
-                tonconnect,
-                tonconnect_port,
-                amount,
-                yes,
-            ),
+            } => commands::library::topup_cmd(name, duration, wallet, tonconnect, amount, yes),
         },
         Commands::Check {
             fix,

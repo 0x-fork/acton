@@ -54,7 +54,6 @@ pub fn verify_cmd(
     new_verifier: bool,
     payment_tx_hash: Option<String>,
     tonconnect: bool,
-    tonconnect_port: u16,
 ) -> anyhow::Result<()> {
     if payment_tx_hash.is_some() && !new_verifier {
         anyhow::bail!(
@@ -87,7 +86,7 @@ pub fn verify_cmd(
         crate::tonconnect::ensure_supported_network(&network)?;
         if wallet_name.is_some() {
             anyhow::bail!(
-                "{} cannot be used with {}; TON Connect uses the wallet selected in the browser",
+                "{} cannot be used with {}; TON Connect uses the externally connected wallet",
                 "--wallet".yellow(),
                 "--tonconnect".yellow()
             );
@@ -234,7 +233,6 @@ pub fn verify_cmd(
                 quote: new_payment_quote.expect("new verifier payment quote must be available"),
                 wallet_name,
                 tonconnect,
-                tonconnect_port,
                 transaction_hash: payment_tx_hash,
             },
         );
@@ -251,7 +249,7 @@ pub fn verify_cmd(
     if tonconnect {
         let storage_path =
             crate::tonconnect::session_storage_path(configured_project_root(), &network)?;
-        let session = Arc::new(TonConnectSession::start(tonconnect_port, storage_path)?);
+        let session = Arc::new(TonConnectSession::start(storage_path)?);
         let connected_wallet = session.connect(&network)?;
         sender_std_addr = connected_wallet.address;
         sender_address = format_std_address(&sender_std_addr, &network, false);
@@ -916,7 +914,6 @@ struct NewVerifierPaymentOptions {
     quote: NewVerifierPaymentQuote,
     wallet_name: Option<String>,
     tonconnect: bool,
-    tonconnect_port: u16,
     transaction_hash: Option<String>,
 }
 
@@ -1048,7 +1045,6 @@ fn send_new_verifier_payment(
     payment_address: &TonAddress,
     wallet_name: Option<String>,
     tonconnect: bool,
-    tonconnect_port: u16,
 ) -> anyhow::Result<String> {
     let network = Network::Testnet;
     let payment_amount = format_nanograms(&BigInt::from(amount_nano));
@@ -1061,7 +1057,7 @@ fn send_new_verifier_payment(
     let normalized_external_hash = if tonconnect {
         let storage_path =
             crate::tonconnect::session_storage_path(configured_project_root(), &network)?;
-        let session = Arc::new(TonConnectSession::start(tonconnect_port, storage_path)?);
+        let session = Arc::new(TonConnectSession::start(storage_path)?);
         let connected_wallet = session.connect(&network)?;
         let sender_address = format_std_address(&connected_wallet.address, &network, false);
         println!(
@@ -1298,7 +1294,6 @@ fn verify_with_new_verifier(
         quote: payment_quote,
         wallet_name,
         tonconnect,
-        tonconnect_port,
         transaction_hash,
     } = payment;
     println!("  {} Using new Acton verifier", "→".blue().bold());
@@ -1386,7 +1381,6 @@ fn verify_with_new_verifier(
             &payment_address,
             wallet_name,
             tonconnect,
-            tonconnect_port,
         )?,
     };
 

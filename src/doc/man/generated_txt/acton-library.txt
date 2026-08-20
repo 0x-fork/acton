@@ -62,13 +62,7 @@ SUBCOMMANDS
               Use TON Connect wallet approval for the publication transaction.
 
               Supported only with --net mainnet and --net testnet. When
-              enabled, Acton opens a local TON Connect page and uses the wallet
-              selected in the browser.
-
-          --tonconnect-port port
-              Local TON Connect page port.
-
-              Defaults to 52258.
+              enabled, Acton prints a native QR code and a tc:// link.
 
           --amount gram
               Explicit GRAM amount to send.
@@ -156,13 +150,8 @@ SUBCOMMANDS
               Use TON Connect wallet approval for the top-up transaction.
 
               Supported only for libraries stored with network = "mainnet" or
-              network = "testnet". When enabled, Acton opens a local TON
-              Connect page and uses the wallet selected in the browser.
-
-          --tonconnect-port port
-              Local TON Connect page port.
-
-              Defaults to 52258.
+              network = "testnet". When enabled, Acton prints a native QR code
+              and a tc:// link.
 
           -y, --yes
               Skip confirmation prompts.

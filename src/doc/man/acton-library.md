@@ -72,13 +72,7 @@ Defaults to `testnet`.
 Use TON Connect wallet approval for the publication transaction.
 
 Supported only with `--net mainnet` and `--net testnet`. When enabled, Acton
-opens a local TON Connect page and uses the wallet selected in the browser.
-{{/option}}
-
-{{#option "`--tonconnect-port` _port_" }}
-Local TON Connect page port.
-
-Defaults to `52258`.
+prints a native QR code and a `tc://` link.
 {{/option}}
 
 {{#option "`--amount` _gram_" }}
@@ -201,14 +195,8 @@ Cannot be used with `--tonconnect`.
 Use TON Connect wallet approval for the top-up transaction.
 
 Supported only for libraries stored with `network = "mainnet"` or
-`network = "testnet"`. When enabled, Acton opens a local TON Connect page and
-uses the wallet selected in the browser.
-{{/option}}
-
-{{#option "`--tonconnect-port` _port_" }}
-Local TON Connect page port.
-
-Defaults to `52258`.
+`network = "testnet"`. When enabled, Acton prints a native QR code and a
+`tc://` link.
 {{/option}}
 
 {{#option "`-y`, `--yes`" }}

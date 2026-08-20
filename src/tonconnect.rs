@@ -1,24 +1,22 @@
 use acton_config::color::OwoColorize;
-use anyhow::{Context as AnyhowContext, anyhow};
-use axum::extract::{DefaultBodyLimit, Path as AxumPath, Query, State};
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
-use axum::response::{Html, IntoResponse, Response};
-use axum::routing::{get, post};
-use axum::{Json, Router};
-use rand::RngCore;
+use anyhow::Context as AnyhowContext;
+use qrcode::{EcLevel, QrCode, render::unicode};
+use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::fmt::Write as _;
 use std::fs;
-use std::io::ErrorKind;
-use std::net::TcpListener;
+use std::io::Read;
+use std::num::{NonZeroU32, NonZeroUsize};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
-use std::thread;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, UNIX_EPOCH};
-use tokio::sync::oneshot;
 use ton_api::Network;
+use ton_connect_core::{
+    AccountAddress, BridgeSseDecoder, CellBoc, ClientId, ConnectEvent, ConnectItem,
+    ConnectItemReply, ConnectLink, ConnectRequest, DecimalString, FriendlyAddress, HttpBridgeUrl,
+    HttpsUrl, KnownAppRequest, NetworkId, NonEmptyVec, PersistedSessionKeyPair, RawMessage,
+    RawTransactionPayload, ReturnStrategy, SendTransactionRequest, SessionCrypto, TonAddressItem,
+    TransactionPayload, WalletMessage, WalletResponse, WalletResult,
+};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, ExactSize};
 use tycho_types::models::{
@@ -28,15 +26,13 @@ use tycho_types::models::{
 
 const TONCONNECT_MAINNET_CHAIN: &str = "-239";
 const TONCONNECT_TESTNET_CHAIN: &str = "-3";
-const API_TOKEN_HEADER: &str = "x-acton-tonconnect-token";
-const MAX_HTTP_BODY_BYTES: usize = 2 * 1024 * 1024;
-const MAX_STORAGE_ENTRIES: usize = 64;
+const TONCONNECT_BRIDGE_URL: &str = "https://connect.ton.org/bridge";
+const TONCONNECT_MANIFEST_URL: &str =
+    "https://ton-blockchain.github.io/acton/tonconnect-manifest.json";
+const TONCONNECT_LINK_BASE: &str = "tc://";
+const TONCONNECT_MESSAGE_TTL_SECONDS: u32 = 300;
+const MAX_SSE_EVENT_BYTES: usize = 2 * 1024 * 1024;
 const MAX_STORAGE_FILE_BYTES: u64 = 2 * 1024 * 1024;
-const MAX_STORAGE_KEY_BYTES: usize = 256;
-const MAX_STORAGE_VALUE_BYTES: usize = 256 * 1024;
-pub const DEFAULT_TONCONNECT_PORT: u16 = 52258;
-
-const INDEX_HTML: &str = include_str!("tonconnect/index.html");
 
 #[derive(Clone)]
 pub struct TonConnectContext {
@@ -51,269 +47,279 @@ pub struct TonConnectWallet {
 }
 
 pub struct TonConnectSession {
-    state: Arc<TonConnectState>,
-    url: String,
-    shutdown: Option<oneshot::Sender<()>>,
-    server_thread: Option<thread::JoinHandle<()>>,
+    storage_path: PathBuf,
+    bridge: HttpBridgeUrl,
+    http: Client,
+    state: Mutex<TonConnectState>,
 }
 
 struct TonConnectState {
-    connected: Mutex<Option<TonConnectWallet>>,
-    connected_cv: Condvar,
-    pending: Mutex<Option<PendingTonConnectRequest>>,
-    pending_cv: Condvar,
-    next_request_id: AtomicU64,
+    crypto: SessionCrypto,
+    wallet: Option<TonConnectWallet>,
+    peer_client_id: Option<ClientId>,
+    last_event_id: Option<String>,
+    next_request_id: u64,
 }
 
-struct PendingTonConnectRequest {
-    id: u64,
-    transaction: TonConnectTransaction,
-    response: Option<Result<String, String>>,
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PersistedTonConnectSession {
+    key_pair: PersistedSessionKeyPair,
+    peer_client_id: ClientId,
+    wallet_address: String,
+    wallet_chain: Option<String>,
+    last_event_id: Option<String>,
+    next_request_id: u64,
 }
 
-#[derive(Clone)]
-struct TonConnectWebState {
-    inner: Arc<TonConnectState>,
-    storage_path: Arc<PathBuf>,
-    api_token: Arc<str>,
-    page_token: Arc<str>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TonConnectTransaction {
-    pub valid_until: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub network: Option<String>,
-    pub messages: Vec<TonConnectMessage>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TonConnectMessage {
-    pub address: String,
-    pub amount: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub payload: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub state_init: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct ConnectPayload {
-    address: String,
-    chain: Option<serde_json::Value>,
-}
-
-#[derive(Serialize)]
-struct RequestPollResponse {
-    pending: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    id: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    transaction: Option<TonConnectTransaction>,
-}
-
-#[derive(Deserialize)]
-struct ResponsePayload {
-    id: u64,
-    ok: bool,
-    boc: Option<String>,
-    error: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct StorageKey {
-    key: String,
-}
-
-#[derive(Deserialize)]
-struct StorageSetPayload {
-    key: String,
-    value: String,
-}
-
-#[derive(Serialize)]
-struct StorageGetResponse {
-    value: Option<String>,
+struct ReceivedWalletMessage {
+    sender: ClientId,
+    message: WalletMessage,
 }
 
 impl TonConnectSession {
-    pub fn start(port: u16, storage_path: PathBuf) -> anyhow::Result<Self> {
-        let listener = bind_listener(port)?;
-        listener
-            .set_nonblocking(true)
-            .context("Failed to configure local TON Connect server socket")?;
-        let addr = listener
-            .local_addr()
-            .context("Failed to read local TON Connect server address")?;
-        let api_token = generate_api_token();
-        let page_token = generate_api_token();
-        let url = format!("http://{addr}/{page_token}");
-        let (shutdown_tx, shutdown_rx) = oneshot::channel();
-
-        let state = Arc::new(TonConnectState {
-            connected: Mutex::new(None),
-            connected_cv: Condvar::new(),
-            pending: Mutex::new(None),
-            pending_cv: Condvar::new(),
-            next_request_id: AtomicU64::new(1),
-        });
-        let web_state = TonConnectWebState {
-            inner: Arc::clone(&state),
-            storage_path: Arc::new(storage_path),
-            api_token: Arc::<str>::from(api_token),
-            page_token: Arc::<str>::from(page_token),
-        };
-
-        let app = Router::new()
-            .route("/{page_token}", get(index))
-            .route("/api/connect", post(connect))
-            .route("/api/request", get(request))
-            .route("/api/response", post(response))
-            .route("/api/storage", get(storage_get).post(storage_set))
-            .route("/api/storage/remove", post(storage_remove))
-            .layer(DefaultBodyLimit::max(MAX_HTTP_BODY_BYTES))
-            .with_state(web_state);
-
-        let server_thread = thread::Builder::new()
-            .name("acton-tonconnect".to_string())
-            .spawn(move || {
-                let runtime = match tokio::runtime::Builder::new_multi_thread()
-                    .enable_all()
-                    .thread_name("acton-tonconnect-runtime")
-                    .build()
-                {
-                    Ok(runtime) => runtime,
-                    Err(error) => {
-                        eprintln!("Failed to start TON Connect runtime: {error}");
-                        return;
-                    }
-                };
-
-                runtime.block_on(async move {
-                    let listener = match tokio::net::TcpListener::from_std(listener) {
-                        Ok(listener) => listener,
-                        Err(error) => {
-                            eprintln!("Failed to start TON Connect listener: {error}");
-                            return;
-                        }
-                    };
-
-                    if let Err(error) = axum::serve(listener, app)
-                        .with_graceful_shutdown(async {
-                            let _ = shutdown_rx.await;
-                        })
-                        .await
-                    {
-                        eprintln!("TON Connect server stopped with an error: {error}");
-                    }
-                });
-            })
-            .context("Failed to spawn local TON Connect server")?;
+    pub fn start(storage_path: PathBuf) -> anyhow::Result<Self> {
+        let bridge = HttpBridgeUrl::try_from(TONCONNECT_BRIDGE_URL)
+            .context("Failed to configure TON Connect bridge")?;
+        let http = Client::builder()
+            .connect_timeout(Duration::from_secs(15))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .context("Failed to create TON Connect HTTP client")?;
+        let state = load_session(&storage_path)?.map_or_else(
+            || {
+                Ok(TonConnectState {
+                    crypto: SessionCrypto::generate()?,
+                    wallet: None,
+                    peer_client_id: None,
+                    last_event_id: None,
+                    next_request_id: 1,
+                })
+            },
+            restore_session,
+        )?;
 
         Ok(Self {
-            state,
-            url,
-            shutdown: Some(shutdown_tx),
-            server_thread: Some(server_thread),
+            storage_path,
+            bridge,
+            http,
+            state: Mutex::new(state),
         })
     }
 
     pub fn connect(&self, network: &Network) -> anyhow::Result<TonConnectWallet> {
-        println!("TON Connect page: {}", self.url);
-        if let Err(error) = opener::open(&self.url) {
-            eprintln!("Failed to open browser automatically: {error}");
-            eprintln!("Open the TON Connect page manually: {}", self.url);
-        }
-        println!("Waiting for TON Connect wallet...");
-
-        let mut connected = self
+        let mut state = self
             .state
-            .connected
             .lock()
-            .expect("TON Connect connected wallet mutex poisoned");
-        while connected.is_none() {
-            connected = self
-                .state
-                .connected_cv
-                .wait(connected)
-                .expect("TON Connect connected wallet mutex poisoned");
+            .expect("TON Connect session mutex poisoned");
+        if let Some(wallet) = state.wallet.clone() {
+            validate_wallet_network(&wallet, network)?;
+            return Ok(wallet);
         }
 
-        let wallet = connected
-            .clone()
-            .expect("TON Connect wallet must be available after wait");
-        drop(connected);
-        validate_wallet_network(&wallet, network)?;
-        Ok(wallet)
-    }
-
-    pub fn send_transaction(&self, transaction: TonConnectTransaction) -> anyhow::Result<String> {
-        let id = self.state.next_request_id.fetch_add(1, Ordering::Relaxed);
-
-        let mut pending = self
-            .state
-            .pending
-            .lock()
-            .expect("TON Connect pending request mutex poisoned");
-        while pending.is_some() {
-            pending = self
-                .state
-                .pending_cv
-                .wait(pending)
-                .expect("TON Connect pending request mutex poisoned");
-        }
-
-        *pending = Some(PendingTonConnectRequest {
-            id,
-            transaction,
-            response: None,
-        });
-        self.state.pending_cv.notify_all();
-        println!("Approve TON Connect transaction #{id} in your wallet...");
+        let request = connect_request(network)?;
+        let link = ConnectLink::connect(
+            state.crypto.client_id(),
+            request.clone(),
+            ReturnStrategy::None,
+            None,
+            None,
+        )
+        .to_url(TONCONNECT_LINK_BASE)
+        .context("Failed to create TON Connect link")?;
+        print_connect_link(link.as_str())?;
+        println!("Waiting for TON Connect wallet");
 
         loop {
-            if let Some(request) = pending.as_mut()
-                && request.id == id
-                && let Some(response) = request.response.take()
-            {
-                *pending = None;
-                self.state.pending_cv.notify_all();
-                return response
-                    .map_err(|error| anyhow!("TON Connect transaction failed: {error}"));
+            let received = self.read_wallet_message(&mut state, None)?;
+            let WalletMessage::Event(event) = received.message else {
+                continue;
+            };
+            event
+                .validate_for_connect(&request, None)
+                .context("Wallet returned an invalid TON Connect response")?;
+            match event {
+                ConnectEvent::Connect { payload, .. } => {
+                    let account = payload
+                        .items
+                        .iter()
+                        .find_map(|item| match item {
+                            ConnectItemReply::TonAddress(account) => Some(account),
+                            ConnectItemReply::TonProof(_) | ConnectItemReply::Error(_) => None,
+                        })
+                        .context("TON Connect response is missing wallet address")?;
+                    let wallet = wallet_from_account(account)?;
+                    validate_wallet_network(&wallet, network)?;
+                    state.peer_client_id = Some(received.sender);
+                    state.wallet = Some(wallet.clone());
+                    self.persist_session(&state)?;
+                    drop(state);
+                    return Ok(wallet);
+                }
+                ConnectEvent::ConnectError { payload, .. } => {
+                    let message = payload.message;
+                    drop(state);
+                    anyhow::bail!("TON Connect connection failed: {message}");
+                }
+                ConnectEvent::Disconnect { .. } => {
+                    drop(state);
+                    anyhow::bail!("TON Connect wallet disconnected before connection completed");
+                }
+            }
+        }
+    }
+
+    pub fn send_transaction(
+        &self,
+        mut transaction: RawTransactionPayload,
+    ) -> anyhow::Result<String> {
+        let mut state = self
+            .state
+            .lock()
+            .expect("TON Connect session mutex poisoned");
+        let peer_client_id = state
+            .peer_client_id
+            .context("TON Connect wallet is not connected")?;
+        if transaction.from.is_none() {
+            let wallet = state
+                .wallet
+                .as_ref()
+                .context("TON Connect wallet is not connected")?;
+            transaction.from = Some(
+                AccountAddress::try_from(wallet.address.to_string())
+                    .context("Failed to encode TON Connect sender address")?,
+            );
+        }
+        let id = state.next_request_id.to_string();
+        state.next_request_id = state.next_request_id.saturating_add(1);
+
+        let request = KnownAppRequest::SendTransaction(SendTransactionRequest {
+            id: id.clone(),
+            payload: TransactionPayload::Raw(transaction),
+        });
+        let post = self
+            .bridge
+            .prepare_app_request_post(&state.crypto, peer_client_id, message_ttl(), None, &request)
+            .context("Failed to encrypt TON Connect transaction")?;
+        self.persist_session(&state)?;
+        self.http
+            .post(post.url().clone())
+            .header(reqwest::header::CONTENT_TYPE, "text/plain; charset=utf-8")
+            .body(post.body().as_str().to_owned())
+            .send()
+            .context("Failed to send TON Connect transaction to bridge")?
+            .error_for_status()
+            .context("TON Connect bridge rejected transaction request")?;
+        println!("Approve TON Connect transaction #{id} in your wallet");
+
+        loop {
+            let received = self.read_wallet_message(&mut state, Some(peer_client_id))?;
+            match received.message {
+                WalletMessage::Response(WalletResponse::Success(response)) if response.id == id => {
+                    self.persist_session(&state)?;
+                    let result = response.result;
+                    drop(state);
+                    return match result {
+                        WalletResult::String(boc) => Ok(boc),
+                        WalletResult::Object(_) => anyhow::bail!(
+                            "TON Connect wallet returned an invalid sendTransaction result"
+                        ),
+                    };
+                }
+                WalletMessage::Response(WalletResponse::Error {
+                    error,
+                    id: response_id,
+                }) if response_id == id => {
+                    self.persist_session(&state)?;
+                    let message = error.message;
+                    drop(state);
+                    anyhow::bail!("TON Connect transaction failed: {message}");
+                }
+                WalletMessage::Event(ConnectEvent::Disconnect { .. }) => {
+                    state.wallet = None;
+                    state.peer_client_id = None;
+                    remove_session(&self.storage_path)?;
+                    drop(state);
+                    anyhow::bail!("TON Connect wallet disconnected");
+                }
+                WalletMessage::Event(ConnectEvent::ConnectError { payload, .. }) => {
+                    let message = payload.message;
+                    drop(state);
+                    anyhow::bail!("TON Connect session failed: {message}");
+                }
+                WalletMessage::Event(ConnectEvent::Connect { .. }) | WalletMessage::Response(_) => {
+                }
+            }
+        }
+    }
+
+    fn read_wallet_message(
+        &self,
+        state: &mut TonConnectState,
+        expected_peer: Option<ClientId>,
+    ) -> anyhow::Result<ReceivedWalletMessage> {
+        loop {
+            let endpoint = self.bridge.events_endpoint(
+                state.crypto.client_id(),
+                state.last_event_id.as_deref(),
+                None,
+            );
+            let mut response = self
+                .http
+                .get(endpoint)
+                .header(reqwest::header::ACCEPT, "text/event-stream")
+                .send()
+                .context("Failed to connect to TON Connect bridge")?
+                .error_for_status()
+                .context("TON Connect bridge rejected event subscription")?;
+            let mut decoder = BridgeSseDecoder::new(max_sse_event_bytes());
+            let mut chunk = [0_u8; 8192];
+
+            loop {
+                let read = response
+                    .read(&mut chunk)
+                    .context("Failed to read TON Connect bridge events")?;
+                if read == 0 {
+                    break;
+                }
+                for event in decoder
+                    .push(&chunk[..read])
+                    .context("Failed to decode TON Connect bridge event")?
+                {
+                    let sender = event.message().from();
+                    if let Some(event_id) = event.event_id() {
+                        state.last_event_id = Some(event_id.to_owned());
+                    }
+                    if expected_peer.is_some_and(|expected| sender != expected) {
+                        continue;
+                    }
+                    let message = event
+                        .decrypt::<WalletMessage>(&state.crypto, sender)
+                        .context("Failed to decrypt TON Connect wallet message")?;
+                    return Ok(ReceivedWalletMessage { sender, message });
+                }
             }
 
-            pending = self
-                .state
-                .pending_cv
-                .wait(pending)
-                .expect("TON Connect pending request mutex poisoned");
+            std::thread::sleep(Duration::from_millis(500));
         }
     }
-}
 
-impl Drop for TonConnectSession {
-    fn drop(&mut self) {
-        if let Some(shutdown) = self.shutdown.take() {
-            let _ = shutdown.send(());
-        }
-        if let Some(thread) = self.server_thread.take() {
-            let _ = thread.join();
-        }
-    }
-}
-
-fn bind_listener(port: u16) -> anyhow::Result<TcpListener> {
-    match TcpListener::bind(("127.0.0.1", port)) {
-        Ok(listener) => Ok(listener),
-        Err(error) if error.kind() == ErrorKind::AddrInUse => anyhow::bail!(
-            "TON Connect port 127.0.0.1:{port} is already in use. Stop the process using it or pass {}.",
-            "--tonconnect-port <port>".yellow()
-        ),
-        Err(error) => Err(error).with_context(|| {
-            format!("Failed to bind local TON Connect server to 127.0.0.1:{port}")
-        }),
+    fn persist_session(&self, state: &TonConnectState) -> anyhow::Result<()> {
+        let Some(wallet) = state.wallet.as_ref() else {
+            return Ok(());
+        };
+        let peer_client_id = state
+            .peer_client_id
+            .context("TON Connect wallet peer is missing")?;
+        let persisted = PersistedTonConnectSession {
+            key_pair: state.crypto.persisted_keypair(),
+            peer_client_id,
+            wallet_address: wallet.address.to_string(),
+            wallet_chain: wallet.chain.clone(),
+            last_event_id: state.last_event_id.clone(),
+            next_request_id: state.next_request_id,
+        };
+        write_session(&self.storage_path, &persisted)
     }
 }
 
@@ -332,18 +338,19 @@ pub fn session_storage_path(project_root: &Path, network: &Network) -> anyhow::R
 pub fn transaction_from_message(
     message: &Cell,
     network: &Network,
-) -> anyhow::Result<TonConnectTransaction> {
+) -> anyhow::Result<RawTransactionPayload> {
     let chain = tonconnect_chain(network)?;
     let expired_at_time = std::time::SystemTime::now() + Duration::from_secs(600);
     let valid_until = expired_at_time.duration_since(UNIX_EPOCH)?.as_secs();
-    Ok(TonConnectTransaction {
-        valid_until,
-        network: Some(chain.to_string()),
-        messages: vec![message_from_cell(message, network)?],
+    Ok(RawTransactionPayload {
+        valid_until: Some(valid_until),
+        network: Some(NetworkId::try_from(chain)?),
+        from: None,
+        messages: NonEmptyVec::try_from(vec![message_from_cell(message, network)?])?,
     })
 }
 
-fn message_from_cell(message: &Cell, network: &Network) -> anyhow::Result<TonConnectMessage> {
+fn message_from_cell(message: &Cell, network: &Network) -> anyhow::Result<RawMessage> {
     let parsed = message
         .parse::<OwnedRelaxedMessage>()
         .context("Failed to parse internal message for TON Connect")?;
@@ -359,18 +366,28 @@ fn message_from_cell(message: &Cell, network: &Network) -> anyhow::Result<TonCon
 
     let payload = body_to_cell(parsed.body)?
         .filter(|cell| !is_empty_cell(cell))
-        .map(|cell| Boc::encode_base64(&cell));
+        .map(|cell| CellBoc::try_from(Boc::encode_base64(&cell)))
+        .transpose()
+        .context("Failed to validate message body for TON Connect")?;
     let state_init = parsed
         .init
-        .map(|state_init| CellBuilder::build_from(state_init).map(|cell| Boc::encode_base64(&cell)))
+        .map(|state_init| {
+            CellBuilder::build_from(state_init)
+                .map(|cell| Boc::encode_base64(&cell))
+                .map_err(anyhow::Error::from)
+                .and_then(|boc| CellBoc::try_from(boc).map_err(anyhow::Error::from))
+        })
         .transpose()
         .context("Failed to serialize state init for TON Connect")?;
 
-    Ok(TonConnectMessage {
-        address: format_address(&dest, network, info.bounce),
-        amount: info.value.tokens.to_string(),
+    Ok(RawMessage {
+        address: FriendlyAddress::try_from(format_address(&dest, network, info.bounce))
+            .context("Failed to encode TON Connect destination address")?,
+        amount: DecimalString::try_from(info.value.tokens.to_string())
+            .context("Failed to encode TON Connect amount")?,
         payload,
         state_init,
+        extra_currency: None,
     })
 }
 
@@ -458,244 +475,53 @@ fn chain_name(chain: &str) -> Option<&'static str> {
     }
 }
 
-async fn index(
-    AxumPath(page_token): AxumPath<String>,
-    State(state): State<TonConnectWebState>,
-) -> Result<Response, (StatusCode, String)> {
-    if page_token != state.page_token.as_ref() {
-        return Err((
-            StatusCode::NOT_FOUND,
-            "TON Connect page not found".to_string(),
-        ));
-    }
-
-    let mut response =
-        Html(INDEX_HTML.replace("__ACTON_API_TOKEN__", state.api_token.as_ref())).into_response();
-    add_index_security_headers(response.headers_mut());
-    Ok(response)
+fn connect_request(network: &Network) -> anyhow::Result<ConnectRequest> {
+    Ok(ConnectRequest {
+        manifest_url: HttpsUrl::try_from(TONCONNECT_MANIFEST_URL)?,
+        items: NonEmptyVec::try_from(vec![ConnectItem::from(TonAddressItem {
+            network: Some(NetworkId::try_from(tonconnect_chain(network)?)?),
+        })])?,
+    })
 }
 
-fn add_index_security_headers(headers: &mut HeaderMap) {
-    headers.insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("no-store, max-age=0"),
+fn wallet_from_account(
+    account: &ton_connect_core::TonAddressItemReply,
+) -> anyhow::Result<TonConnectWallet> {
+    let (address, _) = StdAddr::from_str_ext(&account.address.to_string(), StdAddrFormat::any())
+        .context("Wallet returned an invalid TON address")?;
+    Ok(TonConnectWallet {
+        address,
+        chain: Some(account.network.as_str().to_owned()),
+    })
+}
+
+fn print_connect_link(link: &str) -> anyhow::Result<()> {
+    println!("Scan this QR code with a TON Connect wallet");
+    let code = QrCode::with_error_correction_level(link.as_bytes(), EcLevel::L)
+        .context("Failed to generate TON Connect QR code")?;
+    println!(
+        "{}",
+        code.render::<unicode::Dense1x2>()
+            .quiet_zone(true)
+            .module_dimensions(1, 1)
+            .build()
     );
-    headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
-    headers.insert(header::EXPIRES, HeaderValue::from_static("0"));
-    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
-    headers.insert(
-        header::X_CONTENT_TYPE_OPTIONS,
-        HeaderValue::from_static("nosniff"),
-    );
-    headers.insert(
-        header::REFERRER_POLICY,
-        HeaderValue::from_static("no-referrer"),
-    );
-    headers.insert(
-        header::CONTENT_SECURITY_POLICY,
-        HeaderValue::from_static(
-            "default-src 'self'; \
-             base-uri 'none'; \
-             object-src 'none'; \
-             form-action 'none'; \
-             frame-ancestors 'none'; \
-             script-src 'self' 'unsafe-inline' https://unpkg.com; \
-             style-src 'unsafe-inline'; \
-             img-src https: data:; \
-             connect-src 'self' https: wss:",
-        ),
-    );
-}
-
-async fn connect(
-    State(state): State<TonConnectWebState>,
-    headers: HeaderMap,
-    Json(payload): Json<ConnectPayload>,
-) -> Result<StatusCode, (StatusCode, String)> {
-    verify_api_token(&state, &headers)?;
-    let (address, _) =
-        StdAddr::from_str_ext(&payload.address, StdAddrFormat::any()).map_err(|error| {
-            (
-                StatusCode::BAD_REQUEST,
-                format!("Invalid TON Connect wallet address: {error}"),
-            )
-        })?;
-    let chain = payload.chain.as_ref().and_then(chain_value_to_string);
-
-    {
-        let mut connected = state
-            .inner
-            .connected
-            .lock()
-            .expect("TON Connect connected wallet mutex poisoned");
-        *connected = Some(TonConnectWallet { address, chain });
-    }
-    state.inner.connected_cv.notify_all();
-    Ok(StatusCode::NO_CONTENT)
-}
-
-async fn request(
-    State(state): State<TonConnectWebState>,
-    headers: HeaderMap,
-) -> Result<Json<RequestPollResponse>, (StatusCode, String)> {
-    verify_api_token(&state, &headers)?;
-    let response = {
-        let pending = state
-            .inner
-            .pending
-            .lock()
-            .expect("TON Connect pending request mutex poisoned");
-        if let Some(request) = pending.as_ref()
-            && request.response.is_none()
-        {
-            RequestPollResponse {
-                pending: true,
-                id: Some(request.id),
-                transaction: Some(request.transaction.clone()),
-            }
-        } else {
-            RequestPollResponse {
-                pending: false,
-                id: None,
-                transaction: None,
-            }
-        }
-    };
-
-    Ok(Json(response))
-}
-
-async fn response(
-    State(state): State<TonConnectWebState>,
-    headers: HeaderMap,
-    Json(payload): Json<ResponsePayload>,
-) -> Result<StatusCode, (StatusCode, String)> {
-    verify_api_token(&state, &headers)?;
-    {
-        let mut pending = state
-            .inner
-            .pending
-            .lock()
-            .expect("TON Connect pending request mutex poisoned");
-        let Some(request) = pending.as_mut().filter(|request| request.id == payload.id) else {
-            return Err((
-                StatusCode::NOT_FOUND,
-                format!("Unknown TON Connect request {}", payload.id),
-            ));
-        };
-
-        request.response = Some(if payload.ok {
-            payload
-                .boc
-                .ok_or_else(|| {
-                    (
-                        StatusCode::BAD_REQUEST,
-                        "TON Connect response is missing boc".to_string(),
-                    )
-                })
-                .map(Ok)?
-        } else {
-            Err(payload
-                .error
-                .unwrap_or_else(|| "wallet rejected transaction".to_string()))
-        });
-        drop(pending);
-    }
-    state.inner.pending_cv.notify_all();
-    Ok(StatusCode::NO_CONTENT)
-}
-
-async fn storage_get(
-    State(state): State<TonConnectWebState>,
-    headers: HeaderMap,
-    Query(query): Query<StorageKey>,
-) -> Result<Json<StorageGetResponse>, (StatusCode, String)> {
-    verify_api_token(&state, &headers)?;
-    let value = storage_get_item(&state.storage_path, &query.key).map_err(storage_error)?;
-    Ok(Json(StorageGetResponse { value }))
-}
-
-async fn storage_set(
-    State(state): State<TonConnectWebState>,
-    headers: HeaderMap,
-    Json(payload): Json<StorageSetPayload>,
-) -> Result<StatusCode, (StatusCode, String)> {
-    verify_api_token(&state, &headers)?;
-    storage_set_item(&state.storage_path, payload.key, payload.value).map_err(storage_error)?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-async fn storage_remove(
-    State(state): State<TonConnectWebState>,
-    headers: HeaderMap,
-    Json(payload): Json<StorageKey>,
-) -> Result<StatusCode, (StatusCode, String)> {
-    verify_api_token(&state, &headers)?;
-    storage_remove_item(&state.storage_path, &payload.key).map_err(storage_error)?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-fn verify_api_token(
-    state: &TonConnectWebState,
-    headers: &HeaderMap,
-) -> Result<(), (StatusCode, String)> {
-    if headers
-        .get(API_TOKEN_HEADER)
-        .and_then(|value| value.to_str().ok())
-        == Some(state.api_token.as_ref())
-    {
-        return Ok(());
-    }
-
-    Err((
-        StatusCode::UNAUTHORIZED,
-        "Invalid TON Connect session token".to_string(),
-    ))
-}
-
-fn storage_get_item(path: &Path, key: &str) -> anyhow::Result<Option<String>> {
-    validate_storage_key(key)?;
-    Ok(read_storage(path)?.get(key).cloned())
-}
-
-fn storage_set_item(path: &Path, key: String, value: String) -> anyhow::Result<()> {
-    validate_storage_key(&key)?;
-    validate_storage_value(&value)?;
-    let mut storage = read_storage(path)?;
-    if !storage.contains_key(&key) && storage.len() >= MAX_STORAGE_ENTRIES {
-        anyhow::bail!("TON Connect session storage has too many entries");
-    }
-    storage.insert(key, value);
-    write_storage(path, &storage)
-}
-
-fn storage_remove_item(path: &Path, key: &str) -> anyhow::Result<()> {
-    validate_storage_key(key)?;
-    let mut storage = read_storage(path)?;
-    storage.remove(key);
-    write_storage(path, &storage)
-}
-
-fn validate_storage_key(key: &str) -> anyhow::Result<()> {
-    if key.is_empty() {
-        anyhow::bail!("TON Connect session storage key cannot be empty");
-    }
-    if key.len() > MAX_STORAGE_KEY_BYTES {
-        anyhow::bail!("TON Connect session storage key is too large");
-    }
+    println!("TON Connect link: {link}");
     Ok(())
 }
 
-fn validate_storage_value(value: &str) -> anyhow::Result<()> {
-    if value.len() > MAX_STORAGE_VALUE_BYTES {
-        anyhow::bail!("TON Connect session storage value is too large");
-    }
-    Ok(())
+const fn max_sse_event_bytes() -> NonZeroUsize {
+    NonZeroUsize::new(MAX_SSE_EVENT_BYTES).expect("TON Connect SSE limit must be non-zero")
 }
 
-fn read_storage(path: &Path) -> anyhow::Result<BTreeMap<String, String>> {
+const fn message_ttl() -> NonZeroU32 {
+    NonZeroU32::new(TONCONNECT_MESSAGE_TTL_SECONDS)
+        .expect("TON Connect message TTL must be non-zero")
+}
+
+fn load_session(path: &Path) -> anyhow::Result<Option<PersistedTonConnectSession>> {
     if !path.exists() {
-        return Ok(BTreeMap::new());
+        return Ok(None);
     }
     let metadata = fs::metadata(path).with_context(|| {
         format!(
@@ -717,21 +543,32 @@ fn read_storage(path: &Path) -> anyhow::Result<BTreeMap<String, String>> {
         )
     })?;
     if content.trim().is_empty() {
-        return Ok(BTreeMap::new());
+        return Ok(None);
     }
 
-    serde_json::from_str(&content).with_context(|| {
-        format!(
-            "Failed to parse TON Connect session storage {}",
-            path.display()
-        )
+    serde_json::from_str(&content)
+        .with_context(|| format!("Failed to parse TON Connect session {}", path.display()))
+        .map(Some)
+}
+
+fn restore_session(persisted: PersistedTonConnectSession) -> anyhow::Result<TonConnectState> {
+    let crypto = SessionCrypto::from_persisted(&persisted.key_pair)
+        .context("Failed to restore TON Connect session keys")?;
+    let (address, _) = StdAddr::from_str_ext(&persisted.wallet_address, StdAddrFormat::any())
+        .context("Failed to restore TON Connect wallet address")?;
+    Ok(TonConnectState {
+        crypto,
+        wallet: Some(TonConnectWallet {
+            address,
+            chain: persisted.wallet_chain,
+        }),
+        peer_client_id: Some(persisted.peer_client_id),
+        last_event_id: persisted.last_event_id,
+        next_request_id: persisted.next_request_id.max(1),
     })
 }
 
-fn write_storage(path: &Path, storage: &BTreeMap<String, String>) -> anyhow::Result<()> {
-    if storage.len() > MAX_STORAGE_ENTRIES {
-        anyhow::bail!("TON Connect session storage has too many entries");
-    }
+fn write_session(path: &Path, session: &PersistedTonConnectSession) -> anyhow::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).with_context(|| {
             format!(
@@ -742,7 +579,7 @@ fn write_storage(path: &Path, storage: &BTreeMap<String, String>) -> anyhow::Res
     }
 
     let content =
-        serde_json::to_vec_pretty(storage).context("Failed to serialize TON Connect session")?;
+        serde_json::to_vec_pretty(session).context("Failed to serialize TON Connect session")?;
     if content.len() as u64 > MAX_STORAGE_FILE_BYTES {
         anyhow::bail!(
             "TON Connect session storage {} is too large",
@@ -759,18 +596,13 @@ fn write_storage(path: &Path, storage: &BTreeMap<String, String>) -> anyhow::Res
     Ok(())
 }
 
-fn storage_error(error: anyhow::Error) -> (StatusCode, String) {
-    (StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
-}
-
-fn generate_api_token() -> String {
-    let mut bytes = [0; 32];
-    rand::rngs::OsRng.fill_bytes(&mut bytes);
-    let mut token = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        write!(&mut token, "{byte:02x}").expect("writing to String cannot fail");
+fn remove_session(path: &Path) -> anyhow::Result<()> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error)
+            .with_context(|| format!("Failed to remove TON Connect session {}", path.display())),
     }
-    token
 }
 
 #[cfg(unix)]
@@ -788,14 +620,6 @@ fn set_storage_permissions(path: &Path) -> anyhow::Result<()> {
 #[cfg(not(unix))]
 fn set_storage_permissions(_path: &Path) -> anyhow::Result<()> {
     Ok(())
-}
-
-fn chain_value_to_string(value: &serde_json::Value) -> Option<String> {
-    match value {
-        serde_json::Value::String(value) => Some(value.clone()),
-        serde_json::Value::Number(value) => Some(value.to_string()),
-        _ => None,
-    }
 }
 
 #[cfg(test)]
@@ -830,76 +654,59 @@ mod tests {
         .unwrap();
 
         let transaction = transaction_from_message(&message, &Network::Testnet).unwrap();
-        let message = &transaction.messages[0];
+        let message = &transaction.messages.as_slice()[0];
 
         assert_eq!(
-            transaction.network.as_deref(),
+            transaction.network.as_ref().map(NetworkId::as_str),
             Some(TONCONNECT_TESTNET_CHAIN)
         );
-        assert_eq!(message.amount, "123");
+        assert_eq!(message.amount.as_str(), "123");
         assert_eq!(
-            message.address,
+            message.address.as_str(),
             format_address(&dest, &Network::Testnet, true)
         );
         assert!(message.payload.is_some());
+
+        let encoded = ton_connect_core::AppRequest::encode(KnownAppRequest::SendTransaction(
+            SendTransactionRequest {
+                id: "1".to_owned(),
+                payload: TransactionPayload::Raw(transaction),
+            },
+        ))
+        .unwrap();
+        assert!(matches!(
+            encoded.decode().unwrap(),
+            KnownAppRequest::SendTransaction(_)
+        ));
     }
 
     #[test]
-    fn tonconnect_page_restores_sdk_connection_from_storage() {
-        assert!(!INDEX_HTML.contains("@latest"));
-        assert!(INDEX_HTML.contains("integrity=\"sha384-"));
-        assert!(INDEX_HTML.contains("crossorigin=\"anonymous\""));
-        assert!(
-            INDEX_HTML.contains("https://ton-blockchain.github.io/acton/tonconnect-manifest.json")
-        );
-        assert!(INDEX_HTML.contains("https://ton-blockchain.github.io/acton/logo.png"));
-        assert!(INDEX_HTML.contains(r#"<img class="title-icon""#));
-        assert!(INDEX_HTML.contains("const formatStatusError"));
-        assert!(INDEX_HTML.contains("Acton has finished running. You can close this page."));
-        assert!(INDEX_HTML.contains("tonConnectUI.onStatusChange"));
-        assert!(INDEX_HTML.contains("await tonConnectUI.connectionRestored"));
-        assert!(INDEX_HTML.contains("const result = await tonConnectUI.sendTransaction"));
-    }
+    fn tonconnect_link_contains_native_protocol_request() {
+        let crypto = SessionCrypto::generate().unwrap();
+        let request = connect_request(&Network::Testnet).unwrap();
+        let link = ConnectLink::connect(
+            crypto.client_id(),
+            request,
+            ReturnStrategy::None,
+            None,
+            None,
+        )
+        .to_url(TONCONNECT_LINK_BASE)
+        .unwrap();
 
-    #[test]
-    fn tonconnect_index_security_headers_disable_framing() {
-        let mut headers = HeaderMap::new();
-        add_index_security_headers(&mut headers);
-
+        assert_eq!(link.scheme(), "tc");
         assert_eq!(
-            headers.get(header::X_FRAME_OPTIONS).unwrap(),
-            HeaderValue::from_static("DENY")
+            link.query_pairs().find(|(key, _)| key == "v").unwrap().1,
+            "2"
         );
-        assert_eq!(
-            headers.get(header::CACHE_CONTROL).unwrap(),
-            HeaderValue::from_static("no-store, max-age=0")
-        );
-        assert_eq!(
-            headers.get(header::PRAGMA).unwrap(),
-            HeaderValue::from_static("no-cache")
-        );
-        assert_eq!(
-            headers.get(header::EXPIRES).unwrap(),
-            HeaderValue::from_static("0")
-        );
-        assert!(
-            headers
-                .get(header::CONTENT_SECURITY_POLICY)
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .contains("frame-ancestors 'none'")
-        );
-    }
-
-    #[test]
-    fn tonconnect_busy_port_error_mentions_override_flag() {
-        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
-        let port = listener.local_addr().unwrap().port();
-
-        let error = bind_listener(port).unwrap_err().to_string();
-
-        assert!(error.contains("--tonconnect-port <port>"));
+        assert!(link.query_pairs().any(|(key, value)| {
+            key == "r"
+                && value.contains(TONCONNECT_MANIFEST_URL)
+                && value.contains(TONCONNECT_TESTNET_CHAIN)
+        }));
+        let compact = QrCode::with_error_correction_level(link.as_str(), EcLevel::L).unwrap();
+        let default = QrCode::new(link.as_str()).unwrap();
+        assert!(compact.width() < default.width());
     }
 
     #[test]
@@ -923,50 +730,43 @@ mod tests {
     }
 
     #[test]
-    fn tonconnect_storage_roundtrips_values() {
+    fn tonconnect_session_roundtrips_native_state() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("build/sessions/tonconnect/testnet.json");
+        let wallet = StdAddr::new(0, HashBytes([3; 32]));
+        let crypto = SessionCrypto::generate().unwrap();
+        let client_id = crypto.client_id();
+        let persisted = PersistedTonConnectSession {
+            key_pair: crypto.persisted_keypair(),
+            peer_client_id: ClientId::from_bytes([4; 32]),
+            wallet_address: wallet.to_string(),
+            wallet_chain: Some(TONCONNECT_TESTNET_CHAIN.to_owned()),
+            last_event_id: Some("42".to_owned()),
+            next_request_id: 7,
+        };
 
-        assert_eq!(storage_get_item(&path, "missing").unwrap(), None);
+        write_session(&path, &persisted).unwrap();
+        let restored = restore_session(load_session(&path).unwrap().unwrap()).unwrap();
 
-        storage_set_item(&path, "session".to_string(), "value".to_string()).unwrap();
-        assert_eq!(
-            storage_get_item(&path, "session").unwrap(),
-            Some("value".to_string())
-        );
-
-        let persisted = fs::read_to_string(path).unwrap();
-        assert!(persisted.contains("\"session\""));
-        assert!(persisted.contains("\"value\""));
+        assert_eq!(restored.crypto.client_id(), client_id);
+        assert_eq!(restored.wallet.unwrap().address, wallet);
+        assert_eq!(restored.last_event_id.as_deref(), Some("42"));
+        assert_eq!(restored.next_request_id, 7);
     }
 
     #[test]
-    fn tonconnect_storage_remove_deletes_only_requested_key() {
+    fn tonconnect_storage_rejects_oversized_files() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("build/sessions/tonconnect/testnet.json");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, vec![b'x'; MAX_STORAGE_FILE_BYTES as usize + 1]).unwrap();
 
-        storage_set_item(&path, "keep".to_string(), "1".to_string()).unwrap();
-        storage_set_item(&path, "remove".to_string(), "2".to_string()).unwrap();
-        storage_remove_item(&path, "remove").unwrap();
+        let error = match load_session(&path) {
+            Ok(_) => panic!("oversized session file was accepted"),
+            Err(error) => error.to_string(),
+        };
 
-        assert_eq!(
-            storage_get_item(&path, "keep").unwrap(),
-            Some("1".to_string())
-        );
-        assert_eq!(storage_get_item(&path, "remove").unwrap(), None);
-    }
-
-    #[test]
-    fn tonconnect_storage_rejects_oversized_values() {
-        let temp = tempfile::tempdir().unwrap();
-        let path = temp.path().join("build/sessions/tonconnect/testnet.json");
-        let oversized = "x".repeat(MAX_STORAGE_VALUE_BYTES + 1);
-
-        let error = storage_set_item(&path, "session".to_string(), oversized)
-            .unwrap_err()
-            .to_string();
-
-        assert!(error.contains("value is too large"));
+        assert!(error.contains("is too large"));
     }
 
     #[cfg(unix)]
@@ -977,7 +777,19 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("build/sessions/tonconnect/testnet.json");
 
-        storage_set_item(&path, "session".to_string(), "value".to_string()).unwrap();
+        let crypto = SessionCrypto::generate().unwrap();
+        write_session(
+            &path,
+            &PersistedTonConnectSession {
+                key_pair: crypto.persisted_keypair(),
+                peer_client_id: ClientId::from_bytes([4; 32]),
+                wallet_address: StdAddr::new(0, HashBytes([3; 32])).to_string(),
+                wallet_chain: Some(TONCONNECT_TESTNET_CHAIN.to_owned()),
+                last_event_id: None,
+                next_request_id: 1,
+            },
+        )
+        .unwrap();
 
         let mode = fs::metadata(path).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);

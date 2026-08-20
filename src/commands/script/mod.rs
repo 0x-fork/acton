@@ -86,7 +86,6 @@ pub fn script_cmd(
     explorer: Option<Explorer>,
     show_bodies: bool,
     tonconnect: bool,
-    tonconnect_port: u16,
 ) -> anyhow::Result<()> {
     let project_root = project_root().to_path_buf();
     stdlib::ensure_latest(&project_root)?;
@@ -150,7 +149,6 @@ pub fn script_cmd(
         explorer,
         show_bodies,
         tonconnect,
-        tonconnect_port,
     )
 }
 
@@ -175,7 +173,6 @@ fn run_script_file(
     explorer: Option<Explorer>,
     show_bodies: bool,
     tonconnect: bool,
-    tonconnect_port: u16,
 ) -> anyhow::Result<()> {
     let mappings = mappings.cloned();
 
@@ -211,7 +208,6 @@ fn run_script_file(
                 explorer,
                 show_bodies,
                 tonconnect,
-                tonconnect_port,
             )?;
             Ok(())
         }
@@ -246,7 +242,6 @@ fn execute_script(
     explorer: Option<Explorer>,
     show_bodies: bool,
     tonconnect: bool,
-    tonconnect_port: u16,
 ) -> anyhow::Result<()> {
     let broadcast = net.is_some();
     let dest_address = contract_address(code_cell)?;
@@ -335,7 +330,7 @@ fn execute_script(
     let tonconnect = if tonconnect {
         let network = net.expect("`--tonconnect` must be validated before script execution");
         let storage_path = crate::tonconnect::session_storage_path(&current_project_root, network)?;
-        let session = Arc::new(TonConnectSession::start(tonconnect_port, storage_path)?);
+        let session = Arc::new(TonConnectSession::start(storage_path)?);
         let wallet = session.connect(network)?;
         Some(TonConnectContext { session, wallet })
     } else {

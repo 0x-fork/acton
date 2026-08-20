@@ -116,19 +116,12 @@ mode. Conflicting `--net` and `--fork-net` values are rejected.
 {{#option "`--tonconnect`" }}
 Use TON Connect wallet approval for broadcast messages.
 
-This opens a local browser page, connects a wallet, and sends `net.send(...)`
-messages through that wallet instead of loading local wallet mnemonics.
+Acton prints a native TON Connect QR code and a `tc://` link. It sends
+`net.send(...)` messages through that wallet instead of loading local wallet
+mnemonics.
 The TON Connect session is saved under `build/sessions/tonconnect/<network>.json` and
 reused by later runs in the same project. Currently supported only with
 `--net mainnet` or `--net testnet`.
-{{/option}}
-
-{{#option "`--tonconnect-port` _port_" }}
-Local TON Connect page port. Defaults to `52258`.
-
-Acton keeps this port stable so injected wallets can recognize the same local
-dApp on later runs. If the default port is busy, pass another port explicitly
-and keep using the same value for that project.
 {{/option}}
 
 {{#option "`--explorer` _name_" }}
