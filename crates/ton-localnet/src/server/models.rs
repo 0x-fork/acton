@@ -31,6 +31,11 @@ pub struct SetShardAccountRequest {
 }
 
 #[derive(Deserialize)]
+pub struct SetConfigRequest {
+    pub config: String,
+}
+
+#[derive(Deserialize)]
 pub struct ChangeAccountStateRequest {
     pub address: String,
     pub state: ChangeAccountStatePayload,

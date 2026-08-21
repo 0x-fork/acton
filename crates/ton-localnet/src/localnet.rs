@@ -377,6 +377,12 @@ pub struct LocalnetMineResult {
     pub blocks: Vec<LocalnetBlockId>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetSetConfigResult {
+    pub config_hash: Hash256,
+    pub block_seqno: Seqno,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct LocalnetMiningMode {
     pub skip_empty_blocks: bool,
@@ -596,6 +602,10 @@ pub(crate) enum Request {
     GetConfigAll {
         seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<BocBytes>>,
+    },
+    SetConfig {
+        config: BocBytes,
+        resp: oneshot::Sender<anyhow::Result<LocalnetSetConfigResult>>,
     },
     GetShards {
         seqno: u32,
@@ -1059,6 +1069,13 @@ impl Localnet {
                 resp,
             })
             .await?;
+        rx.await?
+    }
+
+    pub async fn set_config(&self, config: String) -> anyhow::Result<LocalnetSetConfigResult> {
+        let config = BocBytes::from_base64(&config).context("Invalid config base64")?;
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::SetConfig { config, resp }).await?;
         rx.await?
     }
 
@@ -2296,6 +2313,15 @@ fn process_loop_request(
         }
         Request::GetConfigAll { seqno, resp } => {
             let res = handle_get_config_all(node, seqno);
+            let _ = resp.send(res);
+        }
+        Request::SetConfig { config, resp } => {
+            let res = node
+                .set_config(config)
+                .map(|(config_hash, block)| LocalnetSetConfigResult {
+                    config_hash,
+                    block_seqno: block.seqno,
+                });
             let _ = resp.send(res);
         }
         Request::GetShards { seqno, resp } => {

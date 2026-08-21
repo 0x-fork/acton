@@ -19,7 +19,7 @@ use super::handlers::{
     get_wallet_information_v3, get_wallet_states_v3, import_checkpoint, increase_time,
     jetton_faucet, json_rpc, list_checkpoints, load_state, lookup_block, mine_blocks, pack_address,
     restore_checkpoint, run_get_method, run_get_method_std, run_get_method_v3, send_boc,
-    send_boc_return_hash, send_internal_message, send_message_v3, set_mining_mode,
+    send_boc_return_hash, send_internal_message, send_message_v3, set_config, set_mining_mode,
     set_network_conditions, set_next_block_timestamp, set_shard_account, set_time,
     source_trace::build_source_trace, streaming_sse, streaming_ws, try_locate_result_tx,
     try_locate_source_tx, try_locate_tx, unpack_address,
@@ -200,6 +200,7 @@ pub fn create_router(state: ServerState) -> Router {
             "/acton_importCheckpoint",
             post(import_checkpoint).layer(DefaultBodyLimit::max(256 * 1024 * 1024)),
         )
+        .route("/acton_setConfig", post(set_config))
         .route("/acton_setShardAccount", post(set_shard_account))
         .route("/acton_changeAccountState", post(change_account_state))
         .route("/acton_sendInternalMessage", post(send_internal_message))

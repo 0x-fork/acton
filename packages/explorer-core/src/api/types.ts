@@ -1243,6 +1243,11 @@ export interface LocalnetMineResult {
   readonly last_block_seqno: number
 }
 
+export interface LocalnetSetConfigResult {
+  readonly config_hash: string
+  readonly block_seqno: number
+}
+
 export interface LocalnetCheckpoint {
   readonly name: string
   readonly block_seqno: number

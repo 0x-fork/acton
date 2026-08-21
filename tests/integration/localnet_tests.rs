@@ -39,6 +39,7 @@ use ton_api::toncenter::v3 as toncenter_v3;
 use ton_localnet::types::{Addr, Hash256};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
+use tycho_types::models::config::BlockchainConfigParams;
 use tycho_types::models::{
     AccountState, ExtInMsgInfo, IntAddr, Message, MsgInfo, ShardAccount, StateInit, StdAddr,
 };
@@ -3543,6 +3544,112 @@ fn localnet_supports_config_endpoints() {
     );
 
     node.stop();
+}
+
+#[test]
+fn localnet_admin_set_config_replaces_and_persists_full_config() {
+    const TEST_PARAM: u32 = 999;
+
+    let project = ProjectBuilder::new("localnet-admin-set-config").build();
+    let db_path = project.path().join("localnet.sqlite");
+    let db_path_arg = db_path.display().to_string();
+    let start = || {
+        project
+            .localnet()
+            .args([
+                "--no-mining",
+                "--mine-empty-blocks",
+                "--db-path",
+                db_path_arg.as_str(),
+            ])
+            .start()
+    };
+    let node = start();
+    node.post_json("/acton_mine", &json!({}));
+
+    let original = node.get_json("/api/v2/getConfigAll");
+    let original_boc = original["result"]["config"]["bytes"]
+        .as_str()
+        .expect("getConfigAll must return config bytes");
+    let original_cell = Boc::decode_base64(original_boc).expect("default config BOC must be valid");
+    let mut params = BlockchainConfigParams::from_raw(original_cell);
+    let mut marker_builder = CellBuilder::new();
+    marker_builder
+        .store_u32(0xfeed_cafe)
+        .expect("test config marker must fit");
+    let marker = marker_builder
+        .build()
+        .expect("test config marker must build");
+    params
+        .set_raw(TEST_PARAM, marker.clone())
+        .expect("test config param must be inserted");
+    let replacement_cell = params
+        .as_dict()
+        .root()
+        .as_ref()
+        .expect("replacement config must have a root")
+        .clone();
+    let replacement_boc = Boc::encode_base64(replacement_cell.clone());
+    let replacement_hash = hex::encode(replacement_cell.repr_hash().as_array());
+
+    let set = node.post_json("/acton_setConfig", &json!({ "config": replacement_boc }));
+    let latest = node.get_json("/api/v2/getConfigAll");
+    let historical = node.get_json("/api/v2/getConfigAll?seqno=1");
+    let test_param = node.get_json(&format!("/api/v2/getConfigParam?param={TEST_PARAM}"));
+    let test_param_cell = Boc::decode_base64(
+        test_param["result"]["config"]["bytes"]
+            .as_str()
+            .expect("getConfigParam must return config bytes"),
+    )
+    .expect("test config parameter BOC must be valid");
+
+    let invalid_base64 =
+        node.post_json_error("/acton_setConfig", &json!({ "config": "not-a-config" }));
+    let invalid_dictionary = Boc::encode_base64(
+        CellBuilder::new()
+            .build()
+            .expect("invalid config fixture must build"),
+    );
+    let invalid_dictionary =
+        node.post_json_error("/acton_setConfig", &json!({ "config": invalid_dictionary }));
+    let head_after_invalid_requests = latest_masterchain_seqno(&node);
+
+    let before_restart = json!({
+        "set_ok": set["ok"].as_bool(),
+        "set_hash_matches":
+            set["result"]["config_hash"].as_str() == Some(replacement_hash.as_str()),
+        "set_block_seqno": set["result"]["block_seqno"].as_u64(),
+        "latest_matches_replacement":
+            latest["result"]["config"]["bytes"].as_str() == Some(replacement_boc.as_str()),
+        "historical_config_preserved":
+            historical["result"]["config"]["bytes"].as_str() == Some(original_boc),
+        "test_param_matches": test_param_cell.repr_hash() == marker.repr_hash(),
+        "invalid_base64": summarize_admin_response(&invalid_base64),
+        "invalid_dictionary": summarize_admin_response(&invalid_dictionary),
+        "invalid_requests_did_not_mine": head_after_invalid_requests == 2,
+    });
+
+    node.stop();
+    let reopened = start();
+    let reopened_config = reopened.get_json("/api/v2/getConfigAll");
+    let snapshot = json!({
+        "before_restart": before_restart,
+        "sqlite_restart": {
+            "head_seqno": latest_masterchain_seqno(&reopened),
+            "config_preserved":
+                reopened_config["result"]["config"]["bytes"].as_str()
+                    == Some(replacement_boc.as_str()),
+        },
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_admin_set_config_replaces_and_persists_full_config.summary.json"
+        ),
+    );
+
+    reopened.stop();
 }
 
 #[test]

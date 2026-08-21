@@ -573,6 +573,32 @@
         }
       }
     },
+    "/acton_setConfig": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setConfig",
+        "summary": "Replace blockchain config",
+        "description": "Validates and replaces the full blockchain config dictionary from a base64-encoded BOC, then commits the change in a config-only block.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetConfigRequest"
+              },
+              "example": {
+                "config": "te6ccgEC..."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SetConfigResponse"
+          }
+        }
+      }
+    },
     "/acton_setShardAccount": {
       "post": {
         "tags": ["Localnet Control"],
@@ -1142,6 +1168,28 @@
           }
         }
       },
+      "SetConfigResponse": {
+        "description": "Successful blockchain config replacement response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/SetConfigResult"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
       "CheckpointResponse": {
         "description": "Successful checkpoint response.",
         "content": {
@@ -1683,6 +1731,30 @@
           },
           "shard_account": {
             "$ref": "#/components/schemas/Base64Boc"
+          }
+        }
+      },
+      "SetConfigRequest": {
+        "type": "object",
+        "required": ["config"],
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/Base64Boc"
+          }
+        }
+      },
+      "SetConfigResult": {
+        "type": "object",
+        "required": ["config_hash", "block_seqno"],
+        "properties": {
+          "config_hash": {
+            "type": "string",
+            "description": "Representation hash of the committed config dictionary root."
+          },
+          "block_seqno": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Masterchain block seqno that committed the config."
           }
         }
       },

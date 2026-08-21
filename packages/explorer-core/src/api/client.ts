@@ -25,6 +25,7 @@ import type {
   LocalnetMiningMode,
   LocalnetNetworkConditions,
   LocalnetNodeInfo,
+  LocalnetSetConfigResult,
   LocalnetTimeInfo,
   NftItem,
   Shards,
@@ -1346,6 +1347,15 @@ export class TonClient {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({address, shard_account: shardAccount}),
+    })
+  }
+
+  async setConfig(config: string): Promise<LocalnetSetConfigResult> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_setConfig")
+    return this.request(url, "Failed to set localnet blockchain config", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({config}),
     })
   }
 

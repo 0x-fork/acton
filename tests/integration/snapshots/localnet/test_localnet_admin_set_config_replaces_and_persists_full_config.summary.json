@@ -1,0 +1,27 @@
+{
+  "before_restart": {
+    "historical_config_preserved": true,
+    "invalid_base64": {
+      "@extra": "[EXTRA]",
+      "code": 500,
+      "error": "Invalid config base64",
+      "ok": false
+    },
+    "invalid_dictionary": {
+      "@extra": "[EXTRA]",
+      "code": 500,
+      "error": "Failed to parse blockchain config dictionary",
+      "ok": false
+    },
+    "invalid_requests_did_not_mine": true,
+    "latest_matches_replacement": true,
+    "set_block_seqno": 2,
+    "set_hash_matches": true,
+    "set_ok": true,
+    "test_param_matches": true
+  },
+  "sqlite_restart": {
+    "config_preserved": true,
+    "head_seqno": 2
+  }
+}

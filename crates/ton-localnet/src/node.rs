@@ -518,6 +518,40 @@ impl Node {
         self.mine_block_with_limits(BASECHAIN_BLOCK_LIMITS)
     }
 
+    pub fn set_config(&mut self, config_boc: BocBytes) -> anyhow::Result<(Hash256, BlockMeta)> {
+        let config_cell =
+            Boc::decode(&config_boc).context("Failed to decode blockchain config BOC")?;
+        let mut config_slice = config_cell.as_slice_allow_exotic();
+        let config =
+            Dict::<u32, Cell>::load_from_root_ext(&mut config_slice, Cell::empty_context())
+                .context("Failed to parse blockchain config dictionary")?;
+        anyhow::ensure!(
+            config.root().is_some(),
+            "Blockchain config dictionary is empty"
+        );
+        for entry in config.iter() {
+            entry.context("Failed to parse blockchain config dictionary entry")?;
+        }
+
+        let seqno = self.globals.head_seqno + 1;
+        let prev_lt = self.globals.global_lt;
+        let gen_utime = self.next_block_gen_utime()?;
+        let config_hash = Hash256::from(config_cell.repr_hash());
+        self.cas.put(config_boc, config_hash);
+
+        let previous_config_hash = self.globals.config_boc_hash;
+        let previous_config_cell = std::mem::replace(&mut self.config_cell, config_cell);
+        self.globals.config_boc_hash = config_hash;
+        match self.commit_transaction_block(seqno, prev_lt, gen_utime, Vec::new(), Vec::new()) {
+            Ok(block) => Ok((config_hash, block)),
+            Err(error) => {
+                self.globals.config_boc_hash = previous_config_hash;
+                self.config_cell = previous_config_cell;
+                Err(error.context("Failed to commit blockchain config"))
+            }
+        }
+    }
+
     fn mine_block_with_limits(&mut self, block_limits: BlockLimits) -> anyhow::Result<BlockMeta> {
         let seqno = self.globals.head_seqno + 1;
         let prev_lt = self.globals.global_lt;

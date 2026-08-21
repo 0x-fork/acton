@@ -4,9 +4,9 @@ use crate::localnet::{Localnet, LocalnetAccountStateChange, LocalnetMiningMode};
 use crate::server::models::{
     ChangeAccountStatePayload, ChangeAccountStateRequest, CheckpointRequest,
     CreateCheckpointRequest, FaucetRequest, GetVerifiedSourceRequest, ImportCheckpointQuery,
-    IncreaseTimeRequest, JettonFaucetRequest, MineBlocksRequest, SetMiningModeRequest,
-    SetNetworkConditionsRequest, SetNextBlockTimestampRequest, SetShardAccountRequest,
-    SetTimeRequest,
+    IncreaseTimeRequest, JettonFaucetRequest, MineBlocksRequest, SetConfigRequest,
+    SetMiningModeRequest, SetNetworkConditionsRequest, SetNextBlockTimestampRequest,
+    SetShardAccountRequest, SetTimeRequest,
 };
 use crate::server::{
     NetworkConditions, NetworkConditionsInfo, ServerState, StartupAccount, StateSourceInfo,
@@ -297,6 +297,16 @@ pub async fn set_shard_account(
         node.set_shard_account(payload.address, payload.shard_account),
         |()| Value::Null,
     )
+    .await
+}
+
+pub async fn set_config(
+    State(node): State<Arc<Localnet>>,
+    Json(payload): Json<SetConfigRequest>,
+) -> Response {
+    handle_result(node.set_config(payload.config), |res| {
+        serde_json::to_value(res).unwrap_or(Value::Null)
+    })
     .await
 }
 
