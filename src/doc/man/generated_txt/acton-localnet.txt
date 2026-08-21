@@ -376,6 +376,10 @@ CONTROL ENDPOINTS
        o  POST /acton_importCheckpoint?name=bug accepts JSON state bytes and
           imports them as a named checkpoint
 
+       o  POST /acton_setConfig with {"config":"<BASE64_BOC>"} validates and
+          replaces the full blockchain config dictionary, then commits it in a
+          config-only block
+
        o  POST /acton_setShardAccount with
           {"address":"<ADDR>","shard_account":"<BASE64_BOC>"} replaces the
           selected account state with a base64-encoded ShardAccount BOC
@@ -416,6 +420,9 @@ PERSISTENCE
           combined with a database path from either CLI or Acton.toml
 
        o  --dump-state exports a JSON state file on shutdown
+
+       o  blockchain configs replaced through /acton_setConfig are stored in
+          block history and survive restarts when --db-path is configured
 
        o  when no database path is configured, node state is ephemeral unless
           loaded or dumped

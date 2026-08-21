@@ -493,6 +493,12 @@ them as a named checkpoint
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setConfig\fR with \fB{"config":"<BASE64_BOC>"}\fR validates and
+replaces the full blockchain config dictionary, then commits it in a
+config\-only block
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fBPOST /acton_setShardAccount\fR with
 \fB{"address":"<ADDR>","shard_account":"<BASE64_BOC>"}\fR replaces the selected
 account state with a base64\-encoded \fBShardAccount\fR BOC
@@ -551,6 +557,11 @@ with a database path from either CLI or \fBActon.toml\fR
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-dump\-state\fR exports a JSON state file on shutdown
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'blockchain configs replaced through \fB/acton_setConfig\fR are stored in block
+history and survive restarts when \fB\-\-db\-path\fR is configured
 .RE
 .sp
 .RS 4
