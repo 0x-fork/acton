@@ -223,6 +223,7 @@
     ],
     "44": ["addresses", "addresses{}", "suspended_until"],
     "45": ["list", "list{}", "list{}.gas_usage"],
+    "46": ["contract_address", "max_collators_per_validator", "new_code_hash"],
     "71": [
       "bridge_address",
       "external_chain_address",
