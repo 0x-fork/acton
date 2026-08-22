@@ -320,10 +320,14 @@ export const AccountPage: FC<AccountPageProps> = ({
   const nftItemsLoading = accountNftsState.isLoading
   const currentNftCollectionItems = nftCollectionItemsState.items
   const actionTracesLoadMoreWithRemaining = useMemo(
-    () => attachRemainingActionCounts(actionTracesLoadMore, transactions),
+    () =>
+      attachRemainingActionCounts(
+        actionTracesLoadMore,
+        transactions,
+        ACTION_TRACE_LOAD_MORE_PAGE_SIZE,
+      ),
     [actionTracesLoadMore, transactions],
   )
-
   const formattedAddress = useMemo(
     () => normalizeAddress(address, addressFormat),
     [address, addressFormat],
@@ -2533,33 +2537,36 @@ function markCollapsedActionTraces(
   return next
 }
 
-function attachRemainingActionCounts(
+export function attachRemainingActionCounts(
   states: Readonly<Record<string, ActionTraceLoadMoreState>>,
   transactions: readonly V3TransactionListItem[],
+  pageSize: number,
 ): Record<string, ActionTraceLoadMoreState> {
-  const totalActionsByTrace = new Map<string, number>()
+  const totalActionsByTrace = new Map<string, Set<number>>()
+
   for (const transaction of transactions) {
     const traceId = transaction.trace_id?.trim() || transaction.hash?.trim()
     const totalActions = transaction.description.action?.tot_actions
-    if (traceId && totalActions !== undefined && totalActions >= 0) {
-      totalActionsByTrace.set(traceId, totalActions)
-    }
+    if (!traceId || totalActions === undefined || totalActions < 0) continue
+
+    const totals = totalActionsByTrace.get(traceId) ?? new Set<number>()
+    totals.add(totalActions)
+    totalActionsByTrace.set(traceId, totals)
   }
 
   return Object.fromEntries(
     Object.entries(states).map(([traceId, state]) => {
-      const totalActions = totalActionsByTrace.get(traceId)
+      const plausibleTotals = [...(totalActionsByTrace.get(traceId) ?? [])].filter(
+        totalActions => totalActions > state.loadedCount,
+      )
       const remainingCount =
-        totalActions === undefined ? undefined : Math.max(0, totalActions - state.loadedCount)
+        plausibleTotals.length === 1 ? plausibleTotals[0] - state.loadedCount : undefined
       return [
         traceId,
         {
           ...state,
           remainingCount,
-          loadCount:
-            remainingCount === undefined
-              ? ACTION_TRACE_LOAD_MORE_PAGE_SIZE
-              : Math.min(ACTION_TRACE_LOAD_MORE_PAGE_SIZE, remainingCount),
+          loadCount: remainingCount === undefined ? pageSize : Math.min(pageSize, remainingCount),
         },
       ]
     }),

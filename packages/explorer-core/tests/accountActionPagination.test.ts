@@ -1,6 +1,11 @@
 import {expect, test} from "bun:test"
 
-import type {V3Action} from "../src/api/types"
+import type {V3Action, V3TransactionListItem} from "../src/api/types"
+import {
+  getActionTraceLoadMoreLabel,
+  type ActionTraceLoadMoreState,
+} from "../src/components/AccountDetails"
+import {attachRemainingActionCounts} from "../src/pages/AccountPage"
 import {
   MAX_AUTO_LOADED_ACTIONS_PER_TRACE,
   mergeAutomaticActionPage,
@@ -14,6 +19,74 @@ function action(traceId: string, index: number, traceEndLt = "1000"): V3Action {
     trace_end_lt: traceEndLt,
   } as V3Action
 }
+
+function transaction(traceId: string, totalActions: number): V3TransactionListItem {
+  return {
+    hash: `${traceId}-${totalActions}`,
+    trace_id: traceId,
+    description: {action: {tot_actions: totalActions}},
+  } as V3TransactionListItem
+}
+
+function traceLoadMoreState(): ActionTraceLoadMoreState {
+  return {
+    loadedCount: 10,
+    loadCount: 20,
+    hasMore: true,
+    loading: false,
+  }
+}
+
+test("attaches an unambiguous remaining action count", () => {
+  expect(
+    attachRemainingActionCounts({bulk: traceLoadMoreState()}, [transaction("bulk", 144)], 20),
+  ).toEqual({
+    bulk: {...traceLoadMoreState(), remainingCount: 134},
+  })
+})
+
+test("uses the only trace action count larger than the loaded count", () => {
+  const result = attachRemainingActionCounts(
+    {bulk: traceLoadMoreState()},
+    [transaction("bulk", 83), transaction("bulk", 1)],
+    20,
+  )
+
+  expect(result).toEqual({
+    bulk: {...traceLoadMoreState(), remainingCount: 73},
+  })
+  expect(getActionTraceLoadMoreLabel(result.bulk)).toBe("Load 20 more out of 73")
+})
+
+test("ignores multiple plausible transaction action counts for the same trace", () => {
+  expect(
+    attachRemainingActionCounts(
+      {bulk: traceLoadMoreState()},
+      [transaction("bulk", 100), transaction("bulk", 83), transaction("bulk", 1)],
+      20,
+    ),
+  ).toEqual({
+    bulk: {...traceLoadMoreState(), remainingCount: undefined},
+  })
+})
+
+test("trace pagination falls back to the page size for a zero remaining count", () => {
+  const state: ActionTraceLoadMoreState = {
+    ...traceLoadMoreState(),
+    remainingCount: 0,
+  }
+
+  expect(getActionTraceLoadMoreLabel(state)).toBe("Load 20 more")
+})
+
+test("trace pagination displays a trustworthy remaining count", () => {
+  const state: ActionTraceLoadMoreState = {
+    ...traceLoadMoreState(),
+    remainingCount: 134,
+  }
+
+  expect(getActionTraceLoadMoreLabel(state)).toBe("Load 20 more out of 134")
+})
 
 test("large descending traces are capped and skipped with a trace boundary", () => {
   const page = Array.from({length: 20}, (_, index) => action("bulk", index))

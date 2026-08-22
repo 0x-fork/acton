@@ -2014,18 +2014,18 @@ export function ActionHistoryRows({
   )
 }
 
-function getActionTraceLoadMoreLabel(state: ActionTraceLoadMoreState): string {
+export function getActionTraceLoadMoreLabel(state: ActionTraceLoadMoreState): string {
   const remainingCount = state.remainingCount
-  if (remainingCount === undefined) {
-    return `Load ${state.loadCount} more`
+  if (remainingCount !== undefined && remainingCount > 0) {
+    if (remainingCount === 1) {
+      return "Load the last action"
+    }
+    if (remainingCount <= state.loadCount) {
+      return `Load all ${remainingCount} remaining`
+    }
+    return `Load ${state.loadCount} more out of ${remainingCount}`
   }
-  if (remainingCount === 1) {
-    return "Load the last action"
-  }
-  if (remainingCount <= state.loadCount) {
-    return `Load all ${remainingCount} remaining`
-  }
-  return `Load ${state.loadCount} more out of ${remainingCount}`
+  return `Load ${state.loadCount} more`
 }
 
 interface ActionHistoryTableBaseProps {
