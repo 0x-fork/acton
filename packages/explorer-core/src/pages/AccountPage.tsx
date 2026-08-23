@@ -66,6 +66,7 @@ import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
+import {isNftItemNsfw} from "../nftSafetyRegistry"
 import {
   countActionsForTrace,
   mergeAutomaticActionPage,
@@ -1779,6 +1780,9 @@ export const AccountPage: FC<AccountPageProps> = ({
     : undefined
   const nftItemTokenInfo = accountTokenInfo.find(info => info.type === "nft_items")
   const nftCollectionTokenInfo = accountTokenInfo.find(info => info.type === "nft_collections")
+  const nftItemIsNsfw =
+    nftItemTokenInfo?.is_nsfw === true ||
+    (currentNftItem !== undefined && isNftItemNsfw(currentNftItem))
   const nftItemName =
     tokenInfoString(nftItemTokenInfo, "name") ||
     contentString(currentNftItem?.content, "name") ||
@@ -1786,10 +1790,12 @@ export const AccountPage: FC<AccountPageProps> = ({
   const nftItemDescription =
     tokenInfoString(nftItemTokenInfo, "description") ||
     contentString(currentNftItem?.content, "description")
-  const nftItemImageSources = [
-    ...getImageSources(nftItemTokenInfo, NFT_IMAGE_SOURCE_KEYS),
-    ...getImageSources(currentNftItem?.content, NFT_IMAGE_SOURCE_KEYS),
-  ]
+  const nftItemImageSources = nftItemIsNsfw
+    ? []
+    : [
+        ...getImageSources(nftItemTokenInfo, NFT_IMAGE_SOURCE_KEYS),
+        ...getImageSources(currentNftItem?.content, NFT_IMAGE_SOURCE_KEYS),
+      ]
   const nftItemCollectionName =
     tokenInfoString(nftItemTokenInfo, "collection_name") ||
     contentString(currentNftItem?.content, "collection_name")
@@ -1832,7 +1838,9 @@ export const AccountPage: FC<AccountPageProps> = ({
   const nftCollectionIsNsfw = nftCollectionTokenInfo?.is_nsfw === true
   const nftCollectionIsScam = nftCollectionTokenInfo?.is_scam === true
   const collectiblePreviews = nftItems.slice(0, 8).map(item => {
-    const imageSources = getImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
+    const imageSources = isNftItemNsfw(item)
+      ? []
+      : getImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
     return {
       address: item.address,
       image: imageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE,
@@ -2136,7 +2144,6 @@ export const AccountPage: FC<AccountPageProps> = ({
                       index={currentNftItem.index}
                       onAddressClick={handleSearch}
                       onMetadataClick={() => setJettonMetadataOpen(true)}
-                      onNsfw={() => setCurrentNftItem(undefined)}
                     />
                   )}
                   {accountState !== undefined &&
@@ -2239,7 +2246,6 @@ export const AccountPage: FC<AccountPageProps> = ({
                       blurredClassName={styles.blurredImage}
                       collectionName={nftItemCollectionName}
                       blurred={nftItemIsScam}
-                      onNsfw={() => setCurrentNftItem(undefined)}
                     />
                   ) : (
                     <img

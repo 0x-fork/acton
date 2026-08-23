@@ -1054,7 +1054,7 @@ test("message transaction lookup forwards the causal direction", async () => {
   }
 })
 
-test("NFT pages preserve their raw size while excluding flagged or registered NSFW items", async () => {
+test("NFT pages preserve NSFW items so the UI can hide only their images", async () => {
   const originalFetch = globalThis.fetch
   globalThis.fetch = mockFetch(async () =>
     Response.json({
@@ -1125,27 +1125,11 @@ test("NFT pages preserve their raw size while excluding flagged or registered NS
       addressNameBaseUrl: "https://toncenter.example/api",
     })
 
-    expect(await client.getNftItemsPage({address: ["0:nft"]})).toMatchInlineSnapshot(`
-      {
-        "items": [
-          {
-            "address": "0:nft",
-            "code_hash": "code-hash",
-            "content": {
-              "name": "Flagged NFT",
-            },
-            "data_hash": "data-hash",
-            "index": "3",
-            "init": true,
-            "is_nsfw": false,
-            "is_scam": true,
-            "last_transaction_lt": "42",
-            "on_sale": false,
-          },
-        ],
-        "rawItemCount": 3,
-      }
-    `)
+    const page = await client.getNftItemsPage({address: ["0:nft"]})
+    expect(page.items.map(item => item.address)).toEqual(["0:nft", "0:nsfw", "0:registered-nsfw"])
+    expect(page.items[0]).toMatchObject({is_nsfw: false, is_scam: true})
+    expect(page.items[1]).toMatchObject({is_nsfw: true, is_scam: false})
+    expect(page.rawItemCount).toBe(3)
   } finally {
     globalThis.fetch = originalFetch
   }

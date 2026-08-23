@@ -20,7 +20,7 @@ interface NftItemOverviewProps extends NftOverviewBaseProps {
   readonly collectionName?: string
   readonly index: string
   readonly onMetadataClick: () => void
-  readonly onNsfw: () => void
+  readonly onNsfw?: () => void
 }
 
 interface NftCollectionOverviewProps extends NftOverviewBaseProps {

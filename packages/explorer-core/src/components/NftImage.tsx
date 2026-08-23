@@ -192,10 +192,6 @@ export const NftImage: FC<NftImageProps> = ({
     })
   }
 
-  if (image.hidden) {
-    return null
-  }
-
   return (
     <img
       {...imageProps}

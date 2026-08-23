@@ -134,9 +134,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   >(() => new Map())
   const [tokenMastersLoading, setTokenMastersLoading] = useState(false)
 
-  const [hiddenCollectibleAddresses, setHiddenCollectibleAddresses] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  )
   const favorite = isFavorite(address)
 
   useEffect(() => {
@@ -255,9 +252,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const canOpenTokens = Boolean(onMoreAssetsClick)
   const canOpenCollectibles = Boolean(onCollectiblesClick)
   const showCollectiblesRow = collectiblesLoading || collectiblesCount > 0
-  const visibleCollectibles = collectiblePreviews
-    .filter(item => !hiddenCollectibleAddresses.has(item.address))
-    .slice(0, 8)
+  const visibleCollectibles = collectiblePreviews.slice(0, 8)
   const firstMaster = firstWallet
     ? (firstWallet.master ?? tokenMastersByAddress.get(toRawAddress(firstWallet.jetton)))
     : undefined
@@ -639,11 +634,6 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                                     blurredClassName={styles.blurredImage}
                                     collectionName={item.collectionName}
                                     blurred={item.blurred}
-                                    onNsfw={() => {
-                                      setHiddenCollectibleAddresses(current =>
-                                        new Set(current).add(item.address),
-                                      )
-                                    }}
                                   />
                                 </span>
                               ) : (

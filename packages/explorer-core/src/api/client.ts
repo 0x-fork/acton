@@ -47,7 +47,6 @@ import type {
   VerificationSourceResponse,
 } from "./types"
 import {v2ShardToV3Shard, v3ShardToV2Shard} from "./shardId"
-import {isNftItemNsfw} from "../nftSafetyRegistry"
 
 interface TonClientOptions {
   readonly v2BaseUrl: string
@@ -964,9 +963,7 @@ export class TonClient {
 
       const response = await this.request<NftItemsResponse>(url, "Failed to fetch NFTs")
       return {
-        items: response.nft_items
-          .map(item => attachNftItemMetadata(item, response.metadata))
-          .filter(item => !isNftItemNsfw(item)),
+        items: response.nft_items.map(item => attachNftItemMetadata(item, response.metadata)),
         rawItemCount: response.nft_items.length,
       }
     }

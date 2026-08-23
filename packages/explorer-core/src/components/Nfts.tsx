@@ -42,16 +42,11 @@ export const Nfts: FC<NftsProps> = ({
   onAddressClick,
 }) => {
   const [query, setQuery] = useState("")
-  const [hiddenAddresses, setHiddenAddresses] = useState<ReadonlySet<string>>(() => new Set())
   const normalizedQuery = query.trim().toLowerCase()
-  const eligibleItems = useMemo(
-    () => items.filter(item => !hiddenAddresses.has(item.address) && !isNftItemNsfw(item)),
-    [hiddenAddresses, items],
-  )
   const visibleItems = useMemo(() => {
-    if (!normalizedQuery) return eligibleItems
+    if (!normalizedQuery) return items
 
-    return eligibleItems.filter(item => {
+    return items.filter(item => {
       const name = getNftDisplayName(item)
       const collectionName = getCollectionName(item) || item.collection_address || ""
       const searchable = [
@@ -68,9 +63,9 @@ export const Nfts: FC<NftsProps> = ({
 
       return searchable.includes(normalizedQuery)
     })
-  }, [eligibleItems, normalizedQuery])
+  }, [items, normalizedQuery])
 
-  if (eligibleItems.length === 0) {
+  if (items.length === 0) {
     return <div className={styles.empty}>{emptyLabel}</div>
   }
 
@@ -89,7 +84,9 @@ export const Nfts: FC<NftsProps> = ({
         {visibleItems.map(item => {
           const name = getNftDisplayName(item)
           const collectionName = getCollectionName(item)
-          const imageSources = getImageSources(item.content, NFT_CARD_IMAGE_SOURCE_KEYS)
+          const imageSources = isNftItemNsfw(item)
+            ? []
+            : getImageSources(item.content, NFT_CARD_IMAGE_SOURCE_KEYS)
           const isScam = item.is_scam === true
 
           return (
@@ -113,9 +110,6 @@ export const Nfts: FC<NftsProps> = ({
                   blurredClassName={styles.blurredImage}
                   collectionName={collectionName}
                   blurred={isScam}
-                  onNsfw={() => {
-                    setHiddenAddresses(current => new Set(current).add(item.address))
-                  }}
                 />
                 {isScam && <span className={styles.scamLabel}>SCAM</span>}
               </div>
