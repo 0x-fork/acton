@@ -15,6 +15,23 @@ import {
 const NOW = Date.UTC(2026, 7, 5, 12, 0)
 const DATE = Date.UTC(2026, 7, 5, 10, 30, 15)
 
+// Bun uses " at " on macOS and ", " on Linux and Windows for the same en-US format.
+// Keep the assertions platform-aware until https://github.com/oven-sh/bun/issues/40085 is fixed.
+const DATE_TIME_SEPARATOR = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  hourCycle: "h23",
+  timeStyle: "short",
+  timeZone: "UTC",
+})
+  .format(DATE)
+  .includes(" at ")
+  ? " at "
+  : ", "
+
+function expectedDateTime(date: string, time: string): string {
+  return `${date}${DATE_TIME_SEPARATOR}${time}`
+}
+
 describe("date and time", () => {
   test("formats shared date and time presets", () => {
     expect({
@@ -81,12 +98,12 @@ describe("date and time", () => {
       dateDayMonth: "05 Aug 2026",
       dateLong: "August 5, 2026",
       dateNumeric: "05.08.2026",
-      dateTime: "Aug 5, 2026 at 10:30",
+      dateTime: expectedDateTime("Aug 5, 2026", "10:30"),
       dateTimeDayMonth: "05 Aug 2026, 10:30",
       dateTimeDayMonthShort: "05 Aug, 10:30",
       dateTimeNumeric: "05.08.2026, 10:30",
       dateTimeNumericSeconds: "05.08.2026, 10:30:15",
-      dateTimeSeconds: "Aug 5, 2026 at 10:30:15",
+      dateTimeSeconds: expectedDateTime("Aug 5, 2026", "10:30:15"),
       invalid: "—",
       smartToday: "10:30",
       time: "10:30",
@@ -100,7 +117,7 @@ describe("date and time", () => {
         locale: "en-US",
         timeZone: "UTC",
       }),
-    ).toBe("Aug 1, 2026 at 22:40")
+    ).toBe(expectedDateTime("Aug 1, 2026", "22:40"))
   })
 
   test("keeps numeric dates stable across locales", () => {
@@ -250,7 +267,7 @@ describe("date and time", () => {
         }),
       ),
     ).toBe(
-      '<time data-visual-dynamic="time" data-visual-placeholder="&lt;time&gt;" dateTime="2026-08-05T10:30:15.000Z">Aug 5, 2026 at 10:30</time>',
+      `<time data-visual-dynamic="time" data-visual-placeholder="&lt;time&gt;" dateTime="2026-08-05T10:30:15.000Z">${expectedDateTime("Aug 5, 2026", "10:30")}</time>`,
     )
     expect(
       renderToStaticMarkup(
