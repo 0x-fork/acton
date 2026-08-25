@@ -1,8 +1,11 @@
 use acton_config::color::OwoColorize;
 use anyhow::Context as AnyhowContext;
+use inquire::Select;
 use qrcode::{EcLevel, QrCode, render::unicode};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::fmt;
 use std::fs;
 use std::io::Read;
 use std::num::{NonZeroU32, NonZeroUsize};
@@ -26,7 +29,8 @@ use tycho_types::models::{
 
 const TONCONNECT_MAINNET_CHAIN: &str = "-239";
 const TONCONNECT_TESTNET_CHAIN: &str = "-3";
-const TONCONNECT_BRIDGE_URL: &str = "https://connect.ton.org/bridge";
+const TONCONNECT_WALLETS_LIST_URL: &str = "https://config.ton.org/wallets-v2.json";
+const TONCONNECT_DEFAULT_BRIDGE_URL: &str = "https://connect.ton.org/bridge";
 const TONCONNECT_MANIFEST_URL: &str =
     "https://ton-blockchain.github.io/acton/tonconnect-manifest.json";
 const TONCONNECT_LINK_BASE: &str = "tc://";
@@ -48,13 +52,13 @@ pub struct TonConnectWallet {
 
 pub struct TonConnectSession {
     storage_path: PathBuf,
-    bridge: HttpBridgeUrl,
     http: Client,
     state: Mutex<TonConnectState>,
 }
 
 struct TonConnectState {
     crypto: SessionCrypto,
+    bridge: Option<HttpBridgeUrl>,
     wallet: Option<TonConnectWallet>,
     peer_client_id: Option<ClientId>,
     last_event_id: Option<String>,
@@ -65,6 +69,7 @@ struct TonConnectState {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PersistedTonConnectSession {
     key_pair: PersistedSessionKeyPair,
+    bridge_url: String,
     peer_client_id: ClientId,
     wallet_address: String,
     wallet_chain: Option<String>,
@@ -77,10 +82,35 @@ struct ReceivedWalletMessage {
     message: WalletMessage,
 }
 
+#[derive(Deserialize)]
+struct WalletsListEntry {
+    name: String,
+    universal_url: Option<String>,
+    bridge: Vec<WalletsListBridge>,
+}
+
+#[derive(Deserialize)]
+struct WalletsListBridge {
+    #[serde(rename = "type")]
+    kind: String,
+    url: Option<String>,
+}
+
+#[derive(Clone)]
+struct TonConnectWalletOption {
+    name: String,
+    link_base: String,
+    bridge: HttpBridgeUrl,
+}
+
+impl fmt::Display for TonConnectWalletOption {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.name)
+    }
+}
+
 impl TonConnectSession {
     pub fn start(storage_path: PathBuf) -> anyhow::Result<Self> {
-        let bridge = HttpBridgeUrl::try_from(TONCONNECT_BRIDGE_URL)
-            .context("Failed to configure TON Connect bridge")?;
         let http = crate::http::blocking_client_builder()
             .connect_timeout(Duration::from_secs(15))
             .redirect(reqwest::redirect::Policy::none())
@@ -90,6 +120,7 @@ impl TonConnectSession {
             || {
                 Ok(TonConnectState {
                     crypto: SessionCrypto::generate()?,
+                    bridge: None,
                     wallet: None,
                     peer_client_id: None,
                     last_event_id: None,
@@ -101,7 +132,6 @@ impl TonConnectSession {
 
         Ok(Self {
             storage_path,
-            bridge,
             http,
             state: Mutex::new(state),
         })
@@ -118,6 +148,8 @@ impl TonConnectSession {
         }
 
         let request = connect_request(network)?;
+        let selected_wallet = select_tonconnect_wallet(&self.http)?;
+        state.bridge = Some(selected_wallet.bridge);
         let link = ConnectLink::connect(
             state.crypto.client_id(),
             request.clone(),
@@ -125,7 +157,7 @@ impl TonConnectSession {
             None,
             None,
         )
-        .to_url(TONCONNECT_LINK_BASE)
+        .to_url(&selected_wallet.link_base)
         .context("Failed to create TON Connect link")?;
         print_connect_link(link.as_str())?;
         println!("Waiting for TON Connect wallet");
@@ -180,6 +212,10 @@ impl TonConnectSession {
         let peer_client_id = state
             .peer_client_id
             .context("TON Connect wallet is not connected")?;
+        let bridge = state
+            .bridge
+            .clone()
+            .context("TON Connect wallet bridge is not selected")?;
         if transaction.from.is_none() {
             let wallet = state
                 .wallet
@@ -197,8 +233,7 @@ impl TonConnectSession {
             id: id.clone(),
             payload: TransactionPayload::Raw(transaction),
         });
-        let post = self
-            .bridge
+        let post = bridge
             .prepare_app_request_post(&state.crypto, peer_client_id, message_ttl(), None, &request)
             .context("Failed to encrypt TON Connect transaction")?;
         self.persist_session(&state)?;
@@ -236,6 +271,7 @@ impl TonConnectSession {
                     anyhow::bail!("TON Connect transaction failed: {message}");
                 }
                 WalletMessage::Event(ConnectEvent::Disconnect { .. }) => {
+                    state.bridge = None;
                     state.wallet = None;
                     state.peer_client_id = None;
                     remove_session(&self.storage_path)?;
@@ -258,8 +294,12 @@ impl TonConnectSession {
         state: &mut TonConnectState,
         expected_peer: Option<ClientId>,
     ) -> anyhow::Result<ReceivedWalletMessage> {
+        let bridge = state
+            .bridge
+            .clone()
+            .context("TON Connect wallet bridge is not selected")?;
         loop {
-            let endpoint = self.bridge.events_endpoint(
+            let endpoint = bridge.events_endpoint(
                 state.crypto.client_id(),
                 state.last_event_id.as_deref(),
                 None,
@@ -269,16 +309,29 @@ impl TonConnectSession {
                 .get(endpoint)
                 .header(reqwest::header::ACCEPT, "text/event-stream")
                 .send()
-                .context("Failed to connect to TON Connect bridge")?
+                .with_context(|| {
+                    format!(
+                        "Failed to connect to TON Connect bridge {}",
+                        bridge.as_str()
+                    )
+                })?
                 .error_for_status()
-                .context("TON Connect bridge rejected event subscription")?;
+                .with_context(|| {
+                    format!(
+                        "TON Connect bridge {} rejected event subscription",
+                        bridge.as_str()
+                    )
+                })?;
             let mut decoder = BridgeSseDecoder::new(max_sse_event_bytes());
             let mut chunk = [0_u8; 8192];
 
             loop {
-                let read = response
-                    .read(&mut chunk)
-                    .context("Failed to read TON Connect bridge events")?;
+                let read = response.read(&mut chunk).with_context(|| {
+                    format!(
+                        "Failed to read TON Connect bridge {} events",
+                        bridge.as_str()
+                    )
+                })?;
                 if read == 0 {
                     break;
                 }
@@ -293,9 +346,11 @@ impl TonConnectSession {
                     if expected_peer.is_some_and(|expected| sender != expected) {
                         continue;
                     }
-                    let message = event
-                        .decrypt::<WalletMessage>(&state.crypto, sender)
+                    let plaintext = event
+                        .decrypt::<Value>(&state.crypto, sender)
                         .context("Failed to decrypt TON Connect wallet message")?;
+                    let message = decode_wallet_message(plaintext)
+                        .context("Failed to decode TON Connect wallet message")?;
                     return Ok(ReceivedWalletMessage { sender, message });
                 }
             }
@@ -311,8 +366,13 @@ impl TonConnectSession {
         let peer_client_id = state
             .peer_client_id
             .context("TON Connect wallet peer is missing")?;
+        let bridge = state
+            .bridge
+            .as_ref()
+            .context("TON Connect wallet bridge is missing")?;
         let persisted = PersistedTonConnectSession {
             key_pair: state.crypto.persisted_keypair(),
+            bridge_url: bridge.as_str().to_owned(),
             peer_client_id,
             wallet_address: wallet.address.to_string(),
             wallet_chain: wallet.chain.clone(),
@@ -320,6 +380,81 @@ impl TonConnectSession {
             next_request_id: state.next_request_id,
         };
         write_session(&self.storage_path, &persisted)
+    }
+}
+
+fn select_tonconnect_wallet(http: &Client) -> anyhow::Result<TonConnectWalletOption> {
+    let entries = http
+        .get(TONCONNECT_WALLETS_LIST_URL)
+        .timeout(Duration::from_secs(15))
+        .send()
+        .context("Failed to load TON Connect wallets list")?
+        .error_for_status()
+        .context("TON Connect wallets list request failed")?
+        .json::<Vec<WalletsListEntry>>()
+        .context("Failed to parse TON Connect wallets list")?;
+    let mut wallets = tonconnect_wallet_options(entries);
+    wallets.push(TonConnectWalletOption {
+        name: "Other wallet via connect.ton.org".to_owned(),
+        link_base: TONCONNECT_LINK_BASE.to_owned(),
+        bridge: HttpBridgeUrl::try_from(TONCONNECT_DEFAULT_BRIDGE_URL)
+            .context("Failed to configure default TON Connect bridge")?,
+    });
+
+    Select::new("TON Connect wallet:", wallets)
+        .prompt()
+        .context("Failed to select TON Connect wallet")
+}
+
+fn tonconnect_wallet_options(entries: Vec<WalletsListEntry>) -> Vec<TonConnectWalletOption> {
+    entries
+        .into_iter()
+        .filter_map(|entry| {
+            let link_base = entry.universal_url?;
+            let bridge_url = entry
+                .bridge
+                .into_iter()
+                .find(|bridge| bridge.kind == "sse")?
+                .url?;
+            let bridge = HttpBridgeUrl::try_from(bridge_url.as_str()).ok()?;
+            Some(TonConnectWalletOption {
+                name: entry.name,
+                link_base,
+                bridge,
+            })
+        })
+        .collect()
+}
+
+fn decode_wallet_message(mut value: Value) -> anyhow::Result<WalletMessage> {
+    normalize_wallet_message(&mut value);
+    if value.get("event").is_some() {
+        serde_json::from_value::<ConnectEvent>(value)
+            .map(WalletMessage::Event)
+            .context("invalid TON Connect wallet event")
+    } else {
+        serde_json::from_value::<WalletResponse>(value)
+            .map(WalletMessage::Response)
+            .context("invalid TON Connect wallet response")
+    }
+}
+
+fn normalize_wallet_message(value: &mut Value) {
+    if value.get("event").and_then(Value::as_str) != Some("connect") {
+        return;
+    }
+    let Some(features) = value
+        .pointer_mut("/payload/device/features")
+        .and_then(Value::as_array_mut)
+    else {
+        return;
+    };
+    let has_detailed_send_transaction = features
+        .iter()
+        .any(|feature| feature.get("name").and_then(Value::as_str) == Some("SendTransaction"));
+    if has_detailed_send_transaction {
+        // Reference wallets publish the legacy alias beside the detailed capability.
+        features.retain(|feature| feature.as_str() != Some("SendTransaction"));
     }
 }
 
@@ -554,10 +689,13 @@ fn load_session(path: &Path) -> anyhow::Result<Option<PersistedTonConnectSession
 fn restore_session(persisted: PersistedTonConnectSession) -> anyhow::Result<TonConnectState> {
     let crypto = SessionCrypto::from_persisted(&persisted.key_pair)
         .context("Failed to restore TON Connect session keys")?;
+    let bridge = HttpBridgeUrl::try_from(persisted.bridge_url.as_str())
+        .context("Failed to restore TON Connect bridge")?;
     let (address, _) = StdAddr::from_str_ext(&persisted.wallet_address, StdAddrFormat::any())
         .context("Failed to restore TON Connect wallet address")?;
     Ok(TonConnectState {
         crypto,
+        bridge: Some(bridge),
         wallet: Some(TonConnectWallet {
             address,
             chain: persisted.wallet_chain,
@@ -738,6 +876,7 @@ mod tests {
         let client_id = crypto.client_id();
         let persisted = PersistedTonConnectSession {
             key_pair: crypto.persisted_keypair(),
+            bridge_url: TONCONNECT_DEFAULT_BRIDGE_URL.to_owned(),
             peer_client_id: ClientId::from_bytes([4; 32]),
             wallet_address: wallet.to_string(),
             wallet_chain: Some(TONCONNECT_TESTNET_CHAIN.to_owned()),
@@ -749,6 +888,10 @@ mod tests {
         let restored = restore_session(load_session(&path).unwrap().unwrap()).unwrap();
 
         assert_eq!(restored.crypto.client_id(), client_id);
+        assert_eq!(
+            restored.bridge.as_ref().map(HttpBridgeUrl::as_str),
+            Some(TONCONNECT_DEFAULT_BRIDGE_URL)
+        );
         assert_eq!(restored.wallet.unwrap().address, wallet);
         assert_eq!(restored.last_event_id.as_deref(), Some("42"));
         assert_eq!(restored.next_request_id, 7);
@@ -782,6 +925,7 @@ mod tests {
             &path,
             &PersistedTonConnectSession {
                 key_pair: crypto.persisted_keypair(),
+                bridge_url: TONCONNECT_DEFAULT_BRIDGE_URL.to_owned(),
                 peer_client_id: ClientId::from_bytes([4; 32]),
                 wallet_address: StdAddr::new(0, HashBytes([3; 32])).to_string(),
                 wallet_chain: Some(TONCONNECT_TESTNET_CHAIN.to_owned()),
@@ -793,5 +937,65 @@ mod tests {
 
         let mode = fs::metadata(path).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
+    }
+
+    #[test]
+    fn tonconnect_wallets_list_selects_wallet_specific_link_and_bridge() {
+        let entries = serde_json::from_value::<Vec<WalletsListEntry>>(serde_json::json!([{
+            "name": "Tonkeeper",
+            "universal_url": "https://app.tonkeeper.com/ton-connect",
+            "bridge": [
+                { "type": "sse", "url": "https://bridge.tonapi.io/bridge" },
+                { "type": "js", "key": "tonkeeper" }
+            ]
+        }]))
+        .unwrap();
+
+        let wallets = tonconnect_wallet_options(entries);
+        assert_eq!(wallets.len(), 1);
+        assert_eq!(wallets[0].name, "Tonkeeper");
+        assert_eq!(
+            wallets[0].link_base,
+            "https://app.tonkeeper.com/ton-connect"
+        );
+        assert_eq!(
+            wallets[0].bridge.as_str(),
+            "https://bridge.tonapi.io/bridge"
+        );
+    }
+
+    #[test]
+    fn tonkeeper_legacy_and_detailed_send_transaction_features_are_accepted() {
+        let message = serde_json::json!({
+            "event": "connect",
+            "id": 1,
+            "payload": {
+                "items": [],
+                "device": {
+                    "platform": "browser",
+                    "appName": "tonkeeper",
+                    "appVersion": "1",
+                    "maxProtocolVersion": 2,
+                    "features": [
+                        "SendTransaction",
+                        {
+                            "name": "SendTransaction",
+                            "maxMessages": 255,
+                            "extraCurrencySupported": true
+                        },
+                        {
+                            "name": "SignData",
+                            "types": ["text", "binary", "cell"]
+                        }
+                    ]
+                }
+            }
+        });
+
+        assert!(serde_json::from_value::<WalletMessage>(message.clone()).is_err());
+        assert!(matches!(
+            decode_wallet_message(message),
+            Ok(WalletMessage::Event(ConnectEvent::Connect { .. }))
+        ));
     }
 }
