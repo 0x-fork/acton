@@ -70,13 +70,7 @@ fn link_static_archive(
         verify_archive_sha(objs_dir, manifest_path, lib_name);
     }
 
-    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
-        // Preserve the archive name until the final link so Acton can apply --exclude-libs
-        // specifically to TON's bundled native dependencies.
-        println!("cargo:rustc-link-lib=static:-bundle={lib_name}");
-    } else {
-        println!("cargo:rustc-link-lib=static={lib_name}");
-    }
+    println!("cargo:rustc-link-lib=static={lib_name}");
 }
 
 fn link_emulator_deps() {
