@@ -42,6 +42,7 @@ _TARGET_MAP: dict[str, dict[str, str]] = {
 
 _OTOOL_PATH = "/usr/bin/otool"
 _STRINGS_PATH = "/usr/bin/strings"
+_NM_PATH = "/usr/bin/nm"
 
 
 class RustTarget(NamedTuple):
@@ -162,38 +163,45 @@ class StringsParser:
         return self.parse_versions(pattern)
 
 
-def _exported_openssl_symbols(binary_path: str) -> list[str]:
-    try:
-        result = subprocess.run(
-            [
-                "/usr/bin/nm",
-                "--dynamic",
-                "--defined-only",
-                "--format=posix",
-                "--",
-                binary_path,
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except FileNotFoundError as error:
-        message = "nm is not available"
-        raise ValueError(message) from error
+class NmParser:
+    def __init__(self, output: str) -> None:
+        self.output = output
 
-    if result.returncode != 0:
-        message = result.stderr.strip()
-        if len(message) == 0:
-            message = f"nm failed for '{binary_path}'"
-        raise ValueError(message)
+    @staticmethod
+    def _run(binary_path: str) -> str:
+        command = [_NM_PATH, "--dynamic", "--defined-only", "--format=posix", "--", binary_path]
 
-    symbols: set[str] = set()
-    for line in result.stdout.splitlines():
-        parts = line.split(maxsplit=1)
-        if parts and _OPENSSL_SYMBOL_PATTERN.match(parts[0]):
-            symbols.add(parts[0])
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError as error:
+            message = "nm is not available"
+            raise ValueError(message) from error
 
-    return sorted(symbols)
+        if result.returncode != 0:
+            message = result.stderr.strip()
+            if len(message) == 0:
+                message = f"nm failed for '{binary_path}'"
+            raise ValueError(message)
+
+        return result.stdout
+
+    @classmethod
+    def from_binary_path(cls, binary_path: str) -> "NmParser":
+        return cls(cls._run(binary_path))
+
+    def parse_symbols(self, symbol_pattern: re.Pattern[str]) -> list[str]:
+        symbols: set[str] = set()
+        for line in self.output.splitlines():
+            parts = line.split(maxsplit=1)
+            if parts and symbol_pattern.match(parts[0]):
+                symbols.add(parts[0])
+
+        return sorted(symbols)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -252,7 +260,8 @@ def _run_linux_checks(target: RustTarget, binary_path: str) -> list[str]:
             )
 
     try:
-        exported_openssl_symbols = _exported_openssl_symbols(binary_path)
+        nm_parser = NmParser.from_binary_path(binary_path)
+        exported_openssl_symbols = nm_parser.parse_symbols(_OPENSSL_SYMBOL_PATTERN)
     except ValueError as error:
         errors.append(f"linux check failed for '{target_key}': {error}")
         return errors
