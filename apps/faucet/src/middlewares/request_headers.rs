@@ -170,13 +170,13 @@ mod tests {
     fn allows_device_uid_values_from_supported_platforms() {
         assert!(is_allowed_device_uid_header(&"default".parse().unwrap()));
         assert!(is_allowed_device_uid_header(
-            &"87c4bc1848a84471997203ee530d2fda".parse().unwrap()
+            &"00112233445566778899aabbccddeeff".parse().unwrap()
         ));
         assert!(is_allowed_device_uid_header(
-            &"550e8400-e29b-41d4-a716-446655440000".parse().unwrap()
+            &"00112233-4455-6677-8899-aabbccddeeff".parse().unwrap()
         ));
         assert!(is_allowed_device_uid_header(
-            &"550E8400-E29B-41D4-A716-446655440000".parse().unwrap()
+            &"00112233-4455-6677-8899-AABBCCDDEEFF".parse().unwrap()
         ));
         assert!(is_allowed_device_uid("default"));
     }
@@ -184,12 +184,12 @@ mod tests {
     #[test]
     fn normalizes_device_uid_to_compact_lowercase() {
         assert_eq!(
-            normalize_device_uid("D70CA712-E7EB-5652-A9E4-A2287107D8A0"),
-            "d70ca712e7eb5652a9e4a2287107d8a0"
+            normalize_device_uid("00112233445566778899AABBCCDDEEFF"),
+            "00112233445566778899aabbccddeeff"
         );
         assert_eq!(
-            normalize_device_uid("DB5DD24BA13CBA68DD36FBA46A1FE2B0"),
-            "db5dd24ba13cba68dd36fba46a1fe2b0"
+            normalize_device_uid("00112233-4455-6677-8899-AABBCCDDEEFF"),
+            "00112233445566778899aabbccddeeff"
         );
     }
 

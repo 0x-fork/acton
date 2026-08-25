@@ -499,15 +499,15 @@ mod tests {
 
     #[test]
     fn builds_successful_claim_window_keys_from_canonical_address() {
-        let address = "0:e4d954ef9f4e1250a26b5bbad76a1cdd17cfd08babad6f4c23e372270aef6f76";
+        let address = "0:0000000000000000000000000000000000000000000000000000000000000000";
 
         assert_eq!(
             successful_claim_window_key(address),
-            "faucet:antifraud:successful-claim-window:0:e4d954ef9f4e1250a26b5bbad76a1cdd17cfd08babad6f4c23e372270aef6f76"
+            "faucet:antifraud:successful-claim-window:0:0000000000000000000000000000000000000000000000000000000000000000"
         );
         assert_eq!(
             successful_claim_window_seq_key(address),
-            "faucet:antifraud:successful-claim-window:seq:0:e4d954ef9f4e1250a26b5bbad76a1cdd17cfd08babad6f4c23e372270aef6f76"
+            "faucet:antifraud:successful-claim-window:seq:0:0000000000000000000000000000000000000000000000000000000000000000"
         );
     }
 

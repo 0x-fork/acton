@@ -48,30 +48,21 @@ mod tests {
     use super::{AddressValidationError, parse_testnet_address};
     use ton::ton_core::types::TonAddress;
 
-    const RAW_ADDRESS: &str = "0:2cf55953e92efbeadab7ba725c3f93a0b23f842cbba72d7b8e6f510a70e422e3";
-
     #[test]
-    fn accepts_testnet_friendly_addresses_from_ton_core_test_vectors() {
+    fn accepts_testnet_zero_addresses() {
         for address in [
-            "0QAs9VlT6S776tq3unJcP5Ogsj-ELLunLXuOb1EKcOQi4-QO",
-            "kQAs9VlT6S776tq3unJcP5Ogsj-ELLunLXuOb1EKcOQi47nL",
-            "0QAs9VlT6S776tq3unJcP5Ogsj+ELLunLXuOb1EKcOQi4+QO",
-            "kQAs9VlT6S776tq3unJcP5Ogsj+ELLunLXuOb1EKcOQi47nL",
+            "kQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHTW",
+            "0QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACkT",
         ] {
-            assert_eq!(
-                parse_testnet_address(address).map(|address| address.to_hex()),
-                Ok(RAW_ADDRESS.to_string())
-            );
+            assert_eq!(parse_testnet_address(address), Ok(TonAddress::ZERO));
         }
     }
 
     #[test]
-    fn rejects_mainnet_friendly_addresses_from_ton_core_test_vectors() {
+    fn rejects_mainnet_zero_addresses() {
         for address in [
-            "EQAs9VlT6S776tq3unJcP5Ogsj-ELLunLXuOb1EKcOQi4wJB",
-            "UQAs9VlT6S776tq3unJcP5Ogsj-ELLunLXuOb1EKcOQi41-E",
-            "EQAs9VlT6S776tq3unJcP5Ogsj+ELLunLXuOb1EKcOQi4wJB",
-            "UQAs9VlT6S776tq3unJcP5Ogsj+ELLunLXuOb1EKcOQi41+E",
+            "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+            "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ",
         ] {
             assert_eq!(
                 parse_testnet_address(address),

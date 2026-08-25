@@ -18,7 +18,7 @@ async fn requires_airdrop_headers_on_protected_route() {
     let response = request_with_headers(
         Some("acton/0.1.0"),
         None,
-        Some("87c4bc1848a84471997203ee530d2fda"),
+        Some("00112233445566778899aabbccddeeff"),
     )
     .await;
     assert_eq!(response.status(), StatusCode::OK);
@@ -26,7 +26,7 @@ async fn requires_airdrop_headers_on_protected_route() {
     let response = request_with_headers(
         Some("acton/0.1.0"),
         None,
-        Some("550e8400-e29b-41d4-a716-446655440000"),
+        Some("00112233-4455-6677-8899-aabbccddeeff"),
     )
     .await;
     assert_eq!(response.status(), StatusCode::OK);
@@ -34,7 +34,7 @@ async fn requires_airdrop_headers_on_protected_route() {
     let response = request_with_headers(
         Some("acton/0.1.0"),
         None,
-        Some("550E8400-E29B-41D4-A716-446655440000"),
+        Some("00112233-4455-6677-8899-AABBCCDDEEFF"),
     )
     .await;
     assert_eq!(response.status(), StatusCode::OK);
@@ -88,12 +88,12 @@ async fn normalizes_device_uid_before_inserting_client_context() {
 
     for (device_uid, expected) in [
         (
-            "87C4BC1848A84471997203EE530D2FDA",
-            "87c4bc1848a84471997203ee530d2fda",
+            "00112233445566778899AABBCCDDEEFF",
+            "00112233445566778899aabbccddeeff",
         ),
         (
-            "550E8400-E29B-41D4-A716-446655440000",
-            "550e8400e29b41d4a716446655440000",
+            "00112233-4455-6677-8899-AABBCCDDEEFF",
+            "00112233445566778899aabbccddeeff",
         ),
     ] {
         let request = Request::builder()

@@ -110,8 +110,8 @@ mod tests {
     #[test]
     fn builds_device_subject() {
         assert_eq!(
-            device_uid("550e8400-e29b-41d4-a716-446655440000"),
-            "device-uid:550e8400-e29b-41d4-a716-446655440000"
+            device_uid("00112233445566778899aabbccddeeff"),
+            "device-uid:00112233445566778899aabbccddeeff"
         );
     }
 }

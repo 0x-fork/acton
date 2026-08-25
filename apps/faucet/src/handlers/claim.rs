@@ -404,7 +404,7 @@ mod tests {
     #[test]
     fn keeps_queued_claims_from_before_github_limits_compatible() {
         let claim: CreateClaim = serde_json::from_value(json!({
-            "request_id": "71a92124-6380-4654-9282-852e8eb4464b",
+            "request_id": "00000000-0000-4000-8000-000000000001",
             "address": "0:abc",
             "challenge": "challenge",
             "nonce": 42,
@@ -412,7 +412,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(claim.github_user_id, None);
-        assert_eq!(claim.request_id, "71a92124-6380-4654-9282-852e8eb4464b");
+        assert_eq!(claim.request_id, "00000000-0000-4000-8000-000000000001");
         assert_eq!(claim.tier, FaucetTier::Guest);
         assert_eq!(claim.max_requests, 0);
         assert_eq!(claim.client_window_subject, None);
