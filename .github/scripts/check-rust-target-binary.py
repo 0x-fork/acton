@@ -12,6 +12,15 @@ _VERSION_PATTERNS: dict[str, re.Pattern[str]] = {
     "OPENSSL": re.compile(r"\bOPENSSL_(?P<version>\d+\.\d+(?:\.\d+)?)\b"),
 }
 
+_OPENSSL_SYMBOL_PATTERN: re.Pattern[str] = re.compile(
+    r"^(?:"
+    r"ACCESS_DESCRIPTION_|ADMISSIONS_|ADMISSION_SYNTAX_|AES_|ASN1_|ASYNC_|"
+    r"AUTHORITY_|BASIC_CONSTRAINTS_|BF_|BIO_|BN_|CMS_|CONF_|CRYPTO_|CTLOG_|"
+    r"DH_|DSA_|EC_|ECDSA_|ENGINE_|ERR_|EVP_|HMAC_|KDF_|OCSP_|OPENSSL_|OSSL_|"
+    r"PEM_|PKCS|RAND_|RSA_|SCT_|SHA[0-9_]|SSL_|TLS_|TS_|UI_|X509_|d2i_|i2d_"
+    r")"
+)
+
 _TARGET_MAP: dict[str, dict[str, str]] = {
     "x86_64-unknown-linux-gnu": {
         "GLIBC": "2.34",
@@ -153,6 +162,40 @@ class StringsParser:
         return self.parse_versions(pattern)
 
 
+def _exported_openssl_symbols(binary_path: str) -> list[str]:
+    try:
+        result = subprocess.run(
+            [
+                "/usr/bin/nm",
+                "--dynamic",
+                "--defined-only",
+                "--format=posix",
+                "--",
+                binary_path,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError as error:
+        message = "nm is not available"
+        raise ValueError(message) from error
+
+    if result.returncode != 0:
+        message = result.stderr.strip()
+        if len(message) == 0:
+            message = f"nm failed for '{binary_path}'"
+        raise ValueError(message)
+
+    symbols: set[str] = set()
+    for line in result.stdout.splitlines():
+        parts = line.split(maxsplit=1)
+        if parts and _OPENSSL_SYMBOL_PATTERN.match(parts[0]):
+            symbols.add(parts[0])
+
+    return sorted(symbols)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Parse a Rust target string for GitHub Actions")
     parser.add_argument(
@@ -207,6 +250,23 @@ def _run_linux_checks(target: RustTarget, binary_path: str) -> list[str]:
                     f"possible versions {versions}"
                 ),
             )
+
+    try:
+        exported_openssl_symbols = _exported_openssl_symbols(binary_path)
+    except ValueError as error:
+        errors.append(f"linux check failed for '{target_key}': {error}")
+        return errors
+
+    if exported_openssl_symbols:
+        preview = ", ".join(exported_openssl_symbols[:20])
+        if len(exported_openssl_symbols) > 20:
+            preview = f"{preview}, ..."
+        errors.append(
+            (
+                f"linux check failed for '{target_key}': Acton exports "
+                f"{len(exported_openssl_symbols)} bundled OpenSSL symbols ({preview})"
+            ),
+        )
 
     return errors
 
