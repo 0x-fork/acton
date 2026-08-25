@@ -288,7 +288,10 @@ impl StudioServer {
             environment_runtime: Arc::clone(&self.environment_runtime),
             test_run_runtime: Arc::clone(&self.test_run_runtime),
             wallet_runtime: Arc::clone(&self.wallet_runtime),
-            http_client: reqwest::Client::new(),
+            http_client: reqwest::Client::builder()
+                .use_rustls_tls()
+                .build()
+                .expect("Studio HTTP client must build"),
             toncenter_api_keys: self.config.toncenter_api_keys.clone(),
         };
         let api = Router::new()

@@ -4,7 +4,9 @@ use std::ffi::OsStr;
 pub(crate) const USE_PROXY_ENV: &str = "ACTON_USE_PROXY";
 
 pub(crate) fn blocking_client_builder() -> reqwest::blocking::ClientBuilder {
-    let builder = reqwest::blocking::Client::builder().user_agent(crate::build_info::user_agent());
+    let builder = reqwest::blocking::Client::builder()
+        .use_rustls_tls()
+        .user_agent(crate::build_info::user_agent());
     if proxy_enabled() {
         builder
     } else {
@@ -13,7 +15,9 @@ pub(crate) fn blocking_client_builder() -> reqwest::blocking::ClientBuilder {
 }
 
 pub(crate) fn client_builder() -> reqwest::ClientBuilder {
-    let builder = reqwest::Client::builder().user_agent(crate::build_info::user_agent());
+    let builder = reqwest::Client::builder()
+        .use_rustls_tls()
+        .user_agent(crate::build_info::user_agent());
     if proxy_enabled() {
         builder
     } else {

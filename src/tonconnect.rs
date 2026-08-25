@@ -81,7 +81,7 @@ impl TonConnectSession {
     pub fn start(storage_path: PathBuf) -> anyhow::Result<Self> {
         let bridge = HttpBridgeUrl::try_from(TONCONNECT_BRIDGE_URL)
             .context("Failed to configure TON Connect bridge")?;
-        let http = Client::builder()
+        let http = crate::http::blocking_client_builder()
             .connect_timeout(Duration::from_secs(15))
             .redirect(reqwest::redirect::Policy::none())
             .build()

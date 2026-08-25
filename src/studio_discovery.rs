@@ -46,7 +46,7 @@ pub fn running_studio_url(project_root: &Path, expected_workspace_name: &str) ->
 }
 
 fn is_matching_studio_running(studio_url: &str, expected_workspace_name: &str) -> bool {
-    let Ok(client) = reqwest::blocking::Client::builder()
+    let Ok(client) = crate::http::blocking_client_builder()
         .connect_timeout(STUDIO_CONNECT_TIMEOUT)
         .timeout(STUDIO_REQUEST_TIMEOUT)
         .build()

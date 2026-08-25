@@ -44,7 +44,9 @@ const fn user_agent() -> &'static str {
 }
 
 fn http_client_builder() -> reqwest::blocking::ClientBuilder {
-    let builder = reqwest::blocking::Client::builder().user_agent(user_agent());
+    let builder = reqwest::blocking::Client::builder()
+        .use_rustls_tls()
+        .user_agent(user_agent());
     if proxy_enabled() {
         builder
     } else {
@@ -53,7 +55,9 @@ fn http_client_builder() -> reqwest::blocking::ClientBuilder {
 }
 
 fn async_http_client_builder() -> reqwest::ClientBuilder {
-    let builder = reqwest::Client::builder().user_agent(user_agent());
+    let builder = reqwest::Client::builder()
+        .use_rustls_tls()
+        .user_agent(user_agent());
     if proxy_enabled() {
         builder
     } else {

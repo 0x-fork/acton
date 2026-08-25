@@ -893,6 +893,7 @@ fn spawn_environment_startup_probe(environment: Arc<LocalEnvironment>, generatio
             return;
         };
         let Ok(http_client) = reqwest::Client::builder()
+            .use_rustls_tls()
             .timeout(STARTUP_READINESS_REQUEST_TIMEOUT)
             .build()
         else {

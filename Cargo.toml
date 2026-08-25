@@ -128,13 +128,15 @@ quick-junit = "0.6.1" # junit format for tests
 qrcode = { version = "0.14.1", default-features = false }
 
 # disasm for blockchain addresses
+# TON's static archives bundle OpenSSL. Acton clients explicitly select rustls
+# to avoid running a second, system OpenSSL copy in the same process.
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "blocking",
   "multipart",
-  "default-tls",
+  "rustls-tls-native-roots",
 ] }
-tungstenite = { version = "0.28", features = ["native-tls"] }
+tungstenite = { version = "0.28", features = ["rustls-tls-native-roots"] }
 urlencoding = "2.1"
 base64 = "0.22.1"
 async-trait = "0.1.89"

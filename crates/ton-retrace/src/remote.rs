@@ -24,7 +24,7 @@ const fn user_agent() -> &'static str {
 }
 
 fn http_client_builder() -> reqwest::ClientBuilder {
-    let builder = Client::builder().user_agent(user_agent());
+    let builder = Client::builder().use_rustls_tls().user_agent(user_agent());
     if proxy_enabled() {
         builder
     } else {

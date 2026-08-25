@@ -35,6 +35,7 @@ const fn user_agent() -> &'static str {
 
 fn build_verifier_http_client() -> Result<reqwest::Client, reqwest::Error> {
     reqwest::Client::builder()
+        .use_rustls_tls()
         .timeout(VERIFIER_REQUEST_TIMEOUT)
         .user_agent(user_agent())
         .build()
