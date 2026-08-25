@@ -7,7 +7,7 @@ use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=ACTON_RELEASE_CHANNEL");
-    isolate_linux_static_archive_symbols();
+    isolate_linux_ton_archive_symbols();
 
     compress_man();
     compress_project_templates();
@@ -52,11 +52,11 @@ fn main() {
     println!("cargo:rustc-env=ACTON_LONG_VERSION={short_version} ({git_hash} {build_date})");
 }
 
-fn isolate_linux_static_archive_symbols() {
+fn isolate_linux_ton_archive_symbols() {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("linux") {
-        // TON's static archives contain their own OpenSSL. Keep those symbols out of the
-        // executable's dynamic symbol table so system libssl cannot bind to the bundled copy.
-        println!("cargo:rustc-link-arg-bin=acton=-Wl,--exclude-libs,ALL");
+        // The TON archives contain a static OpenSSL. Keep their symbols private so system
+        // libssl always resolves against its matching system libcrypto.
+        println!("cargo:rustc-link-arg-bin=acton=-Wl,--exclude-libs,libemulator.a:libtolk.a");
     }
 }
 
