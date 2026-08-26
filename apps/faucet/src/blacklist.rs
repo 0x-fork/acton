@@ -1,6 +1,9 @@
 use anyhow::Context;
 use sqlx::{QueryBuilder, Row, Sqlite, SqlitePool};
 
+static STATIC_BLACKLIST_SUBJECTS: &[&str] =
+    &["wallet:0:ff3b559e33e89c318f092281b383248443c8afbe84a9812a20954b1ab9ae98"];
+
 #[derive(Clone)]
 pub(crate) struct BlacklistStore {
     pool: SqlitePool,
@@ -43,6 +46,10 @@ impl BlacklistStore {
     }
 
     pub(crate) async fn check(&self, subjects: &[&str]) -> anyhow::Result<Option<BlacklistMatch>> {
+        if let Some(entry) = static_blacklist_match(subjects, STATIC_BLACKLIST_SUBJECTS) {
+            return Ok(Some(entry));
+        }
+
         if subjects.is_empty() {
             return Ok(None);
         }
@@ -85,11 +92,24 @@ impl BlacklistStore {
     }
 }
 
+fn static_blacklist_match(subjects: &[&str], blacklist: &[&str]) -> Option<BlacklistMatch> {
+    let subject = subjects
+        .iter()
+        .find(|subject| blacklist.contains(subject))?;
+    Some(BlacklistMatch {
+        subject: (*subject).to_string(),
+        reason: "address is unavailable".to_string(),
+        expires_at: None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use sqlx::sqlite::SqlitePoolOptions;
 
-    use super::BlacklistStore;
+    use super::{
+        BlacklistMatch, BlacklistStore, STATIC_BLACKLIST_SUBJECTS, static_blacklist_match,
+    };
 
     async fn store() -> BlacklistStore {
         let pool = SqlitePoolOptions::new()
@@ -98,6 +118,22 @@ mod tests {
             .await
             .unwrap();
         BlacklistStore::setup(pool).await.unwrap()
+    }
+
+    #[test]
+    fn finds_static_entry() {
+        let blacklisted_wallet = STATIC_BLACKLIST_SUBJECTS[0];
+        assert_eq!(
+            static_blacklist_match(
+                &["wallet:allowed", blacklisted_wallet],
+                STATIC_BLACKLIST_SUBJECTS,
+            ),
+            Some(BlacklistMatch {
+                subject: blacklisted_wallet.to_string(),
+                reason: "address is unavailable".to_string(),
+                expires_at: None,
+            })
+        );
     }
 
     #[tokio::test]
