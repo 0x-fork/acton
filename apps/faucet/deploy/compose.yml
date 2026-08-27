@@ -1,6 +1,11 @@
 services:
   faucet:
     image: ghcr.io/ton-blockchain/faucet:${FAUCET_IMAGE_TAG:-master}
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
     pull_policy: always
     env_file:
       - ./.env
@@ -25,6 +30,11 @@ services:
 
   redis:
     image: redis:8-alpine
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
     command: [ "redis-server", "--appendonly", "yes" ]
     volumes:
       - redis-data:/data
