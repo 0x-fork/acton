@@ -14,10 +14,21 @@ interface VerifierAbiItem {
 
 const VERIFIER_SOURCE_URL = "https://verifier.acton.monster/api/v1/verification/source"
 const VERIFIER_ABI_URL = "https://verifier.acton.monster/api/v1/abi"
+const DEFAULT_REQUEST_TIMEOUT_MS = 5000
+
+export interface VerifierMetadataRegistryOptions {
+  readonly requestTimeoutMs?: number
+}
 
 export class VerifierMetadataRegistry extends NullMetadataRegistry {
   private readonly compilerAbiCache = new Map<string, ExtendedContractABI | null>()
   private readonly sourceCache = new Map<string, VerificationSourceResponse>()
+  private readonly requestTimeoutMs: number
+
+  constructor(options: VerifierMetadataRegistryOptions = {}) {
+    super()
+    this.requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
+  }
 
   override async getCompilerAbis(
     codeHashes: readonly string[],
@@ -35,12 +46,14 @@ export class VerifierMetadataRegistry extends NullMetadataRegistry {
           return
         }
 
-        const abi = await this.fetchCompilerAbi(normalized).catch(error => {
+        try {
+          const abi = await this.fetchCompilerAbi(normalized)
+          this.compilerAbiCache.set(normalized, abi)
+          result[codeHash] = abi
+        } catch (error) {
           console.debug(`Failed to fetch verifier ABI for ${normalized}`, error)
-          return null
-        })
-        this.compilerAbiCache.set(normalized, abi)
-        result[codeHash] = abi
+          result[codeHash] = null
+        }
       }),
     )
     return result
@@ -56,21 +69,23 @@ export class VerifierMetadataRegistry extends NullMetadataRegistry {
       return cached
     }
 
-    const source = await this.fetchSource(options).catch(error => {
+    try {
+      const source = await this.fetchSource(options)
+      this.sourceCache.set(key, source)
+      if (source.code_hash) {
+        this.sourceCache.set(sourceCacheKey({codeHash: source.code_hash}), source)
+      }
+      return source
+    } catch (error) {
       console.debug("Verifier source lookup failed", error)
       return unverifiedSourceResponse(options)
-    })
-    this.sourceCache.set(key, source)
-    if (source.code_hash) {
-      this.sourceCache.set(sourceCacheKey({codeHash: source.code_hash}), source)
     }
-    return source
   }
 
   private async fetchCompilerAbi(codeHash: string): Promise<ExtendedContractABI | null> {
     const url = new URL(VERIFIER_ABI_URL)
     url.searchParams.set("code_hash", codeHash)
-    const response = await fetch(url)
+    const response = await fetch(url, {signal: AbortSignal.timeout(this.requestTimeoutMs)})
     if (!response.ok) {
       throw new Error(`Verifier ABI request failed with HTTP ${response.status}`)
     }
@@ -98,7 +113,7 @@ export class VerifierMetadataRegistry extends NullMetadataRegistry {
     if (codeHash) {
       url.searchParams.append("code_hash", codeHash)
     }
-    const response = await fetch(url)
+    const response = await fetch(url, {signal: AbortSignal.timeout(this.requestTimeoutMs)})
     if (!response.ok) {
       throw new Error(`Verifier source request failed with HTTP ${response.status}`)
     }
