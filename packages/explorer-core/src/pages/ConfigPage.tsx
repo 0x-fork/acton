@@ -56,6 +56,7 @@ import {getPrecompiledContractMetadata} from "../api/precompiledContract"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {GlobalCapabilities} from "../components/GlobalCapabilities"
+import type {TelegramWalletContractBytecode} from "../config/configParameterMinus123"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
@@ -279,9 +280,11 @@ function ConfigContent({
 }
 
 function ConfigParameterCard({parameter}: {readonly parameter: NetworkConfigParameter}) {
-  const hasValueTab = parameter.parsedValue !== undefined
+  const hasValueTab =
+    parameter.parsedValue !== undefined || parameter.contractBytecode !== undefined
   const hasCompactValue =
     parameter.address !== undefined ||
+    parameter.contractBytecode !== undefined ||
     parameter.burningConfiguration !== undefined ||
     parameter.extraCurrencies !== undefined ||
     parameter.globalVersion !== undefined ||
@@ -384,6 +387,10 @@ function ConfigParameterValue({parameter}: {readonly parameter: NetworkConfigPar
     )
   }
 
+  if (parameter.contractBytecode !== undefined) {
+    return <ContractBytecodeValue configuration={parameter.contractBytecode} />
+  }
+
   if (parameter.burningConfiguration !== undefined) {
     return <BurningConfigurationValue configuration={parameter.burningConfiguration} />
   }
@@ -457,6 +464,54 @@ function ConfigParameterValue({parameter}: {readonly parameter: NetworkConfigPar
           : "This parameter is available as raw cell data"}
       </span>
     </div>
+  )
+}
+
+function ContractBytecodeValue({
+  configuration,
+}: {
+  readonly configuration: TelegramWalletContractBytecode
+}) {
+  return (
+    <ConfigValueGrid
+      items={[
+        {
+          id: "contract-bytecode-hash",
+          label: "code_hash",
+          value: (
+            <TechnicalValue
+              copyLabel="contract bytecode hash"
+              shorten={false}
+              value={configuration.bytecodeHash}
+            />
+          ),
+          wide: true,
+        },
+        {
+          id: "contract-bytecode-revision",
+          label: "revision",
+          value: configuration.revision ?? "Unknown",
+        },
+        {
+          id: "contract-bytecode-repository",
+          label: "GitHub repository",
+          value:
+            configuration.repositoryUrl === undefined ? (
+              "Unknown"
+            ) : (
+              <a
+                className={styles.externalAccountLink}
+                href={configuration.repositoryUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                ton-blockchain/tg-wallet-contract
+                <ExternalLink size={13} aria-hidden="true" />
+              </a>
+            ),
+        },
+      ]}
+    />
   )
 }
 

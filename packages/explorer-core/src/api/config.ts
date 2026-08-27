@@ -8,6 +8,10 @@ import {
   type OracleBridgeParams,
 } from "../cell-inspector/block.tlb.generated"
 import {toNoncriticalParameterEntry} from "../config/configParameter30"
+import {
+  parseTelegramWalletContractBytecode,
+  type TelegramWalletContractBytecode,
+} from "../config/configParameterMinus123"
 
 export const TON_CONFIG_DOCS_URL = "https://docs.ton.org/foundations/config"
 
@@ -105,6 +109,7 @@ export interface NetworkConfigParameter {
   readonly description: string
   readonly rawHex: string
   readonly address?: string
+  readonly contractBytecode?: TelegramWalletContractBytecode
   readonly parsedValue?: ParsedValue
   readonly burningConfiguration?: BurningConfiguration
   readonly extraCurrencies?: readonly ExtraCurrency[]
@@ -243,6 +248,12 @@ const CONFIG_PARAMETER_METADATA: Readonly<Record<number, ConfigParameterMetadata
     title: "Governance test slot",
     description:
       "Testnet scratch slot containing a ConfigParam 16-shaped value with max validators set to zero",
+  },
+  // Identifies config[-123] as shared WalletTg bytecode and pins its known bytecode hash:
+  // https://github.com/ton-blockchain/tg-wallet-contract/blob/rev00/contracts/WalletTg/WalletTg.tolk
+  [-123]: {
+    title: "Telegram Wallet contract bytecode",
+    description: "Shared WalletTg contract bytecode used by Telegram's native Gram Wallet",
   },
   // https://t.me/tonstatus/175
   // https://actonscan.com/tx/2d5738520c63a6aeddc8d7ff7f52a19c70b11b9ecbca81acc1408488262358c2?network=mainnet
@@ -579,6 +590,13 @@ function parseConfigParameter(id: number, cell: Cell): NetworkConfigParameter {
     title: metadata.title,
     description: metadata.description,
     rawHex: cell.toBoc().toString("hex"),
+  }
+
+  if (id === -123) {
+    return {
+      ...parameter,
+      contractBytecode: parseTelegramWalletContractBytecode(cell),
+    }
   }
 
   if (id < 0) return parameter

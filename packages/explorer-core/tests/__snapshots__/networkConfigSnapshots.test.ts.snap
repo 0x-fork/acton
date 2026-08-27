@@ -7888,16 +7888,16 @@ exports[`real network configuration snapshots parses testnet config at mastercha
       "title": "Governance test slot",
     },
     {
-      "contractCode": {
-        "codeHash": "6f177fd863213d7bd3b24a694b0b7efb7425721ed1d21490d052ae93276c4406",
-        "repositoryUrl": "https://github.com/ton-blockchain/tg-wallet-contract",
-        "revision": 0,
+      "contractBytecode": {
+        "bytecodeHash": "6f177fd863213d7bd3b24a694b0b7efb7425721ed1d21490d052ae93276c4406",
+        "repositoryUrl": "https://github.com/ton-blockchain/tg-wallet-contract/tree/rev00",
+        "revision": "00",
       },
       "description": "Shared WalletTg contract bytecode used by Telegram's native Gram Wallet",
       "hasParsedValue": false,
       "hasRawHex": true,
       "id": -123,
-      "title": "Telegram Wallet contract code",
+      "title": "Telegram Wallet contract bytecode",
     },
     {
       "description": "Configures validator participation in governance for the BTC Teleport bridge",
