@@ -10,8 +10,8 @@ describe("real network configuration snapshots", () => {
     expect(toNetworkConfigSnapshot(parseNetworkConfig(rawBoc))).toMatchSnapshot()
   })
 
-  test("parses testnet config at masterchain block 76769489", async () => {
-    const rawBoc = await readNetworkConfigFixture("testnet", 76_769_489)
+  test("parses testnet config at masterchain block 80890417", async () => {
+    const rawBoc = await readNetworkConfigFixture("testnet", 80_890_417)
 
     expect(toNetworkConfigSnapshot(parseNetworkConfig(rawBoc))).toMatchSnapshot()
   })
