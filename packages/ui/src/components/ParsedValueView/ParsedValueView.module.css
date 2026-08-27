@@ -176,6 +176,35 @@
   line-height: 1.35;
 }
 
+.parsedMapKeyValue {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-1);
+}
+
+.parsedMapKeyValue .parsedScalar {
+  font-family: var(--acton-font-sans);
+  font-variant-ligatures: normal;
+  font-size: inherit;
+}
+
+.parsedMapKeyInfo {
+  display: grid;
+  gap: var(--acton-space-2);
+}
+
+.parsedMapKeyInfoId {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.parsedMapKeyInfoDescription {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.45;
+}
+
 .booleanTrue,
 .booleanFalse {
   font-family: var(--acton-font-sans);

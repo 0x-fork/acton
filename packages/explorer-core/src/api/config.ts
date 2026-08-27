@@ -1,5 +1,5 @@
 import {Address, Cell, Dictionary} from "@ton/core"
-import {formatDateTime, type ParsedValue} from "@acton/ui"
+import {formatDateTime, type ParsedValue, type ParsedValueMapEntry} from "@acton/ui"
 
 import {
   type JettonBridgeParams,
@@ -7,6 +7,7 @@ import {
   loadConfigParams,
   type OracleBridgeParams,
 } from "../cell-inspector/block.tlb.generated"
+import {toNoncriticalParameterEntry} from "../config/configParameter30"
 
 export const TON_CONFIG_DOCS_URL = "https://docs.ton.org/foundations/config"
 
@@ -1525,10 +1526,7 @@ function toParsedValue(value: unknown, fieldName?: string): ParsedValue {
     return {
       kind: "map",
       typeName: "dictionary",
-      entries: [...value].map(([key, item]) => ({
-        key: toParsedValue(key),
-        value: toParsedValue(item, fieldName),
-      })),
+      entries: [...value].map(([key, item]) => toParsedDictionaryEntry(key, item, fieldName)),
     }
   }
 
@@ -1558,6 +1556,22 @@ function toParsedValue(value: unknown, fieldName?: string): ParsedValue {
   }
 
   return {kind: "scalar", value: String(value)}
+}
+
+function toParsedDictionaryEntry(
+  key: unknown,
+  value: unknown,
+  fieldName: string | undefined,
+): ParsedValueMapEntry {
+  if (fieldName === "noncritical_params") {
+    const entry = toNoncriticalParameterEntry(key, value, toParsedValue)
+    if (entry) return entry
+  }
+
+  return {
+    key: toParsedValue(key),
+    value: toParsedValue(value, fieldName),
+  }
 }
 
 function isAddressField(fieldName: string | undefined): boolean {

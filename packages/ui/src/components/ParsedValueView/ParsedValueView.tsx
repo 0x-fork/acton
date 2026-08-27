@@ -4,6 +4,7 @@ import {Binary, Check, Copy, FileCode2} from "lucide-react"
 import {ContractChip, type ContractReferenceOptions} from "../ContractChip/ContractChip"
 import {CountValue} from "../CountValue/CountValue"
 import {DisclosureToggle} from "../DisclosureToggle/DisclosureToggle"
+import {InfoPopover} from "../InfoPopover/InfoPopover"
 import {CopyInlineAction, InlineAction, InlineActions} from "../InlineActions/InlineActions"
 import {Popover} from "../Popover/Popover"
 import {VisuallyGroupedNumber} from "../VisuallyGroupedNumber/VisuallyGroupedNumber"
@@ -133,7 +134,13 @@ function ParsedMapEntry({
     <div className={styles.parsedMapEntry}>
       <div className={styles.parsedMapSection}>
         <div className={styles.parsedMapSectionLabel}>Key</div>
-        <div className={styles.parsedMapSectionValue}>
+        <div
+          className={
+            entry.keyInfo
+              ? `${styles.parsedMapSectionValue} ${styles.parsedMapKeyValue}`
+              : styles.parsedMapSectionValue
+          }
+        >
           <ParsedValueView
             value={entry.key}
             contracts={contracts}
@@ -145,6 +152,18 @@ function ParsedMapEntry({
               entry.key.kind === "scalar" && entry.key.typeName === "uint256" ? "key" : undefined
             }
           />
+          {entry.keyInfo && (
+            <InfoPopover ariaLabel={`About parameter ID ${entry.keyInfo.id}`}>
+              <div className={styles.parsedMapKeyInfo}>
+                <span className={styles.parsedMapKeyInfoId}>Parameter ID: {entry.keyInfo.id}</span>
+                {entry.keyInfo.description && (
+                  <span className={styles.parsedMapKeyInfoDescription}>
+                    {entry.keyInfo.description}
+                  </span>
+                )}
+              </div>
+            </InfoPopover>
+          )}
         </div>
       </div>
       <div className={styles.parsedMapSection}>

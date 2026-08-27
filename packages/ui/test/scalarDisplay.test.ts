@@ -4,6 +4,7 @@ import {renderToStaticMarkup} from "react-dom/server"
 
 import {buildStorageDiff} from "../src/components/ParsedValueDiffView/buildStorageDiff"
 import {ParsedValueView} from "../src/components/ParsedValueView/ParsedValueView"
+import {ThemeProvider} from "../src/components/Theme/ThemeProvider"
 
 describe("ParsedValueView", () => {
   test("renders a Cell Inspector action for parsed cells", () => {
@@ -44,6 +45,39 @@ describe("ParsedValueView", () => {
     expect(markup).toMatchInlineSnapshot(
       `"<div><span>map</span><div class="undefined  "><div><div><div>Key</div><div><span>0xff</span></div></div><div><div>Value</div><div><span>1</span></div></div></div><div><div><div>Key</div><div><span>255</span></div></div><div><div>Value</div><div><span>2</span></div></div></div></div></div>"`,
     )
+  })
+
+  test("renders information controls for annotated map keys", () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        ThemeProvider,
+        {defaultTheme: "light"},
+        createElement(ParsedValueView, {
+          value: {
+            kind: "map",
+            entries: [
+              {
+                key: {kind: "scalar", value: "Max leader-window desync"},
+                keyInfo: {
+                  id: 10,
+                  description:
+                    "Maximum tolerated future leader-window distance for inbound Simplex traffic.",
+                },
+                value: {kind: "scalar", value: "64"},
+              },
+              {
+                key: {kind: "scalar", value: "Certificate gossip neighbors"},
+                keyInfo: {id: 15},
+                value: {kind: "scalar", value: "20"},
+              },
+            ],
+          },
+        }),
+      ),
+    )
+
+    expect(markup).toContain('aria-label="About parameter ID 10"')
+    expect(markup).toContain('aria-label="About parameter ID 15"')
   })
 
   test("keeps hexadecimal uint256 keys in storage diffs", () => {

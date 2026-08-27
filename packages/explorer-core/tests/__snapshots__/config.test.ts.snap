@@ -379,7 +379,94 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
                   {
                     "key": "Noncritical params",
                     "value": {
-                      "entries": [],
+                      "entries": [
+                        {
+                          "key": {
+                            "kind": "scalar",
+                            "value": "Target rate",
+                          },
+                          "keyInfo": {
+                            "description": "Target slot or block interval used for leader pacing, block production timing, and skip scheduling.",
+                            "id": 0,
+                          },
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": undefined,
+                            "value": "400",
+                          },
+                        },
+                        {
+                          "key": {
+                            "kind": "scalar",
+                            "value": "First block timeout",
+                          },
+                          "keyInfo": {
+                            "description": "Base timeout before skip voting starts for the first missing block in a leader window.",
+                            "id": 1,
+                          },
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": undefined,
+                            "value": "700",
+                          },
+                        },
+                        {
+                          "key": {
+                            "kind": "scalar",
+                            "value": "Max leader-window desync",
+                          },
+                          "keyInfo": {
+                            "description": "Maximum tolerated future leader-window distance for inbound Simplex traffic.",
+                            "id": 10,
+                          },
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": undefined,
+                            "value": "64",
+                          },
+                        },
+                        {
+                          "key": {
+                            "kind": "scalar",
+                            "value": "Min block interval",
+                          },
+                          "keyInfo": {
+                            "description": "Minimum interval between a parent block timestamp and the next locally generated block.",
+                            "id": 13,
+                          },
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": undefined,
+                            "value": "300",
+                          },
+                        },
+                        {
+                          "key": {
+                            "kind": "scalar",
+                            "value": "Certificate gossip neighbors",
+                          },
+                          "keyInfo": {
+                            "id": 15,
+                          },
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": undefined,
+                            "value": "20",
+                          },
+                        },
+                        {
+                          "key": {
+                            "kind": "scalar",
+                            "typeName": undefined,
+                            "value": "255",
+                          },
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": undefined,
+                            "value": "42",
+                          },
+                        },
+                      ],
                       "kind": "map",
                       "typeName": "dictionary",
                     },

@@ -304,6 +304,13 @@ describe("network configuration parser", () => {
         .storeUint(13, 32)
         .endCell(),
     )
+    const consensusNoncriticalParams = Dictionary.empty<number, number>()
+    consensusNoncriticalParams.set(0, 400)
+    consensusNoncriticalParams.set(1, 700)
+    consensusNoncriticalParams.set(10, 64)
+    consensusNoncriticalParams.set(13, 300)
+    consensusNoncriticalParams.set(15, 20)
+    consensusNoncriticalParams.set(255, 42)
     const consensusExtension: NewConsensusConfigAll = {
       kind: "NewConsensusConfigAll",
       mc: {
@@ -314,7 +321,7 @@ describe("network configuration parser", () => {
           protocol_version: 1,
           use_quic: {kind: "Bool", value: true},
           slots_per_leader_window: 4,
-          noncritical_params: Dictionary.empty<number, number>(),
+          noncritical_params: consensusNoncriticalParams,
         },
       },
       shard: {kind: "Maybe_nothing"},

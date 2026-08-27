@@ -10,7 +10,13 @@ export interface ParsedValueObjectEntry {
 
 export interface ParsedValueMapEntry {
   readonly key: ParsedValue
+  readonly keyInfo?: ParsedValueMapEntryInfo
   readonly value: ParsedValue
+}
+
+export interface ParsedValueMapEntryInfo {
+  readonly id: number | string
+  readonly description?: string
 }
 
 export interface ParsedCodeCell {
