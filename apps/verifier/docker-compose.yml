@@ -1,6 +1,11 @@
 services:
   verifier:
     image: ${VERIFIER_IMAGE:-ghcr.io/i582/verifier:latest}
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 2G
     restart: unless-stopped
     ports:
       - "3000:3000"
