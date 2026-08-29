@@ -16,7 +16,7 @@ use crate::{
     binaries::TonBinaries,
     runtime::run_checked,
     storage::NodeSettings,
-    storage::{Layout, write_json_atomic},
+    storage::{Layout, ipv4_to_i32, write_json_atomic},
 };
 
 use super::engine_config::patch_out_port;
@@ -70,7 +70,7 @@ pub(super) async fn initialize_dht(
             "@type": "adnl.addressList",
             "addrs": [{
                 "@type": "adnl.address.udp",
-                "ip": u32::from(node.public_ip) as i64,
+                "ip": ipv4_to_i32(node.public_ip),
                 "port": node.dht_port,
             }],
             "version": 0,
