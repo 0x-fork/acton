@@ -4,6 +4,7 @@ import {Address} from "@ton/core"
 
 import {CONFLICT_RESOLUTIONS} from "./conflict-resolutions.ts"
 import {mergeSources} from "./merge.ts"
+import type {AddressConflict} from "./merge.ts"
 import {resolveConflicts} from "./resolve.ts"
 import {readSources} from "./sources.ts"
 
@@ -12,6 +13,24 @@ const TESTNET_BASE_JSON_URL = new URL("../src/testnet-base.json", import.meta.ur
 
 const isTestnetAddress = (address: string): boolean =>
   Address.isFriendly(address) && Address.parseFriendly(address).isTestOnly
+
+const printConflicts = (conflicts: readonly AddressConflict[]): void => {
+  console.error("\nUnresolved conflicts:")
+
+  for (const [index, conflict] of conflicts.entries()) {
+    if (index > 0) {
+      console.error()
+    }
+
+    console.error(conflict.address)
+
+    for (const candidate of conflict.candidates) {
+      console.error(`\t- ${candidate.source}: ${candidate.name}`)
+    }
+  }
+
+  console.error()
+}
 
 async function main(): Promise<void> {
   const sources = await readSources()
@@ -32,6 +51,7 @@ async function main(): Promise<void> {
   const resolved = resolveConflicts(merged.conflicts, CONFLICT_RESOLUTIONS)
 
   if (resolved.unresolved.length > 0) {
+    printConflicts(resolved.unresolved)
     throw new Error(`Found ${resolved.unresolved.length} unresolved conflicts`)
   }
 
