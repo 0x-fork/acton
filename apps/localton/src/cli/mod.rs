@@ -145,6 +145,25 @@ pub struct RunArgs {
     #[arg(long, value_name = "MILLISECONDS", value_parser = clap::value_parser!(u32).range(1..))]
     pub block_time: Option<u32>,
 
+    /// Validator round duration for a new network, in seconds
+    ///
+    /// Localton writes the duration and its derived election windows to TON config
+    /// parameter 15 when it creates the network zerostate. Elections open three
+    /// quarters of a round before the validator set changes and close one quarter
+    /// before the change
+    ///
+    /// For example, --election-time 120 creates a two-minute round with elections
+    /// open from 90 to 30 seconds before the validator set changes. The stake freeze
+    /// period is also 30 seconds, and the first election can begin immediately
+    ///
+    /// Without this flag the round duration is 1800 seconds
+    ///
+    /// Minimum: 4 seconds
+    ///
+    /// To change the value, create a new network state
+    #[arg(long, value_name = "SECONDS", value_parser = clap::value_parser!(u32).range(4..))]
+    pub election_time: Option<u32>,
+
     /// Add an active basechain account from a hex-encoded ShardAccount BoC.
     ///
     /// May be specified more than once. Only used when creating a new state.
@@ -196,6 +215,7 @@ impl Default for RunArgs {
             startup_timeout: 180,
             validators: None,
             block_time: None,
+            election_time: None,
             add_account: Vec::new(),
             ton_http_api: false,
             ton_http_api_bind: Ipv4Addr::LOCALHOST,
@@ -519,6 +539,26 @@ mod tests {
 
         assert_eq!(
             Cli::try_parse_from(["localton", "--block-time", "0"])
+                .unwrap_err()
+                .kind(),
+            clap::error::ErrorKind::ValueValidation
+        );
+    }
+
+    #[test]
+    fn election_time_accepts_seconds_for_both_run_forms() {
+        let default_run = Cli::try_parse_from(["localton", "--election-time", "120"]).unwrap();
+        assert_eq!(default_run.run.election_time, Some(120));
+
+        let explicit_run =
+            Cli::try_parse_from(["localton", "run", "--election-time", "240"]).unwrap();
+        let Some(Command::Run(args)) = explicit_run.command else {
+            panic!("expected explicit run command");
+        };
+        assert_eq!(args.election_time, Some(240));
+
+        assert_eq!(
+            Cli::try_parse_from(["localton", "--election-time", "3"])
                 .unwrap_err()
                 .kind(),
             clap::error::ErrorKind::ValueValidation

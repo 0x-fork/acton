@@ -272,6 +272,30 @@ impl Default for NetworkSettings {
 }
 
 impl NetworkSettings {
+    /// Configures a validator round and its dependent genesis timings
+    ///
+    /// TON config parameter 15 expresses the election window relative to the
+    /// validator-set change. Localton opens the window after one quarter of the
+    /// round has elapsed, closes it one quarter before the change, and uses the
+    /// same quarter for stake freezing. The initial validator-set lifetime equals
+    /// the opening offset, which lets the first election begin immediately
+    pub fn set_election_time_seconds(&mut self, election_time_seconds: u32) -> Result<()> {
+        ensure!(
+            election_time_seconds >= 4,
+            "election time must be at least 4 seconds"
+        );
+
+        let quarter = election_time_seconds / 4;
+        let election_start_before = election_time_seconds - quarter;
+
+        self.elected_for_seconds = election_time_seconds;
+        self.election_start_before_seconds = election_start_before;
+        self.election_end_before_seconds = quarter;
+        self.stakes_frozen_for_seconds = quarter;
+        self.original_validator_set_valid_for_seconds = election_start_before;
+        Ok(())
+    }
+
     fn validate(&self) -> Result<()> {
         ensure!(
             self.global_id < 0,
@@ -648,6 +672,20 @@ mod tests {
         assert_eq!(settings.services.ton_http_api.port, 18_002);
         assert_eq!(settings.services.ton_http_api.backend_port, 18_005);
         assert_eq!(settings.services.ton_http_api.monitor_port, 18_006);
+    }
+
+    #[test]
+    fn election_time_configures_consistent_genesis_windows() {
+        let mut network = NetworkSettings::default();
+        network.set_election_time_seconds(120).unwrap();
+
+        assert_eq!(network.elected_for_seconds, 120);
+        assert_eq!(network.election_start_before_seconds, 90);
+        assert_eq!(network.election_end_before_seconds, 30);
+        assert_eq!(network.stakes_frozen_for_seconds, 30);
+        assert_eq!(network.original_validator_set_valid_for_seconds, 90);
+        assert!(network.set_election_time_seconds(3).is_err());
+        network.validate().unwrap();
     }
 
     #[test]

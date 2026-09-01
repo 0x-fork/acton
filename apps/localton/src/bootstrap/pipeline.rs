@@ -144,6 +144,19 @@ fn prepare_settings(
             settings.network.simplex_target_rate_ms = block_time_ms;
         }
     }
+    if let Some(election_time_seconds) = args.election_time {
+        if layout.manifest.is_file() {
+            ensure!(
+                settings.network.elected_for_seconds == election_time_seconds,
+                "network election time is {}s; --election-time cannot change after network creation",
+                settings.network.elected_for_seconds
+            );
+        } else {
+            settings
+                .network
+                .set_election_time_seconds(election_time_seconds)?;
+        }
+    }
     settings.services.ton_http_api.enabled |= args.ton_http_api;
     if args.no_config_http {
         settings.services.config_http.enabled = false;
