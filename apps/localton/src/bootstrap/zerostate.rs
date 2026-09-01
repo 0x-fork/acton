@@ -166,7 +166,7 @@ fn write_genesis_script(
         ),
         (
             "SIMPLEX_MAX_LEADER_WINDOW_DESYNC",
-            network.simplex_max_leader_window_desync_ms.to_string(),
+            network.simplex_max_leader_window_desync.to_string(),
         ),
     ];
     // Values are substituted into a versioned template bundled with the
@@ -480,6 +480,8 @@ fn static_state_filename(file_hash: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use expect_test::expect;
+
     use super::*;
 
     #[test]
@@ -488,6 +490,37 @@ mod tests {
             .replace("GLOBAL_VERSION", &TON_GLOBAL_VERSION.to_string())
             .replace("GLOBAL_CAPABILITIES", &TON_GLOBAL_CAPABILITIES.to_string());
         assert!(rendered.contains("15 1006 config.version!"));
+    }
+
+    #[test]
+    fn genesis_renders_simplex_v2_consensus_config() {
+        let directory = tempfile::tempdir_in("/tmp").unwrap();
+        let layout = Layout::new(directory.path().join("state"));
+        layout.create_dirs().unwrap();
+
+        write_genesis_script(&layout, &NetworkSettings::default(), false).unwrap();
+        let rendered = fs::read_to_string(layout.smartcont.join("gen-zerostate.fif")).unwrap();
+        let start = rendered.find("// TON v2026.06").unwrap();
+        let end_marker = "config.new_consensus_params_all!";
+        let end = rendered[start..].find(end_marker).unwrap() + start + end_marker.len();
+
+        expect![[r#"
+            // TON v2026.06 can display the legacy simplex_config#21 value, but
+            // validator-engine only applies simplex_config_v2#22 to consensus
+            // dict key value -- dict
+            { <b swap 32 u, b> <s -rot swap 8 udict! not abort"cannot add simplex parameter" } : simplex-param!
+            { dictnew
+              0 300 simplex-param!
+              1 700 simplex-param!
+              10 250 simplex-param!
+              4
+              <b x{22} s, 1 8 u, swap 32 u, swap dict, b>
+            } : make-localton-simplex-params
+
+            make-localton-simplex-params // masterchain
+            make-localton-simplex-params // basechain
+            config.new_consensus_params_all!"#]]
+        .assert_eq(&rendered[start..end]);
     }
 
     #[test]

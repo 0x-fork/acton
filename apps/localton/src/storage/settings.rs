@@ -226,14 +226,14 @@ pub struct NetworkSettings {
     pub stakes_frozen_for_seconds: u32,
     /// Original validator-set lifetime in seconds
     pub original_validator_set_valid_for_seconds: u32,
-    /// Target Simplex block rate in milliseconds
+    /// Target Simplex block interval stored as noncritical config 30 key 0
     pub simplex_target_rate_ms: u32,
     /// Number of slots in one Simplex leader window
     pub simplex_slots_per_leader_window: u32,
     /// Timeout for the first block in milliseconds
     pub simplex_first_block_timeout_ms: u32,
-    /// Maximum Simplex leader-window desynchronization in milliseconds
-    pub simplex_max_leader_window_desync_ms: u32,
+    /// Maximum number of future Simplex leader windows accepted from peers
+    pub simplex_max_leader_window_desync: u32,
 }
 
 impl Default for NetworkSettings {
@@ -260,8 +260,8 @@ impl Default for NetworkSettings {
             original_validator_set_valid_for_seconds: 25 * 60,
             simplex_target_rate_ms: 300,
             simplex_slots_per_leader_window: 4,
-            simplex_first_block_timeout_ms: 400,
-            simplex_max_leader_window_desync_ms: 700,
+            simplex_first_block_timeout_ms: 700,
+            simplex_max_leader_window_desync: 250,
         }
     }
 }
@@ -293,8 +293,9 @@ impl NetworkSettings {
         ensure!(
             self.simplex_target_rate_ms > 0
                 && self.simplex_slots_per_leader_window > 0
-                && self.simplex_first_block_timeout_ms > 0,
-            "simplex timing values must be positive"
+                && self.simplex_first_block_timeout_ms > 0
+                && self.simplex_max_leader_window_desync > 0,
+            "simplex consensus values must be positive"
         );
         Ok(())
     }
