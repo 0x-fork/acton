@@ -11,7 +11,7 @@ import process from "node:process"
 
 const INSTALLATION_GUIDE_URL = "https://ton-blockchain.github.io/acton/docs/installation"
 const INSTALL_COMMAND =
-  "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/i582/acton-public/releases/latest/download/acton-installer.sh | sh"
+  "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ton-blockchain/acton/releases/latest/download/acton-installer.sh | sh"
 const INSTALL_ACTION = "Install Acton"
 const CONFIGURE_ACTION = "Configure Path"
 const DOCS_ACTION = "Open Installation Guide"
