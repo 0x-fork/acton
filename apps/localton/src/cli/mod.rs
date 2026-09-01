@@ -18,11 +18,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 )]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Option<Command>,
-
-    /// Options for the default `run` command.
-    #[command(flatten)]
-    pub run: RunArgs,
+    pub command: Command,
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -526,19 +522,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn block_time_accepts_milliseconds_for_both_run_forms() {
-        let default_run = Cli::try_parse_from(["localton", "--block-time", "750"]).unwrap();
-        assert_eq!(default_run.run.block_time, Some(750));
-
-        let explicit_run =
-            Cli::try_parse_from(["localton", "run", "--block-time", "1000"]).unwrap();
-        let Some(Command::Run(args)) = explicit_run.command else {
+    fn block_time_accepts_milliseconds() {
+        let cli = Cli::try_parse_from(["localton", "run", "--block-time", "1000"]).unwrap();
+        let Command::Run(args) = cli.command else {
             panic!("expected explicit run command");
         };
         assert_eq!(args.block_time, Some(1_000));
 
         assert_eq!(
-            Cli::try_parse_from(["localton", "--block-time", "0"])
+            Cli::try_parse_from(["localton", "run", "--block-time", "0"])
                 .unwrap_err()
                 .kind(),
             clap::error::ErrorKind::ValueValidation
@@ -546,22 +538,26 @@ mod tests {
     }
 
     #[test]
-    fn election_time_accepts_seconds_for_both_run_forms() {
-        let default_run = Cli::try_parse_from(["localton", "--election-time", "120"]).unwrap();
-        assert_eq!(default_run.run.election_time, Some(120));
-
-        let explicit_run =
-            Cli::try_parse_from(["localton", "run", "--election-time", "240"]).unwrap();
-        let Some(Command::Run(args)) = explicit_run.command else {
+    fn election_time_accepts_seconds() {
+        let cli = Cli::try_parse_from(["localton", "run", "--election-time", "240"]).unwrap();
+        let Command::Run(args) = cli.command else {
             panic!("expected explicit run command");
         };
         assert_eq!(args.election_time, Some(240));
 
         assert_eq!(
-            Cli::try_parse_from(["localton", "--election-time", "3"])
+            Cli::try_parse_from(["localton", "run", "--election-time", "3"])
                 .unwrap_err()
                 .kind(),
             clap::error::ErrorKind::ValueValidation
+        );
+    }
+
+    #[test]
+    fn command_is_required() {
+        assert_eq!(
+            Cli::try_parse_from(["localton"]).unwrap_err().kind(),
+            clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
         );
     }
 }

@@ -31,6 +31,7 @@ test-results/
 .DS_Store
 Thumbs.db
 .node-*
+.localton
 
 .env
 .worktree/
