@@ -1,0 +1,20 @@
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.statusPill > span {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--acton-color-danger);
+}
+
+.statusPill[data-online="true"] > span {
+  background: var(--acton-color-success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acton-color-success) 12%, transparent);
+}

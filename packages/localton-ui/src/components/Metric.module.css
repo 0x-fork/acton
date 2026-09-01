@@ -1,0 +1,70 @@
+.metric {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 1rem 1.1rem;
+  border-right: 1px solid var(--acton-color-border);
+}
+
+.metric:last-child {
+  border-right: 0;
+}
+
+.metric span {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+}
+
+.metric strong {
+  overflow: hidden;
+  font-size: var(--acton-font-size-xl);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--acton-font-weight-medium);
+  letter-spacing: -0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric strong[data-tone="good"] {
+  color: var(--acton-color-success);
+}
+
+.metric strong[data-tone="warning"] {
+  color: var(--acton-color-warning);
+}
+
+.metric[data-density="compact"] {
+  padding-block: 0.8rem;
+}
+
+.metric[data-density="compact"] strong {
+  font-size: var(--acton-font-size-sm);
+}
+
+@media (max-width: 1050px) {
+  .metric:nth-child(3) {
+    border-right: 0;
+  }
+
+  .metric:nth-child(n + 4) {
+    border-top: 1px solid var(--acton-color-border);
+  }
+}
+
+@media (max-width: 720px) {
+  .metric {
+    border-top: 1px solid var(--acton-color-border);
+  }
+
+  .metric:nth-child(-n + 2) {
+    border-top: 0;
+  }
+
+  .metric:nth-child(even) {
+    border-right: 0;
+  }
+
+  .metric:nth-child(3) {
+    border-right: 1px solid var(--acton-color-border);
+  }
+}
