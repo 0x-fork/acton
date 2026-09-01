@@ -91,8 +91,16 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
             &processes,
         )
         .await?;
-        let genesis_runtime =
-            node::start(&layout, &layout.node, &tools, genesis, timeout, &processes).await?;
+        let genesis_runtime = node::start(
+            &layout,
+            &layout.node,
+            &tools,
+            genesis,
+            timeout,
+            node::NodeStartOptions::default(),
+            &processes,
+        )
+        .await?;
 
         runtime.services.insert("dht".to_owned(), dht_runtime);
         runtime.node = genesis_runtime;

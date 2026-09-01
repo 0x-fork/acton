@@ -40,6 +40,16 @@ pub(crate) struct NodeServiceKeys {
     pub(crate) liteserver: Option<GeneratedKey>,
 }
 
+/// Process-level validator-engine options for one node start.
+///
+/// These options are deliberately separate from persistent node settings: they
+/// tune one process invocation without changing node identity or network policy.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct NodeStartOptions {
+    /// Enables validator-engine's memory-resident CellDb working set for this process.
+    pub(crate) celldb_in_memory: bool,
+}
+
 /// Generates the service identities required by one configured node.
 ///
 /// Control server and client keys are always distinct. A liteserver key exists
@@ -225,6 +235,7 @@ pub(crate) async fn start(
     tools: &Toolchain,
     node: &NodeSettings,
     timeout: Duration,
+    options: NodeStartOptions,
     processes: &ProcessRegistry,
 ) -> Result<NodeRuntime> {
     ensure!(node.enabled, "node `{}` is disabled", node.name);
@@ -242,12 +253,18 @@ pub(crate) async fn start(
     info!(
         operation = "start_node",
         node = node.name,
+        celldb_in_memory = options.celldb_in_memory,
         outcome = "pending",
         "starting validator-engine node"
     );
-    let mut process =
-        validator::start_persistent(node_layout, tools.validator_engine.as_ref(), node, database)
-            .await?;
+    let mut process = validator::start_persistent(
+        node_layout,
+        tools.validator_engine.as_ref(),
+        node,
+        database,
+        options.celldb_in_memory,
+    )
+    .await?;
 
     if let Err(error) = validator::wait_for_console(
         node_layout,
@@ -288,6 +305,7 @@ pub(crate) async fn start(
     info!(
         operation = "start_node",
         node = node.name,
+        celldb_in_memory = options.celldb_in_memory,
         duration_ms = started.elapsed().as_millis(),
         outcome = "success",
         "validator-engine node started"

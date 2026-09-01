@@ -131,6 +131,12 @@ pub struct JoinArgs {
     #[arg(long, env = "TON_BIN_DIR")]
     pub ton_bin_dir: Option<PathBuf>,
 
+    /// Store all CellDb cells in memory while validator-engine is running
+    ///
+    /// RocksDB remains the persistent store.
+    #[arg(long)]
+    pub celldb_in_memory: bool,
+
     /// Maximum node initialization and console readiness wait in seconds.
     #[arg(long, default_value_t = 180)]
     pub startup_timeout: u64,
@@ -581,6 +587,7 @@ mod tests {
             "192.168.27.8",
             "--node",
             "node2",
+            "--celldb-in-memory",
         ])
         .unwrap();
         let Command::Join(args) = cli.command else {
@@ -588,6 +595,7 @@ mod tests {
         };
         assert_eq!(args.global_config_url, "http://192.168.27.4:18000/config");
         assert_eq!(args.node.as_deref(), Some("node2"));
+        assert!(args.celldb_in_memory);
     }
 
     #[test]

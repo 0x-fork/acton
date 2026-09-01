@@ -113,6 +113,9 @@ pub async fn run(args: JoinArgs) -> Result<()> {
                 &toolchain,
                 node_settings,
                 startup_timeout,
+                node::NodeStartOptions {
+                    celldb_in_memory: args.celldb_in_memory,
+                },
                 &processes,
             )
                 .await

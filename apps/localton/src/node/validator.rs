@@ -279,6 +279,7 @@ pub(super) async fn start_persistent(
     engine: &dyn ValidatorEngine,
     node: &NodeSettings,
     database: ValidatorDatabase,
+    celldb_in_memory: bool,
 ) -> Result<ServiceHandle> {
     engine
         .start_persistent(ValidatorStartRequest {
@@ -301,6 +302,7 @@ pub(super) async fn start_persistent(
                 key_proof_ttl_seconds: node.key_proof_ttl_seconds,
             },
             initial_sync_delay: Duration::ZERO,
+            celldb_in_memory,
         })
         .await
 }

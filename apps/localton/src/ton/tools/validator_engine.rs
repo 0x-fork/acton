@@ -195,6 +195,7 @@ pub struct ValidatorStartRequest {
     pub verbosity: u8,
     pub retention: ValidatorRetentionPolicy,
     pub initial_sync_delay: Duration,
+    pub celldb_in_memory: bool,
 }
 
 /// Semantic contract implemented by a `validator-engine` provider.
@@ -282,7 +283,7 @@ impl OfficialValidatorEngine {
             .arg(database)
             .arg("--logname")
             .arg(engine_log)
-            .args(["--session-logs", "", "--celldb-preload-all"]);
+            .args(["--session-logs", ""]);
         command
     }
 
@@ -321,6 +322,43 @@ impl OfficialValidatorEngine {
         }
         Ok(())
     }
+
+    /// Renders the persistent process command for the pinned validator-engine release.
+    ///
+    /// CellDb memory mode remains an invocation-level optimization: RocksDB still
+    /// owns persistent storage and receives durable writes from the engine.
+    fn persistent_command(&self, request: &ValidatorStartRequest) -> Command {
+        let mut command = self.base_command(
+            &request.global_config,
+            &request.database.path,
+            &request.logs.engine,
+            request.threads,
+            request.verbosity,
+        );
+
+        if request.celldb_in_memory {
+            command.arg("--celldb-in-memory");
+        } else {
+            command.arg("--celldb-preload-all");
+        }
+
+        command.args([
+            "--initial-sync-delay",
+            &duration_seconds(request.initial_sync_delay),
+            "--sync-before",
+            &request.retention.sync_before_seconds.to_string(),
+            "--state-ttl",
+            &request.retention.state_ttl_seconds.to_string(),
+            "--block-ttl",
+            &request.retention.block_ttl_seconds.to_string(),
+            "--archive-ttl",
+            &request.retention.archive_ttl_seconds.to_string(),
+            "--key-proof-ttl",
+            &request.retention.key_proof_ttl_seconds.to_string(),
+        ]);
+
+        Self::finish_command(command, request.endpoint)
+    }
 }
 
 #[async_trait]
@@ -340,16 +378,15 @@ impl ValidatorEngine for OfficialValidatorEngine {
             request
                 .endpoint
                 .ensure_available("validator-engine initialization")?;
-            let command = Self::finish_command(
-                self.base_command(
-                    &request.global_config,
-                    &request.database,
-                    &request.log_path,
-                    request.threads,
-                    request.verbosity,
-                ),
-                request.endpoint,
+            let mut command = self.base_command(
+                &request.global_config,
+                &request.database,
+                &request.log_path,
+                request.threads,
+                request.verbosity,
             );
+            command.arg("--celldb-preload-all");
+            let command = Self::finish_command(command, request.endpoint);
             trace_progress(context.node_name.as_deref(), "initialize", "executing");
             let output =
                 run_checked("validator-engine initialization", command, context.timeout).await?;
@@ -401,16 +438,15 @@ impl ValidatorEngine for OfficialValidatorEngine {
             request
                 .endpoint
                 .ensure_available("temporary validator-engine")?;
-            let command = Self::finish_command(
-                self.base_command(
-                    &request.global_config,
-                    &request.database.path,
-                    &request.logs.engine,
-                    request.threads,
-                    request.verbosity,
-                ),
-                request.endpoint,
+            let mut command = self.base_command(
+                &request.global_config,
+                &request.database.path,
+                &request.logs.engine,
+                request.threads,
+                request.verbosity,
             );
+            command.arg("--celldb-preload-all");
+            let command = Self::finish_command(command, request.endpoint);
             trace_progress(Some(&request.node_name), "start_bootstrap", "spawning");
             ManagedProcess::spawn(
                 format!("{} temporary validator-engine", request.node_name),
@@ -442,28 +478,7 @@ impl ValidatorEngine for OfficialValidatorEngine {
                 "validator-engine threads must be positive"
             );
             request.endpoint.ensure_available("validator-engine")?;
-            let mut command = self.base_command(
-                &request.global_config,
-                &request.database.path,
-                &request.logs.engine,
-                request.threads,
-                request.verbosity,
-            );
-            command.args([
-                "--initial-sync-delay",
-                &duration_seconds(request.initial_sync_delay),
-                "--sync-before",
-                &request.retention.sync_before_seconds.to_string(),
-                "--state-ttl",
-                &request.retention.state_ttl_seconds.to_string(),
-                "--block-ttl",
-                &request.retention.block_ttl_seconds.to_string(),
-                "--archive-ttl",
-                &request.retention.archive_ttl_seconds.to_string(),
-                "--key-proof-ttl",
-                &request.retention.key_proof_ttl_seconds.to_string(),
-            ]);
-            let command = Self::finish_command(command, request.endpoint);
+            let command = self.persistent_command(&request);
             trace_progress(Some(&request.node_name), "start_persistent", "spawning");
             ManagedProcess::spawn(
                 request.node_name.clone(),
@@ -563,19 +578,43 @@ mod tests {
         }
     }
 
+    fn persistent_request(celldb_in_memory: bool) -> ValidatorStartRequest {
+        ValidatorStartRequest {
+            node_name: "validator-a".to_owned(),
+            global_config: PathBuf::from("/state/global.config.json"),
+            database: ValidatorDatabase::at("/state/db"),
+            logs: ValidatorLogPaths {
+                engine: PathBuf::from("/state/logs/validator-engine"),
+                stdout: PathBuf::from("/state/logs/validator.stdout.log"),
+                stderr: PathBuf::from("/state/logs/validator.stderr.log"),
+            },
+            endpoint: endpoint(),
+            threads: 8,
+            verbosity: 1,
+            retention: ValidatorRetentionPolicy {
+                sync_before_seconds: 3_600,
+                state_ttl_seconds: 31_536_000,
+                block_ttl_seconds: 31_536_000,
+                archive_ttl_seconds: 31_536_000,
+                key_proof_ttl_seconds: 315_360_000,
+            },
+            initial_sync_delay: Duration::ZERO,
+            celldb_in_memory,
+        }
+    }
+
     #[test]
     fn bootstrap_command_matches_pinned_release_snapshot() {
         let adapter = OfficialValidatorEngine::new("/ton/validator-engine");
-        let command = OfficialValidatorEngine::finish_command(
-            adapter.base_command(
-                Path::new("/state/global.config.json"),
-                Path::new("/state/db"),
-                Path::new("/state/logs/validator-init"),
-                4,
-                2,
-            ),
-            endpoint(),
+        let mut command = adapter.base_command(
+            Path::new("/state/global.config.json"),
+            Path::new("/state/db"),
+            Path::new("/state/logs/validator-init"),
+            4,
+            2,
         );
+        command.arg("--celldb-preload-all");
+        let command = OfficialValidatorEngine::finish_command(command, endpoint());
 
         assert_eq!(
             args(&command),
@@ -603,28 +642,7 @@ mod tests {
     #[test]
     fn persistent_command_matches_pinned_release_snapshot() {
         let adapter = OfficialValidatorEngine::new("/ton/validator-engine");
-        let mut command = adapter.base_command(
-            Path::new("/state/global.config.json"),
-            Path::new("/state/db"),
-            Path::new("/state/logs/validator-engine"),
-            8,
-            1,
-        );
-        command.args([
-            "--initial-sync-delay",
-            &duration_seconds(Duration::ZERO),
-            "--sync-before",
-            "3600",
-            "--state-ttl",
-            "31536000",
-            "--block-ttl",
-            "31536000",
-            "--archive-ttl",
-            "31536000",
-            "--key-proof-ttl",
-            "315360000",
-        ]);
-        let command = OfficialValidatorEngine::finish_command(command, endpoint());
+        let command = adapter.persistent_command(&persistent_request(false));
 
         assert_eq!(
             args(&command),
@@ -659,5 +677,19 @@ mod tests {
                 "192.168.27.8:18006",
             ]
         );
+    }
+
+    #[test]
+    fn persistent_command_enables_in_memory_celldb_for_one_start() {
+        let adapter = OfficialValidatorEngine::new("/ton/validator-engine");
+        let command = adapter.persistent_command(&persistent_request(true));
+        let args = args(&command);
+        let position = args
+            .iter()
+            .position(|argument| argument == "--celldb-in-memory")
+            .expect("in-memory CellDb flag must be present");
+
+        assert_eq!(args[position + 1], "--initial-sync-delay");
+        assert!(!args.iter().any(|argument| argument == "--celldb-preload-all"));
     }
 }

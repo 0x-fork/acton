@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use indicatif::BinaryBytes;
 use tracing::{info, warn};
 
@@ -20,6 +20,7 @@ const READY_CONFIRMATIONS: usize = 3;
 const POLL_INTERVAL: Duration = Duration::from_millis(500);
 const LOG_INTERVAL: Duration = Duration::from_secs(5);
 const STATS_TIMEOUT: Duration = Duration::from_secs(3);
+const HEAD_REQUEST_TIMEOUT: Duration = Duration::from_secs(1);
 const LAG_TOLERANCE_BLOCKS: u32 = 2;
 
 /// Authenticated endpoint of the liteserver owned by this join invocation.
@@ -52,12 +53,18 @@ pub(super) async fn wait_for_network_sync(
         let sample: Result<(u32, u32)> = tokio::try_join!(
             async {
                 let mut network = LocalLiteClient::connect(&layout.global_config).await?;
-                network.last().await.map(|block| block.seqno)
+                tokio::time::timeout(HEAD_REQUEST_TIMEOUT, network.last())
+                    .await
+                    .context("network liteserver head request timed out")?
+                    .map(|block| block.seqno)
             },
             async {
                 let mut local =
                     LocalLiteClient::connect_node(liteserver.port, liteserver.public_key).await?;
-                local.last().await.map(|block| block.seqno)
+                tokio::time::timeout(HEAD_REQUEST_TIMEOUT, local.last())
+                    .await
+                    .context("local liteserver head request timed out")?
+                    .map(|block| block.seqno)
             },
         );
 

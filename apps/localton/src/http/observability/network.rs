@@ -143,11 +143,15 @@ pub(super) async fn node_collection_loop(
     }
 }
 
-/// Reads one head from the liteserver owned by this state directory.
+/// Reads one head after the node's liteserver becomes part of the ready runtime.
+///
+/// Validator-engine rejects lite queries during initial synchronization. Until
+/// Localton publishes readiness, join progress comes from the authenticated
+/// validator console instead.
 async fn collect_node_head(layout: &Layout) -> Result<Option<u32>> {
     let settings = Settings::load(&layout.settings)?;
     let runtime = RuntimeState::load(&layout.runtime)?;
-    if !runtime.node.running {
+    if !runtime.ready || !runtime.node.running {
         return Ok(None);
     }
     let Some(public_key) = runtime.node.liteserver_public_key else {
@@ -490,7 +494,25 @@ fn parse_block(id: &BlockRef, bytes: Vec<u8>) -> Result<(BlockObservation, Block
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ton::tools::lite_client::ValidatorSetMemberInfo;
+    use crate::ton::tools::{lite_client::ValidatorSetMemberInfo, types::TonPublicKey};
+
+    #[tokio::test]
+    async fn node_head_waits_for_runtime_readiness() {
+        let directory = tempfile::tempdir().unwrap();
+        let layout = Layout::new(directory.path().to_path_buf());
+        layout.create_dirs().unwrap();
+
+        let mut settings = Settings::default();
+        settings.node.liteserver_port = 1;
+        settings.save_atomic(&layout.settings).unwrap();
+
+        let mut runtime = RuntimeState::new();
+        runtime.node.running = true;
+        runtime.node.liteserver_public_key = Some(TonPublicKey::from_bytes([1; 32]));
+        runtime.save_atomic(&layout.runtime).unwrap();
+
+        assert_eq!(collect_node_head(&layout).await.unwrap(), None);
+    }
 
     #[test]
     fn election_without_a_next_set_is_reported_as_retrying() {
