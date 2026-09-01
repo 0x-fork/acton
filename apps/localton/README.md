@@ -176,6 +176,17 @@ TON_BIN_DIR=/path/to/ton localton run
 
 The launcher stores this path in `manifest.json`. Later commands use the stored path.
 
+### Shared TON binary cache
+
+Without `--ton-bin-dir`, localton downloads each pinned TON release once per user and
+reuses it across all state directories. The default cache is:
+
+- macOS: `~/Library/Caches/localton/ton/<version>/<platform>/`
+- Linux: `${XDG_CACHE_HOME:-~/.cache}/localton/ton/<version>/<platform>/`
+
+Set `LOCALTON_CACHE_DIR` to replace the `localton` cache root. An explicit
+`--ton-bin-dir` or `TON_BIN_DIR` still has the highest priority.
+
 ## Native ports
 
 The native network uses these ports by default:

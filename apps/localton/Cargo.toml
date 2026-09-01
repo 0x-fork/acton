@@ -30,6 +30,7 @@ ed25519-dalek = "2.2"
 fs2 = "0.4"
 futures-util = "0.3"
 hex = "0.4"
+indicatif = "0.18.3"
 nix = { version = "0.30", features = ["process", "signal"] }
 rand = "0.8"
 regex = "1.11"
@@ -38,6 +39,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
 tokio = { version = "1.47", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
+ton = "0.4.1"
 tonutils = { version = "1.1.0", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }

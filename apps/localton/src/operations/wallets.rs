@@ -384,7 +384,7 @@ async fn create_wallet(
                 _ => unreachable!(),
             };
             let wallet = ton_wallet(ton_version, &signing_key, workchain, wallet_id)?;
-            let address = wallet.address.clone();
+            let address = wallet.address;
             let deploy = wallet
                 .create_ext_in_msg(Vec::new(), 0, valid_until, true)?
                 .to_boc()?;
@@ -1030,10 +1030,7 @@ fn unix_time_u32() -> Result<u32> {
 #[cfg(test)]
 mod tests {
     use ed25519_dalek::SigningKey;
-    use ton::{
-        ton_core::traits::tlb::TLB,
-        ton_wallet::WalletVersion as TonWalletVersion,
-    };
+    use ton::{ton_core::traits::tlb::TLB, ton_wallet::WalletVersion as TonWalletVersion};
     use tycho_types::boc::Boc;
 
     use super::{MAX_GRAMS_NANO, format_nano_grams, parse_grams, parse_seqno, ton_wallet};

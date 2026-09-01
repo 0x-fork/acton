@@ -22,7 +22,6 @@ pub const OUT_PORT: u16 = 3272;
 #[derive(Debug, Clone)]
 pub struct Layout {
     pub root: PathBuf,
-    pub cache: PathBuf,
     pub genesis: PathBuf,
     pub validator_db: PathBuf,
     pub validator_keyring: PathBuf,
@@ -47,7 +46,6 @@ impl Layout {
         let validator_db = genesis.join("db");
         let resources = genesis.join("resources");
         Self {
-            cache: root.join("cache"),
             validator_keyring: validator_db.join("keyring"),
             dht_db: root.join("dht"),
             certs: genesis.join("certs"),
@@ -71,7 +69,6 @@ impl Layout {
     pub fn create_dirs(&self) -> Result<()> {
         for path in [
             &self.root,
-            &self.cache,
             &self.genesis,
             &self.validator_db,
             &self.validator_keyring,
@@ -255,7 +252,8 @@ pub fn endpoint() -> SocketAddrV4 {
     SocketAddrV4::new(Ipv4Addr::LOCALHOST, LITESERVER_PORT)
 }
 
-fn ipv4_to_i32(ip: Ipv4Addr) -> i32 {
+/// Encodes IPv4 in the signed big-endian representation used by TON JSON configs.
+pub(crate) fn ipv4_to_i32(ip: Ipv4Addr) -> i32 {
     i32::from_be_bytes(ip.octets())
 }
 
