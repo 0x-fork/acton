@@ -1,0 +1,123 @@
+# Temporary manual distribution workflow. Remove it after the versioned localton release flow is available.
+name: Build localton nightly binary
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: build-localton-binary-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  build:
+    name: Build localton nightly Linux binary
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        working-directory: apps/localton
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: apps-localton-binary-${{ runner.os }}-${{ runner.arch }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+          workspaces: apps/localton -> target
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Install UI dependencies
+        working-directory: ${{ github.workspace }}
+        run: bun ci
+
+      - name: Install just
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
+        with:
+          tool: just@1.52.0
+          fallback: none
+
+      - name: Build localton
+        run: just build-ci
+
+      - name: Check localton binary
+        run: ./target/release/localton --version
+
+      - name: Package localton binary
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          archive="localton-nightly-linux-x86_64.tar.gz"
+          tar -C target/release -czf "${archive}" localton
+          sha256sum "${archive}" > "${archive}.sha256"
+
+      - name: Upload localton artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: localton-nightly-linux-x86_64
+          path: |
+            apps/localton/localton-nightly-linux-x86_64.tar.gz
+            apps/localton/localton-nightly-linux-x86_64.tar.gz.sha256
+          retention-days: 1
+          if-no-files-found: error
+
+  publish-nightly:
+    name: Publish localton nightly binary
+    needs:
+      - build
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download localton artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: localton-nightly-linux-x86_64
+          path: release-artifacts
+
+      - name: Create or update localton nightly prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: localton-nightly
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          notes="Temporary automated localton build from commit ${GITHUB_SHA}."$'\n\n'"This rolling prerelease will be removed after the versioned localton release flow is available and is not the repository's Latest release."
+
+          if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release edit "${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "localton nightly" \
+              --notes "${notes}" \
+              --prerelease
+          else
+            gh release create "${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --target "${GITHUB_SHA}" \
+              --title "localton nightly" \
+              --notes "${notes}" \
+              --prerelease \
+              --latest=false
+          fi
+
+          gh release upload "${RELEASE_TAG}" release-artifacts/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber
