@@ -133,6 +133,17 @@ fn prepare_settings(
     if let Some(validators) = args.validators {
         settings.enable_validator_count(validators)?;
     }
+    if let Some(block_time_ms) = args.block_time {
+        if layout.manifest.is_file() {
+            ensure!(
+                settings.network.simplex_target_rate_ms == block_time_ms,
+                "network block time is {}ms; --block-time cannot change after network creation",
+                settings.network.simplex_target_rate_ms
+            );
+        } else {
+            settings.network.simplex_target_rate_ms = block_time_ms;
+        }
+    }
     settings.services.ton_http_api.enabled |= args.ton_http_api;
     if args.no_config_http {
         settings.services.config_http.enabled = false;

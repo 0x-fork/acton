@@ -258,7 +258,12 @@ impl Default for NetworkSettings {
             election_end_before_seconds: 10 * 60,
             stakes_frozen_for_seconds: 5 * 60,
             original_validator_set_valid_for_seconds: 25 * 60,
-            simplex_target_rate_ms: 300,
+            // Localton intentionally runs slower than the current 400ms TON
+            // mainnet target so block-by-block debugging remains practical
+            simplex_target_rate_ms: 1_000,
+            // Keep the remaining consensus shape aligned with masterchain:
+            // four slots per leader, a 700ms first-block timeout, and TON's
+            // default allowance of 250 future leader windows
             simplex_slots_per_leader_window: 4,
             simplex_first_block_timeout_ms: 700,
             simplex_max_leader_window_desync: 250,

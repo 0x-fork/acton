@@ -134,6 +134,17 @@ pub struct RunArgs {
     #[arg(long, value_parser = clap::value_parser!(usize))]
     pub validators: Option<usize>,
 
+    /// Target interval between Simplex blocks, in milliseconds
+    ///
+    /// Localton writes this value as noncritical key 0 (target_rate) in TON config
+    /// parameter 30 when it creates the network zerostate. It controls the target
+    /// block-production pace, but actual intervals can be longer when a slot is
+    /// skipped or consensus is delayed
+    ///
+    /// The value is part of zerostate. To change it, create a new network state
+    #[arg(long, value_name = "MILLISECONDS", value_parser = clap::value_parser!(u32).range(1..))]
+    pub block_time: Option<u32>,
+
     /// Add an active basechain account from a hex-encoded ShardAccount BoC.
     ///
     /// May be specified more than once. Only used when creating a new state.
@@ -184,6 +195,7 @@ impl Default for RunArgs {
             ton_bin_dir: None,
             startup_timeout: 180,
             validators: None,
+            block_time: None,
             add_account: Vec::new(),
             ton_http_api: false,
             ton_http_api_bind: Ipv4Addr::LOCALHOST,
@@ -487,4 +499,29 @@ pub struct HardforkArgs {
     /// Output global configuration. Defaults under the state directory.
     #[arg(long)]
     pub output: Option<PathBuf>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn block_time_accepts_milliseconds_for_both_run_forms() {
+        let default_run = Cli::try_parse_from(["localton", "--block-time", "750"]).unwrap();
+        assert_eq!(default_run.run.block_time, Some(750));
+
+        let explicit_run =
+            Cli::try_parse_from(["localton", "run", "--block-time", "1000"]).unwrap();
+        let Some(Command::Run(args)) = explicit_run.command else {
+            panic!("expected explicit run command");
+        };
+        assert_eq!(args.block_time, Some(1_000));
+
+        assert_eq!(
+            Cli::try_parse_from(["localton", "--block-time", "0"])
+                .unwrap_err()
+                .kind(),
+            clap::error::ErrorKind::ValueValidation
+        );
+    }
 }

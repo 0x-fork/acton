@@ -510,7 +510,7 @@ mod tests {
             // dict key value -- dict
             { <b swap 32 u, b> <s -rot swap 8 udict! not abort"cannot add simplex parameter" } : simplex-param!
             { dictnew
-              0 300 simplex-param!
+              0 1000 simplex-param!
               1 700 simplex-param!
               10 250 simplex-param!
               4
