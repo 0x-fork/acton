@@ -1,4 +1,4 @@
-//! Starts and stops the launcher's HTTP services.
+//! Starts and stops the instance's HTTP services.
 //!
 //! [`start`] creates the config, admin, and public V2 listeners enabled in
 //! [`Settings`]. [`ServiceSet`] stores their task handles, published endpoints,
@@ -11,7 +11,7 @@ use anyhow::Result;
 use tokio::{sync::watch, task::JoinHandle};
 use tracing::warn;
 
-use crate::{bootstrap::LauncherControl, storage::Settings};
+use crate::{bootstrap::NodeController, storage::Settings};
 
 mod admin;
 mod config;
@@ -35,25 +35,39 @@ impl ServiceSet {
         &self.endpoints
     }
 
-    pub async fn shutdown(self) {
+    pub async fn shutdown(mut self) {
         let _ = self.shutdown.send(true);
-        for task in self.tasks {
+        // Await by mutable reference so cancellation leaves every handle owned by
+        // `self`; Drop can then abort all unfinished tasks instead of detaching
+        // handles already moved into this future.
+        for task in &mut self.tasks {
             if let Err(error) = task.await {
                 warn!(%error, "HTTP service task failed during shutdown");
             }
+        }
+        self.tasks.clear();
+    }
+}
+
+impl Drop for ServiceSet {
+    fn drop(&mut self) {
+        // Startup futures are cancellation-safe, so no detached HTTP task survives
+        // the cleanup boundary.
+        let _ = self.shutdown.send(true);
+        for task in &self.tasks {
+            task.abort();
         }
     }
 }
 
 pub async fn start(
-    control: LauncherControl,
+    control: NodeController,
     settings: &Settings,
     ton_http_api_bind: Ipv4Addr,
 ) -> Result<ServiceSet> {
     let (shutdown, receiver) = watch::channel(false);
     let mut tasks = Vec::new();
     let mut endpoints = BTreeMap::new();
-
     if settings.services.config_http.enabled {
         let running = config::start(control.clone(), settings.clone(), receiver.clone()).await?;
         tasks.push(running.task);
@@ -67,7 +81,7 @@ pub async fn start(
     }
 
     if settings.services.ton_http_api.enabled {
-        let running = proxy::start(settings, ton_http_api_bind, receiver).await?;
+        let running = proxy::start(settings, ton_http_api_bind, receiver.clone()).await?;
         tasks.push(running.task);
         endpoints.insert("ton_http_api".to_owned(), running.endpoint);
     }

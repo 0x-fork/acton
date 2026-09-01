@@ -3,7 +3,7 @@
 //! The block monitor records the latest masterchain seqno and observation time
 //! in `runtime.json`. Validator maintenance periodically participates in
 //! elections and reclaims stakes according to validation settings. All tasks
-//! share one shutdown channel and are aborted when the launcher stops.
+//! share one shutdown channel and are aborted when the instance stops.
 
 use std::time::Duration;
 
@@ -91,8 +91,7 @@ async fn monitor_once(layout: &Layout) -> Result<()> {
     let seen_at = unix_time();
 
     RuntimeState::update_atomic(&layout.runtime, |runtime| {
-        runtime.masterchain_seqno = Some(last.seqno);
-        runtime.last_block_at = Some(seen_at);
+        runtime.observe_masterchain_head(last.seqno, seen_at);
         Ok(())
     })?;
     Ok(())
@@ -106,7 +105,10 @@ async fn validation_loop(
     let interval = Duration::from_secs(interval_seconds);
     loop {
         if let Err(error) = validators::auto_tick(state.clone()).await {
-            warn!(%error, "validator automation iteration failed");
+            warn!(
+                error = %format_args!("{error:#}"),
+                "validator automation iteration failed"
+            );
         }
         tokio::select! {
             _ = sleep(interval) => {}

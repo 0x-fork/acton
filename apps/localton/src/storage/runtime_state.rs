@@ -10,22 +10,23 @@ use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-pub const RUNTIME_SCHEMA_VERSION: u32 = 1;
+pub const RUNTIME_SCHEMA_VERSION: u32 = 2;
+const MAX_RETAINED_VALIDATOR_KEYS: usize = 64;
 
-/// Current launcher, node, and service state
+/// Current Localton instance, node, and service state
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct RuntimeState {
     /// Version of this runtime state format
     pub schema_version: u32,
-    /// Process ID of the Localton launcher
-    pub launcher_pid: Option<u32>,
-    /// Unix time when the launcher started
+    /// Process ID of this Localton instance
+    pub instance_pid: Option<u32>,
+    /// Unix time when this Localton instance started
     pub started_at: Option<u64>,
     /// `true` when the network can process requests
     pub ready: bool,
-    /// Latest masterchain block number that the launcher observed
+    /// Latest masterchain block number that this instance observed
     pub masterchain_seqno: Option<u32>,
-    /// Unix time when the launcher observed the latest block
+    /// Unix time when the observed masterchain seqno last advanced
     pub last_block_at: Option<u64>,
     /// Runtime state for each configured node
     pub nodes: BTreeMap<String, NodeRuntime>,
@@ -37,7 +38,7 @@ impl RuntimeState {
     pub fn new() -> Self {
         Self {
             schema_version: RUNTIME_SCHEMA_VERSION,
-            launcher_pid: None,
+            instance_pid: None,
             started_at: None,
             ready: false,
             masterchain_seqno: None,
@@ -107,14 +108,14 @@ impl RuntimeState {
         }
     }
 
-    pub fn mark_launcher_started(&mut self) {
-        self.launcher_pid = Some(std::process::id());
+    pub fn mark_instance_started(&mut self) {
+        self.instance_pid = Some(std::process::id());
         self.started_at = Some(unix_time());
         self.ready = false;
     }
 
-    pub fn mark_launcher_stopped(&mut self) {
-        self.launcher_pid = None;
+    pub fn mark_instance_stopped(&mut self) {
+        self.instance_pid = None;
         self.ready = false;
         for node in self.nodes.values_mut() {
             node.running = false;
@@ -125,6 +126,18 @@ impl RuntimeState {
             service.running = false;
             service.pid = None;
         }
+    }
+
+    /// Records a trusted masterchain head without hiding a production stall.
+    ///
+    /// Re-reading the same head proves that the liteserver still answers, but it
+    /// is not a new block. Keeping the previous timestamp distinguishes a
+    /// responsive yet stalled chain from one that is continuing to produce blocks.
+    pub fn observe_masterchain_head(&mut self, seqno: u32, observed_at: u64) {
+        if self.masterchain_seqno.is_none_or(|current| seqno > current) {
+            self.last_block_at = Some(observed_at);
+        }
+        self.masterchain_seqno = Some(seqno);
     }
 }
 
@@ -147,6 +160,9 @@ pub struct NodeRuntime {
     pub liteserver_public_key: Option<String>,
     /// Public validator key
     pub validator_public_key: Option<String>,
+    /// Public validator keys used across election rounds
+    #[serde(default)]
+    pub validator_public_keys: Vec<String>,
     /// Validator ADNL address
     pub validator_adnl: Option<String>,
     /// Current election identifier
@@ -160,6 +176,25 @@ pub struct NodeRuntime {
     pub total_rewards_nano: String,
     /// Latest validator reward in nanotons
     pub last_reward_nano: String,
+}
+
+impl NodeRuntime {
+    pub fn remember_validator_public_key(&mut self, public_key: String) {
+        if !self.validator_public_keys.contains(&public_key) {
+            self.validator_public_keys.push(public_key);
+            if self.validator_public_keys.len() > MAX_RETAINED_VALIDATOR_KEYS {
+                self.validator_public_keys.remove(0);
+            }
+        }
+    }
+
+    pub fn set_validator_public_key(&mut self, public_key: String) {
+        if let Some(current) = self.validator_public_key.clone() {
+            self.remember_validator_public_key(current);
+        }
+        self.remember_validator_public_key(public_key.clone());
+        self.validator_public_key = Some(public_key);
+    }
 }
 
 /// Current state of one Localton service
@@ -205,9 +240,40 @@ mod tests {
                 ..ServiceRuntime::default()
             },
         );
-        state.mark_launcher_stopped();
+        state.mark_instance_stopped();
         assert!(!state.nodes["genesis"].running);
         assert!(!state.services["ton_http_api"].running);
+    }
+
+    #[test]
+    fn repeated_masterchain_head_does_not_look_like_new_production() {
+        let mut state = RuntimeState::new();
+        state.observe_masterchain_head(17, 100);
+        state.observe_masterchain_head(17, 200);
+        expect_test::expect![[r#"
+            (
+                Some(
+                    17,
+                ),
+                Some(
+                    100,
+                ),
+            )
+        "#]]
+        .assert_debug_eq(&(state.masterchain_seqno, state.last_block_at));
+
+        state.observe_masterchain_head(18, 300);
+        expect_test::expect![[r#"
+            (
+                Some(
+                    18,
+                ),
+                Some(
+                    300,
+                ),
+            )
+        "#]]
+        .assert_debug_eq(&(state.masterchain_seqno, state.last_block_at));
     }
 
     #[test]
@@ -235,5 +301,27 @@ mod tests {
             thread.join().unwrap();
         }
         assert_eq!(RuntimeState::load(&path).unwrap().nodes.len(), 8);
+    }
+
+    #[test]
+    fn validator_keys_are_retained_across_rounds() {
+        let mut node = NodeRuntime::default();
+        node.remember_validator_public_key("genesis".to_owned());
+        node.set_validator_public_key("round-1".to_owned());
+        node.set_validator_public_key("round-2".to_owned());
+
+        expect_test::expect![[r#"
+            (
+                Some(
+                    "round-2",
+                ),
+                [
+                    "genesis",
+                    "round-1",
+                    "round-2",
+                ],
+            )
+        "#]]
+        .assert_debug_eq(&(node.validator_public_key, node.validator_public_keys));
     }
 }

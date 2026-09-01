@@ -1,4 +1,4 @@
-//! TON protocol clients and data transformations used by the launcher.
+//! TON protocol clients and data transformations used by Localton workflows.
 //!
 //! These modules parse imported account snapshots, communicate with the local
 //! liteserver, and invoke utilities from the selected TON binary distribution.
@@ -6,5 +6,7 @@
 //! build on them.
 
 pub(crate) mod accounts;
+pub(crate) mod global_config;
 pub(crate) mod lite;
 pub(crate) mod toolchain;
+pub(crate) mod tools;

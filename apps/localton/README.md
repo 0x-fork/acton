@@ -10,7 +10,6 @@ localton stores the network state between runs. `Ctrl-C` or `SIGTERM` stops all 
 
 - The first run creates a new TON zerostate and all required keys.
 - Later runs continue the same blockchain from the stored state.
-- The launcher manages full nodes, validators, elections, stakes, rewards, and wallets.
 - The native CLI includes liteserver commands and an optional TON HTTP API V2 service.
 - Docker Compose adds TON Center API V3, PostgreSQL, Redis, and an event classifier.
 - A new zerostate can include active basechain accounts from another network.
@@ -120,22 +119,22 @@ docker compose down --volumes
 
 The automatic TON installation supports macOS and Linux on `arm64` and `x86_64`. The build requires a stable Rust toolchain.
 
-Install the launcher from this repository:
+Install localton from this repository:
 
 ```bash
 cargo install --locked --path .
 ```
 
-Make sure that `$HOME/.cargo/bin` is in `PATH`. Then start the network:
+Make sure that `$HOME/.cargo/bin` is in `PATH`. Then bootstrap the network:
 
 ```bash
-localton run
+localton bootstrap
 ```
 
 The default state directory is `.localton`. Use `--state-dir` to keep multiple independent networks:
 
 ```bash
-localton run --state-dir ./networks/demo
+localton bootstrap --state-dir ./networks/demo
 ```
 
 The first run performs these operations:
@@ -156,7 +155,7 @@ Liteserver public key: <base64 ed25519 public key>
 Global config: /absolute/path/to/.localton/global.config.json
 ```
 
-Keep the launcher process active while you use the network. Press `Ctrl-C` to stop the network.
+Keep the bootstrap instance active while you use the network. Press `Ctrl-C` to stop the network.
 
 The next run uses the same state and continues the same chain. It does not create a new zerostate.
 
@@ -165,16 +164,16 @@ The next run uses the same state and continues the same chain. It does not creat
 Pass a directory that contains the required official TON binaries:
 
 ```bash
-localton run --ton-bin-dir /path/to/ton
+localton bootstrap --ton-bin-dir /path/to/ton
 ```
 
 You can set the same path through the environment:
 
 ```bash
-TON_BIN_DIR=/path/to/ton localton run
+TON_BIN_DIR=/path/to/ton localton bootstrap
 ```
 
-The launcher stores this path in `manifest.json`. Later commands use the stored path.
+The bootstrap workflow stores this path in `manifest.json`. Later commands use the stored path.
 
 ### Shared TON binary cache
 
@@ -195,15 +194,13 @@ The native network uses these ports by default:
 | --- | --- |
 | `127.0.0.1:4441/tcp` | Console for the genesis validator. |
 | `127.0.0.1:4442/udp` | ADNL for the genesis validator. |
-| `127.0.0.1:18004/tcp` | Primary liteserver. |
+| `127.0.0.1:18004/tcp` | First-host liteserver. |
 | `127.0.0.1:6302/udp` | Local DHT server. |
 | `http://127.0.0.1:18000` | Network manifest, global configuration, and health endpoints. |
 | `http://127.0.0.1:18001` | Administrative HTTP API and faucet. |
 | `http://127.0.0.1:18002/api/v2` | Optional public API V2 proxy. |
 | `http://127.0.0.1:18005/api/v2` | Optional internal API V2 backend. |
 | `http://127.0.0.1:18006` | Optional API V2 monitor. |
-
-Additional nodes use separate port ranges from `settings.json`.
 
 ## TON HTTP API V2
 
@@ -224,7 +221,7 @@ xtask build-ton-http-api-v2 --state-dir .localton --jobs 8
 Then start the network with API V2:
 
 ```bash
-localton run --ton-http-api
+localton bootstrap --ton-http-api
 ```
 
 Make sure that the API returns the current masterchain block:
@@ -261,20 +258,6 @@ Make sure that the persistent configuration is valid:
 localton config validate
 ```
 
-Create a new network with three validators:
-
-```bash
-localton run --state-dir .localton-three --validators 3
-```
-
-Change the enabled validator count in an existing state directory:
-
-```bash
-localton config validators 3 --state-dir .localton
-```
-
-The configuration contains seven predefined node slots. The first slot is always the genesis validator.
-
 ## Import accounts into the zerostate
 
 `--add-account` adds an active basechain account to a new zerostate. The value is a hex-encoded, single-root `ShardAccount` BoC.
@@ -282,13 +265,13 @@ The configuration contains seven predefined node slots. The first slot is always
 Repeat the option to add more accounts:
 
 ```bash
-localton run \
+localton bootstrap \
   --state-dir .localton-imported \
   --add-account <SHARD_ACCOUNT_HEX> \
   --add-account <ANOTHER_SHARD_ACCOUNT_HEX>
 ```
 
-The launcher reads the address, TON balance, code, data, and private libraries from each `ShardAccount`.
+The bootstrap workflow reads the address, TON balance, code, data, and private libraries from each `ShardAccount`.
 
 The import accepts only active accounts from workchain `0`. It rejects duplicate addresses and unsupported account features.
 
@@ -299,7 +282,7 @@ Unsupported features include these items:
 - Anycast addresses and split depth.
 - Public basechain libraries.
 
-The launcher resets historical transaction fields and storage statistics for the new chain. A `ShardAccount` does not include external global libraries.
+The bootstrap workflow resets historical transaction fields and storage statistics for the new chain. A `ShardAccount` does not include external global libraries.
 
 The option applies only to a new state directory. Use a new state directory to change the zerostate account set.
 
@@ -380,43 +363,11 @@ The request returns after API V2 finds the transfer transaction. Therefore, the 
 
 ## Nodes and validators
 
-List the configured nodes:
+List or inspect the genesis node:
 
 ```bash
 localton node list
-```
-
-Enable and start another validator:
-
-```bash
-localton node add node2
-```
-
-Add a full node without validator participation:
-
-```bash
-localton node add node2 --fullnode-only
-```
-
-Start, stop, and inspect a node:
-
-```bash
-localton node start node2
-localton node stop node2
-localton node stats node2
-localton node console node2 getstats
-```
-
-Disable a node and keep its state:
-
-```bash
-localton node remove node2
-```
-
-CAUTION: The next command deletes the generated state for `node2`.
-
-```bash
-localton node remove node2 --delete-state
+localton node stats genesis
 ```
 
 Show elections and validator sets:
@@ -425,11 +376,20 @@ Show elections and validator sets:
 localton validator status
 ```
 
+Enable or disable participation in future elections without stopping the full node:
+
+```bash
+localton validator enable
+localton validator disable
+```
+
+Disabling validator mode does not remove the node from the active validator set. It finishes the current round, stops submitting entries for later rounds, remains synchronized as a full node, and continues recovering unfrozen stakes.
+
 Submit an election request or recover an unfrozen stake:
 
 ```bash
-localton validator participate node2
-localton validator reap node2
+localton validator participate genesis
+localton validator reap genesis
 ```
 
 Process all enabled validators:
@@ -439,7 +399,7 @@ localton validator participate-all
 localton validator reap-all
 ```
 
-Enabled validators automatically create election keys and submit stakes. The launcher also recovers available stakes and rewards.
+Validators with election participation enabled automatically create election keys and submit stakes. Localton reloads this mode from `settings.json` on every poll, so mode changes do not require a restart. It also recovers available stakes and rewards.
 
 ## Hardfork configuration
 
@@ -462,7 +422,7 @@ The command prints the output path and the block identifier that anchors the for
 
 ## HTTP services
 
-The native launcher starts the configuration API and administrative API by default. Both services bind to `127.0.0.1` by default.
+The bootstrap instance starts the configuration API and administrative API by default. Both services bind to `127.0.0.1` by default.
 
 The configuration API on port `18000` provides these routes:
 
@@ -470,8 +430,8 @@ The configuration API on port `18000` provides these routes:
 - `GET /` returns the network manifest and service endpoints.
 - `GET /localhost.global.config.json` returns the global configuration.
 - `GET /config` returns the same global configuration.
+- `POST /faucet` sends one development grant to a node-owned wallet.
 - `GET /live` and `GET /healthz` return liveness data.
-- `GET /add-validator?participate=true` adds a validator and starts election participation.
 
 The administrative API on port `18001` provides these routes:
 
@@ -480,22 +440,22 @@ The administrative API on port `18001` provides these routes:
 - `GET /v1/settings` returns the persistent configuration.
 - `GET /v1/wallets` returns public wallet data.
 - `GET /v1/processes` returns managed process data.
-- `POST /v1/nodes/{name}/start` starts a node.
-- `POST /v1/nodes/{name}/stop` stops a node.
 - `POST /acton_fundAccount` funds an account from the genesis wallet.
 
 Disable either service for one run:
 
 ```bash
-localton run --no-config-http
-localton run --no-admin-http
+localton bootstrap --no-config-http
+localton bootstrap --no-admin-http
 ```
 
 The API V2 proxy preserves methods, paths, queries, bodies, statuses, and end-to-end headers. It also adds browser CORS and PNA headers.
 
 ## State and process lifecycle
 
-localton stores all persistent data under the selected state directory. The important files are:
+localton stores network-specific persistent data under the selected state directory.
+Downloaded official TON binaries live in the shared per-user cache described above.
+The important state files are:
 
 | Path | Content |
 | --- | --- |
@@ -504,12 +464,11 @@ localton stores all persistent data under the selected state directory. The impo
 | `runtime.json` | Current process identifiers, service endpoints, and the latest observed block. |
 | `global.config.json` | Connection data for the local DHT and liteserver. |
 | `genesis/` | Validator database, keys, certificates, and node data. |
-| `nodes/` | Data for additional nodes. |
 | `wallets/` | Managed wallet keys and deployment messages. |
 | `logs/` | Standard output and error logs for managed processes. |
 | `tools/` | Native API V2 source and build artifacts. |
 
-The launcher locks the state directory while it runs. A second launcher cannot use the same state directory at the same time.
+Each Localton instance locks its state directory while it runs. A second instance cannot use the same state directory at the same time.
 
 All long-lived child processes belong to one process registry. Normal exit, signals, startup errors, and child failures use the same cleanup path.
 
@@ -534,7 +493,7 @@ docker build -t localton:dev .
 LOCALTON_IMAGE=localton:dev docker compose up -d
 ```
 
-For launcher development from the repository root, reuse the native TON and indexer files from the published image. This command builds the Rust workspace and replaces only the `localton` binary:
+For Localton development from the repository root, reuse the native TON and indexer files from the published image. This command builds the Rust workspace and replaces only the `localton` binary:
 
 ```bash
 just build-localton-dev-image

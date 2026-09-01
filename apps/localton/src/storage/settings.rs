@@ -14,7 +14,6 @@ use crate::storage::{
 };
 
 pub const SETTINGS_SCHEMA_VERSION: u32 = 1;
-pub const MAX_LOCAL_NODES: usize = 7;
 
 /// Persistent settings for one Full localnet
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
@@ -88,19 +87,7 @@ impl Settings {
         );
         ensure!(
             !self.nodes.is_empty(),
-            "settings must contain a genesis node"
-        );
-        ensure!(
-            self.nodes.len() <= MAX_LOCAL_NODES,
-            "at most {MAX_LOCAL_NODES} local nodes are supported"
-        );
-        ensure!(
-            self.nodes[0].name == "genesis",
-            "the first node must be named genesis"
-        );
-        ensure!(
-            self.nodes[0].enabled && self.nodes[0].validator,
-            "genesis must be an enabled validator"
+            "settings must contain at least one node"
         );
         self.network.validate()?;
         self.services.validate()?;
@@ -126,7 +113,11 @@ impl Settings {
                     bail!("duplicate TCP port {port}");
                 }
             }
-            for (kind, port) in [("ADNL", node.adnl_port), ("DHT", node.dht_port)] {
+            for (kind, port) in [
+                ("ADNL", node.adnl_port),
+                ("out", node.out_port),
+                ("DHT", node.dht_port),
+            ] {
                 if udp_ports
                     .insert(port, format!("{} {kind}", node.name))
                     .is_some()
@@ -135,19 +126,26 @@ impl Settings {
                 }
             }
         }
-        let service_ports = vec![
-            ("config HTTP", self.services.config_http.port),
-            ("admin HTTP", self.services.admin_http.port),
-            ("TON HTTP API public proxy", self.services.ton_http_api.port),
-            (
-                "TON HTTP API backend",
-                self.services.ton_http_api.backend_port,
-            ),
-            (
-                "TON HTTP API monitor",
-                self.services.ton_http_api.monitor_port,
-            ),
-        ];
+        let mut service_ports = Vec::new();
+        if self.services.config_http.enabled {
+            service_ports.push(("config HTTP", self.services.config_http.port));
+        }
+        if self.services.admin_http.enabled {
+            service_ports.push(("admin HTTP", self.services.admin_http.port));
+        }
+        if self.services.ton_http_api.enabled {
+            service_ports.extend([
+                ("TON HTTP API public proxy", self.services.ton_http_api.port),
+                (
+                    "TON HTTP API backend",
+                    self.services.ton_http_api.backend_port,
+                ),
+                (
+                    "TON HTTP API monitor",
+                    self.services.ton_http_api.monitor_port,
+                ),
+            ]);
+        }
         for (kind, port) in service_ports {
             if tcp_ports.insert(port, kind.to_owned()).is_some() {
                 bail!("duplicate TCP port {port}");
@@ -168,19 +166,6 @@ impl Settings {
             .iter_mut()
             .find(|node| node.name == name)
             .with_context(|| format!("unknown node {name}"))
-    }
-
-    pub fn enable_validator_count(&mut self, count: usize) -> Result<()> {
-        ensure!(
-            (1..=MAX_LOCAL_NODES).contains(&count),
-            "validator count must be in 1..={MAX_LOCAL_NODES}"
-        );
-        for (index, node) in self.nodes.iter_mut().enumerate() {
-            node.enabled = index < count;
-            node.validator = index < count;
-            node.participate_in_elections = index < count;
-        }
-        Ok(())
     }
 }
 
@@ -253,11 +238,11 @@ impl Default for NetworkSettings {
             max_validator_stake: 10_000_000,
             min_total_validator_stake: 10_000,
             max_stake_factor: 3,
-            elected_for_seconds: 30 * 60,
-            election_start_before_seconds: 25 * 60,
-            election_end_before_seconds: 10 * 60,
-            stakes_frozen_for_seconds: 5 * 60,
-            original_validator_set_valid_for_seconds: 25 * 60,
+            elected_for_seconds: 2 * 60,
+            election_start_before_seconds: 90,
+            election_end_before_seconds: 30,
+            stakes_frozen_for_seconds: 30,
+            original_validator_set_valid_for_seconds: 90,
             // Localton intentionally runs slower than the current 400ms TON
             // mainnet target so block-by-block debugging remains practical
             simplex_target_rate_ms: 1_000,
@@ -287,7 +272,6 @@ impl NetworkSettings {
 
         let quarter = election_time_seconds / 4;
         let election_start_before = election_time_seconds - quarter;
-
         self.elected_for_seconds = election_time_seconds;
         self.election_start_before_seconds = election_start_before;
         self.election_end_before_seconds = quarter;
@@ -379,31 +363,27 @@ pub struct NodeSettings {
 
 impl Default for NodeSettings {
     fn default() -> Self {
-        Self::for_index(0)
+        Self::genesis()
     }
 }
 
 impl NodeSettings {
-    pub fn for_index(index: usize) -> Self {
-        let index_u16 = u16::try_from(index).expect("local node index fits u16");
-        let is_genesis = index == 0;
+    /// Creates the genesis validator owned by the bootstrap workflow.
+    #[must_use]
+    pub fn genesis() -> Self {
         Self {
-            name: if is_genesis {
-                "genesis".to_owned()
-            } else {
-                format!("node{}", index + 1)
-            },
-            enabled: is_genesis,
-            validator: is_genesis,
+            name: "genesis".to_owned(),
+            enabled: true,
+            validator: true,
             liteserver: true,
             public_ip: Ipv4Addr::LOCALHOST,
-            console_port: VALIDATOR_CONSOLE_PORT + index_u16 * 3,
-            adnl_port: VALIDATOR_ADNL_PORT + index_u16 * 3,
-            liteserver_port: LITESERVER_PORT + index_u16 * 3,
-            out_port: OUT_PORT + index_u16,
-            dht_port: DHT_PORT + index_u16,
+            console_port: VALIDATOR_CONSOLE_PORT,
+            adnl_port: VALIDATOR_ADNL_PORT,
+            liteserver_port: LITESERVER_PORT,
+            out_port: OUT_PORT,
+            dht_port: DHT_PORT,
             threads: 4,
-            verbosity: if is_genesis { 2 } else { 1 },
+            verbosity: 2,
             sync_before_seconds: 3_600,
             state_ttl_seconds: 365 * 86_400,
             block_ttl_seconds: 365 * 86_400,
@@ -445,7 +425,7 @@ impl NodeSettings {
 }
 
 fn default_nodes() -> Vec<NodeSettings> {
-    (0..MAX_LOCAL_NODES).map(NodeSettings::for_index).collect()
+    vec![NodeSettings::genesis()]
 }
 
 /// Settings for Localton HTTP services
@@ -605,7 +585,7 @@ impl Default for ValidationSettings {
         Self {
             auto_participate: true,
             auto_reap: true,
-            poll_interval_seconds: 15,
+            poll_interval_seconds: 5,
             max_factor: 3.0,
             reap_value_nano: 1_000_000_000,
         }
@@ -660,13 +640,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn defaults_cover_all_local_node_slots() {
+    fn bootstrap_defaults_contain_only_genesis() {
         let settings = Settings::default();
         settings.validate().unwrap();
         assert_eq!(settings.network.global_id, -3);
-        assert_eq!(settings.nodes.len(), 7);
+        assert_eq!(settings.nodes.len(), 1);
+        assert_eq!(settings.nodes[0].name, "genesis");
         assert!(settings.nodes[0].participate_in_elections);
-        assert_eq!(settings.nodes[6].name, "node7");
         assert_eq!(settings.services.config_http.port, 18_000);
         assert_eq!(settings.services.admin_http.port, 18_001);
         assert_eq!(settings.services.ton_http_api.port, 18_002);
@@ -675,15 +655,28 @@ mod tests {
     }
 
     #[test]
+    fn default_validator_round_is_two_minutes() {
+        let settings = Settings::default();
+        assert_eq!(settings.network.elected_for_seconds, 120);
+        assert_eq!(settings.network.election_start_before_seconds, 90);
+        assert_eq!(settings.network.election_end_before_seconds, 30);
+        assert_eq!(
+            settings.network.original_validator_set_valid_for_seconds,
+            90
+        );
+        assert_eq!(settings.validation.poll_interval_seconds, 5);
+    }
+
+    #[test]
     fn election_time_configures_consistent_genesis_windows() {
         let mut network = NetworkSettings::default();
-        network.set_election_time_seconds(120).unwrap();
+        network.set_election_time_seconds(240).unwrap();
 
-        assert_eq!(network.elected_for_seconds, 120);
-        assert_eq!(network.election_start_before_seconds, 90);
-        assert_eq!(network.election_end_before_seconds, 30);
-        assert_eq!(network.stakes_frozen_for_seconds, 30);
-        assert_eq!(network.original_validator_set_valid_for_seconds, 90);
+        assert_eq!(network.elected_for_seconds, 240);
+        assert_eq!(network.election_start_before_seconds, 180);
+        assert_eq!(network.election_end_before_seconds, 60);
+        assert_eq!(network.stakes_frozen_for_seconds, 60);
+        assert_eq!(network.original_validator_set_valid_for_seconds, 180);
         assert!(network.set_election_time_seconds(3).is_err());
         network.validate().unwrap();
     }
@@ -697,21 +690,16 @@ mod tests {
     }
 
     #[test]
-    fn enabling_validator_count_updates_topology() {
-        let mut settings = Settings::default();
-        settings.enable_validator_count(3).unwrap();
-        assert!(settings.nodes[0].enabled);
-        assert!(settings.nodes[0].participate_in_elections);
-        assert!(settings.nodes[1].validator);
-        assert!(settings.nodes[2].participate_in_elections);
-        assert!(!settings.nodes[3].enabled);
-    }
-
-    #[test]
     fn duplicate_ports_are_rejected() {
         let mut settings = Settings::default();
-        settings.nodes[1].enabled = true;
-        settings.nodes[1].console_port = settings.nodes[0].console_port;
+        let mut secondary = NodeSettings::genesis();
+        secondary.name = "secondary".to_owned();
+        secondary.console_port = settings.nodes[0].console_port;
+        secondary.adnl_port = 20_001;
+        secondary.liteserver_port = 20_002;
+        secondary.out_port = 20_003;
+        secondary.dht_port = 20_004;
+        settings.nodes.push(secondary);
         assert!(settings.validate().is_err());
     }
 }

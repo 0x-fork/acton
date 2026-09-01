@@ -1,28 +1,31 @@
-//! Serves network discovery, global config, and launcher health endpoints.
+//! Serves network discovery, global config, and instance health endpoints.
 //!
 //! `/` returns the current readiness state and URLs of enabled services.
 //! `/openapi.json` returns a generated OpenAPI description of this service.
 //! `/localhost.global.config.json` and `/config` return the generated TON global
-//! config. `/live` and `/healthz` report launcher readiness. `/add-validator`
-//! creates an additional validator and can immediately enter it into elections.
+//! config. `/faucet` gives a new node an on-chain development balance. `/live`
+//! and `/healthz` report instance readiness.
+
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::{
     Json, Router,
-    extract::{Query, State},
+    extract::State,
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use tokio::sync::watch;
+use tokio::sync::{Mutex, watch};
 use tracing::info;
-use utoipa::{IntoParams, OpenApi, ToSchema};
+use utoipa::{OpenApi, ToSchema};
 
 use crate::{
-    bootstrap::LauncherControl,
+    bootstrap::NodeController,
+    operations::wallets,
     storage::{RuntimeState, Settings},
+    ton::global_config::GlobalConfig,
 };
 
 use super::{
@@ -35,17 +38,23 @@ use super::{
 #[openapi(
     info(
         title = "localton Configuration API",
-        description = "Network discovery, generated TON global config, health, and validator creation"
+        description = "Network discovery, health, and development funding"
     ),
     paths(
         root_handler,
         localhost_global_config_handler,
         global_config_handler,
+        development_faucet_handler,
         live_handler,
-        healthz_handler,
-        add_validator_handler
+        healthz_handler
     ),
-    components(schemas(ConfigDocument, ConfigEndpoints, AddValidatorResponse, ErrorResponse)),
+    components(schemas(
+        ConfigDocument,
+        ConfigEndpoints,
+        DevelopmentFaucetRequest,
+        DevelopmentFaucetResponse,
+        ErrorResponse
+    )),
     tags((name = "configuration", description = "Local TON network configuration and health"))
 )]
 struct ApiDoc;
@@ -56,7 +65,7 @@ pub(super) struct ConfigDocument {
     pub service: String,
     /// `true` when the local network can process requests
     pub ready: bool,
-    /// Latest masterchain block number that the launcher observed
+    /// Latest masterchain block number that the instance observed
     pub masterchain_seqno: Option<u32>,
     /// URLs of the services that Localton enabled
     pub endpoints: ConfigEndpoints,
@@ -72,8 +81,8 @@ pub(super) struct ConfigEndpoints {
     pub live: String,
     /// Health probe URL
     pub healthz: String,
-    /// URL that creates a validator node
-    pub add_validator: String,
+    /// Development faucet used to fund a node-owned wallet
+    pub faucet: String,
     /// Admin API URL, if the service is enabled
     pub admin: Option<String>,
     /// Account funding URL, if the TON HTTP API is enabled
@@ -84,24 +93,31 @@ pub(super) struct ConfigEndpoints {
     pub ton_http_api_monitor: Option<String>,
 }
 
+#[derive(Debug, Deserialize, ToSchema)]
+struct DevelopmentFaucetRequest {
+    /// TON address that receives one development grant
+    address: String,
+}
+
 #[derive(Debug, Serialize, ToSchema)]
-struct AddValidatorResponse {
-    /// Name of the new node
-    node: String,
-    /// `true` because the new node is a validator
-    validator: bool,
-    /// `true` when the node enters elections automatically
-    participate: bool,
+struct DevelopmentFaucetResponse {
+    /// TON address that received the grant
+    address: String,
+    /// Grant amount in nanotons
+    amount_nano: u64,
+    /// Liteserver send status
+    status: u32,
 }
 
 #[derive(Clone)]
 struct ConfigState {
-    control: LauncherControl,
+    control: NodeController,
     settings: Settings,
+    faucet_lock: Arc<Mutex<()>>,
 }
 
 pub(super) async fn start(
-    control: LauncherControl,
+    control: NodeController,
     settings: Settings,
     shutdown: watch::Receiver<bool>,
 ) -> Result<RunningService> {
@@ -114,10 +130,14 @@ pub(super) async fn start(
             get(localhost_global_config_handler),
         )
         .route("/config", get(global_config_handler))
+        .route("/faucet", post(development_faucet_handler))
         .route("/live", get(live_handler))
         .route("/healthz", get(healthz_handler))
-        .route("/add-validator", get(add_validator_handler))
-        .with_state(ConfigState { control, settings });
+        .with_state(ConfigState {
+            control,
+            settings,
+            faucet_lock: Arc::new(Mutex::new(())),
+        });
     let endpoint = format!("http://{address}");
     let running = server::start(
         "config HTTP service",
@@ -184,7 +204,6 @@ pub(super) fn root_document(settings: &Settings, runtime: &RuntimeState) -> Conf
             settings.services.ton_http_api.monitor_port
         )
     });
-
     ConfigDocument {
         service: "localton".to_owned(),
         ready: runtime.ready,
@@ -194,7 +213,7 @@ pub(super) fn root_document(settings: &Settings, runtime: &RuntimeState) -> Conf
             config: format!("{config_endpoint}/config"),
             live: format!("{config_endpoint}/live"),
             healthz: format!("{config_endpoint}/healthz"),
-            add_validator: format!("{config_endpoint}/add-validator"),
+            faucet: format!("{config_endpoint}/faucet"),
             admin: admin_endpoint,
             fund_account: fund_account_endpoint,
             ton_http_api: ton_http_api_endpoint,
@@ -211,13 +230,13 @@ pub(super) fn root_document(settings: &Settings, runtime: &RuntimeState) -> Conf
     path = "/localhost.global.config.json",
     tag = "configuration",
     responses(
-        (status = 200, description = "Generated TON global configuration", body = Value),
+        (status = 200, description = "Generated TON global configuration", body = GlobalConfig),
         (status = 400, description = "Global configuration could not be read", body = ErrorResponse)
     )
 )]
 async fn localhost_global_config_handler(
     State(state): State<ConfigState>,
-) -> Result<Json<Value>, HttpError> {
+) -> Result<Json<GlobalConfig>, HttpError> {
     read_global_config(&state).await
 }
 
@@ -229,33 +248,81 @@ async fn localhost_global_config_handler(
     path = "/config",
     tag = "configuration",
     responses(
-        (status = 200, description = "Generated TON global configuration", body = Value),
+        (status = 200, description = "Generated TON global configuration", body = GlobalConfig),
         (status = 400, description = "Global configuration could not be read", body = ErrorResponse)
     )
 )]
-async fn global_config_handler(State(state): State<ConfigState>) -> Result<Json<Value>, HttpError> {
+async fn global_config_handler(
+    State(state): State<ConfigState>,
+) -> Result<Json<GlobalConfig>, HttpError> {
     read_global_config(&state).await
 }
 
-async fn read_global_config(state: &ConfigState) -> Result<Json<Value>, HttpError> {
+async fn read_global_config(state: &ConfigState) -> Result<Json<GlobalConfig>, HttpError> {
     let bytes = tokio::fs::read(&state.control.layout().global_config)
         .await
         .context("failed to read global config")?;
-    Ok(Json(
-        serde_json::from_slice(&bytes).context("global config is invalid JSON")?,
-    ))
+    Ok(Json(GlobalConfig::from_json_bytes(&bytes)?))
+}
+
+/// Fund a node-owned wallet from the development faucet
+///
+/// The faucet only transfers test coins. The node keeps its wallet and
+/// validator keys locally and submits election messages to Elector itself
+#[utoipa::path(
+    post,
+    path = "/faucet",
+    tag = "configuration",
+    request_body = DevelopmentFaucetRequest,
+    responses(
+        (status = 200, description = "Development grant submitted", body = DevelopmentFaucetResponse),
+        (status = 400, description = "Grant could not be submitted", body = ErrorResponse)
+    )
+)]
+async fn development_faucet_handler(
+    State(state): State<ConfigState>,
+    Json(request): Json<DevelopmentFaucetRequest>,
+) -> Result<Json<DevelopmentFaucetResponse>, HttpError> {
+    let _guard = state.faucet_lock.lock().await;
+    let amount_nano = state
+        .settings
+        .nodes
+        .iter()
+        .map(|node| node.initial_wallet_amount_nano)
+        .max()
+        .context("network has no node wallet grant configured")?;
+    let amount = wallets::format_nano_grams(u128::from(amount_nano));
+    let status = wallets::send(
+        &state.control.toolchain(),
+        wallets::SendRequest {
+            from: "faucet",
+            to: &request.address,
+            amount: &amount,
+            comment: None,
+            body: None,
+            state_init: None,
+            mode: 3,
+            bounce: false,
+        },
+    )
+    .await?;
+    Ok(Json(DevelopmentFaucetResponse {
+        address: request.address,
+        amount_nano,
+        status,
+    }))
 }
 
 /// Get the network readiness state
 ///
-/// The endpoint returns `200` only when the launcher and the network are ready
+/// The endpoint returns `200` only when the instance and the network are ready
 #[utoipa::path(
     get,
     path = "/live",
     tag = "configuration",
     responses(
-        (status = 200, description = "Launcher and network are ready", body = String),
-        (status = 503, description = "Launcher is still starting", body = String),
+        (status = 200, description = "Instance and network are ready", body = String),
+        (status = 503, description = "Instance is still starting", body = String),
         (status = 500, description = "Runtime state could not be read", body = String)
     )
 )]
@@ -271,8 +338,8 @@ async fn live_handler(State(state): State<ConfigState>) -> Response {
     path = "/healthz",
     tag = "configuration",
     responses(
-        (status = 200, description = "Launcher and network are ready", body = String),
-        (status = 503, description = "Launcher is still starting", body = String),
+        (status = 200, description = "Instance and network are ready", body = String),
+        (status = 503, description = "Instance is still starting", body = String),
         (status = 500, description = "Runtime state could not be read", body = String)
     )
 )]
@@ -282,7 +349,7 @@ async fn healthz_handler(State(state): State<ConfigState>) -> Response {
 
 async fn live_response(state: &ConfigState) -> Response {
     match RuntimeState::load(&state.control.layout().runtime) {
-        Ok(runtime) if runtime.ready && runtime.launcher_pid.is_some() => {
+        Ok(runtime) if runtime.ready && runtime.instance_pid.is_some() => {
             (StatusCode::OK, "OK").into_response()
         }
         Ok(_) => (StatusCode::SERVICE_UNAVAILABLE, "STARTING").into_response(),
@@ -292,41 +359,4 @@ async fn live_response(state: &ConfigState) -> Response {
         )
             .into_response(),
     }
-}
-
-#[derive(Debug, Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
-struct AddValidatorQuery {
-    /// Whether the new validator should enter elections immediately
-    #[serde(default = "default_true")]
-    participate: bool,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-/// Create and start a validator node
-///
-/// By default, the new validator enters elections automatically
-#[utoipa::path(
-    get,
-    path = "/add-validator",
-    tag = "configuration",
-    params(AddValidatorQuery),
-    responses(
-        (status = 200, description = "Validator was added", body = AddValidatorResponse),
-        (status = 400, description = "Validator could not be added", body = ErrorResponse)
-    )
-)]
-async fn add_validator_handler(
-    State(state): State<ConfigState>,
-    Query(query): Query<AddValidatorQuery>,
-) -> Result<Json<AddValidatorResponse>, HttpError> {
-    let name = state.control.add_validator(query.participate).await?;
-    Ok(Json(AddValidatorResponse {
-        node: name,
-        validator: true,
-        participate: query.participate,
-    }))
 }

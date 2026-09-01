@@ -1,16 +1,14 @@
 use std::{
     fs,
-    net::{Ipv4Addr, SocketAddrV4},
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
 
-use crate::storage::NodeSettings;
+use crate::{storage::NodeSettings, ton::tools::types::TonPublicKey};
 
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 3;
 pub const TON_RELEASE: &str = "v2026.06";
 
 pub const VALIDATOR_CONSOLE_PORT: u16 = 4441;
@@ -57,7 +55,7 @@ impl Layout {
             runtime: root.join("runtime.json"),
             wallets: root.join("wallets"),
             nodes: root.join("nodes"),
-            lock: root.join("launcher.lock"),
+            lock: root.join("instance.lock"),
             logs: root.join("logs"),
             validator_db,
             resources,
@@ -92,7 +90,6 @@ impl Layout {
             NodeLayout {
                 root: self.genesis.clone(),
                 db: self.validator_db.clone(),
-                keyring: self.validator_keyring.clone(),
                 certs: self.certs.clone(),
                 logs: self.logs.clone(),
                 global_config: self.global_config.clone(),
@@ -101,7 +98,6 @@ impl Layout {
             let root = self.nodes.join(&settings.name);
             NodeLayout {
                 db: root.join("db"),
-                keyring: root.join("db/keyring"),
                 certs: root.join("certs"),
                 logs: self.logs.join(&settings.name),
                 global_config: root.join("global.config.json"),
@@ -115,27 +111,14 @@ impl Layout {
 pub struct NodeLayout {
     pub root: PathBuf,
     pub db: PathBuf,
-    pub keyring: PathBuf,
     pub certs: PathBuf,
     pub logs: PathBuf,
     pub global_config: PathBuf,
 }
 
 impl NodeLayout {
-    pub fn create_dirs(&self) -> Result<()> {
-        for path in [&self.root, &self.db, &self.keyring, &self.certs, &self.logs] {
-            fs::create_dir_all(path)
-                .with_context(|| format!("failed to create {}", path.display()))?;
-        }
-        Ok(())
-    }
-
     pub fn config_json(&self) -> PathBuf {
         self.db.join("config.json")
-    }
-
-    pub fn server_private_key(&self) -> PathBuf {
-        self.certs.join("server")
     }
 
     pub fn server_public_key(&self) -> PathBuf {
@@ -151,13 +134,9 @@ impl NodeLayout {
 pub struct Manifest {
     pub schema_version: u32,
     pub ton_release: String,
-    #[serde(default)]
-    pub ton_bin_dir: Option<PathBuf>,
-    pub validator_id_hex: String,
-    pub validator_id_base64: String,
-    pub liteserver_public_key: String,
-    pub global_config: PathBuf,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ton_bin_dir: PathBuf,
+    pub validator_public_key: TonPublicKey,
+    pub liteserver_public_key: TonPublicKey,
     pub imported_accounts: Vec<ImportedAccountDescriptor>,
 }
 
@@ -186,7 +165,7 @@ impl Manifest {
         }
         if manifest.ton_release != TON_RELEASE {
             bail!(
-                "state was created with TON {}, launcher expects {}; use another --state-dir",
+                "state was created with TON {}, instance expects {}; use another --state-dir",
                 manifest.ton_release,
                 TON_RELEASE
             );
@@ -207,83 +186,13 @@ impl Manifest {
     }
 }
 
-pub fn global_config(
-    zero_root_hash: &str,
-    zero_file_hash: &str,
-    dht_nodes: Vec<Value>,
-    liteserver_public_key: &str,
-) -> Value {
-    let zero_state = json!({
-        "@type": "ton.blockIdExt",
-        "workchain": -1,
-        "shard": -9223372036854775808_i64,
-        "seqno": 0,
-        "root_hash": zero_root_hash,
-        "file_hash": zero_file_hash,
-    });
-    json!({
-        "@type": "config.global",
-        "dht": {
-            "@type": "dht.config.global",
-            "k": 3,
-            "a": 3,
-            "static_nodes": {
-                "@type": "dht.nodes",
-                "nodes": dht_nodes,
-            },
-        },
-        "liteservers": [{
-            "id": {
-                "@type": "pub.ed25519",
-                "key": liteserver_public_key,
-            },
-            "ip": ipv4_to_i32(Ipv4Addr::LOCALHOST),
-            "port": LITESERVER_PORT,
-        }],
-        "validator": {
-            "@type": "validator.config.global",
-            "zero_state": zero_state.clone(),
-            "init_block": zero_state,
-        },
-    })
-}
-
-pub fn endpoint() -> SocketAddrV4 {
-    SocketAddrV4::new(Ipv4Addr::LOCALHOST, LITESERVER_PORT)
-}
-
-/// Encodes IPv4 in the signed big-endian representation used by TON JSON configs.
-pub(crate) fn ipv4_to_i32(ip: Ipv4Addr) -> i32 {
-    i32::from_be_bytes(ip.octets())
-}
-
-pub fn write_json_atomic(path: &Path, value: &Value) -> Result<()> {
+pub fn write_json_atomic<T>(path: &Path, value: &T) -> Result<()>
+where
+    T: Serialize + ?Sized,
+{
     let tmp = path.with_extension("json.tmp");
     fs::write(&tmp, serde_json::to_vec_pretty(value)?)
         .with_context(|| format!("failed to write {}", tmp.display()))?;
     fs::rename(&tmp, path).with_context(|| format!("failed to replace {}", path.display()))?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn localhost_is_ton_signed_ip() {
-        assert_eq!(ipv4_to_i32(Ipv4Addr::LOCALHOST), 2_130_706_433);
-    }
-
-    #[test]
-    fn global_config_has_matching_init_block() {
-        let config = global_config("root", "file", vec![], "pub");
-        assert_eq!(
-            config.pointer("/validator/zero_state"),
-            config.pointer("/validator/init_block")
-        );
-        assert_eq!(
-            config.pointer("/liteservers/0/ip"),
-            Some(&json!(2_130_706_433))
-        );
-    }
 }

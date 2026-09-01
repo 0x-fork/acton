@@ -30,7 +30,7 @@ use crate::{
     storage::{RuntimeState, Settings},
 };
 
-use super::{FUND_ACCOUNT_PATH, admin, config, cors, faucet, proxy};
+use super::{FUND_ACCOUNT_PATH, ServiceSet, admin, config, cors, faucet, proxy};
 
 async fn serve_test_router(app: Router) -> (String, JoinHandle<()>) {
     let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
@@ -51,6 +51,30 @@ fn faucet_router(state: faucet::State) -> Router {
         .with_state(state)
 }
 
+#[tokio::test]
+async fn dropping_service_set_aborts_owned_tasks() {
+    let (shutdown, _receiver) = tokio::sync::watch::channel(false);
+    let task = tokio::spawn(std::future::pending::<()>());
+    let task_status = task.abort_handle();
+    let services = ServiceSet {
+        shutdown,
+        tasks: vec![task],
+        endpoints: BTreeMap::new(),
+    };
+
+    drop(services);
+    let outcome = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        while !task_status.is_finished() {
+            tokio::task::yield_now().await;
+        }
+        "cancelled"
+    })
+    .await
+    .unwrap_or("timed out");
+
+    expect![["cancelled"]].assert_eq(outcome);
+}
+
 #[test]
 fn root_document_lists_enabled_service_endpoints() {
     let mut settings = Settings::default();
@@ -68,6 +92,7 @@ fn root_document_lists_enabled_service_endpoints() {
         document.endpoints.global_config,
         "http://127.0.0.1:18000/localhost.global.config.json"
     );
+    assert_eq!(document.endpoints.faucet, "http://127.0.0.1:18000/faucet");
     assert_eq!(
         document.endpoints.fund_account.as_deref(),
         Some("http://127.0.0.1:18001/acton_fundAccount")
@@ -86,9 +111,9 @@ fn openapi_documents_config_and_admin_routes() {
         "/",
         "/localhost.global.config.json",
         "/config",
+        "/faucet",
         "/live",
         "/healthz",
-        "/add-validator",
     ] {
         assert!(
             config_document["paths"][path].is_object(),
@@ -104,8 +129,6 @@ fn openapi_documents_config_and_admin_routes() {
         "/v1/settings",
         "/v1/wallets",
         "/v1/processes",
-        "/v1/nodes/{name}/start",
-        "/v1/nodes/{name}/stop",
         "/acton_fundAccount",
     ] {
         assert!(
@@ -142,16 +165,12 @@ fn openapi_documents_config_and_admin_routes() {
     let documented_operations = [
         ("CONFIG /", &config_document["paths"]["/"]["get"]),
         (
-            "CONFIG /add-validator",
-            &config_document["paths"]["/add-validator"]["get"],
+            "CONFIG /faucet",
+            &config_document["paths"]["/faucet"]["post"],
         ),
         (
             "ADMIN /v1/status",
             &admin_document["paths"]["/v1/status"]["get"],
-        ),
-        (
-            "ADMIN /v1/nodes/{name}/start",
-            &admin_document["paths"]["/v1/nodes/{name}/start"]["post"],
         ),
         (
             "ADMIN /acton_fundAccount",
@@ -187,17 +206,14 @@ fn openapi_documents_config_and_admin_routes() {
         summary: Get network status and service URLs
         description: Use this endpoint to find the enabled Localton services
 
-        CONFIG /add-validator
-        summary: Create and start a validator node
-        description: By default, the new validator enters elections automatically
+        CONFIG /faucet
+        summary: Fund a node-owned wallet from the development faucet
+        description: The faucet only transfers test coins. The node keeps its wallet and
+        validator keys locally and submits election messages to Elector itself
 
         ADMIN /v1/status
-        summary: Get the current launcher and network state
+        summary: Get the current instance and network state
         description: The response shows readiness, the latest masterchain block, node states, and service states
-
-        ADMIN /v1/nodes/{name}/start
-        summary: Start a configured validator node
-        description: The node must exist in the persistent settings
 
         ADMIN /acton_fundAccount
         summary: Fund an account from the genesis wallet

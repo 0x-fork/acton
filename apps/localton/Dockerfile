@@ -406,4 +406,4 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=240s --retries=12 \
         http://127.0.0.1:18002/api/v2/getMasterchainInfo >/dev/null || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/localton-container-entrypoint"]
-CMD ["run", "--state-dir", "/var/lib/localton", "--ton-http-api"]
+CMD ["bootstrap", "--state-dir", "/var/lib/localton", "--ton-http-api"]

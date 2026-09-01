@@ -1,4 +1,4 @@
-//! Command-line interface and dispatch helpers for the launcher executable.
+//! Command-line interface and dispatch helpers for the Localton executable.
 //!
 //! This module defines the Clap command tree and keeps command handlers in the
 //! adjacent [`commands`] module. Blockchain operations themselves live in their
@@ -14,7 +14,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 #[command(
     name = "localton",
     version,
-    about = "Run and operate a complete headless local TON development network"
+    about = "Bootstrap and operate a complete headless local TON development network"
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -23,8 +23,8 @@ pub struct Cli {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum Command {
-    /// Start the network and all enabled headless services.
-    Run(RunArgs),
+    /// Create or resume a network and run its genesis node
+    Bootstrap(BootstrapArgs),
     /// Inspect persisted and live network status.
     Status(StatusArgs),
     /// Read or update persistent network configuration.
@@ -47,7 +47,7 @@ pub enum Command {
         #[command(subcommand)]
         command: IndexerCommand,
     },
-    /// Manage full nodes and validators.
+    /// Inspect full nodes owned by one local state directory.
     Node {
         #[command(subcommand)]
         command: NodeCommand,
@@ -113,7 +113,7 @@ pub enum SnapshotCommand {
 }
 
 #[derive(Debug, Clone, Args)]
-pub struct RunArgs {
+pub struct BootstrapArgs {
     /// Persistent network state. It is created on the first run and reused.
     #[arg(long, default_value = ".localton")]
     pub state_dir: PathBuf,
@@ -125,10 +125,6 @@ pub struct RunArgs {
     /// Maximum bootstrap/readiness wait in seconds.
     #[arg(long, default_value_t = 180)]
     pub startup_timeout: u64,
-
-    /// Total number of validators to enable, including genesis.
-    #[arg(long, value_parser = clap::value_parser!(usize))]
-    pub validators: Option<usize>,
 
     /// Target interval between Simplex blocks, in milliseconds
     ///
@@ -152,13 +148,19 @@ pub struct RunArgs {
     /// open from 90 to 30 seconds before the validator set changes. The stake freeze
     /// period is also 30 seconds, and the first election can begin immediately
     ///
-    /// Without this flag the round duration is 1800 seconds
+    /// Without this flag the round duration is 120 seconds
     ///
     /// Minimum: 4 seconds
     ///
     /// To change the value, create a new network state
     #[arg(long, value_name = "SECONDS", value_parser = clap::value_parser!(u32).range(4..))]
     pub election_time: Option<u32>,
+
+    /// IPv4 address advertised by the genesis DHT and liteserver.
+    ///
+    /// Set this before first bootstrap when nodes on other hosts must join.
+    #[arg(long, env = "LOCALTON_ADVERTISE_IP")]
+    pub advertise_ip: Option<Ipv4Addr>,
 
     /// Add an active basechain account from a hex-encoded ShardAccount BoC.
     ///
@@ -203,15 +205,15 @@ pub struct RunArgs {
     pub no_admin_http: bool,
 }
 
-impl Default for RunArgs {
+impl Default for BootstrapArgs {
     fn default() -> Self {
         Self {
             state_dir: PathBuf::from(".localton"),
             ton_bin_dir: None,
             startup_timeout: 180,
-            validators: None,
             block_time: None,
             election_time: None,
+            advertise_ip: None,
             add_account: Vec::new(),
             ton_http_api: false,
             ton_http_api_bind: Ipv4Addr::LOCALHOST,
@@ -246,13 +248,6 @@ pub enum ConfigCommand {
     },
     /// Validate settings.json without starting the network.
     Validate(StateArgs),
-    /// Enable a total number of validators in settings.json.
-    Validators {
-        #[command(flatten)]
-        state: StateArgs,
-        #[arg(value_parser = clap::value_parser!(usize))]
-        count: usize,
-    },
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -274,9 +269,8 @@ pub enum LiteCommand {
         state: StateArgs,
         address: String,
         method: String,
-        /// TVM stack in lite-client syntax, for example `0` or `[ 1 2 ]`.
-        #[arg(default_value = "")]
-        params: String,
+        /// Integer TVM stack arguments in decimal or `0x` hexadecimal form.
+        params: Vec<String>,
     },
     /// Send an external message BoC.
     Send {
@@ -304,6 +298,11 @@ pub enum LiteCommand {
     },
     /// Print all shards at the latest masterchain block.
     Shards {
+        #[command(flatten)]
+        state: StateArgs,
+    },
+    /// Print the on-chain validator election schedule and sets.
+    Elections {
         #[command(flatten)]
         state: StateArgs,
     },
@@ -415,40 +414,10 @@ pub enum IndexerCommand {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum NodeCommand {
-    /// List configured nodes and their live status.
+    /// List host-local nodes and their live status.
     List {
         #[command(flatten)]
         state: StateArgs,
-    },
-    /// Enable and start a predefined node.
-    Add {
-        #[command(flatten)]
-        state: StateArgs,
-        name: String,
-        #[arg(long)]
-        fullnode_only: bool,
-        #[arg(long, default_value_t = true)]
-        liteserver: bool,
-    },
-    /// Start an enabled node.
-    Start {
-        #[command(flatten)]
-        state: StateArgs,
-        name: String,
-    },
-    /// Stop a node while leaving its state intact.
-    Stop {
-        #[command(flatten)]
-        state: StateArgs,
-        name: String,
-    },
-    /// Disable a node and optionally delete only that node's generated state.
-    Remove {
-        #[command(flatten)]
-        state: StateArgs,
-        name: String,
-        #[arg(long)]
-        delete_state: bool,
     },
     /// Print validator-engine-console getstats output.
     Stats {
@@ -456,14 +425,6 @@ pub enum NodeCommand {
         state: StateArgs,
         #[arg(default_value = "genesis")]
         name: String,
-    },
-    /// Execute a raw validator-engine-console command.
-    Console {
-        #[command(flatten)]
-        state: StateArgs,
-        name: String,
-        #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
-        args: Vec<String>,
     },
 }
 
@@ -474,12 +435,23 @@ pub enum ValidatorCommand {
         #[command(flatten)]
         state: StateArgs,
     },
+    /// Participate in future elections without restarting the full node.
+    Enable {
+        #[command(flatten)]
+        state: StateArgs,
+        node: Option<String>,
+    },
+    /// Stop participating in future elections and remain a full node.
+    Disable {
+        #[command(flatten)]
+        state: StateArgs,
+        node: Option<String>,
+    },
     /// Create keys and submit an election participation request.
     Participate {
         #[command(flatten)]
         state: StateArgs,
-        #[arg(default_value = "genesis")]
-        node: String,
+        node: Option<String>,
         #[arg(long)]
         election_id: Option<u32>,
     },
@@ -487,8 +459,7 @@ pub enum ValidatorCommand {
     Reap {
         #[command(flatten)]
         state: StateArgs,
-        #[arg(default_value = "genesis")]
-        node: String,
+        node: Option<String>,
     },
     /// Run participation for every enabled validator.
     ParticipateAll {
@@ -522,15 +493,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn block_time_accepts_milliseconds() {
-        let cli = Cli::try_parse_from(["localton", "run", "--block-time", "1000"]).unwrap();
-        let Command::Run(args) = cli.command else {
-            panic!("expected explicit run command");
+    fn bootstrap_accepts_block_time_in_milliseconds() {
+        let cli = Cli::try_parse_from(["localton", "bootstrap", "--block-time", "750"]).unwrap();
+        let Command::Bootstrap(args) = cli.command else {
+            panic!("expected bootstrap command");
         };
-        assert_eq!(args.block_time, Some(1_000));
-
+        assert_eq!(args.block_time, Some(750));
         assert_eq!(
-            Cli::try_parse_from(["localton", "run", "--block-time", "0"])
+            Cli::try_parse_from(["localton", "bootstrap", "--block-time", "0"])
                 .unwrap_err()
                 .kind(),
             clap::error::ErrorKind::ValueValidation
@@ -538,15 +508,14 @@ mod tests {
     }
 
     #[test]
-    fn election_time_accepts_seconds() {
-        let cli = Cli::try_parse_from(["localton", "run", "--election-time", "240"]).unwrap();
-        let Command::Run(args) = cli.command else {
-            panic!("expected explicit run command");
+    fn bootstrap_accepts_election_time_in_seconds() {
+        let cli = Cli::try_parse_from(["localton", "bootstrap", "--election-time", "240"]).unwrap();
+        let Command::Bootstrap(args) = cli.command else {
+            panic!("expected bootstrap command");
         };
         assert_eq!(args.election_time, Some(240));
-
         assert_eq!(
-            Cli::try_parse_from(["localton", "run", "--election-time", "3"])
+            Cli::try_parse_from(["localton", "bootstrap", "--election-time", "3"])
                 .unwrap_err()
                 .kind(),
             clap::error::ErrorKind::ValueValidation
@@ -554,10 +523,19 @@ mod tests {
     }
 
     #[test]
-    fn command_is_required() {
+    fn lifecycle_command_is_explicit_without_legacy_aliases() {
         assert_eq!(
             Cli::try_parse_from(["localton"]).unwrap_err().kind(),
             clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
         );
+
+        for legacy_command in ["run", "agent"] {
+            assert_eq!(
+                Cli::try_parse_from(["localton", legacy_command])
+                    .unwrap_err()
+                    .kind(),
+                clap::error::ErrorKind::InvalidSubcommand
+            );
+        }
     }
 }

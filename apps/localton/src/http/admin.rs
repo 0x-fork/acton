@@ -1,15 +1,14 @@
 //! Serves the local administrative HTTP API.
 //!
 //! Read routes return runtime state, settings, wallets, and supervised
-//! processes. Node routes start and stop additional validators. When V2 is
-//! enabled, `POST /acton_fundAccount` signs a transfer with the genesis wallet,
+//! processes. When V2 is enabled, `POST /acton_fundAccount` signs a transfer with the genesis wallet,
 //! submits it through the V2 backend, and returns the confirmed message hash.
 //! `/openapi.json` describes every administrative route and data model.
 
 use anyhow::Result;
 use axum::{
     Json, Router,
-    extract::{FromRef, Path, State as AxumState},
+    extract::{FromRef, State as AxumState},
     middleware,
     routing::{get, post},
 };
@@ -18,11 +17,10 @@ use tracing::info;
 use utoipa::OpenApi;
 
 use crate::{
-    bootstrap::LauncherControl,
+    bootstrap::NodeController,
     operations::wallets,
     runtime::ProcessInfo,
-    storage::Settings,
-    storage::{NodeRuntime, RuntimeState},
+    storage::{RuntimeState, Settings},
 };
 
 use super::{
@@ -35,15 +33,13 @@ use super::{
 #[openapi(
     info(
         title = "localton Administrative API",
-        description = "Runtime state, settings, wallets, processes, node control, and account funding"
+        description = "Runtime state, settings, wallets, processes, and account funding"
     ),
     paths(
         status_handler,
         settings_handler,
         wallets_handler,
         processes_handler,
-        start_node_handler,
-        stop_node_handler,
         faucet::fund_account_handler
     ),
     components(schemas(
@@ -51,7 +47,6 @@ use super::{
         Settings,
         crate::operations::wallets::PublicWallet,
         ProcessInfo,
-        NodeRuntime,
         faucet::FundAccountRequest,
         faucet::FundAccountResponse,
         faucet::FundAccountErrorResponse,
@@ -63,7 +58,7 @@ struct ApiDoc;
 
 #[derive(Clone)]
 struct AdminState {
-    control: LauncherControl,
+    control: NodeController,
     faucet: faucet::State,
 }
 
@@ -74,7 +69,7 @@ impl FromRef<AdminState> for faucet::State {
 }
 
 pub(super) async fn start(
-    control: LauncherControl,
+    control: NodeController,
     settings: &Settings,
     shutdown: watch::Receiver<bool>,
 ) -> Result<RunningService> {
@@ -93,9 +88,7 @@ pub(super) async fn start(
         .route("/v1/status", get(status_handler))
         .route("/v1/settings", get(settings_handler))
         .route("/v1/wallets", get(wallets_handler))
-        .route("/v1/processes", get(processes_handler))
-        .route("/v1/nodes/{name}/start", post(start_node_handler))
-        .route("/v1/nodes/{name}/stop", post(stop_node_handler));
+        .route("/v1/processes", get(processes_handler));
     if settings.services.ton_http_api.enabled {
         app = app.route(
             FUND_ACCOUNT_PATH,
@@ -126,7 +119,7 @@ pub(super) fn openapi() -> utoipa::openapi::OpenApi {
     ApiDoc::openapi()
 }
 
-/// Get the current launcher and network state
+/// Get the current instance and network state
 ///
 /// The response shows readiness, the latest masterchain block, node states, and service states
 #[utoipa::path(
@@ -134,7 +127,7 @@ pub(super) fn openapi() -> utoipa::openapi::OpenApi {
     path = "/v1/status",
     tag = "administration",
     responses(
-        (status = 200, description = "Current launcher and network state", body = RuntimeState),
+        (status = 200, description = "Current instance and network state", body = RuntimeState),
         (status = 400, description = "Runtime state could not be read", body = ErrorResponse)
     )
 )]
@@ -182,7 +175,7 @@ async fn wallets_handler(
     Ok(Json(wallets::load_public(state.control.layout())?))
 }
 
-/// List the child processes that the launcher supervises
+/// List the child processes that the instance supervises
 ///
 /// Each item contains a stable process name and the current process ID
 #[utoipa::path(
@@ -193,44 +186,4 @@ async fn wallets_handler(
 )]
 async fn processes_handler(AxumState(state): AxumState<AdminState>) -> Json<Vec<ProcessInfo>> {
     Json(state.control.process_info().await)
-}
-
-/// Start a configured validator node
-///
-/// The node must exist in the persistent settings
-#[utoipa::path(
-    post,
-    path = "/v1/nodes/{name}/start",
-    tag = "administration",
-    params(("name" = String, Path, description = "Configured node name")),
-    responses(
-        (status = 200, description = "Updated node runtime state", body = NodeRuntime),
-        (status = 400, description = "Node could not be started", body = ErrorResponse)
-    )
-)]
-async fn start_node_handler(
-    AxumState(state): AxumState<AdminState>,
-    Path(name): Path<String>,
-) -> Result<Json<NodeRuntime>, HttpError> {
-    Ok(Json(state.control.start_node(&name).await?))
-}
-
-/// Stop a configured validator node
-///
-/// The response contains the node state after the stop operation
-#[utoipa::path(
-    post,
-    path = "/v1/nodes/{name}/stop",
-    tag = "administration",
-    params(("name" = String, Path, description = "Configured node name")),
-    responses(
-        (status = 200, description = "Updated node runtime state", body = NodeRuntime),
-        (status = 400, description = "Node could not be stopped", body = ErrorResponse)
-    )
-)]
-async fn stop_node_handler(
-    AxumState(state): AxumState<AdminState>,
-    Path(name): Path<String>,
-) -> Result<Json<NodeRuntime>, HttpError> {
-    Ok(Json(state.control.stop_node(&name).await?))
 }
