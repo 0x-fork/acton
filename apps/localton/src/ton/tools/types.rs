@@ -217,6 +217,27 @@ impl fmt::Display for AdnlEndpoint {
     }
 }
 
+/// Returns whether an IPv4 address can be advertised to peers on a public TON network.
+///
+/// Besides the standard private and special-use ranges, carrier-grade NAT and
+/// benchmarking networks are excluded because neither can accept unsolicited ADNL
+/// traffic from Internet peers.
+pub(crate) fn is_public_ipv4(ip: Ipv4Addr) -> bool {
+    let octets = ip.octets();
+    let shared_address_space = octets[0] == 100 && (64..=127).contains(&octets[1]);
+    let benchmarking = octets[0] == 198 && matches!(octets[1], 18 | 19);
+
+    !ip.is_unspecified()
+        && !ip.is_loopback()
+        && !ip.is_private()
+        && !ip.is_link_local()
+        && !ip.is_multicast()
+        && !ip.is_broadcast()
+        && !ip.is_documentation()
+        && !shared_address_space
+        && !benchmarking
+}
+
 /// JSON address list accepted by official TON ADNL tools.
 ///
 /// All timing and priority fields are explicit because omitting one changes the
@@ -283,7 +304,8 @@ enum AdnlUdpAddressConstructor {
 /// The identifier is public metadata rather than private key material. Keeping the
 /// decoded bytes prevents subtly different lowercase/uppercase representations from
 /// referring to the same key in different parts of the bootstrap workflow.
-#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd, ToSchema)]
+#[schema(value_type = String)]
 pub struct KeyId([u8; 32]);
 
 impl KeyId {
@@ -383,7 +405,8 @@ impl FromStr for KeyId {
 /// The value is stored as 32 bytes rather than base64 or a TL-encoded file. This
 /// prevents workflows from repeatedly decoding transport representations and
 /// makes conversions at JSON and filesystem boundaries explicit.
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, ToSchema)]
+#[schema(value_type = String)]
 pub struct TonPublicKey([u8; 32]);
 
 impl TonPublicKey {
@@ -419,6 +442,15 @@ impl TonPublicKey {
         encoded[..4].copy_from_slice(&ED25519_PUBLIC_KEY_TL_CONSTRUCTOR);
         encoded[4..].copy_from_slice(&self.0);
         encoded
+    }
+
+    /// Encodes the complete TL artifact for official tools that consume a public-key token.
+    ///
+    /// TON JSON stores the raw 32-byte key, while validator election Fift scripts
+    /// expect the constructor-prefixed 36-byte value. Keeping both encodings on
+    /// this type prevents workflow state from storing either transport representation.
+    pub fn to_tl_base64(self) -> String {
+        BASE64.encode(self.to_tl_bytes())
     }
 
     /// Computes the identifier used by TON keyrings and console commands.
@@ -532,6 +564,20 @@ impl DhtNodeDescriptor {
     pub fn from_json_str(value: &str) -> Result<Self> {
         serde_json::from_str(value).context("invalid TON dht.node descriptor")
     }
+
+    /// Reports whether this bootstrap node is reachable through a public IPv4 address.
+    ///
+    /// A config whose discovery nodes are public describes a network outside the
+    /// operator's private LAN. Joining it with a private advertised address leaves
+    /// overlay peers unable to return block proofs, although DHT probes can still
+    /// appear healthy.
+    pub(crate) fn advertises_public_ipv4(&self) -> bool {
+        self.addr_list
+            .addrs
+            .iter()
+            .map(|address| Ipv4Addr::from(address.ip.to_be_bytes()))
+            .any(is_public_ipv4)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -557,6 +603,11 @@ impl Ed25519PublicKey {
             constructor: PublicKeyConstructor::Ed25519,
             key,
         }
+    }
+
+    /// Returns the validated raw key for typed protocol adapters.
+    pub(crate) const fn public_key(&self) -> TonPublicKey {
+        self.key
     }
 }
 

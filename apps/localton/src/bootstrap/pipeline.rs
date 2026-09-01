@@ -8,26 +8,27 @@
 
 use std::time::Duration;
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Result, ensure};
 use tracing::info;
 
 use crate::{
     binaries::TonBinaries,
-    cli::{BootstrapArgs, StatusArgs},
-    http,
+    cli::BootstrapArgs,
+    http, node,
+    operations::status::print_connection_details,
     runtime::{self, ProcessRegistry},
-    storage::Settings,
     storage::{Layout, Manifest},
-    storage::{NodeRuntime, RuntimeState, ServiceRuntime},
+    storage::{NodeRole, Settings},
+    storage::{RuntimeState, ServiceRuntime},
     ton::{
         accounts::parse_imported_accounts,
         global_config::GlobalConfigFile,
         toolchain::Toolchain,
-        tools::{lite_client::LiteTarget, types::DhtDatabase, validator_engine::ValidatorDatabase},
+        tools::{lite_client::LiteTarget, types::DhtDatabase},
     },
 };
 
-use super::{NodeController, acquire_lock, files::absolute_path, genesis, nodes, readiness};
+use super::{acquire_lock, dht, files::absolute_path, genesis, readiness};
 
 /// Owns the complete lifecycle of one bootstrap invocation.
 ///
@@ -43,11 +44,12 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
     let _state_lock = acquire_lock(&layout.lock)?;
 
     let state_exists = layout.manifest.is_file();
+    let settings = prepare_settings(&layout, &args)?;
+    layout.create_bootstrap_dirs()?;
 
     let binaries = TonBinaries::resolve(&layout, args.ton_bin_dir.clone()).await?;
     let tools = Toolchain::official(layout.clone(), binaries);
     let timeout = Duration::from_secs(args.startup_timeout);
-    let settings = prepare_settings(&layout, &args)?;
 
     // The manifest is bootstrap's commit marker. Existing state is reused only
     // after a complete bootstrap; otherwise genesis recreates partial artifacts.
@@ -60,7 +62,7 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
 
     let global_config = GlobalConfigFile::open(layout.global_config.clone())?;
     let dht_database = DhtDatabase::open(layout.dht_db.clone())?;
-    let validator_database = ValidatorDatabase::open(layout.validator_db.clone())?;
+    let genesis = &settings.node;
 
     let masterchain_readiness = if state_exists {
         readiness::MasterchainReadiness::HeadAvailable
@@ -79,17 +81,21 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
     // Every process-start error, signal, or required-child exit converges on the
     // cleanup below instead of escaping through `?` with live processes.
     let result = async {
-        nodes::start_core(
+        info!("starting local DHT and genesis validator-engine");
+        let dht_runtime = dht::start(
             &layout,
-            &tools,
-            &settings,
+            tools.dht_server.as_ref(),
+            genesis,
             dht_database,
-            validator_database,
+            timeout,
             &processes,
         )
         .await?;
+        let genesis_runtime =
+            node::start(&layout, &layout.node, &tools, genesis, timeout, &processes).await?;
 
-        record_core_processes(&mut runtime, &processes, &manifest).await;
+        runtime.services.insert("dht".to_owned(), dht_runtime);
+        runtime.node = genesis_runtime;
         runtime.save_atomic(&layout.runtime)?;
 
         let masterchain_seqno = readiness::wait_for_masterchain(
@@ -112,8 +118,14 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
         )
         .await?;
 
-        let control = NodeController::new(layout.clone(), tools.clone(), processes.clone());
-        let services = http::start(control, &settings, args.ton_http_api_bind).await?;
+        let services = http::start(
+            &layout,
+            &tools,
+            &processes,
+            &settings,
+            args.ton_http_api_bind,
+        )
+        .await?;
 
         if let Err(error) = mark_network_ready(&layout, &mut runtime, &services, masterchain_seqno)
         {
@@ -121,7 +133,12 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
             return Err(error);
         }
 
-        if let Err(error) = print_connection_details(&manifest, &settings, &global_config) {
+        let node_global_config = GlobalConfigFile::open(layout.node.global_config.clone())?;
+        if let Err(error) = print_connection_details(
+            &settings,
+            &manifest.liteserver_public_key,
+            &node_global_config,
+        ) {
             services.shutdown().await;
             return Err(error);
         }
@@ -153,13 +170,10 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
 /// for this run, not properties of the blockchain itself.
 fn prepare_settings(layout: &Layout, args: &BootstrapArgs) -> Result<Settings> {
     let mut settings = Settings::load_or_create(&layout.settings)?;
-    let genesis = settings
-        .nodes
-        .first()
-        .context("bootstrap settings contain no genesis node")?;
+    let genesis = &settings.node;
     ensure!(
-        genesis.name == "genesis" && genesis.enabled && genesis.validator,
-        "bootstrap settings must start with an enabled genesis validator"
+        genesis.role == NodeRole::Genesis && genesis.enabled && genesis.validator,
+        "bootstrap settings must contain an enabled genesis validator"
     );
 
     if let Some(block_time_ms) = args.block_time {
@@ -189,7 +203,7 @@ fn prepare_settings(layout: &Layout, args: &BootstrapArgs) -> Result<Settings> {
     }
 
     if let Some(advertise_ip) = args.advertise_ip {
-        let genesis = settings.node_mut("genesis")?;
+        let genesis = &mut settings.node;
         if layout.manifest.is_file() {
             ensure!(
                 genesis.public_ip == advertise_ip,
@@ -253,47 +267,8 @@ fn mark_network_ready(
             },
         );
     }
-    runtime.ready = true;
-    runtime.observe_masterchain_head(masterchain_seqno, crate::storage::unix_time());
+    runtime.mark_network_ready(masterchain_seqno);
     runtime.save_atomic(&layout.runtime)
-}
-
-/// Maps core child processes into the public runtime-state model.
-///
-/// DHT is infrastructure and is therefore represented as a service. Each
-/// validator-engine process is a blockchain node. Status and admin APIs rely on
-/// this distinction even though both kinds share the same process registry.
-async fn record_core_processes(
-    runtime: &mut RuntimeState,
-    processes: &ProcessRegistry,
-    manifest: &Manifest,
-) {
-    for process in processes.info().await {
-        if process.name == "dht" {
-            runtime.services.insert(
-                "dht".to_owned(),
-                ServiceRuntime {
-                    running: true,
-                    pid: process.pid,
-                    endpoint: None,
-                    last_error: None,
-                },
-            );
-        } else {
-            let mut node = NodeRuntime {
-                initialized: true,
-                running: true,
-                pid: process.pid,
-                status: "running".to_owned(),
-                ..NodeRuntime::default()
-            };
-            if process.name == "genesis" {
-                node.liteserver_public_key = Some(manifest.liteserver_public_key.to_base64());
-                node.remember_validator_public_key(manifest.validator_public_key.to_base64());
-            }
-            runtime.nodes.insert(process.name, node);
-        }
-    }
 }
 
 /// Atomically clears instance and child readiness after every exit path.
@@ -302,41 +277,5 @@ fn mark_instance_stopped(layout: &Layout) -> Result<()> {
         runtime.mark_instance_stopped();
         Ok(())
     })?;
-    Ok(())
-}
-
-/// Prints connection data for a complete persisted network without starting it.
-pub async fn status(args: StatusArgs) -> Result<()> {
-    let state_root = absolute_path(&args.state.state_dir)?;
-    let layout = Layout::new(state_root);
-    let manifest = Manifest::load(&layout.manifest)?;
-    let global_config = GlobalConfigFile::open(layout.global_config.clone())?;
-    DhtDatabase::open(layout.dht_db.clone())?;
-    ValidatorDatabase::open(layout.validator_db.clone())?;
-    let settings = Settings::load_or_create(&layout.settings)?;
-    print_connection_details(&manifest, &settings, &global_config)
-}
-
-fn print_connection_details(
-    manifest: &Manifest,
-    settings: &Settings,
-    global_config: &GlobalConfigFile,
-) -> Result<()> {
-    let global = dunce::canonicalize(global_config.path()).with_context(|| {
-        format!(
-            "global config is missing: {}",
-            global_config.path().display()
-        )
-    })?;
-    let genesis = settings.node("genesis")?;
-    println!(
-        "Liteserver endpoint: {}:{}",
-        genesis.public_ip, genesis.liteserver_port
-    );
-    println!(
-        "Liteserver public key: {}",
-        manifest.liteserver_public_key.to_base64()
-    );
-    println!("Global config: {}", global.display());
     Ok(())
 }

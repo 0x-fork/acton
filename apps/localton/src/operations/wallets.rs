@@ -195,7 +195,7 @@ pub async fn execute(command: WalletCommand) -> Result<()> {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
             let registry = load_registry(&toolchain.layout)?;
             let address = resolve_wallet_or_address(&registry, &wallet)?;
-            let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
+            let mut client = LocalLiteClient::connect(toolchain.lite_config()).await?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&client.account(&address).await?)?
@@ -252,6 +252,80 @@ pub(crate) async fn ensure_wallet_for_toolchain(
     Ok(PublicWallet::from(&wallet))
 }
 
+/// Reads the exact wallet balance through the liteserver selected by the toolchain.
+pub(crate) async fn wallet_balance_nano(toolchain: &Toolchain, name: &str) -> Result<u128> {
+    let wallet = wallet(&toolchain.layout, name)?;
+    let mut client = LocalLiteClient::connect(toolchain.lite_config()).await?;
+
+    client
+        .account(&wallet.address)
+        .await?
+        .balance_nano
+        .parse()
+        .context("wallet balance exceeds u128")
+}
+
+/// Deploys a funded wallet if its account is not active yet.
+///
+/// Native wallet versions rebuild the external deployment message from the stored
+/// seed. Other versions retain their prebuilt BoC path for the existing workflow.
+pub(crate) async fn ensure_wallet_deployed(toolchain: &Toolchain, name: &str) -> Result<()> {
+    let wallet = wallet(&toolchain.layout, name)?;
+    let mut client = LocalLiteClient::connect(toolchain.lite_config()).await?;
+    let account = client.account(&wallet.address).await?;
+    if account.state == "active" {
+        return Ok(());
+    }
+
+    ensure!(
+        account.balance_nano.parse::<u128>().unwrap_or_default() > 0,
+        "wallet `{name}` must be funded before deployment"
+    );
+
+    let deploy = match wallet.version {
+        StoredWalletVersion::V4r2 | StoredWalletVersion::V5r1 => build_native_deploy(&wallet)?,
+        _ => {
+            let path = wallet
+                .deploy_boc
+                .as_ref()
+                .with_context(|| format!("wallet `{name}` has no deployment message"))?;
+            fs::read(path)
+                .with_context(|| format!("failed to read deployment BoC {}", path.display()))?
+        }
+    };
+
+    client.send_boc(deploy).await?;
+    wait_for_wallet_state(toolchain, &wallet.address, "active").await
+}
+
+/// Waits for an expected funding increase to become visible through the liteserver.
+pub(crate) async fn wait_for_wallet_balance(
+    toolchain: &Toolchain,
+    address: &str,
+    minimum_nano: u128,
+) -> Result<()> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+
+    loop {
+        let mut client = LocalLiteClient::connect(toolchain.lite_config()).await?;
+        let balance = client
+            .account(address)
+            .await?
+            .balance_nano
+            .parse::<u128>()
+            .unwrap_or_default();
+        if balance >= minimum_nano {
+            return Ok(());
+        }
+
+        if tokio::time::Instant::now() >= deadline {
+            bail!("wallet funding did not become visible within 30 seconds")
+        }
+
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+}
+
 pub struct FundWalletResult {
     pub address: String,
     pub status: u32,
@@ -278,8 +352,8 @@ pub async fn fund_wallet(state_dir: &Path, wallet: &str, amount: &str) -> Result
     if let Some(record) = registry.wallets.get(wallet)
         && let Some(deploy) = record.deploy_boc.as_ref()
     {
-        wait_for_balance(&toolchain.layout.global_config, &record.address).await?;
-        let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
+        wait_for_balance(toolchain.lite_config(), &record.address).await?;
+        let mut client = LocalLiteClient::connect(toolchain.lite_config()).await?;
         client
             .send_boc(
                 fs::read(deploy).with_context(|| {
@@ -448,13 +522,13 @@ pub struct SendRequest<'a> {
 
 pub async fn send(toolchain: &Toolchain, request: SendRequest<'_>) -> Result<u32> {
     let message = build_message(toolchain, request).await?;
-    let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
+    let mut client = LocalLiteClient::connect(toolchain.lite_config()).await?;
     client.send_boc(message.boc).await
 }
 
 pub(crate) async fn send_confirmed(toolchain: &Toolchain, request: SendRequest<'_>) -> Result<u32> {
     let message = build_message(toolchain, request).await?;
-    let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
+    let mut client = LocalLiteClient::connect(toolchain.lite_config()).await?;
     let status = client.send_boc(message.boc).await?;
     let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
     loop {
@@ -734,6 +808,22 @@ fn build_native_transfer(source: &WalletRecord, transfer: &TransferBuild<'_>) ->
         .map_err(Into::into)
 }
 
+/// Rebuilds a signed deployment message without invoking external wallet scripts.
+fn build_native_deploy(source: &WalletRecord) -> Result<Vec<u8>> {
+    let seed = read_private_key(&source.key_base.with_extension("pk"))?;
+    let signing_key = SigningKey::from_bytes(&seed);
+    let version = match source.version {
+        StoredWalletVersion::V4r2 => TonWalletVersion::V4R2,
+        StoredWalletVersion::V5r1 => TonWalletVersion::V5R1,
+        _ => bail!("wallet version does not use the native deployment path"),
+    };
+
+    ton_wallet(version, &signing_key, source.workchain, source.wallet_id)?
+        .create_ext_in_msg(Vec::new(), 0, unix_time_u32()?.saturating_add(60), true)?
+        .to_boc()
+        .map_err(Into::into)
+}
+
 fn ton_wallet(
     version: TonWalletVersion,
     signing_key: &SigningKey,
@@ -792,7 +882,7 @@ fn load_state_init(path: Option<&Path>) -> Result<Option<StateInit>> {
 }
 
 async fn wallet_seqno(toolchain: &Toolchain, address: &str) -> Result<u32> {
-    let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
+    let mut client = LocalLiteClient::connect(toolchain.lite_config()).await?;
     let account = client.account(address).await?;
     if account.state == "nonexist" || account.state == "uninit" {
         return Ok(0);
@@ -801,7 +891,7 @@ async fn wallet_seqno(toolchain: &Toolchain, address: &str) -> Result<u32> {
         .lite_client_tool
         .run_method(
             &OperationContext::new(Duration::from_secs(30)),
-            &LiteTarget::new(&toolchain.layout.global_config).with_label("localton"),
+            &LiteTarget::new(toolchain.lite_config()).with_label("localton"),
             RunMethodRequest::new(address, "seqno", vec![])?,
         )
         .await?
@@ -826,6 +916,25 @@ async fn wait_for_balance(global_config: &Path, address: &str) -> Result<()> {
         if tokio::time::Instant::now() >= deadline {
             bail!("wallet funding did not become visible within 30 seconds")
         }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+}
+
+/// Polls account state after an external deployment message has been accepted.
+async fn wait_for_wallet_state(toolchain: &Toolchain, address: &str, expected: &str) -> Result<()> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+
+    loop {
+        let mut client = LocalLiteClient::connect(toolchain.lite_config()).await?;
+        let state = client.account(address).await?.state;
+        if state == expected {
+            return Ok(());
+        }
+
+        if tokio::time::Instant::now() >= deadline {
+            bail!("wallet did not become `{expected}` within 30 seconds")
+        }
+
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
 }

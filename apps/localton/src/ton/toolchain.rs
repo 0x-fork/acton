@@ -14,7 +14,7 @@ use crate::{
     binaries::TonBinaries,
     runtime::{CommandOutput, run_checked},
     storage::{Layout, Manifest},
-    storage::{NodeSettings, Settings},
+    storage::{NodeLayout, NodeSettings, Settings},
     ton::tools::{
         create_state::{CreateState, OfficialCreateState},
         dht_server::{DhtServer, OfficialDhtServer},
@@ -36,6 +36,7 @@ use crate::{
 pub struct Toolchain {
     pub layout: Layout,
     pub binaries: TonBinaries,
+    lite_config: PathBuf,
     pub(crate) create_state: Arc<dyn CreateState>,
     pub(crate) dht_server: Arc<dyn DhtServer>,
     pub(crate) fift_tool: Arc<dyn Fift>,
@@ -63,8 +64,10 @@ impl Toolchain {
     /// semantic method is called
     #[must_use]
     pub fn official(layout: Layout, binaries: TonBinaries) -> Self {
+        let lite_config = layout.global_config.clone();
         Self {
             layout,
+            lite_config,
             create_state: Arc::new(OfficialCreateState::new(binaries.clone())),
             dht_server: Arc::new(OfficialDhtServer::new(binaries.clone())),
             fift_tool: Arc::new(OfficialFift::new(binaries.clone())),
@@ -97,11 +100,32 @@ impl Toolchain {
                 manifest.save_atomic(&layout.manifest)?;
             }
         }
-        Ok(Self::official(layout, binaries))
+        let toolchain = Self::official(layout, binaries);
+        if toolchain.layout.settings.is_file() {
+            let node_layout = toolchain.layout.node.clone();
+            return Ok(toolchain.with_node_config(&node_layout));
+        }
+
+        Ok(toolchain)
     }
 
     pub fn settings(&self) -> Result<Settings> {
         Settings::load_or_create(&self.layout.settings)
+    }
+
+    /// Selects the global config used by liteserver client operations.
+    ///
+    /// Validator-engine keeps the config supplied during its own initialization;
+    /// changing this path only affects subsequent client requests.
+    #[must_use]
+    pub(crate) fn with_node_config(mut self, node_layout: &NodeLayout) -> Self {
+        self.lite_config = node_layout.global_config.clone();
+        self
+    }
+
+    /// Returns the global config used by liteserver client operations.
+    pub(crate) fn lite_config(&self) -> &Path {
+        &self.lite_config
     }
 
     pub async fn lite_client(&self, command_text: &str) -> Result<String> {
@@ -111,9 +135,7 @@ impl Toolchain {
     pub async fn lite_client_commands(&self, commands: &[&str]) -> Result<String> {
         ensure!(!commands.is_empty(), "lite-client command list is empty");
         let mut command = Command::new(self.binaries.command("lite-client"));
-        command
-            .args(["-t", "15", "-C"])
-            .arg(&self.layout.global_config);
+        command.args(["-t", "15", "-C"]).arg(&self.lite_config);
         for command_text in commands {
             command.args(["-c", command_text]);
         }
@@ -134,9 +156,9 @@ impl Toolchain {
     /// node-specific client private key and server public key
     pub(crate) fn validator_console_endpoint(
         &self,
+        layout: &NodeLayout,
         node: &NodeSettings,
     ) -> ValidatorConsoleEndpoint {
-        let layout = self.layout.node(node);
         ValidatorConsoleEndpoint {
             address: (Ipv4Addr::LOCALHOST, node.console_port).into(),
             client_private_key: layout.client_private_key(),
@@ -205,7 +227,7 @@ mod tests {
     fn smartcont_script_prefers_state_override_and_falls_back_to_release() {
         let temp = tempfile::tempdir_in("/tmp").unwrap();
         let layout = Layout::new(temp.path().join("state"));
-        layout.create_dirs().unwrap();
+        layout.create_bootstrap_dirs().unwrap();
         let binaries = TonBinaries {
             root: temp.path().join("ton"),
         };

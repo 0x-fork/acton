@@ -1,6 +1,6 @@
 # localton
 
-localton runs an isolated TON development network on one computer.
+localton runs an isolated TON development network across one or more computers.
 
 One command starts a genesis validator, a local DHT server, and a liteserver. The masterchain produces blocks after the network is ready.
 
@@ -10,6 +10,8 @@ localton stores the network state between runs. `Ctrl-C` or `SIGTERM` stops all 
 
 - The first run creates a new TON zerostate and all required keys.
 - Later runs continue the same blockchain from the stored state.
+- The bootstrap instance owns genesis; each joining instance owns one host-local node and its private keys.
+- A node joins the network from public bootstrap data and can enter elections independently.
 - The native CLI includes liteserver commands and an optional TON HTTP API V2 service.
 - Docker Compose adds TON Center API V3, PostgreSQL, Redis, and an event classifier.
 - A new zerostate can include active basechain accounts from another network.
@@ -186,6 +188,59 @@ reuses it across all state directories. The default cache is:
 Set `LOCALTON_CACHE_DIR` to replace the `localton` cache root. An explicit
 `--ton-bin-dir` or `TON_BIN_DIR` still has the highest priority.
 
+## Join a full node
+
+The distributed topology starts with one genesis validator and an independent node on another host. Like mytonctrl, the join workflow needs a standard TON global config URL. The bootstrap instance exposes that file and a development faucet for convenience, but neither service participates in consensus. The joined node can remain a full node or enter validator elections.
+
+On the first host, advertise an address reachable by the second host and expose the global config to the private network:
+
+```bash
+localton bootstrap \
+  --state-dir .localton-bootstrap \
+  --advertise-ip 10.0.0.1 \
+  --config-http-bind 0.0.0.0
+```
+
+On the second host, join with its own empty state directory:
+
+```bash
+localton join http://10.0.0.1:18000/config \
+  --state-dir .localton-node2 \
+  --advertise-ip 10.0.0.2
+```
+
+On first start, `join` downloads only `global.config.json`. The file contains the network identity, zerostate hashes, DHT entry points, and public liteserver data. The workflow then creates an independent database, console keys, liteserver keys, and full-node ADNL identity on the second host. `validator-engine` obtains blockchain state through the TON network, just as a regular node does. After the local liteserver starts, local CLI and election operations use `127.0.0.1`; they no longer depend on the first host's liteserver. Unless `--node` sets an explicit alias, Localton derives a stable `node-<id>` name from the state directory and reuses its local state on later starts.
+
+`GLOBAL_CONFIG_URL` can point to the bootstrap instance's `/config` route or to the same JSON file on any static HTTP server. No Localton-specific bootstrap document is required.
+
+Add `--validator` to make the remote node enter elections:
+
+```bash
+localton join http://10.0.0.1:18000/config \
+  --validator \
+  --state-dir .localton-node2 \
+  --faucet http://10.0.0.1:18000/faucet \
+  --advertise-ip 10.0.0.2
+```
+
+The validator workflow creates a V4R2 wallet plus permanent, temporary, and validator ADNL keys on the second host. It requests test coins for the wallet from the seed faucet, deploys the wallet, reads election state through the ordinary liteserver protocol, and sends its own stake and signed election message directly to Elector. It also recovers its own stake after the round. The bootstrap instance never receives the validator wallet key, validator keys, election signature, or election task.
+
+The faucet is optional. Without `--faucet`, `join` prints its wallet address and waits for the operator to fund it. After the initial grant, validator participation uses only normal TON protocols and contracts. The HTTP API has no endpoint for registering a validator or submitting an election entry.
+
+New networks use two-minute validator rounds. Elections are open from 90 to 30 seconds before the next round, and joining instances poll every five seconds. These values are embedded in the zerostate, so changing them requires creating a new state directory on every host.
+
+Two equal-stake validators are not failure tolerant. If either validator stops, the remaining 50% cannot form the greater-than-two-thirds consensus quorum, so block production pauses until quorum returns. Use at least four equal-stake validators to keep producing blocks after one validator stops. For cold-start resilience, publish more than one DHT entry point as well; a local liteserver removes a client dependency but does not replace consensus quorum or peer discovery.
+
+Allow TCP port `18000` while the second host downloads the config or uses the development faucet. Allow UDP port `6302` to the first DHT node and the joined node's configured ADNL UDP port, `4445` by default, when the hosts are separated by a firewall or NAT.
+
+Inspect the joined node from the second host:
+
+```bash
+localton node stats --state-dir .localton-node2
+```
+
+Keep the joining instance active while the node runs. `Ctrl-C` or `SIGTERM` stops its validator-engine process. A process supervisor such as systemd can restart `localton join` with the same command and state directory.
+
 ## Native ports
 
 The native network uses these ports by default:
@@ -257,6 +312,33 @@ Make sure that the persistent configuration is valid:
 ```bash
 localton config validate
 ```
+
+The bootstrap workflow creates only the genesis validator. Join every additional full node
+or validator through the `join` command so nodes on the same host and remote hosts
+follow the same initialization and synchronization path:
+
+```bash
+localton join http://127.0.0.1:18000/config \
+  --state-dir .localton-validator-a \
+  --advertise-ip 127.0.0.1 \
+  --node validator-a \
+  --validator
+```
+
+On its first run, a joining instance reserves one contiguous range containing five
+ports for its node. It starts at port `19000` and advances one port at a time until the
+complete range is available. Use `--port-base` to choose the first candidate:
+
+```bash
+localton join http://127.0.0.1:18000/config \
+  --state-dir .localton-validator-b \
+  --advertise-ip 127.0.0.1 \
+  --port-base 20000 \
+  --validator
+```
+
+The allocation is saved in the joining instance's `settings.json`. Restarts reuse those exact
+ports and never move the node because another process temporarily occupies one.
 
 ## Import accounts into the zerostate
 
@@ -363,11 +445,20 @@ The request returns after API V2 finds the transfer transaction. Therefore, the 
 
 ## Nodes and validators
 
-List or inspect the genesis node:
+Inspect the node owned by the current Localton state directory:
 
 ```bash
-localton node list
-localton node stats genesis
+localton node stats --state-dir .localton-validator-a
+```
+
+Create every additional full node through `join`. Add `--validator` when the
+node must participate in elections:
+
+```bash
+localton join http://127.0.0.1:18000/config \
+  --state-dir .localton-validator-a \
+  --advertise-ip 127.0.0.1 \
+  --validator
 ```
 
 Show elections and validator sets:
@@ -379,8 +470,8 @@ localton validator status
 Enable or disable participation in future elections without stopping the full node:
 
 ```bash
-localton validator enable
-localton validator disable
+localton validator enable --state-dir .localton-validator-a
+localton validator disable --state-dir .localton-validator-a
 ```
 
 Disabling validator mode does not remove the node from the active validator set. It finishes the current round, stops submitting entries for later rounds, remains synchronized as a full node, and continues recovering unfrozen stakes.
@@ -388,18 +479,11 @@ Disabling validator mode does not remove the node from the active validator set.
 Submit an election request or recover an unfrozen stake:
 
 ```bash
-localton validator participate genesis
-localton validator reap genesis
+localton validator participate
+localton validator reap
 ```
 
-Process all enabled validators:
-
-```bash
-localton validator participate-all
-localton validator reap-all
-```
-
-Validators with election participation enabled automatically create election keys and submit stakes. Localton reloads this mode from `settings.json` on every poll, so mode changes do not require a restart. It also recovers available stakes and rewards.
+Validators with election participation enabled automatically create election keys and submit stakes. Every Localton instance reloads this mode from `settings.json` on every poll, so mode changes do not require a restart. They also recover available stakes and rewards.
 
 ## Hardfork configuration
 
@@ -409,11 +493,10 @@ Create a hardfork configuration from the latest block of the genesis node:
 localton hardfork
 ```
 
-Select another source node or include an external message:
+Include an external message and select the output path:
 
 ```bash
 localton hardfork \
-  --node node2 \
   --external-message ./message.boc \
   --output ./hardfork.global.config.json
 ```

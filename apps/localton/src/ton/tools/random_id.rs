@@ -26,7 +26,7 @@ use super::types::{
 /// Semantic role of an identity created by `generate-random-id`.
 ///
 /// Official file stems are kept here so bootstrap workflows cannot accidentally
-/// use different names for the same role on genesis and additional nodes.
+/// use different names for the same role on genesis and joined nodes.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IdentityRole {
     /// Permanent key embedded in the initial validator set.

@@ -10,8 +10,84 @@ use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-pub const RUNTIME_SCHEMA_VERSION: u32 = 2;
+use crate::ton::tools::types::{KeyId, TonPublicKey};
+
+pub const RUNTIME_SCHEMA_VERSION: u32 = 3;
 const MAX_RETAINED_VALIDATOR_KEYS: usize = 64;
+
+/// Coarse validator-engine stage before its masterchain liteserver is queryable.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum InitialSyncStage {
+    /// Engine startup has selected an init block but has not discovered state yet
+    Starting,
+    /// The engine is walking key blocks to select a persistent state
+    DiscoveringKeyBlocks,
+    /// The selected masterchain persistent state is downloading
+    DownloadingMasterchainState,
+    /// Required shard states are downloading after the masterchain state
+    DownloadingShardStates,
+    /// Download is complete and the engine is preparing the first local head
+    Preparing,
+}
+
+/// Transfer metrics for the persistent state currently downloaded by validator-engine.
+///
+/// The native console rounds byte counts down to a binary B, KB, MB, or GB unit,
+/// so these values are suitable for progress reporting rather than accounting.
+/// Speed and ETA are short rolling estimates emitted by the engine itself.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct StateDownloadProgress {
+    /// Bytes received for the currently selected persistent state
+    pub downloaded_bytes: u64,
+    /// Expected size of that persistent state
+    pub total_bytes: u64,
+    /// Engine-reported rolling transfer rate
+    pub bytes_per_second: u64,
+    /// Engine-reported estimated time until transfer completion
+    pub remaining_seconds: u64,
+}
+
+/// Native initial-sync progress reported by validator-engine `getstats`.
+///
+/// TON downloads a recent persistent state before it exposes a local masterchain
+/// head. The stage remains useful throughout that interval, while part counts are
+/// present only when the selected state is split into downloadable parts and
+/// transfer metrics are present only after validator-engine learns its total size.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct InitialSyncProgress {
+    /// Current high-level validator-engine initialization stage
+    pub stage: InitialSyncStage,
+    /// Masterchain seqno of the state selected by the engine, when known
+    pub masterchain_seqno: Option<u32>,
+    /// Current persistent-state part, when the state is split
+    pub current_part: Option<u32>,
+    /// Total number of persistent-state parts, when known
+    pub total_parts: Option<u32>,
+    /// Byte-level transfer estimates, once the downloader exposes them
+    pub state_download: Option<StateDownloadProgress>,
+}
+
+impl InitialSyncProgress {
+    /// Distinguishes actual download advancement from changing speed and ETA estimates.
+    ///
+    /// This keeps `sync_progressed_at` useful for stall detection: a peer reporting
+    /// a new throughput estimate without receiving more bytes is not progress.
+    fn has_advanced_since(&self, previous: &Self) -> bool {
+        if self.stage != previous.stage
+            || self.masterchain_seqno != previous.masterchain_seqno
+            || self.current_part != previous.current_part
+        {
+            return true;
+        }
+
+        match (&self.state_download, &previous.state_download) {
+            (Some(current), Some(previous)) => current.downloaded_bytes > previous.downloaded_bytes,
+            (Some(_), None) => true,
+            _ => false,
+        }
+    }
+}
 
 /// Current Localton instance, node, and service state
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
@@ -28,8 +104,8 @@ pub struct RuntimeState {
     pub masterchain_seqno: Option<u32>,
     /// Unix time when the observed masterchain seqno last advanced
     pub last_block_at: Option<u64>,
-    /// Runtime state for each configured node
-    pub nodes: BTreeMap<String, NodeRuntime>,
+    /// Runtime state for the node owned by this state directory
+    pub node: NodeRuntime,
     /// Runtime state for each HTTP service
     pub services: BTreeMap<String, ServiceRuntime>,
 }
@@ -43,7 +119,7 @@ impl RuntimeState {
             ready: false,
             masterchain_seqno: None,
             last_block_at: None,
-            nodes: BTreeMap::new(),
+            node: NodeRuntime::default(),
             services: BTreeMap::new(),
         }
     }
@@ -114,14 +190,18 @@ impl RuntimeState {
         self.ready = false;
     }
 
+    /// Publishes readiness together with the trusted masterchain head that proves it.
+    pub fn mark_network_ready(&mut self, masterchain_seqno: u32) {
+        self.ready = true;
+        self.observe_masterchain_head(masterchain_seqno, unix_time());
+    }
+
     pub fn mark_instance_stopped(&mut self) {
         self.instance_pid = None;
         self.ready = false;
-        for node in self.nodes.values_mut() {
-            node.running = false;
-            node.pid = None;
-            node.status = "stopped".to_owned();
-        }
+        self.node.running = false;
+        self.node.pid = None;
+        self.node.status = "stopped".to_owned();
         for service in self.services.values_mut() {
             service.running = false;
             service.pid = None;
@@ -131,8 +211,8 @@ impl RuntimeState {
     /// Records a trusted masterchain head without hiding a production stall.
     ///
     /// Re-reading the same head proves that the liteserver still answers, but it
-    /// is not a new block. Keeping the previous timestamp distinguishes a
-    /// responsive yet stalled chain from one that is continuing to produce blocks.
+    /// is not a new block. Keeping the previous timestamp lets status distinguish
+    /// a responsive yet stalled chain from one that is continuing to produce blocks.
     pub fn observe_masterchain_head(&mut self, seqno: u32, observed_at: u64) {
         if self.masterchain_seqno.is_none_or(|current| seqno > current) {
             self.last_block_at = Some(observed_at);
@@ -154,17 +234,33 @@ pub struct NodeRuntime {
     pub status: String,
     /// Last node error
     pub last_error: Option<String>,
+    /// Latest masterchain block reported by this node's own liteserver
+    pub head_seqno: Option<u32>,
+    /// Masterchain block that the node was trying to reach at the same sample
+    pub network_head_seqno: Option<u32>,
+    /// First non-zero masterchain block time observed while this process synchronized
+    pub sync_initial_masterchain_block_time: Option<u64>,
+    /// Latest masterchain block time reported by validator-engine while synchronizing
+    pub sync_masterchain_block_time: Option<u64>,
+    /// Validator-engine wall-clock time used as the target for the time-based sample
+    pub sync_target_time: Option<u64>,
+    /// Native initial-sync stage used before block-time samples become available
+    pub initial_sync_progress: Option<InitialSyncProgress>,
+    /// Unix time when this node last made measurable synchronization progress
+    pub sync_progressed_at: Option<u64>,
     /// Public key for the validator console
-    pub console_public_key: Option<String>,
+    pub console_public_key: Option<TonPublicKey>,
     /// Public key for the liteserver
-    pub liteserver_public_key: Option<String>,
+    pub liteserver_public_key: Option<TonPublicKey>,
     /// Public validator key
-    pub validator_public_key: Option<String>,
+    pub validator_public_key: Option<TonPublicKey>,
     /// Public validator keys used across election rounds
     #[serde(default)]
-    pub validator_public_keys: Vec<String>,
+    pub validator_public_keys: Vec<TonPublicKey>,
+    /// ADNL address advertised by the node's full-node role
+    pub full_node_adnl: Option<KeyId>,
     /// Validator ADNL address
-    pub validator_adnl: Option<String>,
+    pub validator_adnl: Option<KeyId>,
     /// Current election identifier
     pub election_id: Option<u32>,
     /// Unix time when the current election ends
@@ -179,7 +275,80 @@ pub struct NodeRuntime {
 }
 
 impl NodeRuntime {
-    pub fn remember_validator_public_key(&mut self, public_key: String) {
+    /// Clears an old synchronization sample before a newly started node is measured.
+    ///
+    /// A persisted head from the previous process would otherwise make a fresh join
+    /// look synchronized until its local liteserver becomes queryable.
+    pub fn begin_synchronization(&mut self) {
+        self.status = "synchronizing".to_owned();
+        self.head_seqno = None;
+        self.network_head_seqno = None;
+        self.sync_initial_masterchain_block_time = None;
+        self.sync_masterchain_block_time = None;
+        self.sync_target_time = None;
+        self.initial_sync_progress = None;
+        self.sync_progressed_at = None;
+    }
+
+    /// Records one comparable local and network masterchain sample.
+    ///
+    /// The target is normalized to at least the local head because two liteservers
+    /// can be sampled across a block boundary. This preserves the invariant that
+    /// progress never exceeds 100 percent without hiding the exact local head.
+    pub fn observe_sync_progress(&mut self, local_head: u32, network_head: u32) {
+        let progressed = self.head_seqno != Some(local_head);
+
+        self.head_seqno = Some(local_head);
+        self.network_head_seqno = Some(network_head.max(local_head));
+        self.initial_sync_progress = None;
+
+        if progressed || self.sync_progressed_at.is_none() {
+            self.sync_progressed_at = Some(unix_time());
+        }
+    }
+
+    /// Records the engine's own initial-sync stage before a block head exists.
+    pub fn observe_initial_sync_progress(&mut self, progress: InitialSyncProgress) {
+        let progressed = self
+            .initial_sync_progress
+            .as_ref()
+            .is_none_or(|previous| progress.has_advanced_since(previous));
+
+        self.sync_initial_masterchain_block_time = None;
+        self.sync_masterchain_block_time = None;
+        self.sync_target_time = None;
+        self.initial_sync_progress = Some(progress);
+
+        if progressed || self.sync_progressed_at.is_none() {
+            self.sync_progressed_at = Some(unix_time());
+        }
+    }
+
+    /// Records early synchronization progress before the node liteserver can answer.
+    ///
+    /// Validator-engine exposes the time of its latest masterchain block as soon as
+    /// block download starts. Keeping the first sample lets the UI show progress over
+    /// the remaining time range without pretending that this estimate is a block head.
+    pub fn observe_sync_time_progress(&mut self, block_time: u64, target_time: u64) {
+        if block_time == 0 {
+            return;
+        }
+
+        let progressed = self.sync_masterchain_block_time != Some(block_time);
+
+        self.sync_initial_masterchain_block_time
+            .get_or_insert(block_time);
+        self.sync_masterchain_block_time = Some(block_time);
+        self.sync_target_time = Some(target_time.max(block_time));
+        self.initial_sync_progress = None;
+
+        if progressed || self.sync_progressed_at.is_none() {
+            self.sync_progressed_at = Some(unix_time());
+        }
+    }
+
+    /// Retains a validator identity so rewards from earlier election rounds stay attributable.
+    pub fn remember_validator_public_key(&mut self, public_key: TonPublicKey) {
         if !self.validator_public_keys.contains(&public_key) {
             self.validator_public_keys.push(public_key);
             if self.validator_public_keys.len() > MAX_RETAINED_VALIDATOR_KEYS {
@@ -188,11 +357,12 @@ impl NodeRuntime {
         }
     }
 
-    pub fn set_validator_public_key(&mut self, public_key: String) {
-        if let Some(current) = self.validator_public_key.clone() {
+    /// Changes the active validator identity without discarding the previous round's key.
+    pub fn set_validator_public_key(&mut self, public_key: TonPublicKey) {
+        if let Some(current) = self.validator_public_key {
             self.remember_validator_public_key(current);
         }
-        self.remember_validator_public_key(public_key.clone());
+        self.remember_validator_public_key(public_key);
         self.validator_public_key = Some(public_key);
     }
 }
@@ -222,16 +392,32 @@ mod tests {
     use super::*;
 
     #[test]
+    fn readiness_is_published_with_its_masterchain_head() {
+        let mut state = RuntimeState::new();
+        state.mark_instance_started();
+        state.mark_network_ready(42);
+
+        expect_test::expect![[r#"
+            (
+                true,
+                Some(
+                    42,
+                ),
+                true,
+            )
+        "#]]
+        .assert_debug_eq(&(
+            state.ready,
+            state.masterchain_seqno,
+            state.last_block_at.is_some(),
+        ));
+    }
+
+    #[test]
     fn stop_clears_every_runtime_process() {
         let mut state = RuntimeState::new();
-        state.nodes.insert(
-            "genesis".to_owned(),
-            NodeRuntime {
-                running: true,
-                pid: Some(123),
-                ..NodeRuntime::default()
-            },
-        );
+        state.node.running = true;
+        state.node.pid = Some(123);
         state.services.insert(
             "ton_http_api".to_owned(),
             ServiceRuntime {
@@ -241,7 +427,7 @@ mod tests {
             },
         );
         state.mark_instance_stopped();
-        assert!(!state.nodes["genesis"].running);
+        assert!(!state.node.running);
         assert!(!state.services["ton_http_api"].running);
     }
 
@@ -277,6 +463,134 @@ mod tests {
     }
 
     #[test]
+    fn synchronization_sample_has_a_valid_target_and_can_be_reset() {
+        let mut node = NodeRuntime::default();
+        node.observe_initial_sync_progress(InitialSyncProgress {
+            stage: InitialSyncStage::DownloadingMasterchainState,
+            masterchain_seqno: Some(17),
+            current_part: Some(2),
+            total_parts: Some(8),
+            state_download: None,
+        });
+        node.observe_sync_progress(18, 17);
+        node.observe_sync_time_progress(90, 100);
+        expect_test::expect![[r#"
+            (
+                Some(
+                    18,
+                ),
+                Some(
+                    18,
+                ),
+                Some(
+                    90,
+                ),
+                Some(
+                    90,
+                ),
+                Some(
+                    100,
+                ),
+                None,
+                true,
+            )
+        "#]]
+        .assert_debug_eq(&(
+            node.head_seqno,
+            node.network_head_seqno,
+            node.sync_initial_masterchain_block_time,
+            node.sync_masterchain_block_time,
+            node.sync_target_time,
+            node.initial_sync_progress.as_ref(),
+            node.sync_progressed_at.is_some(),
+        ));
+
+        node.begin_synchronization();
+        expect_test::expect![[r#"
+            (
+                "synchronizing",
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+        "#]]
+        .assert_debug_eq(&(
+            node.status,
+            node.head_seqno,
+            node.network_head_seqno,
+            node.sync_initial_masterchain_block_time,
+            node.sync_masterchain_block_time,
+            node.sync_target_time,
+            node.initial_sync_progress.as_ref(),
+            node.sync_progressed_at,
+        ));
+    }
+
+    #[test]
+    fn repeated_initial_sync_sample_does_not_look_like_progress() {
+        let progress = InitialSyncProgress {
+            stage: InitialSyncStage::Starting,
+            masterchain_seqno: Some(46_894_135),
+            current_part: None,
+            total_parts: None,
+            state_download: Some(StateDownloadProgress {
+                downloaded_bytes: 1_024,
+                total_bytes: 8_192,
+                bytes_per_second: 512,
+                remaining_seconds: 14,
+            }),
+        };
+        let mut node = NodeRuntime::default();
+        node.observe_initial_sync_progress(progress.clone());
+        node.sync_progressed_at = Some(1);
+
+        let mut same_bytes = progress;
+        same_bytes.state_download = Some(StateDownloadProgress {
+            downloaded_bytes: 1_024,
+            total_bytes: 8_192,
+            bytes_per_second: 256,
+            remaining_seconds: 28,
+        });
+        node.observe_initial_sync_progress(same_bytes);
+
+        expect_test::expect![[r#"
+            (
+                Some(
+                    1,
+                ),
+                Some(
+                    InitialSyncProgress {
+                        stage: Starting,
+                        masterchain_seqno: Some(
+                            46894135,
+                        ),
+                        current_part: None,
+                        total_parts: None,
+                        state_download: Some(
+                            StateDownloadProgress {
+                                downloaded_bytes: 1024,
+                                total_bytes: 8192,
+                                bytes_per_second: 256,
+                                remaining_seconds: 28,
+                            },
+                        ),
+                    },
+                ),
+            )
+        "#]]
+        .assert_debug_eq(&(node.sync_progressed_at, node.initial_sync_progress.as_ref()));
+
+        let mut advanced = node.initial_sync_progress.clone().unwrap();
+        advanced.state_download.as_mut().unwrap().downloaded_bytes = 2_048;
+        node.observe_initial_sync_progress(advanced);
+        assert_ne!(node.sync_progressed_at, Some(1));
+    }
+
+    #[test]
     fn atomic_updates_preserve_independent_writers() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("runtime.json");
@@ -285,11 +599,11 @@ mod tests {
             let path = path.clone();
             threads.push(std::thread::spawn(move || {
                 RuntimeState::update_atomic(&path, |state| {
-                    state.nodes.insert(
-                        format!("node-{index}"),
-                        NodeRuntime {
-                            initialized: true,
-                            ..NodeRuntime::default()
+                    state.services.insert(
+                        format!("service-{index}"),
+                        ServiceRuntime {
+                            running: true,
+                            ..ServiceRuntime::default()
                         },
                     );
                     Ok(())
@@ -300,28 +614,31 @@ mod tests {
         for thread in threads {
             thread.join().unwrap();
         }
-        assert_eq!(RuntimeState::load(&path).unwrap().nodes.len(), 8);
+        assert_eq!(RuntimeState::load(&path).unwrap().services.len(), 8);
     }
 
     #[test]
     fn validator_keys_are_retained_across_rounds() {
         let mut node = NodeRuntime::default();
-        node.remember_validator_public_key("genesis".to_owned());
-        node.set_validator_public_key("round-1".to_owned());
-        node.set_validator_public_key("round-2".to_owned());
+        node.remember_validator_public_key(TonPublicKey::from_bytes([1; 32]));
+        node.set_validator_public_key(TonPublicKey::from_bytes([2; 32]));
+        node.set_validator_public_key(TonPublicKey::from_bytes([3; 32]));
 
         expect_test::expect![[r#"
-            (
-                Some(
-                    "round-2",
-                ),
-                [
-                    "genesis",
-                    "round-1",
-                    "round-2",
-                ],
-            )
-        "#]]
-        .assert_debug_eq(&(node.validator_public_key, node.validator_public_keys));
+            {
+              "current": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=",
+              "history": [
+                "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+                "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+                "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM="
+              ]
+            }"#]]
+        .assert_eq(
+            &serde_json::to_string_pretty(&serde_json::json!({
+                "current": node.validator_public_key,
+                "history": node.validator_public_keys,
+            }))
+            .unwrap(),
+        );
     }
 }

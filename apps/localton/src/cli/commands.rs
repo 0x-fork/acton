@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use crate::{
     cli::{ConfigCommand, LiteCommand, StateArgs},
+    operations,
     storage::Layout,
     storage::Settings,
     ton::{
@@ -181,7 +182,7 @@ pub async fn lite(command: LiteCommand) -> Result<()> {
         }
         LiteCommand::Elections { state } => {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
-            print_json(&crate::operations::validators::election_status(&toolchain).await?)?;
+            print_json(&operations::validators::election_status(&toolchain).await?)?;
         }
         LiteCommand::Config { state, params } => {
             let toolchain = Toolchain::resolve(&state.state_dir, None).await?;
@@ -216,8 +217,8 @@ fn layout(state: &StateArgs) -> Result<Layout> {
 
 /// Selects the trusted network config used by typed liteserver operations
 fn lite_target(toolchain: &Toolchain) -> Result<LiteTarget> {
-    require_existing_config(&toolchain.layout.global_config)?;
-    Ok(LiteTarget::new(&toolchain.layout.global_config).with_label("localton"))
+    require_existing_config(toolchain.lite_config())?;
+    Ok(LiteTarget::new(toolchain.lite_config()).with_label("localton"))
 }
 
 fn print_json<T: Serialize>(value: &T) -> Result<()> {

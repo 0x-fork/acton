@@ -15,9 +15,7 @@ use crate::{
 
 pub async fn execute(args: HardforkArgs) -> Result<()> {
     let toolchain = Toolchain::resolve(&args.state.state_dir, None).await?;
-    let settings = toolchain.settings()?;
-    let node = settings.node(&args.node)?;
-    let node_layout = toolchain.layout.node(node);
+    let node_layout = &toolchain.layout.node;
     let binary = toolchain
         .binaries
         .optional_command("create-hardfork")
