@@ -12,8 +12,17 @@ permissions: { }
 
 jobs:
   build:
-    name: Build localton nightly Linux binary
-    runs-on: ubicloud-standard-2-ubuntu-2204
+    name: Build localton nightly Linux ${{ matrix.arch }} binary
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubicloud-standard-2-ubuntu-2204
+          - arch: aarch64
+            runner: ubicloud-standard-2-arm-ubuntu-2204
 
     permissions:
       contents: read
@@ -62,17 +71,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          archive="localton-nightly-linux-x86_64.tar.gz"
+          archive="localton-nightly-linux-${{ matrix.arch }}.tar.gz"
           tar -C target/release -czf "${archive}" localton
           sha256sum "${archive}" > "${archive}.sha256"
 
       - name: Upload localton artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: localton-nightly-linux-x86_64
+          name: localton-nightly-linux-${{ matrix.arch }}
           path: |
-            apps/localton/localton-nightly-linux-x86_64.tar.gz
-            apps/localton/localton-nightly-linux-x86_64.tar.gz.sha256
+            apps/localton/localton-nightly-linux-${{ matrix.arch }}.tar.gz
+            apps/localton/localton-nightly-linux-${{ matrix.arch }}.tar.gz.sha256
           retention-days: 1
           if-no-files-found: error
 
@@ -86,11 +95,12 @@ jobs:
       contents: write
 
     steps:
-      - name: Download localton artifact
+      - name: Download localton artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: localton-nightly-linux-x86_64
+          pattern: localton-nightly-linux-*
           path: release-artifacts
+          merge-multiple: true
 
       - name: Create or update localton nightly prerelease
         env:
