@@ -1079,6 +1079,75 @@
   align-items: start;
 }
 
+.networkHealthSummary {
+  width: 100%;
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(4, minmax(90px, 0.7fr)) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 16px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 12px;
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.networkHealthSummary:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.networkHealthIdentity {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.networkHealthIdentity > span:last-child,
+.networkHealthMetric {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.networkHealthIdentity strong,
+.networkHealthMetric strong {
+  overflow: hidden;
+  color: var(--acton-color-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.networkHealthIdentity > span:last-child > span,
+.networkHealthMetric > span {
+  overflow: hidden;
+  color: var(--acton-color-text-muted);
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.networkHealthIcon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--acton-color-surface-group);
+  color: var(--acton-color-success);
+}
+
+.networkHealthArrow {
+  color: var(--acton-color-text-muted);
+}
+
 .homeMainColumn,
 .homeSideColumn {
   min-width: 0;
@@ -2476,6 +2545,11 @@
 }
 
 @media (max-width: 1240px) {
+  .networkHealthSummary {
+    grid-template-columns: minmax(200px, 1fr) repeat(4, minmax(76px, auto)) auto;
+    gap: 12px;
+  }
+
   .environmentHomeHeader {
     min-height: auto;
     padding-block: 10px;
@@ -2508,6 +2582,14 @@
 }
 
 @media (max-width: 920px) {
+  .networkHealthSummary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .networkHealthMetric {
+    display: none;
+  }
+
   .page {
     height: 100%;
     min-height: 0;

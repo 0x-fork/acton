@@ -34,6 +34,7 @@ import {IntegratePage} from "./dashboard/pages/IntegratePage"
 import {ContractPage} from "./dashboard/pages/ContractPage"
 import {ContractsPage} from "./dashboard/pages/ContractsPage"
 import {NftsPage} from "./dashboard/pages/NftsPage"
+import {NetworkPage} from "./dashboard/pages/NetworkPage"
 import {SettingsPage} from "./dashboard/pages/SettingsPage"
 import {SnapshotsPage} from "./dashboard/pages/SnapshotsPage"
 import {SourceCatalogPage} from "./dashboard/pages/SourceCatalogPage"
@@ -52,6 +53,9 @@ const ApiReferencePage = lazy(async () => {
 })
 const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/dashboard": "Dashboard",
+  "/network": "Network overview",
+  "/network/nodes": "Nodes and synchronization",
+  "/network/validators": "Validators",
   "/faucet": "Faucet",
   "/wallets": "Wallets",
   "/simulator": "Simulator",
@@ -75,6 +79,9 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
 
 const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/dashboard": "Network status and recent activity",
+  "/network": "Throughput, topology and consensus health",
+  "/network/nodes": "Node availability, synchronization and diagnostics",
+  "/network/validators": "Elections, validator sets and block production",
   "/faucet": "Fund accounts in this environment",
   "/wallets": "Project wallets available on this network, ready for TON Connect",
   "/simulator": "Build and replay messages against this network",
@@ -244,6 +251,21 @@ const AppContent: FC<AppContentProps> = ({
                 </DashboardPage>
               }
             />
+            {(["/network", "/network/nodes", "/network/validators"] as const).map(networkPath => (
+              <Route
+                key={networkPath}
+                path={path(networkPath)}
+                element={withCapability(
+                  "observability",
+                  <DashboardPage>
+                    <NetworkPage
+                      view={networkDashboardView(networkPath)}
+                      onEnvironmentChange={onEnvironmentChange}
+                    />
+                  </DashboardPage>,
+                )}
+              />
+            ))}
             <Route
               path={path("/faucet")}
               element={
@@ -719,6 +741,12 @@ function absoluteUrl(value: string): string {
   } catch {
     return value
   }
+}
+
+function networkDashboardView(path: "/network" | "/network/nodes" | "/network/validators") {
+  if (path === "/network/nodes") return "nodes"
+  if (path === "/network/validators") return "validators"
+  return "overview"
 }
 
 interface LocalnetAuthOverlayProps {

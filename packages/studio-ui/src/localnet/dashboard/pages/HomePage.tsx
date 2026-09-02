@@ -1,4 +1,12 @@
-import {CircleDot, CircleHelp, FastForward, GitBranch, Network} from "lucide-react"
+import {
+  ArrowRight,
+  CircleDot,
+  CircleHelp,
+  FastForward,
+  GitBranch,
+  Network,
+  RadioTower,
+} from "lucide-react"
 import {
   BlockChip,
   Button,
@@ -25,6 +33,12 @@ import {
 import {useNavigate} from "react-router"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent} from "react"
+import {
+  createObservabilityClient,
+  type NetworkView,
+  type TpsView,
+  useObservability,
+} from "@acton/localton-ui"
 
 import {supports} from "../../../environmentCapabilities"
 import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
@@ -444,6 +458,13 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
               />
             )}
 
+            {supports(environment, "observability") && environment?.endpoints.observability ? (
+              <NetworkHealthSummary
+                endpoint={environment.endpoints.observability}
+                onOpen={() => void navigate(localnetRoutes.path("/network"))}
+              />
+            ) : undefined}
+
             {hasSimulatedControlApi || hasNetworkNodeInfo ? (
               <DataTable title="Node info" minWidth="42rem">
                 <DataTableTable aria-label="Node info">
@@ -750,6 +771,68 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
       ) : undefined}
     </div>
   )
+}
+
+interface NetworkHealthSummaryProps {
+  readonly endpoint: string
+  readonly onOpen: () => void
+}
+
+/** Gives the environment home a compact live entry point into full network observability */
+const NetworkHealthSummary: FC<NetworkHealthSummaryProps> = ({endpoint, onOpen}) => {
+  const client = useMemo(() => createObservabilityClient(endpoint), [endpoint])
+  const {network, tps} = useObservability(client)
+
+  return (
+    <button type="button" className={styles.networkHealthSummary} onClick={onOpen}>
+      <span className={styles.networkHealthIdentity}>
+        <span className={styles.networkHealthIcon} aria-hidden="true">
+          <RadioTower size={17} />
+        </span>
+        <span>
+          <strong>Network health</strong>
+          <span>{networkHealthLabel(network)}</span>
+        </span>
+      </span>
+      <NetworkHealthMetric
+        label="Nodes"
+        value={network ? `${network.totals.online_nodes}/${network.totals.nodes}` : "—"}
+      />
+      <NetworkHealthMetric
+        label="Synchronized"
+        value={network ? `${network.totals.synchronized_nodes}/${network.totals.nodes}` : "—"}
+      />
+      <NetworkHealthMetric label="Validators" value={network?.totals.active_validators ?? "—"} />
+      <NetworkHealthMetric label="Throughput" value={latestTps(tps)} />
+      <ArrowRight className={styles.networkHealthArrow} size={17} aria-hidden="true" />
+    </button>
+  )
+}
+
+const NetworkHealthMetric: FC<{readonly label: string; readonly value: number | string}> = ({
+  label,
+  value,
+}) => (
+  <span className={styles.networkHealthMetric}>
+    <span>{label}</span>
+    <strong>{value}</strong>
+  </span>
+)
+
+function networkHealthLabel(network: NetworkView | undefined) {
+  if (!network) return "Waiting for observations"
+  if (
+    network.totals.online_nodes === network.totals.nodes &&
+    network.totals.synchronized_nodes === network.totals.nodes
+  ) {
+    return "All nodes online and synchronized"
+  }
+  return `${network.totals.catching_up_nodes} catching up`
+}
+
+function latestTps(tps: TpsView | undefined) {
+  const value = tps?.points.at(-1)?.tps
+  return value === undefined ? "—" : `${formatNumberValue(value, {maximumFractionDigits: 1})} TPS`
 }
 
 function formatForkSummary(

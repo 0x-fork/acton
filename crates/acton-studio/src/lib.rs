@@ -54,8 +54,8 @@ pub use environment::{
     EnvironmentLifecycle, EnvironmentNetwork, EnvironmentRuntime, EnvironmentRuntimeError,
     EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation,
     EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings,
-    EnvironmentStatus, FullTonAccountImport, FullTonNode, PublicTonNetwork, StudioEnvironment,
-    UpdateEnvironmentRequest,
+    EnvironmentStatus, FullTonAccountImport, FullTonNode, PublicTonNetwork,
+    RemoveFullTonNodeRequest, StudioEnvironment, UpdateEnvironmentRequest,
 };
 pub use environment_catalog::{
     MAINNET_ENVIRONMENT_ID, PUBLIC_TON_ENVIRONMENT_IDS, TESTNET_ENVIRONMENT_ID,
@@ -314,6 +314,18 @@ impl StudioServer {
                 post(add_full_ton_node),
             )
             .route(
+                "/environments/{environment_id}/nodes/{node_id}",
+                axum::routing::delete(remove_full_ton_node),
+            )
+            .route(
+                "/environments/{environment_id}/nodes/{node_id}/leave-validation",
+                post(leave_full_ton_validation),
+            )
+            .route(
+                "/environments/{environment_id}/nodes/{node_id}/enter-validation",
+                post(enter_full_ton_validation),
+            )
+            .route(
                 "/environments/{environment_id}/stop",
                 post(stop_environment),
             )
@@ -353,6 +365,10 @@ impl StudioServer {
             .route(
                 "/environments/{environment_id}/rpc/{*path}",
                 any(proxy_environment_rpc),
+            )
+            .route(
+                "/environments/{environment_id}/observability/{*path}",
+                any(proxy_environment_observability),
             )
             .merge(test_api::router())
             .fallback(api_not_found);
@@ -527,6 +543,90 @@ async fn add_full_ton_node(
         .add_full_ton_node(&environment_id, request)
         .await
         .map(|environment| (StatusCode::CREATED, Json(public_environment(environment))))
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/environments/{environment_id}/nodes/{node_id}",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("node_id" = String, Path, description = "Managed node ID"),
+        RemoveFullTonNodeRequest
+    ),
+    responses(
+        (status = 200, description = "Node removed", body = StudioEnvironment),
+        (status = 400, description = "Node is not managed by the environment", body = StudioApiErrorBody),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Node cannot be removed safely", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
+async fn remove_full_ton_node(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, node_id)): AxumPath<(String, String)>,
+    Query(request): Query<RemoveFullTonNodeRequest>,
+) -> Result<Json<StudioEnvironment>, StudioApiError> {
+    state
+        .environment_runtime
+        .remove_full_ton_node(&environment_id, &node_id, request)
+        .await
+        .map(public_environment)
+        .map(Json)
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/nodes/{node_id}/leave-validation",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("node_id" = String, Path, description = "Managed validator node ID")
+    ),
+    responses(
+        (status = 202, description = "Future election participation disabled", body = StudioEnvironment),
+        (status = 400, description = "Node is not a managed validator", body = StudioApiErrorBody),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Validation cannot be changed", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
+async fn leave_full_ton_validation(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, node_id)): AxumPath<(String, String)>,
+) -> Result<(StatusCode, Json<StudioEnvironment>), StudioApiError> {
+    state
+        .environment_runtime
+        .leave_full_ton_validation(&environment_id, &node_id)
+        .await
+        .map(|environment| (StatusCode::ACCEPTED, Json(public_environment(environment))))
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/nodes/{node_id}/enter-validation",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("node_id" = String, Path, description = "Managed validator node ID")
+    ),
+    responses(
+        (status = 202, description = "Future election participation enabled", body = StudioEnvironment),
+        (status = 400, description = "Node is not a managed validator", body = StudioApiErrorBody),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Validation cannot be changed", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
+async fn enter_full_ton_validation(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, node_id)): AxumPath<(String, String)>,
+) -> Result<(StatusCode, Json<StudioEnvironment>), StudioApiError> {
+    state
+        .environment_runtime
+        .enter_full_ton_validation(&environment_id, &node_id)
+        .await
+        .map(|environment| (StatusCode::ACCEPTED, Json(public_environment(environment))))
         .map_err(StudioApiError)
 }
 
@@ -1074,10 +1174,11 @@ async fn wallet_environment(
 }
 
 fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
-    let proxy_root = format!(
-        "{STUDIO_ENVIRONMENTS_PATH}/{}/rpc",
+    let environment_root = format!(
+        "{STUDIO_ENVIRONMENTS_PATH}/{}",
         urlencoding::encode(&environment.id)
     );
+    let proxy_root = format!("{environment_root}/rpc");
     environment.rpc_url.clone_from(&proxy_root);
     environment.endpoints = EnvironmentEndpoints {
         api_v2: environment
@@ -1100,7 +1201,11 @@ fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
             .contains(&EnvironmentCapability::ControlApi)
             && environment.runtime_endpoints.control.is_some())
         .then_some(proxy_root),
-        observability: environment.runtime_endpoints.observability.clone(),
+        observability: (environment
+            .capabilities
+            .contains(&EnvironmentCapability::Observability)
+            && environment.runtime_endpoints.observability.is_some())
+        .then(|| format!("{environment_root}/observability")),
     };
     environment
 }
@@ -1119,6 +1224,89 @@ async fn proxy_environment_rpc(
     request: Request,
 ) -> Response {
     proxy_environment_request_with_capture(state, environment_id, path, request).await
+}
+
+async fn proxy_environment_observability(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, path)): AxumPath<(String, String)>,
+    request: Request,
+) -> Response {
+    let environment = match state.environment_runtime.get(&environment_id).await {
+        Ok(environment) => environment,
+        Err(error) => return StudioApiError(error).into_response(),
+    };
+
+    match proxy_observability_request(state, environment, path, request).await {
+        Ok(response) => response,
+        Err(error) => error.into_response(),
+    }
+}
+
+/// Proxies collector data through Studio so remote browsers never resolve a host-local endpoint.
+async fn proxy_observability_request(
+    state: StudioState,
+    environment: StudioEnvironment,
+    path: String,
+    request: Request,
+) -> Result<Response, StudioApiError> {
+    if environment.status != EnvironmentStatus::Running {
+        return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "environment_not_running",
+            message: format!("Environment {} is not running", environment.name),
+        }));
+    }
+    if !environment
+        .capabilities
+        .contains(&EnvironmentCapability::Observability)
+    {
+        return Err(StudioApiError(EnvironmentRuntimeError::Conflict {
+            code: "environment_observability_unavailable",
+            message: "Observability is not available for this environment".to_owned(),
+        }));
+    }
+    let base_url = environment
+        .runtime_endpoints
+        .observability
+        .as_deref()
+        .ok_or_else(|| {
+            StudioApiError(EnvironmentRuntimeError::Conflict {
+                code: "environment_observability_unavailable",
+                message: "The observability collector is not running".to_owned(),
+            })
+        })?;
+    let (parts, body) = request.into_parts();
+    let mut upstream_url = format!("{}/{}", base_url.trim_end_matches('/'), path);
+    if let Some(query) = parts.uri.query() {
+        upstream_url.push('?');
+        upstream_url.push_str(query);
+    }
+    let upstream_request = apply_upstream_headers(
+        state.http_client.request(parts.method, upstream_url),
+        &parts.headers,
+        &environment,
+        None,
+    );
+    let upstream_response = upstream_request
+        .body(reqwest::Body::wrap_stream(body.into_data_stream()))
+        .send()
+        .await
+        .map_err(proxy_error)?;
+    let status = upstream_response.status();
+    let headers = upstream_response.headers().clone();
+    let mut response = Response::builder().status(status);
+    for (name, value) in &headers {
+        if should_forward_upstream_response_header(name, false) {
+            response = response.header(name, value);
+        }
+    }
+    response
+        .body(Body::from_stream(upstream_response.bytes_stream()))
+        .map_err(|error| {
+            StudioApiError(EnvironmentRuntimeError::Internal {
+                code: "environment_proxy_response_failed",
+                message: format!("Failed to build the observability response: {error}"),
+            })
+        })
 }
 
 async fn proxy_environment_request_with_capture(

@@ -8,17 +8,18 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tokio::process::{Child, Command};
 use tokio::time::timeout;
+use uuid::Uuid;
 use xxhash_rust::xxh3::xxh3_64;
 
 use crate::{EnvironmentRuntimeError, EnvironmentSnapshot, FullTonAccountImport, FullTonNode};
 
 const COMPOSE_TEMPLATE: &str = include_str!("../assets/full-ton-network.compose.yaml");
 const DEFAULT_LOCALTON_IMAGE: &str =
-    "ghcr.io/ton-blockchain/localton:sha-ee9fc2e02f151d9556b33ed79a8fc4cfe37a7c91";
+    "ghcr.io/ton-blockchain/localton:sha-daddb274ef00101efd81f604371b2de50d446f10";
 const COMPOSE_WAIT_TIMEOUT_SECONDS: u16 = 600;
 const DOCKER_CONFIG_DIRECTORY: &str = "docker-pull-config";
 const RUNTIME_DESCRIPTOR_FILE: &str = "runtime.json";
-const RUNTIME_DESCRIPTOR_VERSION: u16 = 1;
+const RUNTIME_DESCRIPTOR_VERSION: u16 = 2;
 const IMPORTED_ACCOUNTS_FILE: &str = "imported-accounts.json";
 const IMPORTED_ACCOUNTS_VERSION: u16 = 1;
 const STARTUP_LOG_FILE: &str = "startup.log";
@@ -28,6 +29,8 @@ const DOCKER_METADATA_TIMEOUT: Duration = Duration::from_secs(10);
 const DOCKER_DIAGNOSTICS_TIMEOUT: Duration = Duration::from_secs(15);
 const COMPOSE_STOP_TIMEOUT: Duration = Duration::from_secs(2 * 60);
 const COMPOSE_DELETE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+const COMPOSE_NODE_REMOVE_TIMEOUT: Duration = Duration::from_secs(2 * 60);
+const COMPOSE_NODE_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
 const SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 const LOCALTON_STATE_DIR: &str = "/var/lib/localton";
 const LOCALTON_SNAPSHOT_DIR: &str = "/var/lib/localton-snapshots";
@@ -65,6 +68,7 @@ struct RuntimeDescriptor {
     version: u16,
     image: String,
     docker_target: DockerTarget,
+    project_name: String,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -163,6 +167,11 @@ impl FullTonNetworkDriver {
                     version: RUNTIME_DESCRIPTOR_VERSION,
                     image,
                     docker_target: resolve_docker_target().await?,
+                    project_name: compose_project_name(
+                        workspace_root,
+                        environment_id,
+                        Uuid::new_v4(),
+                    ),
                 };
                 write_runtime_descriptor(&runtime_file, &runtime).await?;
                 runtime
@@ -172,6 +181,7 @@ impl FullTonNetworkDriver {
         let RuntimeDescriptor {
             image,
             docker_target,
+            project_name,
             ..
         } = runtime;
         let compose_file = data_dir.join("compose.yaml");
@@ -221,7 +231,7 @@ impl FullTonNetworkDriver {
             docker_target,
             isolated_docker_config_dir,
             image,
-            project_name: compose_project_name(workspace_root, environment_id),
+            project_name,
             startup_log_file: data_dir.join(STARTUP_LOG_FILE),
         })
     }
@@ -291,9 +301,136 @@ impl FullTonNetworkDriver {
         result
     }
 
+    /// Disables future election participation inside a joined validator's persistent state.
+    ///
+    /// Localton keeps the validator engine online until TON replaces the elected set. The setting
+    /// survives container restarts and observability reports the intermediate `leaving` state.
+    pub(crate) async fn leave_validation(
+        &self,
+        node: &FullTonNode,
+    ) -> Result<(), EnvironmentRuntimeError> {
+        let mut command = self.compose_command();
+        command.args([
+            "exec",
+            "--no-TTY",
+            &node.id,
+            "/usr/local/bin/localton",
+            "validator",
+            "disable",
+            "--state-dir",
+            LOCALTON_STATE_DIR,
+        ]);
+        self.run_command(
+            command,
+            "disable future validator elections",
+            "environment_node_validation_leave_failed",
+            COMPOSE_NODE_COMMAND_TIMEOUT,
+        )
+        .await
+    }
+
+    pub(crate) async fn enter_validation(
+        &self,
+        node: &FullTonNode,
+    ) -> Result<(), EnvironmentRuntimeError> {
+        let mut command = self.compose_command();
+        command.args([
+            "exec",
+            "--no-TTY",
+            &node.id,
+            "/usr/local/bin/localton",
+            "validator",
+            "enable",
+            "--state-dir",
+            LOCALTON_STATE_DIR,
+        ]);
+        self.run_command(
+            command,
+            "enable future validator elections",
+            "environment_node_validation_enter_failed",
+            COMPOSE_NODE_COMMAND_TIMEOUT,
+        )
+        .await
+    }
+
+    /// Stops one joined service, removes its private state volume, and persists the new topology.
+    ///
+    /// The bootstrap service is not represented by `FullTonNode`, so callers cannot remove the
+    /// network owner through this operation.
+    pub(crate) async fn remove_node(
+        &self,
+        existing_nodes: &[FullTonNode],
+        node: &FullTonNode,
+    ) -> Result<(), EnvironmentRuntimeError> {
+        let mut command = self.compose_command();
+        command.args(["ps", "--all", "--quiet", &node.id]);
+        let output = self
+            .command_output(
+                command,
+                "locate the node container",
+                "environment_node_remove_failed",
+                COMPOSE_NODE_REMOVE_TIMEOUT,
+            )
+            .await?;
+        let container_id = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        let remaining = existing_nodes
+            .iter()
+            .filter(|candidate| candidate.id != node.id)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        // Publish the new topology before deleting runtime state so the removed service cannot
+        // return on the next environment restart if the Compose definition cannot be updated.
+        self.write_compose(&remaining).await?;
+
+        if !container_id.is_empty() {
+            let mut command = self.docker_command();
+            command.args(["rm", "--force", &container_id]);
+            if let Err(error) = self
+                .run_command(
+                    command,
+                    "remove the node container",
+                    "environment_node_remove_failed",
+                    COMPOSE_NODE_REMOVE_TIMEOUT,
+                )
+                .await
+            {
+                let _ = self.write_compose(existing_nodes).await;
+                return Err(error);
+            }
+        }
+
+        let volume = format!("{}_{}-state", self.project_name, node.id);
+        let mut command = self.docker_command();
+        command.args(["volume", "rm", "--force", &volume]);
+        if let Err(error) = self
+            .run_command(
+                command,
+                "remove the node state volume",
+                "environment_node_remove_failed",
+                COMPOSE_NODE_REMOVE_TIMEOUT,
+            )
+            .await
+        {
+            tracing::warn!(
+                operation = "remove_full_ton_node_state",
+                node = %node.name,
+                target = %volume,
+                outcome = "error",
+                %error,
+                "Node container was removed but its state volume could not be deleted"
+            );
+        }
+
+        Ok(())
+    }
+
     async fn write_compose(&self, nodes: &[FullTonNode]) -> Result<(), EnvironmentRuntimeError> {
+        let temp_path = self
+            .compose_file
+            .with_extension(format!("yaml.{}.tmp", std::process::id()));
         tokio::fs::write(
-            &self.compose_file,
+            &temp_path,
             render_compose(&self.image, &self.compose_config, nodes),
         )
         .await
@@ -301,9 +438,20 @@ impl FullTonNetworkDriver {
             code: "environment_storage_failed",
             message: format!(
                 "Failed to write the full TON network definition at {}: {error}",
-                self.compose_file.display()
+                temp_path.display()
             ),
-        })
+        })?;
+        if let Err(error) = tokio::fs::rename(&temp_path, &self.compose_file).await {
+            let _ = tokio::fs::remove_file(&temp_path).await;
+            return Err(EnvironmentRuntimeError::Internal {
+                code: "environment_storage_failed",
+                message: format!(
+                    "Failed to publish the full TON network definition at {}: {error}",
+                    self.compose_file.display()
+                ),
+            });
+        }
+        Ok(())
     }
 
     pub(crate) fn spawn_normal_pull(&self) -> Result<Child, EnvironmentRuntimeError> {
@@ -1106,9 +1254,19 @@ async fn load_or_store_imported_accounts(
         .collect())
 }
 
-fn compose_project_name(workspace_root: &Path, environment_id: &str) -> String {
+// Docker volumes belong to a concrete environment deployment, not to its reusable
+// display ID. The random deployment ID prevents a newly created environment from
+// attaching state left behind after manual removal of Studio metadata.
+fn compose_project_name(
+    workspace_root: &Path,
+    environment_id: &str,
+    deployment_id: Uuid,
+) -> String {
     let workspace_hash = xxh3_64(workspace_root.as_os_str().as_encoded_bytes());
-    format!("acton-studio-{workspace_hash:016x}-{environment_id}")
+    format!(
+        "acton-studio-{workspace_hash:016x}-{environment_id}-{}",
+        deployment_id.as_simple()
+    )
 }
 
 fn validate_image_reference(image: &str) -> Result<(), EnvironmentRuntimeError> {
@@ -1129,6 +1287,7 @@ fn validate_image_reference(image: &str) -> Result<(), EnvironmentRuntimeError> 
 #[cfg(test)]
 mod tests {
     use expect_test::expect;
+    use uuid::Uuid;
 
     use std::path::{Path, PathBuf};
 
@@ -1177,7 +1336,7 @@ v3-worker (exited, exit code 1)"]]
         let actual = format!(
             "project: {}\n{selected_lines}",
             normalize_project_name(
-                &compose_project_name(Path::new("/workspace"), "environment-7"),
+                &test_project_name(Path::new("/workspace"), "environment-7"),
                 Path::new("/workspace"),
                 "environment-7",
             )
@@ -1440,14 +1599,20 @@ v3-worker (exited, exit code 1)"]]
     }
 
     #[test]
-    fn compose_project_names_are_stable_and_isolated_by_workspace() {
-        let first = compose_project_name(Path::new("/workspace/first"), "environment-1");
-        let repeated = compose_project_name(Path::new("/workspace/first"), "environment-1");
-        let second = compose_project_name(Path::new("/workspace/second"), "environment-1");
+    fn compose_project_names_are_stable_and_isolated_by_deployment() {
+        let first = test_project_name(Path::new("/workspace/first"), "environment-1");
+        let repeated = test_project_name(Path::new("/workspace/first"), "environment-1");
+        let second = test_project_name(Path::new("/workspace/second"), "environment-1");
+        let recreated = compose_project_name(
+            Path::new("/workspace/first"),
+            "environment-1",
+            Uuid::from_u128(2),
+        );
 
         assert_eq!(first, repeated);
         assert_ne!(first, second);
-        assert!(first.ends_with("-environment-1"));
+        assert_ne!(first, recreated);
+        assert!(first.contains("-environment-1-"));
     }
 
     #[test]
@@ -1457,11 +1622,13 @@ v3-worker (exited, exit code 1)"]]
                 version: RUNTIME_DESCRIPTOR_VERSION,
                 image: "registry.example/ton:context-build".to_owned(),
                 docker_target: DockerTarget::Context("desktop-linux".to_owned()),
+                project_name: "acton-studio-context-build".to_owned(),
             },
             RuntimeDescriptor {
                 version: RUNTIME_DESCRIPTOR_VERSION,
                 image: "registry.example/ton:host-build".to_owned(),
                 docker_target: DockerTarget::Host("unix:///var/run/docker.sock".to_owned()),
+                project_name: "acton-studio-host-build".to_owned(),
             },
         ];
         let actual = runtimes
@@ -1477,21 +1644,23 @@ v3-worker (exited, exit code 1)"]]
 
         expect![[r#"
             {
-              "version": 1,
+              "version": 2,
               "image": "registry.example/ton:context-build",
               "dockerTarget": {
                 "kind": "context",
                 "value": "desktop-linux"
-              }
+              },
+              "projectName": "acton-studio-context-build"
             }
 
             {
-              "version": 1,
+              "version": 2,
               "image": "registry.example/ton:host-build",
               "dockerTarget": {
                 "kind": "host",
                 "value": "unix:///var/run/docker.sock"
-              }
+              },
+              "projectName": "acton-studio-host-build"
             }"#]]
         .assert_eq(&actual);
     }
@@ -1504,6 +1673,7 @@ v3-worker (exited, exit code 1)"]]
             version: RUNTIME_DESCRIPTOR_VERSION,
             image: "registry.example/persisted/ton:build-17".to_owned(),
             docker_target: DockerTarget::Host("unix:///persisted/docker.sock".to_owned()),
+            project_name: "acton-studio-persisted-environment-17".to_owned(),
         };
         write_runtime_descriptor(&runtime_file, &runtime)
             .await
@@ -1552,12 +1722,13 @@ v3-worker (exited, exit code 1)"]]
         expect![[r#"
             RUNTIME
             {
-              "version": 1,
+              "version": 2,
               "image": "registry.example/persisted/ton:build-17",
               "dockerTarget": {
                 "kind": "host",
                 "value": "unix:///persisted/docker.sock"
-              }
+              },
+              "projectName": "acton-studio-persisted-environment-17"
             }
 
             COMMAND
@@ -1565,7 +1736,7 @@ v3-worker (exited, exit code 1)"]]
             unix:///persisted/docker.sock
             compose
             -p
-            acton-studio-<workspace>-environment-17
+            acton-studio-persisted-environment-17
             -f
             <environment-data>/compose.yaml
 
@@ -1592,6 +1763,7 @@ v3-worker (exited, exit code 1)"]]
             version: RUNTIME_DESCRIPTOR_VERSION,
             image: "registry.example/ton image:invalid".to_owned(),
             docker_target: DockerTarget::Context("desktop-linux".to_owned()),
+            project_name: "acton-studio-invalid-image".to_owned(),
         };
         write_runtime_descriptor(&data_dir.path().join(RUNTIME_DESCRIPTOR_FILE), &runtime)
             .await
@@ -1666,13 +1838,13 @@ acton-studio-<workspace>-environment-1
             inspect
             --format
             {{.Id}}
-            ghcr.io/ton-blockchain/localton:sha-ee9fc2e02f151d9556b33ed79a8fc4cfe37a7c91
+            ghcr.io/ton-blockchain/localton:sha-daddb274ef00101efd81f604371b2de50d446f10
 
             NORMAL
             --context
             desktop-linux
             pull
-            ghcr.io/ton-blockchain/localton:sha-ee9fc2e02f151d9556b33ed79a8fc4cfe37a7c91
+            ghcr.io/ton-blockchain/localton:sha-daddb274ef00101efd81f604371b2de50d446f10
 
             ISOLATED
             --config
@@ -1682,7 +1854,7 @@ acton-studio-<workspace>-environment-1
             pull
             --platform
             linux/arm64
-            ghcr.io/ton-blockchain/localton:sha-ee9fc2e02f151d9556b33ed79a8fc4cfe37a7c91
+            ghcr.io/ton-blockchain/localton:sha-daddb274ef00101efd81f604371b2de50d446f10
 
             CUSTOM ISOLATED: false"]]
         .assert_eq(&actual);
@@ -1696,7 +1868,7 @@ acton-studio-<workspace>-environment-1
             isolated_docker_config_dir: supports_isolated_pull
                 .then(|| PathBuf::from("/workspace/.studio/environment-1/docker-pull-config")),
             image: image.to_owned(),
-            project_name: compose_project_name(Path::new("/workspace"), "environment-1"),
+            project_name: test_project_name(Path::new("/workspace"), "environment-1"),
             startup_log_file: PathBuf::from("/workspace/.studio/environment-1/startup.log"),
         }
     }
@@ -1723,8 +1895,12 @@ acton-studio-<workspace>-environment-1
 
     fn normalize_project_name(value: &str, workspace_root: &Path, environment_id: &str) -> String {
         value.replace(
-            &compose_project_name(workspace_root, environment_id),
+            &test_project_name(workspace_root, environment_id),
             &format!("acton-studio-<workspace>-{environment_id}"),
         )
+    }
+
+    fn test_project_name(workspace_root: &Path, environment_id: &str) -> String {
+        compose_project_name(workspace_root, environment_id, Uuid::from_u128(1))
     }
 }

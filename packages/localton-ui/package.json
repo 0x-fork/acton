@@ -5,6 +5,9 @@
   "license": "MIT OR Apache-2.0",
   "author": "TON Core",
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "build": "tsc --noEmit && vite build",
     "dev": "vite --port 3017",

@@ -11,11 +11,11 @@ use std::{
 use anyhow::{Context, Result};
 use axum::{
     Json, Router,
-    extract::{DefaultBodyLimit, State},
+    extract::{DefaultBodyLimit, Path as AxumPath, State},
     http::StatusCode,
     middleware,
     response::{IntoResponse, Response},
-    routing::{get, options, post},
+    routing::{delete, get, options, post},
 };
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
@@ -166,6 +166,7 @@ pub(super) struct RunningObservability {
         tps_handler,
         local_observation_handler,
         collect_handler,
+        forget_observation_handler,
         health_handler
     ),
     components(schemas(
@@ -237,6 +238,10 @@ pub(super) async fn start(
         .route("/stats/tps", get(tps_handler))
         .route("/observation", get(local_observation_handler))
         .route("/observations", post(collect_handler))
+        .route(
+            "/observations/{observer_id}",
+            delete(forget_observation_handler),
+        )
         .route("/{*path}", options(cors::preflight));
 
     let app = Router::new()
@@ -388,6 +393,21 @@ async fn collect_handler(
 ) -> Result<StatusCode, HttpError> {
     state.store.write().await.ingest(observation, unix_time())?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/observations/{observer_id}",
+    params(("observer_id" = String, Path, description = "Observer ID to forget")),
+    tag = "observability",
+    responses((status = 204, description = "Remote observation forgotten or already absent"))
+)]
+async fn forget_observation_handler(
+    State(state): State<ObservabilityState>,
+    AxumPath(observer_id): AxumPath<String>,
+) -> StatusCode {
+    state.store.write().await.forget(&observer_id);
+    StatusCode::NO_CONTENT
 }
 
 #[utoipa::path(

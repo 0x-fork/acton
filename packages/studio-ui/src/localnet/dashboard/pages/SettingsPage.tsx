@@ -2,8 +2,6 @@ import {
   Button,
   Checkbox,
   CopyInlineButton,
-  Dialog,
-  DialogActions,
   Duration,
   formatDuration,
   formatNumberValue,
@@ -12,16 +10,12 @@ import {
   Tooltip,
   useToast,
 } from "@acton/ui"
-import {CircleHelp, Plus, Trash2} from "lucide-react"
+import {CircleHelp, Trash2} from "lucide-react"
 import {useCallback, useEffect, useState} from "react"
 import type {FC, ReactNode} from "react"
 
 import {supports} from "../../../environmentCapabilities"
-import {
-  addStudioFullTonNode,
-  deleteStudioEnvironment,
-  updateStudioEnvironment,
-} from "../../../studioApi"
+import {deleteStudioEnvironment, updateStudioEnvironment} from "../../../studioApi"
 import type {StudioEnvironment} from "../../../studioApi"
 import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
 import type {TonClient} from "@acton/explorer-core/api/client"
@@ -45,8 +39,6 @@ export const SettingsPage: FC<SettingsPageProps> = ({
   const {environment} = useLocalnetRuntime()
   const localnetConfig =
     environment?.config.kind === "actonLocalnet" ? environment.config : undefined
-  const fullTonConfig =
-    environment?.config.kind === "fullTonNetwork" ? environment.config : undefined
   const runtimeAvailable = environment?.status === "running"
   const hasControlApi = runtimeAvailable && supports(environment, "controlApi")
   const hasMining = runtimeAvailable && supports(environment, "mining")
@@ -61,10 +53,6 @@ export const SettingsPage: FC<SettingsPageProps> = ({
   const [loadError, setLoadError] = useState<string>()
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [isAddNodeDialogOpen, setIsAddNodeDialogOpen] = useState(false)
-  const [nodeName, setNodeName] = useState("")
-  const [nodeIsValidator, setNodeIsValidator] = useState(true)
-  const [isAddingNode, setIsAddingNode] = useState(false)
 
   const loadRuntimeSettings = useCallback(async () => {
     if (!hasControlApi) {
@@ -207,41 +195,6 @@ export const SettingsPage: FC<SettingsPageProps> = ({
       setIsDeleting(false)
     }
   }, [environment, onEnvironmentDelete, showToast])
-
-  const openAddNodeDialog = useCallback(() => {
-    setNodeName(`validator-${(fullTonConfig?.nodes.length ?? 0) + 1}`)
-    setNodeIsValidator(true)
-    setIsAddNodeDialogOpen(true)
-  }, [fullTonConfig?.nodes.length])
-
-  const addNode = useCallback(async () => {
-    if (!environment || !fullTonConfig) return
-    const name = nodeName.trim()
-    if (!name) return
-
-    setIsAddingNode(true)
-    try {
-      const updatedEnvironment = await addStudioFullTonNode(environment.id, {
-        name,
-        validator: nodeIsValidator,
-      })
-      onEnvironmentChange(updatedEnvironment)
-      setIsAddNodeDialogOpen(false)
-      showToast({
-        variant: "success",
-        title: "Node added",
-        description: `${name} joined ${environment.name}`,
-      })
-    } catch (error) {
-      showToast({
-        variant: "error",
-        title: "Node not added",
-        description: errorMessage(error, "Failed to join the node"),
-      })
-    } finally {
-      setIsAddingNode(false)
-    }
-  }, [environment, fullTonConfig, nodeIsValidator, nodeName, onEnvironmentChange, showToast])
 
   const parsedResponseDelay = parseResponseDelay(responseDelay)
   const endpointRows = environment
@@ -457,38 +410,6 @@ export const SettingsPage: FC<SettingsPageProps> = ({
         </div>
       </section>
 
-      {fullTonConfig ? (
-        <section className={styles.settingsSection} aria-labelledby="node-settings-title">
-          <SettingsSectionHeader
-            id="node-settings-title"
-            title="Nodes"
-            description="Add validator-engine instances to this full TON network"
-          />
-
-          <div className={styles.settingsRows}>
-            <NodeSettingsRow name="Genesis" validator />
-            {fullTonConfig.nodes.map(node => (
-              <NodeSettingsRow key={node.id} name={node.name} validator={node.validator} />
-            ))}
-            <div className={styles.settingsRow}>
-              <div className={styles.settingsRowCopy}>
-                <strong>Add node</strong>
-                <span>Join another node without creating another V2 or V3 API stack</span>
-              </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                leadingIcon={<Plus size={15} aria-hidden="true" />}
-                disabled={!runtimeAvailable}
-                onClick={openAddNodeDialog}
-              >
-                Add node
-              </Button>
-            </div>
-          </div>
-        </section>
-      ) : undefined}
-
       {hasMining ? (
         <section className={styles.settingsSection} aria-labelledby="mining-settings-title">
           <SettingsSectionHeader
@@ -590,69 +511,9 @@ export const SettingsPage: FC<SettingsPageProps> = ({
         onConfirm={() => void deleteEnvironment()}
         onOpenChange={setIsDeleteDialogOpen}
       />
-      <Dialog
-        open={isAddNodeDialogOpen}
-        onOpenChange={open => {
-          if (!open && !isAddingNode) setIsAddNodeDialogOpen(false)
-        }}
-        title="Add node"
-        description="The node joins this network and reports to its shared observability dashboard"
-        busy={isAddingNode}
-        maxWidth="30rem"
-      >
-        <div className={styles.addNodeFields}>
-          <Input
-            label="Node name"
-            maxLength={80}
-            value={nodeName}
-            invalid={nodeName.trim().length === 0}
-            onChange={event => setNodeName(event.target.value)}
-            onKeyDown={event => {
-              if (event.key === "Enter") void addNode()
-            }}
-          />
-          <Checkbox
-            label="Participate in validator elections"
-            checked={nodeIsValidator}
-            disabled={isAddingNode}
-            onChange={event => setNodeIsValidator(event.target.checked)}
-          />
-        </div>
-        <DialogActions>
-          <Button
-            variant="secondary"
-            disabled={isAddingNode}
-            onClick={() => setIsAddNodeDialogOpen(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            loading={isAddingNode}
-            disabled={nodeName.trim().length === 0}
-            onClick={() => void addNode()}
-          >
-            Add node
-          </Button>
-        </DialogActions>
-      </Dialog>
     </div>
   )
 }
-
-interface NodeSettingsRowProps {
-  readonly name: string
-  readonly validator: boolean
-}
-
-const NodeSettingsRow: FC<NodeSettingsRowProps> = ({name, validator}) => (
-  <div className={styles.settingsRow}>
-    <div className={styles.settingsRowCopy}>
-      <strong>{name}</strong>
-      <span>{validator ? "Validator node" : "Full node"}</span>
-    </div>
-    <span className={styles.settingsBadge}>{validator ? "Validator" : "Full node"}</span>
-  </div>
-)
 
 function parseResponseDelay(value: string): number | undefined {
   const delay = Number(value)

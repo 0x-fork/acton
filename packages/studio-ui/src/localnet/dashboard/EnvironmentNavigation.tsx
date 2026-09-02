@@ -11,6 +11,7 @@ import {
   ChevronRight,
   HandCoins,
   LayoutGrid,
+  RadioTower,
   Search as SearchIcon,
   Wallet,
   Waypoints,
@@ -70,6 +71,12 @@ const explorerItems: NestedSidebarItem[] = [
   {label: "Blocks", path: "/explorer/blocks"},
   {label: "Tokens", path: "/explorer/tokens"},
   {label: "NFTs", path: "/explorer/nfts"},
+]
+
+const networkItems: NestedSidebarItem[] = [
+  {label: "Overview", path: "/network"},
+  {label: "Nodes", path: "/network/nodes"},
+  {label: "Validators", path: "/network/validators"},
 ]
 
 const contractItems: NestedSidebarItem[] = [
@@ -236,6 +243,8 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
     localPathname !== "/explorer/nfts" &&
     localPathname !== "/explorer/favorites"
   const [isExplorerOpen, setIsExplorerOpen] = useState(isExplorerActive)
+  const isNetworkActive = localPathname.startsWith("/network")
+  const [isNetworkOpen, setIsNetworkOpen] = useState(isNetworkActive)
   const isContractsActive = localPathname.startsWith("/contracts")
   const [isContractsOpen, setIsContractsOpen] = useState(isContractsActive)
   const isApiReferenceActive = localPathname.startsWith("/api-reference/")
@@ -244,6 +253,10 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   useEffect(() => {
     if (isExplorerActive) setIsExplorerOpen(true)
   }, [isExplorerActive])
+
+  useEffect(() => {
+    if (isNetworkActive) setIsNetworkOpen(true)
+  }, [isNetworkActive])
 
   useEffect(() => {
     if (isContractsActive) setIsContractsOpen(true)
@@ -260,7 +273,7 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
         ?.scrollIntoView({block: "nearest", inline: "nearest"})
     })
     return () => globalThis.cancelAnimationFrame(frame)
-  }, [isApiReferenceOpen, isContractsOpen, isExplorerOpen, localPathname])
+  }, [isApiReferenceOpen, isContractsOpen, isExplorerOpen, isNetworkOpen, localPathname])
 
   useEffect(() => {
     if (
@@ -311,6 +324,22 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
               onSelect={path => void navigate(routes.path(path))}
             />
           ))}
+
+          {supports(environment, "observability") ? (
+            <NavigationDisclosure
+              active={isNetworkActive}
+              ariaLabel="Network pages"
+              controlsId="environment-network-navigation"
+              icon={RadioTower}
+              isItemActive={item => localPathname === item.path}
+              items={networkItems}
+              label="Network"
+              onItemSelect={path => void navigate(routes.path(path))}
+              onParentSelect={() => void navigate(routes.path("/network"))}
+              onToggle={() => setIsNetworkOpen(open => !open)}
+              open={isNetworkOpen}
+            />
+          ) : undefined}
 
           {supports(environment, "explorer") ? (
             <NavigationDisclosure

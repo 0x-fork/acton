@@ -1,4 +1,5 @@
 import {lazy, Suspense, useState} from "react"
+import type {ReactNode} from "react"
 import {
   ByteSize,
   DataTable,
@@ -11,6 +12,7 @@ import {
   DataTableTable,
   Disclosure,
   Duration,
+  InlineActions,
   InlineLoader,
   Percentage,
   TechnicalValue,
@@ -24,8 +26,12 @@ import styles from "./NodesSection.module.css"
 const NetworkMap = lazy(() => import("./NetworkMap"))
 
 interface NodesSectionProps {
+  readonly footer?: ReactNode
   readonly nodes: readonly NodeView[]
   readonly now: number
+  readonly renderNodeActions?: (node: NodeView) => ReactNode
+  readonly showLocations?: boolean
+  readonly showTitle?: boolean
 }
 
 const SYNC_LABELS: Record<NodeView["sync_status"], string> = {
@@ -67,39 +73,56 @@ const NODE_ROLE_PRESENTATION: Record<
 }
 
 /** Owns node synchronization, role, production, and observer columns for the network view */
-export function NodesSection({nodes, now}: NodesSectionProps) {
+export function NodesSection({
+  footer,
+  nodes,
+  now,
+  renderNodeActions,
+  showLocations = true,
+  showTitle = true,
+}: NodesSectionProps) {
   const [locationsOpen, setLocationsOpen] = useState(false)
   const locatedNodes = nodes.filter(node => node.location.kind === "country").length
 
   return (
-    <section id="nodes" className={styles.sectionStack} aria-labelledby="nodes-title">
-      <div className={styles.sectionHeading}>
-        <h2 id="nodes-title">Nodes and synchronization</h2>
-      </div>
-      <NodesTable nodes={nodes} now={now} />
-      <Disclosure
-        className={styles.locationDisclosure}
-        label={
-          <span className={styles.locationDisclosureLabel}>
-            <span>Node locations by public IP</span>
-            <span>{locatedNodes.toLocaleString()} located</span>
-          </span>
-        }
-        contentClassName={styles.locationDisclosureContent}
-        onToggle={event => setLocationsOpen(event.currentTarget.open)}
-      >
-        {locationsOpen ? (
-          <Suspense
-            fallback={
-              <div className={styles.mapLoading}>
-                <InlineLoader message="Loading node locations" />
-              </div>
-            }
-          >
-            <NetworkMap nodes={nodes} />
-          </Suspense>
-        ) : null}
-      </Disclosure>
+    <section
+      id="nodes"
+      className={styles.sectionStack}
+      aria-label={showTitle ? undefined : "Nodes and synchronization"}
+      aria-labelledby={showTitle ? "nodes-title" : undefined}
+    >
+      {showTitle ? (
+        <div className={styles.sectionHeading}>
+          <h2 id="nodes-title">Nodes and synchronization</h2>
+        </div>
+      ) : null}
+      <NodesTable nodes={nodes} now={now} renderNodeActions={renderNodeActions} />
+      {footer ? <div className={styles.tableFooter}>{footer}</div> : null}
+      {showLocations ? (
+        <Disclosure
+          className={styles.locationDisclosure}
+          label={
+            <span className={styles.locationDisclosureLabel}>
+              <span>Node locations by public IP</span>
+              <span>{locatedNodes.toLocaleString()} located</span>
+            </span>
+          }
+          contentClassName={styles.locationDisclosureContent}
+          onToggle={event => setLocationsOpen(event.currentTarget.open)}
+        >
+          {locationsOpen ? (
+            <Suspense
+              fallback={
+                <div className={styles.mapLoading}>
+                  <InlineLoader message="Loading node locations" />
+                </div>
+              }
+            >
+              <NetworkMap nodes={nodes} />
+            </Suspense>
+          ) : null}
+        </Disclosure>
+      ) : null}
     </section>
   )
 }
@@ -279,7 +302,7 @@ function NodeRoleBadge({role}: {readonly role: NodeRole}) {
   )
 }
 
-function NodesTable({nodes, now}: NodesSectionProps) {
+function NodesTable({nodes, now, renderNodeActions}: NodesSectionProps) {
   return (
     <DataTable className={styles.nodesTable} minWidth="60rem">
       <DataTableTable>
@@ -304,10 +327,16 @@ function NodesTable({nodes, now}: NodesSectionProps) {
                   <StatusPill online={node.online} />
                 </DataTableCell>
                 <DataTableCell>
-                  <div className={styles.nodeName}>
-                    <strong>{node.name}</strong>
-                    <span>{node.public_ip}</span>
-                  </div>
+                  <InlineActions
+                    className={styles.nodeActions}
+                    visibility="always"
+                    actions={renderNodeActions?.(node)}
+                  >
+                    <div className={styles.nodeName}>
+                      <strong>{node.name}</strong>
+                      <span>{node.public_ip}</span>
+                    </div>
+                  </InlineActions>
                 </DataTableCell>
                 <DataTableCell>
                   <SynchronizationProgress node={node} now={now} />

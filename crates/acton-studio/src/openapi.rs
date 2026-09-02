@@ -16,9 +16,9 @@ use crate::{
     CreateFullTonNodeRequest, EnvironmentCapability, EnvironmentConfig, EnvironmentEndpoints,
     EnvironmentLifecycle, EnvironmentNetwork, EnvironmentSnapshot, EnvironmentSnapshotOperation,
     EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings,
-    EnvironmentStatus, FullTonNode, PublicTonNetwork, SignWalletRequest, SignWalletResponse,
-    StudioApiErrorBody, StudioEnvironment, StudioInfo, StudioWallet, UpdateEnvironmentRequest,
-    WorkspaceInfo,
+    EnvironmentStatus, FullTonNode, PublicTonNetwork, RemoveFullTonNodeRequest, SignWalletRequest,
+    SignWalletResponse, StudioApiErrorBody, StudioEnvironment, StudioInfo, StudioWallet,
+    UpdateEnvironmentRequest, WorkspaceInfo,
 };
 
 #[utoipa::path(
@@ -52,6 +52,9 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
         crate::list_environments,
         crate::create_environment,
         crate::add_full_ton_node,
+        crate::enter_full_ton_validation,
+        crate::leave_full_ton_validation,
+        crate::remove_full_ton_node,
         crate::get_environment,
         crate::update_environment,
         crate::delete_environment,
@@ -68,6 +71,7 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
         proxy_environment_rpc_root,
         proxy_environment_rpc_get,
         proxy_environment_rpc_post,
+        proxy_environment_observability,
         get_address_names,
         set_address_name,
         list_contracts,
@@ -91,6 +95,7 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
         CreateEnvironmentRequest,
         CreateEnvironmentConfig,
         CreateFullTonNodeRequest,
+        RemoveFullTonNodeRequest,
         FullTonNode,
         UpdateEnvironmentRequest,
         CreateEnvironmentSnapshotRequest,
@@ -278,6 +283,23 @@ const fn proxy_environment_rpc_get() {}
     tag = "environment RPC"
 )]
 const fn proxy_environment_rpc_post() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/observability/{path}",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("path" = String, Path, description = "Collector path, for example api/v1/network")
+    ),
+    responses(
+        (status = 200, description = "Response from the environment observability collector", body = Object),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment or observability collector is unavailable", body = StudioApiErrorBody),
+        (status = 502, description = "Failed to reach the observability collector", body = StudioApiErrorBody)
+    ),
+    tag = "environment RPC"
+)]
+const fn proxy_environment_observability() {}
 
 #[utoipa::path(
     get,

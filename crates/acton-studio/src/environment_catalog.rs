@@ -6,7 +6,7 @@ use crate::environment::{
     CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest, CreateFullTonNodeRequest,
     EnvironmentConfig, EnvironmentEndpoints, EnvironmentRuntime, EnvironmentRuntimeError,
     EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation, EnvironmentStatus,
-    PublicTonNetwork, StudioEnvironment, UpdateEnvironmentRequest,
+    PublicTonNetwork, RemoveFullTonNodeRequest, StudioEnvironment, UpdateEnvironmentRequest,
 };
 
 pub const TESTNET_ENVIRONMENT_ID: &str = "testnet";
@@ -132,6 +132,43 @@ impl EnvironmentRuntime for EnvironmentCatalogRuntime {
             return error;
         }
         self.managed.add_full_ton_node(environment_id, request)
+    }
+
+    fn remove_full_ton_node(
+        &self,
+        environment_id: &str,
+        node_id: &str,
+        request: RemoveFullTonNodeRequest,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        if let Some(error) = lifecycle_unavailable(environment_id, "contracted") {
+            return error;
+        }
+        self.managed
+            .remove_full_ton_node(environment_id, node_id, request)
+    }
+
+    fn leave_full_ton_validation(
+        &self,
+        environment_id: &str,
+        node_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        if let Some(error) = lifecycle_unavailable(environment_id, "changed") {
+            return error;
+        }
+        self.managed
+            .leave_full_ton_validation(environment_id, node_id)
+    }
+
+    fn enter_full_ton_validation(
+        &self,
+        environment_id: &str,
+        node_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        if let Some(error) = lifecycle_unavailable(environment_id, "changed") {
+            return error;
+        }
+        self.managed
+            .enter_full_ton_validation(environment_id, node_id)
     }
 
     fn list_snapshots(

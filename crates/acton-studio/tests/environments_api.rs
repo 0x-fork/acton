@@ -6,8 +6,9 @@ use acton_studio::{
     CreateFullTonNodeRequest, EnvironmentConfig, EnvironmentEndpoints, EnvironmentRuntime,
     EnvironmentRuntimeError, EnvironmentRuntimeFuture, EnvironmentSnapshot,
     EnvironmentSnapshotOperation, EnvironmentSnapshotOperationKind,
-    EnvironmentSnapshotOperationPhase, EnvironmentStatus, FullTonNode, STUDIO_ENVIRONMENTS_PATH,
-    StudioEnvironment, StudioServer, StudioServerConfig, UpdateEnvironmentRequest,
+    EnvironmentSnapshotOperationPhase, EnvironmentStatus, FullTonNode, RemoveFullTonNodeRequest,
+    STUDIO_ENVIRONMENTS_PATH, StudioEnvironment, StudioServer, StudioServerConfig,
+    UpdateEnvironmentRequest,
 };
 use axum::Router;
 use axum::body::{Body, to_bytes};
@@ -256,6 +257,97 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
             drop(environments);
             Ok(result)
         })
+    }
+
+    fn remove_full_ton_node(
+        &self,
+        environment_id: &str,
+        node_id: &str,
+        _request: RemoveFullTonNodeRequest,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        let environment_id = environment_id.to_owned();
+        let node_id = node_id.to_owned();
+        Box::pin(async move {
+            let mut environments = self
+                .environments
+                .lock()
+                .expect("environment lock must not be poisoned");
+            let environment = environments
+                .iter_mut()
+                .find(|environment| environment.id == environment_id)
+                .ok_or_else(|| EnvironmentRuntimeError::NotFound {
+                    environment_id: environment_id.clone(),
+                })?;
+            let EnvironmentConfig::FullTonNetwork { nodes, .. } = &mut environment.config else {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "environment_nodes_unavailable",
+                    message: "Nodes can only be removed from a full TON network".to_owned(),
+                });
+            };
+            let previous_len = nodes.len();
+            nodes.retain(|node| node.id != node_id);
+            if nodes.len() == previous_len {
+                return Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "environment_node_not_found",
+                    message: format!("Node {node_id} was not found"),
+                });
+            }
+            let result = environment.clone();
+            drop(environments);
+            Ok(result)
+        })
+    }
+
+    fn leave_full_ton_validation(
+        &self,
+        environment_id: &str,
+        node_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        let environment_id = environment_id.to_owned();
+        let node_id = node_id.to_owned();
+        Box::pin(async move {
+            let environments = self
+                .environments
+                .lock()
+                .expect("environment lock must not be poisoned");
+            let environment = environments
+                .iter()
+                .find(|environment| environment.id == environment_id)
+                .ok_or_else(|| EnvironmentRuntimeError::NotFound {
+                    environment_id: environment_id.clone(),
+                })?;
+            let EnvironmentConfig::FullTonNetwork { nodes, .. } = &environment.config else {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "environment_nodes_unavailable",
+                    message: "Validator participation can only be changed in a full TON network"
+                        .to_owned(),
+                });
+            };
+            let node = nodes
+                .iter()
+                .find(|node| node.id == node_id)
+                .ok_or_else(|| EnvironmentRuntimeError::InvalidRequest {
+                    code: "environment_node_not_found",
+                    message: format!("Node {node_id} was not found"),
+                })?;
+            if !node.validator {
+                return Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "environment_node_not_validator",
+                    message: format!("Node {} is not configured as a validator", node.name),
+                });
+            }
+            let result = environment.clone();
+            drop(environments);
+            Ok(result)
+        })
+    }
+
+    fn enter_full_ton_validation(
+        &self,
+        environment_id: &str,
+        node_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        self.leave_full_ton_validation(environment_id, node_id)
     }
 
     fn list_snapshots(
@@ -1060,7 +1152,7 @@ async fn full_ton_environment_advertises_only_its_supported_surface() {
 
     expect![[r#"
         status: 201 Created
-        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18180,"apiV3Port":18181,"adminPort":18182,"configPort":18183,"observabilityPort":18084,"importedAccounts":[],"nodes":[]},"capabilities":["apiV2","apiV3","configApi","controlApi","explorer","integration","gramFaucet","wallets","simulator","contracts","apiCalls","snapshots"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","config":"/api/v1/environments/test-environment-1/rpc/config","control":"/api/v1/environments/test-environment-1/rpc","observability":"http://127.0.0.1:18084"},"network":{"id":"full-ton-network","label":"Full localnet","chainId":-3,"testOnly":true,"supportsActions":true}}"#]]
+        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18180,"apiV3Port":18181,"adminPort":18182,"configPort":18183,"observabilityPort":18084,"importedAccounts":[],"nodes":[]},"capabilities":["apiV2","apiV3","configApi","controlApi","explorer","integration","gramFaucet","wallets","simulator","contracts","apiCalls","snapshots","observability"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","config":"/api/v1/environments/test-environment-1/rpc/config","control":"/api/v1/environments/test-environment-1/rpc","observability":"/api/v1/environments/test-environment-1/observability"},"network":{"id":"full-ton-network","label":"Full localnet","chainId":-3,"testOnly":true,"supportsActions":true}}"#]]
     .assert_eq(&actual);
 }
 
@@ -1095,7 +1187,136 @@ async fn full_ton_environment_adds_a_node_to_the_existing_network() {
 
     expect![[r#"
         status: 201 Created
-        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18080,"apiV3Port":18081,"adminPort":18082,"configPort":18083,"observabilityPort":18084,"importedAccounts":[],"nodes":[{"id":"node-1","name":"validator-a","validator":true,"portBase":19000}]},"capabilities":["apiV2","apiV3","configApi","controlApi","explorer","integration","gramFaucet","wallets","simulator","contracts","apiCalls","snapshots"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","config":"/api/v1/environments/test-environment-1/rpc/config","control":"/api/v1/environments/test-environment-1/rpc","observability":"http://127.0.0.1:18084"},"network":{"id":"full-ton-network","label":"Full localnet","chainId":-3,"testOnly":true,"supportsActions":true}}"#]]
+        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18080,"apiV3Port":18081,"adminPort":18082,"configPort":18083,"observabilityPort":18084,"importedAccounts":[],"nodes":[{"id":"node-1","name":"validator-a","validator":true,"portBase":19000}]},"capabilities":["apiV2","apiV3","configApi","controlApi","explorer","integration","gramFaucet","wallets","simulator","contracts","apiCalls","snapshots","observability"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","config":"/api/v1/environments/test-environment-1/rpc/config","control":"/api/v1/environments/test-environment-1/rpc","observability":"/api/v1/environments/test-environment-1/observability"},"network":{"id":"full-ton-network","label":"Full localnet","chainId":-3,"testOnly":true,"supportsActions":true}}"#]]
+    .assert_eq(&actual);
+}
+
+#[tokio::test]
+async fn full_ton_environment_removes_a_managed_node() {
+    let app = router();
+    app.clone()
+        .oneshot(
+            Request::post(STUDIO_ENVIRONMENTS_PATH)
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{
+                        "name":"Protocol network",
+                        "config":{"kind":"fullTonNetwork"}
+                    }"#,
+                ))
+                .expect("create request must be valid"),
+        )
+        .await
+        .expect("create request must succeed");
+    app.clone()
+        .oneshot(
+            Request::post("/api/v1/environments/test-environment-1/nodes")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"name":"node-a","validator":false}"#))
+                .expect("add node request must be valid"),
+        )
+        .await
+        .expect("add node request must succeed");
+
+    let response = app
+        .oneshot(
+            Request::delete("/api/v1/environments/test-environment-1/nodes/node-1")
+                .body(Body::empty())
+                .expect("remove request must be valid"),
+        )
+        .await
+        .expect("remove node request must succeed");
+    let actual = response_snapshot(response).await;
+
+    expect![[r#"
+        status: 200 OK
+        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18080,"apiV3Port":18081,"adminPort":18082,"configPort":18083,"observabilityPort":18084,"importedAccounts":[],"nodes":[]},"capabilities":["apiV2","apiV3","configApi","controlApi","explorer","integration","gramFaucet","wallets","simulator","contracts","apiCalls","snapshots","observability"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","config":"/api/v1/environments/test-environment-1/rpc/config","control":"/api/v1/environments/test-environment-1/rpc","observability":"/api/v1/environments/test-environment-1/observability"},"network":{"id":"full-ton-network","label":"Full localnet","chainId":-3,"testOnly":true,"supportsActions":true}}"#]]
+    .assert_eq(&actual);
+}
+
+#[tokio::test]
+async fn full_ton_environment_starts_a_managed_validator_exit() {
+    let app = router();
+    app.clone()
+        .oneshot(
+            Request::post(STUDIO_ENVIRONMENTS_PATH)
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{
+                        "name":"Protocol network",
+                        "config":{"kind":"fullTonNetwork"}
+                    }"#,
+                ))
+                .expect("create request must be valid"),
+        )
+        .await
+        .expect("create request must succeed");
+    app.clone()
+        .oneshot(
+            Request::post("/api/v1/environments/test-environment-1/nodes")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"name":"validator-a","validator":true}"#))
+                .expect("add node request must be valid"),
+        )
+        .await
+        .expect("add node request must succeed");
+
+    let response = app
+        .oneshot(
+            Request::post("/api/v1/environments/test-environment-1/nodes/node-1/leave-validation")
+                .body(Body::empty())
+                .expect("leave validation request must be valid"),
+        )
+        .await
+        .expect("leave validation request must succeed");
+    let actual = response_snapshot(response).await;
+
+    expect![[r#"
+        status: 202 Accepted
+        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18080,"apiV3Port":18081,"adminPort":18082,"configPort":18083,"observabilityPort":18084,"importedAccounts":[],"nodes":[{"id":"node-1","name":"validator-a","validator":true,"portBase":19000}]},"capabilities":["apiV2","apiV3","configApi","controlApi","explorer","integration","gramFaucet","wallets","simulator","contracts","apiCalls","snapshots","observability"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","config":"/api/v1/environments/test-environment-1/rpc/config","control":"/api/v1/environments/test-environment-1/rpc","observability":"/api/v1/environments/test-environment-1/observability"},"network":{"id":"full-ton-network","label":"Full localnet","chainId":-3,"testOnly":true,"supportsActions":true}}"#]]
+    .assert_eq(&actual);
+}
+
+#[tokio::test]
+async fn full_ton_environment_starts_a_managed_validator_entry() {
+    let app = router();
+    app.clone()
+        .oneshot(
+            Request::post(STUDIO_ENVIRONMENTS_PATH)
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{
+                        "name":"Protocol network",
+                        "config":{"kind":"fullTonNetwork"}
+                    }"#,
+                ))
+                .expect("create request must be valid"),
+        )
+        .await
+        .expect("create request must succeed");
+    app.clone()
+        .oneshot(
+            Request::post("/api/v1/environments/test-environment-1/nodes")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"name":"validator-a","validator":true}"#))
+                .expect("add node request must be valid"),
+        )
+        .await
+        .expect("add node request must succeed");
+
+    let response = app
+        .oneshot(
+            Request::post("/api/v1/environments/test-environment-1/nodes/node-1/enter-validation")
+                .body(Body::empty())
+                .expect("enter validation request must be valid"),
+        )
+        .await
+        .expect("enter validation request must succeed");
+    let actual = response_snapshot(response).await;
+
+    expect![[r#"
+        status: 202 Accepted
+        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18080,"apiV3Port":18081,"adminPort":18082,"configPort":18083,"observabilityPort":18084,"importedAccounts":[],"nodes":[{"id":"node-1","name":"validator-a","validator":true,"portBase":19000}]},"capabilities":["apiV2","apiV3","configApi","controlApi","explorer","integration","gramFaucet","wallets","simulator","contracts","apiCalls","snapshots","observability"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","config":"/api/v1/environments/test-environment-1/rpc/config","control":"/api/v1/environments/test-environment-1/rpc","observability":"/api/v1/environments/test-environment-1/observability"},"network":{"id":"full-ton-network","label":"Full localnet","chainId":-3,"testOnly":true,"supportsActions":true}}"#]]
     .assert_eq(&actual);
 }
 
@@ -1169,6 +1390,23 @@ async fn full_ton_environment_routes_each_api_to_its_own_upstream() {
         .await
         .expect("config proxy target must serve");
     });
+    let observability_listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("observability proxy test listener must bind");
+    let observability_port = observability_listener
+        .local_addr()
+        .expect("observability listener must have an address")
+        .port();
+    let observability_upstream = tokio::spawn(async move {
+        axum::serve(
+            observability_listener,
+            Router::new()
+                .fallback(any(proxy_target))
+                .into_make_service(),
+        )
+        .await
+        .expect("observability proxy target must serve");
+    });
 
     let app = router();
     app.clone()
@@ -1183,7 +1421,8 @@ async fn full_ton_environment_routes_each_api_to_its_own_upstream() {
                             "apiV2Port":{v2_port},
                             "apiV3Port":{v3_port},
                             "adminPort":{admin_port},
-                            "configPort":{config_port}
+                            "configPort":{config_port},
+                            "observabilityPort":{observability_port}
                         }}
                     }}"#
                 )))
@@ -1237,18 +1476,31 @@ async fn full_ton_environment_routes_each_api_to_its_own_upstream() {
         )
         .await
         .expect("config proxy request must succeed");
+    let observability_response = app
+        .clone()
+        .oneshot(
+            Request::get(
+                "/api/v1/environments/test-environment-1/observability/api/v1/network?detail=full",
+            )
+            .body(Body::empty())
+            .expect("observability proxy request must be valid"),
+        )
+        .await
+        .expect("observability proxy request must succeed");
     let actual = format!(
-        "V2 ROOT\n{}\n\nV2\n{}\n\nV3\n{}\n\nFAUCET\n{}\n\nCONFIG\n{}",
+        "V2 ROOT\n{}\n\nV2\n{}\n\nV3\n{}\n\nFAUCET\n{}\n\nCONFIG\n{}\n\nOBSERVABILITY\n{}",
         response_snapshot(v2_root_response).await,
         response_snapshot(v2_response).await,
         response_snapshot(v3_response).await,
         response_snapshot(faucet_response).await,
         response_snapshot(config_response).await,
+        response_snapshot(observability_response).await,
     );
     v2_upstream.abort();
     v3_upstream.abort();
     admin_upstream.abort();
     config_upstream.abort();
+    observability_upstream.abort();
 
     expect![[r#"V2 ROOT
 status: 202 Accepted
@@ -1282,6 +1534,13 @@ CONFIG
 status: 202 Accepted
 body: method: GET
 uri: /openapi.json
+marker: missing
+body: <empty>
+
+OBSERVABILITY
+status: 202 Accepted
+body: method: GET
+uri: /api/v1/network?detail=full
 marker: missing
 body: <empty>"#]]
     .assert_eq(&actual);

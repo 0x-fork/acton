@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use chrono::Utc;
+use serde::Deserialize;
 use tokio::net::TcpStream;
 use tokio::process::{Child, Command};
 use tokio::sync::{Mutex, Notify, RwLock};
@@ -23,7 +24,8 @@ use crate::environment::{
     EnvironmentRuntimeError, EnvironmentRuntimeFuture, EnvironmentSnapshot,
     EnvironmentSnapshotOperation, EnvironmentSnapshotOperationKind,
     EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings, EnvironmentStatus,
-    FullTonAccountImport, FullTonNode, StudioEnvironment, UpdateEnvironmentRequest,
+    FullTonAccountImport, FullTonNode, RemoveFullTonNodeRequest, StudioEnvironment,
+    UpdateEnvironmentRequest,
 };
 use crate::environment_store::{
     LoadedEnvironments, StoredEnvironment, load_environments, persist_environment,
@@ -500,8 +502,13 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 });
             }
 
-            let node_number =
-                u16::try_from(nodes.len() + 1).map_err(|_| EnvironmentRuntimeError::Conflict {
+            let node_number = nodes
+                .iter()
+                .filter_map(|node| node.id.strip_prefix("node-")?.parse::<u16>().ok())
+                .max()
+                .unwrap_or(0)
+                .checked_add(1)
+                .ok_or_else(|| EnvironmentRuntimeError::Conflict {
                     code: "environment_node_limit_reached",
                     message: "Studio cannot allocate another node in this environment".to_owned(),
                 })?;
@@ -588,6 +595,265 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 "Node joined the Studio full TON network"
             );
             Ok(updated.clone())
+        })
+    }
+
+    fn remove_full_ton_node(
+        &self,
+        environment_id: &str,
+        node_id: &str,
+        request: RemoveFullTonNodeRequest,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        let environment_id = environment_id.to_owned();
+        let node_id = node_id.to_owned();
+        Box::pin(async move {
+            let started_at = Instant::now();
+            let environment = find_environment(&self.inner, &environment_id).await?;
+            ensure_no_active_snapshot(&environment).await?;
+            let _lifecycle_guard = environment.lifecycle.lock().await;
+            ensure_environment_not_deleted(&environment).await?;
+
+            let details = environment.details.read().await.clone();
+            let EnvironmentConfig::FullTonNetwork { nodes, .. } = &details.config else {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "environment_nodes_unavailable",
+                    message: "Nodes can only be removed from a full TON network".to_owned(),
+                });
+            };
+            let node = nodes
+                .iter()
+                .find(|node| node.id == node_id)
+                .cloned()
+                .ok_or_else(|| EnvironmentRuntimeError::InvalidRequest {
+                    code: "environment_node_not_found",
+                    message: format!("Node {node_id} is not managed by this environment"),
+                })?;
+
+            if node.validator && !request.force {
+                ensure_validator_can_be_removed(&details, &node).await?;
+            }
+
+            let mut config = details.config.clone();
+            let EnvironmentConfig::FullTonNetwork {
+                nodes: updated_nodes,
+                ..
+            } = &mut config
+            else {
+                unreachable!("the environment kind was checked above");
+            };
+            updated_nodes.retain(|candidate| candidate.id != node.id);
+
+            tracing::info!(
+                operation = "remove_full_ton_node",
+                environment_id = %environment_id,
+                node = %node.name,
+                target = %node.id,
+                force = request.force,
+                "Removing a node from the Studio full TON network"
+            );
+            persist_environment(
+                &self.inner.workspace_root,
+                &StoredEnvironment {
+                    id: details.id.clone(),
+                    name: details.name.clone(),
+                    config: config.clone(),
+                    resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
+                },
+            )
+            .await?;
+
+            if let Err(error) = environment.driver.remove_full_ton_node(nodes, &node).await {
+                let _ = persist_environment(
+                    &self.inner.workspace_root,
+                    &StoredEnvironment {
+                        id: details.id,
+                        name: details.name,
+                        config: details.config,
+                        resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
+                    },
+                )
+                .await;
+                tracing::warn!(
+                    operation = "remove_full_ton_node",
+                    environment_id = %environment_id,
+                    node = %node.name,
+                    target = %node.id,
+                    duration_ms = started_at.elapsed().as_millis(),
+                    outcome = "error",
+                    %error,
+                    "Failed to remove a node from the Studio full TON network"
+                );
+                return Err(error);
+            }
+
+            let mut updated = environment.details.write().await;
+            updated.config = config;
+            tracing::info!(
+                operation = "remove_full_ton_node",
+                environment_id = %environment_id,
+                node = %node.name,
+                target = %node.id,
+                duration_ms = started_at.elapsed().as_millis(),
+                outcome = "success",
+                "Node removed from the Studio full TON network"
+            );
+            Ok(updated.clone())
+        })
+    }
+
+    fn leave_full_ton_validation(
+        &self,
+        environment_id: &str,
+        node_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        let environment_id = environment_id.to_owned();
+        let node_id = node_id.to_owned();
+        Box::pin(async move {
+            let started_at = Instant::now();
+            let environment = find_environment(&self.inner, &environment_id).await?;
+            ensure_no_active_snapshot(&environment).await?;
+            let _lifecycle_guard = environment.lifecycle.lock().await;
+            ensure_environment_not_deleted(&environment).await?;
+
+            let details = environment.details.read().await.clone();
+            if details.status != EnvironmentStatus::Running {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "environment_not_running",
+                    message: "The full TON network must be running before validation can change"
+                        .to_owned(),
+                });
+            }
+            let EnvironmentConfig::FullTonNetwork { nodes, .. } = &details.config else {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "environment_nodes_unavailable",
+                    message: "Validator participation can only be changed in a full TON network"
+                        .to_owned(),
+                });
+            };
+            let node = nodes
+                .iter()
+                .find(|node| node.id == node_id)
+                .cloned()
+                .ok_or_else(|| EnvironmentRuntimeError::InvalidRequest {
+                    code: "environment_node_not_found",
+                    message: format!("Node {node_id} is not managed by this environment"),
+                })?;
+            if !node.validator {
+                return Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "environment_node_not_validator",
+                    message: format!("Node {} is not configured as a validator", node.name),
+                });
+            }
+
+            tracing::info!(
+                operation = "leave_full_ton_validation",
+                environment_id = %environment_id,
+                node = %node.name,
+                target = %node.id,
+                "Disabling future validator election participation"
+            );
+            if let Err(error) = environment.driver.leave_full_ton_validation(&node).await {
+                tracing::warn!(
+                    operation = "leave_full_ton_validation",
+                    environment_id = %environment_id,
+                    node = %node.name,
+                    target = %node.id,
+                    duration_ms = started_at.elapsed().as_millis(),
+                    outcome = "error",
+                    %error,
+                    "Failed to disable future validator election participation"
+                );
+                return Err(error);
+            }
+
+            tracing::info!(
+                operation = "leave_full_ton_validation",
+                environment_id = %environment_id,
+                node = %node.name,
+                target = %node.id,
+                duration_ms = started_at.elapsed().as_millis(),
+                outcome = "success",
+                "Future validator election participation disabled"
+            );
+            Ok(details)
+        })
+    }
+
+    fn enter_full_ton_validation(
+        &self,
+        environment_id: &str,
+        node_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        let environment_id = environment_id.to_owned();
+        let node_id = node_id.to_owned();
+        Box::pin(async move {
+            let started_at = Instant::now();
+            let environment = find_environment(&self.inner, &environment_id).await?;
+            ensure_no_active_snapshot(&environment).await?;
+            let _lifecycle_guard = environment.lifecycle.lock().await;
+            ensure_environment_not_deleted(&environment).await?;
+
+            let details = environment.details.read().await.clone();
+            if details.status != EnvironmentStatus::Running {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "environment_not_running",
+                    message: "The full TON network must be running before validation can change"
+                        .to_owned(),
+                });
+            }
+            let EnvironmentConfig::FullTonNetwork { nodes, .. } = &details.config else {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "environment_nodes_unavailable",
+                    message: "Validator participation can only be changed in a full TON network"
+                        .to_owned(),
+                });
+            };
+            let node = nodes
+                .iter()
+                .find(|node| node.id == node_id)
+                .cloned()
+                .ok_or_else(|| EnvironmentRuntimeError::InvalidRequest {
+                    code: "environment_node_not_found",
+                    message: format!("Node {node_id} is not managed by this environment"),
+                })?;
+            if !node.validator {
+                return Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "environment_node_not_validator",
+                    message: format!("Node {} is not configured as a validator", node.name),
+                });
+            }
+
+            tracing::info!(
+                operation = "enter_full_ton_validation",
+                environment_id = %environment_id,
+                node = %node.name,
+                target = %node.id,
+                "Enabling future validator election participation"
+            );
+            if let Err(error) = environment.driver.enter_full_ton_validation(&node).await {
+                tracing::warn!(
+                    operation = "enter_full_ton_validation",
+                    environment_id = %environment_id,
+                    node = %node.name,
+                    target = %node.id,
+                    duration_ms = started_at.elapsed().as_millis(),
+                    outcome = "error",
+                    %error,
+                    "Failed to enable future validator election participation"
+                );
+                return Err(error);
+            }
+
+            tracing::info!(
+                operation = "enter_full_ton_validation",
+                environment_id = %environment_id,
+                node = %node.name,
+                target = %node.id,
+                duration_ms = started_at.elapsed().as_millis(),
+                outcome = "success",
+                "Future validator election participation enabled"
+            );
+            Ok(details)
         })
     }
 
@@ -1360,6 +1626,95 @@ fn validate_full_ton_node_name(name: &str) -> Result<String, EnvironmentRuntimeE
     Ok(name)
 }
 
+#[derive(Deserialize)]
+struct ObservedNetworkNodes {
+    nodes: Vec<ObservedNetworkNode>,
+}
+
+#[derive(Deserialize)]
+struct ObservedNetworkNode {
+    name: String,
+    active_validator: bool,
+    participate_in_elections: bool,
+    current_validator: Option<bool>,
+    next_validator: Option<bool>,
+}
+
+/// Refuses normal removal until election participation is disabled and the validator is outside
+/// every elected set known to the collector.
+///
+/// A missing next set is safe after participation is disabled because the node cannot enter a set
+/// that has not been elected. Collector failures remain unsafe because membership is then unknown.
+async fn ensure_validator_can_be_removed(
+    environment: &StudioEnvironment,
+    node: &FullTonNode,
+) -> Result<(), EnvironmentRuntimeError> {
+    let endpoint = environment
+        .runtime_endpoints
+        .observability
+        .as_deref()
+        .ok_or_else(|| EnvironmentRuntimeError::Conflict {
+            code: "environment_node_state_unavailable",
+            message: "Validator state is unavailable; force removal to continue".to_owned(),
+        })?;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(3))
+        .build()
+        .map_err(|error| EnvironmentRuntimeError::Internal {
+            code: "environment_node_state_unavailable",
+            message: format!("Failed to prepare the validator safety check: {error}"),
+        })?;
+    let response = client
+        .get(format!("{}/api/v1/network", endpoint.trim_end_matches('/')))
+        .send()
+        .await
+        .map_err(|error| EnvironmentRuntimeError::Conflict {
+            code: "environment_node_state_unavailable",
+            message: format!("Validator state is unavailable; force removal to continue: {error}"),
+        })?;
+    if !response.status().is_success() {
+        return Err(EnvironmentRuntimeError::Conflict {
+            code: "environment_node_state_unavailable",
+            message: format!(
+                "Validator state is unavailable; the collector returned {}",
+                response.status()
+            ),
+        });
+    }
+    let network = response
+        .json::<ObservedNetworkNodes>()
+        .await
+        .map_err(|error| EnvironmentRuntimeError::Conflict {
+            code: "environment_node_state_unavailable",
+            message: format!("Validator state is invalid; force removal to continue: {error}"),
+        })?;
+    let observed = network
+        .nodes
+        .into_iter()
+        .find(|observed| observed.name.eq_ignore_ascii_case(&node.name))
+        .ok_or_else(|| EnvironmentRuntimeError::Conflict {
+            code: "environment_node_state_unavailable",
+            message: format!(
+                "Validator {} has not reported its elected-set state; force removal to continue",
+                node.name
+            ),
+        })?;
+    let safely_inactive = !observed.participate_in_elections
+        && !observed.active_validator
+        && observed.current_validator == Some(false)
+        && observed.next_validator != Some(true);
+    if safely_inactive {
+        return Ok(());
+    }
+    Err(EnvironmentRuntimeError::Conflict {
+        code: "environment_node_validator_active",
+        message: format!(
+            "Validator {} belongs to the current or next set; wait for it to leave or force removal",
+            node.name
+        ),
+    })
+}
+
 fn select_port(
     first_port: u16,
     requested: Option<u16>,
@@ -1633,6 +1988,48 @@ impl EnvironmentDriver {
             Self::ActonLocalnet { .. } => Err(EnvironmentRuntimeError::Conflict {
                 code: "environment_nodes_unavailable",
                 message: "Nodes can only be added to a full TON network".to_owned(),
+            }),
+        }
+    }
+
+    async fn leave_full_ton_validation(
+        &self,
+        node: &FullTonNode,
+    ) -> Result<(), EnvironmentRuntimeError> {
+        match self {
+            Self::FullTonNetwork(driver) => driver.leave_validation(node).await,
+            Self::ActonLocalnet { .. } => Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_nodes_unavailable",
+                message: "Validator participation can only be changed in a full TON network"
+                    .to_owned(),
+            }),
+        }
+    }
+
+    async fn enter_full_ton_validation(
+        &self,
+        node: &FullTonNode,
+    ) -> Result<(), EnvironmentRuntimeError> {
+        match self {
+            Self::FullTonNetwork(driver) => driver.enter_validation(node).await,
+            Self::ActonLocalnet { .. } => Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_nodes_unavailable",
+                message: "Validator participation can only be changed in a full TON network"
+                    .to_owned(),
+            }),
+        }
+    }
+
+    async fn remove_full_ton_node(
+        &self,
+        existing_nodes: &[FullTonNode],
+        node: &FullTonNode,
+    ) -> Result<(), EnvironmentRuntimeError> {
+        match self {
+            Self::FullTonNetwork(driver) => driver.remove_node(existing_nodes, node).await,
+            Self::ActonLocalnet { .. } => Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_nodes_unavailable",
+                message: "Nodes can only be removed from a full TON network".to_owned(),
             }),
         }
     }

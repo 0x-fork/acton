@@ -521,6 +521,17 @@ impl ObservationStore {
         self.observations.get(self.identity.observer_id()).cloned()
     }
 
+    /// Removes a retained remote observer immediately instead of waiting for retention expiry.
+    ///
+    /// The collector's own observation is protected because it is required by the health check.
+    /// An online remote node can report itself again after it has been forgotten.
+    pub fn forget(&mut self, observer_id: &str) -> bool {
+        if observer_id == self.identity.observer_id() {
+            return false;
+        }
+        self.observations.remove(observer_id).is_some()
+    }
+
     /// Builds a dashboard view from host reports and one locally read network state.
     ///
     /// When the local node is also the source of the network snapshot, its row uses
@@ -880,6 +891,22 @@ mod tests {
         let collector_identity = ObserverIdentity::from_secret([8; 32]);
         let mut collector = ObservationStore::new("network".to_owned(), collector_identity, 600);
         assert!(collector.ingest(observation, 101).is_err());
+    }
+
+    #[test]
+    fn forgotten_remote_observation_disappears_immediately() {
+        let collector_identity = ObserverIdentity::from_secret([7; 32]);
+        let mut collector =
+            ObservationStore::new("network".to_owned(), collector_identity, 600);
+        let remote_identity = ObserverIdentity::from_secret([8; 32]);
+        let remote_id = remote_identity.observer_id().to_owned();
+        let mut remote = ObservationStore::new("network".to_owned(), remote_identity, 600);
+        let observation = remote.publish(telemetry(None), 100, 20).unwrap();
+        collector.ingest(observation, 100).unwrap();
+
+        assert!(collector.forget(&remote_id));
+        assert!(!collector.forget(&remote_id));
+        assert!(collector.aggregate(100, None, false).nodes.is_empty());
     }
 
     #[test]

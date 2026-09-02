@@ -107,6 +107,7 @@ export type EnvironmentCapability =
   | "timeTravel"
   | "snapshots"
   | "checkpoints"
+  | "observability"
 
 export interface EnvironmentEndpoints {
   readonly apiV2?: string
@@ -389,6 +390,45 @@ export function addStudioFullTonNode(
         "content-type": "application/json",
       },
       body: JSON.stringify(request),
+    },
+  )
+}
+
+export function removeStudioFullTonNode(
+  environmentId: string,
+  nodeId: string,
+): Promise<StudioEnvironment> {
+  return requestJson<StudioEnvironment>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/nodes/${encodeURIComponent(nodeId)}`,
+    {
+      method: "DELETE",
+      headers: {accept: "application/json"},
+    },
+  )
+}
+
+export function leaveStudioFullTonValidation(
+  environmentId: string,
+  nodeId: string,
+): Promise<StudioEnvironment> {
+  return requestJson<StudioEnvironment>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/nodes/${encodeURIComponent(nodeId)}/leave-validation`,
+    {
+      method: "POST",
+      headers: {accept: "application/json"},
+    },
+  )
+}
+
+export function enterStudioFullTonValidation(
+  environmentId: string,
+  nodeId: string,
+): Promise<StudioEnvironment> {
+  return requestJson<StudioEnvironment>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/nodes/${encodeURIComponent(nodeId)}/enter-validation`,
+    {
+      method: "POST",
+      headers: {accept: "application/json"},
     },
   )
 }

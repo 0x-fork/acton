@@ -122,11 +122,40 @@
   padding: 2rem 2.25rem 5rem;
 }
 
+.dashboardContent {
+  min-width: 0;
+}
+
+.embeddedBootState {
+  display: grid;
+  min-height: 18rem;
+  place-items: center;
+}
+
 .sectionStack {
   display: grid;
   scroll-margin-top: 5rem;
   gap: 0.85rem;
   margin-bottom: 2.5rem;
+}
+
+.tpsSkeleton {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 2.5rem;
+}
+
+.tpsSkeletonHeading {
+  display: flex;
+  min-height: 2rem;
+  align-items: center;
+}
+
+.tpsSkeletonHeading h2 {
+  margin: 0;
+  font-size: var(--acton-font-size-md);
+  font-weight: var(--acton-font-weight-semibold);
+  letter-spacing: -0.012em;
 }
 
 .sectionHeading {

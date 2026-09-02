@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -44,6 +44,18 @@ pub struct CreateFullTonNodeRequest {
     pub name: String,
     #[serde(default)]
     pub validator: bool,
+}
+
+/// Controls whether Studio may remove a validator that still belongs to an elected set.
+///
+/// Normal removal is refused while the collector reports the node in the current or next set.
+/// `force` exists for disposable development networks where preserving consensus is not required.
+#[derive(Clone, Copy, Debug, Default, Deserialize, IntoParams, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[into_params(parameter_in = Query)]
+pub struct RemoveFullTonNodeRequest {
+    #[serde(default)]
+    pub force: bool,
 }
 
 impl FullTonAccountImport {
@@ -245,6 +257,7 @@ pub enum EnvironmentCapability {
     TimeTravel,
     Snapshots,
     Checkpoints,
+    Observability,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, ToSchema)]
@@ -407,6 +420,7 @@ impl EnvironmentConfig {
                 EnvironmentCapability::Contracts,
                 EnvironmentCapability::ApiCalls,
                 EnvironmentCapability::Snapshots,
+                EnvironmentCapability::Observability,
             ],
             Self::RemoteTonNetwork { .. } => vec![
                 EnvironmentCapability::ApiV2,
@@ -520,6 +534,58 @@ pub trait EnvironmentRuntime: Send + Sync {
             Err(EnvironmentRuntimeError::Conflict {
                 code: "environment_nodes_unavailable",
                 message: "Nodes can only be added to a managed full TON network".to_owned(),
+            })
+        })
+    }
+
+    /// Stops a managed validator from entering future elections while it remains a full node.
+    ///
+    /// The current elected set is immutable, so callers must continue observing the node until it
+    /// is absent from both the current and next sets before removal becomes safe.
+    fn leave_full_ton_validation(
+        &self,
+        _environment_id: &str,
+        _node_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_nodes_unavailable",
+                message:
+                    "Validator participation can only be changed in a managed full TON network"
+                        .to_owned(),
+            })
+        })
+    }
+
+    /// Re-enables future election participation for a managed validator node.
+    ///
+    /// Enabling participation does not make the node a validator immediately: the node must submit
+    /// an election request and wait until the elected set containing it becomes active.
+    fn enter_full_ton_validation(
+        &self,
+        _environment_id: &str,
+        _node_id: &str,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_nodes_unavailable",
+                message:
+                    "Validator participation can only be changed in a managed full TON network"
+                        .to_owned(),
+            })
+        })
+    }
+
+    fn remove_full_ton_node(
+        &self,
+        _environment_id: &str,
+        _node_id: &str,
+        _request: RemoveFullTonNodeRequest,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_nodes_unavailable",
+                message: "Nodes can only be removed from a managed full TON network".to_owned(),
             })
         })
     }

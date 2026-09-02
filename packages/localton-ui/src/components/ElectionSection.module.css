@@ -5,21 +5,6 @@
   margin-bottom: 2.5rem;
 }
 
-.sectionHeading {
-  display: flex;
-  min-height: 2rem;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.sectionHeading h2 {
-  margin: 0;
-  font-size: var(--acton-font-size-md);
-  font-weight: var(--acton-font-weight-semibold);
-  letter-spacing: -0.012em;
-}
-
 .notice {
   display: flex;
   min-height: 2.75rem;
@@ -31,35 +16,6 @@
   background: var(--acton-color-surface);
   color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
-}
-
-.electionStage {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.65rem;
-  padding: 0 0.55rem;
-  border: 1px solid var(--acton-color-border);
-  border-radius: 999px;
-  color: var(--acton-color-text-muted);
-  font-size: var(--acton-font-size-xs);
-  font-weight: var(--acton-font-weight-medium);
-}
-
-.electionStage[data-stage="accepting_entries"],
-.electionStage[data-stage="next_set_ready"] {
-  border-color: color-mix(in srgb, var(--acton-color-success) 40%, var(--acton-color-border));
-  color: var(--acton-color-success);
-}
-
-.electionStage[data-stage="finalizing"],
-.electionStage[data-stage="retrying"] {
-  border-color: color-mix(in srgb, var(--acton-color-warning) 40%, var(--acton-color-border));
-  color: var(--acton-color-warning);
-}
-
-.electionStage[data-stage="activation_overdue"] {
-  border-color: color-mix(in srgb, var(--acton-color-danger) 40%, var(--acton-color-border));
-  color: var(--acton-color-danger);
 }
 
 .electionPanel {

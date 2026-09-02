@@ -25,25 +25,12 @@ interface ElectionSectionProps {
   readonly now: number
 }
 
-const ELECTION_STAGE_LABELS: Record<ElectionObservation["stage"], string> = {
-  validation: "Validation in progress",
-  accepting_entries: "Entries are open",
-  finalizing: "Selecting next set",
-  next_set_ready: "Next set is ready",
-  retrying: "Election retrying",
-  activation_overdue: "Activation overdue",
-}
-
 const VALIDATOR_PREVIEW_COUNT = 7
 
 /** Owns the election timeline and validator-set presentation for an aggregated network view */
 export function ElectionSection({election, now}: ElectionSectionProps) {
   return (
-    <section id="elections" className={styles.sectionStack} aria-labelledby="elections-title">
-      <div className={styles.sectionHeading}>
-        <h2 id="elections-title">Validator elections</h2>
-        {election ? <ElectionStage stage={election.stage} /> : null}
-      </div>
+    <section id="elections" className={styles.sectionStack} aria-label="Validator elections">
       {election ? (
         <ElectionDiagram election={election} now={now} />
       ) : (
@@ -53,14 +40,6 @@ export function ElectionSection({election, now}: ElectionSectionProps) {
         </div>
       )}
     </section>
-  )
-}
-
-function ElectionStage({stage}: {readonly stage: ElectionObservation["stage"]}) {
-  return (
-    <span className={styles.electionStage} data-stage={stage}>
-      {ELECTION_STAGE_LABELS[stage]}
-    </span>
   )
 }
 
