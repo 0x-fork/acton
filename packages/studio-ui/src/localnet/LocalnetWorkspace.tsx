@@ -1,6 +1,7 @@
 import {Navigate, Route, Routes, useLocation} from "react-router"
 import {Check, KeyRound, ShieldCheck} from "lucide-react"
 import {Dialog, DialogActions, Input} from "@acton/ui"
+import {createObservabilityClient} from "@acton/localton-ui"
 import {
   Suspense,
   lazy,
@@ -181,6 +182,25 @@ const AppContent: FC<AppContentProps> = ({
 }) => {
   const runtime = useLocalnetRuntime()
   const client = runtime.client
+  const observabilityClient = useMemo(
+    () =>
+      runtime.environment?.endpoints.observability
+        ? createObservabilityClient(runtime.environment.endpoints.observability)
+        : undefined,
+    [runtime.environment?.endpoints.observability],
+  )
+  const loadBlockCreatorName = useCallback(
+    async (publicKey: string, signal: AbortSignal) => {
+      const network = await observabilityClient?.network(signal)
+      const normalizedPublicKey = publicKey.toLowerCase()
+      return network?.nodes.find(
+        node =>
+          node.validator_public_key?.toLowerCase() === normalizedPublicKey ||
+          node.validator_public_keys.some(key => key.toLowerCase() === normalizedPublicKey),
+      )?.name
+    },
+    [observabilityClient],
+  )
   const {pathname} = useLocation()
   const [isAddContractOpen, setIsAddContractOpen] = useState(false)
   const [isCreateSnapshotOpen, setIsCreateSnapshotOpen] = useState(false)
@@ -309,7 +329,12 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "explorer",
                 <DashboardPage embedded>
-                  <BlockDetailsPage client={client} latest showConfigAction />
+                  <BlockDetailsPage
+                    client={client}
+                    latest
+                    loadBlockCreatorName={loadBlockCreatorName}
+                    showConfigAction
+                  />
                 </DashboardPage>,
               )}
             />
@@ -318,7 +343,11 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "explorer",
                 <DashboardPage embedded>
-                  <BlockDetailsPage client={client} showConfigAction />
+                  <BlockDetailsPage
+                    client={client}
+                    loadBlockCreatorName={loadBlockCreatorName}
+                    showConfigAction
+                  />
                 </DashboardPage>,
               )}
             />

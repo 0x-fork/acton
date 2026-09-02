@@ -372,6 +372,20 @@
   overflow-wrap: anywhere;
 }
 
+.blockCreatorValue {
+  display: inline-flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--acton-space-1);
+}
+
+.blockCreatorName {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-sans);
+  white-space: nowrap;
+}
+
 .blockReferenceList {
   display: flex;
   flex-wrap: wrap;

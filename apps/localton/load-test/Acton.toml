@@ -1,0 +1,32 @@
+[package]
+name = "localton-load-test"
+description = "Acton workload generator for the localton network"
+version = "0.1.0"
+license = "MIT"
+
+[toolchain]
+acton = "1.1.0"
+
+[contracts.RecursiveDeployer]
+display-name = "Recursive deployer"
+src = "contracts/RecursiveDeployer.tolk"
+depends = []
+
+[test]
+
+[fmt]
+width = 100
+ignore = []
+
+[scripts]
+build-root-message = "acton script scripts/build-root-message.tolk"
+
+[import-mappings]
+acton = ".acton"
+contracts = "contracts"
+gen = "gen"
+tests = "tests"
+wrappers = "wrappers"
+
+# Check full Acton.toml reference and all available keys:
+# https://ton-blockchain.github.io/acton/docs/acton-toml

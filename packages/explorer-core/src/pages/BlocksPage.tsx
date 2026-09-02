@@ -82,6 +82,11 @@ interface BlocksPageProps {
 interface BlockDetailsPageProps extends BlocksPageProps {
   /** Enables config navigation for embedded explorers that expose the config routes. */
   readonly showConfigAction?: boolean
+  /** Resolves a block creator public key to a host-owned node name when that identity is known. */
+  readonly loadBlockCreatorName?: (
+    publicKey: string,
+    signal: AbortSignal,
+  ) => Promise<string | undefined>
   readonly latest?: boolean
   readonly transactionsLoadMoreLimit?: number
 }
@@ -257,6 +262,7 @@ export const BlocksPage: FC<BlocksPageProps> = ({client, loadNetworkTps}) => {
 export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
   client,
   latest = false,
+  loadBlockCreatorName,
   showConfigAction = false,
   transactionsLoadMoreLimit = BLOCK_TRANSACTIONS_LOAD_MORE_LIMIT,
 }) => {
@@ -293,6 +299,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
     isLoadingMoreTransactions: false,
     hasMoreTransactions: false,
   })
+  const [blockCreatorName, setBlockCreatorName] = useState<string>()
   const isLoadingMoreTransactionsRef = useRef(false)
 
   useEffect(() => {
@@ -558,6 +565,21 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
     void prefetchNames(transactionAddresses)
   }, [prefetchNames, transactionAddresses])
 
+  useEffect(() => {
+    const publicKey = state.block ? formatBlockHash(state.block.created_by) : undefined
+    setBlockCreatorName(undefined)
+    if (!publicKey || !loadBlockCreatorName) return
+
+    const controller = new AbortController()
+    void loadBlockCreatorName(publicKey, controller.signal)
+      .then(name => {
+        if (!controller.signal.aborted) setBlockCreatorName(name)
+      })
+      .catch(() => undefined)
+
+    return () => controller.abort()
+  }, [loadBlockCreatorName, state.block])
+
   return (
     <div className={styles.container}>
       <ExplorerBreadcrumbs
@@ -718,6 +740,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
           <>
             <BlockSummaryTable
               block={state.block}
+              creatorName={blockCreatorName}
               onOpenBlock={(block, event) =>
                 openPath(routes.blockPath(block.workchain, block.shard, block.seqno), event)
               }
@@ -1234,8 +1257,9 @@ const BlockTransactionsTableSkeleton: FC<{readonly rows: number}> = ({rows}) => 
 
 const BlockSummaryTable: FC<{
   readonly block: V3Block
+  readonly creatorName?: string
   readonly onOpenBlock: (block: V3BlockId, event: ExplorerNavigationClickEvent) => void
-}> = ({block, onOpenBlock}) => {
+}> = ({block, creatorName, onOpenBlock}) => {
   const routes = useExplorerRoutePaths()
 
   const rootHash = formatBlockHash(block.root_hash)
@@ -1308,7 +1332,19 @@ const BlockSummaryTable: FC<{
       <BlockDetailSection label="Hashes" contentClassName={styles.blockHashesGrid}>
         <BlockDetailItem label="Root hash" value={rootHash} copyValue={rootHash} mono />
         <BlockDetailItem label="File hash" value={fileHash} copyValue={fileHash} mono />
-        <BlockDetailItem label="Created by" value={createdBy} copyValue={createdBy} mono />
+        <BlockDetailItem
+          label="Creator public key"
+          value={
+            <span className={styles.blockCreatorValue}>
+              <span className={styles.blocksMonoCell}>{createdBy}</span>
+              {creatorName ? (
+                <span className={styles.blockCreatorName}>({creatorName})</span>
+              ) : null}
+            </span>
+          }
+          title={createdBy}
+          copyValue={createdBy}
+        />
         <BlockDetailItem label="Rand seed" value={randSeed} copyValue={randSeed} mono />
       </BlockDetailSection>
 
@@ -1611,7 +1647,7 @@ const BlockDetailsSkeleton: FC<{
           wide
         />
         <BlockDetailSkeletonItem
-          label="Created by"
+          label="Creator public key"
           valueClassName={styles.blockDetailSkeletonHashValue}
           wide
         />
