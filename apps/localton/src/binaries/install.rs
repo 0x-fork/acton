@@ -15,7 +15,7 @@ use std::{
 use anyhow::{Context, Result, bail};
 use fs2::FileExt;
 use futures_util::StreamExt;
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{BinaryBytes, ProgressBar, ProgressStyle};
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 use tracing::info;
@@ -27,6 +27,8 @@ use super::{
     REQUIRED_BINARIES,
     release::{current_asset, platform_id},
 };
+
+const DOWNLOAD_LOG_INTERVAL: Duration = Duration::from_secs(5);
 
 /// Resolves the pinned release from the shared cache or installs it once.
 ///
@@ -186,6 +188,12 @@ async fn download(url: &str, path: &Path) -> Result<()> {
         .with_context(|| format!("download failed for {url}"))?;
 
     let progress = download_progress(response.content_length())?;
+    let report_progress_in_logs = progress.is_hidden();
+    let mut log_interval = tokio::time::interval(DOWNLOAD_LOG_INTERVAL);
+    log_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    // `interval` ticks immediately the first time. The download announcement was
+    // just logged, so delay the first progress report until a useful interval passed.
+    log_interval.tick().await;
 
     let mut file = tokio::fs::File::create(path)
         .await
@@ -193,10 +201,20 @@ async fn download(url: &str, path: &Path) -> Result<()> {
     let mut stream = response.bytes_stream();
 
     let result = async {
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.context("TON binary download stream failed")?;
-            file.write_all(&chunk).await?;
-            progress.inc(chunk.len() as u64);
+        loop {
+            tokio::select! {
+                chunk = stream.next() => {
+                    let Some(chunk) = chunk else {
+                        break;
+                    };
+                    let chunk = chunk.context("TON binary download stream failed")?;
+                    file.write_all(&chunk).await?;
+                    progress.inc(chunk.len() as u64);
+                }
+                _ = log_interval.tick(), if report_progress_in_logs => {
+                    log_download_progress(&progress);
+                }
+            }
         }
 
         // Complete the file before synchronous checksum validation reads it.
@@ -207,11 +225,48 @@ async fn download(url: &str, path: &Path) -> Result<()> {
     .await;
 
     match &result {
-        Ok(()) => progress.finish_and_clear(),
+        Ok(()) => {
+            if report_progress_in_logs {
+                info!(
+                    downloaded = %BinaryBytes(progress.position()),
+                    elapsed_seconds = progress.elapsed().as_secs(),
+                    "official TON binaries downloaded"
+                );
+            }
+            progress.finish_and_clear();
+        }
         Err(_) => progress.abandon_with_message("TON binary download failed"),
     }
 
     result
+}
+
+fn log_download_progress(progress: &ProgressBar) {
+    let downloaded = progress.position();
+    let speed = progress.per_sec().round() as u64;
+
+    if let Some(total) = progress.length() {
+        let percent = if total == 0 {
+            100
+        } else {
+            (((downloaded as u128) * 100 / total as u128).min(100)) as u64
+        };
+        info!(
+            downloaded = %BinaryBytes(downloaded),
+            total = %BinaryBytes(total),
+            percent,
+            speed = %format!("{}/s", BinaryBytes(speed)),
+            eta_seconds = progress.eta().as_secs(),
+            "official TON binary download progress"
+        );
+    } else {
+        info!(
+            downloaded = %BinaryBytes(downloaded),
+            speed = %format!("{}/s", BinaryBytes(speed)),
+            elapsed_seconds = progress.elapsed().as_secs(),
+            "official TON binary download progress"
+        );
+    }
 }
 
 fn download_progress(total: Option<u64>) -> Result<ProgressBar> {
