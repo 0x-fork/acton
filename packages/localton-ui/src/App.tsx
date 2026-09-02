@@ -34,7 +34,6 @@ import styles from "./App.module.css"
 import type {NetworkView, NodeView, ShardHead} from "./types"
 
 const POLL_INTERVAL_MS = 2000
-
 export function App() {
   const [network, setNetwork] = useState<NetworkView>()
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
