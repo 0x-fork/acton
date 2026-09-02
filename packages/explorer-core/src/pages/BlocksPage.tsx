@@ -40,7 +40,7 @@ import {
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
 
-import {buildTestnetToncenterBlockUrl, type RawBlockNetwork, type TonClient} from "../api/client"
+import {buildToncoinBlockDownloadUrl, type RawBlockNetwork, type TonClient} from "../api/client"
 import {
   loadBlockTransactionsPage,
   type BlockTransactionListItem,
@@ -74,6 +74,7 @@ const BLOCK_TRANSACTIONS_LOAD_MORE_LIMIT = 100
 const BLOCKS_REFRESH_MS = 2000
 const MASTERCHAIN_SHARD = "8000000000000000"
 const MIN_BLOCK_UNIX_TIME = 0
+
 interface BlocksPageProps {
   readonly client: TonClient
   readonly loadNetworkTps?: LoadNetworkTps
@@ -668,9 +669,10 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
                     variant="outline"
                     size="sm"
                     leadingIcon={<Download size={14} />}
-                    onClick={() =>
-                      globalThis.open(blockActions.downloadUrl, "_blank", "noopener,noreferrer")
-                    }
+                    onClick={() => {
+                      const {downloadUrl} = blockActions
+                      if (downloadUrl) globalThis.location.assign(downloadUrl)
+                    }}
                   >
                     Download
                   </Button>
@@ -1753,7 +1755,6 @@ function getBlockActions(
   readonly toncoinUrl: string
   readonly extendedBlockId: string
 } {
-  const blockId = formatToncenterBlockId(block)
   const tonscanOrigin =
     rawBlockNetwork === "testnet" ? "https://testnet.tonscan.org" : "https://tonscan.org"
   const toncoinOrigin =
@@ -1761,12 +1762,9 @@ function getBlockActions(
       ? "https://test-explorer.toncoin.org"
       : "https://explorer.toncoin.org"
   return {
-    downloadUrl:
-      rawBlockNetwork === "testnet"
-        ? buildTestnetToncenterBlockUrl(block).toString()
-        : rawBlockNetwork === "mainnet"
-          ? `https://tonapi.io/v2/blockchain/blocks/${encodeURIComponent(blockId)}/boc`
-          : undefined,
+    downloadUrl: rawBlockNetwork
+      ? buildToncoinBlockDownloadUrl(toncoinOrigin, block)?.toString()
+      : undefined,
     configSeqno: getConfigSeqno(block),
     tonscanUrl: `${tonscanOrigin}/block/${block.workchain}:${block.shard}:${block.seqno}`,
     toncoinUrl: `${toncoinOrigin}/search?workchain=${block.workchain}&shard=${encodeURIComponent(block.shard)}&seqno=${block.seqno}`,

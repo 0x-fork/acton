@@ -1,7 +1,7 @@
 import {expect, mock, test} from "bun:test"
 import {beginCell} from "@ton/core"
 
-import {TonClient} from "../src/api/client"
+import {buildToncoinBlockDownloadUrl, TonClient} from "../src/api/client"
 
 const mockFetch = (
   implementation: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
@@ -163,6 +163,35 @@ test("raw testnet blocks are loaded from Toncenter getBlock", async () => {
   } finally {
     globalThis.fetch = originalFetch
   }
+})
+
+test("block download URLs use TON Explorer's binary endpoint", () => {
+  const block = {
+    workchain: -1,
+    shard: "8000000000000000",
+    seqno: 82_266_420,
+    root_hash: "dFxj85PJA9R7gbbIvrGs29xEJebpMad4ElBCbP19Cl0=",
+    file_hash: "bJZYgO4Ca9l/OF+pF1dQVDCpUigN+ZoLlg7yDOHv2h8=",
+  }
+
+  expect(buildToncoinBlockDownloadUrl("https://explorer.toncoin.org", block)?.toString()).toBe(
+    "https://explorer.toncoin.org/download?workchain=-1&shard=8000000000000000&seqno=82266420&roothash=745C63F393C903D47B81B6C8BEB1ACDBDC4425E6E931A7781250426CFD7D0A5D&filehash=6C965880EE026BD97F385FA91757505430A952280DF99A0B960EF20CE1EFDA1F",
+  )
+  expect(buildToncoinBlockDownloadUrl("https://test-explorer.toncoin.org", block)?.origin).toBe(
+    "https://test-explorer.toncoin.org",
+  )
+})
+
+test("block download URLs require valid block hashes", () => {
+  expect(
+    buildToncoinBlockDownloadUrl("https://explorer.toncoin.org", {
+      workchain: -1,
+      shard: "8000000000000000",
+      seqno: 42,
+      root_hash: "invalid",
+      file_hash: "invalid",
+    }),
+  ).toBeUndefined()
 })
 
 test("raw mainnet blocks keep using TonAPI until Toncenter exposes getBlock", async () => {

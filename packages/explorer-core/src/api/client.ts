@@ -176,6 +176,23 @@ export interface RawBlockReference {
   readonly file_hash: string
 }
 
+export function buildToncoinBlockDownloadUrl(
+  toncoinOrigin: string,
+  block: RawBlockReference,
+): URL | undefined {
+  const rootHash = hashToHex(block.root_hash)
+  const fileHash = hashToHex(block.file_hash)
+  if (!rootHash || !fileHash) return undefined
+
+  const url = new URL("/download", toncoinOrigin)
+  url.searchParams.append("workchain", block.workchain.toString())
+  url.searchParams.append("shard", block.shard)
+  url.searchParams.append("seqno", block.seqno.toString())
+  url.searchParams.append("roothash", rootHash.toUpperCase())
+  url.searchParams.append("filehash", fileHash.toUpperCase())
+  return url
+}
+
 export function buildTestnetToncenterBlockUrl(block: RawBlockReference): URL {
   const url = new URL("https://testnet.toncenter.com/api/v2/getBlock")
   url.searchParams.append("workchain", block.workchain.toString())
