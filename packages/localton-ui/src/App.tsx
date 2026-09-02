@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from "react"
+import {lazy, Suspense, useEffect, useRef, useState} from "react"
 import {
   Activity,
   Boxes,
@@ -31,11 +31,13 @@ import {Metric} from "./components/Metric"
 import {NodesSection} from "./components/NodesSection"
 import {StatusPill} from "./components/StatusPill"
 import styles from "./App.module.css"
-import type {NetworkView, NodeView, ShardHead} from "./types"
+import type {NetworkView, NodeView, ShardHead, TpsView} from "./types"
 
-const POLL_INTERVAL_MS = 2000
+const TpsSection = lazy(() => import("./components/TpsSection"))
+const POLL_INTERVAL_MS = 1000
 export function App() {
   const [network, setNetwork] = useState<NetworkView>()
+  const [tps, setTps] = useState<TpsView>()
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000))
   const errorToastId = useRef<string | undefined>(undefined)
   const {dismissToast, showToast} = useToast()
@@ -51,11 +53,19 @@ export function App() {
 
     const load = async () => {
       try {
+        const tpsRequest = fetch("/api/v1/stats/tps", {cache: "no-store"})
+          .then(async response => (response.ok ? ((await response.json()) as TpsView) : undefined))
+          .catch(() => undefined)
+
         const response = await fetch("/api/v1/network", {cache: "no-store"})
         if (!response.ok) throw new Error(`Request failed with status ${response.status}`)
-        const next = (await response.json()) as NetworkView
+        const [next, nextTps] = await Promise.all([
+          response.json() as Promise<NetworkView>,
+          tpsRequest,
+        ])
         if (active) {
           setNetwork(next)
+          if (nextTps !== undefined) setTps(nextTps)
 
           if (errorToastId.current !== undefined) {
             dismissToast(errorToastId.current)
@@ -107,6 +117,7 @@ export function App() {
         </a>
         <nav className={styles.navigation} aria-label="Network sections">
           <NavigationLink href="#overview" icon={<Gauge size={15} />} label="Overview" />
+          <NavigationLink href="#throughput" icon={<Activity size={15} />} label="Throughput" />
           <NavigationLink href="#elections" icon={<Clock3 size={15} />} label="Elections" />
           <NavigationLink href="#nodes" icon={<RadioTower size={15} />} label="Nodes" />
           <NavigationLink href="#validators" icon={<ShieldCheck size={15} />} label="Validators" />
@@ -170,6 +181,10 @@ export function App() {
                 </div>
               )}
             </section>
+
+            <Suspense fallback={null}>
+              <TpsSection series={tps} />
+            </Suspense>
 
             <ElectionSection election={network.election} now={now} />
 

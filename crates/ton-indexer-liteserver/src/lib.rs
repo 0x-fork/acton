@@ -351,6 +351,26 @@ impl TonutilsLiteClient {
         self.latest_masterchain_block().await
     }
 
+    /// Returns the number of messages waiting in all shard outbound queues.
+    ///
+    /// The liteserver reports one queue size per shard. Summing them produces
+    /// the network-wide backlog expected by monitoring consumers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the `LiteAPI` request fails.
+    pub async fn out_msg_queue_size(&mut self) -> Result<u64, SourceError> {
+        let sizes = self
+            .inner
+            .get_out_msg_queue_sizes(None)
+            .await
+            .map_err(|error| SourceError::LiteApi(error.to_string()))?;
+
+        Ok(sizes.shards.into_iter().fold(0_u64, |total, shard| {
+            total.saturating_add(u64::from(shard.size))
+        }))
+    }
+
     /// Returns a snapshot of the requests issued by this client.
     #[must_use]
     pub const fn request_stats(&self) -> LiteRequestStats {

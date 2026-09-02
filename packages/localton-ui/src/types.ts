@@ -169,3 +169,18 @@ export interface NetworkView {
   readonly nodes: readonly NodeView[]
   readonly production: readonly ProductionView[]
 }
+
+export interface TpsPoint {
+  readonly timestamp: number
+  readonly transactions: number
+  readonly tps: number
+}
+
+export interface TpsView {
+  readonly status: "indexing" | "ready" | "unavailable"
+  readonly bucket_seconds: number
+  readonly indexed_from: number | null
+  readonly indexed_to: number | null
+  readonly queue_size: number | null
+  readonly points: readonly TpsPoint[]
+}

@@ -32,6 +32,12 @@ impl<S, K, C> IndexPipeline<S, K, C> {
     pub const fn sink(&self) -> &K {
         &self.sink
     }
+
+    /// Returns mutable access to the source for transport-level observations
+    /// that must share the pipeline's established connection.
+    pub const fn source_mut(&mut self) -> &mut S {
+        &mut self.source
+    }
 }
 
 impl<S, K, C> IndexPipeline<S, K, C>

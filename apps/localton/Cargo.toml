@@ -10,7 +10,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [workspace]
-members = ["xtask"]
+members = ["crates/*", "xtask"]
 
 [workspace.package]
 version = "0.1.0"
@@ -36,6 +36,7 @@ futures-util = "0.3"
 hex = "0.4"
 include_dir = "0.7"
 indicatif = "0.18.3"
+localton-indexer = { path = "crates/indexer" }
 maxminddb = "0.30.3"
 nix = { version = "0.30", features = ["process", "signal"] }
 num-bigint = "0.4"

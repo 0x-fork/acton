@@ -19,11 +19,13 @@ use axum::{
 };
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
+use localton_indexer::{TpsSeries, TpsStore};
+use serde::Serialize;
 use tokio::{sync::RwLock, sync::watch, task::JoinHandle, time::MissedTickBehavior};
 #[cfg(debug_assertions)]
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::{info, warn};
-use utoipa::OpenApi;
+use utoipa::{OpenApi, ToSchema};
 
 #[cfg(not(debug_assertions))]
 use axum::http::Uri;
@@ -50,6 +52,8 @@ use geoip::GeoIpResolver;
 use network::NodeHeadSample;
 
 const MAX_TELEMETRY_BODY_BYTES: usize = 256 * 1024;
+const TPS_HISTORY_SECONDS: u64 = 60 * 60;
+const TPS_BUCKET_SECONDS: u64 = 5;
 
 #[cfg(not(debug_assertions))]
 static UI_DIR: Dir<'static> =
@@ -64,6 +68,85 @@ struct ObservabilityState {
     network: watch::Receiver<Option<VerifiedNetworkState>>,
     local_node_is_network_source: bool,
     geoip: SharedGeoIp,
+    tps: Option<TpsStore>,
+}
+
+/// Dashboard state of the embedded transaction throughput indexer.
+#[derive(Clone, Copy, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+enum TpsIndexStatus {
+    /// The collector is still building its first recent window.
+    Indexing,
+    /// At least one throughput bucket is available.
+    Ready,
+    /// This observer is not the network collector and does not own the index.
+    Unavailable,
+}
+
+/// One fixed-duration transaction throughput bucket exposed by the dashboard API.
+#[derive(Serialize, ToSchema)]
+struct TpsPointView {
+    /// Unix timestamp at the start of the bucket.
+    timestamp: u64,
+    /// Transactions committed by all blocks in the bucket.
+    transactions: u64,
+    /// Average transactions per second during the bucket.
+    tps: f64,
+}
+
+/// Recent TPS history for the Localton dashboard.
+#[derive(Serialize, ToSchema)]
+struct TpsView {
+    /// Current availability of the embedded metrics index.
+    status: TpsIndexStatus,
+    /// Duration represented by each point.
+    bucket_seconds: u64,
+    /// Oldest indexed block timestamp in the response window.
+    indexed_from: Option<u64>,
+    /// Newest indexed block timestamp in the response window.
+    indexed_to: Option<u64>,
+    /// Messages currently waiting in shard outbound queues.
+    queue_size: Option<u64>,
+    /// Chronologically ordered throughput buckets.
+    points: Vec<TpsPointView>,
+}
+
+impl TpsView {
+    fn from_series(series: TpsSeries) -> Self {
+        let status = if series.points.is_empty() {
+            TpsIndexStatus::Indexing
+        } else {
+            TpsIndexStatus::Ready
+        };
+
+        Self {
+            status,
+            bucket_seconds: series.bucket_seconds,
+            indexed_from: series.indexed_from,
+            indexed_to: series.indexed_to,
+            queue_size: series.queue_size,
+            points: series
+                .points
+                .into_iter()
+                .map(|point| TpsPointView {
+                    timestamp: point.timestamp,
+                    transactions: point.transactions,
+                    tps: point.tps,
+                })
+                .collect(),
+        }
+    }
+
+    const fn unavailable() -> Self {
+        Self {
+            status: TpsIndexStatus::Unavailable,
+            bucket_seconds: TPS_BUCKET_SECONDS,
+            indexed_from: None,
+            indexed_to: None,
+            queue_size: None,
+            points: Vec::new(),
+        }
+    }
 }
 
 /// HTTP listener and background tasks that share one observation shutdown signal.
@@ -78,10 +161,19 @@ pub(super) struct RunningObservability {
         title = "localton Observability API",
         description = "Signed host telemetry combined with TON state read through a local liteserver"
     ),
-    paths(network_handler, local_observation_handler, collect_handler, health_handler),
+    paths(
+        network_handler,
+        tps_handler,
+        local_observation_handler,
+        collect_handler,
+        health_handler
+    ),
     components(schemas(
         NetworkView,
         SignedObservation,
+        TpsIndexStatus,
+        TpsPointView,
+        TpsView,
         ErrorResponse
     )),
     tags((name = "observability", description = "TON network state and Localton host telemetry"))
@@ -126,17 +218,23 @@ pub(super) async fn start(
     let (node_updates, node_snapshot) = watch::channel(None);
     let local_node_is_network_source = settings.node.role == NodeRole::Genesis;
     let geoip = Arc::new(RwLock::new(None));
+    let tps = local_node_is_network_source
+        .then(|| TpsStore::open(layout.observability.join("network-metrics.sqlite3")))
+        .transpose()
+        .context("failed to open the network metrics index")?;
 
     let state = ObservabilityState {
         store: Arc::clone(&store),
         network: network_snapshot,
         local_node_is_network_source,
         geoip: Arc::clone(&geoip),
+        tps: tps.clone(),
     };
 
     let api = Router::new()
         .route("/openapi.json", get(openapi_handler))
         .route("/network", get(network_handler))
+        .route("/stats/tps", get(tps_handler))
         .route("/observation", get(local_observation_handler))
         .route("/observations", post(collect_handler))
         .route("/{*path}", options(cors::preflight));
@@ -192,6 +290,14 @@ pub(super) async fn start(
         }
     });
     let mut tasks = vec![publisher, network_reader, geoip_loader];
+    if let Some(tps) = tps {
+        tasks.push(tokio::spawn(localton_indexer::run(
+            layout.node.global_config.clone(),
+            settings.node.name.clone(),
+            tps,
+            shutdown.clone(),
+        )));
+    }
     if !local_node_is_network_source {
         tasks.push(tokio::spawn(network::node_collection_loop(
             layout,
@@ -233,6 +339,21 @@ async fn network_handler(State(state): State<ObservabilityState>) -> Json<Networ
     }
 
     Json(view)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/stats/tps",
+    tag = "observability",
+    responses((status = 200, description = "Recent transaction throughput", body = TpsView))
+)]
+async fn tps_handler(State(state): State<ObservabilityState>) -> Result<Json<TpsView>, HttpError> {
+    let Some(store) = state.tps else {
+        return Ok(Json(TpsView::unavailable()));
+    };
+
+    let series = store.recent_tps(TPS_HISTORY_SECONDS, TPS_BUCKET_SECONDS)?;
+    Ok(Json(TpsView::from_series(series)))
 }
 
 #[utoipa::path(
@@ -502,6 +623,7 @@ mod tests {
     fn openapi_exposes_collection_and_network_view() {
         let document = serde_json::to_value(ApiDoc::openapi()).unwrap();
         assert!(document["paths"]["/api/v1/network"]["get"].is_object());
+        assert!(document["paths"]["/api/v1/stats/tps"]["get"].is_object());
         assert!(document["paths"]["/api/v1/observations"]["post"].is_object());
         assert!(document["components"]["schemas"]["NetworkView"].is_object());
     }
