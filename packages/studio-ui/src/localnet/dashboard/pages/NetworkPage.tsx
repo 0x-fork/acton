@@ -210,7 +210,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
       const genesis = node.name.toLowerCase() === "genesis"
       const actions: ReactNode[] = []
 
-      if (managed?.validator) {
+      if (managed) {
         actions.push(
           node.participate_in_elections ? (
             <InlineAction
@@ -218,7 +218,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
               label={`Leave validator set for ${node.name}`}
               title="Leave validator set"
               icon={<LogOut />}
-              disabled={leavingNodeId === managed.id}
+              disabled={!node.online || leavingNodeId === managed.id}
               onClick={() => void leaveValidation(managed)}
             />
           ) : (
@@ -227,7 +227,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
               label={`Enter elections for ${node.name}`}
               title="Enter elections"
               icon={<LogIn />}
-              disabled={enteringNodeId === managed.id}
+              disabled={!node.online || enteringNodeId === managed.id}
               onClick={() => void enterValidation(managed)}
             />
           ),

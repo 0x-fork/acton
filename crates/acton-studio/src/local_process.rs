@@ -816,12 +816,21 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                     code: "environment_node_not_found",
                     message: format!("Node {node_id} is not managed by this environment"),
                 })?;
-            if !node.validator {
-                return Err(EnvironmentRuntimeError::InvalidRequest {
-                    code: "environment_node_not_validator",
-                    message: format!("Node {} is not configured as a validator", node.name),
-                });
-            }
+
+            let mut config = details.config.clone();
+            let EnvironmentConfig::FullTonNetwork {
+                nodes: updated_nodes,
+                ..
+            } = &mut config
+            else {
+                unreachable!("the environment kind was checked above");
+            };
+
+            let updated_node = updated_nodes
+                .iter_mut()
+                .find(|candidate| candidate.id == node.id)
+                .expect("the managed node was resolved from this configuration");
+            updated_node.validator = true;
 
             tracing::info!(
                 operation = "enter_full_ton_validation",
@@ -830,7 +839,27 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 target = %node.id,
                 "Enabling future validator election participation"
             );
+            persist_environment(
+                &self.inner.workspace_root,
+                &StoredEnvironment {
+                    id: details.id.clone(),
+                    name: details.name.clone(),
+                    config: config.clone(),
+                    resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
+                },
+            )
+            .await?;
             if let Err(error) = environment.driver.enter_full_ton_validation(&node).await {
+                let _ = persist_environment(
+                    &self.inner.workspace_root,
+                    &StoredEnvironment {
+                        id: details.id,
+                        name: details.name,
+                        config: details.config,
+                        resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
+                    },
+                )
+                .await;
                 tracing::warn!(
                     operation = "enter_full_ton_validation",
                     environment_id = %environment_id,
@@ -844,6 +873,8 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 return Err(error);
             }
 
+            let mut updated = environment.details.write().await;
+            updated.config = config;
             tracing::info!(
                 operation = "enter_full_ton_validation",
                 environment_id = %environment_id,
@@ -853,7 +884,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
                 outcome = "success",
                 "Future validator election participation enabled"
             );
-            Ok(details)
+            Ok(updated.clone())
         })
     }
 

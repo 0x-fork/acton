@@ -581,11 +581,11 @@ async fn remove_full_ton_node(
     path = "/api/v1/environments/{environment_id}/nodes/{node_id}/leave-validation",
     params(
         ("environment_id" = String, Path, description = "Environment ID"),
-        ("node_id" = String, Path, description = "Managed validator node ID")
+        ("node_id" = String, Path, description = "Managed full node ID")
     ),
     responses(
         (status = 202, description = "Future election participation disabled", body = StudioEnvironment),
-        (status = 400, description = "Node is not a managed validator", body = StudioApiErrorBody),
+        (status = 400, description = "Node is not managed by the environment", body = StudioApiErrorBody),
         (status = 404, description = "Environment not found", body = StudioApiErrorBody),
         (status = 409, description = "Validation cannot be changed", body = StudioApiErrorBody)
     ),

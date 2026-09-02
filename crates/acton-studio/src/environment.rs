@@ -557,10 +557,11 @@ pub trait EnvironmentRuntime: Send + Sync {
         })
     }
 
-    /// Re-enables future election participation for a managed validator node.
+    /// Enables future election participation for a managed full node.
     ///
-    /// Enabling participation does not make the node a validator immediately: the node must submit
-    /// an election request and wait until the elected set containing it becomes active.
+    /// Localton promotes a regular full node to validator mode when needed. The node does not join
+    /// the active validator set immediately: it must submit an election request and wait until the
+    /// elected set containing it becomes active.
     fn enter_full_ton_validation(
         &self,
         _environment_id: &str,
