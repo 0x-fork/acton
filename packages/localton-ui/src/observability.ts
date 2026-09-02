@@ -8,6 +8,8 @@ const POLL_INTERVAL_MS = 1000
 export interface ObservabilityClient {
   /** Removes a retained remote report so an intentionally retired offline node disappears */
   readonly forget: (observerId: string, signal?: AbortSignal) => Promise<void>
+  /** Reads the name of the node serving this observability endpoint */
+  readonly localNodeName: (signal?: AbortSignal) => Promise<string>
   readonly network: (signal?: AbortSignal) => Promise<NetworkView>
   readonly tps: (signal?: AbortSignal) => Promise<TpsView | undefined>
 }
@@ -16,6 +18,12 @@ export interface ObservabilitySnapshot {
   readonly network: NetworkView | undefined
   readonly now: number
   readonly tps: TpsView | undefined
+}
+
+interface LocalObservation {
+  readonly payload: {
+    readonly name: string
+  }
 }
 
 /** Creates a typed client for either the standalone collector or a Studio proxy endpoint */
@@ -42,6 +50,10 @@ export function createObservabilityClient(baseUrl = ""): ObservabilityClient {
       )
       if (!response.ok) throw new Error(`Request failed with status ${response.status}`)
     },
+    localNodeName: signal =>
+      request<LocalObservation>("/api/v1/observation", signal).then(
+        observation => observation.payload.name,
+      ),
     network: signal => request<NetworkView>("/api/v1/network", signal),
     tps: signal =>
       request<TpsView>("/api/v1/stats/tps", signal).catch(error => {
@@ -49,6 +61,27 @@ export function createObservabilityClient(baseUrl = ""): ObservabilityClient {
         return undefined
       }),
   }
+}
+
+/** Reads the stable name of the node that owns the standalone dashboard */
+export function useLocalNodeName(client: ObservabilityClient): string | undefined {
+  const [nodeName, setNodeName] = useState<string>()
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    client
+      .localNodeName(controller.signal)
+      .then(name => {
+        const normalized = name.trim()
+        if (normalized) setNodeName(normalized)
+      })
+      .catch(() => undefined)
+
+    return () => controller.abort()
+  }, [client])
+
+  return nodeName
 }
 
 /** Keeps one live whole-network snapshot while avoiding overlapping one-second refreshes */

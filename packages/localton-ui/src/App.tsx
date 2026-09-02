@@ -1,4 +1,4 @@
-import {useMemo} from "react"
+import {useEffect, useMemo} from "react"
 import {
   Activity,
   Boxes,
@@ -12,12 +12,17 @@ import {
 import {InlineLoader, TechnicalValue, ThemeSwitch} from "@acton/ui"
 
 import {NetworkDashboardContent} from "./NetworkDashboard"
-import {createObservabilityClient, useObservability} from "./observability"
+import {createObservabilityClient, useLocalNodeName, useObservability} from "./observability"
 import styles from "./App.module.css"
 
 export function App() {
   const client = useMemo(() => createObservabilityClient(), [])
+  const nodeName = useLocalNodeName(client)
   const {network, now, tps} = useObservability(client)
+
+  useEffect(() => {
+    document.title = nodeName ? `Network health · ${nodeName}` : "Localton Network"
+  }, [nodeName])
 
   if (!network) {
     return (
