@@ -699,11 +699,7 @@ interface DashboardPageProps {
 }
 
 const DashboardPage: FC<DashboardPageProps> = ({children, embedded = false}) => (
-  <div
-    className={`${dashboardStyles.content} ${styles.pageContent} ${
-      embedded ? dashboardStyles.contentEmbedded : ""
-    }`}
-  >
+  <div className={`${dashboardStyles.content} ${embedded ? dashboardStyles.contentEmbedded : ""}`}>
     {embedded ? <div className={dashboardStyles.embeddedPage}>{children}</div> : children}
   </div>
 )

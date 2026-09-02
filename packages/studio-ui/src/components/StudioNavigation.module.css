@@ -1,4 +1,6 @@
 .page {
+  --studio-page-max-width: 1200px;
+
   position: relative;
   display: flex;
   width: 100%;
@@ -1085,7 +1087,7 @@
 .content {
   display: flex;
   width: 100%;
-  max-width: 1200px;
+  max-width: var(--studio-page-max-width);
   min-height: 100%;
   flex: 0 0 auto;
   flex-direction: column;

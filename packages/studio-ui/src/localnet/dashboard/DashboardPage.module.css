@@ -986,7 +986,7 @@
   min-height: 100%;
   width: 100%;
   flex: 0 0 auto;
-  max-width: 1200px;
+  max-width: var(--studio-page-max-width, 1200px);
   margin-inline: auto;
   padding: 32px 36px 72px;
   display: flex;

@@ -18,11 +18,6 @@
   overflow: visible;
 }
 
-.pageContent {
-  max-width: none;
-  margin-inline: 0;
-}
-
 .transactionDebugPage {
   width: 100%;
   height: 100%;
