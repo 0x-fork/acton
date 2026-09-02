@@ -29,7 +29,7 @@ import {
   Tooltip,
 } from "@acton/ui"
 import {ChevronDown, ExternalLink, Link2, Search} from "lucide-react"
-import {useEffect, useMemo, useState, type FC, type ReactNode} from "react"
+import {useEffect, useMemo, useState, type FC, type MouseEvent, type ReactNode} from "react"
 import {Link, useLocation, useParams} from "react-router"
 
 import type {TonClient} from "../api/client"
@@ -198,6 +198,20 @@ function decodeConfigAnchor(hash: string): string | undefined {
   }
 }
 
+function scrollToConfigParameter(event: MouseEvent<HTMLAnchorElement>, id: number) {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+
+  event.preventDefault()
+  const anchorId = `config-parameter-${id}`
+  const hash = `#${anchorId}`
+
+  if (globalThis.location.hash !== hash) {
+    globalThis.history.pushState(globalThis.history.state, "", hash)
+  }
+
+  globalThis.document.getElementById(anchorId)?.scrollIntoView({behavior: "smooth", block: "start"})
+}
+
 function parseConfigSeqno(value: string | undefined): number | undefined {
   if (value === undefined || !/^\d+$/.test(value)) return undefined
 
@@ -220,6 +234,7 @@ function ConfigContent({
                 key={parameter.id}
                 className={styles.indexLink}
                 href={`#config-parameter-${parameter.id}`}
+                onClick={event => scrollToConfigParameter(event, parameter.id)}
               >
                 {parameter.id}. {parameter.title}
               </a>
@@ -334,6 +349,7 @@ function ConfigParameterAnchor({
       className={`${styles.parameterAnchor} ${className ?? ""}`}
       href={`#config-parameter-${id}`}
       aria-label={`Link to configuration parameter ${id}`}
+      onClick={event => scrollToConfigParameter(event, id)}
     >
       <span className={styles.parameterAnchorNumber}>{id}</span>
       <Link2 className={styles.parameterAnchorIcon} size={16} aria-hidden="true" />

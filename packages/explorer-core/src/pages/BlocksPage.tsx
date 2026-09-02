@@ -80,6 +80,8 @@ interface BlocksPageProps {
 }
 
 interface BlockDetailsPageProps extends BlocksPageProps {
+  /** Enables config navigation for embedded explorers that expose the config routes. */
+  readonly showConfigAction?: boolean
   readonly latest?: boolean
   readonly transactionsLoadMoreLimit?: number
 }
@@ -255,6 +257,7 @@ export const BlocksPage: FC<BlocksPageProps> = ({client, loadNetworkTps}) => {
 export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
   client,
   latest = false,
+  showConfigAction = false,
   transactionsLoadMoreLimit = BLOCK_TRANSACTIONS_LOAD_MORE_LIMIT,
 }) => {
   const params = useParams<{
@@ -650,7 +653,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
                     Download
                   </Button>
                 ) : null}
-                {publicBlockNetwork ? (
+                {publicBlockNetwork || showConfigAction ? (
                   <Button
                     type="button"
                     variant="outline"

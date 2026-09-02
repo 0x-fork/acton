@@ -19,6 +19,7 @@ import dashboardStyles from "./dashboard/DashboardPage.module.css"
 import {AccountPage} from "@acton/explorer-core/pages/AccountPage"
 import {BlockDetailsPage, BlocksPage} from "@acton/explorer-core/pages/BlocksPage"
 import {CellInspectorPage} from "@acton/explorer-core/pages/CellInspectorPage"
+import {ConfigPage} from "@acton/explorer-core/pages/ConfigPage"
 import {EmulatePage} from "@acton/explorer-core/pages/EmulatePage"
 import {ExplorerIndexPage} from "@acton/explorer-core/pages/ExplorerIndexPage"
 import {FavoriteAccountsPage} from "@acton/explorer-core/pages/FavoriteAccountsPage"
@@ -65,6 +66,7 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/contracts/abi": "ABI",
   "/explorer/tokens": "Tokens",
   "/explorer/nfts": "NFTs",
+  "/explorer/config": "Network config",
   "/explorer/suspended": "Suspended addresses",
   "/settings": "Settings",
   "/snapshots": "Snapshots",
@@ -91,6 +93,7 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/contracts/abi": "Manage ABI used to decode contract state and messages",
   "/explorer/tokens": "Jettons detected on this network",
   "/explorer/nfts": "NFT items indexed from this network",
+  "/explorer/config": "Protocol parameters active in this network",
   "/explorer/suspended": "Addresses restricted by the network configuration",
   "/settings": "Manage environment identity, network behavior and mining",
   "/snapshots": "Create and restore persistent network snapshots",
@@ -182,20 +185,25 @@ const AppContent: FC<AppContentProps> = ({
   const [isAddContractOpen, setIsAddContractOpen] = useState(false)
   const [isCreateSnapshotOpen, setIsCreateSnapshotOpen] = useState(false)
   const localPathname = pathname.slice(basePath.length) || "/"
-  const allowsOverflow = localPathname === "/faucet"
+  const allowsOverflow = localPathname === "/faucet" || localPathname.startsWith("/explorer/config")
   const isExplorerPage = localPathname === "/explorer" || localPathname.startsWith("/explorer/")
   const isAbiDetailsPage = /^\/contracts\/abi\/[^/]+$/.test(localPathname)
+  const configSeqno = /^\/explorer\/config\/(\d+)$/.exec(localPathname)?.[1]
   const pageTitle = isExplorerPage
-    ? "Explorer"
+    ? localPathname === "/explorer/config" || configSeqno
+      ? "Network config"
+      : "Explorer"
     : isAbiDetailsPage
       ? "ABI"
       : (LOCALNET_PAGE_TITLES[localPathname] ??
         contractDetailsPageTitle(localPathname) ??
         "Virtual Environment")
   const pageDescription =
-    LOCALNET_PAGE_DESCRIPTIONS[localPathname] ??
-    contractDetailsPageDescription(localPathname) ??
-    "Inspect blocks, accounts, transactions and contract activity"
+    configSeqno === undefined
+      ? (LOCALNET_PAGE_DESCRIPTIONS[localPathname] ??
+        contractDetailsPageDescription(localPathname) ??
+        "Inspect blocks, accounts, transactions and contract activity")
+      : `Protocol parameters at masterchain block #${configSeqno}`
   const path = (value: string) => localnetPath(basePath, value)
   const fallback = <Navigate to={path("/dashboard")} replace />
   const withCapability = (capability: EnvironmentCapability, page: ReactNode) =>
@@ -301,7 +309,7 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "explorer",
                 <DashboardPage embedded>
-                  <BlockDetailsPage client={client} latest />
+                  <BlockDetailsPage client={client} latest showConfigAction />
                 </DashboardPage>,
               )}
             />
@@ -310,10 +318,22 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "explorer",
                 <DashboardPage embedded>
-                  <BlockDetailsPage client={client} />
+                  <BlockDetailsPage client={client} showConfigAction />
                 </DashboardPage>,
               )}
             />
+            {(["/explorer/config", "/explorer/config/:seqno"] as const).map(configPath => (
+              <Route
+                key={configPath}
+                path={path(configPath)}
+                element={withCapability(
+                  "explorer",
+                  <DashboardPage embedded>
+                    <ConfigPage client={client} />
+                  </DashboardPage>,
+                )}
+              />
+            ))}
             <Route
               path={path("/wallets")}
               element={withCapability(

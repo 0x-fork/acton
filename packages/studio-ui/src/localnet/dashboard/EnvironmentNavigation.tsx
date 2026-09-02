@@ -69,6 +69,7 @@ const primaryItems: SidebarItem[] = [{label: "Home", icon: LayoutGrid, path: "/d
 const explorerItems: NestedSidebarItem[] = [
   {label: "Overview", path: "/explorer"},
   {label: "Blocks", path: "/explorer/blocks"},
+  {label: "Config", path: "/explorer/config"},
   {label: "Tokens", path: "/explorer/tokens"},
   {label: "NFTs", path: "/explorer/nfts"},
 ]
@@ -239,6 +240,7 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   const isExplorerOverviewActive =
     localPathname.startsWith("/explorer") &&
     localPathname !== "/explorer/blocks" &&
+    !localPathname.startsWith("/explorer/config") &&
     localPathname !== "/explorer/tokens" &&
     localPathname !== "/explorer/nfts" &&
     localPathname !== "/explorer/favorites"
@@ -279,6 +281,7 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
     if (
       !localPathname.startsWith("/explorer") ||
       localPathname === "/explorer/blocks" ||
+      localPathname.startsWith("/explorer/config") ||
       localPathname === "/explorer/tokens" ||
       localPathname === "/explorer/nfts" ||
       localPathname === "/explorer/favorites"
@@ -352,7 +355,9 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
                   ? isExplorerOverviewActive
                   : item.path === "/explorer/blocks"
                     ? localPathname === item.path || localPathname.startsWith("/block/")
-                    : localPathname === item.path
+                    : item.path === "/explorer/config"
+                      ? localPathname.startsWith(item.path)
+                      : localPathname === item.path
               }
               items={explorerItems}
               label="Explorer"
