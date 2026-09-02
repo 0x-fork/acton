@@ -896,8 +896,7 @@ mod tests {
     #[test]
     fn forgotten_remote_observation_disappears_immediately() {
         let collector_identity = ObserverIdentity::from_secret([7; 32]);
-        let mut collector =
-            ObservationStore::new("network".to_owned(), collector_identity, 600);
+        let mut collector = ObservationStore::new("network".to_owned(), collector_identity, 600);
         let remote_identity = ObserverIdentity::from_secret([8; 32]);
         let remote_id = remote_identity.observer_id().to_owned();
         let mut remote = ObservationStore::new("network".to_owned(), remote_identity, 600);

@@ -20,9 +20,18 @@ rust-version = "1.97.1"
 repository = "https://github.com/ton-blockchain/acton"
 license = "MIT OR Apache-2.0"
 
+[workspace.dependencies]
+async-trait = "0.1.89"
+expect-test = "1.5.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tempfile = "3.20"
+tokio = "1.47"
+tracing = "0.1"
+
 [dependencies]
 anyhow = "1.0"
-async-trait = "0.1.89"
+async-trait.workspace = true
 axum = { version = "0.8", features = ["json", "query", "tokio", "http1"] }
 base64 = "0.22"
 clap = { version = "4.5", features = ["derive", "env"] }
@@ -43,22 +52,22 @@ num-bigint = "0.4"
 rand = "0.8"
 regex = "1.11"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde.workspace = true
+serde_json.workspace = true
 sha2 = "0.10"
-tokio = { version = "1.47", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 ton = "0.4.1"
 tonutils = { version = "1.1.0", features = ["full"] }
 tower-http = { version = "0.6", features = ["fs"] }
-tracing = "0.1"
+tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tycho-types = { version = "0.3.5", default-features = false, features = ["models"] }
 utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
 zip = { version = "4.6", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
-expect-test = "1.5.0"
-tempfile = "3.20"
+expect-test.workspace = true
+tempfile.workspace = true
 
 [profile.release]
 strip = true
