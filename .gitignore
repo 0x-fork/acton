@@ -49,3 +49,8 @@ debug.entitlements
 .playwright-mcp/
 .mcp.json
 crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/
+
+# Acton related files
+build/
+lcov.info
+global.libraries.toml

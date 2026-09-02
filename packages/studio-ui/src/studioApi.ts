@@ -35,7 +35,16 @@ export interface FullTonNetworkEnvironmentConfig {
   readonly apiV3Port: number
   readonly adminPort: number
   readonly configPort: number
+  readonly observabilityPort: number
   readonly importedAccounts: readonly FullTonAccountImport[]
+  readonly nodes: readonly FullTonNode[]
+}
+
+export interface FullTonNode {
+  readonly id: string
+  readonly name: string
+  readonly validator: boolean
+  readonly portBase: number
 }
 
 export interface FullTonAccountImport {
@@ -73,6 +82,7 @@ export interface CreateFullTonNetworkEnvironmentConfig {
   readonly apiV3Port?: number
   readonly adminPort?: number
   readonly configPort?: number
+  readonly observabilityPort?: number
   readonly importedAccounts: readonly FullTonAccountImport[]
 }
 
@@ -103,6 +113,7 @@ export interface EnvironmentEndpoints {
   readonly apiV3?: string
   readonly config?: string
   readonly control?: string
+  readonly observability?: string
 }
 
 export interface EnvironmentNetwork {
@@ -178,6 +189,11 @@ export interface CreateEnvironmentRequest {
 
 export interface UpdateEnvironmentRequest {
   readonly name: string
+}
+
+export interface CreateFullTonNodeRequest {
+  readonly name: string
+  readonly validator: boolean
 }
 
 export interface EnvironmentSnapshot {
@@ -351,6 +367,23 @@ export function updateStudioEnvironment(
     `/api/v1/environments/${encodeURIComponent(environmentId)}`,
     {
       method: "PATCH",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+  )
+}
+
+export function addStudioFullTonNode(
+  environmentId: string,
+  request: CreateFullTonNodeRequest,
+): Promise<StudioEnvironment> {
+  return requestJson<StudioEnvironment>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/nodes`,
+    {
+      method: "POST",
       headers: {
         accept: "application/json",
         "content-type": "application/json",

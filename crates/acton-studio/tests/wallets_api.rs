@@ -38,6 +38,7 @@ impl TestEnvironmentRuntime {
                 api_v3: Some("http://127.0.0.1:5411/api/v3".to_owned()),
                 config: None,
                 control: Some("http://127.0.0.1:5411".to_owned()),
+                observability: None,
             },
         );
         let full_node = StudioEnvironment::new(
@@ -49,13 +50,16 @@ impl TestEnvironmentRuntime {
                 api_v3_port: 18_081,
                 admin_port: 18_082,
                 config_port: 18_083,
+                observability_port: 18_084,
                 imported_accounts: Vec::new(),
+                nodes: Vec::new(),
             },
             EnvironmentEndpoints {
                 api_v2: Some("http://127.0.0.1:18080/api/v2".to_owned()),
                 api_v3: Some("http://127.0.0.1:18081/api/v3".to_owned()),
                 config: Some("http://127.0.0.1:18083".to_owned()),
                 control: Some("http://127.0.0.1:18082".to_owned()),
+                observability: Some("http://127.0.0.1:18084".to_owned()),
             },
         );
         let mut read_only = localnet.clone();

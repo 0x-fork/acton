@@ -1,4 +1,5 @@
 mod http_api;
+mod recursive_load;
 
 use std::path::PathBuf;
 
@@ -17,6 +18,12 @@ struct Cli {
 enum Command {
     /// Build and install the pinned TON HTTP API V2 backend.
     BuildTonHttpApiV2(BuildTonHttpApiV2Args),
+
+    /// Build a deterministic external message for a recursive load root.
+    PrepareRecursiveLoad(PrepareRecursiveLoadArgs),
+
+    /// Fund and deploy a recursive load root through the Localton liteserver.
+    RunRecursiveLoad(RunRecursiveLoadArgs),
 }
 
 #[derive(Debug, Args)]
@@ -30,17 +37,52 @@ struct BuildTonHttpApiV2Args {
     jobs: u8,
 }
 
+#[derive(Debug, Args)]
+struct PrepareRecursiveLoadArgs {
+    /// Positive identifier that gives this workload tree a distinct address space.
+    #[arg(default_value_t = 1)]
+    tree_id: u64,
+}
+
+#[derive(Debug, Args)]
+struct RunRecursiveLoadArgs {
+    /// Root balance in GRAM, with at most nine decimal places.
+    amount: String,
+
+    /// Positive identifier that gives this workload tree a distinct address space.
+    tree_id: u64,
+
+    /// Localton state directory used by the wallet and liteserver commands.
+    #[arg(long, default_value = ".localton")]
+    state_dir: PathBuf,
+
+    /// Maximum time to wait for funding and deployment confirmations.
+    #[arg(long, default_value_t = 600)]
+    timeout_seconds: u64,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .with_target(false)
+        .without_time()
         .compact()
         .init();
 
     match Cli::parse().command {
         Command::BuildTonHttpApiV2(args) => {
             http_api::build(&args.state_dir, usize::from(args.jobs)).await
+        }
+        Command::PrepareRecursiveLoad(args) => recursive_load::prepare(args.tree_id).await,
+        Command::RunRecursiveLoad(args) => {
+            recursive_load::run(
+                &args.amount,
+                args.tree_id,
+                &args.state_dir,
+                args.timeout_seconds,
+            )
+            .await
         }
     }
 }

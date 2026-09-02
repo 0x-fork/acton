@@ -50,11 +50,12 @@ pub use contract_source_artifact::{
 };
 pub use environment::{
     CreateEnvironmentConfig, CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest,
-    EnvironmentCapability, EnvironmentConfig, EnvironmentEndpoints, EnvironmentLifecycle,
-    EnvironmentNetwork, EnvironmentRuntime, EnvironmentRuntimeError, EnvironmentRuntimeFuture,
-    EnvironmentSnapshot, EnvironmentSnapshotOperation, EnvironmentSnapshotOperationKind,
-    EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings, EnvironmentStatus,
-    FullTonAccountImport, PublicTonNetwork, StudioEnvironment, UpdateEnvironmentRequest,
+    CreateFullTonNodeRequest, EnvironmentCapability, EnvironmentConfig, EnvironmentEndpoints,
+    EnvironmentLifecycle, EnvironmentNetwork, EnvironmentRuntime, EnvironmentRuntimeError,
+    EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation,
+    EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings,
+    EnvironmentStatus, FullTonAccountImport, FullTonNode, PublicTonNetwork, StudioEnvironment,
+    UpdateEnvironmentRequest,
 };
 pub use environment_catalog::{
     MAINNET_ENVIRONMENT_ID, PUBLIC_TON_ENVIRONMENT_IDS, TESTNET_ENVIRONMENT_ID,
@@ -309,6 +310,10 @@ impl StudioServer {
                     .delete(delete_environment),
             )
             .route(
+                "/environments/{environment_id}/nodes",
+                post(add_full_ton_node),
+            )
+            .route(
                 "/environments/{environment_id}/stop",
                 post(stop_environment),
             )
@@ -493,6 +498,33 @@ async fn create_environment(
     state
         .environment_runtime
         .create(request)
+        .await
+        .map(|environment| (StatusCode::CREATED, Json(public_environment(environment))))
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/nodes",
+    params(("environment_id" = String, Path, description = "Studio environment identifier")),
+    request_body = CreateFullTonNodeRequest,
+    responses(
+        (status = 201, description = "Node joined the full TON network", body = StudioEnvironment),
+        (status = 400, description = "Invalid node configuration", body = StudioApiErrorBody),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Environment cannot accept a node", body = StudioApiErrorBody),
+        (status = 500, description = "Node startup failed", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
+async fn add_full_ton_node(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+    Json(request): Json<CreateFullTonNodeRequest>,
+) -> Result<(StatusCode, Json<StudioEnvironment>), StudioApiError> {
+    state
+        .environment_runtime
+        .add_full_ton_node(&environment_id, request)
         .await
         .map(|environment| (StatusCode::CREATED, Json(public_environment(environment))))
         .map_err(StudioApiError)
@@ -1068,6 +1100,7 @@ fn public_environment(mut environment: StudioEnvironment) -> StudioEnvironment {
             .contains(&EnvironmentCapability::ControlApi)
             && environment.runtime_endpoints.control.is_some())
         .then_some(proxy_root),
+        observability: environment.runtime_endpoints.observability.clone(),
     };
     environment
 }

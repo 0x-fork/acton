@@ -19,10 +19,11 @@ use crate::contract_registry::{
 };
 use crate::environment::{
     CreateEnvironmentConfig, CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest,
-    EnvironmentConfig, EnvironmentEndpoints, EnvironmentRuntime, EnvironmentRuntimeError,
-    EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation,
-    EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings,
-    EnvironmentStatus, FullTonAccountImport, StudioEnvironment, UpdateEnvironmentRequest,
+    CreateFullTonNodeRequest, EnvironmentConfig, EnvironmentEndpoints, EnvironmentRuntime,
+    EnvironmentRuntimeError, EnvironmentRuntimeFuture, EnvironmentSnapshot,
+    EnvironmentSnapshotOperation, EnvironmentSnapshotOperationKind,
+    EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings, EnvironmentStatus,
+    FullTonAccountImport, FullTonNode, StudioEnvironment, UpdateEnvironmentRequest,
 };
 use crate::environment_store::{
     LoadedEnvironments, StoredEnvironment, load_environments, persist_environment,
@@ -35,6 +36,9 @@ const FIRST_FULL_TON_V2_PORT: u16 = 18080;
 const FIRST_FULL_TON_V3_PORT: u16 = 18081;
 const FIRST_FULL_TON_ADMIN_PORT: u16 = 18082;
 const FIRST_FULL_TON_CONFIG_PORT: u16 = 18083;
+const FIRST_FULL_TON_OBSERVABILITY_PORT: u16 = 18084;
+const FIRST_JOIN_NODE_PORT: u16 = 19000;
+const JOIN_NODE_PORT_STRIDE: u16 = 10;
 const LOCALNET_READY_TIMEOUT: Duration = Duration::from_secs(15);
 const LOCALNET_READY_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const LOCALNET_STATUS_POLL_INTERVAL: Duration = Duration::from_millis(500);
@@ -455,6 +459,135 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             let environment = find_environment(&self.inner, &environment_id).await?;
             ensure_no_active_snapshot(&environment).await?;
             restart_environment(&self.inner, &environment).await
+        })
+    }
+
+    fn add_full_ton_node(
+        &self,
+        environment_id: &str,
+        request: CreateFullTonNodeRequest,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        let environment_id = environment_id.to_owned();
+        Box::pin(async move {
+            let started_at = Instant::now();
+            let node_name = validate_full_ton_node_name(&request.name)?;
+            let environment = find_environment(&self.inner, &environment_id).await?;
+            ensure_no_active_snapshot(&environment).await?;
+            let _lifecycle_guard = environment.lifecycle.lock().await;
+            ensure_environment_not_deleted(&environment).await?;
+
+            let details = environment.details.read().await.clone();
+            if details.status != EnvironmentStatus::Running {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "environment_not_running",
+                    message: "The full TON network must be running before a node can join"
+                        .to_owned(),
+                });
+            }
+            let EnvironmentConfig::FullTonNetwork { nodes, .. } = &details.config else {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "environment_nodes_unavailable",
+                    message: "Nodes can only be added to a full TON network".to_owned(),
+                });
+            };
+            if nodes
+                .iter()
+                .any(|node| node.name.eq_ignore_ascii_case(&node_name))
+            {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "environment_node_name_duplicate",
+                    message: format!("A node named {node_name} already exists"),
+                });
+            }
+
+            let node_number =
+                u16::try_from(nodes.len() + 1).map_err(|_| EnvironmentRuntimeError::Conflict {
+                    code: "environment_node_limit_reached",
+                    message: "Studio cannot allocate another node in this environment".to_owned(),
+                })?;
+            let port_offset = node_number
+                .checked_sub(1)
+                .and_then(|value| value.checked_mul(JOIN_NODE_PORT_STRIDE))
+                .ok_or_else(|| EnvironmentRuntimeError::Conflict {
+                    code: "environment_node_limit_reached",
+                    message: "Studio cannot allocate another node in this environment".to_owned(),
+                })?;
+            let port_base = FIRST_JOIN_NODE_PORT
+                .checked_add(port_offset)
+                .ok_or_else(|| EnvironmentRuntimeError::Conflict {
+                    code: "environment_node_limit_reached",
+                    message: "Studio cannot allocate another node in this environment".to_owned(),
+                })?;
+            let node = FullTonNode {
+                id: format!("node-{node_number}"),
+                name: node_name,
+                validator: request.validator,
+                port_base,
+            };
+            let mut config = details.config.clone();
+            let EnvironmentConfig::FullTonNetwork {
+                nodes: updated_nodes,
+                ..
+            } = &mut config
+            else {
+                unreachable!("the environment kind was checked above");
+            };
+            updated_nodes.push(node.clone());
+
+            tracing::info!(
+                operation = "join_full_ton_node",
+                environment_id = %environment_id,
+                node = %node.name,
+                target = %node.id,
+                "Joining a node to the Studio full TON network"
+            );
+            persist_environment(
+                &self.inner.workspace_root,
+                &StoredEnvironment {
+                    id: details.id.clone(),
+                    name: details.name.clone(),
+                    config: config.clone(),
+                    resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
+                },
+            )
+            .await?;
+
+            if let Err(error) = environment.driver.add_full_ton_node(nodes, &node).await {
+                let _ = persist_environment(
+                    &self.inner.workspace_root,
+                    &StoredEnvironment {
+                        id: details.id,
+                        name: details.name,
+                        config: details.config,
+                        resume_on_startup: environment.resume_on_startup.load(Ordering::Acquire),
+                    },
+                )
+                .await;
+                tracing::warn!(
+                    operation = "join_full_ton_node",
+                    environment_id = %environment_id,
+                    node = %node.name,
+                    target = %node.id,
+                    duration_ms = started_at.elapsed().as_millis(),
+                    outcome = "error",
+                    %error,
+                    "Failed to join a node to the Studio full TON network"
+                );
+                return Err(error);
+            }
+
+            let mut updated = environment.details.write().await;
+            updated.config = config;
+            tracing::info!(
+                operation = "join_full_ton_node",
+                environment_id = %environment_id,
+                node = %node.name,
+                target = %node.id,
+                duration_ms = started_at.elapsed().as_millis(),
+                outcome = "success",
+                "Node joined the Studio full TON network"
+            );
+            Ok(updated.clone())
         })
     }
 
@@ -1149,12 +1282,14 @@ fn resolve_request(
             api_v3_port,
             admin_port,
             config_port,
+            observability_port,
             mut imported_accounts,
         } => {
             validate_requested_port(api_v2_port)?;
             validate_requested_port(api_v3_port)?;
             validate_requested_port(admin_port)?;
             validate_requested_port(config_port)?;
+            validate_requested_port(observability_port)?;
             let api_v2_port = select_port(FIRST_FULL_TON_V2_PORT, api_v2_port, reserved_ports)?;
             let mut excluded_ports = reserved_ports.to_vec();
             excluded_ports.push(api_v2_port);
@@ -1164,6 +1299,12 @@ fn resolve_request(
             excluded_ports.push(admin_port);
             let config_port =
                 select_port(FIRST_FULL_TON_CONFIG_PORT, config_port, &excluded_ports)?;
+            excluded_ports.push(config_port);
+            let observability_port = select_port(
+                FIRST_FULL_TON_OBSERVABILITY_PORT,
+                observability_port,
+                &excluded_ports,
+            )?;
             for account in &mut imported_accounts {
                 account.shard_account_boc_hex = None;
             }
@@ -1172,7 +1313,9 @@ fn resolve_request(
                 api_v3_port,
                 admin_port,
                 config_port,
+                observability_port,
                 imported_accounts,
+                nodes: Vec::new(),
             }
         }
     };
@@ -1206,6 +1349,17 @@ fn validate_environment_name(name: &str) -> Result<String, EnvironmentRuntimeErr
     Ok(name.to_owned())
 }
 
+fn validate_full_ton_node_name(name: &str) -> Result<String, EnvironmentRuntimeError> {
+    let name = validate_environment_name(name)?;
+    if name.eq_ignore_ascii_case("genesis") {
+        return Err(EnvironmentRuntimeError::InvalidRequest {
+            code: "environment_node_name_reserved",
+            message: "The node name genesis is reserved for the bootstrap node".to_owned(),
+        });
+    }
+    Ok(name)
+}
+
 fn select_port(
     first_port: u16,
     requested: Option<u16>,
@@ -1236,7 +1390,7 @@ fn port_is_available(port: u16) -> bool {
 
 async fn reserved_environment_ports(runtime: &LocalProcessRuntimeInner) -> Vec<u16> {
     let environments = runtime.environments.read().await.clone();
-    let mut ports = Vec::with_capacity(environments.len() * 4);
+    let mut ports = Vec::with_capacity(environments.len() * 5);
     for environment in environments {
         match &environment.details.read().await.config {
             EnvironmentConfig::ActonLocalnet { port, .. } => ports.push(*port),
@@ -1245,12 +1399,14 @@ async fn reserved_environment_ports(runtime: &LocalProcessRuntimeInner) -> Vec<u
                 api_v3_port,
                 admin_port,
                 config_port,
+                observability_port,
                 ..
             } => {
                 ports.push(*api_v2_port);
                 ports.push(*api_v3_port);
                 ports.push(*admin_port);
                 ports.push(*config_port);
+                ports.push(*observability_port);
             }
             EnvironmentConfig::RemoteTonNetwork { .. } => {}
         }
@@ -1267,6 +1423,7 @@ fn runtime_endpoints(config: &EnvironmentConfig) -> EnvironmentEndpoints {
                 api_v3: Some(format!("{root}/api/v3")),
                 config: None,
                 control: Some(root),
+                observability: None,
             }
         }
         EnvironmentConfig::FullTonNetwork {
@@ -1274,12 +1431,14 @@ fn runtime_endpoints(config: &EnvironmentConfig) -> EnvironmentEndpoints {
             api_v3_port,
             admin_port,
             config_port,
+            observability_port,
             ..
         } => EnvironmentEndpoints {
             api_v2: Some(format!("http://127.0.0.1:{api_v2_port}/api/v2")),
             api_v3: Some(format!("http://127.0.0.1:{api_v3_port}/api/v3")),
             config: Some(format!("http://127.0.0.1:{config_port}")),
             control: Some(format!("http://127.0.0.1:{admin_port}")),
+            observability: Some(format!("http://127.0.0.1:{observability_port}")),
         },
         EnvironmentConfig::RemoteTonNetwork { .. } => EnvironmentEndpoints::default(),
     }
@@ -1402,7 +1561,9 @@ impl EnvironmentDriver {
                 api_v3_port,
                 admin_port,
                 config_port,
+                observability_port,
                 imported_accounts,
+                nodes,
             } => FullTonNetworkDriver::materialize(
                 data_dir,
                 workspace_root,
@@ -1411,7 +1572,9 @@ impl EnvironmentDriver {
                 *api_v3_port,
                 *admin_port,
                 *config_port,
+                *observability_port,
                 imported_accounts,
+                nodes,
                 resolved_imported_accounts,
             )
             .await
@@ -1457,6 +1620,20 @@ impl EnvironmentDriver {
         match self {
             Self::ActonLocalnet { .. } => Ok(()),
             Self::FullTonNetwork(driver) => driver.delete().await,
+        }
+    }
+
+    async fn add_full_ton_node(
+        &self,
+        existing_nodes: &[FullTonNode],
+        node: &FullTonNode,
+    ) -> Result<(), EnvironmentRuntimeError> {
+        match self {
+            Self::FullTonNetwork(driver) => driver.add_node(existing_nodes, node).await,
+            Self::ActonLocalnet { .. } => Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_nodes_unavailable",
+                message: "Nodes can only be added to a full TON network".to_owned(),
+            }),
         }
     }
 

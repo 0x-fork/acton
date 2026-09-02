@@ -2,10 +2,12 @@ services:
   localton:
     image: "__LOCALTON_IMAGE__"
     command:
-      - run
+      - bootstrap
       - --state-dir
       - /var/lib/localton
       - --ton-http-api
+      - --observability-bind
+      - 0.0.0.0
 __LOCALTON_IMPORTED_ACCOUNTS__
     stop_grace_period: 60s
     restart: unless-stopped
@@ -13,6 +15,7 @@ __LOCALTON_IMPORTED_ACCOUNTS__
       - "127.0.0.1:__LOCALTON_CONFIG_PORT__:18000"
       - "127.0.0.1:__LOCALTON_ADMIN_PORT__:18001"
       - "127.0.0.1:__LOCALTON_V2_PORT__:18002"
+      - "127.0.0.1:__LOCALTON_OBSERVABILITY_PORT__:18007"
     volumes:
       - localton-state:/var/lib/localton
       - localton-snapshots:/var/lib/localton-snapshots
@@ -31,6 +34,8 @@ __LOCALTON_IMPORTED_ACCOUNTS__
       start_period: 240s
       start_interval: 1s
       retries: 12
+
+__LOCALTON_JOIN_NODES__
 
   v3-basechain-bootstrap:
     image: "__LOCALTON_IMAGE__"
@@ -133,7 +138,7 @@ __LOCALTON_IMPORTED_ACCOUNTS__
       - --max-batch-msgs
       - "2048"
     environment:
-      TON_WORKER_DBROOT: /var/lib/localton/genesis/db
+      TON_WORKER_DBROOT: /var/lib/localton/node/db
       TON_WORKER_FROM: "1"
       TON_WORKER_WORKDIR: /var/lib/ton-indexer/work
     depends_on:
@@ -151,7 +156,7 @@ __LOCALTON_IMPORTED_ACCOUNTS__
         soft: 1000000
         hard: 1000000
     volumes:
-      - localton-state:/var/lib/localton:ro
+      - localton-state:/var/lib/localton
       - ton-index-workdir:/var/lib/ton-indexer/work
 
   v3-account-scanner:
@@ -163,7 +168,7 @@ __LOCALTON_IMPORTED_ACCOUNTS__
       TON_ACCOUNT_SCANNER_WORKDIR: /var/lib/ton-indexer/account-scan
       TON_INDEXER_IS_TESTNET: "1"
       TON_INDEXER_TON_HTTP_API_ENDPOINT: http://localton:18002/api/v2
-      TON_WORKER_DBROOT: /var/lib/localton/genesis/db
+      TON_WORKER_DBROOT: /var/lib/localton/node/db
     depends_on:
       localton:
         condition: service_healthy
@@ -185,7 +190,7 @@ __LOCALTON_IMPORTED_ACCOUNTS__
       retries: 12
     restart: unless-stopped
     volumes:
-      - localton-state:/var/lib/localton:ro
+      - localton-state:/var/lib/localton
       - ton-account-scan:/var/lib/ton-indexer/account-scan
 
   v3-api:
@@ -259,3 +264,4 @@ volumes:
   postgres-data:
   ton-account-scan:
   ton-index-workdir:
+__LOCALTON_JOIN_VOLUMES__

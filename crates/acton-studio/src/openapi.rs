@@ -13,11 +13,12 @@ use crate::contract_registry::{
 };
 use crate::{
     CreateEnvironmentConfig, CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest,
-    EnvironmentCapability, EnvironmentConfig, EnvironmentEndpoints, EnvironmentLifecycle,
-    EnvironmentNetwork, EnvironmentSnapshot, EnvironmentSnapshotOperation,
+    CreateFullTonNodeRequest, EnvironmentCapability, EnvironmentConfig, EnvironmentEndpoints,
+    EnvironmentLifecycle, EnvironmentNetwork, EnvironmentSnapshot, EnvironmentSnapshotOperation,
     EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings,
-    EnvironmentStatus, PublicTonNetwork, SignWalletRequest, SignWalletResponse, StudioApiErrorBody,
-    StudioEnvironment, StudioInfo, StudioWallet, UpdateEnvironmentRequest, WorkspaceInfo,
+    EnvironmentStatus, FullTonNode, PublicTonNetwork, SignWalletRequest, SignWalletResponse,
+    StudioApiErrorBody, StudioEnvironment, StudioInfo, StudioWallet, UpdateEnvironmentRequest,
+    WorkspaceInfo,
 };
 
 #[utoipa::path(
@@ -50,6 +51,7 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
         crate::info,
         crate::list_environments,
         crate::create_environment,
+        crate::add_full_ton_node,
         crate::get_environment,
         crate::update_environment,
         crate::delete_environment,
@@ -88,6 +90,8 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
         WorkspaceInfo,
         CreateEnvironmentRequest,
         CreateEnvironmentConfig,
+        CreateFullTonNodeRequest,
+        FullTonNode,
         UpdateEnvironmentRequest,
         CreateEnvironmentSnapshotRequest,
         EnvironmentConfig,

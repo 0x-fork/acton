@@ -15,10 +15,16 @@ RUN bun ci \
 FROM rust:${RUST_VERSION}-bookworm AS localton-builder
 WORKDIR /src/apps/localton
 
+COPY Cargo.toml Cargo.lock /src/
+COPY build.rs /src/build.rs
+COPY src /src/src
+COPY crates /src/crates
+COPY xtask /src/xtask
 COPY apps/localton/Cargo.toml apps/localton/Cargo.lock ./
 COPY apps/localton/src/main.rs ./src/main.rs
 COPY apps/localton/xtask/Cargo.toml ./xtask/Cargo.toml
 COPY apps/localton/xtask/src/main.rs ./xtask/src/main.rs
+COPY apps/localton/crates ./crates
 RUN --mount=type=cache,id=localton-cargo-registry,target=/usr/local/cargo/registry \
     cargo fetch --locked
 

@@ -10,11 +10,11 @@ use tokio::process::{Child, Command};
 use tokio::time::timeout;
 use xxhash_rust::xxh3::xxh3_64;
 
-use crate::{EnvironmentRuntimeError, EnvironmentSnapshot, FullTonAccountImport};
+use crate::{EnvironmentRuntimeError, EnvironmentSnapshot, FullTonAccountImport, FullTonNode};
 
 const COMPOSE_TEMPLATE: &str = include_str!("../assets/full-ton-network.compose.yaml");
 const DEFAULT_LOCALTON_IMAGE: &str =
-    "ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6";
+    "ghcr.io/ton-blockchain/localton:sha-ee9fc2e02f151d9556b33ed79a8fc4cfe37a7c91";
 const COMPOSE_WAIT_TIMEOUT_SECONDS: u16 = 600;
 const DOCKER_CONFIG_DIRECTORY: &str = "docker-pull-config";
 const RUNTIME_DESCRIPTOR_FILE: &str = "runtime.json";
@@ -34,11 +34,22 @@ const LOCALTON_SNAPSHOT_DIR: &str = "/var/lib/localton-snapshots";
 
 pub(crate) struct FullTonNetworkDriver {
     compose_file: PathBuf,
+    compose_config: FullTonComposeConfig,
     docker_target: DockerTarget,
     isolated_docker_config_dir: Option<PathBuf>,
     image: String,
     project_name: String,
     startup_log_file: PathBuf,
+}
+
+#[derive(Clone)]
+struct FullTonComposeConfig {
+    api_v2_port: u16,
+    api_v3_port: u16,
+    admin_port: u16,
+    config_port: u16,
+    observability_port: u16,
+    imported_account_bocs: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -136,7 +147,9 @@ impl FullTonNetworkDriver {
         api_v3_port: u16,
         admin_port: u16,
         config_port: u16,
+        observability_port: u16,
         imported_accounts: &[FullTonAccountImport],
+        nodes: &[FullTonNode],
         resolved_imported_accounts: Option<&[FullTonAccountImport]>,
     ) -> Result<Self, EnvironmentRuntimeError> {
         let runtime_file = data_dir.join(RUNTIME_DESCRIPTOR_FILE);
@@ -183,14 +196,15 @@ impl FullTonNetworkDriver {
             resolved_imported_accounts,
         )
         .await?;
-        let compose = render_compose(
-            &image,
+        let compose_config = FullTonComposeConfig {
             api_v2_port,
             api_v3_port,
             admin_port,
             config_port,
-            &imported_account_bocs,
-        );
+            observability_port,
+            imported_account_bocs,
+        };
+        let compose = render_compose(&image, &compose_config, nodes);
         tokio::fs::write(&compose_file, compose)
             .await
             .map_err(|error| EnvironmentRuntimeError::Internal {
@@ -203,11 +217,92 @@ impl FullTonNetworkDriver {
 
         Ok(Self {
             compose_file,
+            compose_config,
             docker_target,
             isolated_docker_config_dir,
             image,
             project_name: compose_project_name(workspace_root, environment_id),
             startup_log_file: data_dir.join(STARTUP_LOG_FILE),
+        })
+    }
+
+    /// Adds one validator-engine instance without duplicating the shared HTTP APIs or indexer.
+    ///
+    /// The compose definition is persisted before Docker starts the service so a Studio restart
+    /// can reconstruct the same topology. A failed start restores the previous definition.
+    pub(crate) async fn add_node(
+        &self,
+        existing_nodes: &[FullTonNode],
+        node: &FullTonNode,
+    ) -> Result<(), EnvironmentRuntimeError> {
+        let mut nodes = existing_nodes.to_vec();
+        nodes.push(node.clone());
+        self.write_compose(&nodes).await?;
+
+        let mut command = self.compose_command();
+        command
+            .arg("up")
+            .arg("-d")
+            .arg("--wait")
+            .arg("--wait-timeout")
+            .arg(COMPOSE_WAIT_TIMEOUT_SECONDS.to_string())
+            .arg(&node.id);
+        let mut child = match self.spawn_logged(
+            &mut command,
+            false,
+            "join a node to the full TON network with Docker Compose",
+        ) {
+            Ok(child) => child,
+            Err(error) => {
+                let _ = self.write_compose(existing_nodes).await;
+                return Err(error);
+            }
+        };
+
+        let result = match timeout(
+            Duration::from_secs(u64::from(COMPOSE_WAIT_TIMEOUT_SECONDS)),
+            child.wait(),
+        )
+        .await
+        {
+            Ok(Ok(status)) if status.success() => Ok(()),
+            Ok(Ok(status)) => Err(EnvironmentRuntimeError::Internal {
+                code: "environment_node_start_failed",
+                message: self.startup_failure_message("join the node", status).await,
+            }),
+            Ok(Err(error)) => Err(EnvironmentRuntimeError::Internal {
+                code: "environment_node_start_failed",
+                message: format!("Failed to wait for the joining node: {error}"),
+            }),
+            Err(_) => {
+                let _ = child.kill().await;
+                Err(EnvironmentRuntimeError::Internal {
+                    code: "environment_node_start_timeout",
+                    message: format!(
+                        "The joining node did not start within {COMPOSE_WAIT_TIMEOUT_SECONDS} seconds"
+                    ),
+                })
+            }
+        };
+
+        if result.is_err() {
+            let _ = self.write_compose(existing_nodes).await;
+        }
+        result
+    }
+
+    async fn write_compose(&self, nodes: &[FullTonNode]) -> Result<(), EnvironmentRuntimeError> {
+        tokio::fs::write(
+            &self.compose_file,
+            render_compose(&self.image, &self.compose_config, nodes),
+        )
+        .await
+        .map_err(|error| EnvironmentRuntimeError::Internal {
+            code: "environment_storage_failed",
+            message: format!(
+                "Failed to write the full TON network definition at {}: {error}",
+                self.compose_file.display()
+            ),
         })
     }
 
@@ -840,24 +935,52 @@ async fn docker_text(mut command: Command) -> Result<String, EnvironmentRuntimeE
     Ok(value)
 }
 
-fn render_compose(
-    image: &str,
-    api_v2_port: u16,
-    api_v3_port: u16,
-    admin_port: u16,
-    config_port: u16,
-    imported_account_bocs: &[String],
-) -> String {
+fn render_compose(image: &str, config: &FullTonComposeConfig, nodes: &[FullTonNode]) -> String {
     COMPOSE_TEMPLATE
         .replace("__LOCALTON_IMAGE__", image)
-        .replace("__LOCALTON_V2_PORT__", &api_v2_port.to_string())
-        .replace("__LOCALTON_V3_PORT__", &api_v3_port.to_string())
-        .replace("__LOCALTON_ADMIN_PORT__", &admin_port.to_string())
-        .replace("__LOCALTON_CONFIG_PORT__", &config_port.to_string())
+        .replace("__LOCALTON_V2_PORT__", &config.api_v2_port.to_string())
+        .replace("__LOCALTON_V3_PORT__", &config.api_v3_port.to_string())
+        .replace("__LOCALTON_ADMIN_PORT__", &config.admin_port.to_string())
+        .replace("__LOCALTON_CONFIG_PORT__", &config.config_port.to_string())
+        .replace(
+            "__LOCALTON_OBSERVABILITY_PORT__",
+            &config.observability_port.to_string(),
+        )
         .replace(
             "__LOCALTON_IMPORTED_ACCOUNTS__",
-            &render_imported_account_args(imported_account_bocs),
+            &render_imported_account_args(&config.imported_account_bocs),
         )
+        .replace("__LOCALTON_JOIN_NODES__", &render_join_nodes(image, nodes))
+        .replace("__LOCALTON_JOIN_VOLUMES__", &render_join_volumes(nodes))
+}
+
+fn render_join_nodes(image: &str, nodes: &[FullTonNode]) -> String {
+    nodes
+        .iter()
+        .map(|node| {
+            let validator_arg = if node.validator {
+                "      - --validator\n      - --faucet\n      - http://127.0.0.1:18000/faucet\n"
+            } else {
+                ""
+            };
+            let name = serde_json::to_string(&node.name).expect("a node name is valid JSON");
+
+            format!(
+                "  {id}:\n    image: \"{image}\"\n    command:\n      - join\n      - http://127.0.0.1:18000/config\n      - --state-dir\n      - /var/lib/localton\n      - --node\n      - {name}\n      - --advertise-ip\n      - 127.0.0.1\n      - --port-base\n      - \"{port_base}\"\n{validator_arg}    network_mode: service:localton\n    depends_on:\n      localton:\n        condition: service_healthy\n        restart: true\n    healthcheck:\n      test:\n        - CMD\n        - curl\n        - --fail\n        - --silent\n        - --show-error\n        - http://127.0.0.1:{port_base}/healthz\n      interval: 5s\n      timeout: 3s\n      start_period: 240s\n      start_interval: 1s\n      retries: 12\n    restart: unless-stopped\n    volumes:\n      - {id}-state:/var/lib/localton\n    security_opt:\n      - no-new-privileges:true\n",
+                id = node.id,
+                port_base = node.port_base,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn render_join_volumes(nodes: &[FullTonNode]) -> String {
+    nodes
+        .iter()
+        .map(|node| format!("  {}-state:", node.id))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn render_imported_account_args(imported_account_bocs: &[String]) -> String {
@@ -1009,13 +1132,14 @@ mod tests {
 
     use std::path::{Path, PathBuf};
 
-    use crate::FullTonAccountImport;
+    use crate::{FullTonAccountImport, FullTonNode};
 
     use super::{
-        DEFAULT_LOCALTON_IMAGE, DockerTarget, FullTonNetworkDriver, IMPORTED_ACCOUNTS_FILE,
-        IsolatedPullTarget, RUNTIME_DESCRIPTOR_FILE, RUNTIME_DESCRIPTOR_VERSION, RuntimeDescriptor,
-        compose_project_name, load_or_store_imported_accounts, parse_compose_container_states,
-        render_compose, write_runtime_descriptor,
+        DEFAULT_LOCALTON_IMAGE, DockerTarget, FullTonComposeConfig, FullTonNetworkDriver,
+        IMPORTED_ACCOUNTS_FILE, IsolatedPullTarget, RUNTIME_DESCRIPTOR_FILE,
+        RUNTIME_DESCRIPTOR_VERSION, RuntimeDescriptor, compose_project_name,
+        load_or_store_imported_accounts, parse_compose_container_states, render_compose,
+        write_runtime_descriptor,
     };
 
     #[test]
@@ -1042,10 +1166,7 @@ v3-worker (exited, exit code 1)"]]
     fn compose_definition_uses_environment_specific_runtime_values() {
         let compose = render_compose(
             "registry.example/ton:build-42",
-            18180,
-            18181,
-            18182,
-            18183,
+            &test_compose_config(Vec::new()),
             &[],
         );
         let selected_lines = compose
@@ -1062,18 +1183,20 @@ v3-worker (exited, exit code 1)"]]
             )
         );
 
-        expect![[r#"project: acton-studio-<workspace>-environment-7
-    image: "registry.example/ton:build-42"
-      - "127.0.0.1:18183:18000"
-      - "127.0.0.1:18182:18001"
-      - "127.0.0.1:18180:18002"
-    image: "registry.example/ton:build-42"
-    image: "registry.example/ton:build-42"
-    image: "registry.example/ton:build-42"
-    image: "registry.example/ton:build-42"
-    image: "registry.example/ton:build-42"
-      - "127.0.0.1:18181:18003"
-    image: "registry.example/ton:build-42""#]]
+        expect![[r#"
+            project: acton-studio-<workspace>-environment-7
+                image: "registry.example/ton:build-42"
+                  - "127.0.0.1:18183:18000"
+                  - "127.0.0.1:18182:18001"
+                  - "127.0.0.1:18180:18002"
+                  - "127.0.0.1:18184:18007"
+                image: "registry.example/ton:build-42"
+                image: "registry.example/ton:build-42"
+                image: "registry.example/ton:build-42"
+                image: "registry.example/ton:build-42"
+                image: "registry.example/ton:build-42"
+                  - "127.0.0.1:18181:18003"
+                image: "registry.example/ton:build-42""#]]
         .assert_eq(&actual);
         assert!(!compose.contains("__LOCALTON_"));
         assert!(!compose.contains("platform:"));
@@ -1085,11 +1208,8 @@ v3-worker (exited, exit code 1)"]]
     fn compose_definition_passes_each_imported_account_to_localton() {
         let compose = render_compose(
             "registry.example/ton:build-42",
-            18180,
-            18181,
-            18182,
-            18183,
-            &["b5ee9c72".to_owned(), "deadbeef".to_owned()],
+            &test_compose_config(vec!["b5ee9c72".to_owned(), "deadbeef".to_owned()]),
+            &[],
         );
         let actual = compose
             .lines()
@@ -1107,13 +1227,77 @@ v3-worker (exited, exit code 1)"]]
     }
 
     #[test]
+    fn compose_definition_joins_nodes_without_another_http_or_indexer_stack() {
+        let compose = render_compose(
+            "registry.example/ton:build-42",
+            &test_compose_config(Vec::new()),
+            &[FullTonNode {
+                id: "node-1".to_owned(),
+                name: "validator a".to_owned(),
+                validator: true,
+                port_base: 19_000,
+            }],
+        );
+        let node = compose
+            .split("  node-1:\n")
+            .nth(1)
+            .and_then(|services| services.split("\n  v3-basechain-bootstrap:\n").next())
+            .unwrap();
+
+        let actual = node
+            .lines()
+            .map(|line| line.strip_prefix("    ").unwrap_or(line))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        expect![[r#"
+            image: "registry.example/ton:build-42"
+            command:
+              - join
+              - http://127.0.0.1:18000/config
+              - --state-dir
+              - /var/lib/localton
+              - --node
+              - "validator a"
+              - --advertise-ip
+              - 127.0.0.1
+              - --port-base
+              - "19000"
+              - --validator
+              - --faucet
+              - http://127.0.0.1:18000/faucet
+            network_mode: service:localton
+            depends_on:
+              localton:
+                condition: service_healthy
+                restart: true
+            healthcheck:
+              test:
+                - CMD
+                - curl
+                - --fail
+                - --silent
+                - --show-error
+                - http://127.0.0.1:19000/healthz
+              interval: 5s
+              timeout: 3s
+              start_period: 240s
+              start_interval: 1s
+              retries: 12
+            restart: unless-stopped
+            volumes:
+              - node-1-state:/var/lib/localton
+            security_opt:
+              - no-new-privileges:true
+        "#]]
+        .assert_eq(&actual);
+    }
+
+    #[test]
     fn compose_definition_indexes_initial_account_states_before_api_start() {
         let compose = render_compose(
             "registry.example/ton:build-42",
-            18180,
-            18181,
-            18182,
-            18183,
+            &test_compose_config(Vec::new()),
             &[],
         );
         let bootstrap = compose
@@ -1142,72 +1326,73 @@ v3-worker (exited, exit code 1)"]]
             scanner.trim_end()
         );
 
-        expect![[r#"BOOTSTRAP
-    image: "registry.example/ton:build-42"
-    command:
-      - indexer
-      - bootstrap-basechain
-      - --state-dir
-      - /var/lib/localton
-      - --endpoint
-      - http://localton:18002/api/v2
-      - --seqno-file
-      - /var/lib/ton-indexer/account-scan/target-seqno
-    depends_on:
-      localton:
-        condition: service_healthy
-    healthcheck:
-      disable: true
-    volumes:
-      - localton-state:/var/lib/localton
-      - ton-account-scan:/var/lib/ton-indexer/account-scan
-SCANNER
-    image: "registry.example/ton:build-42"
-    user: "0:0"
-    command:
-      - v3-account-scan
-    environment:
-      TON_ACCOUNT_SCANNER_WORKDIR: /var/lib/ton-indexer/account-scan
-      TON_INDEXER_IS_TESTNET: "1"
-      TON_INDEXER_TON_HTTP_API_ENDPOINT: http://localton:18002/api/v2
-      TON_WORKER_DBROOT: /var/lib/localton/genesis/db
-    depends_on:
-      localton:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      v3-basechain-bootstrap:
-        condition: service_completed_successfully
-      v3-migrations:
-        condition: service_completed_successfully
-    healthcheck:
-      test:
-        - CMD
-        - /usr/local/bin/localton-container-entrypoint
-        - v3-account-scan-health
-      interval: 10s
-      timeout: 3s
-      start_period: 240s
-      start_interval: 1s
-      retries: 12
-    restart: unless-stopped
-    volumes:
-      - localton-state:/var/lib/localton:ro
-      - ton-account-scan:/var/lib/ton-indexer/account-scan
-API DEPENDENCIES
-    depends_on:
-      localton:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      v3-migrations:
-        condition: service_completed_successfully
-      v3-account-scanner:
-        condition: service_healthy
-      v3-worker:
-        condition: service_started"#]]
+        expect![[r#"
+            BOOTSTRAP
+                image: "registry.example/ton:build-42"
+                command:
+                  - indexer
+                  - bootstrap-basechain
+                  - --state-dir
+                  - /var/lib/localton
+                  - --endpoint
+                  - http://localton:18002/api/v2
+                  - --seqno-file
+                  - /var/lib/ton-indexer/account-scan/target-seqno
+                depends_on:
+                  localton:
+                    condition: service_healthy
+                healthcheck:
+                  disable: true
+                volumes:
+                  - localton-state:/var/lib/localton
+                  - ton-account-scan:/var/lib/ton-indexer/account-scan
+            SCANNER
+                image: "registry.example/ton:build-42"
+                user: "0:0"
+                command:
+                  - v3-account-scan
+                environment:
+                  TON_ACCOUNT_SCANNER_WORKDIR: /var/lib/ton-indexer/account-scan
+                  TON_INDEXER_IS_TESTNET: "1"
+                  TON_INDEXER_TON_HTTP_API_ENDPOINT: http://localton:18002/api/v2
+                  TON_WORKER_DBROOT: /var/lib/localton/node/db
+                depends_on:
+                  localton:
+                    condition: service_healthy
+                  postgres:
+                    condition: service_healthy
+                  v3-basechain-bootstrap:
+                    condition: service_completed_successfully
+                  v3-migrations:
+                    condition: service_completed_successfully
+                healthcheck:
+                  test:
+                    - CMD
+                    - /usr/local/bin/localton-container-entrypoint
+                    - v3-account-scan-health
+                  interval: 10s
+                  timeout: 3s
+                  start_period: 240s
+                  start_interval: 1s
+                  retries: 12
+                restart: unless-stopped
+                volumes:
+                  - localton-state:/var/lib/localton
+                  - ton-account-scan:/var/lib/ton-indexer/account-scan
+            API DEPENDENCIES
+                depends_on:
+                  localton:
+                    condition: service_healthy
+                  postgres:
+                    condition: service_healthy
+                  redis:
+                    condition: service_healthy
+                  v3-migrations:
+                    condition: service_completed_successfully
+                  v3-account-scanner:
+                    condition: service_healthy
+                  v3-worker:
+                    condition: service_started"#]]
         .assert_eq(&actual);
     }
 
@@ -1332,6 +1517,8 @@ API DEPENDENCIES
             19181,
             19182,
             19183,
+            19184,
+            &[],
             &[],
             None,
         )
@@ -1387,6 +1574,7 @@ API DEPENDENCIES
                   - "127.0.0.1:19183:18000"
                   - "127.0.0.1:19182:18001"
                   - "127.0.0.1:19180:18002"
+                  - "127.0.0.1:19184:18007"
                 image: "registry.example/persisted/ton:build-17"
                 image: "registry.example/persisted/ton:build-17"
                 image: "registry.example/persisted/ton:build-17"
@@ -1417,6 +1605,8 @@ API DEPENDENCIES
             18181,
             18182,
             18183,
+            18184,
+            &[],
             &[],
             None,
         )
@@ -1468,44 +1658,57 @@ acton-studio-<workspace>-environment-1
             custom_driver.isolated_pull_command(&target).is_some()
         );
 
-        expect![[r"INSPECT
---context
-desktop-linux
-image
-inspect
---format
-{{.Id}}
-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6
+        expect![[r"
+            INSPECT
+            --context
+            desktop-linux
+            image
+            inspect
+            --format
+            {{.Id}}
+            ghcr.io/ton-blockchain/localton:sha-ee9fc2e02f151d9556b33ed79a8fc4cfe37a7c91
 
-NORMAL
---context
-desktop-linux
-pull
-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6
+            NORMAL
+            --context
+            desktop-linux
+            pull
+            ghcr.io/ton-blockchain/localton:sha-ee9fc2e02f151d9556b33ed79a8fc4cfe37a7c91
 
-ISOLATED
---config
-/workspace/.studio/environment-1/docker-pull-config
---host
-unix:///docker.sock
-pull
---platform
-linux/arm64
-ghcr.io/ton-blockchain/localton:sha-ede71005293920005bdc5639eac6c0d399d8c7a6
+            ISOLATED
+            --config
+            /workspace/.studio/environment-1/docker-pull-config
+            --host
+            unix:///docker.sock
+            pull
+            --platform
+            linux/arm64
+            ghcr.io/ton-blockchain/localton:sha-ee9fc2e02f151d9556b33ed79a8fc4cfe37a7c91
 
-CUSTOM ISOLATED: false"]]
+            CUSTOM ISOLATED: false"]]
         .assert_eq(&actual);
     }
 
     fn test_driver(image: &str, supports_isolated_pull: bool) -> FullTonNetworkDriver {
         FullTonNetworkDriver {
             compose_file: PathBuf::from("/workspace/.studio/environment-1/compose.yaml"),
+            compose_config: test_compose_config(Vec::new()),
             docker_target: DockerTarget::Context("desktop-linux".to_owned()),
             isolated_docker_config_dir: supports_isolated_pull
                 .then(|| PathBuf::from("/workspace/.studio/environment-1/docker-pull-config")),
             image: image.to_owned(),
             project_name: compose_project_name(Path::new("/workspace"), "environment-1"),
             startup_log_file: PathBuf::from("/workspace/.studio/environment-1/startup.log"),
+        }
+    }
+
+    fn test_compose_config(imported_account_bocs: Vec<String>) -> FullTonComposeConfig {
+        FullTonComposeConfig {
+            api_v2_port: 18_180,
+            api_v3_port: 18_181,
+            admin_port: 18_182,
+            config_port: 18_183,
+            observability_port: 18_184,
+            imported_account_bocs,
         }
     }
 

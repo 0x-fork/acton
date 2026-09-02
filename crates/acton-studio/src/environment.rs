@@ -23,6 +23,29 @@ pub struct FullTonAccountImport {
     pub(crate) shard_account_boc_hex: Option<String>,
 }
 
+/// A Localton node managed as part of a full TON Studio environment.
+///
+/// The genesis node owns the shared HTTP APIs and indexer. Entries in this
+/// collection are additional validator-engine instances that join the same
+/// chain and publish telemetry to the genesis observability collector.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FullTonNode {
+    pub id: String,
+    pub name: String,
+    pub validator: bool,
+    pub port_base: u16,
+}
+
+/// User-selected properties for a node that Studio should join to a running network.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateFullTonNodeRequest {
+    pub name: String,
+    #[serde(default)]
+    pub validator: bool,
+}
+
 impl FullTonAccountImport {
     #[must_use]
     pub fn new(source_environment_id: impl Into<String>, address: impl Into<String>) -> Self {
@@ -67,6 +90,7 @@ pub enum CreateEnvironmentConfig {
         api_v3_port: Option<u16>,
         admin_port: Option<u16>,
         config_port: Option<u16>,
+        observability_port: Option<u16>,
         #[serde(default)]
         imported_accounts: Vec<FullTonAccountImport>,
     },
@@ -186,7 +210,9 @@ pub enum EnvironmentConfig {
         api_v3_port: u16,
         admin_port: u16,
         config_port: u16,
+        observability_port: u16,
         imported_accounts: Vec<FullTonAccountImport>,
+        nodes: Vec<FullTonNode>,
     },
     RemoteTonNetwork {
         network: PublicTonNetwork,
@@ -232,6 +258,8 @@ pub struct EnvironmentEndpoints {
     pub config: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub control: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observability: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -482,6 +510,19 @@ pub trait EnvironmentRuntime: Send + Sync {
     fn stop(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment>;
 
     fn restart(&self, environment_id: &str) -> EnvironmentRuntimeFuture<'_, StudioEnvironment>;
+
+    fn add_full_ton_node(
+        &self,
+        _environment_id: &str,
+        _request: CreateFullTonNodeRequest,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_nodes_unavailable",
+                message: "Nodes can only be added to a managed full TON network".to_owned(),
+            })
+        })
+    }
 
     fn list_snapshots(
         &self,

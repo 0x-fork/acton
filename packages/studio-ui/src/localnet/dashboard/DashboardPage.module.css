@@ -1335,6 +1335,12 @@
   font-size: 0.8rem;
 }
 
+.addNodeFields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .settingsDangerTitle {
   color: var(--acton-color-status-failed-text) !important;
 }

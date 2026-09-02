@@ -3,11 +3,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use acton_studio::{
     CreateEnvironmentConfig, CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest,
-    EnvironmentConfig, EnvironmentEndpoints, EnvironmentRuntime, EnvironmentRuntimeError,
-    EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation,
-    EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStatus,
-    STUDIO_ENVIRONMENTS_PATH, StudioEnvironment, StudioServer, StudioServerConfig,
-    UpdateEnvironmentRequest,
+    CreateFullTonNodeRequest, EnvironmentConfig, EnvironmentEndpoints, EnvironmentRuntime,
+    EnvironmentRuntimeError, EnvironmentRuntimeFuture, EnvironmentSnapshot,
+    EnvironmentSnapshotOperation, EnvironmentSnapshotOperationKind,
+    EnvironmentSnapshotOperationPhase, EnvironmentStatus, FullTonNode, STUDIO_ENVIRONMENTS_PATH,
+    StudioEnvironment, StudioServer, StudioServerConfig, UpdateEnvironmentRequest,
 };
 use axum::Router;
 use axum::body::{Body, to_bytes};
@@ -72,6 +72,7 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
                             api_v3: Some(format!("http://127.0.0.1:{port}/api/v3")),
                             config: None,
                             control: Some(format!("http://127.0.0.1:{port}")),
+                            observability: None,
                         },
                     )
                 }
@@ -80,25 +81,30 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
                     api_v3_port,
                     admin_port,
                     config_port,
+                    observability_port,
                     imported_accounts,
                 } => {
                     let api_v2_port = api_v2_port.unwrap_or(18080);
                     let api_v3_port = api_v3_port.unwrap_or(18081);
                     let admin_port = admin_port.unwrap_or(18082);
                     let config_port = config_port.unwrap_or(18083);
+                    let observability_port = observability_port.unwrap_or(18084);
                     (
                         EnvironmentConfig::FullTonNetwork {
                             api_v2_port,
                             api_v3_port,
                             admin_port,
                             config_port,
+                            observability_port,
                             imported_accounts,
+                            nodes: Vec::new(),
                         },
                         EnvironmentEndpoints {
                             api_v2: Some(format!("http://127.0.0.1:{api_v2_port}/api/v2")),
                             api_v3: Some(format!("http://127.0.0.1:{api_v3_port}/api/v3")),
                             config: Some(format!("http://127.0.0.1:{config_port}")),
                             control: Some(format!("http://127.0.0.1:{admin_port}")),
+                            observability: Some(format!("http://127.0.0.1:{observability_port}")),
                         },
                     )
                 }
@@ -209,6 +215,43 @@ impl EnvironmentRuntime for TestEnvironmentRuntime {
                     environment_id: environment_id.clone(),
                 })?;
             environment.status = EnvironmentStatus::Starting;
+            let result = environment.clone();
+            drop(environments);
+            Ok(result)
+        })
+    }
+
+    fn add_full_ton_node(
+        &self,
+        environment_id: &str,
+        request: CreateFullTonNodeRequest,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        let environment_id = environment_id.to_owned();
+        Box::pin(async move {
+            let mut environments = self
+                .environments
+                .lock()
+                .expect("environment lock must not be poisoned");
+            let environment = environments
+                .iter_mut()
+                .find(|environment| environment.id == environment_id)
+                .ok_or_else(|| EnvironmentRuntimeError::NotFound {
+                    environment_id: environment_id.clone(),
+                })?;
+            let EnvironmentConfig::FullTonNetwork { nodes, .. } = &mut environment.config else {
+                return Err(EnvironmentRuntimeError::Conflict {
+                    code: "environment_nodes_unavailable",
+                    message: "Nodes can only be added to a full TON network".to_owned(),
+                });
+            };
+            let number = nodes.len() + 1;
+            nodes.push(FullTonNode {
+                id: format!("node-{number}"),
+                name: request.name,
+                validator: request.validator,
+                port_base: 19_000
+                    + u16::try_from(number - 1).expect("the test node count must fit u16") * 10,
+            });
             let result = environment.clone();
             drop(environments);
             Ok(result)
@@ -1017,7 +1060,42 @@ async fn full_ton_environment_advertises_only_its_supported_surface() {
 
     expect![[r#"
         status: 201 Created
-        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18180,"apiV3Port":18181,"adminPort":18182,"configPort":18183,"importedAccounts":[]},"capabilities":["apiV2","apiV3","configApi","controlApi","explorer","integration","gramFaucet","wallets","simulator","contracts","apiCalls","snapshots"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","config":"/api/v1/environments/test-environment-1/rpc/config","control":"/api/v1/environments/test-environment-1/rpc"},"network":{"id":"full-ton-network","label":"Full localnet","chainId":-3,"testOnly":true,"supportsActions":true}}"#]]
+        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18180,"apiV3Port":18181,"adminPort":18182,"configPort":18183,"observabilityPort":18084,"importedAccounts":[],"nodes":[]},"capabilities":["apiV2","apiV3","configApi","controlApi","explorer","integration","gramFaucet","wallets","simulator","contracts","apiCalls","snapshots"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","config":"/api/v1/environments/test-environment-1/rpc/config","control":"/api/v1/environments/test-environment-1/rpc","observability":"http://127.0.0.1:18084"},"network":{"id":"full-ton-network","label":"Full localnet","chainId":-3,"testOnly":true,"supportsActions":true}}"#]]
+    .assert_eq(&actual);
+}
+
+#[tokio::test]
+async fn full_ton_environment_adds_a_node_to_the_existing_network() {
+    let app = router();
+    app.clone()
+        .oneshot(
+            Request::post(STUDIO_ENVIRONMENTS_PATH)
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{
+                        "name":"Protocol network",
+                        "config":{"kind":"fullTonNetwork"}
+                    }"#,
+                ))
+                .expect("create request must be valid"),
+        )
+        .await
+        .expect("create request must succeed");
+
+    let response = app
+        .oneshot(
+            Request::post("/api/v1/environments/test-environment-1/nodes")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"name":"validator-a","validator":true}"#))
+                .expect("add node request must be valid"),
+        )
+        .await
+        .expect("add node request must succeed");
+    let actual = response_snapshot(response).await;
+
+    expect![[r#"
+        status: 201 Created
+        body: {"id":"test-environment-1","name":"Protocol network","status":"running","lifecycle":"managed","rpcUrl":"/api/v1/environments/test-environment-1/rpc","config":{"kind":"fullTonNetwork","apiV2Port":18080,"apiV3Port":18081,"adminPort":18082,"configPort":18083,"observabilityPort":18084,"importedAccounts":[],"nodes":[{"id":"node-1","name":"validator-a","validator":true,"portBase":19000}]},"capabilities":["apiV2","apiV3","configApi","controlApi","explorer","integration","gramFaucet","wallets","simulator","contracts","apiCalls","snapshots"],"endpoints":{"apiV2":"/api/v1/environments/test-environment-1/rpc/api/v2","apiV3":"/api/v1/environments/test-environment-1/rpc/api/v3","config":"/api/v1/environments/test-environment-1/rpc/config","control":"/api/v1/environments/test-environment-1/rpc","observability":"http://127.0.0.1:18084"},"network":{"id":"full-ton-network","label":"Full localnet","chainId":-3,"testOnly":true,"supportsActions":true}}"#]]
     .assert_eq(&actual);
 }
 

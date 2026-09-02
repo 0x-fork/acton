@@ -3,10 +3,10 @@ use std::sync::Arc;
 use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_ENV};
 
 use crate::environment::{
-    CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest, EnvironmentConfig,
-    EnvironmentEndpoints, EnvironmentRuntime, EnvironmentRuntimeError, EnvironmentRuntimeFuture,
-    EnvironmentSnapshot, EnvironmentSnapshotOperation, EnvironmentStatus, PublicTonNetwork,
-    StudioEnvironment, UpdateEnvironmentRequest,
+    CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest, CreateFullTonNodeRequest,
+    EnvironmentConfig, EnvironmentEndpoints, EnvironmentRuntime, EnvironmentRuntimeError,
+    EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation, EnvironmentStatus,
+    PublicTonNetwork, StudioEnvironment, UpdateEnvironmentRequest,
 };
 
 pub const TESTNET_ENVIRONMENT_ID: &str = "testnet";
@@ -123,6 +123,17 @@ impl EnvironmentRuntime for EnvironmentCatalogRuntime {
         self.managed.restart(environment_id)
     }
 
+    fn add_full_ton_node(
+        &self,
+        environment_id: &str,
+        request: CreateFullTonNodeRequest,
+    ) -> EnvironmentRuntimeFuture<'_, StudioEnvironment> {
+        if let Some(error) = lifecycle_unavailable(environment_id, "expanded") {
+            return error;
+        }
+        self.managed.add_full_ton_node(environment_id, request)
+    }
+
     fn list_snapshots(
         &self,
         environment_id: &str,
@@ -194,6 +205,7 @@ fn public_environment(descriptor: &PublicTonNetworkDescriptor) -> StudioEnvironm
             api_v3: Some(descriptor.api_v3_endpoint.to_owned()),
             config: None,
             control: None,
+            observability: None,
         },
     )
 }
