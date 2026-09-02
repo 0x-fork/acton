@@ -40,7 +40,7 @@ import {
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
 
-import type {RawBlockNetwork, TonClient} from "../api/client"
+import {buildTestnetToncenterBlockUrl, type RawBlockNetwork, type TonClient} from "../api/client"
 import {
   loadBlockTransactionsPage,
   type BlockTransactionListItem,
@@ -379,7 +379,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
             block.gen_software_capabilities === undefined ||
             block.fees_collected === undefined)
             ? client
-                .getRawBlockBoc(getExtendedBlockId(block), publicBlockNetwork)
+                .getRawBlockBoc(block, publicBlockNetwork)
                 .then(async cell => {
                   const {parseBlockMetadata} = await import("../cell-inspector/blockParser")
                   return parseBlockMetadata(cell)
@@ -1754,8 +1754,6 @@ function getBlockActions(
   readonly extendedBlockId: string
 } {
   const blockId = formatToncenterBlockId(block)
-  const tonapiOrigin =
-    rawBlockNetwork === "testnet" ? "https://testnet.tonapi.io" : "https://tonapi.io"
   const tonscanOrigin =
     rawBlockNetwork === "testnet" ? "https://testnet.tonscan.org" : "https://tonscan.org"
   const toncoinOrigin =
@@ -1763,9 +1761,12 @@ function getBlockActions(
       ? "https://test-explorer.toncoin.org"
       : "https://explorer.toncoin.org"
   return {
-    downloadUrl: rawBlockNetwork
-      ? `${tonapiOrigin}/v2/blockchain/blocks/${encodeURIComponent(blockId)}/boc`
-      : undefined,
+    downloadUrl:
+      rawBlockNetwork === "testnet"
+        ? buildTestnetToncenterBlockUrl(block).toString()
+        : rawBlockNetwork === "mainnet"
+          ? `https://tonapi.io/v2/blockchain/blocks/${encodeURIComponent(blockId)}/boc`
+          : undefined,
     configSeqno: getConfigSeqno(block),
     tonscanUrl: `${tonscanOrigin}/block/${block.workchain}:${block.shard}:${block.seqno}`,
     toncoinUrl: `${toncoinOrigin}/search?workchain=${block.workchain}&shard=${encodeURIComponent(block.shard)}&seqno=${block.seqno}`,

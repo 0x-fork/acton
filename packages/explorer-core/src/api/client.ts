@@ -1,5 +1,6 @@
 import {Cell} from "@ton/core"
 
+import {hashToHex} from "../components/utils"
 import {addressKey, type ExtendedContractABI} from "./compilerAbi"
 import {parseNetworkConfig, type NetworkConfig} from "./config"
 import {
@@ -165,6 +166,25 @@ interface GetBlockTransactionsV2Options {
 
 interface RawBlockResponse {
   readonly data: string
+}
+
+export interface RawBlockReference {
+  readonly workchain: number
+  readonly shard: string
+  readonly seqno: number
+  readonly root_hash: string
+  readonly file_hash: string
+}
+
+export function buildTestnetToncenterBlockUrl(block: RawBlockReference): URL {
+  const url = new URL("https://testnet.toncenter.com/api/v2/getBlock")
+  url.searchParams.append("workchain", block.workchain.toString())
+  url.searchParams.append("shard", v3ShardToV2Shard(block.shard))
+  url.searchParams.append("seqno", block.seqno.toString())
+  url.searchParams.append("root_hash", block.root_hash)
+  url.searchParams.append("file_hash", block.file_hash)
+  url.searchParams.append("archival", "true")
+  return url
 }
 
 interface GetTracesOptions {
@@ -876,9 +896,23 @@ export class TonClient {
     return this.request(url, "Failed to fetch blocks")
   }
 
-  async getRawBlockBoc(extendedBlockId: string, network: RawBlockNetwork): Promise<Cell> {
-    const origin = network === "testnet" ? "https://testnet.tonapi.io" : "https://tonapi.io"
-    const url = new URL(`/v2/liteserver/get_block/${encodeURIComponent(extendedBlockId)}`, origin)
+  async getRawBlockBoc(block: RawBlockReference, network: RawBlockNetwork): Promise<Cell> {
+    if (network === "testnet") {
+      const response = await this.request<RawBlockResponse>(
+        buildTestnetToncenterBlockUrl(block),
+        "Failed to fetch raw block",
+      )
+      try {
+        return Cell.fromBase64(response.data)
+      } catch {
+        throw new Error("Raw block response contains invalid BoC data")
+      }
+    }
+
+    const url = new URL(
+      `/v2/liteserver/get_block/${encodeURIComponent(rawBlockExtendedId(block))}`,
+      "https://tonapi.io",
+    )
     const response = await this.request<RawBlockResponse>(url, "Failed to fetch raw block")
     if (!/^(?:[0-9a-f]{2})+$/i.test(response.data)) {
       throw new Error("Raw block response contains invalid BoC data")
@@ -1755,6 +1789,12 @@ function appendOptionalSearchParam(
   if (value !== undefined) {
     url.searchParams.append(name, value.toString())
   }
+}
+
+function rawBlockExtendedId(block: RawBlockReference): string {
+  const rootHash = hashToHex(block.root_hash) ?? block.root_hash
+  const fileHash = hashToHex(block.file_hash) ?? block.file_hash
+  return `(${block.workchain},${block.shard},${block.seqno},${rootHash},${fileHash})`
 }
 
 function isStreamingTransactionsEvent(value: unknown): value is StreamingTransactionsEvent {
