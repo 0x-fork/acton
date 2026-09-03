@@ -17,6 +17,8 @@ interface TpsSectionProps {
   readonly series: TpsView | undefined
 }
 
+type ChartMetric = "tps" | "block_time"
+
 const DEFAULT_VISIBLE_SECONDS = 10 * 60
 
 use([
@@ -29,7 +31,16 @@ use([
   TooltipComponent,
 ])
 
-/** Presents recent whole-network transaction throughput from the embedded indexer */
+/** Presents related throughput and block-production timing from one indexed window */
+function PerformanceSections({series}: TpsSectionProps) {
+  return (
+    <>
+      <TpsSection series={series} />
+      <BlockTimeSection series={series} />
+    </>
+  )
+}
+
 function TpsSection({series}: TpsSectionProps) {
   const points = series?.points ?? []
   const current = points.at(-1)
@@ -43,15 +54,9 @@ function TpsSection({series}: TpsSectionProps) {
       </div>
       <div className={styles.panel}>
         <div className={styles.summary}>
-          <ThroughputMetric
-            label="Current"
-            value={current ? `${formatTps(current.tps)} TPS` : "—"}
-          />
-          <ThroughputMetric
-            label="Peak"
-            value={points.length > 0 ? `${formatTps(peak)} TPS` : "—"}
-          />
-          <ThroughputMetric
+          <SummaryMetric label="Current" value={current ? `${formatTps(current.tps)} TPS` : "—"} />
+          <SummaryMetric label="Peak" value={points.length > 0 ? `${formatTps(peak)} TPS` : "—"} />
+          <SummaryMetric
             label="Queue"
             value={queueSize === undefined || queueSize === null ? "—" : queueSize.toLocaleString()}
           />
@@ -62,14 +67,71 @@ function TpsSection({series}: TpsSectionProps) {
         ) : points.length === 0 ? (
           <ChartState>Indexing recent blocks</ChartState>
         ) : (
-          <TpsChart points={points} />
+          <MetricsChart metric="tps" points={points} />
         )}
       </div>
     </section>
   )
 }
 
-function ThroughputMetric({label, value}: {readonly label: string; readonly value: string}) {
+function BlockTimeSection({series}: TpsSectionProps) {
+  const points = series?.points ?? []
+  const current = points.at(-1)
+  const bucketDurationMs = (series?.bucket_seconds ?? 5) * 1000
+  const observed = points.flatMap(point => {
+    if (point.masterchain_blocks === 0) return [bucketDurationMs]
+    return point.block_time_ms === null ? [] : [point.block_time_ms]
+  })
+  const p95 = percentile(observed, 0.95)
+  const maximum = observed.length > 0 ? Math.max(...observed) : undefined
+  const target = series?.block_time_target_ms
+
+  return (
+    <section id="block-time" className={styles.section} aria-labelledby="block-time-title">
+      <div className={styles.heading}>
+        <h2 id="block-time-title">Masterchain block time</h2>
+      </div>
+      <div className={styles.panel}>
+        <div className={`${styles.summary} ${styles.summaryFour}`}>
+          <SummaryMetric
+            label="Target"
+            value={target === undefined ? "—" : formatDuration(target)}
+          />
+          <SummaryMetric
+            label="Current"
+            value={
+              current?.masterchain_blocks === 0
+                ? "No blocks"
+                : current?.block_time_ms === null || current?.block_time_ms === undefined
+                  ? "—"
+                  : formatDuration(current.block_time_ms)
+            }
+          />
+          <SummaryMetric label="P95" value={p95 === undefined ? "—" : formatDuration(p95)} />
+          <SummaryMetric
+            label="Maximum"
+            value={maximum === undefined ? "—" : formatDuration(maximum)}
+          />
+        </div>
+
+        {series?.status === "unavailable" ? (
+          <ChartState>Performance indexing is available on the network collector</ChartState>
+        ) : points.length === 0 ? (
+          <ChartState>Indexing recent blocks</ChartState>
+        ) : (
+          <MetricsChart
+            bucketDurationMs={bucketDurationMs}
+            metric="block_time"
+            points={points}
+            targetBlockTimeMs={target}
+          />
+        )}
+      </div>
+    </section>
+  )
+}
+
+function SummaryMetric({label, value}: {readonly label: string; readonly value: string}) {
   return (
     <div className={styles.metric}>
       <span>{label}</span>
@@ -87,7 +149,17 @@ function ChartState({children}: {readonly children: string}) {
   )
 }
 
-function TpsChart({points}: {readonly points: readonly TpsPoint[]}) {
+function MetricsChart({
+  bucketDurationMs,
+  metric,
+  points,
+  targetBlockTimeMs,
+}: {
+  readonly bucketDurationMs?: number
+  readonly metric: ChartMetric
+  readonly points: readonly TpsPoint[]
+  readonly targetBlockTimeMs?: number
+}) {
   const elementRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<EChartsType | undefined>(undefined)
   const extentRef = useRef({from: 0, to: 0})
@@ -134,7 +206,7 @@ function TpsChart({points}: {readonly points: readonly TpsPoint[]}) {
     const lastPoint = points.at(-1)
     if (!chart || !element || !firstPoint || !lastPoint) return
 
-    const renderKey = `${theme}:${firstPoint.timestamp}:${lastPoint.timestamp}:${points.length}`
+    const renderKey = `${metric}:${theme}:${targetBlockTimeMs ?? "none"}:${firstPoint.timestamp}:${lastPoint.timestamp}:${points.length}`
     if (renderKey === renderKeyRef.current) return
     renderKeyRef.current = renderKey
 
@@ -146,12 +218,25 @@ function TpsChart({points}: {readonly points: readonly TpsPoint[]}) {
     zoomRef.current = zoom
     const computed = getComputedStyle(element)
     const color = (name: string) => computed.getPropertyValue(name).trim()
+    const isBlockTime = metric === "block_time"
+    const barColor = color(isBlockTime ? "--block-time-bar-color" : "--tps-bar-color")
+    const activeColor = color(
+      isBlockTime ? "--block-time-bar-active-color" : "--tps-bar-active-color",
+    )
+    const referenceColor = color(
+      isBlockTime ? "--block-time-reference-color" : "--tps-reference-color",
+    )
+    const delayedColor = color("--block-time-delayed-color")
+    const stalledColor = color("--block-time-stalled-color")
+    const chartDescription = isBlockTime
+      ? "Mean masterchain block interval in five-second windows"
+      : "Transaction throughput over time"
 
     chart.setOption({
       animation: false,
       aria: {
         enabled: true,
-        description: "Transaction throughput over time",
+        description: chartDescription,
       },
       dataZoom: [
         {
@@ -170,21 +255,21 @@ function TpsChart({points}: {readonly points: readonly TpsPoint[]}) {
           bottom: 2,
           brushSelect: false,
           dataBackground: {
-            areaStyle: {color: color("--tps-bar-color")},
-            lineStyle: {color: color("--tps-bar-active-color")},
+            areaStyle: {color: barColor},
+            lineStyle: {color: activeColor},
           },
           endValue: zoom.to,
           fillerColor: color("--tps-selection-color"),
           handleSize: "80%",
           handleStyle: {
-            borderColor: color("--tps-bar-active-color"),
+            borderColor: activeColor,
             color: color("--acton-color-surface-raised"),
           },
           height: 24,
-          moveHandleStyle: {color: color("--tps-bar-active-color")},
+          moveHandleStyle: {color: activeColor},
           selectedDataBackground: {
-            areaStyle: {color: color("--tps-bar-color")},
-            lineStyle: {color: color("--tps-bar-active-color")},
+            areaStyle: {color: barColor},
+            lineStyle: {color: activeColor},
           },
           showDetail: false,
           startValue: zoom.from,
@@ -197,23 +282,46 @@ function TpsChart({points}: {readonly points: readonly TpsPoint[]}) {
         {
           barCategoryGap: "8%",
           barMaxWidth: 24,
-          data: points.map(point => [point.timestamp * 1000, point.tps, point.transactions]),
-          itemStyle: {color: color("--tps-bar-color")},
+          data: points.map(point => {
+            const value = isBlockTime
+              ? point.masterchain_blocks === 0
+                ? (bucketDurationMs ?? null)
+                : point.block_time_ms
+              : point.tps
+            const pointColor = isBlockTime
+              ? point.masterchain_blocks === 0
+                ? stalledColor
+                : point.block_time_ms !== null &&
+                    targetBlockTimeMs !== undefined &&
+                    point.block_time_ms > targetBlockTimeMs
+                  ? delayedColor
+                  : barColor
+              : barColor
+            return {
+              itemStyle: {color: pointColor},
+              value: [point.timestamp * 1000, value, point.transactions, point.masterchain_blocks],
+            }
+          }),
+          itemStyle: {color: barColor},
           markLine: {
             animation: false,
-            data: [{type: "average"}],
+            data:
+              isBlockTime && targetBlockTimeMs !== undefined
+                ? [{yAxis: targetBlockTimeMs}]
+                : [{type: "average"}],
             label: {
-              color: color("--tps-reference-color"),
+              color: referenceColor,
               formatter: ({value}: {value?: number | string}) => formatTps(Number(value ?? 0)),
               fontSize: 11,
               fontWeight: 600,
               position: "start",
+              show: !isBlockTime,
             },
-            lineStyle: {color: color("--tps-reference-color"), type: "dashed"},
+            lineStyle: {color: referenceColor, type: "dashed"},
             silent: true,
             symbol: ["none", "none"],
           },
-          name: "Throughput",
+          name: isBlockTime ? "Block time" : "Throughput",
           type: "bar",
         },
       ],
@@ -224,7 +332,7 @@ function TpsChart({points}: {readonly points: readonly TpsPoint[]}) {
         borderWidth: 0,
         confine: true,
         extraCssText: "box-shadow: none",
-        formatter: (params: unknown) => formatChartTooltip(params),
+        formatter: (params: unknown) => formatChartTooltip(params, metric),
         padding: 0,
         trigger: "axis",
       },
@@ -250,7 +358,8 @@ function TpsChart({points}: {readonly points: readonly TpsPoint[]}) {
         axisLabel: {
           color: color("--acton-color-text-subtle"),
           fontSize: 11,
-          formatter: (value: number) => formatAxis(value),
+          formatter: (value: number) =>
+            isBlockTime ? formatDuration(value, true) : formatAxis(value),
         },
         axisLine: {show: false},
         axisTick: {show: false},
@@ -260,15 +369,19 @@ function TpsChart({points}: {readonly points: readonly TpsPoint[]}) {
         type: "value",
       },
     } satisfies EChartsCoreOption)
-  }, [points, theme])
+  }, [bucketDurationMs, metric, points, targetBlockTimeMs, theme])
 
   return (
-    <div className={styles.chart}>
+    <div className={`${styles.chart} ${metric === "block_time" ? styles.blockTimeChart : ""}`}>
       <div
         ref={elementRef}
         className={styles.chartCanvas}
         role="img"
-        aria-label="Transaction throughput over time"
+        aria-label={
+          metric === "block_time"
+            ? "Mean masterchain block interval in five-second windows"
+            : "Transaction throughput over time"
+        }
       />
     </div>
   )
@@ -307,21 +420,42 @@ function resolveZoomRange(previous: ZoomRange | undefined, from: number, to: num
   return {automatic: false, followsLatest: false, from: nextFrom, to: nextTo}
 }
 
-function formatChartTooltip(params: unknown) {
+function formatChartTooltip(params: unknown, metric: ChartMetric) {
   const item = Array.isArray(params) ? params[0] : params
   if (!item || typeof item !== "object" || !("value" in item) || !Array.isArray(item.value)) {
     return ""
   }
 
   const timestamp = Number(item.value[0]) / 1000
-  const tps = Number(item.value[1])
+  const value = item.value[1] === null ? null : Number(item.value[1])
+  const transactions = Number(item.value[2])
+  const masterchainBlocks = Number(item.value[3])
+
+  if (metric === "block_time") {
+    return `<div class="${styles.tooltip}">
+      <strong class="${styles.tooltipTime}">${formatTooltipTime(timestamp)}</strong>
+      <div class="${styles.tooltipValue}">
+        <span class="${styles.tooltipDot}"></span>
+        <span>Block time:</span>
+        <strong>${masterchainBlocks === 0 ? "No blocks" : value === null ? "—" : formatDuration(value)}</strong>
+      </div>
+      <div class="${styles.tooltipValue}">
+        <span>Masterchain blocks:</span>
+        <strong>${masterchainBlocks.toLocaleString()}</strong>
+      </div>
+      <div class="${styles.tooltipValue}">
+        <span>Transactions:</span>
+        <strong>${transactions.toLocaleString()}</strong>
+      </div>
+    </div>`
+  }
 
   return `<div class="${styles.tooltip}">
     <strong class="${styles.tooltipTime}">${formatTooltipTime(timestamp)}</strong>
     <div class="${styles.tooltipValue}">
       <span class="${styles.tooltipDot}"></span>
       <span>Throughput:</span>
-      <strong>${formatTps(tps)} TPS</strong>
+      <strong>${formatTps(value ?? 0)} TPS</strong>
     </div>
   </div>`
 }
@@ -332,6 +466,18 @@ function formatTps(value: number) {
 
 function formatAxis(value: number) {
   return value.toLocaleString(undefined, {maximumFractionDigits: value < 10 ? 1 : 0})
+}
+
+function formatDuration(value: number, compact = false) {
+  if (value < 1000) return `${Math.round(value)} ms`
+  const seconds = value / 1000
+  return `${seconds.toLocaleString(undefined, {maximumFractionDigits: compact ? 1 : 2})} s`
+}
+
+function percentile(values: readonly number[], fraction: number) {
+  if (values.length === 0) return undefined
+  const sorted = [...values].sort((left, right) => left - right)
+  return sorted[Math.ceil(fraction * sorted.length) - 1]
 }
 
 function formatTime(timestamp: number) {
@@ -352,4 +498,4 @@ function formatTooltipTime(timestamp: number) {
   })
 }
 
-export default TpsSection
+export default PerformanceSections

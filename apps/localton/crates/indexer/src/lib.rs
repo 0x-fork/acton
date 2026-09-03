@@ -37,9 +37,18 @@ pub struct TpsPoint {
     pub transactions: u64,
     /// Average transactions per second across the bucket duration.
     pub tps: f64,
+    /// Masterchain blocks produced during the bucket.
+    pub masterchain_blocks: u64,
+    /// Mean interval between masterchain blocks observed in the complete bucket.
+    ///
+    /// `None` means that the bucket has no interval sample: either it contains no
+    /// blocks or its only block has no retained predecessor. The source `gen_utime`
+    /// field has second precision, so sub-second intervals become accurate only
+    /// when averaged across several blocks.
+    pub block_time_ms: Option<f64>,
 }
 
-/// Recent transaction throughput together with the indexed chain-time bounds.
+/// Recent transaction throughput and block timing with indexed chain-time bounds.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct TpsSeries {
     /// Duration represented by each point.
@@ -130,30 +139,76 @@ impl TpsStore {
             .max(indexed_from);
         let bucket = i64::try_from(bucket_seconds).unwrap_or(i64::MAX);
         let complete_until = indexed_to - indexed_to.rem_euclid(bucket);
+        let first_complete_bucket = match query_from.rem_euclid(bucket) {
+            0 => query_from,
+            remainder => query_from.saturating_add(bucket - remainder),
+        };
 
         // Exclude the bucket containing the latest block. Dividing an incomplete
-        // bucket by its full duration would make the newest TPS value look too low.
+        // bucket by its full duration would make its rates look too low. The oldest
+        // partial bucket is excluded for the same reason.
         let mut statement = connection.prepare(
-            "SELECT (block_time / ?1) * ?1 AS bucket_start, SUM(transactions)
-             FROM tps_batches
+            "WITH samples AS (
+                 SELECT block_time,
+                        transactions,
+                        (block_time - LAG(block_time) OVER (ORDER BY masterchain_seqno)) * 1000.0
+                            AS block_time_ms
+                 FROM tps_batches
+             )
+             SELECT (block_time / ?1) * ?1 AS bucket_start,
+                    SUM(transactions),
+                    COUNT(*),
+                    AVG(block_time_ms)
+             FROM samples
              WHERE block_time >= ?2 AND block_time < ?3
              GROUP BY bucket_start
              ORDER BY bucket_start",
         )?;
-        let rows = statement.query_map(params![bucket, query_from, complete_until], |row| {
-            let timestamp: i64 = row.get(0)?;
-            let transactions: i64 = row.get(1)?;
-            Ok(TpsPoint {
+        let rows = statement.query_map(
+            params![bucket, first_complete_bucket, complete_until],
+            |row| {
+                let timestamp: i64 = row.get(0)?;
+                let transactions: i64 = row.get(1)?;
+                let masterchain_blocks: i64 = row.get(2)?;
+                let block_time_ms: Option<f64> = row.get(3)?;
+                Ok((timestamp, transactions, masterchain_blocks, block_time_ms))
+            },
+        )?;
+        let mut aggregates = rows
+            .collect::<rusqlite::Result<Vec<_>>>()?
+            .into_iter()
+            .peekable();
+        let mut timestamp = first_complete_bucket;
+        let mut points = Vec::new();
+
+        while timestamp < complete_until {
+            let (transactions, masterchain_blocks, block_time_ms) = match aggregates.peek() {
+                Some((bucket_start, _, _, _)) if *bucket_start == timestamp => {
+                    let (_, transactions, masterchain_blocks, block_time_ms) = aggregates
+                        .next()
+                        .expect("the matching aggregate was inspected");
+                    (transactions, masterchain_blocks, block_time_ms)
+                }
+                _ => (0, 0, None),
+            };
+            points.push(TpsPoint {
                 timestamp: u64::try_from(timestamp).unwrap_or_default(),
                 transactions: u64::try_from(transactions).unwrap_or_default(),
                 tps: transactions as f64 / bucket_seconds as f64,
-            })
-        })?;
-        let points = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+                masterchain_blocks: u64::try_from(masterchain_blocks).unwrap_or_default(),
+                block_time_ms,
+            });
+
+            let next = timestamp.saturating_add(bucket);
+            if next == timestamp {
+                break;
+            }
+            timestamp = next;
+        }
 
         Ok(TpsSeries {
             bucket_seconds,
-            indexed_from: u64::try_from(query_from).ok(),
+            indexed_from: u64::try_from(first_complete_bucket).ok(),
             indexed_to: u64::try_from(indexed_to).ok(),
             queue_size: self.queue_size(),
             points,
@@ -482,16 +537,79 @@ mod tests {
                         timestamp: 100,
                         transactions: 12,
                         tps: 2.4,
+                        masterchain_blocks: 2,
+                        block_time_ms: Some(
+                            2000.0,
+                        ),
                     },
                     TpsPoint {
                         timestamp: 105,
                         transactions: 4,
                         tps: 0.8,
+                        masterchain_blocks: 1,
+                        block_time_ms: Some(
+                            6000.0,
+                        ),
                     },
                 ],
             }
         "#]]
         .assert_debug_eq(&store.recent_tps(60, 5).unwrap());
+    }
+
+    #[test]
+    fn preserves_empty_buckets_as_block_production_gaps() {
+        let directory = tempfile::tempdir_in("/tmp").unwrap();
+        let store = TpsStore::open(directory.path().join("metrics.sqlite3")).unwrap();
+        store.record_sample(10, 100, 3).unwrap();
+        store.record_sample(11, 111, 5).unwrap();
+
+        expect![[r#"
+            [
+                TpsPoint {
+                    timestamp: 100,
+                    transactions: 3,
+                    tps: 0.6,
+                    masterchain_blocks: 1,
+                    block_time_ms: None,
+                },
+                TpsPoint {
+                    timestamp: 105,
+                    transactions: 0,
+                    tps: 0.0,
+                    masterchain_blocks: 0,
+                    block_time_ms: None,
+                },
+            ]
+        "#]]
+        .assert_debug_eq(&store.recent_tps(60, 5).unwrap().points);
+    }
+
+    #[test]
+    fn excludes_partial_buckets_at_both_window_edges() {
+        let directory = tempfile::tempdir_in("/tmp").unwrap();
+        let store = TpsStore::open(directory.path().join("metrics.sqlite3")).unwrap();
+        store.record_sample(1, 100, 1).unwrap();
+        store.record_sample(2, 101, 2).unwrap();
+        store.record_sample(3, 105, 3).unwrap();
+        store.record_sample(4, 106, 4).unwrap();
+        store.record_sample(5, 110, 5).unwrap();
+        store.record_sample(6, 111, 6).unwrap();
+
+        expect![[r#"
+            [
+                TpsPoint {
+                    timestamp: 105,
+                    transactions: 7,
+                    tps: 1.4,
+                    masterchain_blocks: 2,
+                    block_time_ms: Some(
+                        2500.0,
+                    ),
+                },
+            ]
+        "#]]
+        .assert_debug_eq(&store.recent_tps(10, 5).unwrap().points);
     }
 
     #[tokio::test]

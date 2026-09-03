@@ -174,6 +174,8 @@ export interface TpsPoint {
   readonly timestamp: number
   readonly transactions: number
   readonly tps: number
+  readonly masterchain_blocks: number
+  readonly block_time_ms: number | null
 }
 
 export interface TpsView {
@@ -182,5 +184,6 @@ export interface TpsView {
   readonly indexed_from: number | null
   readonly indexed_to: number | null
   readonly queue_size: number | null
+  readonly block_time_target_ms: number
   readonly points: readonly TpsPoint[]
 }

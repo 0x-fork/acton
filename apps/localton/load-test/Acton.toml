@@ -15,9 +15,9 @@ depends = []
 [test]
 
 [networks.localnet]
-api.v2 = "http://127.0.0.1:3015/api/v1/environments/environment-2/rpc/api/v2"
-api.v3 = "http://127.0.0.1:3015/api/v1/environments/environment-2/rpc/api/v3"
-explorer = "http://127.0.0.1:3015/virtual-environments/environment-2/explorer"
+api.v2 = "http://127.0.0.1:3015/api/v1/environments/environment-4/rpc/api/v2"
+api.v3 = "http://127.0.0.1:3015/api/v1/environments/environment-4/rpc/api/v3"
+explorer = "http://127.0.0.1:3015/virtual-environments/environment-4/explorer"
 
 [fmt]
 width = 100

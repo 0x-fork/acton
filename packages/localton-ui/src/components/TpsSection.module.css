@@ -31,6 +31,10 @@
   border-bottom: 1px solid var(--acton-color-border);
 }
 
+.summaryFour {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .metric {
   display: grid;
   min-width: 0;
@@ -67,11 +71,25 @@
   padding-block: 0.75rem 0.35rem;
 }
 
+.blockTimeChart {
+  --block-time-bar-color: rgb(84 132 214 / 55%);
+  --block-time-bar-active-color: rgb(84 132 214);
+  --block-time-reference-color: rgb(109 153 226);
+  --block-time-delayed-color: var(--acton-color-warning);
+  --block-time-stalled-color: var(--acton-color-danger);
+}
+
 :global([data-theme="dark"]) .chart {
   --tps-bar-color: rgb(108 142 117 / 60%);
   --tps-bar-active-color: rgb(108 142 117);
   --tps-reference-color: rgb(82 102 87);
   --tps-selection-color: rgb(108 142 117 / 18%);
+}
+
+:global([data-theme="dark"]) .blockTimeChart {
+  --block-time-bar-color: rgb(102 137 194 / 55%);
+  --block-time-bar-active-color: rgb(102 137 194);
+  --block-time-reference-color: rgb(126 157 207);
 }
 
 .chartCanvas {

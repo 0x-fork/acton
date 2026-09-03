@@ -360,9 +360,18 @@ function DeferredTpsSection({series}: {readonly series: TpsView | undefined}) {
 
 function TpsSkeleton() {
   return (
-    <section className={styles.tpsSkeleton} aria-label="Loading transaction throughput" aria-busy>
+    <>
+      <PerformanceSectionSkeleton title="Transaction throughput" />
+      <PerformanceSectionSkeleton title="Masterchain block time" />
+    </>
+  )
+}
+
+function PerformanceSectionSkeleton({title}: {readonly title: string}) {
+  return (
+    <section className={styles.tpsSkeleton} aria-label={`Loading ${title.toLowerCase()}`} aria-busy>
       <div className={styles.tpsSkeletonHeading}>
-        <h2>Transaction throughput</h2>
+        <h2>{title}</h2>
       </div>
       <Skeleton shape="rect" width="100%" height="22.375rem" radius="md" />
     </section>

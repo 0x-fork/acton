@@ -69,6 +69,7 @@ struct ObservabilityState {
     local_node_is_network_source: bool,
     geoip: SharedGeoIp,
     tps: Option<TpsStore>,
+    block_time_target_ms: u32,
 }
 
 /// Dashboard state of the embedded transaction throughput indexer.
@@ -83,7 +84,7 @@ enum TpsIndexStatus {
     Unavailable,
 }
 
-/// One fixed-duration transaction throughput bucket exposed by the dashboard API.
+/// One fixed-duration network-performance bucket exposed by the dashboard API.
 #[derive(Serialize, ToSchema)]
 struct TpsPointView {
     /// Unix timestamp at the start of the bucket.
@@ -92,9 +93,14 @@ struct TpsPointView {
     transactions: u64,
     /// Average transactions per second during the bucket.
     tps: f64,
+    /// Masterchain blocks produced during the bucket.
+    masterchain_blocks: u64,
+    /// Mean masterchain block interval in milliseconds, or no value when the
+    /// bucket has no interval sample.
+    block_time_ms: Option<f64>,
 }
 
-/// Recent TPS history for the Localton dashboard.
+/// Recent throughput and block-timing history for the Localton dashboard.
 #[derive(Serialize, ToSchema)]
 struct TpsView {
     /// Current availability of the embedded metrics index.
@@ -107,12 +113,14 @@ struct TpsView {
     indexed_to: Option<u64>,
     /// Messages currently waiting in shard outbound queues.
     queue_size: Option<u64>,
-    /// Chronologically ordered throughput buckets.
+    /// Configured Simplex masterchain block interval.
+    block_time_target_ms: u32,
+    /// Chronologically ordered network-performance buckets.
     points: Vec<TpsPointView>,
 }
 
 impl TpsView {
-    fn from_series(series: TpsSeries) -> Self {
+    fn from_series(series: TpsSeries, block_time_target_ms: u32) -> Self {
         let status = if series.points.is_empty() {
             TpsIndexStatus::Indexing
         } else {
@@ -125,6 +133,7 @@ impl TpsView {
             indexed_from: series.indexed_from,
             indexed_to: series.indexed_to,
             queue_size: series.queue_size,
+            block_time_target_ms,
             points: series
                 .points
                 .into_iter()
@@ -132,18 +141,21 @@ impl TpsView {
                     timestamp: point.timestamp,
                     transactions: point.transactions,
                     tps: point.tps,
+                    masterchain_blocks: point.masterchain_blocks,
+                    block_time_ms: point.block_time_ms,
                 })
                 .collect(),
         }
     }
 
-    const fn unavailable() -> Self {
+    const fn unavailable(block_time_target_ms: u32) -> Self {
         Self {
             status: TpsIndexStatus::Unavailable,
             bucket_seconds: TPS_BUCKET_SECONDS,
             indexed_from: None,
             indexed_to: None,
             queue_size: None,
+            block_time_target_ms,
             points: Vec::new(),
         }
     }
@@ -230,6 +242,7 @@ pub(super) async fn start(
         local_node_is_network_source,
         geoip: Arc::clone(&geoip),
         tps: tps.clone(),
+        block_time_target_ms: settings.network.simplex_target_rate_ms,
     };
 
     let api = Router::new()
@@ -354,11 +367,14 @@ async fn network_handler(State(state): State<ObservabilityState>) -> Json<Networ
 )]
 async fn tps_handler(State(state): State<ObservabilityState>) -> Result<Json<TpsView>, HttpError> {
     let Some(store) = state.tps else {
-        return Ok(Json(TpsView::unavailable()));
+        return Ok(Json(TpsView::unavailable(state.block_time_target_ms)));
     };
 
     let series = store.recent_tps(TPS_HISTORY_SECONDS, TPS_BUCKET_SECONDS)?;
-    Ok(Json(TpsView::from_series(series)))
+    Ok(Json(TpsView::from_series(
+        series,
+        state.block_time_target_ms,
+    )))
 }
 
 #[utoipa::path(
