@@ -86,7 +86,7 @@ async fn monitor_loop(layout: Layout, interval_seconds: u64, mut shutdown: watch
 }
 
 async fn monitor_once(layout: &Layout) -> Result<()> {
-    let mut client = LocalLiteClient::connect(&layout.global_config).await?;
+    let mut client = LocalLiteClient::connect(&layout.node.global_config).await?;
     let last = client.last().await?;
     let seen_at = unix_time();
 

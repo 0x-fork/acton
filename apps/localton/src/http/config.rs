@@ -2,11 +2,12 @@
 //!
 //! `/` returns the current readiness state and URLs of enabled services.
 //! `/openapi.json` returns a generated OpenAPI description of this service.
-//! `/localhost.global.config.json` and `/config` return the generated TON global
-//! config. `/faucet` gives a new node an on-chain development balance. `/live`
-//! and `/healthz` report instance readiness.
+//! `/localhost.global.config.json` returns a loopback liteserver config for
+//! clients on this host, while `/config` retains the advertised endpoint for
+//! other hosts. `/faucet` gives a new node an on-chain development balance.
+//! `/live` and `/healthz` report instance readiness.
 
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use axum::{
@@ -75,7 +76,7 @@ pub(super) struct ConfigDocument {
 pub(super) struct ConfigEndpoints {
     /// URL of the TON global config for local clients
     pub global_config: String,
-    /// Short URL of the same TON global config
+    /// URL of the TON global config advertised to other hosts
     pub config: String,
     /// Readiness probe URL
     pub live: String,
@@ -250,12 +251,12 @@ pub(super) fn root_document(settings: &Settings, runtime: &RuntimeState) -> Conf
 async fn localhost_global_config_handler(
     State(state): State<ConfigState>,
 ) -> Result<Json<GlobalConfig>, HttpError> {
-    read_global_config(&state).await
+    read_global_config(&state.layout.node.global_config).await
 }
 
 /// Get the TON global config
 ///
-/// This endpoint returns the same document as `/localhost.global.config.json`
+/// This endpoint retains the liteserver address advertised to other hosts
 #[utoipa::path(
     get,
     path = "/config",
@@ -268,11 +269,11 @@ async fn localhost_global_config_handler(
 async fn global_config_handler(
     State(state): State<ConfigState>,
 ) -> Result<Json<GlobalConfig>, HttpError> {
-    read_global_config(&state).await
+    read_global_config(&state.layout.global_config).await
 }
 
-async fn read_global_config(state: &ConfigState) -> Result<Json<GlobalConfig>, HttpError> {
-    let bytes = tokio::fs::read(&state.layout.global_config)
+async fn read_global_config(path: &Path) -> Result<Json<GlobalConfig>, HttpError> {
+    let bytes = tokio::fs::read(path)
         .await
         .context("failed to read global config")?;
     Ok(Json(GlobalConfig::from_json_bytes(&bytes)?))

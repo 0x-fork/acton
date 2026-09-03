@@ -5,11 +5,11 @@
 //! also checking that every managed process remains alive. After startup, the
 //! same registry is supervised until Ctrl-C, SIGTERM, or a child failure occurs.
 
-use std::time::Duration;
+use std::{net::SocketAddrV4, time::Duration};
 
 use anyhow::{Context, Result, bail};
 use tokio::{signal, time::sleep};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::{
     runtime::ProcessRegistry,
@@ -109,9 +109,10 @@ pub(super) async fn wait_for_masterchain(
 
 /// Queries the configured liteserver for its latest masterchain block number.
 ///
-/// [`LiteTarget`] binds the query to the same trusted global configuration and
-/// liteserver identity external clients use. This function requires structured
-/// protocol data, so readiness cannot depend on release-specific CLI display text.
+/// [`LiteTarget`] binds the query to a trusted global configuration and
+/// liteserver identity. Bootstrap supplies its node-local configuration so
+/// process health does not depend on the separately advertised endpoint. This
+/// function requires structured protocol data and never parses CLI display text.
 pub(super) async fn lite_client_seqno(
     lite_client: &dyn LiteClient,
     target: &LiteTarget,
@@ -122,6 +123,39 @@ pub(super) async fn lite_client_seqno(
     };
     let info = lite_client.masterchain_info(&context, target).await?;
     Ok(info.last.seqno)
+}
+
+/// Checks whether the endpoint published to other hosts answers from this host.
+///
+/// Local readiness is authoritative for process health, so this probe never
+/// fails startup. A public endpoint can legitimately be unreachable through a
+/// NAT without hairpin routing; callers and operators still need a structured
+/// warning because private advertised addresses commonly become stale after a
+/// DHCP or network change.
+pub(super) async fn probe_advertised_liteserver(
+    lite_client: &dyn LiteClient,
+    target: &LiteTarget,
+    endpoint: SocketAddrV4,
+) {
+    let started = tokio::time::Instant::now();
+    match lite_client_seqno(lite_client, target).await {
+        Ok(masterchain_seqno) => info!(
+            operation = "probe_advertised_liteserver",
+            target = %endpoint,
+            duration_ms = started.elapsed().as_millis() as u64,
+            outcome = "reachable",
+            masterchain_seqno,
+            "advertised liteserver endpoint is reachable"
+        ),
+        Err(error) => warn!(
+            operation = "probe_advertised_liteserver",
+            target = %endpoint,
+            duration_ms = started.elapsed().as_millis() as u64,
+            outcome = "unreachable",
+            error = %format!("{error:#}"),
+            "advertised liteserver endpoint is unreachable; local services remain available, but remote clients may need a new network state with an updated --advertise-ip"
+        ),
+    }
 }
 
 /// Keeps the instance alive until one required child process exits.

@@ -52,10 +52,11 @@ pub struct Runtime {
 }
 
 pub fn prepare_runtime(layout: &Layout, service: &TonHttpApiSettings) -> Result<Runtime> {
+    let local_global_config = &layout.node.global_config;
     ensure!(
-        layout.global_config.is_file(),
-        "TON HTTP API global config is missing: {}",
-        layout.global_config.display()
+        local_global_config.is_file(),
+        "TON HTTP API local global config is missing: {}",
+        local_global_config.display()
     );
 
     let paths = Paths::new(layout);
@@ -73,7 +74,7 @@ pub fn prepare_runtime(layout: &Layout, service: &TonHttpApiSettings) -> Result<
     let runtime_dir = layout.root.join("services/ton-http-api-v2");
     let keystore = runtime_dir
         .join("keystore")
-        .join(network_fingerprint(&layout.global_config)?);
+        .join(network_fingerprint(local_global_config)?);
     let config_vars = runtime_dir.join("config_vars.yaml");
     fs::create_dir_all(&keystore)
         .with_context(|| format!("failed to create {}", keystore.display()))?;
@@ -123,7 +124,7 @@ pub fn prepare_runtime(layout: &Layout, service: &TonHttpApiSettings) -> Result<
             "static_content_dir: {}\n",
             "max_stack_entry_depth: 256\n"
         ),
-        yaml_path(&layout.global_config)?,
+        yaml_path(local_global_config)?,
         yaml_path(&keystore)?,
         service.backend_port,
         service.monitor_port,
@@ -275,7 +276,7 @@ mod tests {
         let layout = Layout::new(temp.path().join("state"));
         layout.create_dirs().unwrap();
         fs::write(
-            &layout.global_config,
+            &layout.node.global_config,
             serde_json::to_vec(&serde_json::json!({
                 "validator": {
                     "init_block": {
@@ -303,7 +304,7 @@ mod tests {
         let runtime = prepare_runtime(&layout, &service).unwrap();
         let config = fs::read_to_string(runtime.config_vars).unwrap();
 
-        assert!(config.contains(&layout.global_config.display().to_string()));
+        assert!(config.contains(&layout.node.global_config.display().to_string()));
         assert!(config.contains("server_port: 18005"));
         assert!(config.contains("monitor_port: 18006"));
         assert!(config.contains("/keystore/"));
@@ -317,7 +318,7 @@ mod tests {
         let layout = Layout::new(temp.path().join("state"));
         layout.create_dirs().unwrap();
         fs::write(
-            &layout.global_config,
+            &layout.node.global_config,
             r#"{"validator":{"init_block":{"root_hash":"root"}}}"#,
         )
         .unwrap();

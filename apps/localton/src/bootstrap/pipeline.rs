@@ -6,7 +6,7 @@
 //! supervise everything until shutdown. Technical details live in sibling
 //! modules and do not obscure this sequence.
 
-use std::time::Duration;
+use std::{net::SocketAddrV4, time::Duration};
 
 use anyhow::{Result, ensure};
 use tracing::info;
@@ -22,7 +22,7 @@ use crate::{
     storage::{RuntimeState, ServiceRuntime},
     ton::{
         accounts::parse_imported_accounts,
-        global_config::GlobalConfigFile,
+        global_config::{GlobalConfig, GlobalConfigFile},
         toolchain::Toolchain,
         tools::{lite_client::LiteTarget, types::DhtDatabase},
     },
@@ -60,9 +60,19 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
         genesis::initialize(&layout, &tools, &settings, &imported_accounts, timeout).await?
     };
 
-    let global_config = GlobalConfigFile::open(layout.global_config.clone())?;
-    let dht_database = DhtDatabase::open(layout.dht_db.clone())?;
     let genesis = &settings.node;
+    let global_config = GlobalConfigFile::open(layout.global_config.clone())?;
+
+    // The canonical global config advertises the endpoint intended for other
+    // hosts. Local processes must use loopback so DHCP changes and NAT hairpin
+    // behavior cannot make a healthy local liteserver fail startup readiness.
+    GlobalConfig::load(global_config.path())?
+        .with_local_liteserver(genesis.liteserver_port, manifest.liteserver_public_key)
+        .save_atomic(&layout.node.global_config)?;
+
+    let local_global_config = GlobalConfigFile::open(layout.node.global_config.clone())?;
+    let tools = tools.with_node_config(&layout.node);
+    let dht_database = DhtDatabase::open(layout.dht_db.clone())?;
 
     let masterchain_readiness = if state_exists {
         readiness::MasterchainReadiness::HeadAvailable
@@ -109,7 +119,7 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
         // V2 performs its own `getMasterchainInfo` readiness check, so it can
         // initialize tonlib while the validator produces the first observed
         // blocks. Both futures must still succeed before readiness is published.
-        let genesis_lite_target = LiteTarget::new(global_config.path()).with_label("genesis");
+        let genesis_lite_target = LiteTarget::new(local_global_config.path()).with_label("genesis");
 
         let (masterchain_seqno, ()) = tokio::try_join!(
             readiness::wait_for_masterchain(
@@ -145,12 +155,20 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
             return Err(error);
         }
 
-        let node_global_config = GlobalConfigFile::open(layout.node.global_config.clone())?;
-        if let Err(error) = print_connection_details(
-            &settings,
-            &manifest.liteserver_public_key,
-            &node_global_config,
-        ) {
+        if !genesis.public_ip.is_loopback() {
+            let advertised_target =
+                LiteTarget::new(global_config.path()).with_label("genesis advertised endpoint");
+            readiness::probe_advertised_liteserver(
+                tools.lite_client_tool.as_ref(),
+                &advertised_target,
+                SocketAddrV4::new(genesis.public_ip, genesis.liteserver_port),
+            )
+            .await;
+        }
+
+        if let Err(error) =
+            print_connection_details(&settings, &manifest.liteserver_public_key, &global_config)
+        {
             services.shutdown().await;
             return Err(error);
         }

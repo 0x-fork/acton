@@ -186,7 +186,7 @@ struct NetworkReader {
 impl NetworkReader {
     /// Advances the rolling chain window without replacing the last complete view on error.
     async fn update(&mut self, toolchain: &Toolchain, now: u64, window_seconds: u64) -> Result<()> {
-        let mut client = LocalLiteClient::connect(&toolchain.layout.global_config).await?;
+        let mut client = LocalLiteClient::connect(toolchain.lite_config()).await?;
         let network_head = client.last().await?;
 
         let validator_round_ended = self
