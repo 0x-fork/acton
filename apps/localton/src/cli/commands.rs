@@ -6,7 +6,8 @@ use num_bigint::BigInt;
 use serde::Serialize;
 
 use crate::{
-    cli::{ConfigCommand, LiteCommand, StateArgs},
+    binaries::TonBinaries,
+    cli::{BinariesCommand, ConfigCommand, LiteCommand, StateArgs},
     operations,
     storage::Layout,
     storage::Settings,
@@ -22,6 +23,16 @@ use crate::{
         },
     },
 };
+
+pub async fn binaries(command: BinariesCommand) -> Result<()> {
+    match command {
+        BinariesCommand::Install => {
+            let binaries = TonBinaries::install_pinned().await?;
+            println!("{}", binaries.root.display());
+        }
+    }
+    Ok(())
+}
 
 pub async fn config(command: ConfigCommand) -> Result<()> {
     match command {

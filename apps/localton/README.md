@@ -136,6 +136,17 @@ Make sure that `$HOME/.cargo/bin` is in `PATH`. Then bootstrap the network:
 localton bootstrap
 ```
 
+Download and verify the pinned official TON release without creating network state
+or starting a node:
+
+```bash
+localton binaries install
+```
+
+The command prints the installed binary directory. It uses the shared cache described
+below, so repeated runs reuse an already verified installation. Set
+`LOCALTON_CACHE_DIR` to select a different cache root.
+
 The default state directory is `.localton`. Use `--state-dir` to keep multiple independent networks:
 
 ```bash

@@ -31,6 +31,18 @@ pub struct TonBinaries {
 }
 
 impl TonBinaries {
+    /// Installs and validates the pinned release in the shared per-user cache.
+    ///
+    /// This entry point is independent of network state and does not initialize
+    /// or start any TON process.
+    pub(crate) async fn install_pinned() -> Result<Self> {
+        let binaries = Self {
+            root: install::install_pinned_release().await?,
+        };
+        binaries.validate()?;
+        Ok(binaries)
+    }
+
     /// Resolves the TON installation owned by a state directory.
     ///
     /// An explicit override has highest priority. Bootstrap state keeps the
@@ -69,7 +81,7 @@ impl TonBinaries {
                 )
             })?
         } else {
-            install::install_pinned_release().await?
+            Self::install_pinned().await?.root
         };
         let binaries = Self { root };
         binaries.validate()?;

@@ -32,6 +32,11 @@ pub enum Command {
     Bootstrap(BootstrapArgs),
     /// Join and supervise one independent full node in this state directory
     Join(JoinArgs),
+    /// Manage the pinned official TON binary distribution.
+    Binaries {
+        #[command(subcommand)]
+        command: BinariesCommand,
+    },
     /// Inspect persisted and live network status.
     Status(StatusArgs),
     /// Read or update persistent network configuration.
@@ -71,6 +76,12 @@ pub enum Command {
     },
     /// Create and inspect a hardfork configuration.
     Hardfork(HardforkArgs),
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum BinariesCommand {
+    /// Download, verify, and install the pinned TON release without starting a node.
+    Install,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -601,6 +612,17 @@ mod tests {
         assert_eq!(args.global_config_url, "http://192.168.27.4:18000/config");
         assert_eq!(args.node.as_deref(), Some("node2"));
         assert!(args.celldb_in_memory);
+    }
+
+    #[test]
+    fn binaries_install_is_a_state_independent_command() {
+        let cli = Cli::try_parse_from(["localton", "binaries", "install"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Command::Binaries {
+                command: BinariesCommand::Install
+            }
+        ));
     }
 
     #[test]

@@ -30,6 +30,7 @@ async fn main() -> Result<()> {
     match cli.command {
         Command::Bootstrap(args) => bootstrap::run(args).await,
         Command::Join(args) => join::run(args).await,
+        Command::Binaries { command } => cli::commands::binaries(command).await,
         Command::Status(args) => operations::status::execute(args),
         Command::Config { command } => cli::commands::config(command).await,
         Command::Lite { command } => cli::commands::lite(command).await,
