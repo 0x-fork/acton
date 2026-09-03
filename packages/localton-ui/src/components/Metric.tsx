@@ -1,9 +1,11 @@
+import type {ReactNode} from "react"
+
 import styles from "./Metric.module.css"
 
 interface MetricProps {
   readonly density?: "default" | "compact"
   readonly label: string
-  readonly value: string
+  readonly value: ReactNode
   readonly tone?: "default" | "good" | "warning"
 }
 

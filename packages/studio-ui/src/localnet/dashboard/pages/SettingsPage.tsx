@@ -332,7 +332,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({
             </>
           ) : undefined}
 
-          {hasControlApi ? (
+          {localnetConfig && hasControlApi ? (
             <>
               <div className={styles.settingsRow}>
                 <div className={styles.settingsRowCopy}>

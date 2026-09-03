@@ -9,9 +9,9 @@ import {
   DataTableHead,
   DataTableHeaderCell,
   DataTableRow,
+  DataTableSkeletonRows,
   DataTableTable,
   Duration,
-  InlineLoader,
   RelativeTime,
   Skeleton,
   TechnicalValue,
@@ -55,14 +55,7 @@ export function NetworkDashboard({
   }, [network, onNetworkChange])
 
   if (!network) {
-    return (
-      <div className={styles.embeddedBootState}>
-        <InlineLoader
-          message="Reading network state"
-          subtext="Waiting for the observability service"
-        />
-      </div>
-    )
+    return <NetworkDashboardSkeleton nodesFooter={nodesFooter} view={view} />
   }
 
   return (
@@ -74,6 +67,217 @@ export function NetworkDashboard({
       tps={tps}
       view={view}
     />
+  )
+}
+
+interface LoadingTableColumn {
+  readonly align?: "left" | "right"
+  readonly label: string
+  readonly width?: string
+}
+
+function NetworkDashboardSkeleton({
+  nodesFooter,
+  view,
+}: {
+  readonly nodesFooter?: ReactNode
+  readonly view: NetworkDashboardView
+}) {
+  return (
+    <div className={styles.dashboardContent} aria-label="Loading network state" aria-busy="true">
+      {view === "all" || view === "overview" ? (
+        <>
+          <NetworkOverviewSkeleton showTitle={view === "all"} />
+          <TpsSkeleton />
+        </>
+      ) : null}
+
+      {view === "all" || view === "validators" ? (
+        <>
+          <ElectionSkeleton />
+          <LoadingTableSection
+            ariaLabel="Validator production"
+            columns={[
+              {label: "Validator", width: "8rem"},
+              {label: "Participation", width: "8rem"},
+              {label: "Production", width: "7rem"},
+              {label: "Public key", width: "9rem"},
+              {label: "MC blocks", align: "right", width: "4rem"},
+              {label: "Shard blocks", align: "right", width: "4rem"},
+              {label: "ADNL", width: "9rem"},
+            ]}
+            minWidth="68rem"
+            rows={1}
+            title="Validator production"
+          />
+        </>
+      ) : null}
+
+      {view === "all" || view === "nodes" ? (
+        <>
+          <LoadingTableSection
+            ariaLabel="Nodes and synchronization"
+            columns={[
+              {label: "Status", width: "5rem"},
+              {label: "Node", width: "8rem"},
+              {label: "Synchronization", width: "14rem"},
+              {label: "Roles", width: "5rem"},
+              {label: "MC blocks", align: "right", width: "4rem"},
+              {label: "Shard blocks", align: "right", width: "4rem"},
+              {label: "Observer", width: "9rem"},
+            ]}
+            footer={nodesFooter}
+            minWidth="60rem"
+            rows={1}
+            rowSize="node"
+            showTitle={view === "all"}
+            title="Nodes and synchronization"
+          />
+          <LoadingTableSection
+            ariaLabel="Collector diagnostics"
+            columns={[
+              {label: "Status", width: "5rem"},
+              {label: "Observer", width: "9rem"},
+              {label: "Endpoint", width: "13rem"},
+              {label: "Last report", width: "7rem"},
+            ]}
+            minWidth="44rem"
+            rows={1}
+            title="Collector diagnostics"
+          />
+        </>
+      ) : null}
+
+      {view === "all" || view === "overview" ? (
+        <LoadingTableSection
+          ariaLabel="Shard topology"
+          columns={[
+            {label: "Workchain", width: "6rem"},
+            {label: "Shard", width: "10rem"},
+            {label: "Seqno", align: "right", width: "5rem"},
+            {label: "Block age", width: "6rem"},
+            {label: "Split or merge", width: "8rem"},
+            {label: "Root hash", width: "12rem"},
+          ]}
+          minWidth="62rem"
+          rows={1}
+          title="Shard topology"
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function NetworkOverviewSkeleton({showTitle}: {readonly showTitle: boolean}) {
+  return (
+    <section className={styles.sectionStack} aria-label="Loading network overview">
+      {showTitle ? (
+        <div className={styles.sectionHeading}>
+          <h2>Network overview</h2>
+        </div>
+      ) : null}
+      <div className={styles.metricStrip}>
+        {["Online nodes", "Synchronized", "Active validators", "Masterchain", "Current shards"].map(
+          label => (
+            <Metric
+              key={label}
+              label={label}
+              value={<Skeleton width="4.5rem" height="1.375rem" />}
+            />
+          ),
+        )}
+      </div>
+    </section>
+  )
+}
+
+function ElectionSkeleton() {
+  return (
+    <section className={styles.sectionStack} aria-label="Loading validator elections">
+      <div className={styles.electionSkeletonPanel}>
+        <div className={styles.electionSkeletonSummary}>
+          {["Round ID", "Current set", "Main subset", "Next set", "Stake hold"].map(label => (
+            <Metric
+              key={label}
+              density="compact"
+              label={label}
+              value={<Skeleton width="5.5rem" height="1.0625rem" />}
+            />
+          ))}
+        </div>
+        <div className={styles.electionSkeletonChart}>
+          {Array.from({length: 3}, (_, index) => (
+            <div className={styles.electionSkeletonRound} key={index}>
+              <Skeleton width={index === 1 ? "11rem" : "9rem"} />
+              <Skeleton shape="rect" width="100%" height="0.7rem" radius="round" />
+            </div>
+          ))}
+        </div>
+        <div className={styles.electionSkeletonDisclosures}>
+          {Array.from({length: 3}, (_, index) => (
+            <div className={styles.electionSkeletonDisclosure} key={index}>
+              <Skeleton width={index === 2 ? "8rem" : "14rem"} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function LoadingTableSection({
+  ariaLabel,
+  columns,
+  footer,
+  minWidth,
+  rows = 3,
+  rowSize = "default",
+  showTitle = true,
+  title,
+}: {
+  readonly ariaLabel: string
+  readonly columns: readonly LoadingTableColumn[]
+  readonly footer?: ReactNode
+  readonly minWidth: string
+  readonly rows?: number
+  readonly rowSize?: "default" | "node"
+  readonly showTitle?: boolean
+  readonly title: string
+}) {
+  return (
+    <section className={styles.sectionStack} aria-label={`Loading ${ariaLabel}`}>
+      {showTitle ? (
+        <div className={styles.sectionHeading}>
+          <h2>{title}</h2>
+        </div>
+      ) : null}
+      <DataTable
+        className={rowSize === "node" ? styles.nodeSkeletonTable : undefined}
+        minWidth={minWidth}
+      >
+        <DataTableTable aria-label={ariaLabel}>
+          <DataTableHead>
+            <DataTableRow>
+              {columns.map(column => (
+                <DataTableHeaderCell key={column.label} align={column.align}>
+                  {column.label}
+                </DataTableHeaderCell>
+              ))}
+            </DataTableRow>
+          </DataTableHead>
+          <DataTableBody>
+            <DataTableSkeletonRows
+              alignments={columns.map(column => column.align ?? "left")}
+              columns={columns.length}
+              rowKeyPrefix={`network-${ariaLabel.toLowerCase().replaceAll(" ", "-")}`}
+              rows={rows}
+              widths={columns.map(column => column.width)}
+            />
+          </DataTableBody>
+        </DataTableTable>
+      </DataTable>
+      {footer ? <div className={styles.loadingTableFooter}>{footer}</div> : null}
+    </section>
   )
 }
 
@@ -160,7 +364,7 @@ function TpsSkeleton() {
       <div className={styles.tpsSkeletonHeading}>
         <h2>Transaction throughput</h2>
       </div>
-      <Skeleton shape="rect" width="100%" height="22.5rem" radius="md" />
+      <Skeleton shape="rect" width="100%" height="22.375rem" radius="md" />
     </section>
   )
 }

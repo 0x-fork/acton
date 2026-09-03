@@ -1,4 +1,15 @@
-import {DataTableEmpty, GramAmount} from "@acton/ui"
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableEmpty,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableSkeletonRows,
+  DataTableTable,
+  GramAmount,
+} from "@acton/ui"
 import type {FC, ReactNode} from "react"
 
 import type {V3AccountState} from "../api/types"
@@ -25,40 +36,26 @@ export const DeveloperAccountListSkeleton: FC<{
   readonly title?: string
   readonly rows?: number
 }> = ({className, title, rows = 4}) => (
-  <div
-    className={`${styles.tableWrap} ${className ?? ""}`}
+  <DataTable
+    className={className}
+    minWidth="42.5rem"
+    title={title}
     aria-label={title ? `Loading ${title}` : "Loading accounts"}
+    aria-busy
   >
-    {title ? <div className={styles.tableTitle}>{title}</div> : null}
-    <table className={styles.table}>
-      <thead>
-        <tr>
-          <th>Account</th>
-          <th className={styles.statusHeader}>Status</th>
-          <th className={styles.typeHeader}>Type</th>
-          <th className={styles.balanceHeader}>Balance</th>
-        </tr>
-      </thead>
-      <tbody>
-        {Array.from({length: rows}, (_, index) => (
-          <tr key={`developer-account-skeleton-${index}`} className={styles.row}>
-            <td className={styles.accountCell}>
-              <span className={`${styles.skeletonLine} ${styles.skeletonAccount}`} />
-            </td>
-            <td className={styles.statusCell}>
-              <span className={`${styles.skeletonLine} ${styles.skeletonStatus}`} />
-            </td>
-            <td className={styles.typeCell}>
-              <span className={`${styles.skeletonLine} ${styles.skeletonType}`} />
-            </td>
-            <td className={styles.balanceCell}>
-              <span className={`${styles.skeletonLine} ${styles.skeletonBalance}`} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
+    <DataTableTable aria-label={title ?? "Accounts"}>
+      <AccountTableHead />
+      <DataTableBody>
+        <DataTableSkeletonRows
+          alignments={["left", "left", "left", "right"]}
+          columns={4}
+          rowKeyPrefix="developer-account-skeleton"
+          rows={rows}
+          widths={["76%", "62px", "78%", "92px"]}
+        />
+      </DataTableBody>
+    </DataTableTable>
+  </DataTable>
 )
 
 export const DeveloperAccountList: FC<DeveloperAccountListProps> = ({
@@ -69,18 +66,10 @@ export const DeveloperAccountList: FC<DeveloperAccountListProps> = ({
   onAddressClick,
 }) => {
   return (
-    <div className={`${styles.tableWrap} ${className ?? ""}`}>
-      {title ? <div className={styles.tableTitle}>{title}</div> : null}
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>Account</th>
-            <th className={styles.statusHeader}>Status</th>
-            <th className={styles.typeHeader}>Type</th>
-            <th className={styles.balanceHeader}>Balance</th>
-          </tr>
-        </thead>
-        <tbody>
+    <DataTable className={className} minWidth="42.5rem" title={title}>
+      <DataTableTable aria-label={title ?? "Accounts"}>
+        <AccountTableHead />
+        <DataTableBody>
           {accounts.length === 0 ? (
             <DataTableEmpty colSpan={4}>{emptyState}</DataTableEmpty>
           ) : (
@@ -91,9 +80,9 @@ export const DeveloperAccountList: FC<DeveloperAccountListProps> = ({
               const canOpenAccount = onAddressClick !== undefined
 
               return (
-                <tr
+                <DataTableRow
                   key={account.address}
-                  className={`${styles.row} ${canOpenAccount ? styles.rowInteractive : ""}`}
+                  interactive={canOpenAccount}
                   onClick={event => onAddressClick?.(account.address, event)}
                   onKeyDown={event => {
                     if (!canOpenAccount) {
@@ -109,30 +98,45 @@ export const DeveloperAccountList: FC<DeveloperAccountListProps> = ({
                   role={canOpenAccount ? "button" : undefined}
                   aria-label={canOpenAccount ? `Open account ${account.address}` : undefined}
                 >
-                  <td className={styles.accountCell}>
+                  <DataTableCell truncate>
                     <ExplorerAddressChip
                       address={account.address}
                       onAddressClick={onAddressClick}
                     />
-                  </td>
-                  <td className={styles.statusCell}>
+                  </DataTableCell>
+                  <DataTableCell>
                     <span className={`${styles.statusBadge} ${styles[status.className]}`}>
                       {status.label}
                     </span>
-                  </td>
-                  <td className={styles.typeCell}>
-                    <span className={styles.typeValue}>{type}</span>
-                  </td>
-                  <td className={styles.balanceCell}>
-                    <span className={styles.balanceText}>{balance}</span>
-                  </td>
-                </tr>
+                  </DataTableCell>
+                  <DataTableCell tone="muted" truncate>
+                    {type}
+                  </DataTableCell>
+                  <DataTableCell align="right" tone="strong">
+                    {balance}
+                  </DataTableCell>
+                </DataTableRow>
               )
             })
           )}
-        </tbody>
-      </table>
-    </div>
+        </DataTableBody>
+      </DataTableTable>
+    </DataTable>
+  )
+}
+
+function AccountTableHead() {
+  return (
+    <DataTableHead>
+      <DataTableRow>
+        <DataTableHeaderCell>Account</DataTableHeaderCell>
+        <DataTableHeaderCell columnWidth="98px">Status</DataTableHeaderCell>
+        <DataTableHeaderCell columnWidth="132px">Type</DataTableHeaderCell>
+        <DataTableHeaderCell align="right" columnWidth="260px">
+          Balance
+        </DataTableHeaderCell>
+      </DataTableRow>
+    </DataTableHead>
   )
 }
 
