@@ -43,11 +43,11 @@ impl ProjectWalletRuntime {
     const fn wallets_for(&self, environment: &StudioEnvironment) -> &BTreeMap<String, Wallet> {
         match &environment.config {
             EnvironmentConfig::ActonLocalnet { .. }
+            | EnvironmentConfig::FullTonNetwork { .. }
             | EnvironmentConfig::RemoteTonNetwork {
                 network: PublicTonNetwork::Testnet,
             } => &self.localnet_wallets,
-            EnvironmentConfig::FullTonNetwork { .. }
-            | EnvironmentConfig::RemoteTonNetwork {
+            EnvironmentConfig::RemoteTonNetwork {
                 network: PublicTonNetwork::Mainnet,
             } => &self.mainnet_wallets,
         }
@@ -115,14 +115,19 @@ mod tests {
     use acton_studio::{EnvironmentEndpoints, EnvironmentStatus};
 
     #[test]
-    fn public_networks_use_wallets_with_their_global_id() {
+    fn environments_use_wallets_with_their_global_id() {
         let runtime = ProjectWalletRuntime {
             localnet_wallets: BTreeMap::new(),
             mainnet_wallets: BTreeMap::new(),
         };
+        let full_ton = full_ton_environment();
         let testnet = remote_environment(PublicTonNetwork::Testnet);
         let mainnet = remote_environment(PublicTonNetwork::Mainnet);
 
+        assert!(std::ptr::eq(
+            runtime.wallets_for(&full_ton),
+            &runtime.localnet_wallets
+        ));
         assert!(std::ptr::eq(
             runtime.wallets_for(&testnet),
             &runtime.localnet_wallets
@@ -131,6 +136,26 @@ mod tests {
             runtime.wallets_for(&mainnet),
             &runtime.mainnet_wallets
         ));
+    }
+
+    fn full_ton_environment() -> StudioEnvironment {
+        StudioEnvironment::new(
+            "full-ton",
+            "Full TON",
+            EnvironmentStatus::Running,
+            EnvironmentConfig::FullTonNetwork {
+                api_v2_port: 18_080,
+                api_v3_port: 18_081,
+                admin_port: 18_082,
+                config_port: 18_083,
+                observability_port: 18_084,
+                block_time_ms: None,
+                election_time_seconds: None,
+                imported_accounts: Vec::new(),
+                nodes: Vec::new(),
+            },
+            EnvironmentEndpoints::default(),
+        )
     }
 
     fn remote_environment(network: PublicTonNetwork) -> StudioEnvironment {

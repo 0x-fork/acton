@@ -38,6 +38,28 @@ target/debug/localton lite send load-test/root-message.boc --state-dir .localton
 
 The root accepts the external message and creates the first two internal deployment messages. Every activated child continues the same process on-chain without further scripts or external messages.
 
+## Start from an Acton script
+
+The regular Acton script prompts for a configured wallet, the amount in GRAM, and a previously unused positive tree ID. It funds a fresh root and submits the external trigger:
+
+```bash
+acton script --net localnet scripts/deploy.tolk
+```
+
+For a full local network created in Studio, first copy its `[networks.localnet]` configuration from **Connect environment** into this project's `Acton.toml`. Fund the selected project wallet from the Studio faucet before starting a large run.
+
+The same script can be checked safely in Acton's local emulator without broadcasting:
+
+```bash
+acton script scripts/deploy.tolk
+```
+
+The `recursive-load` alias is also available:
+
+```bash
+acton run recursive-load -- --net localnet
+```
+
 To build a fresh root, fund it, and send the external message in one command, pass the amount in GRAM and a previously unused positive tree ID:
 
 ```bash
