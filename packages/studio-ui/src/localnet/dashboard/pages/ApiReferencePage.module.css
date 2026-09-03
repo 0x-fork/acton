@@ -7,7 +7,7 @@
   background: var(--acton-color-canvas);
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
 }
 
 .apiReferencePage > div {

@@ -5,7 +5,7 @@
   color: var(--acton-color-text);
   overflow: hidden;
   position: relative;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
 }
 
 .sidebarSlot {
@@ -499,7 +499,7 @@
 .searchResultBody {
   padding: 6px;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
   opacity: 0;
   transition: opacity 140ms ease;
 }
@@ -621,7 +621,7 @@
   min-height: 0;
   flex: 1 1 auto;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
   padding-right: 2px;
   padding-bottom: 4px;
   background: var(--acton-color-surface);
@@ -648,7 +648,7 @@
   padding-bottom: 12px;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
   scroll-padding-bottom: 12px;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -979,7 +979,7 @@
   flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
 }
 
 .content {
@@ -1061,7 +1061,7 @@
   flex: 1 1 auto;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
 }
 
 .environmentHomeContent {
@@ -2027,7 +2027,7 @@
   border-radius: 10px;
   background: var(--acton-color-surface-raised);
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
 }
 
 .checkpointRow {
@@ -2229,7 +2229,7 @@
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
 }
 
 .assetChoiceButton {
@@ -2909,7 +2909,7 @@
     min-height: 0;
     flex: 0 0 auto;
     overflow: visible;
-    overscroll-behavior: contain;
+    overscroll-behavior-y: contain;
   }
 
   .content {

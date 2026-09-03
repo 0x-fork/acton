@@ -7,7 +7,7 @@
   height: 100dvh;
   max-height: 100dvh;
   overflow: hidden;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
   color: var(--acton-color-text);
   background: var(--acton-color-canvas);
 }
@@ -479,7 +479,7 @@
 .searchResultBody {
   padding: 6px;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
   opacity: 0;
   transition: opacity 140ms ease;
 }
@@ -619,7 +619,7 @@
   padding-bottom: 12px;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
   scroll-padding-bottom: 12px;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -1003,7 +1003,7 @@
   flex: 1 1 auto;
   flex-direction: column;
   overflow: hidden;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
 }
 
 .pageHeader {
@@ -1022,7 +1022,7 @@
   flex: 1 1 auto;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
 }
 
 .pageHeaderInner {
@@ -1383,7 +1383,7 @@
   .contentViewport {
     overflow-x: hidden;
     overflow-y: auto;
-    overscroll-behavior: contain;
+    overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
   }
 

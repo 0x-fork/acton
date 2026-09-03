@@ -23,7 +23,7 @@
 
 .summary > div {
   min-width: 0;
-  gap: 9px;
+  gap: 14px;
 }
 
 .summary > div > span:last-child {
@@ -98,7 +98,8 @@
   padding: 11px 0 0;
   border-top: 1px solid var(--acton-color-border);
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, max-content);
+  justify-content: space-between;
   gap: 24px;
   list-style: none;
 }
@@ -106,7 +107,7 @@
 .checks li {
   position: relative;
   min-width: 0;
-  gap: 8px;
+  gap: 12px;
 }
 
 .checks li:nth-child(2) {
@@ -120,6 +121,7 @@
 .checks li > span:nth-child(2) {
   color: var(--acton-color-text-muted);
   font-size: 0.72rem;
+  white-space: nowrap;
 }
 
 .checks li > strong {
@@ -135,6 +137,7 @@
 @media (max-width: 700px) {
   .checks {
     grid-template-columns: 1fr;
+    justify-content: stretch;
     gap: 9px;
   }
 

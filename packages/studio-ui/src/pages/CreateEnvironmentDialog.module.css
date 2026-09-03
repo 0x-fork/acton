@@ -28,7 +28,7 @@
   gap: var(--acton-space-5);
   padding: 0 var(--acton-space-5) var(--acton-space-5);
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
 }
 
 .formGrid {
