@@ -14,7 +14,7 @@ build-dev:
     cargo build
 
 build-localton-dev-image:
-    docker build --file apps/localton/Dockerfile --target localton-rust-only --build-arg LOCALTON_BASE_IMAGE="{{ LOCALTON_BASE_IMAGE }}" --tag "{{ LOCALTON_DEV_IMAGE }}" .
+    docker build --file apps/localton/Dockerfile --target localton-rust-only --build-arg LOCALTON_BASE_IMAGE="{{ LOCALTON_BASE_IMAGE }}" --build-arg VCS_REF="$(git rev-parse HEAD)" --tag "{{ LOCALTON_DEV_IMAGE }}" .
 
 build-source-trace-wasm:
     wasm-pack build crates/acton-source-trace-wasm --target web --out-dir "{{ SOURCE_TRACE_WASM_OUT }}" --out-name acton_source_trace_wasm

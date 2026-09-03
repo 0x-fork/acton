@@ -13,12 +13,17 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 #[derive(Debug, Parser)]
 #[command(
     name = "localton",
-    version,
+    version = localton_version(),
     about = "Bootstrap, join, and operate a complete headless local TON development network"
 )]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
+}
+
+#[inline]
+const fn localton_version() -> &'static str {
+    env!("LOCALTON_LONG_VERSION")
 }
 
 #[derive(Debug, Clone, Subcommand)]

@@ -14,13 +14,14 @@ RUN bun ci \
 
 FROM rust:${RUST_VERSION}-bookworm AS localton-builder
 WORKDIR /src/apps/localton
+ARG VCS_REF=unknown
 
 COPY Cargo.toml Cargo.lock /src/
 COPY build.rs /src/build.rs
 COPY src /src/src
 COPY crates /src/crates
 COPY xtask /src/xtask
-COPY apps/localton/Cargo.toml apps/localton/Cargo.lock ./
+COPY apps/localton/Cargo.toml apps/localton/Cargo.lock apps/localton/build.rs ./
 COPY apps/localton/src/main.rs ./src/main.rs
 COPY apps/localton/xtask/Cargo.toml ./xtask/Cargo.toml
 COPY apps/localton/xtask/src/main.rs ./xtask/src/main.rs
@@ -35,7 +36,7 @@ COPY apps/localton/NOTICE.md apps/localton/README.md ./
 COPY --from=ui-builder /repo/packages/localton-ui/dist /src/packages/localton-ui/dist
 RUN --mount=type=cache,id=localton-cargo-registry,target=/usr/local/cargo/registry \
     --mount=type=cache,id=localton-cargo-target,target=/src/target \
-    cargo build --locked --release --workspace \
+    LOCALTON_GIT_HASH="${VCS_REF}" cargo build --locked --release --workspace \
     && install -Dm755 target/release/localton /out/localton \
     && install -Dm755 target/release/xtask /out/xtask
 
