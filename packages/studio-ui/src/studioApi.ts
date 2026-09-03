@@ -36,6 +36,8 @@ export interface FullTonNetworkEnvironmentConfig {
   readonly adminPort: number
   readonly configPort: number
   readonly observabilityPort: number
+  readonly blockTimeMs?: number
+  readonly electionTimeSeconds?: number
   readonly importedAccounts: readonly FullTonAccountImport[]
   readonly nodes: readonly FullTonNode[]
 }
@@ -83,6 +85,8 @@ export interface CreateFullTonNetworkEnvironmentConfig {
   readonly adminPort?: number
   readonly configPort?: number
   readonly observabilityPort?: number
+  readonly blockTimeMs?: number
+  readonly electionTimeSeconds?: number
   readonly importedAccounts: readonly FullTonAccountImport[]
 }
 

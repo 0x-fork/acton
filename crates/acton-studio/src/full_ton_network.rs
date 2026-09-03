@@ -52,6 +52,8 @@ struct FullTonComposeConfig {
     admin_port: u16,
     config_port: u16,
     observability_port: u16,
+    block_time_ms: Option<u32>,
+    election_time_seconds: Option<u32>,
     imported_account_bocs: Vec<String>,
 }
 
@@ -152,6 +154,8 @@ impl FullTonNetworkDriver {
         admin_port: u16,
         config_port: u16,
         observability_port: u16,
+        block_time_ms: Option<u32>,
+        election_time_seconds: Option<u32>,
         imported_accounts: &[FullTonAccountImport],
         nodes: &[FullTonNode],
         resolved_imported_accounts: Option<&[FullTonAccountImport]>,
@@ -212,6 +216,8 @@ impl FullTonNetworkDriver {
             admin_port,
             config_port,
             observability_port,
+            block_time_ms,
+            election_time_seconds,
             imported_account_bocs,
         };
         let compose = render_compose(&image, &compose_config, nodes);
@@ -1095,6 +1101,22 @@ fn render_compose(image: &str, config: &FullTonComposeConfig, nodes: &[FullTonNo
             &config.observability_port.to_string(),
         )
         .replace(
+            "__LOCALTON_BLOCK_TIME__",
+            &config
+                .block_time_ms
+                .map_or_else(String::new, |milliseconds| {
+                    format!("      - --block-time\n      - \"{milliseconds}\"")
+                }),
+        )
+        .replace(
+            "__LOCALTON_ELECTION_TIME__",
+            &config
+                .election_time_seconds
+                .map_or_else(String::new, |seconds| {
+                    format!("      - --election-time\n      - \"{seconds}\"")
+                }),
+        )
+        .replace(
             "__LOCALTON_IMPORTED_ACCOUNTS__",
             &render_imported_account_args(&config.imported_account_bocs),
         )
@@ -1383,6 +1405,27 @@ v3-worker (exited, exit code 1)"]]
 
         expect![["- --add-account\n- \"b5ee9c72\"\n- --add-account\n- \"deadbeef\""]]
             .assert_eq(&actual);
+    }
+
+    #[test]
+    fn compose_definition_passes_network_timing_to_localton() {
+        let mut config = test_compose_config(Vec::new());
+        config.block_time_ms = Some(750);
+        config.election_time_seconds = Some(240);
+        let compose = render_compose("registry.example/ton:build-42", &config, &[]);
+        let actual = compose
+            .lines()
+            .filter(|line| {
+                line.contains("--block-time")
+                    || line.contains("\"750\"")
+                    || line.contains("--election-time")
+                    || line.contains("\"240\"")
+            })
+            .map(str::trim_start)
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        expect![["- --block-time\n- \"750\"\n- --election-time\n- \"240\""]].assert_eq(&actual);
     }
 
     #[test]
@@ -1688,6 +1731,8 @@ v3-worker (exited, exit code 1)"]]
             19182,
             19183,
             19184,
+            None,
+            None,
             &[],
             &[],
             None,
@@ -1778,6 +1823,8 @@ v3-worker (exited, exit code 1)"]]
             18182,
             18183,
             18184,
+            None,
+            None,
             &[],
             &[],
             None,
@@ -1880,6 +1927,8 @@ acton-studio-<workspace>-environment-1
             admin_port: 18_182,
             config_port: 18_183,
             observability_port: 18_184,
+            block_time_ms: None,
+            election_time_seconds: None,
             imported_account_bocs,
         }
     }

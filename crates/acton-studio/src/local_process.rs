@@ -1580,6 +1580,8 @@ fn resolve_request(
             admin_port,
             config_port,
             observability_port,
+            block_time_ms,
+            election_time_seconds,
             mut imported_accounts,
         } => {
             validate_requested_port(api_v2_port)?;
@@ -1587,6 +1589,21 @@ fn resolve_request(
             validate_requested_port(admin_port)?;
             validate_requested_port(config_port)?;
             validate_requested_port(observability_port)?;
+
+            if block_time_ms == Some(0) {
+                return Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "full_ton_block_time_invalid",
+                    message: "Block time must be greater than zero".to_owned(),
+                });
+            }
+
+            if election_time_seconds.is_some_and(|seconds| seconds < 4) {
+                return Err(EnvironmentRuntimeError::InvalidRequest {
+                    code: "full_ton_election_time_invalid",
+                    message: "Election time must be at least 4 seconds".to_owned(),
+                });
+            }
+
             let api_v2_port = select_port(FIRST_FULL_TON_V2_PORT, api_v2_port, reserved_ports)?;
             let mut excluded_ports = reserved_ports.to_vec();
             excluded_ports.push(api_v2_port);
@@ -1611,12 +1628,66 @@ fn resolve_request(
                 admin_port,
                 config_port,
                 observability_port,
+                block_time_ms,
+                election_time_seconds,
                 imported_accounts,
                 nodes: Vec::new(),
             }
         }
     };
     Ok((name, config))
+}
+
+#[cfg(test)]
+mod full_ton_request_validation_tests {
+    use expect_test::expect;
+
+    use super::{
+        CreateEnvironmentConfig, CreateEnvironmentRequest, EnvironmentRuntimeError, resolve_request,
+    };
+
+    #[test]
+    fn network_timing_rejects_values_localton_cannot_bootstrap() {
+        let cases = [
+            ("block time", Some(0), Some(120)),
+            ("election time", Some(1_000), Some(3)),
+        ];
+        let actual = cases
+            .into_iter()
+            .map(|(label, block_time_ms, election_time_seconds)| {
+                let result = resolve_request(
+                    CreateEnvironmentRequest {
+                        name: "Full localnet".to_owned(),
+                        config: CreateEnvironmentConfig::FullTonNetwork {
+                            api_v2_port: None,
+                            api_v3_port: None,
+                            admin_port: None,
+                            config_port: None,
+                            observability_port: None,
+                            block_time_ms,
+                            election_time_seconds,
+                            imported_accounts: Vec::new(),
+                        },
+                    },
+                    &[],
+                );
+                match result {
+                    Err(EnvironmentRuntimeError::InvalidRequest { code, message }) => {
+                        format!("{label}: {code} ({message})")
+                    }
+                    Err(error) => format!("{label}: unexpected error ({error})"),
+                    Ok(_) => format!("{label}: unexpected success"),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        expect![[
+            r"block time: full_ton_block_time_invalid (Block time must be greater than zero)
+election time: full_ton_election_time_invalid (Election time must be at least 4 seconds)"
+        ]]
+        .assert_eq(&actual);
+    }
 }
 
 fn validate_requested_port(port: Option<u16>) -> Result<(), EnvironmentRuntimeError> {
@@ -1948,6 +2019,8 @@ impl EnvironmentDriver {
                 admin_port,
                 config_port,
                 observability_port,
+                block_time_ms,
+                election_time_seconds,
                 imported_accounts,
                 nodes,
             } => FullTonNetworkDriver::materialize(
@@ -1959,6 +2032,8 @@ impl EnvironmentDriver {
                 *admin_port,
                 *config_port,
                 *observability_port,
+                *block_time_ms,
+                *election_time_seconds,
                 imported_accounts,
                 nodes,
                 resolved_imported_accounts,

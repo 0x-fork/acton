@@ -103,6 +103,12 @@ pub enum CreateEnvironmentConfig {
         admin_port: Option<u16>,
         config_port: Option<u16>,
         observability_port: Option<u16>,
+        /// Target interval between blocks written to zerostate config parameter 30.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        block_time_ms: Option<u32>,
+        /// Validator round duration used to derive zerostate election windows.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        election_time_seconds: Option<u32>,
         #[serde(default)]
         imported_accounts: Vec<FullTonAccountImport>,
     },
@@ -223,6 +229,12 @@ pub enum EnvironmentConfig {
         admin_port: u16,
         config_port: u16,
         observability_port: u16,
+        /// Target interval between blocks fixed when Localton creates the network.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        block_time_ms: Option<u32>,
+        /// Validator round duration fixed when Localton creates the network.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        election_time_seconds: Option<u32>,
         imported_accounts: Vec<FullTonAccountImport>,
         nodes: Vec<FullTonNode>,
     },

@@ -42,6 +42,8 @@ interface EnvironmentFormState {
   readonly rateLimit: string
   readonly responseDelayMs: string
   readonly blockIntervalMs: string
+  readonly fullTonBlockTimeMs: string
+  readonly fullTonElectionTimeSeconds: string
   readonly noMining: boolean
   readonly mineEmptyBlocks: boolean
   readonly importedAccounts: readonly ImportedAccountForm[]
@@ -179,6 +181,16 @@ export function CreateEnvironmentDialog({
               }
             : {
                 kind: "fullTonNetwork",
+                blockTimeMs: optionalPositiveInteger(
+                  form.fullTonBlockTimeMs,
+                  "Block time",
+                  4_294_967_295,
+                ),
+                electionTimeSeconds: optionalPositiveInteger(
+                  form.fullTonElectionTimeSeconds,
+                  "Election time",
+                  4_294_967_295,
+                ),
                 importedAccounts,
               },
       }
@@ -349,6 +361,35 @@ export function CreateEnvironmentDialog({
                 onChange={updateImportedAccount}
                 onRemove={removeImportedAccount}
               />
+              <Disclosure
+                label="Network timing"
+                contentClassName={styles.advancedContent}
+              >
+                <div className={styles.formGrid}>
+                  <Input
+                    label="Block time"
+                    description="Target interval between blocks"
+                    suffix="ms"
+                    type="number"
+                    min={1}
+                    max={4_294_967_295}
+                    placeholder="1,000"
+                    value={form.fullTonBlockTimeMs}
+                    onChange={event => updateForm("fullTonBlockTimeMs", event.target.value)}
+                  />
+                  <Input
+                    label="Election time"
+                    description="Duration of each validator round"
+                    suffix="s"
+                    type="number"
+                    min={4}
+                    max={4_294_967_295}
+                    placeholder="120"
+                    value={form.fullTonElectionTimeSeconds}
+                    onChange={event => updateForm("fullTonElectionTimeSeconds", event.target.value)}
+                  />
+                </div>
+              </Disclosure>
             </div>
           )}
         </div>
@@ -387,6 +428,8 @@ function createInitialForm(environmentCount: number): EnvironmentFormState {
     rateLimit: "",
     responseDelayMs: "",
     blockIntervalMs: "",
+    fullTonBlockTimeMs: "",
+    fullTonElectionTimeSeconds: "",
     noMining: false,
     mineEmptyBlocks: false,
     importedAccounts: [],

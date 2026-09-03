@@ -51,6 +51,8 @@ impl TestEnvironmentRuntime {
                 admin_port: 18_082,
                 config_port: 18_083,
                 observability_port: 18_084,
+                block_time_ms: None,
+                election_time_seconds: None,
                 imported_accounts: Vec::new(),
                 nodes: Vec::new(),
             },

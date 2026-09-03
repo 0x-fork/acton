@@ -5,6 +5,8 @@ services:
       - bootstrap
       - --state-dir
       - /var/lib/localton
+__LOCALTON_BLOCK_TIME__
+__LOCALTON_ELECTION_TIME__
       - --ton-http-api
       - --observability-bind
       - 0.0.0.0

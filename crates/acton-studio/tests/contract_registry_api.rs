@@ -253,6 +253,8 @@ fn full_ton_environment(base_url: &str) -> StudioEnvironment {
             admin_port: 18082,
             config_port: 18083,
             observability_port: 18084,
+            block_time_ms: None,
+            election_time_seconds: None,
             imported_accounts: Vec::new(),
             nodes: Vec::new(),
         },

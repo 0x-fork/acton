@@ -499,6 +499,8 @@ environment_store_unsupported_version: <workspace>/.studio/environments/environm
                 admin_port: 8083,
                 config_port: 8084,
                 observability_port: 8085,
+                block_time_ms: None,
+                election_time_seconds: None,
                 imported_accounts: Vec::new(),
                 nodes: Vec::new(),
             },
