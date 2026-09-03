@@ -2,8 +2,8 @@
 //!
 //! Console commands mutate security-sensitive engine state and differ in retry
 //! safety. This module keeps raw `-rc` strings private, parses every result into a
-//! semantic value, and deliberately leaves retry ordering and engine restarts to
-//! the validator workflow.
+//! semantic value, and deliberately leaves retry ordering and lifecycle changes
+//! to the validator workflow.
 
 use std::{
     collections::BTreeMap,
@@ -250,17 +250,6 @@ pub struct ChangeFullNodeAddress {
     pub adnl_key: KeyId,
 }
 
-/// Imports an externally generated private validator key into the engine.
-///
-/// The path is passed to the official process, but file contents are never read,
-/// logged, or included in adapter diagnostics. Import retry is intentionally left
-/// to the bootstrap workflow because some release failures require an engine
-/// restart before the same file can be accepted.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ImportPrivateKey {
-    pub private_key: PathBuf,
-}
-
 /// Requests a signature from an engine-owned key without exposing a raw hex CLI
 /// contract to workflows.
 ///
@@ -361,15 +350,6 @@ pub trait ValidatorConsole: Send + Sync {
         context: &OperationContext,
         endpoint: &ValidatorConsoleEndpoint,
         request: ChangeFullNodeAddress,
-    ) -> Result<()>;
-
-    /// Imports an external private key exactly once without reading its contents
-    /// in Localton.
-    async fn import_private_key(
-        &self,
-        context: &OperationContext,
-        endpoint: &ValidatorConsoleEndpoint,
-        request: ImportPrivateKey,
     ) -> Result<()>;
 
     /// Signs bytes with an engine-owned key and validates the 64-byte result.
@@ -609,21 +589,6 @@ impl ValidatorConsole for OfficialValidatorConsole {
         .await
     }
 
-    async fn import_private_key(
-        &self,
-        context: &OperationContext,
-        endpoint: &ValidatorConsoleEndpoint,
-        request: ImportPrivateKey,
-    ) -> Result<()> {
-        self.execute(
-            context,
-            endpoint,
-            ConsoleCommand::ImportPrivateKey(request),
-            ensure_console_success,
-        )
-        .await
-    }
-
     async fn sign(
         &self,
         context: &OperationContext,
@@ -655,7 +620,6 @@ enum ConsoleCommand {
     AddAdnl(AddAdnl),
     AddValidatorAddress(AddValidatorAddress),
     ChangeFullNodeAddress(ChangeFullNodeAddress),
-    ImportPrivateKey(ImportPrivateKey),
     Sign(SignRequest),
 }
 
@@ -671,7 +635,6 @@ impl ConsoleCommand {
             Self::AddAdnl(_) => "add_adnl",
             Self::AddValidatorAddress(_) => "add_validator_address",
             Self::ChangeFullNodeAddress(_) => "change_full_node_address",
-            Self::ImportPrivateKey(_) => "import_private_key",
             Self::Sign(_) => "sign",
         }
     }
@@ -699,9 +662,6 @@ impl ConsoleCommand {
             ),
             Self::ChangeFullNodeAddress(request) => {
                 format!("changefullnodeaddr {}", request.adnl_key)
-            }
-            Self::ImportPrivateKey(request) => {
-                format!("importf {}", request.private_key.display())
             }
             Self::Sign(request) => {
                 format!("sign {} {}", request.key, hex::encode(&request.payload))
@@ -1035,12 +995,6 @@ mod tests {
             (
                 ConsoleCommand::ChangeFullNodeAddress(ChangeFullNodeAddress { adnl_key: second }),
                 format!("changefullnodeaddr {second}"),
-            ),
-            (
-                ConsoleCommand::ImportPrivateKey(ImportPrivateKey {
-                    private_key: PathBuf::from("/state/keyring/validator"),
-                }),
-                "importf /state/keyring/validator".to_owned(),
             ),
             (
                 ConsoleCommand::Sign(SignRequest {

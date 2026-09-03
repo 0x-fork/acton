@@ -106,25 +106,29 @@ pub async fn run(args: BootstrapArgs) -> Result<()> {
         runtime.node = genesis_runtime;
         runtime.save_atomic(&layout.runtime)?;
 
-        let masterchain_seqno = readiness::wait_for_masterchain(
-            &layout,
-            tools.lite_client_tool.as_ref(),
-            &LiteTarget::new(global_config.path()).with_label("genesis"),
-            &processes,
-            timeout,
-            masterchain_readiness,
-        )
-        .await?;
+        // V2 performs its own `getMasterchainInfo` readiness check, so it can
+        // initialize tonlib while the validator produces the first observed
+        // blocks. Both futures must still succeed before readiness is published.
+        let genesis_lite_target = LiteTarget::new(global_config.path()).with_label("genesis");
 
-        http::v2::start(
-            &layout,
-            &tools.binaries,
-            &settings,
-            timeout,
-            &processes,
-            &mut runtime,
-        )
-        .await?;
+        let (masterchain_seqno, ()) = tokio::try_join!(
+            readiness::wait_for_masterchain(
+                &layout,
+                tools.lite_client_tool.as_ref(),
+                &genesis_lite_target,
+                &processes,
+                timeout,
+                masterchain_readiness,
+            ),
+            http::v2::start(
+                &layout,
+                &tools.binaries,
+                &settings,
+                timeout,
+                &processes,
+                &mut runtime,
+            ),
+        )?;
 
         let services = http::start(
             &layout,

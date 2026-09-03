@@ -20,11 +20,11 @@ use crate::{
     },
 };
 
-const LITE_QUERY_TIMEOUT: Duration = Duration::from_secs(10);
+const LITE_QUERY_TIMEOUT: Duration = Duration::from_secs(1);
 const READINESS_PROGRESS_INTERVAL: Duration = Duration::from_secs(5);
 
 #[cfg(not(test))]
-const READINESS_POLL_INTERVAL: Duration = Duration::from_secs(1);
+const READINESS_POLL_INTERVAL: Duration = Duration::from_millis(250);
 #[cfg(test)]
 const READINESS_POLL_INTERVAL: Duration = Duration::from_millis(1);
 
@@ -168,7 +168,13 @@ pub(crate) async fn shutdown_signal() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::VecDeque, sync::Mutex};
+    use std::{
+        collections::VecDeque,
+        sync::{
+            Mutex,
+            atomic::{AtomicBool, Ordering},
+        },
+    };
 
     use anyhow::anyhow;
     use async_trait::async_trait;
@@ -186,12 +192,21 @@ mod tests {
 
     struct ReadinessLiteClient {
         seqnos: Mutex<VecDeque<u32>>,
+        stall_next_query: AtomicBool,
     }
 
     impl ReadinessLiteClient {
         fn new(seqnos: impl IntoIterator<Item = u32>) -> Self {
             Self {
                 seqnos: Mutex::new(seqnos.into_iter().collect()),
+                stall_next_query: AtomicBool::new(false),
+            }
+        }
+
+        fn stalling_once(seqnos: impl IntoIterator<Item = u32>) -> Self {
+            Self {
+                seqnos: Mutex::new(seqnos.into_iter().collect()),
+                stall_next_query: AtomicBool::new(true),
             }
         }
 
@@ -206,9 +221,13 @@ mod tests {
     impl LiteClient for ReadinessLiteClient {
         async fn masterchain_info(
             &self,
-            _context: &OperationContext,
+            context: &OperationContext,
             _target: &LiteTarget,
         ) -> Result<MasterchainInfo> {
+            if self.stall_next_query.swap(false, Ordering::Relaxed) {
+                sleep(context.timeout).await;
+                bail!("simulated stalled readiness query");
+            }
             let seqno = self
                 .seqnos
                 .lock()
@@ -345,5 +364,31 @@ mod tests {
                 .collect::<Vec<_>>(),
             [18]
         );
+    }
+
+    #[tokio::test]
+    async fn retries_quickly_after_a_stalled_liteserver_query() {
+        let state = tempfile::tempdir().unwrap();
+        let layout = Layout::new(state.path().join("state"));
+        let target = LiteTarget::new(layout.global_config.clone()).with_label("genesis");
+        let processes = ProcessRegistry::default();
+        let client = ReadinessLiteClient::stalling_once([17]);
+
+        let seqno = tokio::time::timeout(
+            Duration::from_secs(2),
+            wait_for_masterchain(
+                &layout,
+                &client,
+                &target,
+                &processes,
+                Duration::from_secs(3),
+                MasterchainReadiness::HeadAvailable,
+            ),
+        )
+        .await
+        .expect("a stalled readiness query must not consume the old 10-second timeout")
+        .unwrap();
+
+        assert_eq!(seqno, 17);
     }
 }

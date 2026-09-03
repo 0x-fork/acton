@@ -3,8 +3,7 @@
 //! Each local validator has an engine database, an ADNL identity, a control
 //! console, and optionally a liteserver. This module supplies typed engine and
 //! console operations in workflow order, installs service keys into the generated
-//! config, and owns retries and temporary-process restarts needed to register
-//! permanent validator identities.
+//! config, and owns the retries needed to register permanent validator identities.
 
 use std::{
     future::Future,
@@ -23,7 +22,7 @@ use crate::{
         types::{AdnlEndpoint, GeneratedKey, KeyId, OperationContext},
         validator_console::{
             AddAdnl, AddPermanentKey, AddTemporaryKey, AddValidatorAddress, ChangeFullNodeAddress,
-            ImportPrivateKey, ValidatorConsole, ValidatorConsoleEndpoint,
+            ValidatorConsole, ValidatorConsoleEndpoint,
         },
         validator_engine::{
             ValidatorBootstrapRequest, ValidatorDatabase, ValidatorEngine, ValidatorLogPaths,
@@ -37,7 +36,6 @@ const CONSOLE_OPERATION_TIMEOUT: Duration = Duration::from_secs(15);
 const CONSOLE_READINESS_TIMEOUT: Duration = Duration::from_secs(2);
 const CONSOLE_ENDPOINT_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const CONSOLE_RETRY_LIMIT: usize = 5;
-const IMPORT_RETRY_LIMIT: usize = 3;
 const RETRY_DELAY: Duration = Duration::from_millis(500);
 const READINESS_LOG_INTERVAL: Duration = Duration::from_secs(5);
 
@@ -84,6 +82,10 @@ pub(crate) async fn configure_genesis_identity(
         let end = u32::try_from(now.saturating_add(YEAR_SECONDS))
             .context("validator bootstrap key expiry exceeds TON uint32 time")?;
 
+        // Genesis installs `validator` in the engine keyring before this process
+        // starts. TON's `addpermkey` calls `check_key` before persisting the
+        // validator record, so success here also proves the private key is
+        // available; a later `importf` would only re-import the same key.
         retry_console_mutation(node, "add_permanent_key", || {
             console.add_permanent_key(
                 &console_context,
@@ -160,40 +162,6 @@ pub(crate) async fn configure_genesis_identity(
                 ChangeFullNodeAddress { adnl_key: node_key },
             )
         })
-        .await?;
-
-        // The official adapter normalizes TON v2026.06's successful disconnect
-        // after `changefullnodeaddr`. The process itself may still terminate with
-        // the associated ADNL unsubscribe error, so the workflow probes it and
-        // owns the required restart before importing the permanent private key.
-        if wait_for_console(node_layout, console, node, &mut temporary, context)
-            .await
-            .is_err()
-        {
-            warn!(
-                "ton.tool" = "validator-bootstrap",
-                operation = "configure_genesis_identity",
-                node = %node.name,
-                stage = "post_full_node_identity",
-                retry_attempt = 1,
-                progress = "restarting_engine",
-                outcome = "retrying",
-                "temporary validator stopped after changing its full-node identity"
-            );
-            temporary.stop().await?;
-            temporary = start_bootstrap(node_layout, engine, node).await?;
-            wait_for_console(node_layout, console, node, &mut temporary, context).await?;
-        }
-
-        import_validator_key(
-            node_layout,
-            engine,
-            console,
-            node,
-            validator,
-            context,
-            &mut temporary,
-        )
         .await?;
 
         Ok(GenesisNodeIdentity {
@@ -305,77 +273,6 @@ pub(super) async fn start_persistent(
             celldb_in_memory,
         })
         .await
-}
-
-/// Imports the generated validator private key with bounded engine restarts.
-///
-/// `importf` is not reliably accepted by a freshly mutated bootstrap engine on
-/// every supported TON build. Each failed attempt restarts the temporary service,
-/// waits for authenticated readiness, and then retries the same intended import.
-/// Neither the key path nor any command text is emitted in workflow telemetry.
-async fn import_validator_key(
-    node_layout: &NodeLayout,
-    engine: &dyn ValidatorEngine,
-    console: &dyn ValidatorConsole,
-    node: &NodeSettings,
-    validator: &GeneratedKey,
-    context: &OperationContext,
-    temporary: &mut ServiceHandle,
-) -> Result<()> {
-    let endpoint = console_endpoint(node_layout, node);
-    let console_context = operation_context(context, node, CONSOLE_OPERATION_TIMEOUT);
-    let private_key = node_layout.keyring.join(validator.id.to_keyring_filename());
-    let mut last_error = None;
-    for attempt in 1..=IMPORT_RETRY_LIMIT {
-        workflow_retry(
-            node,
-            "import_private_key",
-            attempt,
-            IMPORT_RETRY_LIMIT,
-            "attempting",
-            "pending",
-            false,
-        );
-        match console
-            .import_private_key(
-                &console_context,
-                &endpoint,
-                ImportPrivateKey {
-                    private_key: private_key.clone(),
-                },
-            )
-            .await
-        {
-            Ok(()) => {
-                workflow_retry(
-                    node,
-                    "import_private_key",
-                    attempt,
-                    IMPORT_RETRY_LIMIT,
-                    "complete",
-                    "success",
-                    false,
-                );
-                return Ok(());
-            }
-            Err(error) => {
-                workflow_retry(
-                    node,
-                    "import_private_key",
-                    attempt,
-                    IMPORT_RETRY_LIMIT,
-                    "restarting_engine",
-                    "retrying",
-                    true,
-                );
-                last_error = Some(error);
-                temporary.stop().await?;
-                *temporary = start_bootstrap(node_layout, engine, node).await?;
-                wait_for_console(node_layout, console, node, temporary, context).await?;
-            }
-        }
-    }
-    Err(last_error.context("validator key import failed without an error")?)
 }
 
 /// Waits until a live service answers a typed, authenticated health request.
