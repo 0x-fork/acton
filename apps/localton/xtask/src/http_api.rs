@@ -14,7 +14,7 @@ const UPSTREAM_BUILD_PATH: &str = "ton-http-api/ton-http-api-cpp";
 const TAG: &str = "v2.1.13";
 const COMMIT: &str = "ab081891316b3513fb86d3815e33d141fdca2c6d";
 const TON_COMMIT: &str = "bbc3bc6d52abbe3a7f852b22050708166fdaafbc";
-const BUILD_SCHEMA: &str = "3";
+const BUILD_SCHEMA: &str = "4";
 const BROKEN_CACHE_CONSTRUCTION: &str = "cache_ = std::make_shared<Cache>(cache_size, way_size);";
 const FIXED_CACHE_CONSTRUCTION: &str = "cache_ = std::make_shared<Cache>(cache_ways, way_size);";
 
@@ -308,6 +308,9 @@ async fn configure(paths: &Paths) -> Result<()> {
             "-DUSERVER_FEATURE_TESTSUITE=OFF",
             "-DUSERVER_USE_STATIC_LIBS=ON",
             "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF",
+            // Avoid CPU-specific instructions from upstream's -march=native default.
+            "-DTON_ARCH=",
+            "-DPORTABLE=ON",
         ]);
     apply_native_build_environment(&mut command, paths)?;
     run("configure TON HTTP API V2", &mut command).await?;
