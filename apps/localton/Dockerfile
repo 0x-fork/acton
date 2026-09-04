@@ -31,6 +31,7 @@ RUN --mount=type=cache,id=localton-cargo-registry,target=/usr/local/cargo/regist
 
 COPY apps/localton/src ./src
 COPY apps/localton/xtask ./xtask
+COPY apps/localton/docker ./docker
 COPY apps/localton/assets ./assets
 COPY apps/localton/NOTICE.md apps/localton/README.md ./
 COPY --from=ui-builder /repo/packages/localton-ui/dist /src/packages/localton-ui/dist
@@ -217,8 +218,8 @@ FROM golang:${GO_VERSION}-bookworm AS go-toolchain
 
 FROM ubuntu:${UBUNTU_VERSION} AS ton-indexer-builder
 ARG TON_INDEXER_BUILD_JOBS=4
-ARG TON_INDEXER_COMMIT=eb9fbfa3212a583d3eef672f74b98600dfdd898c
-ARG TON_INDEXER_REPOSITORY=https://github.com/toncenter/ton-indexer.git
+ARG TON_INDEXER_COMMIT
+ARG TON_INDEXER_REPOSITORY
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -259,79 +260,33 @@ ENV CC=clang \
     CCACHE_DIR=/ccache \
     CCACHE_MAXSIZE=8G
 
-COPY apps/localton/docker/ton-indexer-cors.patch /tmp/ton-indexer-cors.patch
-COPY apps/localton/docker/ton-indexer-classifier-cpu.patch /tmp/ton-indexer-classifier-cpu.patch
-COPY apps/localton/docker/ton-indexer-v3-catchup.patch /tmp/ton-indexer-v3-catchup.patch
-COPY apps/localton/docker/ton-indexer-localton-scanner.patch /tmp/ton-indexer-localton-scanner.patch
-
-RUN git init -q /src/ton-indexer \
-    && git -C /src/ton-indexer remote add origin "${TON_INDEXER_REPOSITORY}" \
-    && git -C /src/ton-indexer fetch --depth 1 origin "${TON_INDEXER_COMMIT}" \
-    && git -C /src/ton-indexer checkout --detach FETCH_HEAD \
-    && git -C /src/ton-indexer submodule update --init --recursive --depth 1 \
-    && test "$(git -C /src/ton-indexer rev-parse HEAD)" = "${TON_INDEXER_COMMIT}" \
-    && git -C /src/ton-indexer apply \
-        /tmp/ton-indexer-cors.patch \
-        /tmp/ton-indexer-classifier-cpu.patch \
-        /tmp/ton-indexer-v3-catchup.patch \
-        /tmp/ton-indexer-localton-scanner.patch
+COPY --from=localton-builder /out/xtask /usr/local/bin/xtask
 
 RUN --mount=type=cache,id=ton-indexer-ccache,target=/ccache \
-    cmake \
-        -S /src/ton-indexer/ton-index-worker \
-        -B /src/ton-indexer/build-worker \
-        -G Ninja \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-        -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-        -DPORTABLE=1 \
-        -DTON_ARCH= \
-    && cmake --build /src/ton-indexer/build-worker \
-        --parallel "${TON_INDEXER_BUILD_JOBS}" \
-        --target \
-            ton-index-postgres \
-            ton-index-postgres-migrate \
-            ton-smc-scanner \
-            ton-marker \
-            ton-marker-cli \
-            ton-marker-core \
-    && install -d /out/ton-indexer/bin /out/ton-indexer/lib \
-    && install -m 0755 \
-        /src/ton-indexer/build-worker/ton-index-postgres/ton-index-postgres \
-        /src/ton-indexer/build-worker/ton-index-postgres/ton-index-postgres-migrate \
-        /src/ton-indexer/build-worker/ton-smc-scanner/ton-smc-scanner \
-        /out/ton-indexer/bin/ \
-    && cp -a \
-        /src/ton-indexer/build-worker/ton-marker/libton-marker* \
-        /out/ton-indexer/lib/
+    xtask build-ton-http-api-v3 \
+        --state-dir /tmp/indexer-build \
+        --install-dir /out/ton-indexer \
+        --component worker \
+        --jobs "${TON_INDEXER_BUILD_JOBS}"
 
 FROM ton-indexer-builder AS ton-index-api-builder
 COPY --from=go-toolchain /usr/local/go /usr/local/go
 ENV PATH=/usr/local/go/bin:/root/go/bin:${PATH}
-WORKDIR /src/ton-indexer/ton-index-go
-
-RUN install -m 0644 \
-        /src/ton-indexer/ton-index-worker/ton-marker/src/wrapper.h \
-        /usr/local/include/wrapper.h \
-    && cp -a /out/ton-indexer/lib/libton-marker* /usr/lib/ \
-    && ldconfig
 
 RUN --mount=type=cache,id=ton-indexer-go-build,target=/root/.cache/go-build \
     --mount=type=cache,id=ton-indexer-go-mod,target=/go/pkg/mod \
-    go install github.com/swaggo/swag/cmd/swag@v1.16.3 \
-    && swag init \
-    && CGO_ENABLED=1 go build \
-        -trimpath \
-        -ldflags="-s -w -buildid=" \
-        -o /out/ton-indexer/bin/ton-index-go \
-        ./main.go
+    xtask build-ton-http-api-v3 \
+        --state-dir /tmp/indexer-build \
+        --install-dir /out/ton-indexer \
+        --component api \
+        --jobs "${TON_INDEXER_BUILD_JOBS}"
 
 FROM ton-indexer-builder AS ton-index-classifier-builder
 RUN --mount=type=cache,id=ton-indexer-pip,target=/root/.cache/pip \
-    python3 -m venv /out/ton-indexer/venv \
-    && /out/ton-indexer/venv/bin/pip install \
-        -r /src/ton-indexer/indexer/requirements.txt \
-    && cp -a /src/ton-indexer/indexer /out/ton-indexer/classifier
+    xtask build-ton-http-api-v3 \
+        --state-dir /tmp/indexer-build \
+        --install-dir /out/ton-indexer \
+        --component classifier
 
 FROM ubuntu:${UBUNTU_VERSION} AS runtime
 ARG BUILD_VERSION=dev
@@ -395,7 +350,7 @@ COPY --from=ton-index-classifier-builder \
 COPY --from=ton-index-classifier-builder \
     /out/ton-indexer/classifier \
     /opt/ton-indexer/classifier
-COPY --from=ton-indexer-builder /src/ton-indexer/LICENSE /usr/share/doc/localton/TON-INDEXER-LICENSE
+COPY --from=ton-indexer-builder /out/ton-indexer/LICENSE /usr/share/doc/localton/TON-INDEXER-LICENSE
 COPY --chmod=0755 apps/localton/docker/container-entrypoint.sh /usr/local/bin/localton-container-entrypoint
 COPY apps/localton/NOTICE.md /usr/share/doc/localton/
 

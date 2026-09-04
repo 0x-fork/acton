@@ -1,4 +1,5 @@
 mod http_api;
+mod http_api_v3;
 mod recursive_load;
 
 use std::path::PathBuf;
@@ -18,6 +19,9 @@ struct Cli {
 enum Command {
     /// Build and install the pinned TON HTTP API V2 backend.
     BuildTonHttpApiV2(BuildTonHttpApiV2Args),
+
+    /// Build and install the pinned TON Center API V3 components.
+    BuildTonHttpApiV3(http_api_v3::BuildArgs),
 
     /// Build a deterministic external message for a recursive load root.
     PrepareRecursiveLoad(PrepareRecursiveLoadArgs),
@@ -74,6 +78,7 @@ async fn main() -> Result<()> {
         Command::BuildTonHttpApiV2(args) => {
             http_api::build(&args.state_dir, usize::from(args.jobs)).await
         }
+        Command::BuildTonHttpApiV3(args) => http_api_v3::build(args).await,
         Command::PrepareRecursiveLoad(args) => recursive_load::prepare(args.tree_id).await,
         Command::RunRecursiveLoad(args) => {
             recursive_load::run(

@@ -373,6 +373,40 @@ The native build requires these development components:
 - Boost, OpenSSL, ICU, libsodium, and `libmicrohttpd`.
 - LZ4, fmt, hiredis, jemalloc, and c-ares.
 
+## Build TON Center API V3
+
+The Docker image builds API V3 through the same `xtask` executable as API V2.
+The task checks out a pinned `toncenter/ton-indexer` commit, applies the bundled
+Localton patches, and builds the worker, Go API, and Python event classifier:
+
+```bash
+xtask build-ton-http-api-v3 --state-dir .localton --jobs 8
+```
+
+Sources and build files stay under `.localton/tools/ton-http-api-v3`; installed
+artifacts go into its `install` directory. Use `--install-dir` to choose another
+installation directory. The installation contains `bin`, `lib`, `include`,
+`venv`, `classifier`, and the upstream `LICENSE`.
+
+Use `--component worker`, `--component api`, or `--component classifier` to build
+one component. The API builds the worker's native libraries if they have not
+been installed for the selected source version. Docker uses these component
+options in separate stages to retain its C++, Go, and pip caches.
+
+The task requires the build tools and development libraries installed by the
+Dockerfile: Clang, CMake, Ninja, ccache, Go, Python with venv/pip, and the TON
+Indexer C++ dependencies. It uses the current user's build directories and
+does not install headers or libraries into system directories. The worker
+uses portable CPU settings, and the Go API links against its installed marker
+libraries.
+
+The default repository and commit are pinned in `xtask`. Override them with
+`--repository` and `--commit`, or `TON_INDEXER_REPOSITORY` and
+`TON_INDEXER_COMMIT`. The corresponding Docker build arguments remain available.
+Changing the commit or bundled patches invalidates the prepared source and
+native build directory. This command builds V3; use Docker Compose to run its
+services with PostgreSQL and Redis.
+
 ## Network configuration
 
 Create `settings.json` without starting the network:
