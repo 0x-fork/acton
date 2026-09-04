@@ -227,6 +227,33 @@ On first start, `join` downloads only `global.config.json`. The file contains th
 
 `GLOBAL_CONFIG_URL` can point to the bootstrap instance's `/config` route or to the same JSON file on any static HTTP server. No Localton-specific bootstrap document is required.
 
+### Start a full node from a database dump
+
+The dump contains public validator-engine database files, but not the
+machine's node configuration or private keys. Pass it to `join`; Localton creates
+those host-owned files first, imports the chain data without replacing them, then
+starts a disk-backed full node and its liteserver:
+
+```bash
+brew install lzip
+
+localton join <GLOBAL_CONFIG_URL> \
+  --state-dir .localton-node \
+  --advertise-ip <ADVERTISED_IPV4> \
+  --dump /path/to/ton_dump.tar.lz \
+  --startup-timeout 1800
+```
+
+On Debian or Ubuntu, install `plzip` instead. Keep the archive outside the state
+directory. The import streams decompressed tar data into a staging directory, so it
+does not require a second copy of the extracted database. The node manifest is
+written only after import completes; an interrupted import is discarded and retried
+on the next invocation. Once initialized, later starts do not require `--dump`.
+
+Forward the selected ADNL UDP port to the advertised public IPv4 address. The
+liteserver listens on the port saved in `.localton-node/settings.json`; it does
+not need to be exposed publicly when only local clients use it.
+
 Add `--validator` to make the remote node enter elections:
 
 ```bash

@@ -55,6 +55,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"
+tar = "0.4.46"
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 ton = "0.4.1"
 tonutils = { version = "1.1.0", features = ["full"] }
