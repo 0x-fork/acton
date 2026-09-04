@@ -52,7 +52,7 @@ USER localton
 
 FROM ubuntu:${UBUNTU_VERSION} AS ton-binaries
 ARG TARGETARCH
-ARG TON_RELEASE=v2026.06
+ARG TON_RELEASE=v2026.08
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -66,11 +66,11 @@ RUN set -eux; \
     case "${TARGETARCH}" in \
         amd64) \
             asset="ton-linux-x86_64.zip"; \
-            sha256="15a252cbe49f700f52863a397c615283e150ec0fa72eb5d55893d3346bec8d04" \
+            sha256="548f0f29b5ebf1a42d6aa23438b25c7a0c05b2330a7f278d2ca83fc2015685e9" \
             ;; \
         arm64) \
             asset="ton-linux-arm64.zip"; \
-            sha256="f93dd78d907d47507b3b41f74a4fcee5fefb5b164c3df1469d436100dfd87a7a" \
+            sha256="acb73cd85118754e149744d35c3ef4775f065c8545b49600f70ffe8dea68060e" \
             ;; \
         *) \
             echo "unsupported Docker target architecture: ${TARGETARCH}" >&2; \
@@ -360,6 +360,7 @@ RUN apt-get update \
         libsodium23 \
         passwd \
         python3 \
+        plzip \
         tini \
         zlib1g \
     && rm -rf /var/lib/apt/lists/* \
