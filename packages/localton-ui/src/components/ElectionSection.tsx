@@ -525,7 +525,7 @@ function ValidatorSetTables({election}: {readonly election: ElectionObservation}
               <span>{label}</span>
               <span className={styles.validatorSetSummaryMeta}>
                 {set
-                  ? `${formatValidators(set.validators)} · ${formatTimestamp(set.validation_started_at)}–${formatTimestamp(set.validation_ended_at)}`
+                  ? `${formatValidators(set.validators)} · ${formatTimestamp(set.validation_started_at)} – ${formatTimestamp(set.validation_ended_at)}`
                   : unavailableLabel}
               </span>
             </span>
