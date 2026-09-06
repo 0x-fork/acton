@@ -609,7 +609,7 @@ function ValidatorPerformanceSection({
       <div className={styles.sectionHeading}>
         <h2 id="validator-performance-title">Current round validator performance</h2>
       </div>
-      <DataTable className={styles.validatorPerformanceTable} minWidth="56rem">
+      <DataTable minWidth="56rem">
         <DataTableTable aria-label="Current round validator performance" layout="fixed">
           <DataTableHead>
             <DataTableRow>

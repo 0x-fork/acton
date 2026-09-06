@@ -282,10 +282,6 @@
   color: var(--acton-color-danger-text);
 }
 
-.validatorPerformanceTable.validatorPerformanceTable {
-  max-width: 72rem;
-}
-
 .topologyChange {
   color: var(--acton-color-warning);
   font-weight: var(--acton-font-weight-medium);
