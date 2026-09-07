@@ -2,8 +2,8 @@ name: Update TON TL-B
 
 on:
   schedule:
-    # Every Monday at 05:23 UTC
-    - cron: "23 5 * * 1"
+    # 08:00 Europe/Moscow every Monday (05:00 UTC)
+    - cron: "0 5 * * 1"
   workflow_dispatch:
 
 concurrency:
