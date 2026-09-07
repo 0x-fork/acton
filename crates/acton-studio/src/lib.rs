@@ -58,7 +58,8 @@ pub use environment::{
     CreateFullTonNodeRequest, EnvironmentCapability, EnvironmentConfig, EnvironmentEndpoints,
     EnvironmentLifecycle, EnvironmentNetwork, EnvironmentRuntime, EnvironmentRuntimeError,
     EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation,
-    EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStartupTimings,
+    EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase,
+    EnvironmentStartupOperation, EnvironmentStartupState, EnvironmentStartupTimings,
     EnvironmentStatus, FullTonAccountImport, FullTonNode, ImportAccountsRequest,
     NetworkConfigUpdate, PublicTonNetwork, RemoveFullTonNodeRequest, StudioEnvironment,
     UpdateEnvironmentRequest,
@@ -402,6 +403,10 @@ impl StudioServer {
             .route(
                 "/environments/{environment_id}/health",
                 get(get_environment_health),
+            )
+            .route(
+                "/environments/{environment_id}/startup",
+                get(get_environment_startup),
             )
             .route(
                 "/environments/{environment_id}/snapshots",
@@ -1074,6 +1079,39 @@ async fn get_environment_health(
     state
         .environment_runtime
         .health(&environment_id)
+        .await
+        .map(Json)
+        .map_err(StudioApiError)
+}
+
+#[derive(Deserialize)]
+struct EnvironmentStartupQuery {
+    tail: Option<usize>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/startup",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("tail" = Option<usize>, Query, description = "Maximum startup log lines to return")
+    ),
+    responses(
+        (status = 200, description = "Live Full localnet startup progress and log tail", body = EnvironmentStartupState),
+        (status = 404, description = "Environment not found", body = StudioApiErrorBody),
+        (status = 409, description = "Startup diagnostics are unavailable", body = StudioApiErrorBody),
+        (status = 500, description = "Failed to inspect environment startup", body = StudioApiErrorBody)
+    ),
+    tag = "environments"
+)]
+async fn get_environment_startup(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+    Query(query): Query<EnvironmentStartupQuery>,
+) -> Result<Json<EnvironmentStartupState>, StudioApiError> {
+    state
+        .environment_runtime
+        .startup_state(&environment_id, query.tail.unwrap_or(100).min(200))
         .await
         .map(Json)
         .map_err(StudioApiError)

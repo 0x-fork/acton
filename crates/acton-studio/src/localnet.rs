@@ -13,8 +13,8 @@ use tokio::{process::Child, sync::Mutex};
 
 use crate::environment::{
     EnvironmentConfig, EnvironmentRuntimeError, EnvironmentSnapshotOperation,
-    EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase, EnvironmentStatus,
-    FullTonAccountImport,
+    EnvironmentSnapshotOperationKind, EnvironmentSnapshotOperationPhase,
+    EnvironmentStartupOperation, EnvironmentStartupState, EnvironmentStatus, FullTonAccountImport,
 };
 
 pub(crate) struct FullLocalnet {
@@ -83,6 +83,28 @@ impl FullLocalnet {
     /// Reads live health from the process that owns Docker and the API probes.
     pub(crate) async fn health(&self) -> Result<NetworkHealth, EnvironmentRuntimeError> {
         self.client().await?.health().await.map_err(error)
+    }
+
+    /// Reads the current startup operation and a bounded log tail without launching
+    /// an auxiliary owner for a stopped network
+    pub(crate) async fn startup_state(
+        &self,
+        tail: usize,
+    ) -> Result<EnvironmentStartupState, EnvironmentRuntimeError> {
+        let network = self.network().await?;
+        let operation = network
+            .operation
+            .filter(|operation| operation.kind == "start")
+            .map(|operation| EnvironmentStartupOperation {
+                phase: operation.phase,
+                progress: operation.progress,
+                completed_steps: operation.completed_steps,
+            });
+        let logs = acton_localnet::inspection::logs(&self.location.path, tail)
+            .await
+            .map_err(error)?;
+
+        Ok(EnvironmentStartupState { operation, logs })
     }
 
     pub(crate) async fn shutdown(&self) -> Result<(), EnvironmentRuntimeError> {

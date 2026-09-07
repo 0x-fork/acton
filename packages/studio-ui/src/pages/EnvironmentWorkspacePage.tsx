@@ -149,7 +149,10 @@ export function EnvironmentWorkspacePage({
           </span>
         </div>
         {isStarting && environment?.startupTimings ? (
-          <EnvironmentStartupProgress timings={environment.startupTimings} />
+          <EnvironmentStartupProgress
+            environmentId={environment.id}
+            timings={environment.startupTimings}
+          />
         ) : undefined}
         {visibleError ? (
           <RawDataBlock

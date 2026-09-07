@@ -1,12 +1,25 @@
-.root {
+.container {
   width: min(100%, 44rem);
   margin: 16px auto 0;
+}
+
+.root {
   padding: 12px 14px;
   border: 1px solid var(--acton-color-border);
   border-radius: 10px;
   color: var(--acton-color-text);
   background: var(--acton-color-surface-raised);
   box-sizing: border-box;
+}
+
+.summary[data-separated="true"] {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.logs {
+  margin-top: 8px;
 }
 
 .summary,

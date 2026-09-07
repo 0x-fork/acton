@@ -183,6 +183,15 @@ async fn studio_uses_cli_for_lifecycle_and_http_for_nodes_and_snapshots() {
         "[package]\nname = \"studio-fixture\"\ndescription = \"Studio integration fixture\"\nversion = \"0.1.0\"\n[contracts]\n",
     )
     .expect("project manifest");
+    let standalone = catalog::create(
+        &service.state(),
+        CreateNetwork {
+            name: "Studio network".to_owned(),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("standalone network with the same display name");
     let runtime = studio(service.root.path(), &executable).await;
     let created = runtime
         .create(request("Studio network"))
@@ -226,6 +235,11 @@ async fn studio_uses_cli_for_lifecycle_and_http_for_nodes_and_snapshots() {
         .into_iter()
         .find(|entry| entry.network.id == network_id)
         .expect("Studio network in common catalog");
+    expect!["Studio network:true"].assert_eq(&format!(
+        "{}:{}",
+        created.name,
+        location.network.name != standalone.network.name
+    ));
     expect![[r#"["importedAccounts","kind","networkId"]"#]].assert_eq(
         &serde_json::to_string(
             &metadata["config"]

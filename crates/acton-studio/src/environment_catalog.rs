@@ -6,9 +6,9 @@ use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_EN
 use crate::environment::{
     CreateEnvironmentRequest, CreateEnvironmentSnapshotRequest, CreateFullTonNodeRequest,
     EnvironmentConfig, EnvironmentEndpoints, EnvironmentRuntime, EnvironmentRuntimeError,
-    EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation, EnvironmentStatus,
-    NetworkConfigUpdate, PublicTonNetwork, RemoveFullTonNodeRequest, StudioEnvironment,
-    UpdateEnvironmentRequest,
+    EnvironmentRuntimeFuture, EnvironmentSnapshot, EnvironmentSnapshotOperation,
+    EnvironmentStartupState, EnvironmentStatus, NetworkConfigUpdate, PublicTonNetwork,
+    RemoveFullTonNodeRequest, StudioEnvironment, UpdateEnvironmentRequest,
 };
 
 pub const TESTNET_ENVIRONMENT_ID: &str = "testnet";
@@ -140,6 +140,18 @@ impl EnvironmentRuntime for EnvironmentCatalogRuntime {
         }
 
         self.managed.health(environment_id)
+    }
+
+    fn startup_state(
+        &self,
+        environment_id: &str,
+        tail: usize,
+    ) -> EnvironmentRuntimeFuture<'_, EnvironmentStartupState> {
+        if let Some(error) = lifecycle_unavailable(environment_id, "inspected") {
+            return error;
+        }
+
+        self.managed.startup_state(environment_id, tail)
     }
 
     fn update_network_config(

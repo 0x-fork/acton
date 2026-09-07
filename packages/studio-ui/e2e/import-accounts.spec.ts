@@ -83,22 +83,25 @@ for (const lostResponse of [false, true]) {
     await dialog.getByLabel("Account 1 contract name").fill("Imported contract")
     await dialog.getByLabel("Account 1 address").fill(address)
     await dialog.getByRole("button", {name: "Import accounts", exact: true}).click()
+    const notifications = page.getByRole("region", {name: "Notifications"})
+    await expect(dialog).not.toBeVisible()
     if (lostResponse) {
-      await expect(dialog.getByLabel("Account 1 contract name")).toBeDisabled()
+      await expect(notifications).toContainText("Retry sends the same import safely")
       await page.reload()
+      await page
+        .getByLabel("State actions")
+        .getByRole("button", {name: "Import accounts", exact: true})
+        .click()
       await expect(dialog).toBeVisible()
       await dialog.getByRole("button", {name: "Retry same import"}).click()
       expect(submitted[1]).toEqual(submitted[0])
     }
-    await expect(dialog.getByRole("status")).toHaveText("Installing hardfork")
+    await expect(notifications).toContainText("[6/10] Installing hardfork")
     const pollsBefore = environmentPolls
     await expect.poll(() => environmentPolls).toBeGreaterThan(pollsBefore)
-    await expect(dialog).toBeVisible()
-    await expect(dialog.getByLabel("Account 1 address")).toBeDisabled()
-    await dialog.getByRole("button", {name: "Close", exact: true}).click()
+    await expect(dialog).not.toBeVisible()
     await page.reload()
-    await expect(dialog).toBeVisible()
-    await expect(dialog.getByRole("status")).toHaveText("Installing hardfork")
+    await expect(notifications).toContainText("[6/10] Installing hardfork")
     status = "running"
     operation = {
       ...(operation as unknown as AdminOperation),
@@ -106,8 +109,8 @@ for (const lostResponse of [false, true]) {
       finishedAt: new Date().toISOString(),
       blockSeqno: 123,
     }
-    await expect(dialog.getByRole("status")).toHaveText("Accounts imported")
-    await expect(dialog.getByRole("link", {name: "View contracts"})).toHaveAttribute(
+    await expect(notifications).toContainText("Accounts imported")
+    await expect(notifications.getByRole("link", {name: "View contracts"})).toHaveAttribute(
       "href",
       "/virtual-environments/environment-1/contracts",
     )
@@ -145,7 +148,10 @@ test("rejected source import reports a toast and allows correcting the shared fo
     })
   })
   await page.goto("/virtual-environments/environment-1/dashboard")
-  await page.getByRole("button", {name: "Import accounts", exact: true}).click()
+  await page
+    .getByLabel("State actions")
+    .getByRole("button", {name: "Import accounts", exact: true})
+    .click()
   const dialog = page.getByRole("dialog", {name: "Import accounts"})
   await dialog.getByRole("button", {name: "Add account"}).click()
   await dialog.getByLabel("Account 1 address").fill(address)
@@ -153,6 +159,10 @@ test("rejected source import reports a toast and allows correcting the shared fo
   await expect(page.getByRole("region", {name: "Notifications"})).toContainText(
     "Account does not exist in Mainnet",
   )
+  await page
+    .getByLabel("State actions")
+    .getByRole("button", {name: "Import accounts", exact: true})
+    .click()
   await expect(dialog.getByLabel("Account 1 address")).toBeEnabled()
   await expect(dialog).not.toContainText("Account does not exist in Mainnet")
 })

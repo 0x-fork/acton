@@ -416,6 +416,20 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
         })
     }
 
+    fn startup_state(
+        &self,
+        environment_id: &str,
+        tail: usize,
+    ) -> EnvironmentRuntimeFuture<'_, crate::EnvironmentStartupState> {
+        let environment_id = environment_id.to_owned();
+
+        Box::pin(async move {
+            let environment = find_environment(&self.inner, &environment_id).await?;
+            ensure_environment_not_deleted(&environment).await?;
+            full_localnet(&environment)?.startup_state(tail).await
+        })
+    }
+
     fn network_activity(
         &self,
         environment_id: &str,
@@ -1111,26 +1125,42 @@ async fn resolve_request(
                     })
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            let location = acton_localnet::catalog::create(
-                &localnet::root(workspace),
-                acton_localnet::CreateNetwork {
-                    name: name.clone(),
-                    block_time_ms,
-                    election_time_seconds,
-                    imported_account_bocs,
-                    ports: acton_localnet::PortOptions {
-                        config: config_port,
-                        admin: admin_port,
-                        api_v2: api_v2_port,
-                        api_v3: api_v3_port,
-                        observability: observability_port,
-                    },
-                    reserved_ports: reserved_ports.to_vec(),
-                    ..Default::default()
+            let mut create_network = acton_localnet::CreateNetwork {
+                name: name.clone(),
+                block_time_ms,
+                election_time_seconds,
+                imported_account_bocs,
+                ports: acton_localnet::PortOptions {
+                    config: config_port,
+                    admin: admin_port,
+                    api_v2: api_v2_port,
+                    api_v3: api_v3_port,
+                    observability: observability_port,
                 },
+                reserved_ports: reserved_ports.to_vec(),
+                ..Default::default()
+            };
+            let catalog_root = localnet::root(workspace);
+            let location = match acton_localnet::catalog::create(
+                &catalog_root,
+                create_network.clone(),
             )
             .await
-            .map_err(localnet::error)?;
+            {
+                Ok(location) => location,
+                Err(acton_localnet::Error::Conflict {
+                    code: "network_name_exists",
+                    ..
+                }) => {
+                    // Studio display names belong to Studio. A standalone or orphaned Localton
+                    // definition must not make an otherwise free environment name unusable.
+                    create_network.name = unique_managed_localnet_name(&name);
+                    acton_localnet::catalog::create(&catalog_root, create_network)
+                        .await
+                        .map_err(localnet::error)?
+                }
+                Err(error) => return Err(localnet::error(error)),
+            };
             for account in &mut imported_accounts {
                 account.shard_account_boc_hex = None;
             }
@@ -1139,6 +1169,13 @@ async fn resolve_request(
         }
     };
     Ok((name, config, None))
+}
+
+fn unique_managed_localnet_name(display_name: &str) -> String {
+    let prefix = display_name.chars().take(60).collect::<String>();
+    let suffix = uuid::Uuid::new_v4().simple().to_string();
+
+    format!("{prefix} · studio-{}", &suffix[..8])
 }
 
 fn validate_requested_port(port: Option<u16>) -> Result<(), EnvironmentRuntimeError> {

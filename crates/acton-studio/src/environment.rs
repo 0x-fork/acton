@@ -149,6 +149,29 @@ pub enum EnvironmentSnapshotOperationPhase {
 
 pub use acton_localnet::StartupTimings as EnvironmentStartupTimings;
 
+/// Browser-facing snapshot of a Full localnet startup operation
+///
+/// Studio exposes only progress fields that help explain startup. The local
+/// filesystem log path and operation result remain owned by the localnet process
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentStartupOperation {
+    pub phase: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub progress: Option<acton_localnet::OperationProgress>,
+    #[serde(default)]
+    pub completed_steps: Vec<acton_localnet::OperationStep>,
+}
+
+/// Bounded live startup diagnostics displayed while a Full localnet opens
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentStartupState {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operation: Option<EnvironmentStartupOperation>,
+    pub logs: String,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentSnapshotOperation {
@@ -563,6 +586,21 @@ pub trait EnvironmentRuntime: Send + Sync {
             Err(EnvironmentRuntimeError::Conflict {
                 code: "environment_health_unavailable",
                 message: "Health diagnostics are not available for this environment".to_owned(),
+            })
+        })
+    }
+
+    /// Reads bounded startup state without starting or mutating the environment
+    fn startup_state(
+        &self,
+        _environment_id: &str,
+        _tail: usize,
+    ) -> EnvironmentRuntimeFuture<'_, EnvironmentStartupState> {
+        Box::pin(async {
+            Err(EnvironmentRuntimeError::Conflict {
+                code: "environment_startup_state_unavailable",
+                message: "Startup diagnostics are available for Full localnet environments"
+                    .to_owned(),
             })
         })
     }

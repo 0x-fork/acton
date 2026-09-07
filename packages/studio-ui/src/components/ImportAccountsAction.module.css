@@ -17,36 +17,6 @@
   line-height: 1.5;
 }
 
-.progress {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--acton-space-2);
-  padding: var(--acton-space-3);
-  font-size: var(--acton-font-size-sm);
-}
-
-.contractsLink {
-  color: var(--acton-color-accent);
-  font-size: var(--acton-font-size-sm);
-}
-
-.spinner {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .spinner {
-    animation: none;
-  }
-}
-
 .actions {
   padding: var(--acton-space-4) var(--acton-space-5);
   border-top: 1px solid var(--acton-color-border);

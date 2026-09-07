@@ -294,6 +294,29 @@ export interface EnvironmentStartupTimings {
   readonly apiReadyMs?: number
 }
 
+export interface EnvironmentOperationProgress {
+  readonly completed: number
+  readonly total?: number
+  readonly unit: string
+  readonly detail: string
+}
+
+export interface EnvironmentOperationStep {
+  readonly phase: string
+  readonly durationMs: number
+}
+
+export interface EnvironmentStartupOperation {
+  readonly phase: string
+  readonly progress?: EnvironmentOperationProgress
+  readonly completedSteps: readonly EnvironmentOperationStep[]
+}
+
+export interface EnvironmentStartupState {
+  readonly operation?: EnvironmentStartupOperation
+  readonly logs: string
+}
+
 export interface EnvironmentSnapshotOperation {
   readonly kind: EnvironmentSnapshotOperationKind
   readonly phase: EnvironmentSnapshotOperationPhase
@@ -443,6 +466,16 @@ export function fetchStudioEnvironmentHealth(
 ): Promise<NetworkHealth> {
   return requestJson<NetworkHealth>(
     `/api/v1/environments/${encodeURIComponent(environmentId)}/health`,
+    {headers: {accept: "application/json"}, signal},
+  )
+}
+
+export function fetchStudioEnvironmentStartup(
+  environmentId: string,
+  signal?: AbortSignal,
+): Promise<EnvironmentStartupState> {
+  return requestJson<EnvironmentStartupState>(
+    `/api/v1/environments/${encodeURIComponent(environmentId)}/startup?tail=100`,
     {headers: {accept: "application/json"}, signal},
   )
 }
