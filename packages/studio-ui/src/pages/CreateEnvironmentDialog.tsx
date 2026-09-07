@@ -325,7 +325,7 @@ export function CreateEnvironmentDialog({
                   />
                   <Input
                     label="Response delay"
-                    description="Delay TonCenter and Emulate API responses"
+                    description="Delay TON Center and Emulate API responses"
                     suffix="ms"
                     type="number"
                     min={1}

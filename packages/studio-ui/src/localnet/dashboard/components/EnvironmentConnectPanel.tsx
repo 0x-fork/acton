@@ -1,4 +1,11 @@
-import {Button, CopyInlineButton, HighlightedCode, Tooltip} from "@acton/ui"
+import {
+  Button,
+  CopyInlineAction,
+  CopyInlineButton,
+  HighlightedCode,
+  InlineActions,
+  Tooltip,
+} from "@acton/ui"
 import {Braces, Cable, CircleAlert, FileCode2, Settings} from "lucide-react"
 import {useEffect, useMemo, useState} from "react"
 import {Link} from "react-router"
@@ -12,7 +19,6 @@ interface EnvironmentConnectPanelProps {
   readonly apiV2Url?: string
   readonly apiV3Url?: string
   readonly configureActonNetwork: boolean
-  readonly controlUrl?: string
   readonly environmentName: string
   readonly explorerUrl?: string
   readonly integratePath: string
@@ -51,7 +57,6 @@ export function EnvironmentConnectPanel({
   apiV2Url,
   apiV3Url,
   configureActonNetwork,
-  controlUrl,
   environmentName,
   explorerUrl,
   integratePath,
@@ -62,22 +67,30 @@ export function EnvironmentConnectPanel({
     () => ({
       apiV2: toAbsoluteUrl(apiV2Url),
       apiV3: toAbsoluteUrl(apiV3Url),
-      control: toAbsoluteUrl(controlUrl),
       explorer: toAbsoluteUrl(explorerUrl),
     }),
-    [apiV2Url, apiV3Url, controlUrl, explorerUrl],
+    [apiV2Url, apiV3Url, explorerUrl],
   )
-  const endpointEntries = useMemo(
-    () =>
-      [
-        urls.apiV2 ? {label: "V2 API", value: urls.apiV2} : undefined,
-        urls.apiV3 ? {label: "V3 API", value: urls.apiV3} : undefined,
-        urls.control ? {label: "Control API", value: urls.control} : undefined,
-      ].filter((entry): entry is {readonly label: string; readonly value: string} =>
-        Boolean(entry),
-      ),
-    [urls.apiV2, urls.apiV3, urls.control],
-  )
+  const endpointEntries = useMemo(() => {
+    const entries: {label: string; value: string; href?: string}[] = []
+
+    if (urls.apiV2) {
+      entries.push({label: "TON Center v2", value: urls.apiV2})
+    }
+
+    if (urls.apiV3) {
+      // Display and copy the API root because this is the value applications must configure.
+      // Open the concrete docs file so an old browser-cached upstream redirect cannot bypass
+      // the environment proxy. Studio still serves the same docs from the displayed API root.
+      entries.push({
+        label: "TON Center v3",
+        value: urls.apiV3,
+        href: `${withoutTrailingSlash(urls.apiV3)}/index.html`,
+      })
+    }
+
+    return entries
+  }, [urls.apiV2, urls.apiV3])
   const availableOptions = useMemo(
     () =>
       integrationOptions.filter(option =>
@@ -189,12 +202,16 @@ console.log(masterchain)`
               <div>
                 <h3>
                   {target === "rpc"
-                    ? "Use an endpoint"
+                    ? "Find the current TON Center endpoint"
                     : target === "acton" && !actonConfig
                       ? "Run a script on this network"
                       : "Add this setup"}
                 </h3>
-                {target === "acton" && !actonConfig ? (
+                {target === "rpc" ? (
+                  <p className={styles.stepDescription}>
+                    Search your app configuration for the Mainnet or Testnet TON Center URL it uses
+                  </p>
+                ) : target === "acton" && !actonConfig ? (
                   <p className={styles.stepDescription}>
                     Studio routes Acton&apos;s built-in {actonNetworkName} network while it is
                     running
@@ -220,13 +237,7 @@ console.log(masterchain)`
               ) : undefined}
             </div>
 
-            {target === "rpc" ? (
-              <div className={styles.endpointList}>
-                {endpointEntries.map(endpoint => (
-                  <EndpointRow key={endpoint.label} {...endpoint} />
-                ))}
-              </div>
-            ) : target === "acton" && !actonConfig ? (
+            {target === "rpc" ? undefined : target === "acton" && !actonConfig ? (
               <HighlightedCode
                 className={styles.codeBlock}
                 language="shellscript"
@@ -243,6 +254,25 @@ console.log(masterchain)`
             )}
           </div>
         </div>
+
+        {target === "rpc" ? (
+          <div className={styles.step}>
+            <span className={styles.stepNumber}>3</span>
+            <div className={styles.stepContent}>
+              <div>
+                <h3>Point your app to this environment</h3>
+                <p className={styles.stepDescription}>
+                  Use the endpoint that matches your app&apos;s TON Center API version
+                </p>
+              </div>
+              <dl className={styles.endpointList} aria-label="RPC endpoints">
+                {endpointEntries.map(endpoint => (
+                  <EndpointRow key={endpoint.label} {...endpoint} />
+                ))}
+              </dl>
+            </div>
+          </div>
+        ) : undefined}
 
         {target === "acton" && actonConfig ? (
           <div className={styles.step}>
@@ -315,21 +345,45 @@ console.log(masterchain)`
   )
 }
 
-function EndpointRow({label, value}: {readonly label: string; readonly value: string}) {
+function EndpointRow({
+  label,
+  value,
+  href = value,
+}: {
+  readonly label: string
+  readonly value: string
+  readonly href?: string
+}) {
   return (
     <div className={styles.endpointRow}>
-      <span>{label}</span>
-      <Tooltip content={value}>
-        <code>{value}</code>
-      </Tooltip>
-      <CopyInlineButton
-        value={value}
-        label={`Copy ${label} endpoint`}
-        copiedLabel={`${label} endpoint copied`}
-        copiedChildren={null}
-      >
-        {null}
-      </CopyInlineButton>
+      <dt className={styles.endpointLabel}>{label}</dt>
+      <dd className={styles.endpointValue}>
+        {/* Opening and copying are separate actions so copying never triggers navigation. */}
+        <InlineActions
+          className={styles.endpointActions}
+          visibility="always"
+          actions={
+            <CopyInlineAction
+              value={value}
+              label={`Copy ${label} endpoint`}
+              copiedLabel={`${label} endpoint copied`}
+              size="compact"
+            />
+          }
+        >
+          <Tooltip content={value}>
+            <a
+              className={styles.endpointLink}
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Open ${label} endpoint`}
+            >
+              <code>{value}</code>
+            </a>
+          </Tooltip>
+        </InlineActions>
+      </dd>
     </div>
   )
 }
@@ -354,7 +408,6 @@ function integrationPromptFor({
   readonly urls: {
     readonly apiV2?: string
     readonly apiV3?: string
-    readonly control?: string
     readonly explorer?: string
   }
 }): string {
@@ -385,13 +438,12 @@ ${tonClientRequest}`
   }
 
   const endpointLines = [
-    urls.apiV2 ? `V2 API: ${urls.apiV2}` : undefined,
-    urls.apiV3 ? `V3 API: ${urls.apiV3}` : undefined,
-    urls.control ? `Control API: ${urls.control}` : undefined,
+    urls.apiV2 ? `TON Center v2: ${urls.apiV2}` : undefined,
+    urls.apiV3 ? `TON Center v3: ${urls.apiV3}` : undefined,
     urls.explorer ? `Explorer: ${urls.explorer}` : undefined,
   ].filter((line): line is string => Boolean(line))
 
-  return `Connect the TON application to "${environmentName}" through Acton Studio.
+  return `Connect the TON application to "${environmentName}" through Acton Studio. Find the Mainnet or Testnet TON Center endpoint in the application configuration, then replace it with the matching endpoint below.
 
 ${endpointLines.join("\n")}`
 }

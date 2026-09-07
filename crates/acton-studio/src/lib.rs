@@ -10,6 +10,7 @@ use axum::body::Body;
 use axum::extract::{DefaultBodyLimit, Path as AxumPath, Query, Request, State};
 #[cfg(not(debug_assertions))]
 use axum::http::Uri;
+use axum::http::header::{CONTENT_LENGTH, CONTENT_TYPE, LOCATION};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{any, get, post};
@@ -1539,6 +1540,7 @@ async fn proxy_environment_request(
             message: format!("Environment {} is not running", environment.name),
         }));
     }
+
     let toncenter_api_key = state.toncenter_api_keys.for_environment(&environment);
 
     if contract_facade::handles(request.method(), &path) {
@@ -1561,7 +1563,10 @@ async fn proxy_environment_request(
     } else {
         (reqwest::Body::wrap_stream(body.into_data_stream()), None)
     };
-    let mut upstream_url = environment_upstream_url(&environment, &path)?;
+    // v3 returns a permanent, origin-relative redirect from its API root. Resolve that redirect
+    // inside Studio so browsers never cache a route that drops the environment proxy prefix.
+    let upstream_path = toncenter_upstream_path(&parts.method, &path);
+    let mut upstream_url = environment_upstream_url(&environment, upstream_path)?;
     if let Some(query) = parts.uri.query() {
         upstream_url.push('?');
         upstream_url.push_str(query);
@@ -1582,11 +1587,31 @@ async fn proxy_environment_request(
         .map_err(proxy_error)?;
     let status = upstream_response.status();
     let headers = upstream_response.headers().clone();
+
+    // The two TON Center versions expose different documentation frontends, but both embed
+    // origin-relative URLs that must be adapted before their response reaches the browser.
+    let rewrite_docs = is_toncenter_docs_response(&path, &headers);
+    let rewrite_openapi = is_toncenter_openapi_response(&path, &headers);
+    let rewrites_body = rewrite_docs || rewrite_openapi;
     let mut response = Response::builder().status(status);
     for (name, value) in &headers {
-        if should_forward_upstream_response_header(name, is_public_toncenter) {
-            response = response.header(name, value);
+        // Rewritten HTML and JSON have a different byte length. Let Axum calculate it.
+        let content_length_is_stale = rewrites_body && name == CONTENT_LENGTH;
+        if !should_forward_upstream_response_header(name, is_public_toncenter)
+            || content_length_is_stale
+        {
+            continue;
         }
+
+        // Preserve the environment prefix for any documentation redirect not handled above.
+        if name == LOCATION
+            && let Some(location) = rewrite_toncenter_redirect_location(value, &environment.id)
+        {
+            response = response.header(name, location);
+            continue;
+        }
+
+        response = response.header(name, value);
     }
 
     let response_body =
@@ -1609,7 +1634,16 @@ async fn proxy_environment_request(
                 .await;
             }
             Body::from(bytes)
+        } else if rewrite_docs {
+            // Documentation responses are small and must be buffered to rewrite embedded URLs.
+            let bytes = upstream_response.bytes().await.map_err(proxy_error)?;
+            Body::from(rewrite_toncenter_docs_html(&bytes, &environment.id, &path))
+        } else if rewrite_openapi {
+            // Swagger derives every Execute URL from the schema, so it needs a proxy-aware server.
+            let bytes = upstream_response.bytes().await.map_err(proxy_error)?;
+            Body::from(rewrite_toncenter_openapi_json(&bytes, &environment.id))
         } else {
+            // Keep normal API calls streaming; only documentation responses need transformation.
             Body::from_stream(upstream_response.bytes_stream())
         };
     response.body(response_body).map_err(|error| {
@@ -1668,6 +1702,136 @@ fn endpoint_relative_path<'a>(path: &'a str, endpoint: &str) -> Option<&'a str> 
     }
     path.strip_prefix(endpoint)
         .and_then(|remaining| remaining.strip_prefix('/'))
+}
+
+/// Identifies HTML served anywhere below either TON Center API root.
+///
+/// v2 serves HTML at `/api/v2`; v3 redirects to `/api/v3/index.html`. Checking the complete API
+/// subtree covers both layouts without treating HTML returned by other Studio services as docs.
+fn is_toncenter_docs_response(path: &str, headers: &HeaderMap) -> bool {
+    let path = path.trim_start_matches('/');
+    let is_api_path = endpoint_relative_path(path, "api/v2").is_some()
+        || endpoint_relative_path(path, "api/v3").is_some();
+    let is_html = headers
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("text/html"));
+
+    is_api_path && is_html
+}
+
+/// Identifies the schema names used by both bundled TON Center documentation frontends.
+fn is_toncenter_openapi_response(path: &str, headers: &HeaderMap) -> bool {
+    let path = path.trim_start_matches('/');
+    let is_api_path = endpoint_relative_path(path, "api/v2").is_some()
+        || endpoint_relative_path(path, "api/v3").is_some();
+    let is_schema = matches!(path.rsplit('/').next(), Some("openapi.json" | "doc.json"));
+    let is_json = headers
+        .get(CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("application/json"));
+
+    is_api_path && is_schema && is_json
+}
+
+/// Reattaches an upstream root-relative TON Center redirect to its environment proxy.
+///
+/// Redirects outside `/api/v2` and `/api/v3` are left untouched because they may intentionally
+/// target another service or an external authentication flow.
+fn rewrite_toncenter_redirect_location(
+    location: &HeaderValue,
+    environment_id: &str,
+) -> Option<HeaderValue> {
+    let location = location.to_str().ok()?;
+    let is_api_path = ["/api/v2", "/api/v3"].iter().any(|prefix| {
+        location == *prefix
+            || location
+                .strip_prefix(prefix)
+                .is_some_and(|path| path.starts_with('/'))
+    });
+    if !is_api_path {
+        return None;
+    }
+
+    HeaderValue::from_str(&format!(
+        "{STUDIO_ENVIRONMENTS_PATH}/{environment_id}/rpc{location}"
+    ))
+    .ok()
+}
+
+/// Selects the upstream v3 documentation file without exposing its permanent redirect to clients.
+///
+/// The public Studio URL remains the API root. Only the upstream request changes, which keeps the
+/// endpoint useful as configuration while preventing browsers from caching v3's origin-relative
+/// redirect outside the environment proxy.
+fn toncenter_upstream_path<'a>(method: &axum::http::Method, path: &'a str) -> &'a str {
+    if method == axum::http::Method::GET && path.trim_matches('/') == "api/v3" {
+        "api/v3/index.html"
+    } else {
+        path
+    }
+}
+
+/// Keeps schema requests inside the environment proxy when TON Center serves its Swagger UI.
+///
+/// TON Center uses root-relative schema URLs. Browsers otherwise resolve those URLs against
+/// Studio itself and lose the environment identifier required to select the upstream network.
+fn rewrite_toncenter_docs_html(body: &[u8], environment_id: &str, path: &str) -> Vec<u8> {
+    let Ok(html) = std::str::from_utf8(body) else {
+        return body.to_vec();
+    };
+    let proxy_root = format!("{STUDIO_ENVIRONMENTS_PATH}/{environment_id}/rpc");
+    let mut rewritten = html.to_owned();
+
+    // The v3 API root is served from its upstream index file without redirecting the browser.
+    // An explicit base keeps relative scripts and styles under `/api/v3/` even though the visible
+    // browser URL has no trailing slash. It also makes direct index-file navigation equivalent.
+    let path = path.trim_start_matches('/');
+    if let Some(version) = ["v2", "v3"]
+        .into_iter()
+        .find(|version| endpoint_relative_path(path, &format!("api/{version}")).is_some())
+    {
+        let base = format!("<head><base href=\"{proxy_root}/api/{version}/\">");
+        rewritten = rewritten.replacen("<head>", &base, 1);
+    }
+
+    // Match only root-relative quoted URLs. Absolute upstream links must remain external.
+    for version in ["v2", "v3"] {
+        for quote in ['"', '\''] {
+            let source = format!("{quote}/api/{version}/");
+            let target = format!("{quote}{proxy_root}/api/{version}/");
+            rewritten = rewritten.replace(&source, &target);
+        }
+    }
+
+    rewritten.into_bytes()
+}
+
+/// Routes documentation requests through Studio instead of resolving API paths at its origin root.
+///
+/// TON Center v2 publishes `OpenAPI` 3, while v3 publishes Swagger 2. Both schemas define paths such
+/// as `/api/v2/getMasterchainInfo` and need format-specific proxy metadata. Swagger 2 ignores the
+/// `OpenAPI` `servers` field, so treating the documents alike silently sends v3 requests to Studio's
+/// origin root.
+fn rewrite_toncenter_openapi_json(body: &[u8], environment_id: &str) -> Vec<u8> {
+    let Ok(mut document) = serde_json::from_slice::<serde_json::Value>(body) else {
+        return body.to_vec();
+    };
+    let proxy_root = format!("{STUDIO_ENVIRONMENTS_PATH}/{environment_id}/rpc");
+
+    if document.get("swagger").and_then(|value| value.as_str()) == Some("2.0") {
+        // With no host or schemes Swagger UI inherits Studio's current origin and protocol, then
+        // prefixes every v3 operation with the environment-specific base path.
+        if let Some(document) = document.as_object_mut() {
+            document.remove("host");
+            document.remove("schemes");
+            document.insert("basePath".to_owned(), proxy_root.into());
+        }
+    } else {
+        document["servers"] = serde_json::json!([{ "url": proxy_root }]);
+    }
+
+    serde_json::to_vec(&document).unwrap_or_else(|_| body.to_vec())
 }
 
 fn is_hop_by_hop_header(name: &HeaderName) -> bool {
@@ -2102,7 +2266,9 @@ mod proxy_header_tests {
         CapturedSubmissionBody, DeploymentSubmissionKind, MAX_DEPLOYMENT_SUBMISSION_BODY_BYTES,
         PublicToncenterApiKeys, TONCENTER_API_KEY_HEADER, apply_environment_upstream_auth,
         apply_upstream_headers, deployment_submission_accepted, deployment_submission_boc,
-        sensitive_header_value, should_forward_upstream_response_header,
+        rewrite_toncenter_docs_html, rewrite_toncenter_openapi_json,
+        rewrite_toncenter_redirect_location, sensitive_header_value,
+        should_forward_upstream_response_header, toncenter_upstream_path,
     };
     use crate::{
         EnvironmentConfig, EnvironmentEndpoints, EnvironmentStatus, PublicTonNetwork,
@@ -2310,6 +2476,92 @@ MANAGED
 content-type: true
 set-cookie: true
 x-api-key: true"]]
+        .assert_eq(&actual);
+    }
+
+    #[test]
+    fn toncenter_docs_schema_urls_stay_inside_the_environment_proxy() {
+        let html = r#"<html><head></head><body><script>
+const v2 = "/api/v2/openapi.json";
+const v3 = '/api/v3/doc.json';
+const upstream = "https://toncenter.com/api/v2/openapi.json";
+</script></body></html>"#;
+        let rewritten = rewrite_toncenter_docs_html(html.as_bytes(), "mainnet", "api/v3");
+        let actual = String::from_utf8(rewritten).expect("rewritten documentation must be UTF-8");
+
+        expect![[r#"<html><head><base href="/api/v1/environments/mainnet/rpc/api/v3/"></head><body><script>
+const v2 = "/api/v1/environments/mainnet/rpc/api/v2/openapi.json";
+const v3 = '/api/v1/environments/mainnet/rpc/api/v3/doc.json';
+const upstream = "https://toncenter.com/api/v2/openapi.json";
+</script></body></html>"#]]
+        .assert_eq(&actual);
+    }
+
+    #[test]
+    fn toncenter_docs_redirects_stay_inside_the_environment_proxy() {
+        let location = HeaderValue::from_static("/api/v3/index.html");
+        let rewritten = rewrite_toncenter_redirect_location(&location, "environment-10")
+            .expect("TON Center redirect must be rewritten");
+
+        expect!["/api/v1/environments/environment-10/rpc/api/v3/index.html"]
+            .assert_eq(rewritten.to_str().expect("rewritten location must be text"));
+    }
+
+    #[test]
+    fn toncenter_v3_root_is_resolved_before_reaching_the_browser() {
+        let actual = [
+            (axum::http::Method::GET, "api/v3"),
+            (axum::http::Method::GET, "/api/v3/"),
+            (axum::http::Method::POST, "api/v3"),
+            (axum::http::Method::GET, "api/v3/transactions"),
+        ]
+        .map(|(method, path)| toncenter_upstream_path(&method, path))
+        .join("\n");
+
+        expect![[r"api/v3/index.html
+api/v3/index.html
+api/v3
+api/v3/transactions"]]
+        .assert_eq(&actual);
+    }
+
+    #[test]
+    fn toncenter_openapi_requests_stay_inside_the_environment_proxy() {
+        let document = br#"{"openapi":"3.1.1","paths":{"/api/v2/getMasterchainInfo":{}}}"#;
+        let rewritten = rewrite_toncenter_openapi_json(document, "environment-10");
+        let value: serde_json::Value =
+            serde_json::from_slice(&rewritten).expect("rewritten schema must be JSON");
+        let actual = serde_json::to_string_pretty(&value).expect("schema must serialize");
+
+        expect![[r#"{
+  "openapi": "3.1.1",
+  "paths": {
+    "/api/v2/getMasterchainInfo": {}
+  },
+  "servers": [
+    {
+      "url": "/api/v1/environments/environment-10/rpc"
+    }
+  ]
+}"#]]
+        .assert_eq(&actual);
+    }
+
+    #[test]
+    fn toncenter_swagger_requests_stay_inside_the_environment_proxy() {
+        let document = br#"{"swagger":"2.0","host":"","basePath":"","schemes":[],"paths":{"/api/v3/masterchainInfo":{}}}"#;
+        let rewritten = rewrite_toncenter_openapi_json(document, "environment-10");
+        let value: serde_json::Value =
+            serde_json::from_slice(&rewritten).expect("rewritten schema must be JSON");
+        let actual = serde_json::to_string_pretty(&value).expect("schema must serialize");
+
+        expect![[r#"{
+  "basePath": "/api/v1/environments/environment-10/rpc",
+  "paths": {
+    "/api/v3/masterchainInfo": {}
+  },
+  "swagger": "2.0"
+}"#]]
         .assert_eq(&actual);
     }
 

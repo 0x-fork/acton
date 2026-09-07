@@ -71,14 +71,6 @@
   outline-offset: 2px;
 }
 
-.endpointRow code {
-  min-width: 0;
-  overflow: hidden;
-  font-family: var(--acton-font-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .setup {
   padding: 18px;
   display: flex;
@@ -131,6 +123,7 @@
 }
 
 .step {
+  position: relative;
   min-width: 0;
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
@@ -138,7 +131,19 @@
   gap: 12px;
 }
 
+.step:not(:last-child)::before {
+  position: absolute;
+  top: 24px;
+  bottom: -18px;
+  left: 11.5px;
+  width: 1px;
+  background: var(--acton-color-border);
+  content: "";
+}
+
 .stepNumber {
+  position: relative;
+  z-index: 1;
   width: 24px;
   height: 24px;
   border: 1px solid var(--acton-color-border);
@@ -257,36 +262,66 @@
 }
 
 .endpointList {
-  overflow: hidden;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 10px;
 }
 
 .endpointRow {
-  min-height: 40px;
-  padding: 0 12px;
-  border-top: 1px solid var(--acton-color-border);
-  display: grid;
-  grid-template-columns: 84px minmax(0, 1fr) 20px;
-  align-items: center;
-  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--acton-color-border);
+  border-radius: 8px;
+  background: var(--acton-color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
   box-sizing: border-box;
 }
 
-.endpointRow:first-child {
-  border-top: 0;
-}
-
-.endpointRow > span {
+.endpointLabel {
+  margin: 0;
   color: var(--acton-color-text-muted);
-  font-size: 0.7rem;
-  font-weight: 650;
-  line-height: 1;
-  text-transform: uppercase;
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+  line-height: 1.3;
 }
 
-.endpointRow code {
-  color: var(--acton-color-text);
+.endpointValue {
+  min-width: 0;
+  margin: 0;
   font-size: 0.76rem;
-  line-height: 1.35;
+}
+
+.endpointActions {
+  width: 100%;
+}
+
+.endpointLink {
+  min-width: 0;
+  color: var(--acton-color-accent);
+  text-decoration: none;
+}
+
+.endpointLink code {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-family: var(--acton-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.endpointLink:hover {
+  text-decoration: underline;
+}
+
+.endpointLink:focus-visible {
+  border-radius: var(--acton-radius-control-sm);
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
 }
 
 .codeBlock {
@@ -312,16 +347,5 @@
 
   .integrationOptions {
     grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 620px) {
-  .endpointRow {
-    grid-template-columns: 1fr 20px;
-    padding-block: 9px;
-  }
-
-  .endpointRow > span {
-    grid-column: 1 / -1;
   }
 }

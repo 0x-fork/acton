@@ -23,7 +23,6 @@ export const EnvironmentConnect: FC<EnvironmentConnectProps> = ({onDismiss}) => 
       apiV2Url={environment?.endpoints.apiV2}
       apiV3Url={environment?.endpoints.apiV3}
       configureActonNetwork={remoteNetwork === undefined}
-      controlUrl={environment?.endpoints.control}
       environmentName={environment?.name ?? "Virtual environment"}
       explorerUrl={supports(environment, "explorer") ? routes.path("/explorer") : undefined}
       integratePath={routes.path("/integrate")}

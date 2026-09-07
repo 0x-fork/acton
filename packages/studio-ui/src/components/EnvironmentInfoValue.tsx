@@ -70,7 +70,7 @@ function getEnvironmentTypeDescription(environment: StudioEnvironment): string {
     return "This environment starts quickly, pins a remote TON block, resolves account state as needed, and executes new blocks locally using Acton's simplified implementation"
   }
 
-  return "This environment starts quickly with compatible blocks, LiteAPI, TonCenter v2/v3, Streaming API, and Emulate API; it uses Acton's simplified implementation rather than a real TON network"
+  return "This environment starts quickly with compatible blocks, LiteAPI, TON Center v2/v3, Streaming API, and Emulate API; it uses Acton's simplified implementation rather than a real TON network"
 }
 
 function getEnvironmentNetworkDescription(environment: StudioEnvironment): string {
