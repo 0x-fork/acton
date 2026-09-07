@@ -25,6 +25,7 @@ import {EmulatePage} from "@acton/explorer-core/pages/EmulatePage"
 import {ExplorerIndexPage} from "@acton/explorer-core/pages/ExplorerIndexPage"
 import {FavoriteAccountsPage} from "@acton/explorer-core/pages/FavoriteAccountsPage"
 import {FaucetPage as TestnetFaucetPage} from "@acton/explorer-ui/faucet/FaucetPage"
+import {ValidatorsPage} from "@acton/explorer-ui/pages/ValidatorsPage"
 import {SuspendedAddressesPage} from "@acton/explorer-core/pages/SuspendedAddressesPage"
 import {TransactionPage} from "@acton/explorer-core/pages/TransactionPage"
 import {AddressBookProvider} from "@acton/explorer-core/hooks/useAddressBook"
@@ -78,6 +79,7 @@ const LOCALNET_PAGE_TITLES: Readonly<Record<string, string>> = {
   "/explorer/tokens": "Tokens",
   "/explorer/nfts": "NFTs",
   "/explorer/config": "Network config",
+  "/explorer/elections": "Elections",
   "/explorer/suspended": "Suspended addresses",
   "/settings": "Settings",
   "/admin": "Admin actions",
@@ -110,6 +112,7 @@ const LOCALNET_PAGE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/explorer/tokens": "Jettons detected on this network",
   "/explorer/nfts": "NFT items indexed from this network",
   "/explorer/config": "Protocol parameters active in this network",
+  "/explorer/elections": "Validator rounds, timing and stake configuration",
   "/explorer/suspended": "Addresses restricted by the network configuration",
   "/settings": "Manage environment identity, network behavior and mining",
   "/admin": "Edit account balances, code and state",
@@ -236,7 +239,7 @@ const AppContent: FC<AppContentProps> = ({
   const pageTitle = isExplorerPage
     ? localPathname === "/explorer/config" || configSeqno
       ? "Network config"
-      : "Explorer"
+      : (LOCALNET_PAGE_TITLES[localPathname] ?? "Explorer")
     : isAbiDetailsPage
       ? "ABI"
       : (LOCALNET_PAGE_TITLES[localPathname] ??
@@ -465,6 +468,19 @@ const AppContent: FC<AppContentProps> = ({
                 )}
               />
             ))}
+            <Route
+              path={path("/explorer/elections")}
+              element={
+                runtime.environment?.lifecycle === "external"
+                  ? withCapability(
+                      "explorer",
+                      <DashboardPage embedded>
+                        <ValidatorsPage client={client} />
+                      </DashboardPage>,
+                    )
+                  : fallback
+              }
+            />
             <Route
               path={path("/wallets")}
               element={withCapability(

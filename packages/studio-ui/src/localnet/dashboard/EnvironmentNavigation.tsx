@@ -71,6 +71,7 @@ const explorerItems: NestedSidebarItem[] = [
   {label: "Overview", path: "/explorer"},
   {label: "Blocks", path: "/explorer/blocks"},
   {label: "Config", path: "/explorer/config"},
+  {label: "Elections", path: "/explorer/elections"},
   {label: "Tokens", path: "/explorer/tokens"},
   {label: "NFTs", path: "/explorer/nfts"},
 ]
@@ -226,6 +227,9 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
       ? formatForkNetworkLabel(forkNetwork)
       : undefined
   const visibleStandaloneItems = supports(environment, "simulator") ? standaloneItems : []
+  const visibleExplorerItems = explorerItems.filter(
+    item => item.path !== "/explorer/elections" || environment?.lifecycle === "external",
+  )
   const visibleNetworkItems = networkItems.filter(item =>
     item.path === "/network/config"
       ? supports(environment, "controlApi")
@@ -257,6 +261,7 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
     localPathname.startsWith("/explorer") &&
     localPathname !== "/explorer/blocks" &&
     !localPathname.startsWith("/explorer/config") &&
+    localPathname !== "/explorer/elections" &&
     localPathname !== "/explorer/tokens" &&
     localPathname !== "/explorer/nfts" &&
     localPathname !== "/explorer/favorites"
@@ -381,7 +386,7 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
                       ? localPathname.startsWith(item.path)
                       : localPathname === item.path
               }
-              items={explorerItems}
+              items={visibleExplorerItems}
               label="Explorer"
               onItemSelect={path => void navigate(routes.path(path))}
               onParentSelect={() => void navigate(routes.path(explorerPath))}

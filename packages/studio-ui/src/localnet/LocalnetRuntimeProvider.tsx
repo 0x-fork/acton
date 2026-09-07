@@ -211,6 +211,12 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
       saveAuthToken,
     ],
   )
+  // Public networks present elections as chain data in Explorer. Managed localnets keep
+  // their operational validator view in Network, where node observations are available.
+  const electionsPath = localnetPath(
+    basePath,
+    environment?.lifecycle === "external" ? "/explorer/elections" : "/network/validators",
+  )
 
   return (
     <LocalnetRuntimeContext.Provider value={value}>
@@ -225,7 +231,7 @@ export const LocalnetRuntimeProvider: FC<LocalnetRuntimeProviderProps> = ({
           basePath={localnetPath(basePath, "/explorer")}
           cellPath={localnetPath(basePath, "/cell-inspector")}
           contractsPath={localnetPath(basePath, "/contracts")}
-          electionsPath={localnetPath(basePath, "/network/validators")}
+          electionsPath={electionsPath}
           emulatePath={localnetPath(basePath, "/simulator")}
           localnetBasePath={basePath}
           sourcesPath={localnetPath(basePath, "/contracts/sources")}

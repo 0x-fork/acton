@@ -6,7 +6,8 @@
   "author": "TON Core",
   "type": "module",
   "exports": {
-    "./faucet/FaucetPage": "./src/faucet/FaucetPage.tsx"
+    "./faucet/FaucetPage": "./src/faucet/FaucetPage.tsx",
+    "./pages/ValidatorsPage": "./src/pages/ValidatorsPage.tsx"
   },
   "main": "index.js",
   "scripts": {
