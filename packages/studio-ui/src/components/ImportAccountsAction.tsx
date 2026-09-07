@@ -130,20 +130,23 @@ export function ImportAccountsAction({
   }, [request, storageKey])
 
   useEffect(() => {
-    if (!request) return
     const controller = new AbortController()
-    let timer: ReturnType<typeof setTimeout>
+    const operationId = request?.id
+    let polling = false
     let lastError: string | undefined
 
     async function poll() {
+      if (!operationId || polling) return
+
+      polling = true
       try {
         const current = await fetchStudioAdminOperation(
           environment.id,
           controller.signal,
-          request?.id,
+          operationId,
         )
         if (controller.signal.aborted) return
-        if (current && current.id === request?.id) {
+        if (current && current.id === operationId) {
           acknowledged.current = current.id
           setOperation(current)
           setUncertain(false)
@@ -165,13 +168,17 @@ export function ImportAccountsAction({
         if (message !== lastError)
           showToast({title: "Import status unavailable", description: message, variant: "error"})
         lastError = message
+      } finally {
+        polling = false
       }
-      if (!controller.signal.aborted) timer = setTimeout(() => void poll(), 1500)
     }
+
     void poll()
+    const timer = setInterval(() => void poll(), 1500)
+
     return () => {
       controller.abort()
-      clearTimeout(timer)
+      clearInterval(timer)
     }
   }, [environment.id, onCompleted, request, showToast])
 

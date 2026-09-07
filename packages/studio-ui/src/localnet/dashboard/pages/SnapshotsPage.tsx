@@ -127,49 +127,55 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({environment, onActionsCha
 
   useEffect(() => {
     const controller = new AbortController()
-    let timer: ReturnType<typeof setTimeout>
+    let polling = false
 
     // Progress discovery must work independently of inventory errors, including
-    // after navigation or reload. Schedule after each response to avoid overlap.
+    // after navigation or reload. Guard the interval so slow requests never overlap.
     const poll = async () => {
-      const revision = mutationRevision.current
-      let next: EnvironmentSnapshotOperation | null = null
+      if (polling) return
+
+      polling = true
       try {
-        next = await fetchStudioEnvironmentSnapshotOperation(environment.id, controller.signal)
-        if (controller.signal.aborted) return
-        if (revision === mutationRevision.current) {
-          setOperation(next)
-          setOperationLoaded(true)
-          pollErrorShown.current = false
+        const revision = mutationRevision.current
+        try {
+          const next = await fetchStudioEnvironmentSnapshotOperation(
+            environment.id,
+            controller.signal,
+          )
+          if (controller.signal.aborted) return
+          if (revision === mutationRevision.current) {
+            setOperation(next)
+            setOperationLoaded(true)
+            pollErrorShown.current = false
+          }
+        } catch (error) {
+          if (controller.signal.aborted) return
+          setOperationLoaded(false)
+          if (!pollErrorShown.current) {
+            showToast({
+              variant: "error",
+              title: "Failed to load snapshot progress",
+              description: errorMessage(error, "The progress request failed"),
+            })
+            pollErrorShown.current = true
+          }
         }
-      } catch (error) {
-        if (controller.signal.aborted) return
-        setOperationLoaded(false)
-        if (!pollErrorShown.current) {
-          showToast({
-            variant: "error",
-            title: "Failed to load snapshot progress",
-            description: errorMessage(error, "The progress request failed"),
-          })
-          pollErrorShown.current = true
-        }
-      }
-      if (refreshList.current) void loadSnapshots(controller.signal)
-      if (!controller.signal.aborted) {
-        timer = setTimeout(
-          () => void poll(),
-          next && next.phase !== "completed" && next.phase !== "failed" ? 1000 : 3000,
-        )
+
+        if (refreshList.current) void loadSnapshots(controller.signal)
+      } finally {
+        polling = false
       }
     }
 
     void loadSnapshots(controller.signal)
     void poll()
+    const timer = setInterval(() => void poll(), active ? 1000 : 3000)
+
     return () => {
       controller.abort()
-      clearTimeout(timer)
+      clearInterval(timer)
     }
-  }, [environment.id, loadSnapshots, showToast])
+  }, [active, environment.id, loadSnapshots, showToast])
 
   const actions = useMemo(
     () => (
