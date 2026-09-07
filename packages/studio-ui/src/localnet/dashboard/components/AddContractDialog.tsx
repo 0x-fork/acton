@@ -16,7 +16,7 @@ interface AddContractDialogProps {
 }
 
 export function AddContractDialog({client, open, onAdded, onOpenChange}: AddContractDialogProps) {
-  const {showToast} = useToast()
+  const {showToast, updateToast} = useToast()
   const addressFormat = useAddressFormat()
   const [address, setAddress] = useState("")
   const [name, setName] = useState("")
@@ -26,12 +26,12 @@ export function AddContractDialog({client, open, onAdded, onOpenChange}: AddCont
     if (!open) {
       setAddress("")
       setName("")
-      setSubmitting(false)
     }
   }, [open])
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
+    if (submitting) return
 
     const parsedAddress = parseAddress(address.trim())
     if (!parsedAddress) {
@@ -44,21 +44,29 @@ export function AddContractDialog({client, open, onAdded, onOpenChange}: AddCont
     }
 
     const contractAddress = formatAddress(parsedAddress.toRawString(), false, addressFormat)
+    const contractName = name.trim()
+    const toastId = showToast({
+      title: "Adding contract",
+      description: contractName || contractAddress,
+      variant: "loading",
+      durationMs: 0,
+    })
     setSubmitting(true)
     try {
-      const contractName = name.trim()
       await client.registerContract(contractAddress, contractName || undefined)
       await onAdded()
       onOpenChange(false)
-      showToast({
+      updateToast(toastId, {
         title: contractName ? `${contractName} added` : "Contract added",
         variant: "success",
+        durationMs: 4000,
       })
     } catch (error) {
-      showToast({
+      updateToast(toastId, {
         title: "Contract not added",
         description: error instanceof Error ? error.message : "Failed to add contract",
         variant: "error",
+        durationMs: 8000,
       })
     } finally {
       setSubmitting(false)
@@ -92,13 +100,8 @@ export function AddContractDialog({client, open, onAdded, onOpenChange}: AddCont
           onChange={event => setName(event.target.value)}
         />
         <DialogActions stackOnMobile className={styles.actions}>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={submitting}
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            {submitting ? "Close" : "Cancel"}
           </Button>
           <Button type="submit" variant="primary" loading={submitting} disabled={!address.trim()}>
             Add contract

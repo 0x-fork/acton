@@ -26,13 +26,8 @@ export function DeleteEnvironmentDialog({
       maxWidth="28rem"
     >
       <DialogActions>
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={loading}
-          onClick={() => onOpenChange(false)}
-        >
-          Cancel
+        <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+          {loading ? "Close" : "Cancel"}
         </Button>
         <Button
           type="button"

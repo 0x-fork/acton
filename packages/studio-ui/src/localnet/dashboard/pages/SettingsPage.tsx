@@ -40,7 +40,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({
   onEnvironmentChange,
   onEnvironmentDelete,
 }) => {
-  const {showToast} = useToast()
+  const {showToast, updateToast} = useToast()
   const {environment} = useLocalnetRuntime()
   const localnetConfig =
     environment?.config.kind === "actonSimulatedLocalnet" ? environment.config : undefined
@@ -219,26 +219,35 @@ export const SettingsPage: FC<SettingsPageProps> = ({
   )
 
   const deleteEnvironment = useCallback(async () => {
-    if (!environment) return
+    if (!environment || isDeleting) return
+
+    const toastId = showToast({
+      variant: "loading",
+      title: "Deleting environment",
+      description: environment.name,
+      durationMs: 0,
+    })
     setIsDeleting(true)
     try {
       await deleteStudioEnvironment(environment.id)
-      showToast({
+      updateToast(toastId, {
         variant: "success",
         title: "Environment deleted",
         description: `${environment.name} and its stored state were removed`,
+        durationMs: 4000,
       })
       onEnvironmentDelete(environment.id)
     } catch (error) {
-      showToast({
+      updateToast(toastId, {
         variant: "error",
         title: "Environment not deleted",
         description: errorMessage(error, "Failed to delete the environment"),
+        durationMs: 8000,
       })
     } finally {
       setIsDeleting(false)
     }
-  }, [environment, onEnvironmentDelete, showToast])
+  }, [environment, isDeleting, onEnvironmentDelete, showToast, updateToast])
 
   const parsedResponseDelay = parseResponseDelay(responseDelay)
   const containerService = containerHealth?.services.find(service => service.name === "localton")

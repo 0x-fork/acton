@@ -1,4 +1,4 @@
-import {Button, Checkbox, Dialog, DialogActions, Input} from "@acton/ui"
+import {Button, Checkbox, Dialog, DialogActions, Input, useToast} from "@acton/ui"
 import {Play} from "lucide-react"
 import {type FormEvent, useEffect, useState} from "react"
 
@@ -31,6 +31,7 @@ const INITIAL_FORM: RunTestsFormState = {
 }
 
 export function RunTestsDialog({open, onOpenChange, onStarted}: RunTestsDialogProps) {
+  const {showToast, updateToast} = useToast()
   const [form, setForm] = useState(INITIAL_FORM)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string>()
@@ -50,6 +51,13 @@ export function RunTestsDialog({open, onOpenChange, onStarted}: RunTestsDialogPr
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (isSubmitting) return
+
+    const toastId = showToast({
+      title: "Starting test run",
+      variant: "loading",
+      durationMs: 0,
+    })
     setIsSubmitting(true)
     setError(undefined)
     const request: StartTestRunRequest = {
@@ -65,8 +73,20 @@ export function RunTestsDialog({open, onOpenChange, onStarted}: RunTestsDialogPr
       const run = await startStudioTestRun(request)
       onStarted(run)
       onOpenChange(false)
+      updateToast(toastId, {
+        title: "Test run started",
+        variant: "success",
+        durationMs: 4000,
+      })
     } catch (error) {
-      setError(getErrorMessage(error))
+      const message = getErrorMessage(error)
+      setError(message)
+      updateToast(toastId, {
+        title: "Test run not started",
+        description: message,
+        variant: "error",
+        durationMs: 8000,
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -136,13 +156,8 @@ export function RunTestsDialog({open, onOpenChange, onStarted}: RunTestsDialogPr
         ) : null}
 
         <DialogActions>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={isSubmitting}
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            {isSubmitting ? "Close" : "Cancel"}
           </Button>
           <Button
             type="submit"

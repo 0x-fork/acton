@@ -75,7 +75,7 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({
   environment,
   onCreateOpenChange,
 }) => {
-  const {showToast} = useToast()
+  const {showToast, updateToast} = useToast()
   const [snapshots, setSnapshots] = useState<readonly EnvironmentSnapshot[]>([])
   const [operation, setOperation] = useState<EnvironmentSnapshotOperation | null>(null)
   const [loading, setLoading] = useState(true)
@@ -179,28 +179,54 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({
   }, [active, loadSnapshots, operation, showToast])
 
   const submitDialog = useCallback(async () => {
-    if (!dialog) return
+    if (!dialog || submitting) return
+
+    const snapshot = dialog.kind === "create" ? undefined : dialog.snapshot
+    const toastId = showToast({
+      variant: "loading",
+      title:
+        dialog.kind === "create"
+          ? "Starting snapshot creation"
+          : dialog.kind === "restore"
+            ? "Starting snapshot restore"
+            : "Deleting snapshot",
+      description: snapshot ? snapshotLabel(snapshot) : snapshotName.trim() || environment.name,
+      durationMs: 0,
+    })
     setSubmitting(true)
     try {
       if (dialog.kind === "create") {
         const name = snapshotName.trim()
         setOperation(await createStudioEnvironmentSnapshot(environment.id, name || undefined))
         setSnapshotName("")
+        updateToast(toastId, {
+          variant: "info",
+          title: "Snapshot creation started",
+          description: "Progress is available on this page",
+          durationMs: 4000,
+        })
       } else if (dialog.kind === "restore") {
         setOperation(await restoreStudioEnvironmentSnapshot(environment.id, dialog.snapshot.id))
+        updateToast(toastId, {
+          variant: "info",
+          title: "Snapshot restore started",
+          description: "Progress is available on this page",
+          durationMs: 4000,
+        })
       } else {
         setDeletingId(dialog.snapshot.id)
         await deleteStudioEnvironmentSnapshot(environment.id, dialog.snapshot.id)
         await loadSnapshots()
-        showToast({
+        updateToast(toastId, {
           variant: "success",
           title: "Snapshot deleted",
           description: `${snapshotLabel(dialog.snapshot)} was removed`,
+          durationMs: 4000,
         })
       }
       setDialog(undefined)
     } catch (error) {
-      showToast({
+      updateToast(toastId, {
         variant: "error",
         title:
           dialog.kind === "create"
@@ -209,12 +235,22 @@ export const SnapshotsPage: FC<SnapshotsPageProps> = ({
               ? "Restore not started"
               : "Snapshot not deleted",
         description: errorMessage(error, "The snapshot request failed"),
+        durationMs: 8000,
       })
     } finally {
       setDeletingId(undefined)
       setSubmitting(false)
     }
-  }, [dialog, environment.id, loadSnapshots, showToast, snapshotName])
+  }, [
+    dialog,
+    environment.id,
+    environment.name,
+    loadSnapshots,
+    showToast,
+    snapshotName,
+    submitting,
+    updateToast,
+  ])
 
   return (
     <section className={`${pageStyles.settingsSection} ${styles.page}`}>
@@ -416,7 +452,7 @@ const SnapshotDialog: FC<SnapshotDialogProps> = ({
     <Dialog
       open={state !== undefined}
       onOpenChange={open => {
-        if (!open && !loading) onClose()
+        if (!open) onClose()
       }}
       title={title}
       description={description}
@@ -433,8 +469,8 @@ const SnapshotDialog: FC<SnapshotDialogProps> = ({
         />
       ) : undefined}
       <DialogActions className={styles.dialogActions}>
-        <Button variant="secondary" disabled={loading} onClick={onClose}>
-          Cancel
+        <Button variant="secondary" onClick={onClose}>
+          {loading ? "Close" : "Cancel"}
         </Button>
         <Button
           variant={state?.kind === "delete" ? "danger" : "primary"}

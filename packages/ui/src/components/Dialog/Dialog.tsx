@@ -47,7 +47,8 @@ export function Dialog({
   title,
 }: DialogProps) {
   const {theme} = useTheme()
-  const canDismiss = dismissible && !busy
+  // Busy describes the work inside the dialog. It must not trap the user while that work continues.
+  const canDismiss = dismissible
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen || canDismiss) {
       onOpenChange(nextOpen)

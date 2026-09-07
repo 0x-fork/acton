@@ -59,7 +59,7 @@ export function VirtualEnvironmentsPage({
   onOpenEnvironment,
   onRefresh,
 }: VirtualEnvironmentsPageProps) {
-  const {showToast} = useToast()
+  const {showToast, updateToast} = useToast()
   const [stoppingIds, setStoppingIds] = useState<ReadonlySet<string>>(new Set())
   const [restartingIds, setRestartingIds] = useState<ReadonlySet<string>>(new Set())
   const [stopTarget, setStopTarget] = useState<StudioEnvironment>()
@@ -70,22 +70,29 @@ export function VirtualEnvironmentsPage({
 
   const handleStop = async () => {
     const environment = stopTarget
-    if (!environment) return
+    if (!environment || stoppingIds.has(environment.id)) return
 
+    const toastId = showToast({
+      title: `Stopping ${environment.name}`,
+      variant: "loading",
+      durationMs: 0,
+    })
     setStoppingIds(current => new Set(current).add(environment.id))
     try {
       const stopped = await stopStudioEnvironment(environment.id)
       onEnvironmentChange(stopped)
-      showToast({
+      updateToast(toastId, {
         title: `${environment.name} stopped`,
         variant: "success",
+        durationMs: 4000,
       })
       setStopTarget(undefined)
     } catch (error) {
-      showToast({
+      updateToast(toastId, {
         title: `Failed to stop ${environment.name}`,
         description: getErrorMessage(error),
         variant: "error",
+        durationMs: 8000,
       })
     } finally {
       setStoppingIds(current => {

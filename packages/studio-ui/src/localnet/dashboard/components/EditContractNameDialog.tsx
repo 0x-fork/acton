@@ -20,36 +20,43 @@ export function EditContractNameDialog({
   onOpenChange,
   onSaved,
 }: EditContractNameDialogProps) {
-  const {showToast} = useToast()
+  const {showToast, updateToast} = useToast()
   const [name, setName] = useState("")
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     setName(contract?.name ?? "")
-    setSubmitting(false)
   }, [contract])
 
   const nameUnchanged = name.trim() === (contract?.name?.trim() ?? "")
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    if (!contract) return
+    if (!contract || submitting) return
 
     const nextName = name.trim()
+    const toastId = showToast({
+      title: "Updating contract name",
+      description: nextName || contract.address,
+      variant: "loading",
+      durationMs: 0,
+    })
     setSubmitting(true)
     try {
       await client.setAddressName(contract.address, nextName)
       await onSaved()
       onOpenChange(false)
-      showToast({
+      updateToast(toastId, {
         title: nextName ? "Contract name updated" : "Custom name removed",
         variant: "success",
+        durationMs: 4000,
       })
     } catch (error) {
-      showToast({
+      updateToast(toastId, {
         title: "Contract name not updated",
         description: error instanceof Error ? error.message : "Failed to update contract name",
         variant: "error",
+        durationMs: 8000,
       })
     } finally {
       setSubmitting(false)
@@ -74,13 +81,8 @@ export function EditContractNameDialog({
           onChange={event => setName(event.target.value)}
         />
         <DialogActions stackOnMobile className={styles.actions}>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={submitting}
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            {submitting ? "Close" : "Cancel"}
           </Button>
           <Button type="submit" variant="primary" loading={submitting} disabled={nameUnchanged}>
             Save name

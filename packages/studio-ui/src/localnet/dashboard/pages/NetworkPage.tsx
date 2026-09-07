@@ -76,10 +76,16 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
   )
 
   const addNode = useCallback(async () => {
-    if (!environment || !config) return
+    if (!environment || !config || isAdding) return
     const name = nodeName.trim()
     if (!name) return
 
+    const toastId = showToast({
+      variant: "loading",
+      title: "Adding node",
+      description: name,
+      durationMs: 0,
+    })
     setIsAdding(true)
     try {
       const updated = await addStudioFullTonNode(environment.id, {
@@ -89,21 +95,32 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
       onEnvironmentChange(updated)
       setNodeName("")
       setAddDialogOpen(false)
-      showToast({
+      updateToast(toastId, {
         variant: "success",
         title: "Node added",
         description: `${name} joined ${environment.name}`,
+        durationMs: 4000,
       })
     } catch (error) {
-      showToast({
+      updateToast(toastId, {
         variant: "error",
         title: "Node not added",
         description: message(error, "Failed to join the node"),
+        durationMs: 8000,
       })
     } finally {
       setIsAdding(false)
     }
-  }, [config, environment, nodeIsValidator, nodeName, onEnvironmentChange, showToast])
+  }, [
+    config,
+    environment,
+    isAdding,
+    nodeIsValidator,
+    nodeName,
+    onEnvironmentChange,
+    showToast,
+    updateToast,
+  ])
 
   const setNodeRunning = useCallback(
     async (node: FullTonNode, running: boolean) => {
@@ -140,54 +157,70 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
   )
 
   const removeNode = useCallback(async () => {
-    if (!environment || !removingNode) return
+    if (!environment || !removingNode || isRemoving) return
 
+    const toastId = showToast({
+      variant: "loading",
+      title: "Removing node",
+      description: removingNode.name,
+      durationMs: 0,
+    })
     setIsRemoving(true)
     try {
       const updated = await removeStudioFullTonNode(environment.id, removingNode.id)
       onEnvironmentChange(updated)
-      showToast({
+      updateToast(toastId, {
         variant: "success",
         title: "Node removed",
         description: `${removingNode.name} and its stored state were removed`,
+        durationMs: 4000,
       })
       setRemovingNode(undefined)
     } catch (error) {
-      showToast({
+      updateToast(toastId, {
         variant: "error",
         title: "Node not removed",
         description: message(error, "Failed to remove the node"),
+        durationMs: 8000,
       })
     } finally {
       setIsRemoving(false)
     }
-  }, [environment, onEnvironmentChange, removingNode, showToast])
+  }, [environment, isRemoving, onEnvironmentChange, removingNode, showToast, updateToast])
 
   const leaveValidation = useCallback(
     async (node: FullTonNode) => {
-      if (!environment) return
+      if (!environment || leavingNodeId === node.id) return
 
+      const toastId = showToast({
+        variant: "loading",
+        title: "Leaving validator set",
+        description: node.name,
+        durationMs: 0,
+      })
       setLeavingNodeId(node.id)
       try {
         const updated = await leaveStudioFullTonValidation(environment.id, node.id)
         onEnvironmentChange(updated)
         setRemovingNode(current => (current?.id === node.id ? undefined : current))
-        showToast({
+        updateToast(toastId, {
           variant: "success",
           title: "Validator exit started",
           description: `${node.name} will stop participating after the current validator round`,
+          durationMs: 4000,
         })
       } catch (error) {
-        showToast({
+        updateToast(toastId, {
           variant: "error",
           title: "Validator exit not started",
           description: message(error, "Failed to disable validator participation"),
+          durationMs: 8000,
         })
       } finally {
         setLeavingNodeId(undefined)
       }
     },
-    [environment, onEnvironmentChange, showToast],
+    [environment, leavingNodeId, onEnvironmentChange, showToast, updateToast],
   )
 
   const enterValidation = useCallback(
@@ -403,9 +436,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
         className={styles.addNodePopup}
         maxWidth="28rem"
         open={addDialogOpen}
-        onOpenChange={nextOpen => {
-          if (!isAdding) setAddDialogOpen(nextOpen)
-        }}
+        onOpenChange={setAddDialogOpen}
         title="Add node"
         description="Join another node to this local network"
       >
@@ -438,7 +469,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
           />
           <DialogActions>
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
-              Cancel
+              {isAdding ? "Close" : "Cancel"}
             </Button>
             <Button
               variant="secondary"
@@ -489,7 +520,7 @@ export const NetworkPage: FC<NetworkPageProps> = ({onEnvironmentChange, view}) =
           ) : null}
           <DialogActions>
             <Button variant="outline" onClick={() => setRemovingNode(undefined)}>
-              Cancel
+              {isRemoving || leavingNodeId === removingNode?.id ? "Close" : "Cancel"}
             </Button>
             {unsafeRemoval && participationEnabled && removingNode ? (
               <Button

@@ -124,7 +124,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   const routes = useExplorerRoutePaths()
   const localnetRoutes = useLocalnetRoutes()
   const openPath = useOpenExplorerPath()
-  const {showToast} = useToast()
+  const {showToast, updateToast} = useToast()
   const {prefetchNames, updateDomains} = useAddressBook()
   const [nodeInfo, setNodeInfo] = useState<LocalnetNodeInfo | undefined>()
   const [networkNodeInfo, setNetworkNodeInfo] = useState<NetworkNodeInfo | undefined>()
@@ -373,14 +373,13 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   }, [])
 
   const closeTimeAdvanceModal = useCallback(() => {
-    if (!isAdvancingTime) {
-      setIsTimeModalOpen(false)
-    }
-  }, [isAdvancingTime])
+    setIsTimeModalOpen(false)
+  }, [])
 
   const handleTimeAdvanceSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault()
+      if (isAdvancingTime) return
 
       const seconds = parseTimeAdvanceSeconds(timeAdvanceSeconds)
       if (!seconds) {
@@ -388,33 +387,41 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         return
       }
 
+      const toastId = showToast({
+        title: "Advancing network time",
+        description: formatDuration(seconds, {display: "readable", sign: "always"}),
+        variant: "loading",
+        durationMs: 0,
+      })
       setIsAdvancingTime(true)
       setTimeAdvanceError(undefined)
       try {
         const nextTimeInfo = await client.increaseTime(seconds)
         setNodeInfo(current => (current ? {...current, ...nextTimeInfo} : current))
         setIsTimeModalOpen(false)
-        showToast({
+        updateToast(toastId, {
           variant: "success",
           title: "Time advanced",
           description: `Node time moved by ${formatDuration(seconds, {
             display: "readable",
             sign: "always",
           })}`,
+          durationMs: 4000,
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to advance node time."
         setTimeAdvanceError(message)
-        showToast({
+        updateToast(toastId, {
           variant: "error",
           title: "Time not advanced",
           description: message,
+          durationMs: 8000,
         })
       } finally {
         setIsAdvancingTime(false)
       }
     },
-    [client, showToast, timeAdvanceSeconds],
+    [client, isAdvancingTime, showToast, timeAdvanceSeconds, updateToast],
   )
 
   return (
@@ -750,13 +757,8 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
             )}
 
             <DialogActions stackOnMobile>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isAdvancingTime}
-                onClick={closeTimeAdvanceModal}
-              >
-                Cancel
+              <Button type="button" variant="outline" onClick={closeTimeAdvanceModal}>
+                {isAdvancingTime ? "Close" : "Cancel"}
               </Button>
               <Button
                 type="submit"

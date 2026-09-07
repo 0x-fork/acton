@@ -64,7 +64,7 @@ export function CreateEnvironmentDialog({
   onCreated,
   onOpenChange,
 }: CreateEnvironmentDialogProps) {
-  const {showToast} = useToast()
+  const {showToast, updateToast} = useToast()
   const [form, setForm] = useState<EnvironmentFormState>(() => createInitialForm(environmentCount))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const nextImportedAccountId = useRef(1)
@@ -150,6 +150,7 @@ export function CreateEnvironmentDialog({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (isSubmitting) return
 
     let request: CreateEnvironmentRequest
     try {
@@ -203,21 +204,29 @@ export function CreateEnvironmentDialog({
       return
     }
 
+    const toastId = showToast({
+      title: "Creating environment",
+      description: request.name,
+      variant: "loading",
+      durationMs: 0,
+    })
     setIsSubmitting(true)
     try {
       const environment = await createStudioEnvironment(request)
       onCreated(environment)
       onOpenChange(false)
-      showToast({
+      updateToast(toastId, {
         title: `${environment.name} is starting`,
         description: "Studio is starting the network in the background",
         variant: "success",
+        durationMs: 4000,
       })
     } catch (error) {
-      showToast({
+      updateToast(toastId, {
         title: "Failed to create environment",
         description: getErrorMessage(error),
         variant: "error",
+        durationMs: 8000,
       })
     } finally {
       setIsSubmitting(false)
@@ -392,13 +401,8 @@ export function CreateEnvironmentDialog({
         </div>
 
         <DialogActions className={styles.formActions}>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={isSubmitting}
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
+          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+            {isSubmitting ? "Close" : "Cancel"}
           </Button>
           <Button
             type="submit"

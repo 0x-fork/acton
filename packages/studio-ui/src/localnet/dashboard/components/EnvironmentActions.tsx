@@ -67,7 +67,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
   onAdminActions,
   onStateChanged,
 }) => {
-  const {showToast} = useToast()
+  const {showToast, updateToast} = useToast()
   const stateFileInputRef = useRef<HTMLInputElement>(null)
   const [isCheckpointsOpen, setIsCheckpointsOpen] = useState(false)
   const [checkpoints, setCheckpoints] = useState<readonly LocalnetCheckpoint[]>([])
@@ -192,89 +192,124 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
   }, [])
 
   const closeStateConfirmation = useCallback(() => {
-    if (busyAction === "load-state") return
     setStateFile(undefined)
     setStateFileDetails(undefined)
     if (stateFileInputRef.current) stateFileInputRef.current.value = ""
-  }, [busyAction])
+  }, [])
 
   const loadState = useCallback(async () => {
-    if (!stateFile) return
+    if (!stateFile || busyAction === "load-state") return
+
+    const file = stateFile
+    const toastId = showToast({
+      variant: "loading",
+      title: "Loading localnet state",
+      description: file.name,
+      durationMs: 0,
+    })
     setBusyAction("load-state")
     try {
-      await client.loadState(stateFile)
+      await client.loadState(file)
       setCheckpoints([])
       setStateFile(undefined)
       setStateFileDetails(undefined)
       if (stateFileInputRef.current) stateFileInputRef.current.value = ""
       onStateChanged()
-      showToast({
+      updateToast(toastId, {
         variant: "success",
         title: "State loaded",
-        description: `${stateFile.name} replaced the current localnet state`,
+        description: `${file.name} replaced the current localnet state`,
+        durationMs: 4000,
       })
     } catch (error) {
-      showToast({
+      updateToast(toastId, {
         variant: "error",
         title: "State not loaded",
         description: errorMessage(error, "Failed to load localnet state"),
+        durationMs: 8000,
       })
     } finally {
       setBusyAction(undefined)
     }
-  }, [client, onStateChanged, showToast, stateFile])
+  }, [busyAction, client, onStateChanged, showToast, stateFile, updateToast])
 
   const createCheckpoint = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault()
+      if (busyAction === "create-checkpoint") return
+
       const name = checkpointName.trim()
       if (!name) {
         setCheckpointError("Enter a checkpoint name")
         return
       }
 
+      const toastId = showToast({
+        variant: "loading",
+        title: "Creating checkpoint",
+        description: name,
+        durationMs: 0,
+      })
       setBusyAction("create-checkpoint")
       setCheckpointError(undefined)
       try {
         const checkpoint = await client.createCheckpoint(name)
         setCheckpoints(current => [...current, checkpoint])
         setCheckpointName("")
-        showToast({
+        updateToast(toastId, {
           variant: "success",
           title: "Checkpoint created",
           description: `${checkpoint.name} stores block ${checkpoint.block_seqno}`,
+          durationMs: 4000,
         })
       } catch (error) {
-        setCheckpointError(errorMessage(error, "Failed to create checkpoint"))
+        const message = errorMessage(error, "Failed to create checkpoint")
+        setCheckpointError(message)
+        updateToast(toastId, {
+          variant: "error",
+          title: "Checkpoint not created",
+          description: message,
+          durationMs: 8000,
+        })
       } finally {
         setBusyAction(undefined)
       }
     },
-    [checkpointName, client, showToast],
+    [busyAction, checkpointName, client, showToast, updateToast],
   )
 
   const restoreCheckpoint = useCallback(async () => {
-    if (!checkpointToRestore) return
+    if (!checkpointToRestore || busyAction === "restore-checkpoint") return
+
+    const checkpoint = checkpointToRestore
+    const toastId = showToast({
+      variant: "loading",
+      title: "Restoring checkpoint",
+      description: checkpoint.name,
+      durationMs: 0,
+    })
     setBusyAction("restore-checkpoint")
     try {
-      await client.restoreCheckpoint(checkpointToRestore.name)
+      await client.restoreCheckpoint(checkpoint.name)
       setCheckpointToRestore(undefined)
       onStateChanged()
-      showToast({
+      updateToast(toastId, {
         variant: "success",
         title: "Checkpoint restored",
-        description: `${checkpointToRestore.name} is now the current localnet state`,
+        description: `${checkpoint.name} is now the current localnet state`,
+        durationMs: 4000,
       })
     } catch (error) {
-      showToast({
+      updateToast(toastId, {
         variant: "error",
         title: "Checkpoint not restored",
         description: errorMessage(error, "Failed to restore checkpoint"),
+        durationMs: 8000,
       })
     } finally {
       setBusyAction(undefined)
     }
-  }, [checkpointToRestore, client, onStateChanged, showToast])
+  }, [busyAction, checkpointToRestore, client, onStateChanged, showToast, updateToast])
 
   const downloadCheckpoint = useCallback(
     async (checkpoint: LocalnetCheckpoint) => {
@@ -511,7 +546,7 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
         className={styles.dashboardDialog}
         maxWidth={460}
         busy={busyAction === "load-state"}
-        closeLabel="Cancel loading state"
+        closeLabel="Close load state dialog"
         onOpenChange={open => {
           if (!open) closeStateConfirmation()
         }}
@@ -527,12 +562,8 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
             </div>
           </div>
           <DialogActions stackOnMobile>
-            <Button
-              variant="outline"
-              disabled={busyAction === "load-state"}
-              onClick={closeStateConfirmation}
-            >
-              Cancel
+            <Button variant="outline" onClick={closeStateConfirmation}>
+              {busyAction === "load-state" ? "Close" : "Cancel"}
             </Button>
             <Button
               variant="danger"
@@ -553,9 +584,9 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
         className={styles.dashboardDialog}
         maxWidth={460}
         busy={busyAction === "restore-checkpoint"}
-        closeLabel="Cancel checkpoint restore"
+        closeLabel="Close checkpoint restore dialog"
         onOpenChange={open => {
-          if (!open && busyAction !== "restore-checkpoint") setCheckpointToRestore(undefined)
+          if (!open) setCheckpointToRestore(undefined)
         }}
       >
         <div className={styles.stateConfirmationContent}>
@@ -567,12 +598,8 @@ export const EnvironmentActions: FC<EnvironmentActionsProps> = ({
             </div>
           </div>
           <DialogActions stackOnMobile>
-            <Button
-              variant="outline"
-              disabled={busyAction === "restore-checkpoint"}
-              onClick={() => setCheckpointToRestore(undefined)}
-            >
-              Cancel
+            <Button variant="outline" onClick={() => setCheckpointToRestore(undefined)}>
+              {busyAction === "restore-checkpoint" ? "Close" : "Cancel"}
             </Button>
             <Button
               variant="primary"

@@ -42,7 +42,7 @@ interface ContractsPageProps {
 }
 
 export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageProps) {
-  const {showToast} = useToast()
+  const {showToast, updateToast} = useToast()
   const navigate = useNavigate()
   const routes = useExplorerRoutePaths()
   const localnetRoutes = useLocalnetRoutes()
@@ -122,9 +122,16 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
   }
 
   const deleteContract = async () => {
-    if (!contractBeingDeleted) return
+    if (!contractBeingDeleted || deleting) return
 
     const contract = contractBeingDeleted
+    const contractTitle = getContractIdentity(contract).title
+    const toastId = showToast({
+      title: "Removing contract from Studio",
+      description: contractTitle,
+      variant: "loading",
+      durationMs: 0,
+    })
     setDeleting(true)
     try {
       await client.deleteContract(contract.address)
@@ -132,17 +139,19 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
         current.filter(currentContract => currentContract.address !== contract.address),
       )
       setContractBeingDeleted(undefined)
-      showToast({
+      updateToast(toastId, {
         title: "Contract removed from Studio",
-        description: `${getContractIdentity(contract).title} was removed from this environment's registry`,
+        description: `${contractTitle} was removed from this environment's registry`,
         variant: "success",
+        durationMs: 4000,
       })
     } catch (error) {
-      showToast({
+      updateToast(toastId, {
         title: "Contract not removed",
         description:
           error instanceof Error ? error.message : "Failed to remove contract from Studio",
         variant: "error",
+        durationMs: 8000,
       })
     } finally {
       setDeleting(false)
@@ -282,7 +291,7 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
       <Dialog
         open={contractBeingDeleted !== undefined}
         onOpenChange={open => {
-          if (!open && !deleting) setContractBeingDeleted(undefined)
+          if (!open) setContractBeingDeleted(undefined)
         }}
         title={
           contractBeingDeleted
@@ -297,10 +306,9 @@ export function ContractsPage({addOpen, client, onAddOpenChange}: ContractsPageP
           <Button
             type="button"
             variant="secondary"
-            disabled={deleting}
             onClick={() => setContractBeingDeleted(undefined)}
           >
-            Cancel
+            {deleting ? "Close" : "Cancel"}
           </Button>
           <Button
             type="button"

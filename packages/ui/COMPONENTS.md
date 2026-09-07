@@ -1713,8 +1713,10 @@ the modal frame and scroll behavior while callers own the domain content.
   Keep the title and content mounted while closing; clear drafts when this
   callback receives `false` to avoid a visible reset during the exit animation.
 - `maxWidth`: caps the shared responsive popup width.
-- `busy`: sets `aria-busy` and blocks Escape, outside press, and the standard
-  close action while an operation is running.
+- `busy`: sets `aria-busy` while an operation is running. The dialog remains
+  dismissible so the operation can continue in the background.
+- `dismissible`: controls Escape, outside press, and the standard close action.
+  Set it to `false` only when the user must respond before leaving the dialog.
 - `contentPadding`: use `"none"` when the caller owns a flush or independently
   scrolling content layout.
 - `contentClassName`: caller-owned content layout hook.
@@ -1743,7 +1745,8 @@ the modal frame and scroll behavior while callers own the domain content.
 - Use `DialogActions` for confirmation and workflow buttons instead of local
   flexbox footer styles.
 - Pass async mutation state through `busy`; keep the relevant action button's
-  own loading state for progress feedback.
+  own loading state for progress feedback. Preserve the operation outside the
+  dialog and report its result through a toast or page state after dismissal.
 - Use Popover for compact anchored context; use Dialog for modal inspection or
   workflows.
 
