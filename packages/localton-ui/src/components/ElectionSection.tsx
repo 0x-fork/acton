@@ -13,6 +13,7 @@ import {
   DateTime,
   Disclosure,
   Duration,
+  formatDateTime,
   formatDuration,
   GramAmount,
   Percentage,
@@ -282,7 +283,7 @@ function ElectionDiagram({
               </div>
               <div className={styles.electionRoundTrack}>
                 {phases.map(phase => {
-                  const timeRange = `${formatTimestamp(phase.start)} – ${formatTimestamp(phase.end)}`
+                  const timeRange = `${formatTimelineTimestamp(phase.start)} – ${formatTimelineTimestamp(phase.end)}`
                   const duration = phase.end - phase.start
                   const tooltipLabel = `${phase.name}. ${phase.description}. ${timeRange} · ${formatDuration(duration)}`
 
@@ -695,6 +696,10 @@ function formatTimestamp(value: number) {
     minute: "2-digit",
     second: "2-digit",
   }).format(value * 1000)
+}
+
+function formatTimelineTimestamp(value: number) {
+  return formatDateTime(value, {display: "date-time-numeric-seconds", unit: "seconds"})
 }
 
 function formatValidators(count: number) {
