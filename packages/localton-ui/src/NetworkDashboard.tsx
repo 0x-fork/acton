@@ -91,19 +91,23 @@ export function NetworkDashboard({
     )
   }
 
+  // Collector snapshots do not guarantee row order while a new node joins.
+  // Natural name ordering keeps managed fallback and observed rows in one stable position.
+  const nodes = [
+    ...network.nodes,
+    ...fallbackNodes.filter(
+      node =>
+        !network.nodes.some(observed => observed.name.toLowerCase() === node.name.toLowerCase()),
+    ),
+  ].sort((left, right) =>
+    left.name.localeCompare(right.name, undefined, {numeric: true, sensitivity: "base"}),
+  )
+
   return (
     <NetworkDashboardContent
       network={{
         ...network,
-        nodes: [
-          ...network.nodes,
-          ...fallbackNodes.filter(
-            node =>
-              !network.nodes.some(
-                observed => observed.name.toLowerCase() === node.name.toLowerCase(),
-              ),
-          ),
-        ],
+        nodes,
       }}
       nodesFooter={nodesFooter}
       now={now}

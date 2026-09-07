@@ -688,17 +688,18 @@
   line-height: 20px;
 }
 
-.loading {
-  padding-top: 2px;
-}
-
 .loadingIndex {
   grid-area: index;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* Match the sticky index after accounting for the page header and its 16px edges. */
+  height: calc(100dvh - 89px);
+  max-height: calc(var(--config-scroll-height, 100dvh) - 32px);
   gap: 14px;
   padding: 14px;
+  box-sizing: border-box;
+  overflow: hidden;
   background: var(--acton-color-surface-raised);
   border: 1px solid var(--acton-color-border);
   border-radius: 10px;
@@ -717,40 +718,82 @@
   flex-direction: column;
   min-width: 0;
   gap: 12px;
+  container-type: inline-size;
 }
 
 .loadingParameterCard {
+  display: flex;
+  height: 186px;
   min-width: 0;
+  flex-direction: column;
+  box-sizing: border-box;
   overflow: hidden;
   background: var(--acton-color-surface-raised);
   border: 1px solid var(--acton-color-border);
   border-radius: 10px;
 }
 
+.loadingParameterCard:first-child {
+  height: 206px;
+}
+
+.loadingParameterCard:nth-child(4) {
+  height: 319px;
+}
+
 .loadingParameterHeader {
   display: grid;
+  height: 86px;
+  flex: 0 0 86px;
   grid-template-columns: 26px minmax(0, 1fr);
   align-items: center;
   gap: var(--acton-space-3);
   row-gap: var(--acton-space-2);
   padding: var(--acton-space-4);
+  box-sizing: border-box;
+}
+
+.loadingParameterCard:first-child .loadingParameterHeader {
+  height: 106px;
+  flex-basis: 106px;
 }
 
 .loadingParameterDescription {
+  display: flex;
+  flex-direction: column;
   grid-column: 1 / -1;
+  gap: 7px;
 }
 
 .loadingParameterBody {
   display: flex;
-  flex-direction: column;
   min-width: 0;
-  gap: 18px;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
   margin: 0 var(--acton-space-4) var(--acton-space-4);
   padding: 14px;
+  box-sizing: border-box;
   overflow: hidden;
   background: var(--acton-color-surface);
   border: 1px solid var(--acton-color-border);
   border-radius: 8px;
+}
+
+@container (min-width: 612px) {
+  .loadingParameterCard:first-child {
+    height: 186px;
+  }
+
+  .loadingParameterCard:first-child .loadingParameterHeader {
+    height: 86px;
+    flex-basis: 86px;
+  }
+
+  .loadingParameterDescriptionContinuation {
+    display: none;
+  }
 }
 
 @media (max-width: 860px) {
@@ -762,6 +805,11 @@
 
   .indexPanel {
     position: static;
+    max-height: 230px;
+  }
+
+  .loadingIndex {
+    height: 230px;
     max-height: 230px;
   }
 

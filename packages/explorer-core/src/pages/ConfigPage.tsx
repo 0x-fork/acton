@@ -24,7 +24,6 @@ import {
   Percentage,
   RawDataBlock,
   Skeleton,
-  SkeletonText,
   TechnicalValue,
   TokenAmount,
   Tooltip,
@@ -1902,8 +1901,7 @@ function ConfigPageSkeleton({navigationPosition}: {readonly navigationPosition: 
         className={`${styles.loadingLayout} ${navigationPosition === "right" ? styles.navigationRight : ""}`}
       >
         <div className={styles.loadingIndex}>
-          <Skeleton height="12px" width="36%" />
-          {Array.from({length: 10}).map((_, index) => (
+          {Array.from({length: 27}).map((_, index) => (
             <div key={index} className={styles.loadingIndexRow}>
               <Skeleton height="12px" width="24px" />
               <Skeleton height="12px" width={`${58 + (index % 3) * 12}%`} />
@@ -1917,15 +1915,20 @@ function ConfigPageSkeleton({navigationPosition}: {readonly navigationPosition: 
               <div className={styles.loadingParameterHeader}>
                 <Skeleton height="26px" width="26px" radius="sm" />
                 <Skeleton height="18px" width={`${42 + (index % 3) * 12}%`} />
-                <Skeleton
-                  className={styles.loadingParameterDescription}
-                  height="13px"
-                  width="72%"
-                />
+                <div className={styles.loadingParameterDescription}>
+                  <Skeleton height="13px" width="72%" />
+                  {index === 0 ? (
+                    <Skeleton
+                      className={styles.loadingParameterDescriptionContinuation}
+                      height="13px"
+                      width="46%"
+                    />
+                  ) : undefined}
+                </div>
               </div>
               <div className={styles.loadingParameterBody}>
-                <Skeleton height="34px" width="239px" radius="sm" />
-                <SkeletonText lineCount={index % 2 === 0 ? 3 : 5} />
+                <Skeleton height="18px" width="58%" />
+                <Skeleton height="12px" width="38%" />
               </div>
             </article>
           ))}

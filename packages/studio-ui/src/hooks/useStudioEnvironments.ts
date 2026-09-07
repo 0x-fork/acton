@@ -55,7 +55,9 @@ export function useStudioEnvironments(): StudioEnvironmentsState {
   const setEnvironment = useCallback((nextEnvironment: StudioEnvironment) => {
     setEnvironments(current => {
       const existingIndex = current.findIndex(environment => environment.id === nextEnvironment.id)
-      if (existingIndex === -1) return [nextEnvironment, ...current]
+      // The API lists managed environments in creation order. Append optimistic
+      // additions in that same order so the next poll does not move the row.
+      if (existingIndex === -1) return [...current, nextEnvironment]
 
       const next = [...current]
       next[existingIndex] = nextEnvironment

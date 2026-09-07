@@ -28,6 +28,7 @@ export function useConfigNavigation(parameters: readonly NetworkConfigParameter[
       const element = document.getElementById(`config-parameter-${parameter.id}`)
       return element && content.contains(element) ? [{id: parameter.id, element}] : []
     })
+    let shouldSyncHash = location.hash.length > 0
     let frame = 0
 
     const update = () => {
@@ -48,6 +49,10 @@ export function useConfigNavigation(parameters: readonly NetworkConfigParameter[
       }
       setActiveId(current?.id)
 
+      // Keep a clean URL on first render. The fragment starts tracking the
+      // reading position only after the user scrolls or opens a fragment URL.
+      if (!shouldSyncHash) return
+
       const hash = current ? `#config-parameter-${current.id}` : ""
       if (location.hash !== hash) {
         history.replaceState(history.state, "", `${location.pathname}${location.search}${hash}`)
@@ -57,7 +62,13 @@ export function useConfigNavigation(parameters: readonly NetworkConfigParameter[
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(update)
     }
+    const handleScroll = () => {
+      shouldSyncHash = true
+      schedule()
+    }
     const restore = () => {
+      shouldSyncHash = location.hash.length > 0
+
       try {
         const anchor = decodeURIComponent(location.hash.slice(1))
         const card = cards.find(candidate => candidate.element.id === anchor)
@@ -73,7 +84,7 @@ export function useConfigNavigation(parameters: readonly NetworkConfigParameter[
       restore()
     }
     schedule()
-    scrollTarget.addEventListener("scroll", schedule, {passive: true})
+    scrollTarget.addEventListener("scroll", handleScroll, {passive: true})
     globalThis.addEventListener("resize", schedule)
     globalThis.addEventListener("popstate", restore)
     globalThis.addEventListener("hashchange", restore)
@@ -84,7 +95,7 @@ export function useConfigNavigation(parameters: readonly NetworkConfigParameter[
     return () => {
       cancelAnimationFrame(frame)
       observer.disconnect()
-      scrollTarget.removeEventListener("scroll", schedule)
+      scrollTarget.removeEventListener("scroll", handleScroll)
       globalThis.removeEventListener("resize", schedule)
       globalThis.removeEventListener("popstate", restore)
       globalThis.removeEventListener("hashchange", restore)

@@ -22,7 +22,6 @@ import {useLocation, useNavigate} from "react-router"
 
 import {supports, supportsAny} from "../../environmentCapabilities"
 import {useLocalnetRuntime} from "../LocalnetRuntimeProvider"
-import {readExplorerLastPath, writeExplorerLastPath} from "@acton/explorer-core/explorerResume"
 import {useNetworkInfo} from "@acton/explorer-core/hooks/useNetworkInfo"
 import {useLocalnetRoutes} from "../routes"
 import {formatForkNetworkLabel} from "./dashboardUtils"
@@ -221,7 +220,6 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   const {environment} = useLocalnetRuntime()
   const {forkNetwork} = useNetworkInfo()
   const navigationRef = useRef<HTMLElement>(null)
-  const [explorerPath, setExplorerPath] = useState(() => readExplorerLastPath())
   const forkBadgeLabel =
     environment?.config.kind === "actonSimulatedLocalnet"
       ? formatForkNetworkLabel(forkNetwork)
@@ -290,30 +288,17 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
   }, [isApiReferenceActive])
 
   useEffect(() => {
-    const frame = globalThis.requestAnimationFrame(() => {
+    // Wait until a newly opened group reaches its final height. Revealing the
+    // active child while the grid row is still growing makes the scroll
+    // container correct its position again at the end of the transition.
+    const timeout = globalThis.setTimeout(() => {
       navigationRef.current
         ?.querySelector<HTMLElement>('[aria-current="page"]')
         ?.scrollIntoView({block: "nearest", inline: "nearest"})
-    })
-    return () => globalThis.cancelAnimationFrame(frame)
-  }, [isApiReferenceOpen, isContractsOpen, isExplorerOpen, isNetworkOpen, localPathname])
+    }, 280)
 
-  useEffect(() => {
-    if (
-      !localPathname.startsWith("/explorer") ||
-      localPathname === "/explorer/blocks" ||
-      localPathname.startsWith("/explorer/config") ||
-      localPathname === "/explorer/tokens" ||
-      localPathname === "/explorer/nfts" ||
-      localPathname === "/explorer/favorites"
-    ) {
-      return
-    }
-
-    const nextPath = `${localPathname}${location.search}${location.hash}`
-    writeExplorerLastPath(nextPath)
-    setExplorerPath(nextPath)
-  }, [localPathname, location.hash, location.search])
+    return () => globalThis.clearTimeout(timeout)
+  }, [localPathname])
 
   return (
     <nav
@@ -359,13 +344,16 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
               items={visibleNetworkItems}
               label="Network"
               onItemSelect={path => void navigate(routes.path(path))}
-              onParentSelect={() =>
+              onParentSelect={() => {
+                // Open in the same render as the route change so the sidebar
+                // never paints the active group in its collapsed state.
+                setIsNetworkOpen(true)
                 void navigate(
                   routes.path(
                     environment?.config.kind === "fullTonNetwork" ? "/network" : "/network/config",
                   ),
                 )
-              }
+              }}
               onToggle={() => setIsNetworkOpen(open => !open)}
               open={isNetworkOpen}
             />
@@ -389,7 +377,10 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
               items={visibleExplorerItems}
               label="Explorer"
               onItemSelect={path => void navigate(routes.path(path))}
-              onParentSelect={() => void navigate(routes.path(explorerPath))}
+              onParentSelect={() => {
+                setIsExplorerOpen(true)
+                void navigate(routes.path("/explorer"))
+              }}
               onToggle={() => setIsExplorerOpen(open => !open)}
               open={isExplorerOpen}
             />
@@ -411,7 +402,10 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
               items={contractItems}
               label="Contracts"
               onItemSelect={path => void navigate(routes.path(path))}
-              onParentSelect={() => void navigate(routes.path("/contracts"))}
+              onParentSelect={() => {
+                setIsContractsOpen(true)
+                void navigate(routes.path("/contracts"))
+              }}
               onToggle={() => setIsContractsOpen(open => !open)}
               open={isContractsOpen}
             />
@@ -473,9 +467,10 @@ export const EnvironmentNavigation: FC<EnvironmentNavigationProps> = ({
                   items={visibleApiReferenceItems}
                   label="API Reference"
                   onItemSelect={path => void navigate(routes.path(path))}
-                  onParentSelect={() =>
+                  onParentSelect={() => {
+                    setIsApiReferenceOpen(true)
                     void navigate(routes.path(visibleApiReferenceItems[0].path))
-                  }
+                  }}
                   onToggle={() => setIsApiReferenceOpen(open => !open)}
                   open={isApiReferenceOpen}
                 />

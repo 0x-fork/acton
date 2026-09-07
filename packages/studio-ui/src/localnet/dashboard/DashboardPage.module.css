@@ -929,8 +929,8 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 1px 0 1px 8px;
-  margin: 2px 0 6px 17px;
+  padding: 3px 0 7px 8px;
+  margin: 0 0 0 17px;
   list-style: none;
   border-left: 1px solid var(--acton-color-border);
 }
