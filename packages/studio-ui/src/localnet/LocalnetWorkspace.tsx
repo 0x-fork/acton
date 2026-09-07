@@ -224,7 +224,7 @@ const AppContent: FC<AppContentProps> = ({
   )
   const {pathname} = useLocation()
   const [isAddContractOpen, setIsAddContractOpen] = useState(false)
-  const [isCreateSnapshotOpen, setIsCreateSnapshotOpen] = useState(false)
+  const [snapshotActions, setSnapshotActions] = useState<ReactNode>()
   const [configActions, setConfigActions] = useState<ReactNode>()
   const [activityActions, setActivityActions] = useState<ReactNode>()
   const [nodeActions, setNodeActions] = useState<ReactNode>()
@@ -257,16 +257,12 @@ const AppContent: FC<AppContentProps> = ({
     supports(runtime.environment, capability) ? page : fallback
   const isFullLocalnet = runtime.environment?.config.kind === "fullTonNetwork"
   const openAddContract = useCallback(() => setIsAddContractOpen(true), [])
-  const openCreateSnapshot = useCallback(() => setIsCreateSnapshotOpen(true), [])
   const primaryAction = useMemo<LocalnetWorkspaceShellAction | undefined>(() => {
     if (localPathname === "/contracts" && supports(runtime.environment, "contracts")) {
       return {icon: "plus", label: "Add contract", onClick: openAddContract}
     }
-    if (localPathname === "/snapshots" && supports(runtime.environment, "snapshots")) {
-      return {icon: "archive", label: "Create snapshot", onClick: openCreateSnapshot}
-    }
     return undefined
-  }, [localPathname, openAddContract, openCreateSnapshot, runtime.environment])
+  }, [localPathname, openAddContract, runtime.environment])
   const primaryEndpoint =
     runtime.environment?.endpoints.apiV3 ??
     runtime.environment?.endpoints.apiV2 ??
@@ -276,9 +272,11 @@ const AppContent: FC<AppContentProps> = ({
       ? configActions
       : localPathname === "/network/activity"
         ? activityActions
-        : localPathname === "/network/nodes"
-          ? nodeActions
-          : undefined
+        : localPathname === "/snapshots"
+          ? snapshotActions
+          : localPathname === "/network/nodes"
+            ? nodeActions
+            : undefined
 
   useLayoutEffect(() => {
     onShellChange({
@@ -292,7 +290,6 @@ const AppContent: FC<AppContentProps> = ({
 
   useEffect(() => {
     if (localPathname !== "/contracts") setIsAddContractOpen(false)
-    if (localPathname !== "/snapshots") setIsCreateSnapshotOpen(false)
   }, [localPathname])
 
   return (
@@ -544,9 +541,8 @@ const AppContent: FC<AppContentProps> = ({
                 <DashboardPage>
                   {runtime.environment ? (
                     <SnapshotsPage
-                      createOpen={isCreateSnapshotOpen}
                       environment={runtime.environment}
-                      onCreateOpenChange={setIsCreateSnapshotOpen}
+                      onActionsChange={setSnapshotActions}
                     />
                   ) : (
                     fallback

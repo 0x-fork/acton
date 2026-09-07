@@ -500,32 +500,8 @@ impl DockerNetwork {
         args: &[&str],
         input: Option<Vec<u8>>,
     ) -> Result<serde_json::Value, Error> {
-        let mut command = self.docker_command();
-        let state_volume = format!(
-            "{}_{}-state:{LOCALTON_STATE_DIR}",
-            self.project_name, service
-        );
-        let backups_volume = format!(
-            "{}_localton-snapshots:{LOCALTON_SNAPSHOT_DIR}",
-            self.project_name
-        );
-        command
-            .args([
-                "run",
-                "--rm",
-                "-i",
-                "--network",
-                "none",
-                "--volume",
-                &state_volume,
-                "--volume",
-                &backups_volume,
-                "--entrypoint",
-                "/usr/local/bin/localton",
-                &self.image,
-            ])
-            .args(args)
-            .args(["--state-dir", LOCALTON_STATE_DIR]);
+        let mut command = self.offline_command(service);
+        command.args(args).args(["--state-dir", LOCALTON_STATE_DIR]);
         self.admin_json(command, service, args, input, SNAPSHOT_TIMEOUT)
             .await
     }
@@ -650,13 +626,13 @@ mod tests {
         if retried.id != accepted.id || !retried.is_active() {
             return Err(failure("Retry did not return the active operation"));
         }
-        if !matches!(runtime.snapshots().await, Err(Error::Conflict { .. })) {
-            return Err(failure(
-                "Snapshots were not excluded during an administrative operation",
-            ));
-        }
+
         let mut phase = String::new();
         loop {
+            // Inventory reads committed manifests without taking the mutation lock,
+            // so Studio can keep polling while the edit and its recovery run.
+            runtime.snapshots().await?;
+
             let operation = runtime
                 .admin_operation()
                 .await?
