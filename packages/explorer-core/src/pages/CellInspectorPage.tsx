@@ -2,8 +2,10 @@ import {
   Checkbox,
   CountValue,
   CopyInlineAction,
+  EmptyState,
   HighlightedCode,
   Input,
+  InlineButton,
   ParsedValueView,
   Percentage,
   PillTab,
@@ -16,7 +18,7 @@ import {
   disassembleBocHex,
   type ContractVerifiedSource,
 } from "@acton/transaction-ui"
-import {CircleAlert} from "lucide-react"
+import {CircleAlert, ScanSearch, Sparkles} from "lucide-react"
 import {useCallback, useDeferredValue, useEffect, useRef, useState, type FC} from "react"
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
@@ -79,6 +81,9 @@ const OUTPUT_TABS: readonly {
 ]
 
 const CELL_INSPECTOR_DRAFT_KEY = "acton:cell-inspector:draft"
+// A jetton internal transfer with a comment in forward_payload demonstrates ABI inference and cell refs.
+const CELL_INSPECTOR_EXAMPLE_BOC =
+  "te6cckEBAgEAdwABqReNRRkAAAAAAAAAAEAmJaAIARrERd68pWkGfPc/BblUU2HQ3SxbrWVJuvtzutJ+hcfbACNYiLvXlK0gz57n4Lcqimw6G6WLdaypN19ud1pP0Lj7RAcBADoAAAAASGVsbG8gZnJvbSBDZWxsIEluc3BlY3RvcjzlH+0="
 const MAX_CELL_QUERY_LENGTH = 4096
 const EMPTY_CELL_INSPECTOR_DRAFT: CellInspectorDraft = {
   input: "",
@@ -288,17 +293,19 @@ export const CellInspectorPage: FC = () => {
     selectedRootCodeHash,
   ])
 
+  const handleInputChange = useCallback((value: string) => {
+    replaceCellQuery()
+    setInput(value)
+    setRootIndex(0)
+    setActiveTab("parsed")
+  }, [])
+
   return (
     <section className={styles.container}>
       <div className={styles.workspace}>
         <CellInspectorInputPanel
           input={input}
-          onInputChange={value => {
-            replaceCellQuery()
-            setInput(value)
-            setRootIndex(0)
-            setActiveTab("parsed")
-          }}
+          onInputChange={handleInputChange}
           rootIndex={rootIndex}
           rootCount={rootCount}
           onRootIndexChange={value => {
@@ -317,7 +324,7 @@ export const CellInspectorPage: FC = () => {
 
         <section className={styles.outputPanel} aria-live="polite">
           {inspection.status === "idle" ? (
-            <EmptyOutput />
+            <EmptyOutput onUseExample={() => handleInputChange(CELL_INSPECTOR_EXAMPLE_BOC)} />
           ) : inspection.status === "loading" && !result ? (
             <LoadingOutput />
           ) : result ? (
@@ -368,7 +375,7 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
   onCustomTlbEnabledChange,
 }) => (
   <section className={styles.inputPanel}>
-    <label className={`${styles.textareaField} ${styles.cellField}`} htmlFor="cell-inspector-input">
+    <div className={`${styles.textareaField} ${styles.cellField}`}>
       <textarea
         id="cell-inspector-input"
         aria-label="Cell input"
@@ -381,7 +388,7 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
         autoComplete="off"
       />
       <span className={styles.fieldHint}>Paste Base64, hex, a ton:// URL, or an explorer link</span>
-    </label>
+    </div>
 
     <div className={styles.optionsGrid}>
       <Input
@@ -847,15 +854,23 @@ function BocOutput({result}: {readonly result: ParsedInspectionResult}) {
   )
 }
 
-function EmptyOutput() {
+function EmptyOutput({onUseExample}: {readonly onUseExample: () => void}) {
   return (
-    <div className={styles.emptyOutput}>
-      <div className={styles.emptyTitle}>Paste a cell or BoC to inspect it</div>
-      <p>
-        Known ABIs and TON formats are detected automatically, and the original cell data is always
-        available for comparison
-      </p>
-    </div>
+    <EmptyState
+      className={styles.emptyOutput}
+      icon={<ScanSearch size={22} aria-hidden="true" />}
+      title="Paste a cell or BoC to inspect it"
+      description="Known ABIs and TON formats are detected automatically, and the original cell data is always available for comparison"
+      action={
+        <InlineButton
+          variant="accent"
+          leadingIcon={<Sparkles size={14} aria-hidden="true" />}
+          onClick={onUseExample}
+        >
+          Use example BoC
+        </InlineButton>
+      }
+    />
   )
 }
 
