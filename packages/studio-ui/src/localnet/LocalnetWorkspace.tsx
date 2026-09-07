@@ -224,6 +224,7 @@ const AppContent: FC<AppContentProps> = ({
   const [isCreateSnapshotOpen, setIsCreateSnapshotOpen] = useState(false)
   const [configActions, setConfigActions] = useState<ReactNode>()
   const [activityActions, setActivityActions] = useState<ReactNode>()
+  const [nodeActions, setNodeActions] = useState<ReactNode>()
   const localPathname = pathname.slice(basePath.length) || "/"
   const allowsOverflow =
     localPathname === "/faucet" ||
@@ -272,7 +273,9 @@ const AppContent: FC<AppContentProps> = ({
       ? configActions
       : localPathname === "/network/activity"
         ? activityActions
-        : undefined
+        : localPathname === "/network/nodes"
+          ? nodeActions
+          : undefined
 
   useLayoutEffect(() => {
     onShellChange({
@@ -362,6 +365,9 @@ const AppContent: FC<AppContentProps> = ({
                     <NetworkPage
                       view={networkDashboardView(networkPath)}
                       onEnvironmentChange={onEnvironmentChange}
+                      onActionsChange={
+                        networkPath === "/network/nodes" ? setNodeActions : undefined
+                      }
                     />
                   </DashboardPage>,
                 )}
