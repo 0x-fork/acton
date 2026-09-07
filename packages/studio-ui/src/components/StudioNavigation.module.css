@@ -199,8 +199,8 @@
 }
 
 .workspaceMark {
-  width: 28px;
-  height: 28px;
+  width: 42px;
+  height: 42px;
   flex: 0 0 auto;
   display: block;
 }
@@ -1287,8 +1287,8 @@
   }
 
   .workspaceMark {
-    width: 26px;
-    height: 26px;
+    width: 42px;
+    height: 42px;
   }
 
   .workspaceMeta {
