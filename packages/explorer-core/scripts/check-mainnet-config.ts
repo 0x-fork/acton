@@ -92,7 +92,7 @@ async function main(): Promise<void> {
   const parameters = inspectConfigBoc(rawBoc.trim())
   const additions = findConfigAdditions(manifest, parameters)
 
-  if (options.update) {
+  if (options.fix) {
     if (!hasConfigAdditions(additions)) {
       console.log(`Mainnet config is already covered (${parameters.length} parameters)`)
       return
@@ -110,6 +110,9 @@ async function main(): Promise<void> {
 
   if (hasConfigAdditions(additions)) {
     printAdditions(additions)
+    if (Object.keys(additions.parseErrors).length === 0) {
+      console.error("\nRun `bun mainnet-config:fix` to update the manifest")
+    }
     process.exitCode = 1
     return
   }
@@ -186,17 +189,17 @@ async function fetchLatestMainnetConfig(): Promise<string> {
   return bytes
 }
 
-function parseArguments(arguments_: readonly string[]): {
+export function parseArguments(arguments_: readonly string[]): {
   readonly bocPath?: string
-  readonly update: boolean
+  readonly fix: boolean
 } {
   let bocPath: string | undefined
-  let update = false
+  let fix = false
 
   for (let index = 0; index < arguments_.length; index += 1) {
     const argument = arguments_[index]
-    if (argument === "--update") {
-      update = true
+    if (argument === "--fix") {
+      fix = true
       continue
     }
     if (argument === "--boc") {
@@ -208,7 +211,7 @@ function parseArguments(arguments_: readonly string[]): {
     throw new Error(`Unknown argument: ${argument}`)
   }
 
-  return {bocPath, update}
+  return {bocPath, fix}
 }
 
 function printAdditions(additions: ConfigAdditions): void {

@@ -5,6 +5,8 @@ import {
   findConfigAdditions,
   hasConfigAdditions,
   inspectConfigBoc,
+  mergeConfigManifest,
+  parseArguments,
   type MainnetConfigManifest,
 } from "../scripts/check-mainnet-config"
 
@@ -41,5 +43,32 @@ describe("mainnet config audit", () => {
       fields: {18: ["new_field"]},
       parseErrors: {},
     })
+  })
+
+  test("fixes additions without removing historical fields", () => {
+    const manifest: MainnetConfigManifest = {
+      network: "mainnet",
+      parameters: {18: ["mc_cell_price_ps", "old_optional_field"]},
+    }
+    const parameters = [
+      {id: 18, fields: ["mc_cell_price_ps", "new_field"]},
+      {id: -123, fields: []},
+    ]
+
+    const fixed = mergeConfigManifest(manifest, parameters)
+
+    expect(fixed).toEqual({
+      network: "mainnet",
+      parameters: {
+        "-123": [],
+        18: ["mc_cell_price_ps", "new_field", "old_optional_field"],
+      },
+    })
+    expect(hasConfigAdditions(findConfigAdditions(fixed, parameters))).toBe(false)
+  })
+
+  test("accepts --fix", () => {
+    expect(parseArguments(["--fix"])).toEqual({bocPath: undefined, fix: true})
+    expect(() => parseArguments(["--update"])).toThrow("Unknown argument: --update")
   })
 })
