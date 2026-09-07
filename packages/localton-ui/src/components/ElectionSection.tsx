@@ -13,6 +13,7 @@ import {
   DateTime,
   Disclosure,
   Duration,
+  formatDuration,
   GramAmount,
   Percentage,
   RelativeTime,
@@ -282,7 +283,8 @@ function ElectionDiagram({
               <div className={styles.electionRoundTrack}>
                 {phases.map(phase => {
                   const timeRange = `${formatTimestamp(phase.start)} – ${formatTimestamp(phase.end)}`
-                  const tooltipLabel = `${phase.name}. ${phase.description}. ${timeRange}`
+                  const duration = phase.end - phase.start
+                  const tooltipLabel = `${phase.name}. ${phase.description}. ${timeRange} · ${formatDuration(duration)}`
 
                   return (
                     <Tooltip
@@ -290,7 +292,9 @@ function ElectionDiagram({
                         <span className={styles.phaseTooltip}>
                           <span className={styles.phaseTooltipHeader}>
                             <strong>{phase.name}</strong>
-                            <span className={styles.phaseTooltipTime}>{timeRange}</span>
+                            <span className={styles.phaseTooltipTime}>
+                              {timeRange} · <Duration value={duration} tooltip={false} />
+                            </span>
                           </span>
                           <span>{phase.description}</span>
                         </span>
