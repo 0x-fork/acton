@@ -28,7 +28,7 @@
   border: 1px solid transparent;
   border-radius: var(--acton-radius-round);
   background: var(--acton-color-surface-raised);
-  color: var(--acton-color-text);
+  color: inherit;
   transition:
     background-color var(--acton-duration-fast) var(--acton-ease-standard),
     color var(--acton-duration-fast) var(--acton-ease-standard);
@@ -37,7 +37,7 @@
 .infoPopover:hover .button,
 .infoPopover:focus-visible .button {
   background: var(--acton-color-surface-hover);
-  color: var(--acton-color-text);
+  color: inherit;
 }
 
 .panel {

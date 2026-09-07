@@ -1,12 +1,4 @@
-import {
-  ArrowRight,
-  CircleDot,
-  CircleHelp,
-  FastForward,
-  GitBranch,
-  Network,
-  RadioTower,
-} from "lucide-react"
+import {ArrowRight, FastForward, RadioTower} from "lucide-react"
 import {
   BlockChip,
   Button,
@@ -27,7 +19,6 @@ import {
   humanizeIdentifier,
   Input,
   DAY_SECONDS,
-  Tooltip,
   useToast,
 } from "@acton/ui"
 import {useNavigate} from "react-router"
@@ -40,6 +31,7 @@ import {
   useObservability,
 } from "@acton/localton-ui"
 
+import {EnvironmentInfoValue} from "../../../components/EnvironmentInfoValue"
 import {supports} from "../../../environmentCapabilities"
 import {useLocalnetRuntime} from "../../LocalnetRuntimeProvider"
 import type {TonClient} from "@acton/explorer-core/api/client"
@@ -474,8 +466,8 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
             ) : undefined}
 
             {hasSimulatedControlApi || hasNetworkNodeInfo ? (
-              <DataTable title="Node info" minWidth="42rem">
-                <DataTableTable aria-label="Node info">
+              <DataTable title="Network info" minWidth="42rem">
+                <DataTableTable aria-label="Network info">
                   <DataTableHead>
                     <DataTableRow>
                       <DataTableHeaderCell columnWidth={hasFork ? "16%" : "25%"}>
@@ -520,42 +512,9 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                         </DataTableCell>
                         <DataTableCell>
                           <span className={styles.nodeInfoStateSource}>
-                            {remoteNetworkConfig ? (
-                              <>
-                                <Network size={15} aria-hidden="true" />
-                                <span>{environment?.network.label ?? "Remote network"}</span>
-                              </>
-                            ) : (
-                              <>
-                                {fullNetworkConfig ? (
-                                  <Network size={15} aria-hidden="true" />
-                                ) : nodeInfo?.fork_network ? (
-                                  <GitBranch size={15} aria-hidden="true" />
-                                ) : (
-                                  <CircleDot size={15} aria-hidden="true" />
-                                )}
-                                <span>
-                                  {fullNetworkConfig ? "Full localnet" : "Simulated localnet"}
-                                </span>
-                                <Tooltip
-                                  content={
-                                    fullNetworkConfig
-                                      ? "Runs a complete local TON network and full indexer, supports actions, and reproduces full-node API behavior, but starts more slowly and uses more memory and disk space"
-                                      : nodeInfo?.fork_network
-                                        ? "Fast local environment starting from a TON network snapshot with compatible blocks and APIs; Acton's custom simplified implementation, not a real TON network"
-                                        : "Fast local environment with compatible blocks, LiteAPI, TonCenter v2/v3, Streaming API, and Emulate API; Acton's custom simplified implementation, not a real TON network"
-                                  }
-                                >
-                                  <button
-                                    type="button"
-                                    className={styles.settingsSectionHelp}
-                                    aria-label={`About ${fullNetworkConfig ? "Full localnet" : "Simulated localnet"}`}
-                                  >
-                                    <CircleHelp size={14} aria-hidden="true" />
-                                  </button>
-                                </Tooltip>
-                              </>
-                            )}
+                            {environment ? (
+                              <EnvironmentInfoValue environment={environment} property="type" />
+                            ) : undefined}
                           </span>
                         </DataTableCell>
                         {hasFork && (

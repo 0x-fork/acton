@@ -16,6 +16,7 @@ import {useCallback, useEffect, useState} from "react"
 import type {FC, ReactNode} from "react"
 
 import {supports} from "../../../environmentCapabilities"
+import {EnvironmentInfoValue} from "../../../components/EnvironmentInfoValue"
 import {
   deleteStudioEnvironment,
   fetchStudioEnvironmentHealth,
@@ -323,6 +324,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({
             label="Environment ID"
             description="A unique identifier for this environment"
             value={environment?.id ?? "Unavailable"}
+            copyValue={environment?.id}
             technical
           />
         </div>
@@ -340,18 +342,24 @@ export const SettingsPage: FC<SettingsPageProps> = ({
             label="Environment type"
             description="The runtime used by this environment"
             value={
-              environment?.config.kind === "fullTonNetwork"
-                ? "Full localnet"
-                : environment?.config.kind === "remoteTonNetwork"
-                  ? "Remote TON network"
-                  : "Simulated localnet"
+              environment ? (
+                <EnvironmentInfoValue environment={environment} property="type" />
+              ) : (
+                "Unavailable"
+              )
             }
           />
 
           <SettingsValueRow
             label="Network"
             description="The TON network identity exposed to connected tools"
-            value={environment?.network.label ?? "Unavailable"}
+            value={
+              environment ? (
+                <EnvironmentInfoValue environment={environment} property="network" />
+              ) : (
+                "Unavailable"
+              )
+            }
           />
 
           {endpointRows.map(endpoint => (
