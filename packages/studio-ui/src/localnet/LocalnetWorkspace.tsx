@@ -246,7 +246,7 @@ const AppContent: FC<AppContentProps> = ({
       ? (LOCALNET_PAGE_DESCRIPTIONS[localPathname] ??
         contractDetailsPageDescription(localPathname) ??
         "Inspect blocks, accounts, transactions and contract activity")
-      : `Protocol parameters at masterchain block #${configSeqno}`
+      : `Protocol parameters at masterchain block ${configSeqno}`
   const path = (value: string) => localnetPath(basePath, value)
   const fallback = <Navigate to={path("/dashboard")} replace />
   const withCapability = (capability: EnvironmentCapability, page: ReactNode) =>

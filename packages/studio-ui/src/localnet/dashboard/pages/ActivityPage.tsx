@@ -636,7 +636,7 @@ function ActivityPageSkeleton() {
       <div className={styles.metrics}>
         {["Confirmed messages", "Completed scenarios", "Active scenarios", "Failed scenarios"].map(
           label => (
-            <Metric key={label} label={label} value={<Skeleton width={56} height={26} />} />
+            <Metric key={label} label={label} value={<Skeleton width={56} height="1.375rem" />} />
           ),
         )}
       </div>
@@ -648,12 +648,16 @@ function ActivityPageSkeleton() {
           </div>
           <Skeleton width="100%" height={6} />
           <div className={styles.scenarios}>
-            {scenarios.map(({id, name, description, icon: Icon}) => (
+            {scenarios.map(({id, name, description}) => (
               <div key={id} className={styles.scenario}>
-                <Icon size={20} className={styles.skeletonIcon} aria-hidden="true" />
-                <div className={styles.scenarioText}>
+                <Skeleton width={20} height={20} shape="circle" />
+                <div className={`${styles.scenarioText} ${styles.skeletonScenarioText}`}>
                   <strong>{name}</strong>
                   <span>{description}</span>
+                  <div className={styles.skeletonScenarioPlaceholders}>
+                    <Skeleton width={id === "batches" ? 112 : 76} height={14} />
+                    <Skeleton width={id === "nfts" ? "82%" : "68%"} height={12} />
+                  </div>
                 </div>
                 <div className={styles.weight}>
                   <Skeleton width="100%" height={4} />
@@ -671,27 +675,35 @@ function ActivityPageSkeleton() {
             <h2>Workload</h2>
           </div>
           <div className={styles.presets} role="group" aria-label="Workload presets">
-            {["Quiet", "Steady", "Busy"].map(label => (
-              <Button key={label} size="sm" variant="outline" disabled>
-                {label}
-              </Button>
+            {[62, 68, 58].map((width, index) => (
+              <Skeleton key={index} width={width} height={32} radius="md" />
             ))}
           </div>
           <div className={styles.workload}>
-            <Input label="Launch interval" suffix="s" disabled />
-            <Input label="Scenarios per launch" disabled />
-            <Input
-              label="Concurrent scenarios"
-              description="Starts above this limit are skipped"
-              disabled
-            />
-            <Input label="Run duration" suffix="s" description="0 to run until stopped" disabled />
+            {[
+              {label: "Launch interval"},
+              {label: "Scenarios per launch"},
+              {
+                label: "Concurrent scenarios",
+                description: "Starts above this limit are skipped",
+              },
+              {label: "Run duration", description: "0 to run until stopped"},
+            ].map(({label, description}) => (
+              <div key={label} className={styles.skeletonField}>
+                <span className={styles.skeletonFieldLabel}>{label}</span>
+                <Skeleton width="100%" height={40} radius="md" />
+                {description ? (
+                  <span className={styles.skeletonFieldDescription}>{description}</span>
+                ) : undefined}
+              </div>
+            ))}
           </div>
         </div>
       </div>
       <div className={styles.history}>
         <div className={styles.historyHeading}>
           <h2>Recent scenarios</h2>
+          <span className={styles.hint}>Messages are counted after confirmation</span>
         </div>
         <div className={styles.empty}>
           <Skeleton width={230} height={14} />

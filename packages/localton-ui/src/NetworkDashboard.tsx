@@ -247,15 +247,15 @@ function NetworkOverviewSkeleton({showTitle}: {readonly showTitle: boolean}) {
         </div>
       ) : null}
       <div className={styles.metricStrip}>
-        {["Online nodes", "Synchronized", "Active validators", "Masterchain", "Current shards"].map(
-          label => (
-            <Metric
-              key={label}
-              label={label}
-              value={<Skeleton width="4.5rem" height="1.375rem" />}
-            />
-          ),
-        )}
+        {[
+          "Online nodes",
+          "Synchronized",
+          "Active validators",
+          "Masterchain block",
+          "Current shards",
+        ].map(label => (
+          <Metric key={label} label={label} value={<Skeleton width="4.5rem" height="1.375rem" />} />
+        ))}
       </div>
     </section>
   )
@@ -463,8 +463,8 @@ function NetworkOverviewSection({
           }
         />
         <Metric
-          label="Masterchain"
-          value={network.chain ? `#${network.chain.seqno.toLocaleString()}` : "Waiting"}
+          label="Masterchain block"
+          value={network.chain ? network.chain.seqno.toLocaleString() : "Waiting"}
         />
         <Metric label="Current shards" value={String(network.chain?.shard_count ?? 0)} />
       </div>

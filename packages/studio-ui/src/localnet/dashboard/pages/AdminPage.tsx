@@ -207,7 +207,7 @@ export const AdminPage: FC<{readonly environment: StudioEnvironment}> = ({enviro
           <>
             Verified at masterchain block{" "}
             <Link to={blockPath(-1, "8000000000000000", operation.blockSeqno)}>
-              #{operation.blockSeqno}
+              {operation.blockSeqno}
             </Link>
           </>
         ) : undefined),
