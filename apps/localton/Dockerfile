@@ -3,7 +3,7 @@
 ARG RUST_VERSION=1.97.1
 ARG GO_VERSION=1.24.11
 ARG UBUNTU_VERSION=24.04
-ARG LOCALTON_BASE_IMAGE=ghcr.io/ton-blockchain/localton:sha-0394fbfe91cebd55d893ef8fe7433d7b4f1700e9
+ARG LOCALTON_BASE_IMAGE=ghcr.io/ton-blockchain/localton:sha-1cae3c73a0bfe69ea19bd82b047190a44a0582d0
 
 FROM oven/bun:1.4.0 AS ui-builder
 WORKDIR /repo
