@@ -1,0 +1,61 @@
+{
+  "opcodes": {
+    "0xfa170099": {
+      "all_values": [
+        353
+      ],
+      "avg_gas": 353,
+      "max_gas": 353,
+      "min_gas": 353,
+      "samples": 1
+    },
+    "ProfileSignature": {
+      "all_values": [
+        335
+      ],
+      "avg_gas": 335,
+      "max_gas": 335,
+      "min_gas": 335,
+      "samples": 1
+    }
+  },
+  "timestamp": 0,
+  "trace_chains": {
+    "test-profiled-external-signature::trace#1": {
+      "test_name": "test-profiled-external-signature",
+      "total_fees": 20601,
+      "total_forward_fees": 89157,
+      "total_gas_fees": 20601,
+      "total_gas_used": 309,
+      "trace_name": "Trace 1",
+      "tx_count": 1
+    },
+    "test-profiled-external-signature::trace#2": {
+      "test_name": "test-profiled-external-signature",
+      "total_fees": 23534,
+      "total_forward_fees": 73513,
+      "total_gas_fees": 23534,
+      "total_gas_used": 353,
+      "trace_name": "Trace 2",
+      "tx_count": 1
+    },
+    "test-profiled-external-signature::trace#3": {
+      "test_name": "test-profiled-external-signature",
+      "total_fees": 129802,
+      "total_forward_fees": 0,
+      "total_gas_fees": 22334,
+      "total_gas_used": 335,
+      "trace_name": "Trace 3",
+      "tx_count": 1
+    },
+    "test-profiled-external-signature::trace#4": {
+      "test_name": "test-profiled-external-signature",
+      "total_fees": 23534,
+      "total_forward_fees": 44446,
+      "total_gas_fees": 23534,
+      "total_gas_used": 353,
+      "trace_name": "Trace 4",
+      "tx_count": 1
+    }
+  }
+}

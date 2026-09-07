@@ -1,4 +1,5 @@
 use crate::commands::test::TestRunner;
+use crate::formatter::FormatterContext;
 use acton_config::color::{OwoColorize, colors_enabled};
 use acton_config::test::GasProfileFormat;
 use acton_debug::replayer::{CallFrameInfo, StepMode, Tick, TolkReplayer};
@@ -12,10 +13,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tolk_compiler::SourceMap;
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::dynamic_unpack;
+use tolk_compiler::types_kernel::TyIdx;
 use ton_emulator::emulator::SendMessageResultSuccess;
 use ton_executor::get::DEFAULT_GET_METHOD_GAS_LIMIT;
 use ton_retrace::trace::{Trace, TraceStep};
 use tycho_types::boc::Boc;
+use tycho_types::cell::CellSlice;
 use tycho_types::models::{ComputePhase, MsgInfo, TxInfo};
 
 const SIGNIFICANT_PERCENT_CHANGE: f64 = 5.0;
@@ -107,14 +112,13 @@ fn collect_opcode_gas(runner: &TestRunner) -> HashMap<String, Vec<u64>> {
     let mut gas_per_opcode = HashMap::new();
 
     for result in runner.emulations.messages() {
-        let Some(opcode) = result.opcode() else {
-            continue;
-        };
         let Some(used_gas) = result.used_gas() else {
             continue;
         };
 
-        let opcode_name = resolve_opcode_name(runner, result, opcode);
+        let Some(opcode_name) = resolve_message_name(runner, result) else {
+            continue;
+        };
         gas_per_opcode
             .entry(opcode_name)
             .or_insert_with(Vec::new)
@@ -124,21 +128,124 @@ fn collect_opcode_gas(runner: &TestRunner) -> HashMap<String, Vec<u64>> {
     gas_per_opcode
 }
 
-fn resolve_opcode_name(
-    runner: &TestRunner,
-    result: &SendMessageResultSuccess,
-    opcode: u32,
-) -> String {
-    runner
+fn resolve_message_name(runner: &TestRunner, result: &SendMessageResultSuccess) -> Option<String> {
+    let build_result = runner
         .build_cache
-        .message_name_by_opcode(
-            opcode,
-            runner
-                .build_cache
-                .result_for_code(&result.code)
-                .map(|(_, result)| result),
-        )
-        .unwrap_or_else(|| format!("0x{opcode:08x}"))
+        .result_for_code(&result.code)
+        .map(|(_, result)| result);
+
+    if let Some(message_name) = build_result
+        .as_ref()
+        .and_then(|result| result.abi.as_deref())
+        .and_then(|abi| decode_declared_message_name(result, abi))
+    {
+        // Match the transaction UI: after ABI decoding succeeds, the selected schema is
+        // authoritative. Prefixless messages are grouped by that schema's name instead of
+        // reinterpreting their first field as an opcode.
+        return Some(message_name);
+    }
+
+    let opcode = result.opcode()?;
+    Some(
+        runner
+            .build_cache
+            .message_name_by_opcode(opcode, build_result)
+            .unwrap_or_else(|| format!("0x{opcode:08x}")),
+    )
+}
+
+fn decode_declared_message_name(
+    result: &SendMessageResultSuccess,
+    abi: &ContractABI,
+) -> Option<String> {
+    let in_message = result.transaction.load_in_msg().ok()??;
+    let (candidate_groups, bounced): (Vec<Vec<TyIdx>>, bool) = match &in_message.info {
+        MsgInfo::Int(info) if info.bounced => (
+            vec![
+                abi.outgoing_messages
+                    .iter()
+                    .map(|message| message.body_ty_idx)
+                    .collect::<Vec<_>>(),
+                abi.incoming_messages
+                    .iter()
+                    .map(|message| message.body_ty_idx)
+                    .collect::<Vec<_>>(),
+            ],
+            true,
+        ),
+        MsgInfo::Int(_) => (
+            vec![
+                abi.incoming_messages
+                    .iter()
+                    .map(|message| message.body_ty_idx)
+                    .collect::<Vec<_>>(),
+            ],
+            false,
+        ),
+        MsgInfo::ExtIn(_) => (
+            vec![
+                abi.incoming_external
+                    .iter()
+                    .map(|message| message.body_ty_idx)
+                    .collect::<Vec<_>>(),
+            ],
+            false,
+        ),
+        MsgInfo::ExtOut(_) => return None,
+    };
+
+    let mut body = in_message.body;
+    if bounced && body.skip_first(32, 0).is_err() {
+        return None;
+    }
+    let opcode = {
+        let mut parser = body;
+        parser.load_u32().ok()
+    };
+
+    candidate_groups
+        .into_iter()
+        .find_map(|candidates| decode_message_name_with_candidates(body, abi, &candidates, opcode))
+}
+
+fn decode_message_name_with_candidates(
+    body: CellSlice<'_>,
+    abi: &ContractABI,
+    candidates: &[TyIdx],
+    opcode: Option<u32>,
+) -> Option<String> {
+    if candidates.is_empty() {
+        return None;
+    }
+
+    let require_opcode_match = candidates.len() > 1;
+    for &body_ty_idx in candidates {
+        let opcode_name = opcode.and_then(|opcode| {
+            FormatterContext::compiler_message_name_for_opcode(abi, body_ty_idx, opcode)
+        });
+        if require_opcode_match && opcode_name.is_none() {
+            continue;
+        }
+
+        let mut parser = body;
+        let initial_bits = parser.size_bits();
+        let initial_refs = parser.size_refs();
+        if dynamic_unpack::unpack_from_slice(&mut parser, abi, body_ty_idx).is_err()
+            || parser.size_refs() != 0
+            || (parser.size_bits() != 0
+                && parser.size_bits() >= initial_bits
+                && parser.size_refs() >= initial_refs)
+        {
+            continue;
+        }
+
+        return Some(
+            opcode_name
+                .unwrap_or_else(|| FormatterContext::compiler_body_type_name(abi, body_ty_idx)),
+        );
+    }
+
+    None
 }
 
 fn collect_trace_chain_stats(runner: &TestRunner) -> Vec<TraceChainStats> {

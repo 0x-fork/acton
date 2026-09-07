@@ -53,6 +53,15 @@ const fn preferred_opcode_message_name(opcode: u32) -> Option<&'static str> {
     }
 }
 
+fn parse_abi_opcode(value: &str) -> Option<u32> {
+    let (digits, radix) = value
+        .strip_prefix("0x")
+        .or_else(|| value.strip_prefix("0X"))
+        .map_or((value, 10), |digits| (digits, 16));
+
+    BigInt::parse_bytes(digits.as_bytes(), radix).and_then(|value| value.to_u32())
+}
+
 #[cfg(test)]
 mod preferred_opcode_message_name_tests {
     use super::preferred_opcode_message_name;
@@ -1440,53 +1449,78 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         let Some(opcode) = opcode else {
             return false;
         };
-        Self::compiler_type_matches_opcode_inner(abi, ty_idx, opcode, &mut HashSet::new())
+
+        Self::compiler_message_name_for_opcode(abi, ty_idx, opcode).is_some()
     }
 
-    fn compiler_type_matches_opcode_inner(
+    /// Resolves an opcode only within the ABI type declared for a message direction.
+    ///
+    /// Callers use this instead of the global declaration lookup when a prefixless body could
+    /// otherwise make its first field look like an unrelated operation.
+    pub(crate) fn compiler_message_name_for_opcode(
+        abi: &ContractABI,
+        ty_idx: TyIdx,
+        opcode: u32,
+    ) -> Option<String> {
+        Self::compiler_message_name_for_opcode_inner(abi, ty_idx, opcode, &mut HashSet::new())
+    }
+
+    fn compiler_message_name_for_opcode_inner(
         abi: &ContractABI,
         ty_idx: TyIdx,
         opcode: u32,
         seen: &mut HashSet<TyIdx>,
-    ) -> bool {
+    ) -> Option<String> {
         if !seen.insert(ty_idx) {
-            return false;
+            return None;
         }
 
         match abi.ty_by_idx(ty_idx) {
             Some(Ty::StructRef { struct_name, .. }) => {
-                Self::struct_declaration_matches_opcode(abi, struct_name, opcode)
+                abi.declarations.iter().find_map(|declaration| {
+                    let ABIDeclaration::Struct {
+                        name,
+                        type_params,
+                        prefix,
+                        ..
+                    } = declaration
+                    else {
+                        return None;
+                    };
+
+                    (name == struct_name
+                        && type_params.as_ref().is_none_or(Vec::is_empty)
+                        && prefix.as_ref().is_some_and(|prefix| {
+                            prefix.prefix_len == 32 && prefix.prefix_num == u64::from(opcode)
+                        }))
+                    .then(|| name.clone())
+                })
             }
             Some(Ty::AliasRef { alias_name, .. }) => Self::alias_target_ty_idx(abi, alias_name)
-                .is_some_and(|target_ty_idx| {
-                    Self::compiler_type_matches_opcode_inner(abi, target_ty_idx, opcode, seen)
+                .and_then(|target_ty_idx| {
+                    Self::compiler_message_name_for_opcode_inner(abi, target_ty_idx, opcode, seen)
                 }),
-            _ => false,
+            Some(Ty::EnumRef { enum_name }) => abi.declarations.iter().find_map(|declaration| {
+                let ABIDeclaration::Enum { name, members, .. } = declaration else {
+                    return None;
+                };
+
+                (name == enum_name)
+                    .then(|| {
+                        members.iter().find_map(|member| {
+                            parse_abi_opcode(&member.value)
+                                .filter(|value| *value == opcode)
+                                .map(|_| member.name.clone())
+                        })
+                    })
+                    .flatten()
+            }),
+            Some(Ty::Union { variants, .. }) => variants.iter().find_map(|variant| {
+                (variant.prefix_len == 32 && variant.prefix_num == u64::from(opcode))
+                    .then(|| Self::compiler_body_type_name(abi, variant.variant_ty_idx))
+            }),
+            _ => None,
         }
-    }
-
-    fn struct_declaration_matches_opcode(
-        abi: &ContractABI,
-        struct_name: &str,
-        opcode: u32,
-    ) -> bool {
-        abi.declarations.iter().any(|declaration| {
-            let ABIDeclaration::Struct {
-                name,
-                type_params,
-                prefix,
-                ..
-            } = declaration
-            else {
-                return false;
-            };
-
-            name == struct_name
-                && type_params.as_ref().is_none_or(Vec::is_empty)
-                && prefix.as_ref().is_some_and(|prefix| {
-                    prefix.prefix_len == 32 && prefix.prefix_num == u64::from(opcode)
-                })
-        })
     }
 
     fn alias_target_ty_idx(abi: &ContractABI, alias_name: &str) -> Option<TyIdx> {
@@ -1590,7 +1624,8 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         None
     }
 
-    fn compiler_body_type_name(abi: &ContractABI, body_ty_idx: TyIdx) -> String {
+    /// Returns the stable user-facing name for a compiler ABI message type.
+    pub(crate) fn compiler_body_type_name(abi: &ContractABI, body_ty_idx: TyIdx) -> String {
         match abi.ty_by_idx(body_ty_idx) {
             Some(body_ty) => match body_ty {
                 Ty::StructRef { struct_name, .. } => struct_name.clone(),

@@ -178,6 +178,47 @@ fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
+const PROFILE_SIGNATURE_MESSAGE: &str = r"
+struct ProfileSignature {
+    signature: bits512
+}
+";
+
+const PROFILE_EXTERNAL_SIGNATURE_CONTRACT: &str = r#"
+import "@stdlib/gas-payments"
+import "profile_signature"
+
+contract ProfileExternalSignatureTarget {
+    incomingExternal: ProfileSignature
+}
+
+fun onExternalMessage(inMsgBody: slice) {
+    val _request = lazy ProfileSignature.fromSlice(inMsgBody);
+    acceptExternalMessage();
+}
+
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const PROFILE_INTERNAL_SIGNATURE_CONTRACT: &str = r#"
+import "profile_signature"
+
+contract ProfileInternalSignatureTarget {
+    incomingMessages: ProfileSignature
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _request = lazy ProfileSignature.fromSlice(in.body);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
 const PROFILED_TYPED_OPCODE_TEST: &str = r#"
 import "../../lib/testing/expect"
 import "../../lib/build"
@@ -248,6 +289,86 @@ get fun `test-profiled-unknown-opcode`() {
         value: ton("0.2"),
         dest: address,
         body: beginCell().storeUint(0xFA170099, 32).storeUint(1, 64).endCell(),
+    }));
+    expect(result.size()).toEqual(1);
+}
+"#;
+
+const PROFILED_EXTERNAL_SIGNATURE_TEST: &str = r#"
+import "../../lib/testing/expect"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/types/big_array"
+
+get fun `test-profiled-external-signature`() {
+    val init = ContractState {
+        code: build("target"),
+        data: createEmptyCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val sender = testing.treasury("sender");
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: init,
+        },
+    }))).toHaveSuccessfulDeploy({ to: address });
+
+    val signature = beginCell()
+        .storeUint(0xFA1700AA, 32)
+        .storeUint(0, 240)
+        .storeUint(0, 240)
+        .endCell();
+    val externalResult = net.sendExternal(net.createExternalMessage(address, signature));
+    expect(externalResult.isAccepted()).toBeTrue();
+    expect(externalResult.unwrap().size()).toEqual(1);
+
+    val internalResult = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: address,
+        body: beginCell().storeUint(0xFA170099, 32).storeUint(1, 64).endCell(),
+    }));
+    expect(internalResult.size()).toEqual(1);
+}
+"#;
+
+const PROFILED_INTERNAL_SIGNATURE_TEST: &str = r#"
+import "../../lib/testing/expect"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/types/big_array"
+
+get fun `test-profiled-internal-signature`() {
+    val init = ContractState {
+        code: build("target"),
+        data: createEmptyCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val sender = testing.treasury("sender");
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: init,
+        },
+    }))).toHaveSuccessfulDeploy({ to: address });
+
+    val signature = beginCell()
+        .storeUint(0xFA1700BB, 32)
+        .storeUint(0, 240)
+        .storeUint(0, 240)
+        .endCell();
+    val result = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: address,
+        body: signature,
     }));
     expect(result.size()).toEqual(1);
 }
@@ -2014,6 +2135,58 @@ fn test_gas_snapshot_uses_hex_opcode_when_abi_name_is_unknown() {
             "unknown-profile.json",
             "integration/snapshots/flags/test_gas_snapshot_uses_hex_opcode_when_abi_name_is_unknown.json",
         );
+}
+
+#[test]
+fn test_gas_snapshot_does_not_treat_external_signature_as_opcode() {
+    let project = ProjectBuilder::new("profiling-external-signature")
+        .file("contracts/profile_signature", PROFILE_SIGNATURE_MESSAGE)
+        .contract("target", PROFILE_EXTERNAL_SIGNATURE_CONTRACT)
+        .test_file("profile", PROFILED_EXTERNAL_SIGNATURE_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    let output = project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--snapshot")
+        .arg("external-signature-profile.json")
+        .run()
+        .success();
+
+    normalize_profile_snapshot_file(&project, "external-signature-profile.json");
+    output
+        .assert_contains("0xfa170099")
+        .assert_file_snapshot_matches(
+            "external-signature-profile.json",
+            "integration/snapshots/flags/test_gas_snapshot_does_not_treat_external_signature_as_opcode.json",
+        );
+}
+
+#[test]
+fn test_gas_snapshot_does_not_treat_internal_signature_as_opcode() {
+    let project = ProjectBuilder::new("profiling-internal-signature")
+        .file("contracts/profile_signature", PROFILE_SIGNATURE_MESSAGE)
+        .contract("target", PROFILE_INTERNAL_SIGNATURE_CONTRACT)
+        .test_file("profile", PROFILED_INTERNAL_SIGNATURE_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    let output = project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--snapshot")
+        .arg("internal-signature-profile.json")
+        .run()
+        .success();
+
+    normalize_profile_snapshot_file(&project, "internal-signature-profile.json");
+    output.assert_file_snapshot_matches(
+        "internal-signature-profile.json",
+        "integration/snapshots/flags/test_gas_snapshot_does_not_treat_internal_signature_as_opcode.json",
+    );
 }
 
 #[test]
