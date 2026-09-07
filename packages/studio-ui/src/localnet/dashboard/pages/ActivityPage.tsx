@@ -73,6 +73,8 @@ type Draft = {
   scenarios: Record<ActivityScenario, string>
 }
 
+const ACTIVITY_AUTOSAVE_DELAY_MS = 200
+
 interface ActivityPageProps {
   readonly environment: StudioEnvironment
   readonly onActionsChange: (actions: ReactNode) => void
@@ -85,16 +87,23 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
   const openExplorerPath = useOpenExplorerPath()
   const [state, setState] = useState<ActivityState>()
   const [draft, setDraft] = useState<Draft>()
-  const [pending, setPending] = useState<"save" | "start" | "stop">()
+  const [pending, setPending] = useState<"start" | "stop">()
+  const [saving, setSaving] = useState(false)
+  const [saveRetry, setSaveRetry] = useState(0)
   const [available, setAvailable] = useState(true)
   const [retry, setRetry] = useState(0)
   const latest = useRef<ActivityState | undefined>(undefined)
+  const latestDraft = useRef<Draft | undefined>(undefined)
+  const savedDraft = useRef<Draft | undefined>(undefined)
   const revision = useRef(0)
   const mutating = useRef(false)
   const mounted = useRef(true)
   const running = state?.status === "running" || state?.status === "stopping"
   const editable = !running && !pending
-  const dirty = state && draft && JSON.stringify(draft) !== JSON.stringify(toDraft(state.config))
+
+  useEffect(() => {
+    latestDraft.current = draft
+  }, [draft])
 
   useEffect(() => {
     mounted.current = true
@@ -138,7 +147,12 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
             }
             latest.current = next
             setState(next)
-            setDraft(current => current ?? toDraft(next.config))
+            if (!latestDraft.current) {
+              const initialDraft = toDraft(next.config)
+              latestDraft.current = initialDraft
+              savedDraft.current = initialDraft
+              setDraft(initialDraft)
+            }
             setAvailable(true)
             reportedError = false
           } catch (error) {
@@ -168,12 +182,71 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
     }
   }, [environment.id, environment.name, retry, showToast])
 
+  useEffect(() => {
+    if (!draft || running || draftsEqual(draft, savedDraft.current)) return
+
+    let config: ActivityConfig
+    try {
+      config = fromDraft(draft)
+    } catch {
+      // Preserve incomplete values while the user is editing and save once the draft is valid
+      return
+    }
+
+    const environmentId = environment.id
+    const draftToSave = draft
+    const timer = globalThis.setTimeout(async () => {
+      if (mutating.current) {
+        setSaveRetry(value => value + 1)
+        return
+      }
+
+      mutating.current = true
+      revision.current += 1
+      setSaving(true)
+
+      try {
+        const next = await controlNetworkActivity(environmentId, "save", config)
+
+        if (mounted.current) {
+          revision.current += 1
+          latest.current = next
+          savedDraft.current = draftToSave
+          setState(next)
+          setAvailable(true)
+        }
+      } catch (error) {
+        if (mounted.current) {
+          showToast({
+            variant: "error",
+            title: "Settings not saved",
+            description: errorMessage(error),
+          })
+        }
+      } finally {
+        mutating.current = false
+
+        if (mounted.current) {
+          setSaving(false)
+
+          // A completed request must not replace or suppress changes made while it was running
+          if (!draftsEqual(latestDraft.current, draftToSave)) {
+            setSaveRetry(value => value + 1)
+          }
+        }
+      }
+    }, ACTIVITY_AUTOSAVE_DELAY_MS)
+
+    return () => globalThis.clearTimeout(timer)
+  }, [draft, environment.id, running, saveRetry, showToast])
+
   const control = useCallback(
-    async (command: "save" | "start" | "stop") => {
+    async (command: "start" | "stop") => {
       if (mutating.current || !draft) return
+
       let config: ActivityConfig | undefined
       try {
-        if (command !== "stop") config = fromDraft(draft)
+        if (command === "start") config = fromDraft(draft)
       } catch (error) {
         showToast({
           variant: "error",
@@ -183,57 +256,49 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
         return
       }
 
+      const environmentId = environment.id
+      const draftAtStart = draft
       mutating.current = true
       revision.current += 1
       setPending(command)
       const toast = showToast({
         variant: "loading",
-        title:
-          command === "start"
-            ? "Starting activity"
-            : command === "stop"
-              ? "Stopping activity"
-              : "Saving activity settings",
+        title: command === "start" ? "Starting activity" : "Stopping activity",
         description:
           command === "stop"
             ? "Waiting for in-flight wallet funding requests to finish"
             : undefined,
         durationMs: 0,
       })
+
       try {
-        const next = await controlNetworkActivity(environment.id, command, config)
-        revision.current += 1
+        const next = await controlNetworkActivity(environmentId, command, config)
+
         if (mounted.current) {
+          revision.current += 1
           latest.current = next
           setState(next)
-          setDraft(toDraft(next.config))
           setAvailable(true)
+
+          if (command === "start") savedDraft.current = draftAtStart
         }
+
         updateToast(toast, {
           variant: "success",
-          title:
-            command === "start"
-              ? "Activity started"
-              : command === "stop"
-                ? "Activity stopped"
-                : "Activity settings saved",
+          title: command === "start" ? "Activity started" : "Activity stopped",
           description: environment.name,
           durationMs: 5000,
         })
       } catch (error) {
         updateToast(toast, {
           variant: "error",
-          title:
-            command === "start"
-              ? "Activity not started"
-              : command === "stop"
-                ? "Activity not stopped"
-                : "Settings not saved",
+          title: command === "start" ? "Activity not started" : "Activity not stopped",
           description: errorMessage(error),
           durationMs: 8000,
         })
       } finally {
         mutating.current = false
+
         if (mounted.current) setPending(undefined)
       }
     },
@@ -243,16 +308,6 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
   useLayoutEffect(() => {
     onActionsChange(
       <div className={styles.actions}>
-        {!running && dirty ? (
-          <Button
-            variant="outline"
-            loading={pending === "save"}
-            disabled={Boolean(pending)}
-            onClick={() => void control("save")}
-          >
-            Save settings
-          </Button>
-        ) : null}
         <Button
           variant={running ? "outline" : "primary"}
           leadingIcon={running ? <Square size={15} /> : <Play size={15} />}
@@ -260,12 +315,15 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
           disabled={
             !draft ||
             Boolean(pending) ||
+            (!running && saving) ||
             (!running && (environment.status !== "running" || !available))
           }
           title={
             !running && environment.status !== "running"
               ? "Start the network to generate activity"
-              : undefined
+              : !running && saving
+                ? "Waiting for activity settings to save"
+                : undefined
           }
           onClick={() => void control(running ? "stop" : "start")}
         >
@@ -280,7 +338,7 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
       </div>,
     )
     return () => onActionsChange(undefined)
-  }, [available, control, dirty, draft, environment.status, onActionsChange, pending, running])
+  }, [available, control, draft, environment.status, onActionsChange, pending, running, saving])
 
   if (!draft || !state) {
     return available ? (
@@ -424,29 +482,32 @@ export function ActivityPage({environment, onActionsChange}: ActivityPageProps) 
                 {label: "Steady", interval: "5", count: "5", concurrency: "32"},
                 {label: "Busy", interval: "1", count: "20", concurrency: "256"},
               ] as const
-            ).map(preset => (
-              <Button
-                key={preset.label}
-                size="sm"
-                variant="secondary"
-                aria-pressed={
-                  draft.intervalSeconds === preset.interval &&
-                  draft.scenariosPerLaunch === preset.count &&
-                  draft.concurrency === preset.concurrency
-                }
-                disabled={!editable}
-                onClick={() =>
-                  setDraft({
-                    ...draft,
-                    intervalSeconds: preset.interval,
-                    scenariosPerLaunch: preset.count,
-                    concurrency: preset.concurrency,
-                  })
-                }
-              >
-                {preset.label}
-              </Button>
-            ))}
+            ).map(preset => {
+              const selected =
+                draft.intervalSeconds === preset.interval &&
+                draft.scenariosPerLaunch === preset.count &&
+                draft.concurrency === preset.concurrency
+
+              return (
+                <Button
+                  key={preset.label}
+                  size="sm"
+                  variant={selected ? "secondary" : "outline"}
+                  aria-pressed={selected}
+                  disabled={!editable}
+                  onClick={() =>
+                    setDraft({
+                      ...draft,
+                      intervalSeconds: preset.interval,
+                      scenariosPerLaunch: preset.count,
+                      concurrency: preset.concurrency,
+                    })
+                  }
+                >
+                  {preset.label}
+                </Button>
+              )
+            })}
           </div>
           <div className={styles.workload}>
             <Input
@@ -611,7 +672,7 @@ function ActivityPageSkeleton() {
           </div>
           <div className={styles.presets} role="group" aria-label="Workload presets">
             {["Quiet", "Steady", "Busy"].map(label => (
-              <Button key={label} size="sm" variant="secondary" disabled>
+              <Button key={label} size="sm" variant="outline" disabled>
                 {label}
               </Button>
             ))}
@@ -693,4 +754,8 @@ function fromDraft(draft: Draft): ActivityConfig {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error)
+}
+
+function draftsEqual(left: Draft | undefined, right: Draft | undefined) {
+  return JSON.stringify(left) === JSON.stringify(right)
 }

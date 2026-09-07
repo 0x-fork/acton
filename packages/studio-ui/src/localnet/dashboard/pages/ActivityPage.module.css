@@ -32,11 +32,6 @@
   gap: 8px;
 }
 
-.presets button[aria-pressed="true"] {
-  background: var(--acton-color-text);
-  color: var(--acton-color-surface);
-}
-
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
