@@ -85,6 +85,8 @@ async fn checkout_source(paths: &Paths, repository: &str, commit: &str) -> Resul
             "--depth",
             "1",
             "external/userver",
+            // The current upstream CMake config adds fmt unconditionally.
+            "external/fmt",
         ])
         .current_dir(&paths.source);
     run("update TON HTTP API V2 submodules", &mut submodules).await?;
