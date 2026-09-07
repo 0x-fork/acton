@@ -14,7 +14,7 @@ permissions: { }
 
 jobs:
   update:
-    name: Update mainnet config manifest
+    name: Update mainnet config test manifest
     if: github.repository == 'ton-blockchain/acton'
     runs-on: ubicloud-standard-2-ubuntu-2204
     timeout-minutes: 15
@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: bun ci
 
-      - name: Update mainnet config manifest
+      - name: Update mainnet config test manifest
         working-directory: packages/explorer-core
         run: bun run mainnet-config:fix
 

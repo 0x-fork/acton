@@ -133,5 +133,6 @@ jobs:
           else
             gh pr edit "${pull_request}" \
               --repo "${GITHUB_REPOSITORY}" \
+              --title "chore(explorer): update TON TL-B schema" \
               --body-file "${body_file}"
           fi
