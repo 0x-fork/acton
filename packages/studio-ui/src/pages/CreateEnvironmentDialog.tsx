@@ -24,7 +24,7 @@ import {WalletNamesInput} from "./WalletNamesInput"
 import styles from "./CreateEnvironmentDialog.module.css"
 
 interface CreateEnvironmentDialogProps {
-  readonly environmentCount: number
+  readonly environments: readonly StudioEnvironment[]
   readonly importSourceEnvironments: readonly StudioEnvironment[]
   readonly open: boolean
   readonly walletNames: readonly string[]
@@ -57,7 +57,7 @@ interface ImportedAccountForm {
 }
 
 export function CreateEnvironmentDialog({
-  environmentCount,
+  environments,
   importSourceEnvironments,
   open,
   walletNames,
@@ -65,16 +65,20 @@ export function CreateEnvironmentDialog({
   onOpenChange,
 }: CreateEnvironmentDialogProps) {
   const {showToast, updateToast} = useToast()
-  const [form, setForm] = useState<EnvironmentFormState>(() => createInitialForm(environmentCount))
+  const simulatedDefaultName = defaultEnvironmentName("actonSimulatedLocalnet", environments)
+  const fullDefaultName = defaultEnvironmentName("fullTonNetwork", environments)
+  const [form, setForm] = useState<EnvironmentFormState>(() =>
+    createInitialForm(simulatedDefaultName),
+  )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const nextImportedAccountId = useRef(1)
 
   useEffect(() => {
     if (open) {
-      setForm(createInitialForm(environmentCount))
+      setForm(createInitialForm(simulatedDefaultName))
       nextImportedAccountId.current = 1
     }
-  }, [environmentCount, open])
+  }, [open, simulatedDefaultName])
 
   const updateForm = <Key extends keyof EnvironmentFormState>(
     key: Key,
@@ -85,13 +89,16 @@ export function CreateEnvironmentDialog({
 
   const updateKind = (kind: EnvironmentFormState["kind"]) => {
     setForm(current => {
-      const currentDefaultName = defaultEnvironmentName(current.kind, environmentCount)
+      const currentDefaultName =
+        current.kind === "actonSimulatedLocalnet" ? simulatedDefaultName : fullDefaultName
       return {
         ...current,
         kind,
         name:
           current.name === currentDefaultName
-            ? defaultEnvironmentName(kind, environmentCount)
+            ? kind === "actonSimulatedLocalnet"
+              ? simulatedDefaultName
+              : fullDefaultName
             : current.name,
       }
     })
@@ -418,10 +425,10 @@ export function CreateEnvironmentDialog({
   )
 }
 
-function createInitialForm(environmentCount: number): EnvironmentFormState {
+function createInitialForm(name: string): EnvironmentFormState {
   return {
     kind: "actonSimulatedLocalnet",
-    name: defaultEnvironmentName("actonSimulatedLocalnet", environmentCount),
+    name,
     port: "",
     forkNetwork: "",
     forkBlockNumber: "",
@@ -599,11 +606,15 @@ async function loadAddressSuggestions(
 
 function defaultEnvironmentName(
   kind: EnvironmentFormState["kind"],
-  environmentCount: number,
+  environments: readonly StudioEnvironment[],
 ): string {
-  return kind === "actonSimulatedLocalnet"
-    ? `Simulated localnet ${environmentCount + 1}`
-    : `Full localnet ${environmentCount + 1}`
+  const prefix = kind === "actonSimulatedLocalnet" ? "Simulated localnet" : "Full localnet"
+  const names = new Set(environments.map(environment => environment.name))
+  let suffix = 1
+
+  while (names.has(`${prefix} ${suffix}`)) suffix += 1
+
+  return `${prefix} ${suffix}`
 }
 
 function optionalPositiveInteger(

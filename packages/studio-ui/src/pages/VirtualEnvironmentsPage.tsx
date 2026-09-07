@@ -267,7 +267,7 @@ export function VirtualEnvironmentsPage({
       </TablePage>
 
       <CreateEnvironmentDialog
-        environmentCount={environments.length}
+        environments={environments}
         importSourceEnvironments={importSourceEnvironments}
         open={createOpen}
         walletNames={walletNames}

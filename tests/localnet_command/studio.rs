@@ -452,13 +452,41 @@ async fn studio_uses_cli_for_lifecycle_and_http_for_nodes_and_snapshots() {
         .delete(&created.id)
         .await
         .expect("delete stopped environment");
-    runtime.shutdown().await.expect("empty Studio shutdown");
     expect![["0:false:true"]].assert_eq(&format!(
         "{}:{}:{}",
         runtime.list().await.expect("environments").len(),
         metadata_path.exists(),
         service.network.path.join("fixture-running").exists()
     ));
+
+    // Deletion must release the catalog name as well as the Studio record. A
+    // stale localnet definition would make this second create fail with
+    // `network_name_exists`, even though the environment disappeared from Studio.
+    let recreated = runtime
+        .create(request("Studio network"))
+        .await
+        .expect("reuse deleted environment name");
+    let EnvironmentConfig::FullTonNetwork {
+        api_v2_port,
+        api_v3_port,
+        ..
+    } = recreated.config
+    else {
+        panic!("full network")
+    };
+    let recreated_v2 = api_listener(api_v2_port).await;
+    let recreated_v3 = api_listener(api_v3_port).await;
+    let recreated = running(&runtime, &recreated.id).await;
+    expect![["Studio network:true"]].assert_eq(&format!(
+        "{}:{}",
+        recreated.name,
+        recreated.id != created.id
+    ));
+    runtime
+        .delete(&recreated.id)
+        .await
+        .expect("delete recreated environment");
+    runtime.shutdown().await.expect("empty Studio shutdown");
 
     let commands =
         std::fs::read_to_string(service.root.path().join("acton-commands")).expect("commands");
@@ -471,13 +499,15 @@ async fn studio_uses_cli_for_lifecycle_and_http_for_nodes_and_snapshots() {
                 .any(|arg| arg == "start")
         })
         .count();
-    expect!["3"].assert_eq(&starts.to_string());
+    expect!["4"].assert_eq(&starts.to_string());
     service.stop(&independent).await;
     first_v2.abort();
     first_v3.abort();
     v2.abort();
     v3.abort();
-    let _ = tokio::join!(first_v2, first_v3, v2, v3);
+    recreated_v2.abort();
+    recreated_v3.abort();
+    let _ = tokio::join!(first_v2, first_v3, v2, v3, recreated_v2, recreated_v3);
     drop(runtime);
     drop(service);
 }
