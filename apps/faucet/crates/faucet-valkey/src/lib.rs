@@ -115,14 +115,14 @@ pub enum CappedEphemeralStoreDecision {
 
 #[derive(Clone)]
 pub struct ValkeyStore {
-    connection: redis::aio::MultiplexedConnection,
+    connection: redis::aio::ConnectionManager,
 }
 
 impl ValkeyStore {
     pub async fn new(config: &ValkeyConfig) -> anyhow::Result<Self> {
         let client = redis::Client::open(config.uri.as_str()).context("Invalid Valkey URI")?;
         let connection = client
-            .get_multiplexed_async_connection()
+            .get_connection_manager()
             .await
             .context("Failed to connect to Valkey")?;
 
