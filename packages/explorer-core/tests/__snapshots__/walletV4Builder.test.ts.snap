@@ -1,0 +1,185 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Wallet V4 simulator builder WalletV4r1 reads wallet parameters through the shared bits264 dictionary fallback 1`] = `
+[
+  {
+    "plugins": [],
+    "seqno": "41",
+    "walletId": "698983191",
+  },
+  {
+    "plugins": [
+      "FF000000000000000000000000000000000000000000000000000000000000002A",
+    ],
+    "seqno": "41",
+    "walletId": "698983191",
+  },
+]
+`;
+
+exports[`Wallet V4 simulator builder WalletV4r1 leaves unrelated or incompatible ABI schemas generic 1`] = `
+{
+  "internal": null,
+  "renamed": null,
+  "wrongMessagesType": null,
+}
+`;
+
+exports[`Wallet V4 simulator builder WalletV4r2 reads wallet parameters through the shared bits264 dictionary fallback 1`] = `
+[
+  {
+    "plugins": [],
+    "seqno": "41",
+    "walletId": "698983191",
+  },
+  {
+    "plugins": [
+      "FF000000000000000000000000000000000000000000000000000000000000002A",
+    ],
+    "seqno": "41",
+    "walletId": "698983191",
+  },
+]
+`;
+
+exports[`Wallet V4 simulator builder WalletV4r2 leaves unrelated or incompatible ABI schemas generic 1`] = `
+{
+  "internal": null,
+  "renamed": null,
+  "wrongMessagesType": null,
+}
+`;
+
+exports[`Wallet V4 simulator builder empty lists stay inline and malformed or overflowing lists cannot enter the builder 1`] = `
+{
+  "decodedEmpty": [],
+  "empty": true,
+  "rejected": [
+    true,
+    true,
+    true,
+    true,
+    true,
+  ],
+}
+`;
+
+exports[`Wallet V4 simulator builder WalletV4r1 encodes the complete signed request with four ordered messages 1`] = `
+{
+  "header": {
+    "opcode": 0,
+    "seqno": 41,
+    "signature": "0",
+    "subwalletId": 698983191,
+    "validUntil": 1788865000,
+  },
+  "outgoing": [
+    {
+      "body": "ABI",
+      "bounce": true,
+      "mode": 0,
+      "stateInit": false,
+      "to": "EQAiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIp3C",
+      "value": "1000000000",
+    },
+    {
+      "body": "empty",
+      "bounce": false,
+      "mode": 1,
+      "stateInit": true,
+      "to": "EQAiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIp3C",
+      "value": "2000000000",
+    },
+    {
+      "body": "empty",
+      "bounce": true,
+      "mode": 3,
+      "stateInit": false,
+      "to": "EQAiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIp3C",
+      "value": "3000000000",
+    },
+    {
+      "body": "empty",
+      "bounce": false,
+      "mode": 128,
+      "stateInit": false,
+      "to": "EQAiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIp3C",
+      "value": "4000000000",
+    },
+  ],
+  "reversedModes": [
+    "128",
+    "3",
+    "1",
+    "0",
+  ],
+  "roundTrip": true,
+  "schema": {
+    "messagesField": "messages",
+    "messagesStruct": "WalletV4r1SimpleSend",
+    "signedStruct": "WalletV4r1SignedExternal",
+    "version": "v4",
+  },
+  "transport": "external-in",
+}
+`;
+
+exports[`Wallet V4 simulator builder WalletV4r2 encodes the complete signed request with four ordered messages 1`] = `
+{
+  "header": {
+    "opcode": 0,
+    "seqno": 41,
+    "signature": "0",
+    "subwalletId": 698983191,
+    "validUntil": 1788865000,
+  },
+  "outgoing": [
+    {
+      "body": "ABI",
+      "bounce": true,
+      "mode": 0,
+      "stateInit": false,
+      "to": "EQAiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIp3C",
+      "value": "1000000000",
+    },
+    {
+      "body": "empty",
+      "bounce": false,
+      "mode": 1,
+      "stateInit": true,
+      "to": "EQAiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIp3C",
+      "value": "2000000000",
+    },
+    {
+      "body": "empty",
+      "bounce": true,
+      "mode": 3,
+      "stateInit": false,
+      "to": "EQAiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIp3C",
+      "value": "3000000000",
+    },
+    {
+      "body": "empty",
+      "bounce": false,
+      "mode": 128,
+      "stateInit": false,
+      "to": "EQAiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIp3C",
+      "value": "4000000000",
+    },
+  ],
+  "reversedModes": [
+    "128",
+    "3",
+    "1",
+    "0",
+  ],
+  "roundTrip": true,
+  "schema": {
+    "messagesField": "messages",
+    "messagesStruct": "WalletV4r2SimpleSend",
+    "signedStruct": "WalletV4r2SignedExternal",
+    "version": "v4",
+  },
+  "transport": "external-in",
+}
+`;

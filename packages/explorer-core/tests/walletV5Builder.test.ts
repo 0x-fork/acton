@@ -21,12 +21,12 @@ import {
 
 import bundledAbiCatalog from "../../../crates/acton-abi-catalog/data/data-abis.json"
 import {
-  decodeWalletV5Messages,
+  decodeWalletMessages,
   EMPTY_MESSAGE_BODY,
-  encodeWalletV5Messages,
-  isWalletV5ExternalMessage,
+  encodeWalletMessages,
+  getWalletExternalSchema,
   type WalletSendDraft,
-} from "../src/pages/emulate/walletV5"
+} from "../src/pages/emulate/walletMessages"
 
 const walletRecord = bundledAbiCatalog.contracts.find(
   contract => contract.id === "wallets.WalletV5r1",
@@ -62,14 +62,17 @@ describe("Wallet V5 simulator builder", () => {
     declaration.fields[0].ty_idx = 7
 
     expect({
-      external: isWalletV5ExternalMessage(walletAbi, external),
-      internal: isWalletV5ExternalMessage(
-        walletAbi,
-        listAbiMessageBuilderOptions(walletAbi, "internal")[0],
-      ),
-      v4: isWalletV5ExternalMessage(v4Abi, listAbiMessageBuilderOptions(v4Abi, "external")[0]),
-      wrongType: isWalletV5ExternalMessage(changed, external),
-      renamed: isWalletV5ExternalMessage({...walletAbi, contract_name: "CustomWallet"}, external),
+      external: getWalletExternalSchema(walletAbi, external)?.version === "v5",
+      internal:
+        getWalletExternalSchema(walletAbi, listAbiMessageBuilderOptions(walletAbi, "internal")[0])
+          ?.version === "v5",
+      v4:
+        getWalletExternalSchema(v4Abi, listAbiMessageBuilderOptions(v4Abi, "external")[0])
+          ?.version === "v5",
+      wrongType: getWalletExternalSchema(changed, external)?.version === "v5",
+      renamed:
+        getWalletExternalSchema({...walletAbi, contract_name: "CustomWallet"}, external)
+          ?.version === "v5",
     }).toMatchSnapshot()
   })
 
@@ -111,7 +114,7 @@ describe("Wallet V5 simulator builder", () => {
         stateInitBoc: init.toBoc().toString("base64"),
       },
     ]
-    const outActions = encodeWalletV5Messages(drafts)
+    const outActions = encodeWalletMessages("v5", drafts)
     if (!outActions) throw new Error("Expected nonempty wallet actions")
     const option = listAbiMessageBuilderOptions(walletAbi, "external")[0]
     const boc = buildAbiMessageBoc({
@@ -162,8 +165,8 @@ describe("Wallet V5 simulator builder", () => {
         }
       }),
       decodedPayload: parseAbiJson(decodedBody.argsJson),
-      roundTrip: encodeWalletV5Messages(decodeWalletV5Messages(outActions)) === outActions,
-      reversed: decodeWalletV5Messages(encodeWalletV5Messages([...drafts].reverse())).map(
+      roundTrip: encodeWalletMessages("v5", decodeWalletMessages("v5", outActions)) === outActions,
+      reversed: decodeWalletMessages("v5", encodeWalletMessages("v5", [...drafts].reverse())).map(
         item => item.address,
       ),
     }).toMatchSnapshot()
@@ -180,16 +183,16 @@ describe("Wallet V5 simulator builder", () => {
     const cell = beginCell()
       .store(storeOutList([{type: "sendMsg", mode: 3, outMsg: message}]))
       .endCell()
-    const drafts = decodeWalletV5Messages(cell.toBoc().toString("base64"))
-    const encoded = encodeWalletV5Messages(drafts)
+    const drafts = decodeWalletMessages("v5", cell.toBoc().toString("base64"))
+    const encoded = encodeWalletMessages("v5", drafts)
     if (!encoded) throw new Error("Expected nonempty wallet actions")
     const rebuilt = Cell.fromHex(encoded)
 
     expect({
       identical: rebuilt.equals(cell),
       amount: drafts[0].amount,
-      empty: decodeWalletV5Messages(EMPTY_MESSAGE_BODY),
-      absent: decodeWalletV5Messages(null),
+      empty: decodeWalletMessages("v5", EMPTY_MESSAGE_BODY),
+      absent: decodeWalletMessages("v5", null),
     }).toMatchSnapshot()
   })
 
@@ -198,12 +201,16 @@ describe("Wallet V5 simulator builder", () => {
       .store(storeOutList([{type: "reserve", mode: 0, currency: {coins: 1n}}]))
       .endCell()
     const cases = [
-      () => encodeWalletV5Messages([{...draft, address: "invalid"}]),
-      () => encodeWalletV5Messages([{...draft, amount: "-1"}]),
-      () => encodeWalletV5Messages([{...draft, bodyBoc: ""}]),
-      () => encodeWalletV5Messages([{...draft, sendMode: "256"}]),
-      () => encodeWalletV5Messages(Array.from({length: 256}, () => draft)),
-      () => decodeWalletV5Messages(reserve.toBoc().toString("hex")),
+      () => encodeWalletMessages("v5", [{...draft, address: "invalid"}]),
+      () => encodeWalletMessages("v5", [{...draft, amount: "-1"}]),
+      () => encodeWalletMessages("v5", [{...draft, bodyBoc: ""}]),
+      () => encodeWalletMessages("v5", [{...draft, sendMode: "256"}]),
+      () =>
+        encodeWalletMessages(
+          "v5",
+          Array.from({length: 256}, () => draft),
+        ),
+      () => decodeWalletMessages("v5", reserve.toBoc().toString("hex")),
     ]
     expect(
       cases.map(run => {
@@ -216,7 +223,13 @@ describe("Wallet V5 simulator builder", () => {
       }),
     ).toMatchSnapshot()
     expect(
-      decodeWalletV5Messages(encodeWalletV5Messages(Array.from({length: 255}, () => draft))),
+      decodeWalletMessages(
+        "v5",
+        encodeWalletMessages(
+          "v5",
+          Array.from({length: 255}, () => draft),
+        ),
+      ),
     ).toHaveLength(255)
   })
 })

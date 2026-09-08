@@ -16,6 +16,7 @@ import {
   sampleAbiValueForTy,
   stringifyAbiJson,
 } from "./abiValue"
+import {unpackStorageValue} from "./decodeStorageValue"
 
 export interface AbiStorageBuilderInfo {
   readonly tyIdx: number
@@ -48,13 +49,14 @@ export function buildAbiStorageDataBoc(abi: ContractABI, storageJson: string): s
   return encodeAbiValueToBoc(abi, tyIdx, parseAbiJsonStrict(storageJson))
 }
 
+/** Decode complete storage with the same bitsN dictionary support as Explorer's Storage view. */
 export function decodeAbiStorageDataBoc(abi: ContractABI, dataBoc: string): unknown {
   const tyIdx = abi.storage?.storage_ty_idx
   if (tyIdx === undefined) {
     throw new Error("ABI does not describe contract storage.")
   }
 
-  return decodeAbiValueFromBoc(abi, tyIdx, dataBoc)
+  return unpackStorageValue(new DynamicCtx(abi), tyIdx, parseAbiCellArg(dataBoc).beginParse())
 }
 
 export function createAbiStorageSymbols(abi: ContractABI): SymTable {

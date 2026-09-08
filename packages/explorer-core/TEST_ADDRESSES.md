@@ -8,6 +8,8 @@ These addresses are not fixtures and their balances or recent history can change
 
 | Address | What to verify | Last checked |
 | --- | --- | --- |
+| [`UQA9Xxv6Ig-SvxM_j_Xde6XTOG3ftJfEYUFFLauvq5wyHMru`](https://actonscan.com/address/UQA9Xxv6Ig-SvxM_j_Xde6XTOG3ftJfEYUFFLauvq5wyHMru?network=mainnet) | Wallet V4 R1 Simulator: automatic wallet ID and seqno, signed external simple send with a 0.1 GRAM self-message and comment under Ignore CHKSIG; compute and action exit codes are 0 and the message remains editable after emulation | 2026-09-08 |
+| [`UQAtPMPoGXJzm6zvqeRcK6IzgJa8RpISp0xpMPgOgj5ggKaV`](https://actonscan.com/address/UQAtPMPoGXJzm6zvqeRcK6IzgJa8RpISp0xpMPgOgj5ggKaV?network=mainnet) | Wallet V4 R2 Simulator: automatic wallet ID and seqno through the bits264 plugin-dictionary fallback, 0.1 GRAM self-message with comment, compute and action exit codes 0, lossless raw/builder switching and four-message limit | 2026-09-08 |
 | [`EQDV9A9W0GpbnFhiI6hJkGUSNIqU7Nxx-rn5FVQsAc7ZkfZB`](https://actonscan.com/address/EQDV9A9W0GpbnFhiI6hJkGUSNIqU7Nxx-rn5FVQsAc7ZkfZB?network=mainnet) | Frozen account state, no Contract type row, Unfreezer link next to Tonscan | 2026-07-30 |
 | [`EQCBMyAieemf3vF3umY0lCaQxLhwvbTFuL8eQxPYrpeZ8O4O`](https://actonscan.com/address/EQCBMyAieemf3vF3umY0lCaQxLhwvbTFuL8eQxPYrpeZ8O4O?network=mainnet) | Active account that is also suspended, suspended overview must not depend on account state | 2026-07-30 |
 | [`Ef9mDsqzIg2i8fdw0Bb7UGafA3Gc1qX5IYjp6AOZwGlfvim2`](https://actonscan.com/address/Ef9mDsqzIg2i8fdw0Bb7UGafA3Gc1qX5IYjp6AOZwGlfvim2?network=mainnet) | Suspended account with a long resolved name, name ellipsis and spacing between QR and edit controls | 2026-07-30 |

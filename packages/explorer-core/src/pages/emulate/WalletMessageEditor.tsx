@@ -9,31 +9,34 @@ import {
 import {Clock3, RefreshCw} from "lucide-react"
 
 import {WalletMessageListEditor} from "./WalletMessageListEditor"
-import styles from "./WalletV5MessageEditor.module.css"
+import type {WalletExternalSchema} from "./walletMessages"
+import styles from "./WalletMessageEditor.module.css"
 
 /** Fields resolved from the same account state and timestamp that the simulator will use. */
-export type WalletV5Parameter = "seqno" | "walletId" | "validUntil"
+export type WalletParameter = "seqno" | "walletId" | "validUntil"
 
-interface WalletV5MessageEditorProps extends AbiValueEditorProps {
+interface WalletMessageEditorProps extends AbiValueEditorProps {
+  readonly wallet: WalletExternalSchema
   readonly ignoreChksig: boolean
-  readonly fetchParameter: (name: WalletV5Parameter) => Promise<string>
+  readonly fetchParameter: (name: WalletParameter) => Promise<string>
   readonly loadRecipientAbi: (address: string) => Promise<ContractABI | undefined>
   readonly initializeParameters: boolean
 }
 
 /** Adds wallet semantics to the catalog ABI without taking ownership of the serialized form draft. */
-export function WalletV5MessageEditor({
+export function WalletMessageEditor({
+  wallet,
   ignoreChksig,
   fetchParameter,
   loadRecipientAbi,
   initializeParameters,
   ...editorProps
-}: WalletV5MessageEditorProps) {
+}: WalletMessageEditorProps) {
   const signatureDescriptionId = useId()
   const currentValue = useRef(editorProps.value)
   currentValue.current = editorProps.value
 
-  function changeParameter(name: WalletV5Parameter, value: unknown) {
+  function changeParameter(name: string, value: unknown) {
     // Automatic field requests may resolve in the same render batch; merge them without losing siblings.
     const next = {...(currentValue.current as Record<string, unknown>), [name]: value}
     currentValue.current = next
@@ -45,32 +48,35 @@ export function WalletV5MessageEditor({
       {...editorProps}
       className={styles.walletEditor}
       renderField={field => {
-        if (field.structName !== "WalletSignedExternalV5r1") return field.defaultEditor
+        if (field.structName === wallet.messagesStruct && field.name === wallet.messagesField) {
+          return (
+            <WalletMessageListEditor
+              version={wallet.version}
+              value={field.value}
+              onChange={field.onChange}
+              disabled={field.disabled}
+              rawEditor={field.defaultEditor}
+              loadRecipientAbi={loadRecipientAbi}
+              addressSuggestions={editorProps.addressSuggestions ?? []}
+            />
+          )
+        }
+        if (field.structName !== wallet.signedStruct) return field.defaultEditor
 
         switch (field.name) {
           case "seqno":
           case "walletId":
+          case "subwalletId":
           case "validUntil":
             return (
               <WalletParameterInput
                 field={{
                   ...field,
-                  onChange: value => changeParameter(field.name as WalletV5Parameter, value),
+                  onChange: value => changeParameter(field.name, value),
                 }}
-                name={field.name}
+                name={field.name === "subwalletId" ? "walletId" : field.name}
                 fetchParameter={fetchParameter}
                 initializeParameters={initializeParameters}
-              />
-            )
-          case "outActions":
-            return (
-              <WalletMessageListEditor
-                value={field.value}
-                onChange={field.onChange}
-                disabled={field.disabled}
-                rawEditor={field.defaultEditor}
-                loadRecipientAbi={loadRecipientAbi}
-                addressSuggestions={editorProps.addressSuggestions ?? []}
               />
             )
           case "extendedActions":
@@ -112,8 +118,8 @@ function WalletParameterInput({
   initializeParameters,
 }: {
   readonly field: AbiFieldEditorProps
-  readonly name: WalletV5Parameter
-  readonly fetchParameter: WalletV5MessageEditorProps["fetchParameter"]
+  readonly name: WalletParameter
+  readonly fetchParameter: WalletMessageEditorProps["fetchParameter"]
   readonly initializeParameters: boolean
 }) {
   const {showToast} = useToast()

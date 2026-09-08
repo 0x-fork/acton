@@ -15,8 +15,8 @@ import {
   type TonAddressSuggestion,
 } from "@acton/transaction-ui"
 
-import {EMPTY_MESSAGE_BODY} from "./walletV5"
-import styles from "./WalletV5MessageEditor.module.css"
+import {EMPTY_MESSAGE_BODY} from "./walletMessages"
+import styles from "./WalletMessageEditor.module.css"
 
 type BodyMode = "empty" | "comment" | "abi" | "raw"
 

@@ -16,13 +16,14 @@ import {ArrowDown, ArrowUp, Plus, Trash2} from "lucide-react"
 
 import {WalletMessageBodyEditor} from "./WalletMessageBodyEditor"
 import {
-  decodeWalletV5Messages,
+  decodeWalletMessages,
   EMPTY_MESSAGE_BODY,
-  encodeWalletV5Messages,
-  MAX_WALLET_V5_MESSAGES,
+  encodeWalletMessages,
+  WALLET_MESSAGE_LIMITS,
+  type WalletMessageVersion,
   type WalletSendDraft,
-} from "./walletV5"
-import styles from "./WalletV5MessageEditor.module.css"
+} from "./walletMessages"
+import styles from "./WalletMessageEditor.module.css"
 
 const sendModeFlags = [1, 2, 4, 8, 16, 32, 64, 128].map(value => ({
   value,
@@ -33,6 +34,7 @@ const sendModeOptions = sendModeFlags
   .map(flag => flag.name)
 
 interface WalletMessageListEditorProps {
+  readonly version: WalletMessageVersion
   readonly value: unknown
   readonly onChange: (value: unknown) => void
   readonly disabled: boolean
@@ -43,6 +45,7 @@ interface WalletMessageListEditorProps {
 
 /** Keeps unfinished message fields locally while invalidating the parent BoC until all rows serialize. */
 export function WalletMessageListEditor({
+  version,
   value,
   onChange,
   disabled,
@@ -53,7 +56,7 @@ export function WalletMessageListEditor({
   const {showToast} = useToast()
   const [initial] = useState(() => {
     try {
-      return {drafts: decodeWalletV5Messages(value), raw: false}
+      return {drafts: decodeWalletMessages(version, value), raw: false}
     } catch {
       return {drafts: [] as readonly WalletSendDraft[], raw: true}
     }
@@ -67,16 +70,16 @@ export function WalletMessageListEditor({
     if (value === emittedValue.current) return
     emittedValue.current = value
     try {
-      setDrafts(decodeWalletV5Messages(value))
+      setDrafts(decodeWalletMessages(version, value))
     } catch {
       setRaw(true)
     }
-  }, [value])
+  }, [value, version])
 
   function update(next: readonly WalletSendDraft[]) {
     setDrafts(next)
     try {
-      emittedValue.current = encodeWalletV5Messages(next)
+      emittedValue.current = encodeWalletMessages(version, next)
     } catch {
       // Empty text is deliberately invalid, rather than the last valid message silently remaining active.
       emittedValue.current = ""
@@ -98,7 +101,7 @@ export function WalletMessageListEditor({
   function switchMode() {
     if (raw) {
       try {
-        setDrafts(decodeWalletV5Messages(value))
+        setDrafts(decodeWalletMessages(version, value))
         setRaw(false)
       } catch (error) {
         reportError(error)
@@ -134,7 +137,9 @@ export function WalletMessageListEditor({
       ) : (
         <>
           {drafts.length === 0 && (
-            <p className={styles.hint}>Add a message for the wallet to send</p>
+            <p className={styles.hint}>
+              Add up to {WALLET_MESSAGE_LIMITS[version]} messages for the wallet to send
+            </p>
           )}
           {drafts.map((draft, index) => (
             <div
@@ -209,7 +214,11 @@ export function WalletMessageListEditor({
                     .map(flag => flag.name)}
                   options={sendModeOptions}
                   placeholder="Select send modes"
-                  description="External V5 messages require SendModeIgnoreErrors (+2)"
+                  description={
+                    version === "v5"
+                      ? "External V5 messages require SendModeIgnoreErrors (+2)"
+                      : undefined
+                  }
                   onValuesChange={values =>
                     updateMessage(draft.id, {
                       sendMode: String(
@@ -238,7 +247,7 @@ export function WalletMessageListEditor({
               variant="outline"
               size="sm"
               leadingIcon={<Plus size={16} />}
-              disabled={disabled || drafts.length >= MAX_WALLET_V5_MESSAGES}
+              disabled={disabled || drafts.length >= WALLET_MESSAGE_LIMITS[version]}
               onClick={() =>
                 update([
                   ...drafts,

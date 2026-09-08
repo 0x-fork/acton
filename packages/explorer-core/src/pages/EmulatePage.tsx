@@ -106,8 +106,8 @@ import {
   type TraceTransactionEnrichmentResult,
 } from "./transactionTraceEnrichment"
 import styles from "./EmulatePage.module.css"
-import {WalletV5MessageEditor, type WalletV5Parameter} from "./emulate/WalletV5MessageEditor"
-import {isWalletV5ExternalMessage} from "./emulate/walletV5"
+import {WalletMessageEditor, type WalletParameter} from "./emulate/WalletMessageEditor"
+import {getWalletExternalSchema} from "./emulate/walletMessages"
 
 type EmulateInputMode = "builder" | "raw"
 type AbiSourceMode = "auto" | "manual"
@@ -488,14 +488,19 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
   const selectedBuilderOption = builderOptions.find(option =>
     abiMessageBuilderOptionMatchesName(option, selectedMessageName),
   )
-  const walletV5 =
-    abiEndpoint === "destination" && isWalletV5ExternalMessage(activeAbi, selectedBuilderOption)
+  const walletSchema = useMemo(
+    () =>
+      abiEndpoint === "destination"
+        ? getWalletExternalSchema(activeAbi, selectedBuilderOption)
+        : undefined,
+    [abiEndpoint, activeAbi, selectedBuilderOption],
+  )
 
   useEffect(() => {
-    if (walletV5 && inputMode === "builder" && !explicitSignatureMode.current) {
+    if (walletSchema && inputMode === "builder" && !explicitSignatureMode.current) {
       setIgnoreChksig(true)
     }
-  }, [walletV5, inputMode])
+  }, [walletSchema, inputMode])
 
   const changeSignatureMode = useCallback((ignore: boolean) => {
     explicitSignatureMode.current = true
@@ -704,7 +709,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
     } else {
       nextParams.delete(EMULATE_MC_SEQNO_QUERY_PARAM)
     }
-    if (nextFields.ignoreChksig || walletV5) {
+    if (nextFields.ignoreChksig || walletSchema) {
       nextParams.set(EMULATE_IGNORE_CHKSIG_QUERY_PARAM, String(nextFields.ignoreChksig))
     } else {
       nextParams.delete(EMULATE_IGNORE_CHKSIG_QUERY_PARAM)
@@ -740,7 +745,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
     targetAddress,
     timeOverrideMode,
     unixTimestampInput,
-    walletV5,
+    walletSchema,
   ])
 
   const loadWalletEditorAccount = useCallback(
@@ -793,7 +798,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
   )
 
   const fetchWalletParameter = useCallback(
-    async (name: WalletV5Parameter): Promise<string> => {
+    async (name: WalletParameter): Promise<string> => {
       if (name === "validUntil") {
         const mcSeqno = parseMcSeqno(mcSeqnoInput)
         const now =
@@ -810,8 +815,9 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
       const account = await loadWalletEditorAccount(targetAddress.trim())
       const abi = account.abi
       const external = abi ? listAbiMessageBuilderOptions(abi, "external")[0] : undefined
-      if (!isWalletV5ExternalMessage(abi, external) || !abi) {
-        throw new Error("The selected account state is not a supported Wallet V5 R1")
+      const actualSchema = getWalletExternalSchema(abi, external)
+      if (!actualSchema || !abi || actualSchema.signedStruct !== walletSchema?.signedStruct) {
+        throw new Error("The selected account state does not match this wallet type")
       }
       const storage = decodeAbiStorageDataBoc(abi, account.data.toBoc().toString("hex")) as Record<
         string,
@@ -830,6 +836,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
       targetAddress,
       timeOverrideInput,
       timeOverrideMode,
+      walletSchema,
     ],
   )
 
@@ -2068,8 +2075,9 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
               {canConfigureMessage &&
                 selectedBuilderOption &&
                 messageSymbols &&
-                (walletV5 ? (
-                  <WalletV5MessageEditor
+                (walletSchema ? (
+                  <WalletMessageEditor
+                    wallet={walletSchema}
                     key={`${network.id}:${targetAddress}:${selectedBuilderOption.id}`}
                     symbols={messageSymbols}
                     tyIdx={selectedBuilderOption.valueTyIdx}
