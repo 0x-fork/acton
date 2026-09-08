@@ -21,6 +21,7 @@ mod auth;
 mod challenge;
 mod claim;
 mod health;
+mod info;
 mod robots;
 mod stats;
 
@@ -50,14 +51,14 @@ pub(crate) fn router(state: AppState) -> Router {
         .route_layer(middleware::from_fn(require_airdrop_headers));
 
     Router::new()
-        .route("/", get(health::root))
+        .route("/", get(info::root))
         .route("/openapi.json", get(openapi_handler))
         .route("/robots.txt", get(robots::robots_txt))
-        .route("/ready", get(health::ok))
-        .route("/health", get(health::ok))
-        .route("/metrics", get(health::ok))
+        .route("/ready", get(info::ok))
+        .route("/health", get(health::health))
+        .route("/metrics", get(info::ok))
         .route("/stats", get(stats::get_stats))
-        .route("/version", get(health::version))
+        .route("/version", get(info::version))
         .route("/auth/github/start", get(auth::github_start))
         .route("/auth/github/callback", get(auth::github_callback))
         .merge(browser_auth_routes)

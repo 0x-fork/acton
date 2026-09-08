@@ -129,6 +129,17 @@ impl ValkeyStore {
         Ok(Self { connection })
     }
 
+    pub async fn ping(&self) -> anyhow::Result<()> {
+        let mut connection = self.connection.clone();
+        let response: String = redis::cmd("PING")
+            .query_async(&mut connection)
+            .await
+            .context("Failed to ping Valkey")?;
+        anyhow::ensure!(response == "PONG", "Unexpected Valkey PING response");
+
+        Ok(())
+    }
+
     pub async fn add_sent_amount(&self, amount: u64) -> anyhow::Result<u64> {
         let mut connection = self.connection.clone();
         redis::cmd("INCRBY")

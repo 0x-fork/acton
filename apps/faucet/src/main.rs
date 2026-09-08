@@ -15,6 +15,7 @@ use faucet_valkey::{
 use github_auth::GitHubAuth;
 use handlers::CreateClaim;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
+use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -135,6 +136,7 @@ async fn main() -> anyhow::Result<()> {
 
     let shared_state = AppState {
         storage: storage.clone(),
+        database: pool,
         wallet: Arc::new(wallet),
         client: client.clone(),
         pow: Pow::new(config.pow.difficulty),
@@ -294,6 +296,7 @@ async fn shutdown_signal() {
 #[derive(Clone)]
 pub(crate) struct AppState {
     pub(crate) storage: SqliteStorage<CreateClaim, JsonCodec<CompactType>, HookCallbackListener>,
+    pub(crate) database: SqlitePool,
     wallet: Arc<Wallet>,
     client: Arc<ToncenterClient>,
     pub(crate) pow: Pow,
