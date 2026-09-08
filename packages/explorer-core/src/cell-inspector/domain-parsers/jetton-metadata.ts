@@ -41,11 +41,7 @@ function readSnakeText(initialSlice: Slice): string | undefined {
 
   while (slice) {
     cellCount += 1
-    if (
-      cellCount > MAX_SNAKE_CELLS ||
-      slice.remainingBits % 8 !== 0 ||
-      slice.remainingRefs > 1
-    ) {
+    if (cellCount > MAX_SNAKE_CELLS || slice.remainingBits % 8 !== 0 || slice.remainingRefs > 1) {
       return undefined
     }
 
@@ -77,11 +73,7 @@ function parseOnChainJettonMetadata(cell: Cell): DomainParserMatch | undefined {
 
   let dictionary: Dictionary<bigint, Cell>
   try {
-    dictionary = Dictionary.load(
-      Dictionary.Keys.BigUint(256),
-      Dictionary.Values.Cell(),
-      slice,
-    )
+    dictionary = Dictionary.load(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell(), slice)
   } catch {
     return undefined
   }
@@ -168,11 +160,7 @@ function parseMetadataUri(cell: Cell): DomainParserMatch | undefined {
   return metadataUriMatch(uri, wrapped ? "Referenced snake string" : "Snake string", false)
 }
 
-function metadataUriMatch(
-  uri: string,
-  layout: string,
-  isTep64: boolean,
-): DomainParserMatch {
+function metadataUriMatch(uri: string, layout: string, isTep64: boolean): DomainParserMatch {
   return {
     data: {storage: isTep64 ? "off-chain" : "uri", uri},
     parsedValue: {
@@ -197,9 +185,7 @@ function metadataUriMatch(
 
 function parseJettonMetadata(cell: Cell): DomainParserMatch | undefined {
   return (
-    parseOnChainJettonMetadata(cell) ??
-    parseOffChainJettonMetadata(cell) ??
-    parseMetadataUri(cell)
+    parseOnChainJettonMetadata(cell) ?? parseOffChainJettonMetadata(cell) ?? parseMetadataUri(cell)
   )
 }
 
