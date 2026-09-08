@@ -23,7 +23,7 @@ import {
 import type {TonClient} from "@acton/explorer-core/api/client"
 import {
   loadJettonWalletsWithMasters,
-  sortJettonWalletsByAmount,
+  sortJettonWalletsForDisplay,
 } from "@acton/explorer-core/api/jettonWallets"
 import type {JettonWallet} from "@acton/explorer-core/api/types"
 import {ExplorerAddressChip} from "@acton/explorer-core/components/ExplorerAddressChip"
@@ -117,7 +117,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
           nextTokensById[walletId].push(tokenWallet)
         }
         for (const [walletId, tokenWalletsForWallet] of Object.entries(nextTokensById)) {
-          nextTokensById[walletId] = sortJettonWalletsByAmount(tokenWalletsForWallet)
+          nextTokensById[walletId] = sortJettonWalletsForDisplay(tokenWalletsForWallet)
         }
         if (walletTokensRequestRef.current === requestId) {
           setWalletTokensById(nextTokensById)
