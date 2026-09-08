@@ -133,21 +133,29 @@ export function buildAbiMessageBoc({
   bounce = true,
   argsJson,
 }: BuildAbiMessageBocOptions): string {
+  return buildMessageBoc({
+    transport: option.transport,
+    destinationAddress: Address.parse(destination.trim()),
+    source,
+    value,
+    bounce,
+    body: buildAbiMessageBody({abi, option, argsJson}),
+  })
+}
+
+/** Builds only the payload so wallet actions can reuse the ABI builder with MessageRelaxed. */
+export function buildAbiMessageBody({
+  abi,
+  option,
+  argsJson,
+}: Pick<BuildAbiMessageBocOptions, "abi" | "option" | "argsJson">): Message["body"] {
   const ctx = new DynamicCtx(abi)
-  const destinationAddress = Address.parse(destination.trim())
   const input = parseBuilderArgsJson(argsJson)
   const normalizedInput = normalizeAbiDynamicArg(ctx, option.valueTyIdx, input)
   const bodyValue = option.union ? buildUnionInput(option, normalizedInput) : normalizedInput
   const bodyBuilder = beginCell()
   packToBuilderDynamic(ctx, option.bodyTyIdx, bodyValue, bodyBuilder)
-  return buildMessageBoc({
-    transport: option.transport,
-    destinationAddress,
-    source,
-    value,
-    bounce,
-    body: bodyBuilder.endCell(),
-  })
+  return bodyBuilder.endCell()
 }
 
 export function buildEmptyMessageBoc({

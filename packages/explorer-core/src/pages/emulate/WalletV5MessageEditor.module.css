@@ -1,0 +1,67 @@
+.fields,
+.messages,
+.message {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+}
+
+.messages {
+  padding-block: var(--acton-space-2);
+}
+
+.message {
+  padding-block: var(--acton-space-3);
+  border-top: 1px solid var(--acton-color-border);
+}
+
+.header {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--acton-space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-1);
+}
+
+.hint {
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* Compact form disclosures keep the shared chevron and keyboard focus without a full-row halo. */
+.disclosure > summary {
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: 2rem;
+  padding-block: var(--acton-space-1);
+}
+
+.disclosure > .disclosureContent {
+  padding-block: var(--acton-space-2);
+}
+.walletEditor > div {
+  gap: var(--acton-space-4);
+}
+
+/* The text cursor shares the chip container's surface, unlike standalone Simulator inputs. */
+.walletEditor .sendModes input[role="combobox"] {
+  background: transparent;
+}

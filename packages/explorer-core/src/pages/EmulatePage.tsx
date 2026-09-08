@@ -106,6 +106,8 @@ import {
   type TraceTransactionEnrichmentResult,
 } from "./transactionTraceEnrichment"
 import styles from "./EmulatePage.module.css"
+import {WalletV5MessageEditor, type WalletV5Parameter} from "./emulate/WalletV5MessageEditor"
+import {isWalletV5ExternalMessage} from "./emulate/walletV5"
 
 type EmulateInputMode = "builder" | "raw"
 type AbiSourceMode = "auto" | "manual"
@@ -116,6 +118,7 @@ const EMULATE_ADDRESS_QUERY_PARAM = "address"
 const EMULATE_SOURCE_QUERY_PARAM = "source"
 const EMULATE_ABI_ENDPOINT_QUERY_PARAM = "abiEndpoint"
 const EMULATE_VALUE_QUERY_PARAM = "value"
+const EMULATE_TRANSPORT_QUERY_PARAM = "transport"
 const EMULATE_BOUNCE_QUERY_PARAM = "bounce"
 const EMULATE_MC_SEQNO_QUERY_PARAM = "mcSeqno"
 const EMULATE_IGNORE_CHKSIG_QUERY_PARAM = "ignoreChksig"
@@ -131,6 +134,7 @@ interface EmulateSearchFields {
   readonly sourceAddress: string
   readonly abiEndpoint: EmulateAbiEndpoint
   readonly messageValue: string
+  readonly messageTransport: AbiMessageTransport
   readonly bounce: boolean
   readonly mcSeqnoInput: string
   readonly ignoreChksig: boolean
@@ -141,12 +145,18 @@ interface EmulateSearchFields {
 
 function readEmulateSearchFields(searchParams: URLSearchParams): EmulateSearchFields {
   const timeMode = searchParams.get(EMULATE_TIME_MODE_QUERY_PARAM)
+  const messageTransport =
+    searchParams.get(EMULATE_TRANSPORT_QUERY_PARAM) === "external" ? "external" : "internal"
   return {
     targetAddress: searchParams.get(EMULATE_ADDRESS_QUERY_PARAM) ?? "",
     sourceAddress: searchParams.get(EMULATE_SOURCE_QUERY_PARAM) ?? "",
     abiEndpoint:
-      searchParams.get(EMULATE_ABI_ENDPOINT_QUERY_PARAM) === "source" ? "source" : "destination",
+      messageTransport === "internal" &&
+      searchParams.get(EMULATE_ABI_ENDPOINT_QUERY_PARAM) === "source"
+        ? "source"
+        : "destination",
     messageValue: searchParams.get(EMULATE_VALUE_QUERY_PARAM) ?? DEFAULT_MESSAGE_VALUE,
+    messageTransport,
     bounce: searchParams.get(EMULATE_BOUNCE_QUERY_PARAM) !== "false",
     mcSeqnoInput: searchParams.get(EMULATE_MC_SEQNO_QUERY_PARAM) ?? "",
     ignoreChksig: searchParams.get(EMULATE_IGNORE_CHKSIG_QUERY_PARAM) === "true",
@@ -165,6 +175,7 @@ function areEmulateSearchFieldsEqual(
     left.sourceAddress === right.sourceAddress &&
     left.abiEndpoint === right.abiEndpoint &&
     left.messageValue === right.messageValue &&
+    left.messageTransport === right.messageTransport &&
     left.bounce === right.bounce &&
     left.mcSeqnoInput === right.mcSeqnoInput &&
     left.ignoreChksig === right.ignoreChksig &&
@@ -273,7 +284,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
     () => navigationPayload?.messageValue ?? initialSearchFields.messageValue,
   )
   const [messageTransport, setMessageTransport] = useState<AbiMessageTransport>(
-    () => navigationPayload?.messageTransport ?? "internal",
+    () => navigationPayload?.messageTransport ?? initialSearchFields.messageTransport,
   )
   const [bounce, setBounce] = useState(
     () => navigationPayload?.bounce ?? initialSearchFields.bounce,
@@ -304,6 +315,9 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
     () => navigationPayload?.mcSeqnoInput ?? initialSearchFields.mcSeqnoInput,
   )
   const [ignoreChksig, setIgnoreChksig] = useState(() => initialSearchFields.ignoreChksig)
+  const explicitSignatureMode = useRef(
+    searchParams.has(EMULATE_IGNORE_CHKSIG_QUERY_PARAM) || Boolean(navigationPayload),
+  )
   const [timeOverrideOpen, setTimeOverrideOpen] = useState(false)
   const [timeOverrideMode, setTimeOverrideMode] = useState<TimeOverrideMode>(
     () => initialSearchFields.timeOverrideMode,
@@ -474,6 +488,19 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
   const selectedBuilderOption = builderOptions.find(option =>
     abiMessageBuilderOptionMatchesName(option, selectedMessageName),
   )
+  const walletV5 =
+    abiEndpoint === "destination" && isWalletV5ExternalMessage(activeAbi, selectedBuilderOption)
+
+  useEffect(() => {
+    if (walletV5 && inputMode === "builder" && !explicitSignatureMode.current) {
+      setIgnoreChksig(true)
+    }
+  }, [walletV5, inputMode])
+
+  const changeSignatureMode = useCallback((ignore: boolean) => {
+    explicitSignatureMode.current = true
+    setIgnoreChksig(ignore)
+  }, [])
   const isEmptyMessageSelected =
     selectedMessageName === EMPTY_MESSAGE_ID || builderOptions.length === 0
   const builderPreview = useMemo(
@@ -602,6 +629,10 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
     setSourceAddress(fieldsFromUrl.sourceAddress)
     setAbiEndpoint(fieldsFromUrl.abiEndpoint)
     setMessageValue(fieldsFromUrl.messageValue)
+    if (fieldsFromUrl.messageTransport !== previousFields.messageTransport) {
+      setSelectedMessageName("")
+    }
+    setMessageTransport(fieldsFromUrl.messageTransport)
     setBounce(fieldsFromUrl.bounce)
     if (fieldsFromUrl.mcSeqnoInput !== previousFields.mcSeqnoInput) {
       baseBlockUnixTimeQuery.current = undefined
@@ -625,6 +656,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
       sourceAddress: sourceAddress.trim(),
       abiEndpoint,
       messageValue: messageValue.trim() || DEFAULT_MESSAGE_VALUE,
+      messageTransport,
       bounce,
       mcSeqnoInput: mcSeqnoInput.trim(),
       ignoreChksig,
@@ -657,6 +689,11 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
     } else {
       nextParams.set(EMULATE_VALUE_QUERY_PARAM, nextFields.messageValue)
     }
+    if (nextFields.messageTransport === "external") {
+      nextParams.set(EMULATE_TRANSPORT_QUERY_PARAM, "external")
+    } else {
+      nextParams.delete(EMULATE_TRANSPORT_QUERY_PARAM)
+    }
     if (nextFields.bounce) {
       nextParams.delete(EMULATE_BOUNCE_QUERY_PARAM)
     } else {
@@ -667,8 +704,8 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
     } else {
       nextParams.delete(EMULATE_MC_SEQNO_QUERY_PARAM)
     }
-    if (nextFields.ignoreChksig) {
-      nextParams.set(EMULATE_IGNORE_CHKSIG_QUERY_PARAM, "true")
+    if (nextFields.ignoreChksig || walletV5) {
+      nextParams.set(EMULATE_IGNORE_CHKSIG_QUERY_PARAM, String(nextFields.ignoreChksig))
     } else {
       nextParams.delete(EMULATE_IGNORE_CHKSIG_QUERY_PARAM)
     }
@@ -695,6 +732,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
     ignoreChksig,
     increaseTimeInput,
     mcSeqnoInput,
+    messageTransport,
     messageValue,
     searchParams,
     setSearchParams,
@@ -702,7 +740,98 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
     targetAddress,
     timeOverrideMode,
     unixTimestampInput,
+    walletV5,
   ])
+
+  const loadWalletEditorAccount = useCallback(
+    async (address: string) => {
+      const overrides = buildAccountStateOverrides({
+        enabled: stateOverrideEnabled,
+        entries: stateOverrideEntries,
+        storagePreviews: stateOverrideStoragePreviews,
+      })
+      const override = Object.entries(overrides ?? {}).find(
+        ([key]) => addressKey(key) === addressKey(address),
+      )?.[1]
+      if (override?.state && override.state.type !== "active") {
+        throw new Error("The selected account state is not active")
+      }
+
+      // Read the exact selected state, then apply the same overrides as the emulator.
+      const state = override?.state?.type === "active" ? override.state : undefined
+      let code = state?.codeBoc ? parseAbiCellArg(state.codeBoc) : undefined
+      let data = state?.dataBoc ? parseAbiCellArg(state.dataBoc) : undefined
+      if (!code || !data) {
+        const boc = await client.getShardAccountCell(address, parseMcSeqno(mcSeqnoInput))
+        const account = loadShardAccount(Cell.fromBase64(boc).beginParse()).account
+        const current = account?.storage.state
+        if (current?.type !== "active") throw new Error("The selected account state is not active")
+        code ??= current.state.code ?? undefined
+        data ??= current.state.data ?? undefined
+      }
+      if (!code || !data) throw new Error("The selected account state has no code or data")
+
+      const codeHash = code.hash().toString("hex")
+      const records = await metadataRegistry.getCompilerAbis([codeHash])
+      return {data, abi: records[codeHash]?.compiler_abi}
+    },
+    [
+      client,
+      mcSeqnoInput,
+      metadataRegistry,
+      stateOverrideEnabled,
+      stateOverrideEntries,
+      stateOverrideStoragePreviews,
+    ],
+  )
+
+  const loadRecipientAbi = useCallback(
+    async (address: string) => {
+      return (await loadWalletEditorAccount(address)).abi
+    },
+    [loadWalletEditorAccount],
+  )
+
+  const fetchWalletParameter = useCallback(
+    async (name: WalletV5Parameter): Promise<string> => {
+      if (name === "validUntil") {
+        const mcSeqno = parseMcSeqno(mcSeqnoInput)
+        const now =
+          (await resolveEmulationUnixTime({
+            client,
+            mcSeqno,
+            mode: timeOverrideMode,
+            value: timeOverrideInput,
+          })) ?? (await loadEmulationBlockUnixTime(client, mcSeqno))
+        if (now + 300 > MAX_UINT32) throw new Error("The expiration time exceeds uint32")
+        return String(now + 300)
+      }
+
+      const account = await loadWalletEditorAccount(targetAddress.trim())
+      const abi = account.abi
+      const external = abi ? listAbiMessageBuilderOptions(abi, "external")[0] : undefined
+      if (!isWalletV5ExternalMessage(abi, external) || !abi) {
+        throw new Error("The selected account state is not a supported Wallet V5 R1")
+      }
+      const storage = decodeAbiStorageDataBoc(abi, account.data.toBoc().toString("hex")) as Record<
+        string,
+        unknown
+      >
+      const value = storage[name === "walletId" ? "subwalletId" : "seqno"]
+      if (value === undefined || parseOptionalUint32(String(value)) === undefined) {
+        throw new Error(`The wallet state does not contain a valid ${name}`)
+      }
+      return String(value)
+    },
+    [
+      client,
+      loadWalletEditorAccount,
+      mcSeqnoInput,
+      targetAddress,
+      timeOverrideInput,
+      timeOverrideMode,
+    ],
+  )
 
   const createStateOverrideDraft = useCallback(
     (address = "") =>
@@ -1071,6 +1200,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
   const applySharedEmulation = useCallback(
     (emulation: SharedEmulation) => {
       applyEmulateNavigationPayload(emulation.input)
+      explicitSignatureMode.current = true
       setIgnoreChksig(emulation.options.ignoreChksig)
       setTimeOverrideMode("timestamp")
       setIncreaseTimeInput("")
@@ -1643,7 +1773,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
 
         <Checkbox
           checked={ignoreChksig}
-          onChange={event => setIgnoreChksig(event.target.checked)}
+          onChange={event => changeSignatureMode(event.target.checked)}
           disabled={isLoading}
           label="Ignore CHKSIG"
           description="Skip signature checks during emulation"
@@ -1935,21 +2065,43 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
                 </Select>
               )}
 
-              {canConfigureMessage && selectedBuilderOption && messageSymbols && (
-                <AbiValueEditor
-                  symbols={messageSymbols}
-                  tyIdx={selectedBuilderOption.valueTyIdx}
-                  value={argsFormValue}
-                  initialValue={
-                    navigationBuilder && selectedMessageName === navigationBuilder.messageName
-                      ? navigationBuilderInitialValue
-                      : undefined
-                  }
-                  onChange={handleArgsFormChange}
-                  addressSuggestions={favoriteAddressSuggestions}
-                  disabled={isLoading}
-                />
-              )}
+              {canConfigureMessage &&
+                selectedBuilderOption &&
+                messageSymbols &&
+                (walletV5 ? (
+                  <WalletV5MessageEditor
+                    key={`${network.id}:${targetAddress}:${selectedBuilderOption.id}`}
+                    symbols={messageSymbols}
+                    tyIdx={selectedBuilderOption.valueTyIdx}
+                    value={argsFormValue}
+                    initialValue={
+                      navigationBuilder && selectedMessageName === navigationBuilder.messageName
+                        ? navigationBuilderInitialValue
+                        : undefined
+                    }
+                    onChange={handleArgsFormChange}
+                    addressSuggestions={favoriteAddressSuggestions}
+                    disabled={isLoading}
+                    ignoreChksig={ignoreChksig}
+                    fetchParameter={fetchWalletParameter}
+                    loadRecipientAbi={loadRecipientAbi}
+                    initializeParameters={!navigationBuilder}
+                  />
+                ) : (
+                  <AbiValueEditor
+                    symbols={messageSymbols}
+                    tyIdx={selectedBuilderOption.valueTyIdx}
+                    value={argsFormValue}
+                    initialValue={
+                      navigationBuilder && selectedMessageName === navigationBuilder.messageName
+                        ? navigationBuilderInitialValue
+                        : undefined
+                    }
+                    onChange={handleArgsFormChange}
+                    addressSuggestions={favoriteAddressSuggestions}
+                    disabled={isLoading}
+                  />
+                ))}
             </section>
           </div>
         ) : (

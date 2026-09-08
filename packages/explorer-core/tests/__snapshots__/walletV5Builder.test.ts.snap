@@ -1,0 +1,72 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Wallet V5 simulator builder recognizes the complete V5 external schema, leaving other wallets and similarly named fields alone 1`] = `
+{
+  "external": true,
+  "internal": false,
+  "renamed": false,
+  "v4": false,
+  "wrongType": false,
+}
+`;
+
+exports[`Wallet V5 simulator builder serializes an external V5 request with ordered messages, ABI payload, StateInit and a zero signature 1`] = `
+{
+  "actions": [
+    {
+      "bounce": true,
+      "mode": 3,
+      "stateInit": false,
+      "to": "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+      "value": "123456789",
+    },
+    {
+      "bounce": false,
+      "mode": 3,
+      "stateInit": true,
+      "to": "EQAiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIp3C",
+      "value": "2500000000",
+    },
+  ],
+  "decodedPayload": {
+    "$": "WalletExtensionActionV5r1",
+    "extendedActions": null,
+    "outActions": null,
+    "queryId": "427",
+  },
+  "extended": false,
+  "header": {
+    "opcode": "7369676e",
+    "seqno": 427,
+    "validUntil": 1788858300,
+    "walletId": 2147483409,
+  },
+  "reversed": [
+    "EQAiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIp3C",
+    "EQAREREREREREREREREREREREREREREREREREREREREREeYT",
+  ],
+  "roundTrip": true,
+  "signatureBits": "0",
+  "transport": "external-in",
+}
+`;
+
+exports[`Wallet V5 simulator builder keeps relaxed headers and extra currencies when opening an existing list 1`] = `
+{
+  "absent": [],
+  "amount": "9.87654321",
+  "empty": [],
+  "identical": true,
+}
+`;
+
+exports[`Wallet V5 simulator builder rejects incomplete drafts and preserves unsupported raw actions 1`] = `
+[
+  true,
+  true,
+  true,
+  true,
+  true,
+  true,
+]
+`;

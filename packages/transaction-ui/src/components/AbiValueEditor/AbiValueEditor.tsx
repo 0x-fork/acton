@@ -1,5 +1,6 @@
 import {
   createContext,
+  Fragment,
   useContext,
   useEffect,
   useMemo,
@@ -18,7 +19,23 @@ import styles from "./AbiValueEditor.module.css"
 
 const AddressSuggestionsContext = createContext<readonly TonAddressSuggestion[]>([])
 
+/** A domain editor can replace a struct field while retaining the generic ABI fallback. */
+export interface AbiFieldEditorProps {
+  readonly structName: string
+  readonly name: string
+  readonly tyIdx: number
+  readonly value: unknown
+  readonly onChange: (value: unknown) => void
+  readonly disabled: boolean
+  readonly defaultEditor: ReactNode
+}
+
+type AbiFieldRenderer = (field: AbiFieldEditorProps) => ReactNode
+
+const FieldRendererContext = createContext<AbiFieldRenderer | undefined>(undefined)
+
 export interface AbiValueEditorProps {
+  readonly className?: string
   readonly symbols: SymTable
   readonly tyIdx: number
   readonly value: unknown
@@ -29,9 +46,12 @@ export interface AbiValueEditorProps {
   readonly invalid?: boolean
   readonly label?: string
   readonly addressSuggestions?: readonly TonAddressSuggestion[]
+  /** Match the owning struct and field type, not just a field name shared by unrelated ABIs. */
+  readonly renderField?: AbiFieldRenderer
 }
 
 export function AbiValueEditor({
+  className,
   symbols,
   tyIdx,
   value,
@@ -41,6 +61,7 @@ export function AbiValueEditor({
   invalid = false,
   label,
   addressSuggestions = [],
+  renderField,
 }: AbiValueEditorProps) {
   const appliedInitialValue = useRef<unknown>(undefined)
 
@@ -55,19 +76,21 @@ export function AbiValueEditor({
 
   return (
     <AddressSuggestionsContext.Provider value={addressSuggestions}>
-      <div
-        className={`${styles.editor} ${invalid ? styles.invalid : ""}`}
-        aria-invalid={invalid || undefined}
-      >
-        <AbiValueEditorNode
-          symbols={symbols}
-          tyIdx={tyIdx}
-          value={value}
-          onChange={onChange}
-          disabled={disabled}
-          label={label}
-        />
-      </div>
+      <FieldRendererContext.Provider value={renderField}>
+        <div
+          className={`${styles.editor} ${invalid ? styles.invalid : ""} ${className ?? ""}`}
+          aria-invalid={invalid || undefined}
+        >
+          <AbiValueEditorNode
+            symbols={symbols}
+            tyIdx={tyIdx}
+            value={value}
+            onChange={onChange}
+            disabled={disabled}
+            label={label}
+          />
+        </div>
+      </FieldRendererContext.Provider>
     </AddressSuggestionsContext.Provider>
   )
 }
@@ -142,6 +165,7 @@ function AbiValueEditorNode({
   hideHeader = false,
 }: AbiValueEditorNodeProps) {
   const addressSuggestions = useContext(AddressSuggestionsContext)
+  const renderField = useContext(FieldRendererContext)
   const ty = tryTyByIdx(symbols, tyIdx)
   const typeLabel = useMemo(() => safeRenderTy(symbols, tyIdx), [symbols, tyIdx])
   if (!ty) {
@@ -474,19 +498,40 @@ function AbiValueEditorNode({
             group
           />
           {fields.length === 0 && <span className={styles.emptyValue}>No fields</span>}
-          {fields.map(field => (
-            <AbiValueEditorNode
-              key={field.name}
-              symbols={symbols}
-              tyIdx={field.ty_idx}
-              value={
-                isRecord(value) ? value[field.name] : sampleAbiValueForTy(symbols, field.ty_idx)
-              }
-              onChange={next => onChange({...recordValue(value), [field.name]: next})}
-              disabled={disabled}
-              label={field.name}
-            />
-          ))}
+          {fields.map(field => {
+            const fieldValue = isRecord(value)
+              ? value[field.name]
+              : sampleAbiValueForTy(symbols, field.ty_idx)
+            const changeField = (next: unknown) =>
+              onChange({...recordValue(value), [field.name]: next})
+            const defaultEditor = (
+              <AbiValueEditorNode
+                key={field.name}
+                symbols={symbols}
+                tyIdx={field.ty_idx}
+                value={fieldValue}
+                onChange={changeField}
+                disabled={disabled}
+                label={field.name}
+              />
+            )
+
+            return renderField ? (
+              <Fragment key={field.name}>
+                {renderField({
+                  structName: ty.struct_name,
+                  name: field.name,
+                  tyIdx: field.ty_idx,
+                  value: fieldValue,
+                  onChange: changeField,
+                  disabled,
+                  defaultEditor,
+                })}
+              </Fragment>
+            ) : (
+              defaultEditor
+            )
+          })}
         </div>
       )
     }
