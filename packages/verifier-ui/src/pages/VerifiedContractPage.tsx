@@ -88,11 +88,6 @@ const compilerTagSources: Readonly<
 }
 
 const compilerTagOverrides: Readonly<Record<string, Readonly<Record<string, string | null>>>> = {
-  func: {
-    "0.4.5": null,
-    "0.4.6": null,
-    "0.4.6-wasmfix.0": null,
-  },
   tolk: {
     "0.6.0": null,
     "0.7.0": "tolk0.7",
@@ -108,7 +103,7 @@ function compilerTag(language: string, version: string, tagPrefix: string): stri
   if (override === null) {
     return undefined
   }
-  if (override) {
+  if (override !== undefined) {
     return override
   }
 
