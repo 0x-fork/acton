@@ -8,6 +8,8 @@ These addresses are not fixtures and their balances or recent history can change
 
 | Address | What to verify | Last checked |
 | --- | --- | --- |
+| [`EQAVUSshxwidTs6F1kckyH4OxkM9fl2aoZG-Lh3x5DiZ8s7C`](https://actonscan.com/address/EQAVUSshxwidTs6F1kckyH4OxkM9fl2aoZG-Lh3x5DiZ8s7C?network=mainnet) | STONCAT master: generic TEP-74 ABI fallback, successful get_jetton_data decoding and raw storage without an assumed layout | 2026-09-09 |
+| [`EQBzU2fioouNYWoD3f064TwSM3C1pNnO47dW1VUhWGZOhwm8`](https://actonscan.com/address/EQBzU2fioouNYWoD3f064TwSM3C1pNnO47dW1VUhWGZOhwm8?network=mainnet) | STONCAT wallet: generic TEP-74 ABI fallback and successful get_wallet_data decoding with owner and master addresses | 2026-09-09 |
 | [`UQA9Xxv6Ig-SvxM_j_Xde6XTOG3ftJfEYUFFLauvq5wyHMru`](https://actonscan.com/address/UQA9Xxv6Ig-SvxM_j_Xde6XTOG3ftJfEYUFFLauvq5wyHMru?network=mainnet) | Wallet V4 R1 Simulator: automatic wallet ID and seqno, signed external simple send with a 0.1 GRAM self-message and comment under Ignore CHKSIG; compute and action exit codes are 0 and the message remains editable after emulation | 2026-09-08 |
 | [`UQAtPMPoGXJzm6zvqeRcK6IzgJa8RpISp0xpMPgOgj5ggKaV`](https://actonscan.com/address/UQAtPMPoGXJzm6zvqeRcK6IzgJa8RpISp0xpMPgOgj5ggKaV?network=mainnet) | Wallet V4 R2 Simulator: automatic wallet ID and seqno through the bits264 plugin-dictionary fallback, 0.1 GRAM self-message with comment, compute and action exit codes 0, lossless raw/builder switching and four-message limit | 2026-09-08 |
 | [`EQDV9A9W0GpbnFhiI6hJkGUSNIqU7Nxx-rn5FVQsAc7ZkfZB`](https://actonscan.com/address/EQDV9A9W0GpbnFhiI6hJkGUSNIqU7Nxx-rn5FVQsAc7ZkfZB?network=mainnet) | Frozen account state, no Contract type row, Unfreezer link next to Tonscan | 2026-07-30 |
@@ -81,6 +83,7 @@ The early `v0 -> v1 -> v0 -> v1` rollback means this history cannot be found saf
 
 | Transaction | What to verify | Last checked |
 | --- | --- | --- |
+| [`37bf9a98ff1355d179dd7b8f95a45aeb6566cbeccb2d97b2585d4e5924ad3302`](https://actonscan.com/tx/37bf9a98ff1355d179dd7b8f95a45aeb6566cbeccb2d97b2585d4e5924ad3302?network=mainnet) | STONCAT transfer trace: standard Jetton ABI names in the tree and parsed transfer/internal-transfer bodies, including referenced forward payload; no storage loading for an interface-only ABI | 2026-09-09 |
 | [`8199e63661cc9db0764d81403d17679e154aa24a725b632f6936402a2442319e`](https://actonscan.com/tx/8199e63661cc9db0764d81403d17679e154aa24a725b632f6936402a2442319e?network=mainnet) | Large trace with 240 actions and 241 transactions, useful for checking that Actions and Value Flow start with 10 full rows plus one faded preview row, remain responsive, and reveal the full table and Value Flow total on demand | 2026-08-10 |
 | [`2a88c08d3411efa6dc08acfdce87389c98ea03a52f696a00882f71cba3682fde`](https://actonscan.com/tx/2a88c08d3411efa6dc08acfdce87389c98ea03a52f696a00882f71cba3682fde?network=mainnet) | `DnsDomainItemChangeDnsRecord` with a referenced value slice containing a `dns_smc_address`, useful for checking Slice handoff to Cell Inspector and TON DNS domain parsing | 2026-09-08 |
 | [`1d0aac90eae0914432710b859d6d4c6bb42aa36141f29fe00165cc240cc17a87`](https://actonscan.com/tx/1d0aac90eae0914432710b859d6d4c6bb42aa36141f29fe00165cc240cc17a87?network=mainnet) | Opening Actions in the transaction details reproduces `Cannot parse stack:` | 2026-08-02 |
