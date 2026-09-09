@@ -1,7 +1,7 @@
 use std::{
     path::{Component, Path, PathBuf},
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use async_trait::async_trait;
@@ -17,6 +17,8 @@ use tokio::{
 use utoipa::ToSchema;
 
 use crate::config::Config;
+
+const GIT_COMMAND_TIMEOUT: Duration = Duration::from_mins(1);
 
 #[async_trait]
 pub trait SourceStorage: Send + Sync + 'static {
@@ -867,9 +869,9 @@ async fn git_with_author(
     storage: &GitSourceStorage,
     verified_at: u64,
 ) -> Result<(), SourceStorageError> {
-    let command = git_command_string(args);
     let git_date = format!("{verified_at} +0000");
-    let output = Command::new("git")
+    let mut command = Command::new("git");
+    command
         .args(args)
         .current_dir(repo_path)
         .env("GIT_AUTHOR_NAME", &storage.author_name)
@@ -877,13 +879,8 @@ async fn git_with_author(
         .env("GIT_AUTHOR_DATE", &git_date)
         .env("GIT_COMMITTER_NAME", &storage.author_name)
         .env("GIT_COMMITTER_EMAIL", &storage.author_email)
-        .env("GIT_COMMITTER_DATE", &git_date)
-        .output()
-        .await
-        .map_err(|source| SourceStorageError::GitSpawn {
-            command: command.clone(),
-            source,
-        })?;
+        .env("GIT_COMMITTER_DATE", &git_date);
+    let output = run_git_command(command, args, GIT_COMMAND_TIMEOUT).await?;
 
     if output.status.success() {
         return Ok(());
@@ -896,13 +893,34 @@ async fn git_command(
     repo_path: &Path,
     args: &[&str],
 ) -> Result<std::process::Output, SourceStorageError> {
-    let command = git_command_string(args);
-    Command::new("git")
-        .args(args)
-        .current_dir(repo_path)
-        .output()
+    let mut command = Command::new("git");
+    command.args(args).current_dir(repo_path);
+    run_git_command(command, args, GIT_COMMAND_TIMEOUT).await
+}
+
+// Storage holds a mutex across Git operations. A stalled remote or credential
+// prompt must not block all subsequent writes and registry reads indefinitely.
+async fn run_git_command(
+    mut command: Command,
+    args: &[&str],
+    timeout: Duration,
+) -> Result<std::process::Output, SourceStorageError> {
+    command
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .stdin(std::process::Stdio::null())
+        .kill_on_drop(true);
+    let command_name = git_command_string(args);
+    tokio::time::timeout(timeout, command.output())
         .await
-        .map_err(|source| SourceStorageError::GitSpawn { command, source })
+        .map_err(|_| SourceStorageError::Git {
+            command: command_name.clone(),
+            status: "timed out".to_owned(),
+            stderr: format!("Git exceeded its {} ms deadline", timeout.as_millis()),
+        })?
+        .map_err(|source| SourceStorageError::GitSpawn {
+            command: command_name,
+            source,
+        })
 }
 
 async fn current_branch(repo_path: &Path) -> Result<String, SourceStorageError> {
@@ -983,4 +1001,45 @@ struct DiskManifestFile {
     pub is_stdlib: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub has_include_directives: Option<bool>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn git_process_has_closed_stdin_and_disables_credential_prompts() {
+        let mut command = Command::new("node");
+        command.args([
+            "--eval",
+            "process.stdin.on('data', () => { throw new Error('unexpected input') }); \
+             process.stdin.on('end', () => process.stdout.write(process.env.GIT_TERMINAL_PROMPT))",
+        ]);
+        let output = run_git_command(command, &["probe"], Duration::from_secs(3))
+            .await
+            .expect("process completes");
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"0");
+    }
+
+    #[tokio::test]
+    async fn stalled_git_process_releases_storage_with_retryable_push_context() {
+        let mut command = Command::new("node");
+        command.args(["--eval", "setInterval(() => {}, 1000)"]);
+        let result = tokio::time::timeout(
+            Duration::from_secs(3),
+            run_git_command(
+                command,
+                &["push", "origin", "HEAD:main"],
+                Duration::from_millis(100),
+            ),
+        )
+        .await
+        .expect("deadline must cover a stalled process");
+        let error = result.expect_err("process must time out");
+        assert!(
+            matches!(&error, SourceStorageError::Git { command, status, .. } if command == "git push origin HEAD:main" && status == "timed out")
+        );
+        assert!(crate::error::ApiError::from(error).is_payment_retryable());
+    }
 }

@@ -59,7 +59,7 @@ export async function compileTact(input) {
 
 function tactPkgSource(input) {
   const pkgSource = input.sources
-    .filter((source) => normalizeSourcePath(source.path).endsWith(".pkg"))
+    .filter((source) => normalizeSourcePath(source.path).toLowerCase().endsWith(".pkg"))
     .sort(
       (left, right) =>
         left.path.split("/").length - right.path.split("/").length,

@@ -57,6 +57,50 @@ const SOURCES_ALIASED_FILES: &str = r#"[
   {"path":"contracts/lib.tolk","is_entrypoint":false}
 ]"#;
 
+#[tokio::test]
+async fn verification_admission_rejects_ambiguous_and_excessive_uploads_before_payment() {
+    let mut snapshot = serde_json::Map::new();
+    for (name, value) in [
+        ("code_hash", CODE_HASH_TWO),
+        ("language", "func"),
+        ("compile_params", "{}"),
+        ("sources", "[]"),
+        ("tx_hash", PAYMENT_TX_HASH),
+    ] {
+        let state = payment_error_app_state(CODE_HASH_ONE, PaymentError::AlreadyUsed);
+        let mut parts = valid_verify_parts();
+        parts.push(text_part(name, value));
+        let response = post_verify(state, parts).await;
+        let status = response.status().as_u16();
+        snapshot.insert(
+            name.to_owned(),
+            json!({"status": status, "body": response_json::<Value>(response).await}),
+        );
+    }
+
+    let state = payment_error_app_state(CODE_HASH_ONE, PaymentError::AlreadyUsed);
+    let mut parts = valid_verify_parts();
+    for index in 0..256 {
+        parts.push(owned_file_part(
+            "files",
+            format!("file{index}.tolk"),
+            "text/plain",
+            "",
+        ));
+    }
+    let response = post_verify(state, parts).await;
+    let status = response.status().as_u16();
+    snapshot.insert(
+        "too_many_files".to_owned(),
+        json!({"status": status, "body": response_json::<Value>(response).await}),
+    );
+
+    assert_eq!(
+        format!("{}\n", serde_json::to_string_pretty(&snapshot).unwrap()),
+        include_str!("snapshots/verification_admission.json"),
+    );
+}
+
 async fn post_take_ticket(
     state: verifier::state::AppState,
     code_hash: &str,

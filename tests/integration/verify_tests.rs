@@ -683,7 +683,7 @@ fn test_verify_verifier_reports_mismatch() {
         VerifierMockResponse {
             status: 200,
             body: serde_json::json!({
-                "code_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+                "code_hash": VERIFY_TEST_CODE_HASH,
                 "compiled_code_hash": "2222222222222222222222222222222222222222222222222222222222222222",
                 "verification_result": "mismatch",
                 "source_bundle_hash": null,
@@ -1028,4 +1028,77 @@ fn test_verify_verifier_rejects_network_option() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/verify/test_verify_verifier_rejects_network_option.stderr.txt",
         );
+}
+
+#[test]
+fn test_verify_rejects_inconsistent_success_responses() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-response-integrity");
+    for (field, value, snapshot) in [
+        (
+            "code_hash",
+            serde_json::json!("b".repeat(64)),
+            "wrong-target",
+        ),
+        (
+            "compiled_code_hash",
+            serde_json::json!("b".repeat(64)),
+            "wrong-compiled",
+        ),
+        (
+            "compiled_code_hash",
+            serde_json::Value::Null,
+            "wrong-compiled",
+        ),
+    ] {
+        let mut response = successful_verification_response();
+        let mut body: serde_json::Value = serde_json::from_str(&response.body).unwrap();
+        body[field] = value;
+        response.body = body.to_string();
+        let (mock_url, mock_handle, _) =
+            spawn_verifier_mock(vec![payment_ticket_response(), response]);
+        project
+            .acton()
+            .env("ACTON_VERIFY_BACKEND", &mock_url)
+            .verify()
+            .verify_contract("simple")
+            .arg("--payment-tx-hash")
+            .arg(VERIFY_TEST_PAYMENT_TX_HASH)
+            .run()
+            .failure()
+            .assert_stderr_snapshot_matches(&format!(
+                "integration/snapshots/verify/verify-{snapshot}.stderr.txt"
+            ));
+        mock_handle.join().expect("mock verifier must finish");
+    }
+}
+
+#[test]
+fn test_verify_rejects_unsupported_source_paths_before_payment() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-path-preflight");
+    std::fs::rename(
+        project.path().join("contracts/simple.tolk"),
+        project.path().join("contracts/my contract.tolk"),
+    )
+    .unwrap();
+    let config_path = project.path().join("Acton.toml");
+    let config = std::fs::read_to_string(&config_path)
+        .unwrap()
+        .replace("contracts/simple.tolk", "contracts/my contract.tolk");
+    std::fs::write(config_path, config).unwrap();
+    let (mock_url, mock_handle, _) = spawn_verifier_mock(vec![payment_ticket_response()]);
+    project
+        .acton()
+        .env("ACTON_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .verify_contract("simple")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/verify/verify-path-preflight.stderr.txt",
+        );
+    mock_handle
+        .join()
+        .expect("only a quote should be requested; no payment or upload");
 }

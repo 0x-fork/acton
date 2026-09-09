@@ -1,6 +1,7 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     path::{Component, Path},
+    time::Instant,
 };
 
 use axum::{
@@ -36,6 +37,7 @@ mod languages;
 
 const API_KEY_HEADER: &str = "x-verifier-key";
 const MAX_SOURCE_PATH_CHARS: usize = 128;
+const MAX_UPLOADED_FILES: usize = 256;
 
 #[utoipa::path(
     post,
@@ -82,12 +84,21 @@ async fn handle_multipart(
     let mut verified_at = None;
     let mut tx_hash = None;
     let mut files = Vec::new();
+    let mut seen_fields = BTreeSet::new();
 
     while let Some(field) = multipart
         .next_field()
         .await
         .map_err(|err| ApiError::bad_request(err.to_string()))?
     {
+        if let Some(name) = field.name()
+            && name != "files"
+            && !seen_fields.insert(name.to_owned())
+        {
+            return Err(ApiError::bad_request(format!(
+                "duplicate multipart field: {name}"
+            )));
+        }
         match field.name() {
             Some("address") => {
                 address = Some(
@@ -152,6 +163,11 @@ async fn handle_multipart(
                 );
             }
             Some("files") => {
+                if files.len() >= MAX_UPLOADED_FILES {
+                    return Err(ApiError::bad_request(format!(
+                        "at most {MAX_UPLOADED_FILES} source files may be uploaded"
+                    )));
+                }
                 files.push(read_file_part(field).await?);
             }
             _ => {}
@@ -238,6 +254,14 @@ async fn handle_multipart(
         .as_ref()
         .map(|claim| claim.transaction_hash.clone());
 
+    let started = Instant::now();
+    let target_hash = resolved_target.code_hash.clone();
+    tracing::info!(
+        operation = "verify",
+        target = %target_hash,
+        outcome = "started",
+        "verification started"
+    );
     let result = verify_unverified(
         state,
         resolved_target,
@@ -249,6 +273,14 @@ async fn handle_multipart(
         payment_tx_hash,
     )
     .await;
+
+    tracing::info!(
+        operation = "verify",
+        target = %target_hash,
+        duration_ms = started.elapsed().as_millis(),
+        outcome = if result.is_ok() { "completed" } else { "failed" },
+        "verification finished"
+    );
 
     if let Some(claim) = payment_claim {
         let outcome = if result.as_ref().is_err_and(ApiError::is_payment_retryable) {
@@ -348,14 +380,14 @@ async fn verify_unverified(
         }
     };
 
-    print_verify_request(
-        &resolved_target,
-        &compile_input.language,
-        &compile_params,
-        &compile_input.sources,
-        &compiled_code_hash,
-        source_bundle_hash.as_deref(),
-        verification_result,
+    tracing::info!(
+        operation = "verify",
+        target = %resolved_target.code_hash,
+        language = %compile_input.language,
+        compiled_code_hash = %compiled_code_hash,
+        source_bundle_hash,
+        outcome = %verification_result,
+        "verification result"
     );
 
     Ok(Json(VerifyResponse {
@@ -666,35 +698,6 @@ impl<'a> SourceBundleSource<'a> {
             is_stdlib: file.is_stdlib,
             has_include_directives: file.has_include_directives,
         }
-    }
-}
-
-fn print_verify_request(
-    target: &ResolvedVerificationTarget,
-    language: &str,
-    compile_params: &Value,
-    sources: &[SourceMetadata],
-    compiled_code_hash: &str,
-    source_bundle_hash: Option<&str>,
-    verification_result: VerificationResult,
-) {
-    println!("verification request");
-    println!("address: {}", target.address.as_deref().unwrap_or("<none>"));
-    println!("code_hash: {}", target.code_hash);
-    println!("compiled_code_hash: {compiled_code_hash}");
-    println!(
-        "source_bundle_hash: {}",
-        source_bundle_hash.unwrap_or("<none>")
-    );
-    println!("verification_result: {verification_result}");
-    println!("language: {language}");
-    println!("compile_params: {compile_params}");
-
-    for source in sources {
-        println!(
-            "source: path={} is_entrypoint={}",
-            source.path, source.is_entrypoint
-        );
     }
 }
 

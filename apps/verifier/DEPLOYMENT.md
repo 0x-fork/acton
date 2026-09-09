@@ -252,6 +252,11 @@ One payment permits at most three verification claims. The limit includes a
 claim that resumes after an expired processing lease. Later claims fail as
 used without another TON Center request.
 
+Compiler stdin, output and execution share the configured timeout (ten seconds
+by default). Worker output is capped at 16 MiB for stdout and 64 KiB for stderr.
+Git commands time out after 60 seconds and do not accept interactive credentials.
+Keep container memory/process limits and reverse-proxy rate limits enabled.
+
 ## Systemd Wrapper
 
 Use systemd to keep Docker Compose running after reboots.

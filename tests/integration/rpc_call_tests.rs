@@ -350,9 +350,10 @@ fn test_rpc_call_uses_verifier_abi_and_cache() {
     ]);
     let verifier_backend = format!("  {verifier_url}/  ");
     append_custom_network(project.path(), "mock", &format!("{toncenter_url}/api/v2"));
-    let cache_path = project
-        .path()
-        .join(format!("build/cache/verifier-abi/{code_hash}.json"));
+    let backend_hash = <sha2::Sha256 as sha2::Digest>::digest(verifier_url.as_bytes());
+    let cache_path = project.path().join(format!(
+        "build/cache/verifier-abi/{backend_hash:x}/{code_hash}.json"
+    ));
 
     let rpc_call = || {
         project

@@ -9,7 +9,7 @@ use acton_config::config::{ActonConfig, project_root as configured_project_root}
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -327,6 +327,18 @@ pub fn verify_cmd(
     let verify_result: VerifyResponse = response
         .json()
         .context("Failed to parse verifier response")?;
+
+    if verify_result.code_hash != code_hash_hex {
+        anyhow::bail!(
+            "TON verifier returned a result for a different code hash: expected {code_hash_hex}, received {}",
+            verify_result.code_hash
+        );
+    }
+    if matches!(verify_result.verification_result, VerificationResult::Match)
+        && verify_result.compiled_code_hash.as_deref() != Some(code_hash_hex.as_str())
+    {
+        anyhow::bail!("TON verifier reported a match without a matching compiled code hash");
+    }
 
     match verify_result.verification_result {
         VerificationResult::AlreadyVerified => {
@@ -899,10 +911,50 @@ fn normalize_backend_url(raw: &str) -> Option<String> {
 }
 
 fn verifier_sources(paths: &[(String, bool)]) -> anyhow::Result<Vec<VerifierSource>> {
+    // Match the public verifier's upload policy before asking the user to pay.
+    // Buildable local paths are not necessarily safe portable registry paths.
+    anyhow::ensure!(
+        paths.len() <= 256,
+        "TON verifier accepts at most 256 source files"
+    );
+    let mut seen = BTreeSet::new();
     paths
         .iter()
         .map(|(path, is_entrypoint)| {
             validate_verifier_relative_path(path, "source path")?;
+            let portable = path.len() <= 128
+                && path.bytes().all(|byte| {
+                    byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-')
+                })
+                && path.split('/').all(|part| {
+                    !part.is_empty() && !part.ends_with('.') && !part.eq_ignore_ascii_case(".git")
+                })
+                && !path
+                    .split('/')
+                    .next()
+                    .is_some_and(|part| part.eq_ignore_ascii_case("output"));
+            anyhow::ensure!(
+                portable,
+                "Source path is not supported by TON verifier: {path}. \
+                 Use relative paths up to 128 ASCII characters with letters, numbers, '.', '_' and '-'; \
+                 '.git' and the root 'output' directory are reserved"
+            );
+
+            let filename = path.rsplit('/').next().unwrap_or(path).to_ascii_lowercase();
+            let source_extension_count = filename
+                .split('.')
+                .skip(1)
+                .filter(|ext| matches!(*ext, "tolk" | "fc" | "func" | "tact" | "pkg"))
+                .count();
+            anyhow::ensure!(
+                filename.ends_with(".tolk") && source_extension_count == 1,
+                "Source path must have a single .tolk source extension: {path}"
+            );
+            anyhow::ensure!(
+                seen.insert(path.to_ascii_lowercase()),
+                "Duplicate source path (case-insensitive): {path}"
+            );
+
             Ok(VerifierSource {
                 path: path.clone(),
                 is_entrypoint: *is_entrypoint,
@@ -1161,6 +1213,53 @@ mod tests {
     const CODE_HASH: &str = "e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973";
     const COMMENT: &str =
         "acton-verify:v1:e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973";
+
+    #[test]
+    fn verifier_sources_validate_portable_paths_before_payment() {
+        for path in [
+            "contracts/main.tolk",
+            "lib/my-contract.v2.tolk",
+            "deps/Lib.TOLK",
+        ] {
+            assert!(
+                verifier_sources(&[(path.to_owned(), true)]).is_ok(),
+                "{path}"
+            );
+        }
+        for path in [
+            "contracts/my contract.tolk",
+            "../main.tolk",
+            "/main.tolk",
+            "a//main.tolk",
+            "a./main.tolk",
+            ".Git/main.tolk",
+            "output/main.tolk",
+            "main.fc.tolk",
+            "main.tolk.pkg",
+            "main.txt",
+            "合约.tolk",
+        ] {
+            assert!(
+                verifier_sources(&[(path.to_owned(), true)]).is_err(),
+                "{path}"
+            );
+        }
+        assert!(verifier_sources(&[(format!("{}.tolk", "a".repeat(124)), true)]).is_err());
+        assert!(
+            verifier_sources(&[
+                ("Main.tolk".to_owned(), true),
+                ("main.tolk".to_owned(), false)
+            ])
+            .is_err()
+        );
+        let paths = (0..256)
+            .map(|index| (format!("file{index}.tolk"), index == 0))
+            .collect::<Vec<_>>();
+        assert!(verifier_sources(&paths).is_ok());
+        let mut paths = paths;
+        paths.push(("extra.tolk".to_owned(), false));
+        assert!(verifier_sources(&paths).is_err());
+    }
 
     #[test]
     fn payment_address_uses_bounceable_testnet_format() {

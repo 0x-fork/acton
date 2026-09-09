@@ -36,4 +36,4 @@ path = "verifier-index.sqlite3"
 [compiler]
 node_bin = "node"
 worker_path = "compiler-worker/compile.mjs"
-timeout_ms = 5000
+timeout_ms = 10000

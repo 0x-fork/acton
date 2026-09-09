@@ -98,8 +98,16 @@ Responsibilities:
 
 ### Payment Verification
 
-Payment verification always uses TON testnet. The CLI does not accept `--net`
-with `--new`.
+`acton verify` uses TON verifier and pays for verification on TON testnet.
+Verification records are keyed by code hash, so the same verified code can be
+used on any TON network. Address lookups through this backend use its configured
+testnet provider.
+
+Acton validates portable source paths before payment. Uploads accept at most
+256 files. Source paths are relative, at most 128 ASCII characters, and contain
+only letters, numbers, `/`, `.`, `_`, and `-`. Empty components, traversal,
+trailing dots, `.git`, the root `output` directory, repeated source extensions,
+and case-insensitive duplicates are rejected.
 
 The ticket always binds a code hash, even when the final `/verify` request also
 contains an address. The client computes or resolves the code hash before it
@@ -212,6 +220,29 @@ Git provides:
 The local Docker volume is only a checkout/cache. The remote Git repository is
 the durable storage target after every successful push.
 
+Git commands have a 60-second deadline and cannot prompt for credentials on
+stdin. A push timeout follows the same rollback and retry path as other push
+failures. Deployments must provide working noninteractive Git credentials.
+
+### Execution Limits
+
+Duplicate singleton multipart fields are rejected before payment is claimed.
+Repeated `files` fields remain supported.
+
+The compiler deadline covers writing stdin, reading stdout and stderr, and
+waiting for process exit. Both output pipes are drained concurrently. Output
+is limited to 16 MiB on stdout and 64 KiB on stderr; exceeding either limit
+terminates the worker. The default deadline is ten seconds and is configured
+with `compiler.timeout_ms`. Compilation failures, including resource limits,
+consume the current claim under the existing payment policy.
+
+These limits complement the container's memory and process limits and reverse
+proxy rate limits. They do not provide an independent OS sandbox for each
+compiler. Account lookups have a 30-second provider deadline.
+
+Verification logs contain operation, target hash, result and elapsed time.
+Submitted compiler parameters and complete source payloads are not logged.
+
 ### Verification Registry
 
 The registry is a trait-based layer over accepted verification records.
@@ -279,7 +310,7 @@ not expose a base64 source-content field.
 2. Acton sends the code hash to `/take_ticket`.
 3. If the code hash is verified, Acton stops successfully without payment.
 4. For new code, the backend returns a testnet payment quote.
-5. Acton gets wallet approval and sends the payment with the exact comment.
+5. Acton validates source paths, gets wallet approval and sends the payment with the exact comment.
 6. Acton waits for the finalized recipient transaction.
 7. Acton sends the sources and recipient transaction hash to `/verify`.
 8. The backend resolves the target code hash.
@@ -289,6 +320,7 @@ not expose a base64 source-content field.
 12. If the hashes differ, the response is `mismatch` and no bundle is stored.
 13. If the hashes match, the registry stores the payment hash and source bundle.
 14. The API returns `match`, `source_bundle_hash`, and `storage_revision`.
+    Acton checks that both returned code hashes match its local compilation.
 15. The backend consumes the payment unless an allowlisted source storage
     failure occurred and the retry budget remains.
 

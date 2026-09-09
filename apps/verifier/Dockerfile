@@ -77,7 +77,7 @@ ENV VERIFIER_CONFIG=/etc/verifier/config.toml \
     VERIFIER_REGISTRY_INDEX_PATH=/var/lib/verifier/registry-index/registry-index.sqlite3 \
     VERIFIER_COMPILER_NODE_BIN=/usr/local/bin/node \
     VERIFIER_COMPILER_WORKER_PATH=/app/compiler-worker/compile.mjs \
-    VERIFIER_COMPILER_TIMEOUT_MS=5000
+    VERIFIER_COMPILER_TIMEOUT_MS=10000
 
 EXPOSE 3000
 

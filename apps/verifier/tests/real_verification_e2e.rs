@@ -240,6 +240,16 @@ async fn verify_all_tact_npm_versions_with_real_compiler() {
     }
 }
 
+#[tokio::test]
+async fn verify_tact_accepts_uppercase_package_extension() {
+    let state = real_compiler_app_state(&[]);
+    let mut input = fixture("valid-tact.json");
+    input.entrypoint = "contract.PKG".to_owned();
+    input.sources[0].path = input.entrypoint.clone();
+    let response = verify_fixture(state, TACT_CODE_HASH, input).await;
+    assert_verified(response, "tact", TACT_CODE_HASH).await;
+}
+
 async fn verify_fixture(
     state: verifier::state::AppState,
     code_hash: &str,

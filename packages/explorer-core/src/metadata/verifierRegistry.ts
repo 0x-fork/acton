@@ -21,7 +21,7 @@ export interface VerifierMetadataRegistryOptions {
 }
 
 export class VerifierMetadataRegistry extends NullMetadataRegistry {
-  private readonly compilerAbiCache = new Map<string, ExtendedContractABI | null>()
+  private readonly compilerAbiCache = new Map<string, ExtendedContractABI>()
   private readonly sourceCache = new Map<string, VerificationSourceResponse>()
   private readonly requestTimeoutMs: number
 
@@ -48,7 +48,9 @@ export class VerifierMetadataRegistry extends NullMetadataRegistry {
 
         try {
           const abi = await this.fetchCompilerAbi(normalized)
-          this.compilerAbiCache.set(normalized, abi)
+          if (abi) {
+            this.compilerAbiCache.set(normalized, abi)
+          }
           result[codeHash] = abi
         } catch (error) {
           console.debug(`Failed to fetch verifier ABI for ${normalized}`, error)
@@ -63,17 +65,19 @@ export class VerifierMetadataRegistry extends NullMetadataRegistry {
     readonly address?: string
     readonly codeHash?: string
   }): Promise<VerificationSourceResponse> {
-    const key = sourceCacheKey(options)
-    const cached = this.sourceCache.get(key)
+    const codeHash = normalizeCodeHash(options.codeHash)
+    // Only positive code-hash lookups are immutable. An address can upgrade its
+    // code, and an unverified hash can acquire a source bundle at any moment.
+    const cached = !options.address && codeHash ? this.sourceCache.get(codeHash) : undefined
     if (cached) {
       return cached
     }
 
     try {
       const source = await this.fetchSource(options)
-      this.sourceCache.set(key, source)
-      if (source.code_hash) {
-        this.sourceCache.set(sourceCacheKey({codeHash: source.code_hash}), source)
+      const resolvedHash = normalizeCodeHash(source.code_hash)
+      if (source.verified && source.bundle && resolvedHash) {
+        this.sourceCache.set(resolvedHash, source)
       }
       return source
     } catch (error) {
@@ -117,14 +121,10 @@ export class VerifierMetadataRegistry extends NullMetadataRegistry {
     if (!response.ok) {
       throw new Error(`Verifier source request failed with HTTP ${response.status}`)
     }
-    return response.json() as Promise<VerificationSourceResponse>
+    const source = (await response.json()) as VerificationSourceResponse
+    if (codeHash && normalizeCodeHash(source.code_hash) !== codeHash) {
+      throw new Error("Verifier returned sources for a different code hash")
+    }
+    return source
   }
-}
-
-function sourceCacheKey(options: {readonly address?: string; readonly codeHash?: string}): string {
-  const codeHash = normalizeCodeHash(options.codeHash)
-  if (codeHash) {
-    return `code_hash:${codeHash}`
-  }
-  return `address:${options.address?.trim() ?? ""}`
 }

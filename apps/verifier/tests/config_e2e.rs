@@ -45,7 +45,7 @@ fn example_config_toml_loads() {
         config.compiler_worker_path().to_string_lossy(),
         "compiler-worker/compile.mjs"
     );
-    assert_eq!(config.compiler_timeout(), Duration::from_secs(5));
+    assert_eq!(config.compiler_timeout(), Duration::from_secs(10));
 }
 
 #[test]
@@ -63,6 +63,47 @@ fn omitted_network_uses_testnet() {
     assert_eq!(config.logging_level(), "debug");
     assert_eq!(config.network().to_string(), "testnet");
     assert_eq!(config.toncenter_base_url(), "https://testnet.toncenter.com");
+    assert_eq!(config.compiler_timeout(), Duration::from_secs(10));
+    assert_eq!(
+        Config::default().compiler_timeout(),
+        Duration::from_secs(10)
+    );
+}
+
+#[test]
+fn compiler_timeout_can_be_overridden() {
+    let mut config_file = tempfile::NamedTempFile::new().expect("config file");
+    writeln!(config_file, "[compiler]\ntimeout_ms = 15000").expect("write config");
+    let config = Config::load_from_path(config_file.path()).expect("custom compiler config");
+    assert_eq!(config.compiler_timeout(), Duration::from_secs(15));
+}
+
+#[test]
+fn docker_entrypoint_generates_default_and_overridden_compiler_timeout() {
+    for override_ms in [None, Some("15000")] {
+        let directory = tempfile::tempdir().expect("config directory");
+        let config_path = directory.path().join("config.toml");
+        let mut command = std::process::Command::new("sh");
+        command
+            .args(["docker/entrypoint.sh", "true"])
+            .env_clear()
+            .env("PATH", std::env::var_os("PATH").expect("PATH"))
+            .env("VERIFIER_CONFIG", &config_path);
+        if let Some(value) = override_ms {
+            command.env("VERIFIER_COMPILER_TIMEOUT_MS", value);
+        }
+        let output = command.output().expect("run entrypoint");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let config = Config::load_from_path(&config_path).expect("generated config");
+        assert_eq!(
+            config.compiler_timeout(),
+            Duration::from_secs(if override_ms.is_some() { 15 } else { 10 })
+        );
+    }
 }
 
 #[test]

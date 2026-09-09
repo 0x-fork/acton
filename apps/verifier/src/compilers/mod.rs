@@ -5,12 +5,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 use tokio::{
-    io::AsyncWriteExt,
+    io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     process::Command,
     time::{self, Duration},
 };
 
 use crate::{config::Config, source_storage::SourceMapData};
+
+const MAX_WORKER_STDOUT_BYTES: usize = 16 * 1024 * 1024;
+const MAX_WORKER_STDERR_BYTES: usize = 64 * 1024;
 
 #[async_trait]
 pub trait CompilerService: Send + Sync + 'static {
@@ -62,27 +65,46 @@ impl CompilerService for NodeCompilerService {
             .map_err(CompilerError::Spawn)?;
 
         let mut stdin = child.stdin.take().ok_or(CompilerError::MissingStdin)?;
-        stdin
-            .write_all(&input)
-            .await
-            .map_err(CompilerError::WriteStdin)?;
-        drop(stdin);
+        let stdout = child.stdout.take().ok_or(CompilerError::MissingOutput)?;
+        let stderr = child.stderr.take().ok_or(CompilerError::MissingOutput)?;
 
-        let output = time::timeout(self.timeout, child.wait_with_output())
-            .await
-            .map_err(|_| CompilerError::Timeout {
-                timeout_ms: self.timeout.as_millis(),
-            })?
-            .map_err(CompilerError::Wait)?;
+        // Drain both pipes while sending sources: a worker can fill its output pipe
+        // before reading stdin. The deadline covers this exchange as well as compilation.
+        let execution = time::timeout(self.timeout, async {
+            tokio::try_join!(
+                async {
+                    stdin
+                        .write_all(&input)
+                        .await
+                        .map_err(CompilerError::WriteStdin)?;
+                    drop(stdin);
+                    Ok(())
+                },
+                read_worker_output(stdout, MAX_WORKER_STDOUT_BYTES, "stdout"),
+                read_worker_output(stderr, MAX_WORKER_STDERR_BYTES, "stderr"),
+                async { child.wait().await.map_err(CompilerError::Wait) },
+            )
+        })
+        .await
+        .map_err(|_| CompilerError::Timeout {
+            timeout_ms: self.timeout.as_millis(),
+        })
+        .and_then(std::convert::identity);
 
-        if !output.status.success() {
+        if execution.is_err() {
+            // Reap the child before releasing this request's resources.
+            let _ = child.kill().await;
+        }
+        let ((), stdout, stderr, status) = execution?;
+
+        if !status.success() {
             return Err(CompilerError::WorkerFailed {
-                status: output.status,
-                stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+                status,
+                stderr: String::from_utf8_lossy(&stderr).into_owned(),
             });
         }
 
-        let output = serde_json::from_slice::<WorkerOutput>(&output.stdout)
+        let output = serde_json::from_slice::<WorkerOutput>(&stdout)
             .map_err(CompilerError::DeserializeOutput)?;
 
         match output {
@@ -98,6 +120,25 @@ impl CompilerService for NodeCompilerService {
             WorkerOutput::CompileError { error } => Err(CompilerError::CompileFailed(error)),
         }
     }
+}
+
+// Compiler diagnostics and generated metadata are untrusted in size, even for
+// a small source upload. Stop collecting as soon as either pipe exceeds its budget.
+async fn read_worker_output(
+    reader: impl AsyncRead + Unpin,
+    limit: usize,
+    stream: &'static str,
+) -> Result<Vec<u8>, CompilerError> {
+    let mut bytes = Vec::new();
+    reader
+        .take(limit as u64 + 1)
+        .read_to_end(&mut bytes)
+        .await
+        .map_err(CompilerError::Wait)?;
+    if bytes.len() > limit {
+        return Err(CompilerError::OutputTooLarge { stream, limit });
+    }
+    Ok(bytes)
 }
 
 fn isolated_command(program: &str) -> Command {
@@ -176,6 +217,10 @@ pub enum CompilerError {
     Spawn(std::io::Error),
     #[error("compiler worker stdin was not available")]
     MissingStdin,
+    #[error("compiler worker output pipe was not available")]
+    MissingOutput,
+    #[error("compiler worker {stream} exceeded {limit} bytes")]
+    OutputTooLarge { stream: &'static str, limit: usize },
     #[error("failed to write compiler worker stdin: {0}")]
     WriteStdin(std::io::Error),
     #[error("compiler worker timed out after {timeout_ms} ms")]
@@ -193,6 +238,85 @@ pub enum CompilerError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Exercise the real process boundary: mocks cannot reproduce a full stdin
+    // pipe or a worker that writes output before it reads the request.
+    async fn run_worker_script(
+        script: &str,
+        timeout: Duration,
+    ) -> Result<CompileOutput, CompilerError> {
+        let directory = tempfile::tempdir().expect("worker directory");
+        let worker_path = directory.path().join("worker.mjs");
+        std::fs::write(&worker_path, script).expect("worker script");
+        let service = NodeCompilerService {
+            node_bin: "node".to_owned(),
+            worker_path,
+            timeout,
+        };
+        time::timeout(
+            Duration::from_secs(5),
+            service.compile(CompileRequest {
+                language: "tolk".to_owned(),
+                compiler_version: "1.4.2".to_owned(),
+                entrypoint: "main.tolk".to_owned(),
+                import_mappings: BTreeMap::new(),
+                compile_params: Value::Null,
+                sources: vec![CompileSource {
+                    path: "main.tolk".to_owned(),
+                    content: "x".repeat(1024 * 1024),
+                    is_entrypoint: true,
+                    include_in_command: None,
+                    is_stdlib: None,
+                    has_include_directives: None,
+                }],
+            }),
+        )
+        .await
+        .expect("compiler must enforce its own deadline")
+    }
+
+    #[tokio::test]
+    async fn worker_deadline_covers_blocked_stdin() {
+        let result =
+            run_worker_script("setInterval(() => {}, 1000)", Duration::from_millis(100)).await;
+        assert!(matches!(result, Err(CompilerError::Timeout { .. })));
+    }
+
+    #[tokio::test]
+    async fn worker_output_limits_abort_both_streams() {
+        for stream in ["stdout", "stderr"] {
+            let script = format!(
+                "process.{stream}.write('x'.repeat(17 * 1024 * 1024)); setInterval(() => {{}}, 1000)"
+            );
+            let result = run_worker_script(&script, Duration::from_secs(3)).await;
+            assert!(
+                matches!(result, Err(CompilerError::OutputTooLarge { stream: actual, .. }) if actual == stream)
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn worker_drains_output_while_sending_sources() {
+        let result = run_worker_script(
+            r"
+            process.stdout.write(' '.repeat(1024 * 1024), () => {
+                let input = '';
+                process.stdin.on('data', chunk => input += chunk);
+                process.stdin.on('end', () => {
+                    const request = JSON.parse(input);
+                    process.stdout.write(JSON.stringify({
+                        status: 'ok',
+                        code_hash: String(request.sources[0].content.length)
+                    }));
+                });
+            });
+            ",
+            Duration::from_secs(3),
+        )
+        .await
+        .expect("full duplex exchange must complete");
+        assert_eq!(result.code_hash, "1048576");
+    }
 
     #[tokio::test]
     async fn isolated_command_resolves_executable_and_clears_environment() {
