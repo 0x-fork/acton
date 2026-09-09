@@ -431,7 +431,7 @@ async fn openapi_json_documents_verifier_api() {
 }
 
 #[tokio::test]
-async fn api_routes_allow_browser_cors() {
+async fn api_routes_do_not_handle_browser_cors() {
     let state = app_state(&[], CODE_HASH_ONE);
     let preflight_request = Request::builder()
         .method(Method::OPTIONS)
@@ -444,15 +444,14 @@ async fn api_routes_allow_browser_cors() {
     let preflight_response = app::router_with_state(state.clone())
         .oneshot(preflight_request)
         .await
-        .expect("router should handle CORS preflight");
+        .expect("router should return a response to an OPTIONS request");
 
-    assert_eq!(preflight_response.status(), StatusCode::OK);
-    assert_eq!(
+    assert_eq!(preflight_response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    assert!(
         preflight_response
             .headers()
             .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
-            .and_then(|value| value.to_str().ok()),
-        Some("*")
+            .is_none()
     );
 
     let get_request = Request::builder()
@@ -465,15 +464,14 @@ async fn api_routes_allow_browser_cors() {
     let get_response = app::router_with_state(state)
         .oneshot(get_request)
         .await
-        .expect("router should handle browser GET request");
+        .expect("router should handle GET request with an Origin header");
 
     assert_eq!(get_response.status(), StatusCode::NOT_FOUND);
-    assert_eq!(
+    assert!(
         get_response
             .headers()
             .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
-            .and_then(|value| value.to_str().ok()),
-        Some("*")
+            .is_none()
     );
 }
 
