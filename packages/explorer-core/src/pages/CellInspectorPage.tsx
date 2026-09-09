@@ -383,9 +383,7 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
     <section className={styles.inputPanel}>
       <div className={styles.inputHeader}>
         <div className={styles.provenanceTitle}>Input</div>
-        <div className={styles.provenanceMeta}>
-          Base64, hex, a ton:// URL, or an explorer link
-        </div>
+        <div className={styles.provenanceMeta}>Base64, hex, a ton:// URL, or an explorer link</div>
       </div>
       <div className={`${styles.textareaField} ${styles.cellField}`}>
         <textarea
