@@ -337,8 +337,8 @@ fn test_rpc_call_uses_verifier_abi_and_cache() {
         spawn_toncenter_v2_mock_with_capture(toncenter_responses);
     let (verifier_url, verifier_handle, verifier_captured) = spawn_verifier_mock(vec![
         VerifierMockResponse {
-            status: 200,
-            body: serde_json::json!({ "items": [] }).to_string(),
+            status: 404,
+            body: serde_json::json!({ "error": "ABI was not found" }).to_string(),
             headers: vec![],
         },
         abi_response(&code_hash, &abi),

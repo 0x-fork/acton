@@ -417,6 +417,8 @@ async fn openapi_json_documents_verifier_api() {
 
     let take_ticket = &body["paths"]["/api/v1/take_ticket"]["post"];
     let verify = &body["paths"]["/api/v1/verify"]["post"];
+    let abi = &body["paths"]["/api/v1/abi"]["get"];
+    let source = &body["paths"]["/api/v1/verification/source"]["get"];
     assert_eq!(take_ticket["operationId"], "take_ticket");
     assert_eq!(verify["operationId"], "verify");
     assert_eq!(response_statuses(take_ticket), ["200", "400", "502", "503"]);
@@ -424,6 +426,8 @@ async fn openapi_json_documents_verifier_api() {
         response_statuses(verify),
         ["200", "400", "401", "402", "404", "409", "502", "503"]
     );
+    assert_eq!(response_statuses(abi), ["200", "404", "502"]);
+    assert_eq!(response_statuses(source), ["200", "400", "404", "502"]);
 }
 
 #[tokio::test]
@@ -463,7 +467,7 @@ async fn api_routes_allow_browser_cors() {
         .await
         .expect("router should handle browser GET request");
 
-    assert_eq!(get_response.status(), StatusCode::OK);
+    assert_eq!(get_response.status(), StatusCode::NOT_FOUND);
     assert_eq!(
         get_response
             .headers()
@@ -708,6 +712,38 @@ async fn abi_returns_indexed_tolk_abi_records_with_code_hash() {
 }
 
 #[tokio::test]
+async fn abi_returns_not_found_when_contract_or_abi_is_missing() {
+    let state = app_state(&[], CODE_HASH_ONE);
+    let path = format!("/api/v1/abi?code_hash={CODE_HASH_ONE}");
+
+    let response = get(state.clone(), &path).await;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_error_contains(response, "ABI was not found").await;
+
+    let verify_response = post_verify(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+    assert_eq!(verify_response.status(), StatusCode::OK);
+
+    let response = get(state.clone(), &path).await;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_error_contains(response, "ABI was not found").await;
+
+    let response = get(state, "/api/v1/abi").await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json::<AbiContractsResponse>(response).await;
+    assert!(body.items.is_empty());
+}
+
+#[tokio::test]
 async fn verification_status_reports_unverified_code_hash_without_stored_bundle() {
     let response = get(
         app_state(&[], CODE_HASH_ONE),
@@ -816,15 +852,21 @@ async fn verification_status_returns_not_found_when_address_has_no_code_hash() {
 }
 
 #[tokio::test]
+async fn verification_source_returns_not_found_without_stored_bundle() {
+    let response = get(
+        app_state(&[], CODE_HASH_ONE),
+        &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_error_contains(response, "verified source was not found").await;
+}
+
+#[tokio::test]
 async fn verification_source_returns_verified_bundle_files() {
     let (state, recorded_requests) = recording_source_storage_app_state(&[], CODE_HASH_ONE);
     let source_path = format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}");
-    let unverified_response = get(state.clone(), &source_path).await;
-    assert_eq!(unverified_response.status(), StatusCode::OK);
-    let unverified = response_json::<VerificationSourceResponse>(unverified_response).await;
-    assert!(!unverified.verified);
-    assert!(unverified.bundle.is_none());
-
     let verify_response = post_verify(
         state.clone(),
         vec![

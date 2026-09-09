@@ -73,7 +73,7 @@ pub async fn status_handler(
     responses(
         (status = 200, description = "Verified source bundle for the resolved code hash", body = VerificationSourceResponse),
         (status = 400, description = "Invalid or missing verification target", body = crate::error::ErrorResponse),
-        (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
+        (status = 404, description = "Current code hash or verified source bundle was not found", body = crate::error::ErrorResponse),
         (status = 502, description = "Blockchain, registry, or source lookup failure", body = crate::error::ErrorResponse)
     ),
     tag = "verification"
@@ -92,12 +92,17 @@ pub async fn source_handler(
             code_hash: resolved_target.code_hash.clone(),
         })
         .await?;
-    let bundle = receipt.bundle.map(SourceBundleResponse::from);
+    let bundle = receipt.bundle.ok_or_else(|| {
+        ApiError::not_found(format!(
+            "verified source was not found for code_hash {}",
+            resolved_target.code_hash
+        ))
+    })?;
 
     Ok(Json(VerificationSourceResponse {
         code_hash: resolved_target.code_hash,
-        verified: bundle.is_some(),
-        bundle,
+        verified: true,
+        bundle: Some(SourceBundleResponse::from(bundle)),
     }))
 }
 
@@ -180,6 +185,7 @@ pub async fn statistics_history_handler(
     ),
     responses(
         (status = 200, description = "Tolk ABI records indexed from verified contracts", body = AbiContractsResponse),
+        (status = 404, description = "ABI was not found for the requested code hash", body = crate::error::ErrorResponse),
         (status = 502, description = "Registry lookup failure", body = crate::error::ErrorResponse)
     ),
     tag = "verification"
@@ -188,14 +194,23 @@ pub async fn abi_handler(
     State(state): State<AppState>,
     Query(query): Query<AbiQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
+    let code_hash = non_empty_code_hash(query.code_hash);
     let receipt = state
         .verification_registry()
         .abi_contracts(AbiContractsRequest {
-            code_hash: non_empty_code_hash(query.code_hash),
+            code_hash: code_hash.clone(),
             limit: page_limit(query.limit),
             offset: query.offset.unwrap_or(0),
         })
         .await?;
+
+    if receipt.items.is_empty()
+        && let Some(code_hash) = code_hash
+    {
+        return Err(ApiError::not_found(format!(
+            "ABI was not found for code_hash {code_hash}"
+        )));
+    }
 
     Ok(Json(AbiContractsResponse {
         items: receipt

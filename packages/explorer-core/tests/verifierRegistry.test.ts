@@ -84,12 +84,11 @@ test("newly verified ABIs and sources become visible without reloading the regis
   const source = {code_hash: CODE_HASH, verified: true, bundle: {files: []}}
   globalThis.fetch = mockFetch(async input => {
     requestCount += 1
+    if (!verified) {
+      return Response.json({error: "not found"}, {status: 404})
+    }
     return Response.json(
-      String(input).includes("/abi?")
-        ? {items: verified ? [{code_hash: CODE_HASH, abi}] : []}
-        : verified
-          ? source
-          : {code_hash: CODE_HASH, verified: false, bundle: null},
+      String(input).includes("/abi?") ? {items: [{code_hash: CODE_HASH, abi}]} : source,
     )
   })
   try {

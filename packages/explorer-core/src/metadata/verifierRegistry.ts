@@ -90,6 +90,9 @@ export class VerifierMetadataRegistry extends NullMetadataRegistry {
     const url = new URL(VERIFIER_ABI_URL)
     url.searchParams.set("code_hash", codeHash)
     const response = await fetch(url, {signal: AbortSignal.timeout(this.requestTimeoutMs)})
+    if (response.status === 404) {
+      return null
+    }
     if (!response.ok) {
       throw new Error(`Verifier ABI request failed with HTTP ${response.status}`)
     }
@@ -118,6 +121,9 @@ export class VerifierMetadataRegistry extends NullMetadataRegistry {
       url.searchParams.append("code_hash", codeHash)
     }
     const response = await fetch(url, {signal: AbortSignal.timeout(this.requestTimeoutMs)})
+    if (response.status === 404) {
+      return unverifiedSourceResponse(options)
+    }
     if (!response.ok) {
       throw new Error(`Verifier source request failed with HTTP ${response.status}`)
     }

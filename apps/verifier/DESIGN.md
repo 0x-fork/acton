@@ -362,11 +362,15 @@ Source responses include:
 
 - `code_hash`
 - `verified`
-- `bundle`, which is `null` when the code hash is not verified
+- `bundle` with the verified source; the endpoint returns HTTP 404 when the
+  code hash has no verified source bundle
 
 Each source bundle includes `source_bundle_hash`, optional `payment_tx_hash`,
 `verified_at`, `storage_revision`, `entrypoint`, a grouped `compiler` object,
 optional `source_map`, and source `files`.
+
+`/api/v1/abi?code_hash=...` returns HTTP 404 when the requested contract has no
+indexed ABI. The unfiltered `/api/v1/abi` collection still returns an empty list.
 
 `payment_tx_hash` is absent only for an authenticated administrative submission
 that sets `verified_at` and skips the public payment flow.

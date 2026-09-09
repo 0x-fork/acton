@@ -92,7 +92,11 @@ fn fetch_abi(backend: &str, code_hash: &str) -> anyhow::Result<Option<ContractAB
         .context("Failed to build verifier HTTP client")?
         .get(url)
         .send()
-        .context("Failed to fetch ABI from verifier")?
+        .context("Failed to fetch ABI from verifier")?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
+    }
+    let response = response
         .error_for_status()
         .context("Verifier returned an error while fetching ABI")?;
     let payload = response
