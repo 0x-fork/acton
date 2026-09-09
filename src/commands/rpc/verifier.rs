@@ -1,4 +1,4 @@
-use crate::commands::verify::new_verifier_backend;
+use crate::commands::verify::verifier_backend;
 use crate::http::blocking_client_builder;
 use crate::paths::build_cache_dir;
 use acton_config::config::project_root;
@@ -81,7 +81,7 @@ pub(super) fn find_abi(code_hash: &str) -> anyhow::Result<Option<Arc<ContractABI
 }
 
 fn fetch_abi(code_hash: &str) -> anyhow::Result<Option<ContractABI>> {
-    let backend = new_verifier_backend();
+    let backend = verifier_backend();
     let abi_endpoint = format!("{backend}/api/v1/abi");
     let url = format!("{abi_endpoint}?code_hash={code_hash}");
 

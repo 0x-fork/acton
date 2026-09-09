@@ -365,7 +365,7 @@ fn test_rpc_call_uses_verifier_abi_and_cache() {
             .arg("--net")
             .arg("custom:mock")
             .arg("--json")
-            .env("ACTON_NEW_VERIFY_BACKEND", &verifier_backend)
+            .env("ACTON_VERIFY_BACKEND", &verifier_backend)
             .env("ACTON_LOG_DIR", &log_dir)
             .run()
             .success()

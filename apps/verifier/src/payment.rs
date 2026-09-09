@@ -937,7 +937,7 @@ fn load_aligned_bytes(slice: &mut CellSlice<'_>) -> Option<Vec<u8>> {
 
 #[derive(Debug, Error)]
 pub enum PaymentError {
-    #[error("the Acton verifier supports only TON testnet")]
+    #[error("the TON verifier supports only TON testnet")]
     UnsupportedNetwork,
     #[error("missing required verifier configuration: {0}")]
     MissingConfiguration(&'static str),

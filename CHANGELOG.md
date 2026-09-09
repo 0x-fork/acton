@@ -11,9 +11,8 @@ more capable RPC and localnet tooling, and a shared explorer and transaction UI.
 
 `acton simulated-localnet` remains the lightweight in-process simulator. Acton Studio can
 manage both simulator environments and full local TON networks; those full
-networks are powered by the separate Localton runtime. The new verifier service,
-API, and web UI are included below, while the `acton verify --new` CLI
-integration remains hidden and preview-only.
+networks are powered by the separate Localton runtime. The verifier service,
+API, web UI, and `acton verify` CLI integration are included below.
 
 ### Breaking Changes and Migration
 
@@ -333,8 +332,7 @@ integration remains hidden and preview-only.
 - Added the verifier service, API, and web UI for Tolk, FunC, and Tact. The
   service recompiles submitted source, compares its code hash with an address
   or supplied hash, and stores an immutable source bundle in a Git-backed
-  registry. The separate `acton verify --new` CLI integration remains hidden
-  and preview-only; it is not the default verification flow.
+  registry. `acton verify` uses this service on TON testnet.
 - The restricted Node.js compiler worker supports multiple compiler versions,
   generated registry loaders, import mappings, compiler ABI data, Tolk source
   maps, Tact package metadata, generated files, and Tact-to-Tolk ABI conversion.
@@ -371,7 +369,7 @@ integration remains hidden and preview-only.
   authorize only one attempt. Authenticated API-key submissions bypass the
   payment requirement, and accepted bundles expose the payment transaction
   hash.
-- The hidden `acton verify --new` flow uploads normalized multipart bundles,
+- The `acton verify` flow uploads normalized multipart bundles,
   validates optional deployed addresses, obtains and pays testnet tickets,
   supports retrying with `--payment-tx-hash`, retries transient failures, and
   treats `already_verified` as success.

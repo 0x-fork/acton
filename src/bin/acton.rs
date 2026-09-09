@@ -829,33 +829,27 @@ enum Commands {
     Verify {
         #[arg(help = "Contract name to verify (prompts if not provided)", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: Option<String>,
-        #[arg(long, help = "Deployed contract address (prompts if not provided)")]
+        #[arg(
+            long,
+            help = "Deployed testnet contract address to compare with compiled code"
+        )]
         address: Option<String>,
         #[arg(
             long,
-            help = "Network to use with the built-in verifier (defaults to testnet)",
-            conflicts_with = "new_verifier"
-        )]
-        net: Option<String>,
-        #[arg(
-            long,
-            help = "Wallet from Acton.toml to use for verification (defaults to the only one if single wallet configured)",
+            help = "Testnet wallet from Acton.toml to use for the verification payment",
             add = ArgValueCompleter::new(complete_wallets)
         )]
         wallet: Option<String>,
         #[arg(long, help = "Tolk compiler version to use on verifier side")]
         compiler_version: Option<String>,
-        #[arg(long, help = "Run verification without sending the final transaction")]
-        dry_run: bool,
         #[arg(
-            long = "new",
-            help = "Use the testnet Acton verifier with an on-chain spam payment"
+            long,
+            help = "Prepare verification without sending payment or uploading sources"
         )]
-        new_verifier: bool,
+        dry_run: bool,
         #[arg(
             long,
             help = "Reuse a finalized testnet payment transaction",
-            requires = "new_verifier",
             conflicts_with_all = ["wallet", "tonconnect", "dry_run"]
         )]
         payment_tx_hash: Option<String>,
@@ -2535,21 +2529,17 @@ fn main() {
         Commands::Verify {
             contract_id,
             address,
-            net,
             wallet,
             compiler_version,
             dry_run,
             tonconnect,
-            new_verifier,
             payment_tx_hash,
         } => verify_cmd(
             contract_id,
             address,
-            net,
             wallet,
             compiler_version,
             dry_run,
-            new_verifier,
             payment_tx_hash,
             tonconnect,
         ),
