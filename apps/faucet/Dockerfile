@@ -3,6 +3,7 @@
 FROM rust:1.97.1-slim-bookworm AS rust-builder
 
 WORKDIR /build/apps/faucet
+ARG VCS_REF=unknown
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential pkg-config ca-certificates git libssl-dev \
@@ -12,7 +13,7 @@ COPY apps/faucet/Cargo.toml apps/faucet/Cargo.lock apps/faucet/rust-toolchain.to
 COPY apps/faucet/crates ./crates
 COPY apps/faucet/src ./src
 
-RUN cargo build --release --locked --bin faucet
+RUN FAUCET_GIT_HASH="${VCS_REF}" cargo build --release --locked --bin faucet
 
 FROM debian:bookworm-slim AS runtime
 ARG BUILD_VERSION=dev

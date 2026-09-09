@@ -12,6 +12,7 @@ RUN bun install --frozen-lockfile --filter @acton/verifier-ui \
 FROM rust:1.97.1-slim-bookworm AS rust-builder
 
 WORKDIR /build/apps/verifier
+ARG VCS_REF=unknown
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential pkg-config ca-certificates git libssl-dev \
@@ -21,7 +22,7 @@ COPY apps/verifier/Cargo.toml apps/verifier/Cargo.lock apps/verifier/rust-toolch
 COPY apps/verifier/src ./src
 COPY --from=frontend-builder /workspace/packages/verifier-ui/dist /build/packages/verifier-ui/dist
 
-RUN cargo build --release --locked
+RUN VERIFIER_GIT_HASH="${VCS_REF}" cargo build --release --locked
 
 FROM node:22-bookworm-slim AS compiler-worker
 
