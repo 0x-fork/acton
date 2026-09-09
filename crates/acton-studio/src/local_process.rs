@@ -1725,9 +1725,13 @@ async fn monitor_full_ton_network(
                     .await
                 }
             }
+            let has_runtime_diagnostic = environment.details.read().await.error.is_some();
             if let Ok(Some(status)) = child_status
                 && !status.success()
+                && !has_runtime_diagnostic
             {
+                // The persisted network error explains startup failures to the user. Only fall
+                // back to the process status when the runtime did not publish that diagnostic.
                 set_environment_status(
                     &environment,
                     EnvironmentStatus::Failed,
