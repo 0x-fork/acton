@@ -87,8 +87,31 @@ const compilerTagSources: Readonly<
   },
 }
 
+const compilerTagOverrides: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  tolk: {
+    "0.7.0": "tolk0.7",
+    "0.8.0": "tolk-0.8",
+    "0.9.0": "tolk-0.9",
+    "0.10.0": "tolk-0.10",
+  },
+}
+
+function compilerTag(language: string, version: string, tagPrefix: string): string {
+  const override = compilerTagOverrides[language]?.[version]
+  if (override) {
+    return override
+  }
+
+  if (version.startsWith(tagPrefix)) {
+    return version
+  }
+
+  return `${tagPrefix}${version}`
+}
+
 function compilerVersionUrl(language: string, version: string): string | undefined {
-  const source = compilerTagSources[language.trim().toLowerCase()]
+  const normalizedLanguage = language.trim().toLowerCase()
+  const source = compilerTagSources[normalizedLanguage]
   const normalizedVersion = version.trim()
   if (!source) {
     return undefined
@@ -97,9 +120,7 @@ function compilerVersionUrl(language: string, version: string): string | undefin
     return undefined
   }
 
-  const tag = normalizedVersion.startsWith(source.tagPrefix)
-    ? normalizedVersion
-    : `${source.tagPrefix}${normalizedVersion}`
+  const tag = compilerTag(normalizedLanguage, normalizedVersion, source.tagPrefix)
   return `${source.repositoryUrl}/releases/tag/${encodeURIComponent(tag)}`
 }
 
