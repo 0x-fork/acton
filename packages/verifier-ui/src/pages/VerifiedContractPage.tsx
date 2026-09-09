@@ -73,6 +73,10 @@ function DetailRow({
 const compilerTagSources: Readonly<
   Record<string, {readonly repositoryUrl: string; readonly tagPrefix: string}>
 > = {
+  func: {
+    repositoryUrl: "https://github.com/ton-community/func-js-bin",
+    tagPrefix: "v",
+  },
   tact: {
     repositoryUrl: "https://github.com/tact-lang/tact",
     tagPrefix: "v",
