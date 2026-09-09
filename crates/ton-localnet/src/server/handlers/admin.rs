@@ -27,7 +27,7 @@ use std::time::Duration;
 use ton_api::toncenter::v2::requests::SendBocRequest;
 
 const VERIFIER_SOURCE_URL: &str =
-    "https://verifier-staging.actonscan.com/api/v1/verification/source";
+    "https://verifier-staging.ton.org/api/v1/verification/source";
 const VERIFIER_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
 const fn user_agent() -> &'static str {

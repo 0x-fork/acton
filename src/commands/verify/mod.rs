@@ -26,7 +26,7 @@ use tycho_types::models::{
     StdAddr,
 };
 
-const VERIFIER_BACKEND: &str = "https://verifier-staging.actonscan.com";
+const VERIFIER_BACKEND: &str = "https://verifier-staging.ton.org";
 const VERIFY_BACKEND_ENV: &str = "ACTON_VERIFY_BACKEND";
 const VERIFIER_PAYMENT_COMMENT_PREFIX: &str = "acton-verify:v1:";
 const SOURCE_UPLOAD_ATTEMPTS: usize = 8;
