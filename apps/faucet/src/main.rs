@@ -111,7 +111,23 @@ async fn main() -> anyhow::Result<()> {
     let blacklist = BlacklistStore::setup(pool.clone())
         .await
         .context("Failed to setup antifraud blacklist")?;
-    info!("Initialized antifraud blacklist");
+    let active_bans = blacklist
+        .active_entries()
+        .await
+        .context("Failed to load active antifraud bans")?;
+    info!(
+        active_bans = active_bans.len(),
+        "Initialized antifraud blacklist"
+    );
+    for ban in active_bans {
+        info!(
+            source = ban.source.as_str(),
+            subject = %ban.subject,
+            reason = %ban.reason,
+            expires_at = ?ban.expires_at,
+            "Active antifraud ban"
+        );
+    }
     let storage_config = SqliteConfig::new(std::any::type_name::<CreateClaim>());
     let storage = SqliteStorage::new_with_callback(&config.database.url, &storage_config);
     info!("Initialized claim storage");
