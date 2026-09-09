@@ -2,6 +2,7 @@ import {
   Checkbox,
   CountValue,
   CopyInlineAction,
+  Disclosure,
   EmptyState,
   HighlightedCode,
   Input,
@@ -375,88 +376,109 @@ const CellInspectorInputPanel: FC<CellInspectorInputPanelProps> = ({
   customTlbEnabled,
   onCustomTlbChange,
   onCustomTlbEnabledChange,
-}) => (
-  <section className={styles.inputPanel}>
-    <div className={`${styles.textareaField} ${styles.cellField}`}>
-      <textarea
-        id="cell-inspector-input"
-        aria-label="Cell input"
-        className={styles.cellInput}
-        value={input}
-        onChange={event => onInputChange(event.target.value)}
-        placeholder="te6cc… or b5ee9c72…"
-        spellCheck={false}
-        autoCapitalize="off"
-        autoComplete="off"
-      />
-      <span className={styles.fieldHint}>Paste Base64, hex, a ton:// URL, or an explorer link</span>
-    </div>
+}) => {
+  const [optionsOpen, setOptionsOpen] = useState(readCellInspectorOptionsOpen)
 
-    <div className={styles.optionsGrid}>
-      <Input
-        className={styles.numberInput}
-        label="Root"
-        type="number"
-        min={0}
-        max={rootCount === undefined ? undefined : Math.max(0, rootCount - 1)}
-        disabled={rootCount === 1}
-        value={rootIndex}
-        onChange={event => onRootIndexChange(nonNegativeInteger(event.target.value, 0))}
-        description={
-          rootCount === undefined ? (
-            "0-based index"
-          ) : (
-            <>
-              <CountValue singular="root" value={rootCount} /> available
-            </>
-          )
-        }
-      />
-      <Input
-        className={styles.numberInput}
-        label="Tree depth"
-        type="number"
-        min={0}
-        max={128}
-        value={maxDepth}
-        onChange={event => onMaxDepthChange(boundedInteger(event.target.value, 8, 0, 128))}
-        description="Raw depth limit"
-      />
-    </div>
+  return (
+    <section className={styles.inputPanel}>
+      <div className={styles.inputHeader}>
+        <div className={styles.provenanceTitle}>Input</div>
+        <div className={styles.provenanceMeta}>
+          Base64, hex, a ton:// URL, or an explorer link
+        </div>
+      </div>
+      <div className={`${styles.textareaField} ${styles.cellField}`}>
+        <textarea
+          id="cell-inspector-input"
+          aria-label="Cell input"
+          className={styles.cellInput}
+          value={input}
+          onChange={event => onInputChange(event.target.value)}
+          placeholder="te6cc… or b5ee9c72…"
+          spellCheck={false}
+          autoCapitalize="off"
+          autoComplete="off"
+        />
+      </div>
 
-    <Checkbox
-      className={styles.strictOption}
-      label="Strict parsing"
-      description="Require full cell consumption"
-      checked={strict}
-      onChange={event => onStrictChange(event.currentTarget.checked)}
-    />
-
-    <div className={styles.customTlbSection}>
-      <Checkbox
-        label="Use custom TL-B schema"
-        description="Ignore ABI and automatic detection"
-        checked={customTlbEnabled}
-        onChange={event => onCustomTlbEnabledChange(event.currentTarget.checked)}
-      />
-      {customTlbEnabled && (
-        <label className={styles.textareaField} htmlFor="cell-inspector-custom-tlb">
-          <span className={styles.fieldLabel}>Schema</span>
-          <span className={styles.fieldHint}>Applied to the selected root</span>
-          <textarea
-            id="cell-inspector-custom-tlb"
-            aria-label="Custom TL-B schema"
-            className={styles.tlbInput}
-            value={customTlb}
-            onChange={event => onCustomTlbChange(event.target.value)}
-            placeholder="message#1234 value:uint32 = Message;"
-            spellCheck={false}
+      <Disclosure
+        className={styles.optionsDisclosure}
+        contentClassName={styles.optionsDisclosureContent}
+        label="Parsing options"
+        open={optionsOpen}
+        onToggle={event => {
+          const open = event.currentTarget.open
+          setOptionsOpen(open)
+          replaceCellInspectorOptionsQuery(open)
+        }}
+      >
+        <div className={styles.optionsGrid}>
+          <Input
+            className={styles.numberInput}
+            label="Root"
+            type="number"
+            min={0}
+            max={rootCount === undefined ? undefined : Math.max(0, rootCount - 1)}
+            disabled={rootCount === 1}
+            value={rootIndex}
+            onChange={event => onRootIndexChange(nonNegativeInteger(event.target.value, 0))}
+            description={
+              rootCount === undefined ? (
+                "0-based index"
+              ) : (
+                <>
+                  <CountValue singular="root" value={rootCount} /> available
+                </>
+              )
+            }
           />
-        </label>
-      )}
-    </div>
-  </section>
-)
+          <Input
+            className={styles.numberInput}
+            label="Tree depth"
+            type="number"
+            min={0}
+            max={128}
+            value={maxDepth}
+            onChange={event => onMaxDepthChange(boundedInteger(event.target.value, 8, 0, 128))}
+            description="Raw depth limit"
+          />
+        </div>
+
+        <Checkbox
+          className={styles.strictOption}
+          label="Strict parsing"
+          description="Require full cell consumption"
+          checked={strict}
+          onChange={event => onStrictChange(event.currentTarget.checked)}
+        />
+
+        <div className={styles.customTlbSection}>
+          <Checkbox
+            label="Use custom TL-B schema"
+            description="Ignore ABI and automatic detection"
+            checked={customTlbEnabled}
+            onChange={event => onCustomTlbEnabledChange(event.currentTarget.checked)}
+          />
+          {customTlbEnabled && (
+            <label className={styles.textareaField} htmlFor="cell-inspector-custom-tlb">
+              <span className={styles.fieldLabel}>Schema</span>
+              <span className={styles.fieldHint}>Applied to the selected root</span>
+              <textarea
+                id="cell-inspector-custom-tlb"
+                aria-label="Custom TL-B schema"
+                className={styles.tlbInput}
+                value={customTlb}
+                onChange={event => onCustomTlbChange(event.target.value)}
+                placeholder="message#1234 value:uint32 = Message;"
+                spellCheck={false}
+              />
+            </label>
+          )}
+        </div>
+      </Disclosure>
+    </section>
+  )
+}
 
 async function inspectCell({
   input,
@@ -957,17 +979,30 @@ function cellQueryValue(result: CellInspectorParseResult): string | undefined {
 }
 
 function replaceCellQuery(cell?: string): void {
+  replaceCellInspectorQueryParameter("cell", cell)
+}
+
+function readCellInspectorOptionsOpen(): boolean {
+  if (typeof globalThis.location === "undefined") return false
+  return new URLSearchParams(globalThis.location.search).get("options") === "open"
+}
+
+function replaceCellInspectorOptionsQuery(open: boolean): void {
+  replaceCellInspectorQueryParameter("options", open ? "open" : undefined)
+}
+
+function replaceCellInspectorQueryParameter(name: "cell" | "options", value?: string): void {
   if (typeof globalThis.location === "undefined" || typeof globalThis.history === "undefined") {
     return
   }
 
   const url = new URL(globalThis.location.href)
-  if ((url.searchParams.get("cell") ?? undefined) === cell) return
+  if ((url.searchParams.get(name) ?? undefined) === value) return
 
-  if (cell) {
-    url.searchParams.set("cell", cell)
+  if (value) {
+    url.searchParams.set(name, value)
   } else {
-    url.searchParams.delete("cell")
+    url.searchParams.delete(name)
   }
   globalThis.history.replaceState(
     globalThis.history.state,
