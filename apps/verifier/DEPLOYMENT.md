@@ -22,7 +22,7 @@ The verifier stores verified source bundles in Git under the configured
 `source_repository.storage_root`, which defaults to `sources`:
 
 ```text
-sources/{code_hash}/
+sources/{first_two_code_hash_characters}/{remaining_code_hash_characters}/
 ```
 
 Each bundle contains:

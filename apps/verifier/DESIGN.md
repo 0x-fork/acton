@@ -14,8 +14,9 @@ on-chain code hash matches a code hash present in the source registry.
 The registry is off-chain. Git stores the source bundles and manifests, and the
 runtime registry layer serves reads from a SQLite index. The index can be
 rebuilt from the Git repository by scanning
-`{source_repository.storage_root}/{code_hash}/`. The storage root defaults to
-`sources`.
+`{source_repository.storage_root}/{code_hash_prefix}/{code_hash_suffix}/`,
+where `code_hash_prefix` is the first two characters of the code hash and
+`code_hash_suffix` is the rest. The storage root defaults to `sources`.
 
 The verifier uses TON testnet payments to limit automated spam. A separate
 SQLite ledger prevents payment replay. The backend rebuilds this ledger from
@@ -203,10 +204,11 @@ Source storage persists verified bundles in Git:
 
 ```text
 <storage_root>/
-  <code_hash>/
-    manifest.json
-    files/
-      ...
+  <first_two_code_hash_characters>/
+    <remaining_code_hash_characters>/
+      manifest.json
+      files/
+        ...
 ```
 
 Git provides:

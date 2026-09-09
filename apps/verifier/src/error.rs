@@ -174,6 +174,7 @@ fn source_storage_error_is_payment_retryable(err: &SourceStorageError) -> bool {
             command.starts_with("git push ")
         }
         SourceStorageError::MissingConfig(_)
+        | SourceStorageError::InvalidCodeHash
         | SourceStorageError::InvalidPath { .. }
         | SourceStorageError::ReadFileUtf8 { .. }
         | SourceStorageError::SerializeManifest(_)

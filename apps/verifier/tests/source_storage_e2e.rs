@@ -19,6 +19,7 @@ use verifier::{
 };
 
 const CODE_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const CODE_HASH_PREFIX: &str = "aa";
 const SOURCE_BUNDLE_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const SECOND_BUNDLE_HASH: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const ORIGINAL_VERIFIED_AT: u64 = 1_600_000_000;
@@ -60,7 +61,8 @@ async fn git_source_storage_uses_configured_storage_root() -> Result<(), Box<dyn
         fixture
             .repo_path
             .join(storage_root)
-            .join(CODE_HASH)
+            .join(CODE_HASH_PREFIX)
+            .join(&CODE_HASH[CODE_HASH_PREFIX.len()..])
             .join("manifest.json")
             .is_file()
     );
@@ -309,7 +311,10 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
     assert!(storage.current_revision().await?.is_some());
 
     let started_at = unix_timestamp()?;
-    let bundle_path = format!("sources/{CODE_HASH}");
+    let bundle_path = format!(
+        "sources/{CODE_HASH_PREFIX}/{}",
+        &CODE_HASH[CODE_HASH_PREFIX.len()..]
+    );
     let receipt = storage
         .store_bundle(StoreSourceBundleRequest {
             code_hash: CODE_HASH.to_owned(),
@@ -547,7 +552,14 @@ async fn git_source_storage_cleans_up_after_commit_failure_and_allows_retry()
         )?,
         ""
     );
-    assert!(!fixture.repo_path.join("sources").join(CODE_HASH).exists());
+    assert!(
+        !fixture
+            .repo_path
+            .join("sources")
+            .join(CODE_HASH_PREFIX)
+            .join(&CODE_HASH[CODE_HASH_PREFIX.len()..])
+            .exists()
+    );
 
     assert_success(
         run_command(
@@ -614,7 +626,14 @@ async fn git_source_storage_rolls_back_after_push_failure_and_allows_retry()
         )?,
         ""
     );
-    assert!(!fixture.repo_path.join("sources").join(CODE_HASH).exists());
+    assert!(
+        !fixture
+            .repo_path
+            .join("sources")
+            .join(CODE_HASH_PREFIX)
+            .join(&CODE_HASH[CODE_HASH_PREFIX.len()..])
+            .exists()
+    );
 
     assert_success(
         run_command(

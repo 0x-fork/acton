@@ -16,7 +16,7 @@ use tokio::{
 };
 use utoipa::ToSchema;
 
-use crate::config::Config;
+use crate::{blockchain::is_valid_code_hash, config::Config};
 
 const GIT_COMMAND_TIMEOUT: Duration = Duration::from_mins(1);
 
@@ -160,7 +160,7 @@ impl GitSourceStorage {
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
         ensure_git_repo(repo_path).await?;
 
-        let bundle_path = bundle_relative_path(&self.storage_root, &request.code_hash);
+        let bundle_path = bundle_relative_path(&self.storage_root, &request.code_hash)?;
         let bundle_dir = repo_path.join(&bundle_path);
         let mut rollback_revision = None;
         let existing_revision = if fs::try_exists(bundle_dir.join("manifest.json"))
@@ -266,7 +266,7 @@ impl GitSourceStorage {
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
         ensure_git_repo(repo_path).await?;
 
-        let bundle_path = bundle_relative_path(&self.storage_root, code_hash);
+        let bundle_path = bundle_relative_path(&self.storage_root, code_hash)?;
         let bundle_dir = repo_path.join(&bundle_path);
         if !fs::try_exists(bundle_dir.join("manifest.json"))
             .await
@@ -298,7 +298,7 @@ impl GitSourceStorage {
             return Ok(Vec::new());
         }
 
-        let mut read_dir =
+        let mut shard_entries =
             fs::read_dir(&storage_dir)
                 .await
                 .map_err(|source| SourceStorageError::ReadDir {
@@ -306,8 +306,8 @@ impl GitSourceStorage {
                     source,
                 })?;
         let mut code_hashes = Vec::new();
-        while let Some(entry) =
-            read_dir
+        while let Some(shard_entry) =
+            shard_entries
                 .next_entry()
                 .await
                 .map_err(|source| SourceStorageError::ReadDir {
@@ -316,15 +316,51 @@ impl GitSourceStorage {
                 })?
         {
             let file_type =
-                entry
+                shard_entry
                     .file_type()
                     .await
                     .map_err(|source| SourceStorageError::ReadDir {
-                        path: entry.path(),
+                        path: shard_entry.path(),
                         source,
                     })?;
-            if file_type.is_dir() {
-                code_hashes.push(entry.file_name().to_string_lossy().into_owned());
+            if !file_type.is_dir() {
+                continue;
+            }
+
+            let shard = shard_entry.file_name().to_string_lossy().into_owned();
+            if shard.len() != 2 {
+                continue;
+            }
+
+            let shard_dir = shard_entry.path();
+            let mut bundle_entries =
+                fs::read_dir(&shard_dir)
+                    .await
+                    .map_err(|source| SourceStorageError::ReadDir {
+                        path: shard_dir.clone(),
+                        source,
+                    })?;
+            while let Some(bundle_entry) =
+                bundle_entries
+                    .next_entry()
+                    .await
+                    .map_err(|source| SourceStorageError::ReadDir {
+                        path: shard_dir.clone(),
+                        source,
+                    })?
+            {
+                let file_type = bundle_entry.file_type().await.map_err(|source| {
+                    SourceStorageError::ReadDir {
+                        path: bundle_entry.path(),
+                        source,
+                    }
+                })?;
+                if !file_type.is_dir() {
+                    continue;
+                }
+
+                let suffix = bundle_entry.file_name().to_string_lossy().into_owned();
+                code_hashes.push(format!("{shard}{suffix}"));
             }
         }
 
@@ -382,6 +418,8 @@ impl SourceStorage for GitSourceStorage {
 pub enum SourceStorageError {
     #[error("missing source storage configuration: {0}")]
     MissingConfig(&'static str),
+    #[error("invalid code hash: expected exactly 64 hexadecimal characters")]
+    InvalidCodeHash,
     #[error("invalid source storage path {path}: {message}", path = path.display())]
     InvalidPath { path: PathBuf, message: String },
     #[error("failed to create directory {path}: {source}", path = path.display())]
@@ -630,8 +668,13 @@ fn source_attributes_check_path(storage_root: &str) -> String {
     format!("{storage_root}/.verifier-attributes-check")
 }
 
-fn bundle_relative_path(storage_root: &str, code_hash: &str) -> String {
-    format!("{storage_root}/{code_hash}")
+fn bundle_relative_path(storage_root: &str, code_hash: &str) -> Result<String, SourceStorageError> {
+    if !is_valid_code_hash(code_hash) {
+        return Err(SourceStorageError::InvalidCodeHash);
+    }
+
+    let (prefix, suffix) = code_hash.split_at(2);
+    Ok(format!("{storage_root}/{prefix}/{suffix}"))
 }
 
 async fn write_bundle_files(
@@ -1006,6 +1049,26 @@ struct DiskManifestFile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bundle_path_splits_code_hash_after_first_two_characters() {
+        let code_hash = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+        let path = bundle_relative_path("sources", code_hash)
+            .expect("valid code hash should produce a bundle path");
+
+        assert_eq!(
+            path,
+            "sources/ab/cdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+        );
+    }
+
+    #[test]
+    fn bundle_path_rejects_invalid_code_hash() {
+        assert!(matches!(
+            bundle_relative_path("sources", "not-a-code-hash"),
+            Err(SourceStorageError::InvalidCodeHash)
+        ));
+    }
 
     #[tokio::test]
     async fn git_process_has_closed_stdin_and_disables_credential_prompts() {
