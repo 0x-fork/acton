@@ -6,9 +6,10 @@ import {
   Disclosure,
   Input,
   Select,
+  Tooltip,
   useToast,
 } from "@acton/ui"
-import {Plus} from "lucide-react"
+import {Info, Plus, X} from "lucide-react"
 import {type FormEvent, useEffect, useRef, useState} from "react"
 
 import {
@@ -25,6 +26,9 @@ import {
 import {WalletNamesInput} from "./WalletNamesInput"
 
 import styles from "./CreateEnvironmentDialog.module.css"
+
+const FULL_LOCALNET_DOCKER_NOTICE_DISMISSED_STORAGE_KEY =
+  "acton-studio:full-localnet-docker-notice-dismissed"
 
 interface CreateEnvironmentDialogProps {
   readonly environments: readonly StudioEnvironment[]
@@ -67,6 +71,10 @@ export function CreateEnvironmentDialog({
     createInitialForm(simulatedDefaultName),
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDockerNoticeDismissed, setIsDockerNoticeDismissed] = useState(
+    () =>
+      globalThis.localStorage.getItem(FULL_LOCALNET_DOCKER_NOTICE_DISMISSED_STORAGE_KEY) === "true",
+  )
   const nextImportedAccountId = useRef(1)
 
   useEffect(() => {
@@ -263,6 +271,39 @@ export function CreateEnvironmentDialog({
             <option value="fullTonNetwork">Full localnet</option>
           </Select>
 
+          {form.kind === "fullTonNetwork" && !isDockerNoticeDismissed ? (
+            <div className={styles.dockerRequirement}>
+              <Info size={14} aria-hidden="true" />
+              <span>
+                Docker must be installed and running; the first launch downloads the 200 MB{" "}
+                <a
+                  href="https://github.com/ton-blockchain/acton/pkgs/container/localton"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  localton
+                </a>{" "}
+                image
+              </span>
+              <Tooltip content="Don't show again">
+                <button
+                  type="button"
+                  className={styles.dockerRequirementDismiss}
+                  aria-label="Don't show again"
+                  onClick={() => {
+                    setIsDockerNoticeDismissed(true)
+                    globalThis.localStorage.setItem(
+                      FULL_LOCALNET_DOCKER_NOTICE_DISMISSED_STORAGE_KEY,
+                      "true",
+                    )
+                  }}
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </Tooltip>
+            </div>
+          ) : undefined}
+
           <Input
             label="Name"
             description="Used in Studio and environment history"
@@ -314,7 +355,11 @@ export function CreateEnvironmentDialog({
                 onChange={values => updateForm("accounts", values)}
               />
 
-              <Disclosure label="Network and mining" contentClassName={styles.advancedContent}>
+              <Disclosure
+                className={styles.compactDisclosure}
+                label="Network and mining"
+                contentClassName={styles.advancedContent}
+              >
                 <div className={styles.formGrid}>
                   <Input
                     label="Rate limit"
@@ -373,7 +418,11 @@ export function CreateEnvironmentDialog({
                 onChange={updateImportedAccount}
                 onRemove={removeImportedAccount}
               />
-              <Disclosure label="Network timing" contentClassName={styles.advancedContent}>
+              <Disclosure
+                className={styles.compactDisclosure}
+                label="Network timing"
+                contentClassName={styles.advancedContent}
+              >
                 <div className={styles.formGrid}>
                   <Input
                     label="Block time"
