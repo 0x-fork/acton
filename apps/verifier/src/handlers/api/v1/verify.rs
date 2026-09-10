@@ -36,6 +36,7 @@ use crate::{
 mod languages;
 
 const API_KEY_HEADER: &str = "x-verifier-key";
+const MAX_SOURCE_DIRECTORY_DEPTH: usize = 16;
 const MAX_SOURCE_PATH_CHARS: usize = 128;
 const MAX_UPLOADED_FILES: usize = 256;
 
@@ -459,6 +460,11 @@ fn validate_source_path(path: &str) -> Result<(), ApiError> {
     }
 
     validate_relative_path("source path", path)?;
+    if path.bytes().filter(|character| *character == b'/').count() > MAX_SOURCE_DIRECTORY_DEPTH {
+        return Err(ApiError::bad_request(format!(
+            "source path must contain no more than {MAX_SOURCE_DIRECTORY_DEPTH} directories"
+        )));
+    }
     validate_source_path_components(path)?;
     validate_source_extension_count(path)
 }

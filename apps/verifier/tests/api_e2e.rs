@@ -2106,6 +2106,55 @@ async fn verify_rejects_source_path_over_length_limit() {
 }
 
 #[tokio::test]
+async fn verify_accepts_source_path_at_directory_depth_limit() {
+    let path = format!("{}/main.tolk", ["dir"; 16].join("/"));
+    assert_eq!(path.matches('/').count(), 16);
+    let sources = serde_json::to_string(&json!([{
+        "path": path,
+        "is_entrypoint": true,
+    }]))
+    .expect("source metadata should serialize");
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            owned_text_part("sources", sources),
+            owned_file_part("files", path, "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn verify_rejects_source_path_over_directory_depth_limit() {
+    let path = format!("{}/main.tolk", ["dir"; 17].join("/"));
+    assert_eq!(path.matches('/').count(), 17);
+    let sources = serde_json::to_string(&json!([{
+        "path": path,
+        "is_entrypoint": true,
+    }]))
+    .expect("source metadata should serialize");
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            owned_text_part("sources", sources),
+            owned_file_part("files", path, "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_contains(response, "no more than 16 directories").await;
+}
+
+#[tokio::test]
 async fn verify_rejects_non_ascii_source_paths() {
     for path in [
         concat!("ca", "f", "\u{e9}.tolk"),
