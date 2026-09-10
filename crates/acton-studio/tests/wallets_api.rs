@@ -29,7 +29,7 @@ impl TestEnvironmentRuntime {
                 accounts: vec!["deployer".to_owned()],
                 rate_limit: None,
                 response_delay_ms: None,
-                block_interval_ms: None,
+                block_time_ms: None,
                 no_mining: false,
                 mine_empty_blocks: false,
             },

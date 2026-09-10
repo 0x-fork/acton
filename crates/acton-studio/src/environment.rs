@@ -89,7 +89,7 @@ pub enum CreateEnvironmentConfig {
         accounts: Vec<String>,
         rate_limit: Option<u32>,
         response_delay_ms: Option<u64>,
-        block_interval_ms: Option<u64>,
+        block_time_ms: Option<u64>,
         #[serde(default)]
         no_mining: bool,
         #[serde(default)]
@@ -259,7 +259,7 @@ pub enum EnvironmentConfig {
         accounts: Vec<String>,
         rate_limit: Option<u32>,
         response_delay_ms: Option<u64>,
-        block_interval_ms: Option<u64>,
+        block_time_ms: Option<u64>,
         no_mining: bool,
         mine_empty_blocks: bool,
     },

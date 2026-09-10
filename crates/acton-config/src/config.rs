@@ -520,7 +520,7 @@ pub struct LocalnetSettings {
     pub response_delay_ms: Option<u64>,
     /// Localnet block production interval in milliseconds
     #[schemars(range(min = 1))]
-    pub block_interval_ms: Option<u64>,
+    pub block_time_ms: Option<u64>,
     /// Disable automatic localnet block production
     pub no_mining: Option<bool>,
     /// Mine blocks even when there are no pending messages
@@ -2329,7 +2329,7 @@ fork-block-number = 1234567
 accounts = ["deployer", "user"]
 rate-limit = 3
 response-delay-ms = 300
-block-interval-ms = 250
+block-time-ms = 250
 no-mining = true
 mine-empty-blocks = true
 "#;
@@ -2346,7 +2346,7 @@ mine-empty-blocks = true
         );
         assert_eq!(localnet.rate_limit, Some(3));
         assert_eq!(localnet.response_delay_ms, Some(300));
-        assert_eq!(localnet.block_interval_ms, Some(250));
+        assert_eq!(localnet.block_time_ms, Some(250));
         assert_eq!(localnet.no_mining, Some(true));
         assert_eq!(localnet.mine_empty_blocks, Some(true));
     }

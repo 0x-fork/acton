@@ -48,7 +48,7 @@ interface EnvironmentFormState {
   readonly accounts: readonly string[]
   readonly rateLimit: string
   readonly responseDelayMs: string
-  readonly blockIntervalMs: string
+  readonly blockTimeMs: string
   readonly fullTonBlockTimeMs: string
   readonly fullTonElectionTimeSeconds: string
   readonly noMining: boolean
@@ -196,7 +196,7 @@ export function CreateEnvironmentDialog({
                 accounts: form.accounts,
                 rateLimit: optionalPositiveInteger(form.rateLimit, "Rate limit"),
                 responseDelayMs: optionalPositiveInteger(form.responseDelayMs, "Response delay"),
-                blockIntervalMs: optionalPositiveInteger(form.blockIntervalMs, "Block interval"),
+                blockTimeMs: optionalPositiveInteger(form.blockTimeMs, "Block time"),
                 noMining: form.noMining,
                 mineEmptyBlocks: form.noMining ? false : form.mineEmptyBlocks,
               }
@@ -408,14 +408,14 @@ export function CreateEnvironmentDialog({
                     onChange={event => updateForm("responseDelayMs", event.target.value)}
                   />
                   <Input
-                    label="Block interval"
-                    description="Leave empty to use the Acton project setting"
+                    label="Block time"
+                    description="Target interval between automatic blocks; ignored with manual mining"
                     suffix="ms"
                     type="number"
                     min={1}
                     placeholder="Project default"
-                    value={form.blockIntervalMs}
-                    onChange={event => updateForm("blockIntervalMs", event.target.value)}
+                    value={form.blockTimeMs}
+                    onChange={event => updateForm("blockTimeMs", event.target.value)}
                   />
                 </div>
                 <div className={styles.checkboxGroup}>
@@ -510,7 +510,7 @@ function createInitialForm(name: string, accounts: readonly string[] = []): Envi
     accounts: [...new Set(accounts)],
     rateLimit: "",
     responseDelayMs: "",
-    blockIntervalMs: "",
+    blockTimeMs: "",
     fullTonBlockTimeMs: "",
     fullTonElectionTimeSeconds: "",
     noMining: false,

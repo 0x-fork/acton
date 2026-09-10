@@ -1193,9 +1193,9 @@ pub enum SimulatedLocalnetCommand {
             long,
             value_name = "MS",
             value_parser = clap::value_parser!(u64).range(1..),
-            help = "Localnet block production interval, in milliseconds (default: [localnet].block-interval-ms or 500)"
+            help = "Target interval between automatic blocks, in milliseconds (default: [localnet].block-time-ms or 500)"
         )]
-        block_interval_ms: Option<u64>,
+        block_time_ms: Option<u64>,
         #[arg(
             long,
             help = "Disable automatic block production; mine blocks manually with `acton simulated-localnet mine` (default: [localnet].no-mining)"
@@ -2592,7 +2592,7 @@ fn main() {
                 db_path,
                 rate_limit,
                 response_delay_ms,
-                block_interval_ms,
+                block_time_ms,
                 no_mining,
                 mine_empty_blocks,
                 snapshots_dir,
@@ -2608,7 +2608,7 @@ fn main() {
                     accounts,
                     rate_limit,
                     response_delay_ms,
-                    block_interval_ms,
+                    block_time_ms,
                     no_mining,
                     mine_empty_blocks,
                 );
@@ -2625,7 +2625,7 @@ fn main() {
                         resolved_localnet.accounts,
                         resolved_localnet.rate_limit,
                         resolved_localnet.response_delay_ms,
-                        resolved_localnet.block_interval_ms,
+                        resolved_localnet.block_time_ms,
                         resolved_localnet.no_mining,
                         resolved_localnet.mine_empty_blocks,
                         snapshots_dir,
@@ -2865,7 +2865,7 @@ struct ResolvedLocalnetSettings {
     accounts: Vec<String>,
     rate_limit: Option<u32>,
     response_delay_ms: Option<u64>,
-    block_interval_ms: u64,
+    block_time_ms: u64,
     no_mining: bool,
     mine_empty_blocks: bool,
 }
@@ -2886,7 +2886,7 @@ fn resolve_localnet_settings(
     cli_accounts: Option<Vec<String>>,
     cli_rate_limit: Option<u32>,
     cli_response_delay_ms: Option<u64>,
-    cli_block_interval_ms: Option<u64>,
+    cli_block_time_ms: Option<u64>,
     cli_no_mining: bool,
     cli_mine_empty_blocks: bool,
 ) -> ResolvedLocalnetSettings {
@@ -2899,9 +2899,9 @@ fn resolve_localnet_settings(
         accounts: cli_accounts.or(config.accounts).unwrap_or_default(),
         rate_limit: cli_rate_limit.or(config.rate_limit),
         response_delay_ms: cli_response_delay_ms.or(config.response_delay_ms),
-        block_interval_ms: cli_block_interval_ms
-            .or(config.block_interval_ms)
-            .unwrap_or(ton_localnet::DEFAULT_BLOCK_INTERVAL_MS),
+        block_time_ms: cli_block_time_ms
+            .or(config.block_time_ms)
+            .unwrap_or(ton_localnet::DEFAULT_BLOCK_TIME_MS),
         no_mining: cli_no_mining || config.no_mining.unwrap_or(false),
         mine_empty_blocks: cli_mine_empty_blocks || config.mine_empty_blocks.unwrap_or(false),
     }

@@ -70,7 +70,7 @@ struct LocalnetAdminStatus {
     time_offset_seconds: i64,
     next_block_timestamp: Option<u32>,
     auto_mining: bool,
-    block_interval_ms: u64,
+    block_time_ms: u64,
     rate_limit_rps: Option<u32>,
     mining_mode: LocalnetMiningMode,
     #[serde(flatten)]
@@ -99,7 +99,7 @@ pub async fn get_status(State(state): State<ServerState>) -> Response {
                 time_offset_seconds: clock_info.time_offset_seconds,
                 next_block_timestamp: clock_info.next_block_timestamp,
                 auto_mining: node.auto_mining(),
-                block_interval_ms: node.block_interval_ms(),
+                block_time_ms: node.block_time_ms(),
                 rate_limit_rps,
                 mining_mode,
                 state_source: StateSourceInfo::from(&state_source),

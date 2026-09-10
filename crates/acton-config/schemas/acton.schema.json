@@ -1079,7 +1079,7 @@
             "type": "string"
           }
         },
-        "block-interval-ms": {
+        "block-time-ms": {
           "description": "Localnet block production interval in milliseconds",
           "type": "integer",
           "format": "uint64",

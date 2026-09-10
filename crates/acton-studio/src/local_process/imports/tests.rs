@@ -194,7 +194,7 @@ async fn import_pins_cells_and_registers_after_success_across_a_studio_restart()
         accounts: vec![],
         rate_limit: None,
         response_delay_ms: None,
-        block_interval_ms: None,
+        block_time_ms: None,
         no_mining: false,
         mine_empty_blocks: false,
     };

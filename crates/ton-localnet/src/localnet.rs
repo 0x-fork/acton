@@ -731,11 +731,11 @@ pub struct Localnet {
     tx: mpsc::Sender<Request>,
     events_tx: broadcast::Sender<StreamingCommitEvent>,
     started_at: SystemTime,
-    block_interval_ms: u64,
+    block_time_ms: u64,
     auto_mining: bool,
 }
 
-pub const DEFAULT_BLOCK_INTERVAL_MS: u64 = 500;
+pub const DEFAULT_BLOCK_TIME_MS: u64 = 500;
 
 impl Localnet {
     #[must_use]
@@ -743,7 +743,7 @@ impl Localnet {
         state_source: StateSource,
         db_path: Option<String>,
         snapshots: SnapshotStore,
-        block_interval: Duration,
+        block_time: Duration,
         auto_mining: bool,
         mining_mode: LocalnetMiningMode,
     ) -> Self {
@@ -751,7 +751,7 @@ impl Localnet {
         let (events_tx, _) = broadcast::channel(1024);
         let started_at = SystemTime::now();
         let node_events_tx = events_tx.clone();
-        let block_interval_ms = u64::try_from(block_interval.as_millis()).unwrap_or(u64::MAX);
+        let block_time_ms = u64::try_from(block_time.as_millis()).unwrap_or(u64::MAX);
 
         std::thread::spawn(move || {
             if let Err(e) = run_node_loop(
@@ -760,7 +760,7 @@ impl Localnet {
                 state_source,
                 db_path,
                 snapshots,
-                block_interval,
+                block_time,
                 auto_mining,
                 mining_mode,
             ) {
@@ -772,7 +772,7 @@ impl Localnet {
             tx,
             events_tx,
             started_at,
-            block_interval_ms,
+            block_time_ms,
             auto_mining,
         }
     }
@@ -784,9 +784,11 @@ impl Localnet {
             .map_or(0, |duration| duration.as_secs())
     }
 
+    /// Reports the configured delay between automatic mining attempts for runtime settings.
+    /// Manual mining does not use this delay; changing mining mode leaves it unchanged.
     #[must_use]
-    pub const fn block_interval_ms(&self) -> u64 {
-        self.block_interval_ms
+    pub const fn block_time_ms(&self) -> u64 {
+        self.block_time_ms
     }
 
     #[must_use]
@@ -1869,14 +1871,14 @@ fn run_node_loop(
     state_source: StateSource,
     db_path: Option<String>,
     snapshots: SnapshotStore,
-    block_interval: Duration,
+    block_time: Duration,
     auto_mining: bool,
     mut mining_mode: LocalnetMiningMode,
 ) -> anyhow::Result<()> {
     let mut node = create_node(events_tx, state_source, db_path)?;
     tracing::info!(
-        "TON localnet started, block interval: {}ms, auto mining: {}, skip empty blocks: {}",
-        block_interval.as_millis(),
+        "TON localnet started, block time: {}ms, auto mining: {}, skip empty blocks: {}",
+        block_time.as_millis(),
         auto_mining,
         mining_mode.skip_empty_blocks
     );
@@ -1896,7 +1898,7 @@ fn run_node_loop(
         rx,
         node,
         snapshots,
-        block_interval,
+        block_time,
         mining_mode,
     ))
 }
@@ -1920,21 +1922,21 @@ async fn run_node_loop_async(
     mut rx: mpsc::Receiver<Request>,
     mut node: Node,
     snapshots: SnapshotStore,
-    block_interval: Duration,
+    block_time: Duration,
     mut mining_mode: LocalnetMiningMode,
 ) -> anyhow::Result<()> {
-    let mut next_block_at = Instant::now() + block_interval;
+    let mut next_block_at = Instant::now() + block_time;
 
     loop {
         if Instant::now() >= next_block_at {
-            next_block_at = mine_scheduled_block(&mut node, block_interval, mining_mode);
+            next_block_at = mine_scheduled_block(&mut node, block_time, mining_mode);
             continue;
         }
 
         tokio::select! {
             biased;
             () = tokio::time::sleep_until(next_block_at) => {
-                next_block_at = mine_scheduled_block(&mut node, block_interval, mining_mode);
+                next_block_at = mine_scheduled_block(&mut node, block_time, mining_mode);
             }
             req = rx.recv() => {
                 let Some(req) = req else {
@@ -1948,13 +1950,13 @@ async fn run_node_loop_async(
 
 fn mine_scheduled_block(
     node: &mut Node,
-    block_interval: Duration,
+    block_time: Duration,
     mining_mode: LocalnetMiningMode,
 ) -> Instant {
     if let Err(e) = mine_block_with_mode(node, mining_mode) {
         tracing::error!("Block mining failed: {:?}", e);
     }
-    Instant::now() + block_interval
+    Instant::now() + block_time
 }
 
 fn mine_block_with_mode(

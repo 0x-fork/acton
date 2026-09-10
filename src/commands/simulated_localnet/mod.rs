@@ -42,7 +42,7 @@ pub async fn simulated_localnet_start_cmd(
     accounts: Vec<String>,
     rate_limit: Option<u32>,
     response_delay_ms: Option<u64>,
-    block_interval_ms: u64,
+    block_time_ms: u64,
     no_mining: bool,
     mine_empty_blocks: bool,
     snapshots_dir: Option<std::path::PathBuf>,
@@ -58,8 +58,8 @@ pub async fn simulated_localnet_start_cmd(
         "             It provides TON-compatible blocks, LiteAPI, TON Center v2/v3, Streaming API, and Emulate API"
     );
 
-    if block_interval_ms == 0 {
-        anyhow::bail!("localnet block interval must be greater than 0");
+    if block_time_ms == 0 {
+        anyhow::bail!("localnet block time must be greater than 0");
     }
 
     let (state_source, fork_network, fork_block_number) = if let Some(network) = fork_net {
@@ -94,7 +94,7 @@ pub async fn simulated_localnet_start_cmd(
         state_source,
         db_path.clone(),
         snapshots,
-        Duration::from_millis(block_interval_ms),
+        Duration::from_millis(block_time_ms),
         !no_mining,
         LocalnetMiningMode {
             skip_empty_blocks: !mine_empty_blocks,

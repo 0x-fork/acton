@@ -1247,7 +1247,7 @@ export interface LocalnetNodeInfo extends LocalnetTimeInfo {
   readonly uptime_seconds: number
   readonly last_block_seqno: number
   readonly auto_mining: boolean
-  readonly block_interval_ms: number
+  readonly block_time_ms: number
   readonly rate_limit_rps: number | null
   readonly state_source: string
   readonly fork_network?: string | null

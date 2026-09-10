@@ -66,9 +66,10 @@ Maximum \fB/api\fR requests per second to simulate provider rate limits.
 Delay TON Center v2/v3 and Emulate API responses.
 .RE
 .sp
-\fB\-\-block\-interval\-ms\fR \fIms\fR
+\fB\-\-block\-time\-ms\fR \fIms\fR
 .RS 4
-Localnet block production interval.
+Target interval between automatic blocks, in milliseconds. Ignored when
+automatic mining is disabled.
 .RE
 .sp
 \fB\-\-no\-mining\fR
@@ -286,7 +287,7 @@ fork\-block\-number = 55000000
 accounts = ["deployer", "user"]
 rate\-limit = 1
 response\-delay\-ms = 300
-block\-interval\-ms = 500
+block\-time\-ms = 500
 no\-mining = false
 .fi
 .RE
@@ -359,7 +360,7 @@ endpoints, and the bundled localnet UI
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'the node produces a block every \fB\-\-block\-interval\-ms\fR milliseconds, defaults
+\h'-04'\(bu\h'+03'the node produces a block every \fB\-\-block\-time\-ms\fR milliseconds, defaults
 to 500 ms, and still creates empty blocks when no transactions are queued
 .RE
 .sp

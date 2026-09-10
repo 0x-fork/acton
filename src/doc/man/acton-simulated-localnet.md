@@ -69,8 +69,9 @@ Maximum `/api` requests per second to simulate provider rate limits.
 Delay TON Center v2/v3 and Emulate API responses.
 {{/option}}
 
-{{#option "`--block-interval-ms` _ms_" }}
-Localnet block production interval.
+{{#option "`--block-time-ms` _ms_" }}
+Target interval between automatic blocks, in milliseconds. Ignored when
+automatic mining is disabled.
 {{/option}}
 
 {{#option "`--no-mining`" }}
@@ -309,7 +310,7 @@ fork-block-number = 55000000
 accounts = ["deployer", "user"]
 rate-limit = 1
 response-delay-ms = 300
-block-interval-ms = 500
+block-time-ms = 500
 no-mining = false
 ```
 
@@ -368,7 +369,7 @@ and prints a fresh token.
   `Ctrl+C`
 - the Localnet UI is available on the root path, for example
   `http://127.0.0.1:<port>/`
-- the node produces a block every `--block-interval-ms` milliseconds, defaults
+- the node produces a block every `--block-time-ms` milliseconds, defaults
   to 500 ms, and still creates empty blocks when no transactions are queued
 - `--no-mining` or `[localnet].no-mining = true` disables automatic block
   production; use `acton simulated-localnet mine [N]` or `POST /acton_mine` to create

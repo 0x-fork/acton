@@ -25,7 +25,7 @@ export interface ActonSimulatedLocalnetEnvironmentConfig {
   readonly accounts: readonly string[]
   readonly rateLimit?: number
   readonly responseDelayMs?: number
-  readonly blockIntervalMs?: number
+  readonly blockTimeMs?: number
   readonly noMining: boolean
   readonly mineEmptyBlocks: boolean
 }
@@ -76,7 +76,7 @@ export interface CreateActonSimulatedLocalnetEnvironmentConfig {
   readonly accounts: readonly string[]
   readonly rateLimit?: number
   readonly responseDelayMs?: number
-  readonly blockIntervalMs?: number
+  readonly blockTimeMs?: number
   readonly noMining: boolean
   readonly mineEmptyBlocks: boolean
 }

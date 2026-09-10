@@ -58,8 +58,9 @@ SUBCOMMANDS
           --response-delay-ms ms
               Delay TON Center v2/v3 and Emulate API responses.
 
-          --block-interval-ms ms
-              Localnet block production interval.
+          --block-time-ms ms
+              Target interval between automatic blocks, in milliseconds.
+              Ignored when automatic mining is disabled.
 
           --no-mining
               Disable automatic block production. Mine blocks manually with
@@ -235,7 +236,7 @@ CONFIGURATION
            accounts = ["deployer", "user"]
            rate-limit = 1
            response-delay-ms = 300
-           block-interval-ms = 500
+           block-time-ms = 500
            no-mining = false
 
        CLI flags override config values for the current invocation. In
@@ -296,7 +297,7 @@ RUNTIME MODEL
        o  the Localnet UI is available on the root path, for example
           http://127.0.0.1:<port>/
 
-       o  the node produces a block every --block-interval-ms milliseconds,
+       o  the node produces a block every --block-time-ms milliseconds,
           defaults to 500 ms, and still creates empty blocks when no
           transactions are queued
 

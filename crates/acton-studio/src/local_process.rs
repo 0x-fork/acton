@@ -1145,7 +1145,7 @@ async fn resolve_request(
             accounts,
             rate_limit,
             response_delay_ms,
-            block_interval_ms,
+            block_time_ms,
             no_mining,
             mine_empty_blocks,
         } => {
@@ -1159,13 +1159,11 @@ async fn resolve_request(
                     message: "Fork network is required when a fork block is selected".to_owned(),
                 });
             }
-            if rate_limit == Some(0) || response_delay_ms == Some(0) || block_interval_ms == Some(0)
-            {
+            if rate_limit == Some(0) || response_delay_ms == Some(0) || block_time_ms == Some(0) {
                 return Err(EnvironmentRuntimeError::InvalidRequest {
                     code: "environment_limit_invalid",
-                    message:
-                        "Rate limit, response delay and block interval must be greater than zero"
-                            .to_owned(),
+                    message: "Rate limit, response delay and block time must be greater than zero"
+                        .to_owned(),
                 });
             }
             if no_mining && mine_empty_blocks {
@@ -1187,7 +1185,7 @@ async fn resolve_request(
                     .collect(),
                 rate_limit,
                 response_delay_ms,
-                block_interval_ms,
+                block_time_ms,
                 no_mining,
                 mine_empty_blocks,
             }
@@ -1597,7 +1595,7 @@ fn spawn_localnet(
         accounts,
         rate_limit,
         response_delay_ms,
-        block_interval_ms,
+        block_time_ms,
         no_mining,
         mine_empty_blocks,
     } = config
@@ -1638,10 +1636,10 @@ fn spawn_localnet(
             .arg("--response-delay-ms")
             .arg(response_delay_ms.to_string());
     }
-    if let Some(block_interval_ms) = block_interval_ms {
+    if let Some(block_time_ms) = block_time_ms {
         command
-            .arg("--block-interval-ms")
-            .arg(block_interval_ms.to_string());
+            .arg("--block-time-ms")
+            .arg(block_time_ms.to_string());
     }
     if *no_mining {
         command.arg("--no-mining");

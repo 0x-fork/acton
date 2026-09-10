@@ -19,5 +19,5 @@ pub mod types;
 mod v3_events;
 mod virtual_clock;
 pub(crate) use error::{LiteServerErrorCode, LocalnetError};
-pub use localnet::{DEFAULT_BLOCK_INTERVAL_MS, Localnet, LocalnetMiningMode};
+pub use localnet::{DEFAULT_BLOCK_TIME_MS, Localnet, LocalnetMiningMode};
 pub use server::{ServerArgs, ServerError, StartupAccount, run_server};

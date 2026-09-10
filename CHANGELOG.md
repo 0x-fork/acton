@@ -195,7 +195,7 @@ API, web UI, and `acton verify` CLI integration are included below.
 
 ### Localnet Simulator
 
-- Added interval and manual block production with `--block-interval-ms`,
+- Added interval and manual block production with `--block-time-ms`,
   `--no-mining`, `acton simulated-localnet mine`, `/acton_mine`, and optional empty-block
   mining. Submitted messages are queued into blocks, and automatic mining runs
   only while messages are pending unless empty-block mining is enabled.
