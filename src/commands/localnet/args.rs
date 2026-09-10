@@ -25,7 +25,8 @@ pub struct LocalnetArgs {
 /// stopping a network always preserves its blockchain and snapshot volumes.
 #[derive(Subcommand)]
 pub enum LocalnetCommand {
-    #[command(about = "Run the localnet HTTP service in the foreground")]
+    // Process launchers use this entry point; users manage the network through start/stop.
+    #[command(hide = true, about = "Run the localnet HTTP service in the foreground")]
     Serve {
         network: Option<String>,
 
