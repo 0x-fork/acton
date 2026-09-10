@@ -58,7 +58,7 @@ jobs:
         # language=Bash
         run: |
           args=(
-            run -p xtask -- github-cleanup
+            run -p xtask -- github-cleanup --summary
           )
 
           if [[ -n "${XTASK_LAST_ACCESSED_DAYS}" ]]; then

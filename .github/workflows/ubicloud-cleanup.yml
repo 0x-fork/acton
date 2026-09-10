@@ -61,7 +61,7 @@ jobs:
         # language=Bash
         run: |
           args=(
-            run -p xtask -- ubicloud-cleanup
+            run -p xtask -- ubicloud-cleanup --summary
             --project "${UBICLOUD_PROJECT_ID}"
             --installation "${GITHUB_INSTALLATION}"
             --repository "${GITHUB_REPOSITORY_NAME}"
