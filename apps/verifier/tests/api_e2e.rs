@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 use verifier::app;
 use verifier::compilers::CompileGeneratedSource;
+use verifier::config::UploadLimits;
 use verifier::payment::{
     OnchainPaymentVerifier, PaymentAttemptOutcome, PaymentError, PaymentLedger, PaymentVerifier,
 };
@@ -99,6 +100,59 @@ async fn verification_admission_rejects_ambiguous_and_excessive_uploads_before_p
         format!("{}\n", serde_json::to_string_pretty(&snapshot).unwrap()),
         include_str!("snapshots/verification_admission.json"),
     );
+}
+
+#[tokio::test]
+async fn verify_enforces_configured_source_file_size_limit() {
+    const CONTENT: &str = "fun main() {}";
+
+    let limits = UploadLimits::new(2 * 1024 * 1024, None, Some(CONTENT.len()), None, None);
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE).with_upload_limits(limits),
+        valid_verify_parts(),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let limits = UploadLimits::new(2 * 1024 * 1024, None, Some(CONTENT.len() - 1), None, None);
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE).with_upload_limits(limits),
+        valid_verify_parts(),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    assert_error_contains(response, "uploaded file main.tolk").await;
+}
+
+#[tokio::test]
+async fn verify_enforces_configured_json_size_limit() {
+    let limits = UploadLimits::new(
+        2 * 1024 * 1024,
+        Some(COMPILE_PARAMS_TOLK.len()),
+        None,
+        None,
+        None,
+    );
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE).with_upload_limits(limits),
+        valid_verify_parts(),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    assert_error_contains(response, "sources JSON field").await;
+}
+
+#[tokio::test]
+async fn verify_enforces_configured_request_size_limit() {
+    let limits = UploadLimits::new(128, None, None, None, None);
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE).with_upload_limits(limits),
+        valid_verify_parts(),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
 }
 
 async fn post_take_ticket(
@@ -424,7 +478,9 @@ async fn openapi_json_documents_verifier_api() {
     assert_eq!(response_statuses(take_ticket), ["200", "400", "502", "503"]);
     assert_eq!(
         response_statuses(verify),
-        ["200", "400", "401", "402", "404", "409", "502", "503"]
+        [
+            "200", "400", "401", "402", "404", "409", "413", "502", "503"
+        ]
     );
     assert_eq!(response_statuses(abi), ["200", "404", "502"]);
     assert_eq!(response_statuses(source), ["200", "400", "404", "502"]);

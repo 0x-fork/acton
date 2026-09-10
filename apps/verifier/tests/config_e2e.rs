@@ -46,6 +46,12 @@ fn example_config_toml_loads() {
         "compiler-worker/compile.mjs"
     );
     assert_eq!(config.compiler_timeout(), Duration::from_secs(10));
+    let upload_limits = config.upload_limits();
+    assert_eq!(upload_limits.max_request_bytes(), 2 * 1024 * 1024);
+    assert_eq!(upload_limits.max_json_file_bytes(), None);
+    assert_eq!(upload_limits.max_tolk_file_bytes(), None);
+    assert_eq!(upload_limits.max_func_file_bytes(), None);
+    assert_eq!(upload_limits.max_tact_file_bytes(), None);
 }
 
 #[test]
@@ -79,6 +85,31 @@ fn compiler_timeout_can_be_overridden() {
 }
 
 #[test]
+fn upload_limits_can_be_overridden() {
+    let mut config_file = tempfile::NamedTempFile::new().expect("config file");
+    writeln!(
+        config_file,
+        r"
+[upload_limits]
+max_request_bytes = 1000
+max_json_file_bytes = 100
+max_tolk_file_bytes = 200
+max_func_file_bytes = 300
+max_tact_file_bytes = 400
+"
+    )
+    .expect("write config");
+
+    let config = Config::load_from_path(config_file.path()).expect("custom upload limits");
+    let upload_limits = config.upload_limits();
+    assert_eq!(upload_limits.max_request_bytes(), 1000);
+    assert_eq!(upload_limits.max_json_file_bytes(), Some(100));
+    assert_eq!(upload_limits.max_tolk_file_bytes(), Some(200));
+    assert_eq!(upload_limits.max_func_file_bytes(), Some(300));
+    assert_eq!(upload_limits.max_tact_file_bytes(), Some(400));
+}
+
+#[test]
 fn docker_entrypoint_generates_default_and_overridden_compiler_timeout() {
     for override_ms in [None, Some("15000")] {
         let directory = tempfile::tempdir().expect("config directory");
@@ -104,6 +135,38 @@ fn docker_entrypoint_generates_default_and_overridden_compiler_timeout() {
             Duration::from_secs(if override_ms.is_some() { 15 } else { 10 })
         );
     }
+}
+
+#[test]
+fn docker_entrypoint_generates_upload_limits() {
+    let directory = tempfile::tempdir().expect("config directory");
+    let config_path = directory.path().join("config.toml");
+    let output = std::process::Command::new("sh")
+        .args(["docker/entrypoint.sh", "true"])
+        .env_clear()
+        .env("PATH", std::env::var_os("PATH").expect("PATH"))
+        .env("VERIFIER_CONFIG", &config_path)
+        .env("VERIFIER_UPLOAD_MAX_REQUEST_BYTES", "1000")
+        .env("VERIFIER_UPLOAD_MAX_JSON_FILE_BYTES", "100")
+        .env("VERIFIER_UPLOAD_MAX_TOLK_FILE_BYTES", "200")
+        .env("VERIFIER_UPLOAD_MAX_FUNC_FILE_BYTES", "300")
+        .env("VERIFIER_UPLOAD_MAX_TACT_FILE_BYTES", "400")
+        .output()
+        .expect("run entrypoint");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let limits = Config::load_from_path(&config_path)
+        .expect("generated config")
+        .upload_limits();
+    assert_eq!(limits.max_request_bytes(), 1000);
+    assert_eq!(limits.max_json_file_bytes(), Some(100));
+    assert_eq!(limits.max_tolk_file_bytes(), Some(200));
+    assert_eq!(limits.max_func_file_bytes(), Some(300));
+    assert_eq!(limits.max_tact_file_bytes(), Some(400));
 }
 
 #[test]

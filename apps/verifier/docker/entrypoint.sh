@@ -104,6 +104,14 @@ write_generated_config() {
         write_optional_string node_bin "${VERIFIER_COMPILER_NODE_BIN:-node}"
         write_optional_string worker_path "${VERIFIER_COMPILER_WORKER_PATH:-/app/compiler-worker/compile.mjs}"
         write_optional_int timeout_ms "${VERIFIER_COMPILER_TIMEOUT_MS:-10000}"
+        printf '\n'
+
+        printf '[upload_limits]\n'
+        write_optional_int max_request_bytes "${VERIFIER_UPLOAD_MAX_REQUEST_BYTES:-2097152}"
+        write_optional_int max_json_file_bytes "${VERIFIER_UPLOAD_MAX_JSON_FILE_BYTES:-}"
+        write_optional_int max_tolk_file_bytes "${VERIFIER_UPLOAD_MAX_TOLK_FILE_BYTES:-}"
+        write_optional_int max_func_file_bytes "${VERIFIER_UPLOAD_MAX_FUNC_FILE_BYTES:-}"
+        write_optional_int max_tact_file_bytes "${VERIFIER_UPLOAD_MAX_TACT_FILE_BYTES:-}"
     } > "$config_path"
 }
 

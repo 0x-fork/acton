@@ -7,10 +7,7 @@ use std::{
 use axum::{
     Json,
     body::Bytes,
-    extract::{
-        Multipart as MultipartExtractor, State,
-        multipart::{Field, Multipart},
-    },
+    extract::{Multipart as MultipartExtractor, State, multipart::Multipart},
     http::HeaderMap,
     response::IntoResponse,
 };
@@ -34,11 +31,11 @@ use crate::{
 };
 
 mod languages;
+mod upload_limits;
 
 const API_KEY_HEADER: &str = "x-verifier-key";
 const MAX_SOURCE_DIRECTORY_DEPTH: usize = 16;
 const MAX_SOURCE_PATH_CHARS: usize = 128;
-const MAX_UPLOADED_FILES: usize = 256;
 
 #[utoipa::path(
     post,
@@ -56,6 +53,7 @@ const MAX_UPLOADED_FILES: usize = 256;
         (status = 402, description = "Payment is missing or invalid", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
         (status = 409, description = "Payment is already used or in progress", body = crate::error::ErrorResponse),
+        (status = 413, description = "The request or one of its parts exceeds the configured upload limit", body = crate::error::ErrorResponse),
         (status = 502, description = "Compiler, blockchain, payment provider, or source storage failure", body = crate::error::ErrorResponse),
         (status = 503, description = "Payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),
@@ -87,11 +85,7 @@ async fn handle_multipart(
     let mut files = Vec::new();
     let mut seen_fields = BTreeSet::new();
 
-    while let Some(field) = multipart
-        .next_field()
-        .await
-        .map_err(|err| ApiError::bad_request(err.to_string()))?
-    {
+    while let Some(field) = multipart.next_field().await.map_err(ApiError::from)? {
         if let Some(name) = field.name()
             && name != "files"
             && !seen_fields.insert(name.to_owned())
@@ -102,43 +96,32 @@ async fn handle_multipart(
         }
         match field.name() {
             Some("address") => {
-                address = Some(
-                    field
-                        .text()
-                        .await
-                        .map_err(|err| ApiError::bad_request(err.to_string()))?,
-                );
+                address = Some(field.text().await.map_err(ApiError::from)?);
             }
             Some("code_hash") => {
-                code_hash = Some(
-                    field
-                        .text()
-                        .await
-                        .map_err(|err| ApiError::bad_request(err.to_string()))?,
-                );
+                code_hash = Some(field.text().await.map_err(ApiError::from)?);
             }
             Some("language") => {
-                language = Some(
-                    field
-                        .text()
-                        .await
-                        .map_err(|err| ApiError::bad_request(err.to_string()))?,
-                );
+                language = Some(field.text().await.map_err(ApiError::from)?);
             }
             Some("compile_params") => {
-                let raw_params = field
-                    .text()
-                    .await
-                    .map_err(|err| ApiError::bad_request(err.to_string()))?;
+                let raw_params = upload_limits::read_json_part(
+                    field,
+                    state.upload_limits().max_json_file_bytes(),
+                    "compile_params JSON field",
+                )
+                .await?;
                 compile_params = serde_json::from_str(&raw_params).map_err(|err| {
                     ApiError::bad_request(format!("invalid compile_params JSON: {err}"))
                 })?;
             }
             Some("sources") => {
-                let raw_sources = field
-                    .text()
-                    .await
-                    .map_err(|err| ApiError::bad_request(err.to_string()))?;
+                let raw_sources = upload_limits::read_json_part(
+                    field,
+                    state.upload_limits().max_json_file_bytes(),
+                    "sources JSON field",
+                )
+                .await?;
                 sources = Some(
                     serde_json::from_str::<Vec<SourceMetadata>>(&raw_sources).map_err(|err| {
                         ApiError::bad_request(format!("invalid sources JSON: {err}"))
@@ -146,30 +129,18 @@ async fn handle_multipart(
                 );
             }
             Some("verified_at") => {
-                let value = field
-                    .text()
-                    .await
-                    .map_err(|err| ApiError::bad_request(err.to_string()))?;
+                let value = field.text().await.map_err(ApiError::from)?;
                 let verified_at_millis = value
                     .parse::<u64>()
                     .map_err(|err| ApiError::bad_request(format!("invalid verified_at: {err}")))?;
                 verified_at = Some(verified_at_millis / 1_000);
             }
             Some("tx_hash") => {
-                tx_hash = Some(
-                    field
-                        .text()
-                        .await
-                        .map_err(|err| ApiError::bad_request(err.to_string()))?,
-                );
+                tx_hash = Some(field.text().await.map_err(ApiError::from)?);
             }
             Some("files") => {
-                if files.len() >= MAX_UPLOADED_FILES {
-                    return Err(ApiError::bad_request(format!(
-                        "at most {MAX_UPLOADED_FILES} source files may be uploaded"
-                    )));
-                }
-                files.push(read_file_part(field).await?);
+                upload_limits::ensure_file_slot(files.len())?;
+                files.push(upload_limits::read_file_part(field, state.upload_limits()).await?);
             }
             _ => {}
         }
@@ -402,16 +373,6 @@ async fn verify_unverified(
 
 fn non_empty_text(value: Option<String>) -> Option<String> {
     value.filter(|value| !value.trim().is_empty())
-}
-
-async fn read_file_part(field: Field<'_>) -> Result<ReceivedFile, ApiError> {
-    let file_name = field.file_name().map(ToOwned::to_owned);
-    let content = field
-        .bytes()
-        .await
-        .map_err(|err| ApiError::bad_request(err.to_string()))?;
-
-    Ok(ReceivedFile { file_name, content })
 }
 
 fn prepare_compile_input(

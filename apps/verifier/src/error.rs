@@ -1,5 +1,6 @@
 use axum::{
     Json,
+    extract::multipart::MultipartError,
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -29,6 +30,16 @@ impl ApiError {
     pub const fn bad_request(message: String) -> Self {
         Self {
             status: StatusCode::BAD_REQUEST,
+            message,
+            expose_message: true,
+            public_fallback: INTERNAL_ERROR_MESSAGE,
+            payment_retryable: false,
+        }
+    }
+
+    pub const fn payload_too_large(message: String) -> Self {
+        Self {
+            status: StatusCode::PAYLOAD_TOO_LARGE,
             message,
             expose_message: true,
             public_fallback: INTERNAL_ERROR_MESSAGE,
@@ -120,6 +131,18 @@ impl From<VerificationError> for ApiError {
                 Self::hidden_bad_gateway(blockchain_err.to_string())
             }
             err => Self::bad_request(err.to_string()),
+        }
+    }
+}
+
+impl From<MultipartError> for ApiError {
+    fn from(err: MultipartError) -> Self {
+        let status = err.status();
+        let message = err.body_text();
+        if status == StatusCode::PAYLOAD_TOO_LARGE {
+            Self::payload_too_large(message)
+        } else {
+            Self::bad_request(message)
         }
     }
 }

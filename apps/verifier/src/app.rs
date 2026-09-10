@@ -1,4 +1,4 @@
-use axum::{Router, routing::get};
+use axum::{Router, extract::DefaultBodyLimit, routing::get};
 use tower_http::compression::CompressionLayer;
 
 use crate::{
@@ -19,6 +19,7 @@ pub fn router() -> Result<Router, StateError> {
 }
 
 pub fn router_with_state(state: AppState) -> Router {
+    let max_request_bytes = state.upload_limits().max_request_bytes();
     Router::<AppState>::new()
         .route("/healthz", get(handlers::health::handler))
         .route("/robots.txt", get(handlers::robots::handler))
@@ -26,5 +27,6 @@ pub fn router_with_state(state: AppState) -> Router {
         .nest("/api/v1", handlers::api::v1::router())
         .fallback(handlers::frontend::handler)
         .with_state(state)
+        .layer(DefaultBodyLimit::max(max_request_bytes))
         .layer(CompressionLayer::new())
 }

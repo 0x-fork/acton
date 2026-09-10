@@ -17,6 +17,7 @@ const LOCALNET_TONCENTER_BASE_URL: &str = "http://127.0.0.1:5411";
 const DEFAULT_COMPILER_NODE_BIN: &str = "node";
 const DEFAULT_COMPILER_WORKER_PATH: &str = "compiler-worker/compile.mjs";
 const DEFAULT_COMPILER_TIMEOUT_MS: u64 = 10_000;
+const DEFAULT_MAX_UPLOAD_REQUEST_BYTES: usize = 2 * 1024 * 1024;
 const DEFAULT_SOURCE_REPOSITORY_REMOTE: &str = "origin";
 const DEFAULT_SOURCE_REPOSITORY_STORAGE_ROOT: &str = "sources";
 const DEFAULT_SOURCE_REPOSITORY_COMMIT_ENABLED: bool = true;
@@ -49,6 +50,7 @@ pub struct Config {
     compiler_node_bin: String,
     compiler_worker_path: PathBuf,
     compiler_timeout: Duration,
+    upload_limits: UploadLimits,
 }
 
 impl Config {
@@ -199,6 +201,11 @@ impl Config {
     pub const fn compiler_timeout(&self) -> Duration {
         self.compiler_timeout
     }
+
+    #[must_use]
+    pub const fn upload_limits(&self) -> UploadLimits {
+        self.upload_limits
+    }
 }
 
 impl Default for Config {
@@ -225,7 +232,67 @@ impl Default for Config {
             compiler_node_bin: DEFAULT_COMPILER_NODE_BIN.to_owned(),
             compiler_worker_path: PathBuf::from(DEFAULT_COMPILER_WORKER_PATH),
             compiler_timeout: Duration::from_millis(DEFAULT_COMPILER_TIMEOUT_MS),
+            upload_limits: UploadLimits::default(),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UploadLimits {
+    request: usize,
+    json_file: Option<usize>,
+    tolk_file: Option<usize>,
+    func_file: Option<usize>,
+    tact_file: Option<usize>,
+}
+
+impl UploadLimits {
+    #[must_use]
+    pub const fn new(
+        max_request_bytes: usize,
+        max_json_file_bytes: Option<usize>,
+        max_tolk_file_bytes: Option<usize>,
+        max_func_file_bytes: Option<usize>,
+        max_tact_file_bytes: Option<usize>,
+    ) -> Self {
+        Self {
+            request: max_request_bytes,
+            json_file: max_json_file_bytes,
+            tolk_file: max_tolk_file_bytes,
+            func_file: max_func_file_bytes,
+            tact_file: max_tact_file_bytes,
+        }
+    }
+
+    #[must_use]
+    pub const fn max_request_bytes(self) -> usize {
+        self.request
+    }
+
+    #[must_use]
+    pub const fn max_json_file_bytes(self) -> Option<usize> {
+        self.json_file
+    }
+
+    #[must_use]
+    pub const fn max_tolk_file_bytes(self) -> Option<usize> {
+        self.tolk_file
+    }
+
+    #[must_use]
+    pub const fn max_func_file_bytes(self) -> Option<usize> {
+        self.func_file
+    }
+
+    #[must_use]
+    pub const fn max_tact_file_bytes(self) -> Option<usize> {
+        self.tact_file
+    }
+}
+
+impl Default for UploadLimits {
+    fn default() -> Self {
+        Self::new(DEFAULT_MAX_UPLOAD_REQUEST_BYTES, None, None, None, None)
     }
 }
 
@@ -293,6 +360,8 @@ struct ConfigFile {
     payment: PaymentConfig,
     #[serde(default)]
     compiler: CompilerConfig,
+    #[serde(default)]
+    upload_limits: UploadLimitsConfig,
 }
 
 impl ConfigFile {
@@ -356,6 +425,15 @@ impl ConfigFile {
                     .timeout_ms
                     .unwrap_or(DEFAULT_COMPILER_TIMEOUT_MS),
             ),
+            upload_limits: UploadLimits::new(
+                self.upload_limits
+                    .request
+                    .unwrap_or(DEFAULT_MAX_UPLOAD_REQUEST_BYTES),
+                self.upload_limits.json_file,
+                self.upload_limits.tolk_file,
+                self.upload_limits.func_file,
+                self.upload_limits.tact_file,
+            ),
         }
     }
 }
@@ -411,6 +489,20 @@ struct CompilerConfig {
     node_bin: Option<String>,
     worker_path: Option<PathBuf>,
     timeout_ms: Option<u64>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct UploadLimitsConfig {
+    #[serde(rename = "max_request_bytes")]
+    request: Option<usize>,
+    #[serde(rename = "max_json_file_bytes")]
+    json_file: Option<usize>,
+    #[serde(rename = "max_tolk_file_bytes")]
+    tolk_file: Option<usize>,
+    #[serde(rename = "max_func_file_bytes")]
+    func_file: Option<usize>,
+    #[serde(rename = "max_tact_file_bytes")]
+    tact_file: Option<usize>,
 }
 
 const fn default_bind_addr() -> SocketAddr {

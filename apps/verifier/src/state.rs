@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::{
     blockchain::{BlockchainClient, ToncenterClient},
     compilers::{CompilerService, NodeCompilerService},
-    config::Config,
+    config::{Config, UploadLimits},
     payment::{OnchainPaymentVerifier, PaymentError, PaymentVerifier},
     registry::{SourceVerificationRegistry, VerificationRegistry},
     registry_index::{SqliteVerificationIndex, VerificationIndexError},
@@ -20,6 +20,7 @@ pub struct AppState {
     verification_registry: Arc<dyn VerificationRegistry>,
     verification_service: VerificationService,
     payment_verifier: Arc<dyn PaymentVerifier>,
+    upload_limits: UploadLimits,
 }
 
 impl AppState {
@@ -44,7 +45,8 @@ impl AppState {
             verification_registry,
             payment_verifier,
         )
-        .with_api_key(config.api_key()))
+        .with_api_key(config.api_key())
+        .with_upload_limits(config.upload_limits()))
     }
 
     #[must_use]
@@ -60,6 +62,7 @@ impl AppState {
             verification_registry,
             verification_service: VerificationService::new(blockchain_client),
             payment_verifier,
+            upload_limits: UploadLimits::default(),
         }
     }
 
@@ -67,6 +70,17 @@ impl AppState {
     pub fn with_api_key(mut self, api_key: Option<&str>) -> Self {
         self.api_key = api_key.map(ToOwned::to_owned);
         self
+    }
+
+    #[must_use]
+    pub const fn with_upload_limits(mut self, upload_limits: UploadLimits) -> Self {
+        self.upload_limits = upload_limits;
+        self
+    }
+
+    #[must_use]
+    pub const fn upload_limits(&self) -> UploadLimits {
+        self.upload_limits
     }
 
     #[must_use]

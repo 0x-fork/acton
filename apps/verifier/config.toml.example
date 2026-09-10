@@ -37,3 +37,10 @@ path = "verifier-index.sqlite3"
 node_bin = "node"
 worker_path = "compiler-worker/compile.mjs"
 timeout_ms = 10000
+
+[upload_limits]
+max_request_bytes = 2097152
+# max_json_file_bytes = 1048576
+# max_tolk_file_bytes = 524288
+# max_func_file_bytes = 524288
+# max_tact_file_bytes = 524288
