@@ -265,7 +265,7 @@ Configures shared defaults for the localnet target and local development service
 | Field               | Type       | Default | Description                                                                                                                 |
 |:--------------------|:-----------|:--------|:----------------------------------------------------------------------------------------------------------------------------|
 | `port`              | `integer`  | `5411`  | HTTP port used by localnet services and tools.                                                                                |
-| `db-path`           | `string`   | -       | SQLite database path for persistent node state. Relative paths resolve from project root; incompatible with `--load-state`. |
+| `db-path`           | `string`   | -       | SQLite database path for persistent node state. Relative paths resolve from project root. |
 | `fork-net`          | `string`   | -       | Remote network used as the source of forked localnet state.                                                                 |
 | `fork-block-number` | `integer`  | -       | Remote masterchain block sequence number used for a historical localnet fork.                                              |
 | `accounts`          | `string[]` | -       | Wallet names from `[wallets]` to auto-fund and auto-deploy on `localnet start`.                                             |

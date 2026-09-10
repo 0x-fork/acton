@@ -2,11 +2,10 @@ use super::utils::handle_result;
 use crate::api::toncenter_v2 as v2;
 use crate::localnet::{Localnet, LocalnetAccountStateChange, LocalnetMiningMode};
 use crate::server::models::{
-    ChangeAccountStatePayload, ChangeAccountStateRequest, CheckpointRequest,
-    CreateCheckpointRequest, FaucetRequest, GetVerifiedSourceRequest, ImportCheckpointQuery,
-    IncreaseTimeRequest, JettonFaucetRequest, MineBlocksRequest, SetConfigParamRequest,
-    SetConfigRequest, SetMiningModeRequest, SetNetworkConditionsRequest,
-    SetNextBlockTimestampRequest, SetShardAccountRequest, SetTimeRequest,
+    ChangeAccountStatePayload, ChangeAccountStateRequest, CreateSnapshotRequest, FaucetRequest,
+    GetVerifiedSourceRequest, IncreaseTimeRequest, JettonFaucetRequest, MineBlocksRequest,
+    SetConfigParamRequest, SetConfigRequest, SetMiningModeRequest, SetNetworkConditionsRequest,
+    SetNextBlockTimestampRequest, SetShardAccountRequest, SetTimeRequest, SnapshotRequest,
 };
 use crate::server::{
     NetworkConditions, NetworkConditionsInfo, ServerState, StartupAccount, StateSourceInfo,
@@ -163,71 +162,59 @@ pub async fn set_mining_mode(
     .await
 }
 
-pub async fn create_checkpoint(
+pub async fn create_snapshot(
     State(node): State<Arc<Localnet>>,
-    Json(payload): Json<CreateCheckpointRequest>,
+    Json(payload): Json<CreateSnapshotRequest>,
 ) -> Response {
-    handle_result(node.create_checkpoint(payload.name, payload.force), |res| {
+    handle_result(node.create_snapshot(payload.name), |res| {
         serde_json::to_value(res).unwrap_or(Value::Null)
     })
     .await
 }
 
-pub async fn list_checkpoints(State(node): State<Arc<Localnet>>) -> Response {
-    handle_result(node.list_checkpoints(), |res| {
+pub async fn list_snapshots(State(node): State<Arc<Localnet>>) -> Response {
+    handle_result(node.list_snapshots(), |res| {
         serde_json::to_value(res).unwrap_or(Value::Null)
     })
     .await
 }
 
-pub async fn restore_checkpoint(
+pub async fn restore_snapshot(
     State(node): State<Arc<Localnet>>,
-    Json(payload): Json<CheckpointRequest>,
+    Json(payload): Json<SnapshotRequest>,
 ) -> Response {
-    handle_result(node.restore_checkpoint(payload.name), |res| {
+    handle_result(node.restore_snapshot(payload.id), |res| {
         serde_json::to_value(res).unwrap_or(Value::Null)
     })
     .await
 }
 
-pub async fn delete_checkpoint(
+pub async fn delete_snapshot(
     State(node): State<Arc<Localnet>>,
-    Json(payload): Json<CheckpointRequest>,
+    Json(payload): Json<SnapshotRequest>,
 ) -> Response {
-    handle_result(node.delete_checkpoint(payload.name), |res| {
-        serde_json::to_value(res).unwrap_or(Value::Null)
-    })
-    .await
+    handle_result(node.delete_snapshot(payload.id), |()| Value::Null).await
 }
 
-pub async fn clear_checkpoints(State(node): State<Arc<Localnet>>) -> Response {
-    handle_result(
-        node.clear_checkpoints(),
-        |deleted| serde_json::json!({ "deleted": deleted }),
-    )
-    .await
-}
-
-pub async fn export_checkpoint(
+pub async fn export_snapshot(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<CheckpointRequest>,
+    Query(payload): Query<SnapshotRequest>,
 ) -> Response {
     json_download_response(
-        node.export_checkpoint(payload.name).await,
-        "attachment; filename=acton-simulated-localnet-checkpoint.json",
+        node.export_snapshot(payload.id).await,
+        "attachment; filename=acton-simulated-localnet-snapshot.json",
     )
     .await
 }
 
-pub async fn import_checkpoint(
+pub async fn import_snapshot(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<ImportCheckpointQuery>,
+    Query(payload): Query<CreateSnapshotRequest>,
     body: Bytes,
 ) -> Response {
-    handle_result(
-        node.import_checkpoint(payload.name, body.to_vec(), payload.force),
-        |res| serde_json::to_value(res).unwrap_or(Value::Null),
-    )
+    handle_result(node.import_snapshot(payload.name, body.to_vec()), |res| {
+        serde_json::to_value(res).unwrap_or(Value::Null)
+    })
     .await
 }
 
@@ -259,18 +246,6 @@ pub async fn set_next_block_timestamp(
         serde_json::to_value(res).unwrap_or(Value::Null)
     })
     .await
-}
-
-pub async fn dump_state(State(node): State<Arc<Localnet>>) -> Response {
-    json_download_response(
-        node.dump_state().await,
-        "attachment; filename=acton-simulated-localnet-state.json",
-    )
-    .await
-}
-
-pub async fn load_state(State(node): State<Arc<Localnet>>, body: Bytes) -> Response {
-    handle_result(node.load_state(body.to_vec()), |()| Value::Null).await
 }
 
 async fn json_download_response(

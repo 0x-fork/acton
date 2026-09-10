@@ -20,7 +20,6 @@ import type {
   JettonTransfer,
   JettonWallet,
   JettonWalletData,
-  LocalnetCheckpoint,
   LocalnetContract,
   LocalnetMineResult,
   LocalnetMiningMode,
@@ -1251,83 +1250,6 @@ export class TonClient {
     return this.request(url, "Failed to fetch node info")
   }
 
-  async downloadState(): Promise<Blob> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_dumpState")
-    return this.requestBlob(url, "Failed to download localnet state")
-  }
-
-  async loadState(state: Blob): Promise<void> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_loadState")
-    await this.request<null>(url, "Failed to load localnet state", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: state,
-    })
-  }
-
-  async createCheckpoint(name: string, force = false): Promise<LocalnetCheckpoint> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_createCheckpoint")
-    return this.request(url, "Failed to create checkpoint", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({name, force}),
-    })
-  }
-
-  async listCheckpoints(): Promise<readonly LocalnetCheckpoint[]> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_listCheckpoints")
-    return this.request(url, "Failed to list checkpoints")
-  }
-
-  async restoreCheckpoint(name: string): Promise<LocalnetCheckpoint> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_restoreCheckpoint")
-    return this.request(url, "Failed to restore checkpoint", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({name}),
-    })
-  }
-
-  async deleteCheckpoint(name: string): Promise<LocalnetCheckpoint> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_deleteCheckpoint")
-    return this.request(url, "Failed to delete checkpoint", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({name}),
-    })
-  }
-
-  async clearCheckpoints(): Promise<number> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_clearCheckpoints")
-    const result = await this.request<{readonly deleted: number}>(
-      url,
-      "Failed to clear checkpoints",
-      {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: "{}",
-      },
-    )
-    return result.deleted
-  }
-
-  async downloadCheckpoint(name: string): Promise<Blob> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_exportCheckpoint")
-    url.searchParams.set("name", name)
-    return this.requestBlob(url, "Failed to download checkpoint")
-  }
-
-  async importCheckpoint(name: string, state: Blob, force = false): Promise<LocalnetCheckpoint> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_importCheckpoint")
-    url.searchParams.set("name", name)
-    url.searchParams.set("force", force.toString())
-    return this.request(url, "Failed to import checkpoint", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: state,
-    })
-  }
-
   async mineBlocks(blocks = 1): Promise<LocalnetMineResult> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_mine")
     return this.request(url, "Failed to mine localnet block", {
@@ -1684,24 +1606,6 @@ export class TonClient {
     url.searchParams.append("ttl", DNS_RESOLVE_TTL.toString())
 
     return this.request<DnsResolvedResponse>(url, "Failed to resolve TON DNS name on-chain")
-  }
-
-  private async requestBlob(url: URL, errorMessage: string): Promise<Blob> {
-    const response = await fetch(url.toString(), this.withRequestHeaders(url))
-    if (response.status === 401) {
-      this.onUnauthorized?.()
-    }
-    if (!response.ok) {
-      const text = await response.text()
-      let error = text
-      try {
-        error = this.extractError(JSON.parse(text) as unknown) ?? text
-      } catch {
-        // Preserve a non-JSON server response when one is available.
-      }
-      throw new Error(error || errorMessage)
-    }
-    return response.blob()
   }
 
   private pendingRequestKey(url: URL, options?: RequestInit): string | undefined {

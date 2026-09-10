@@ -12,6 +12,7 @@ mod node_snapshot;
 mod offchain_metadata;
 pub mod remote;
 pub mod server;
+pub mod snapshots;
 pub mod storage;
 pub mod streaming;
 pub mod types;

@@ -10,7 +10,7 @@ use axum::body::Body;
 use axum::extract::{DefaultBodyLimit, Path as AxumPath, Query, Request, State};
 #[cfg(not(debug_assertions))]
 use axum::http::Uri;
-use axum::http::header::{CONTENT_LENGTH, CONTENT_TYPE, LOCATION};
+use axum::http::header::{CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_TYPE, LOCATION};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{any, get, post};
@@ -422,6 +422,14 @@ impl StudioServer {
             .route(
                 "/environments/{environment_id}/snapshots",
                 get(list_environment_snapshots).post(create_environment_snapshot),
+            )
+            .route(
+                "/environments/{environment_id}/snapshots/import",
+                post(import_environment_snapshot).layer(DefaultBodyLimit::max(256 * 1024 * 1024)),
+            )
+            .route(
+                "/environments/{environment_id}/snapshots/{snapshot_id}/download",
+                get(export_environment_snapshot),
             )
             .route(
                 "/environments/{environment_id}/snapshots/{snapshot_id}",
@@ -1176,6 +1184,69 @@ async fn list_environment_snapshots(
         .await
         .map(Json)
         .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/environments/{environment_id}/snapshots/import",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("name" = Option<String>, Query, description = "Snapshot display name")
+    ),
+    request_body(content = String, content_type = "application/json"),
+    responses(
+        (status = 201, description = "Snapshot imported without restoring state", body = EnvironmentSnapshot),
+        (status = 409, description = "Snapshot import is unavailable", body = StudioApiErrorBody),
+        (status = 500, description = "Snapshot could not be imported", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn import_environment_snapshot(
+    State(state): State<StudioState>,
+    AxumPath(environment_id): AxumPath<String>,
+    Query(request): Query<CreateEnvironmentSnapshotRequest>,
+    body: axum::body::Bytes,
+) -> Result<(StatusCode, Json<EnvironmentSnapshot>), StudioApiError> {
+    state
+        .environment_runtime
+        .import_snapshot(&environment_id, request.name, body.to_vec())
+        .await
+        .map(|snapshot| (StatusCode::CREATED, Json(snapshot)))
+        .map_err(StudioApiError)
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/environments/{environment_id}/snapshots/{snapshot_id}/download",
+    params(
+        ("environment_id" = String, Path, description = "Environment ID"),
+        ("snapshot_id" = String, Path, description = "Snapshot ID")
+    ),
+    responses(
+        (status = 200, description = "Saved JSON snapshot", content_type = "application/json", body = String),
+        (status = 409, description = "Snapshot export is unavailable", body = StudioApiErrorBody),
+        (status = 500, description = "Snapshot could not be exported", body = StudioApiErrorBody)
+    ),
+    tag = "snapshots"
+)]
+async fn export_environment_snapshot(
+    State(state): State<StudioState>,
+    AxumPath((environment_id, snapshot_id)): AxumPath<(String, String)>,
+) -> Result<Response, StudioApiError> {
+    let json = state
+        .environment_runtime
+        .export_snapshot(&environment_id, &snapshot_id)
+        .await
+        .map_err(StudioApiError)?;
+
+    Ok((
+        [
+            (CONTENT_TYPE, "application/json"),
+            (CONTENT_DISPOSITION, "attachment; filename=snapshot.json"),
+        ],
+        json,
+    )
+        .into_response())
 }
 
 #[utoipa::path(

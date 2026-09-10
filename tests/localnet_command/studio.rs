@@ -471,10 +471,9 @@ async fn studio_uses_cli_for_lifecycle_and_http_for_nodes_and_snapshots() {
         .list_snapshots(&created.id)
         .await
         .expect("snapshots");
-    expect![["1:3:checkpoint"]].assert_eq(&format!(
-        "{}:{}:{}",
+    expect![["1:checkpoint"]].assert_eq(&format!(
+        "{}:{}",
         snapshots.len(),
-        snapshots[0].format_version,
         snapshots[0].name.as_deref().expect("snapshot name"),
     ));
     let snapshot_id = &snapshots[0].id;

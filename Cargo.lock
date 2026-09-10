@@ -257,6 +257,7 @@ dependencies = [
  "tokio",
  "ton",
  "ton-api",
+ "ton-localnet",
  "toncenter-keys",
  "tower 0.5.2",
  "tower-http",
@@ -5964,6 +5965,7 @@ dependencies = [
  "tvm-ffi",
  "tycho-types",
  "url",
+ "uuid",
 ]
 
 [[package]]

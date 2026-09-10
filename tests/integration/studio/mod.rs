@@ -7,6 +7,7 @@ use crate::support::project::Project;
 use acton_studio::StudioInfo;
 
 mod reporting;
+mod snapshots;
 mod start;
 mod test_runs;
 

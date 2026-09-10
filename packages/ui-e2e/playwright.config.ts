@@ -58,9 +58,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `${JSON.stringify(actonBinary)} simulated-localnet start --port ${localnetNodePort} --load-state packages/ui-e2e/fixtures/localnet/ui-state.json --no-mining`,
+      command: "bun run packages/ui-e2e/fixtures/localnet/start.ts",
       cwd: repositoryRoot,
-      url: `http://127.0.0.1:${localnetNodePort}/acton_nodeInfo`,
+      env: {
+        ACTON_E2E_BIN: actonBinary,
+        ACTON_UI_E2E_NODE_PORT: String(localnetNodePort),
+      },
+      wait: {stdout: /Snapshot fixture ready/},
       reuseExistingServer: false,
       timeout: 180_000,
     },

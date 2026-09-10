@@ -1,17 +1,14 @@
 use crate::common::assertion;
-use crate::support::TestOutputExt;
 use crate::support::localnet::{
     latest_masterchain_seqno, parse_address_balance, pretty_json_for_snapshot, response_payload,
-    summarize_admin_response,
 };
 use crate::support::project::ProjectBuilder;
 use serde_json::{Value, json};
-use std::fs;
 
 const GIVER_ADDRESS: &str = "0:5555555555555555555555555555555555555555555555555555555555555555";
 
 #[test]
-fn localnet_state_dump_and_load_replace_live_state_and_clear_checkpoints() {
+fn localnet_snapshot_import_does_not_restore_or_remove_saved_states() {
     let project = ProjectBuilder::new("localnet-state-transfer").build();
     let node = project
         .localnet()
@@ -22,24 +19,10 @@ fn localnet_state_dump_and_load_replace_live_state_and_clear_checkpoints() {
     let dumped_seqno = response_payload(&first_mine)["last_block_seqno"]
         .as_u64()
         .expect("mine response must expose last_block_seqno") as u32;
-    let state_path = project.path().join("state.json");
-    let state_path_arg = state_path.display().to_string();
-    let port = node.port().to_string();
-    let dump_output = project
-        .acton()
-        .args(["simulated-localnet", "state", "dump"])
-        .arg(&state_path_arg)
-        .arg("--port")
-        .arg(&port)
-        .run()
-        .success();
-    let state_json = fs::read(&state_path).expect("state command must write the JSON file");
-    let state_document: Value =
-        serde_json::from_slice(&state_json).expect("dumped state must be valid JSON");
-    let checkpoint = node.post_json(
-        "/acton_createCheckpoint",
-        &json!({ "name": "cleared-on-load" }),
-    );
+    let saved = node.post_json("/acton_createSnapshot", &json!({"name": "initial"}));
+    let id = saved["result"]["id"].as_str().expect("snapshot ID");
+    let state_json = node.get_bytes(&format!("/acton_exportSnapshot?id={id}"));
+    let state_document: Value = serde_json::from_slice(&state_json).expect("saved JSON");
 
     let target = "0:5555555555555555555555555555555555555555555555555555555555555555";
     let funded = node.post_json(
@@ -56,54 +39,60 @@ fn localnet_state_dump_and_load_replace_live_state_and_clear_checkpoints() {
     let target_after_mutation =
         node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
 
-    let load_output = project
-        .acton()
-        .args(["simulated-localnet", "state", "load"])
-        .arg(&state_path_arg)
-        .arg("--port")
-        .arg(&port)
-        .run()
-        .success();
+    let later = node.post_json("/acton_createSnapshot", &json!({"name": "later"}));
+    let imported = node.post_bytes("/acton_importSnapshot", state_json);
+    let seqno_after_import = latest_masterchain_seqno(&node);
+    let balance_after_import =
+        node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
+    let restored = node.post_json(
+        "/acton_restoreSnapshot",
+        &json!({"id": imported["result"]["id"]}),
+    );
     let loaded_seqno = latest_masterchain_seqno(&node);
     let target_after_load =
         node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
-    let checkpoints_after_load = node.get_json("/acton_listCheckpoints");
+    let snapshots_after_restore = node.get_json("/acton_listSnapshots");
 
     let snapshot = json!({
-        "dump": {
-            "output": dump_output.get_stdout().trim(),
+        "export": {
+            "ok": saved["ok"],
             "seqno": dumped_seqno,
-            "state_head_seqno": state_document["globals"]["head_seqno"].as_u64(),
+            "state_head_seqno": state_document["state"]["globals"]["head_seqno"].as_u64(),
         },
         "mutate": {
-            "checkpoint": summarize_admin_response(&checkpoint),
+            "later_snapshot_saved": later["ok"],
             "fund_ok": funded["ok"].as_bool(),
             "seqno": mutated_seqno,
             "balance": parse_address_balance(&target_after_mutation).to_string(),
         },
-        "load": {
-            "output": load_output.get_stdout().trim(),
+        "import": {
+            "ok": imported["ok"],
+            "new_id": imported["result"]["id"] != saved["result"]["id"],
+            "seqno_unchanged": seqno_after_import == i64::from(mutated_seqno),
+            "balance_unchanged": parse_address_balance(&balance_after_import)
+                == parse_address_balance(&target_after_mutation),
+        },
+        "restore": {
+            "ok": restored["ok"],
             "seqno": loaded_seqno,
             "balance": parse_address_balance(&target_after_load).to_string(),
-            "checkpoints": summarize_admin_response(&checkpoints_after_load),
+            "saved_snapshot_count": snapshots_after_restore["result"].as_array().map(Vec::len),
         },
     });
 
     assertion().eq(
         format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
-        snapbox::file!("snapshots/localnet/test_localnet_state_transfer.summary.json"),
+        snapbox::file!("snapshots/localnet/test_localnet_snapshot_transfer.summary.json"),
     );
 
     node.stop();
 }
 
 #[test]
-fn sqlite_state_dump_preserves_transactions_and_historical_account_states() {
+fn sqlite_snapshot_preserves_transactions_and_historical_account_states() {
     let project = ProjectBuilder::new("localnet-sqlite-state-transfer").build();
     let db_path = project.path().join("localnet.sqlite");
     let db_path_arg = db_path.display().to_string();
-    let state_path = project.path().join("state-from-sqlite.json");
-    let state_path_arg = state_path.display().to_string();
     let target = "0:6666666666666666666666666666666666666666666666666666666666666666";
 
     let node = project
@@ -143,34 +132,23 @@ fn sqlite_state_dump_preserves_transactions_and_historical_account_states() {
         ])
         .start();
     let sqlite = persistence_view(&reopened, target, first_state_block);
-    let reopened_port = reopened.port().to_string();
-    let dump_output = project
-        .acton()
-        .args(["simulated-localnet", "state", "dump"])
-        .arg(&state_path_arg)
-        .arg("--port")
-        .arg(&reopened_port)
-        .run()
-        .success();
-    let state_document: Value = serde_json::from_slice(
-        &fs::read(&state_path).expect("state dump from SQLite-backed node must exist"),
-    )
-    .expect("state dump from SQLite-backed node must be valid JSON");
+    let saved = reopened.post_json("/acton_createSnapshot", &json!({"name": "from-sqlite"}));
+    let id = saved["result"]["id"].as_str().expect("snapshot ID");
+    let saved_json = reopened.get_bytes(&format!("/acton_exportSnapshot?id={id}"));
+    let saved_document: Value =
+        serde_json::from_slice(&saved_json).expect("exported snapshot JSON");
+    let state_document = &saved_document["state"];
     reopened.stop();
 
     let restored = project
         .localnet()
         .args(["--no-mining", "--mine-empty-blocks"])
         .start();
-    let restored_port = restored.port().to_string();
-    let load_output = project
-        .acton()
-        .args(["simulated-localnet", "state", "load"])
-        .arg(&state_path_arg)
-        .arg("--port")
-        .arg(&restored_port)
-        .run()
-        .success();
+    let imported_snapshot = restored.post_bytes("/acton_importSnapshot", saved_json.clone());
+    let load_output = restored.post_json(
+        "/acton_restoreSnapshot",
+        &json!({"id": imported_snapshot["result"]["id"]}),
+    );
     let loaded = persistence_view(&restored, target, first_state_block);
     restored.stop();
 
@@ -185,15 +163,11 @@ fn sqlite_state_dump_preserves_transactions_and_historical_account_states() {
             imported_db_path_arg.as_str(),
         ])
         .start();
-    let imported_port = imported.port().to_string();
-    let sqlite_load_output = project
-        .acton()
-        .args(["simulated-localnet", "state", "load"])
-        .arg(&state_path_arg)
-        .arg("--port")
-        .arg(&imported_port)
-        .run()
-        .success();
+    let imported_snapshot = imported.post_bytes("/acton_importSnapshot", saved_json);
+    let sqlite_load_output = imported.post_json(
+        "/acton_restoreSnapshot",
+        &json!({"id": imported_snapshot["result"]["id"]}),
+    );
     let imported_view = persistence_view(&imported, target, first_state_block);
     imported.stop();
 
@@ -225,8 +199,8 @@ fn sqlite_state_dump_preserves_transactions_and_historical_account_states() {
             "historical_state_preserved": sqlite["historical_balance"] == live["historical_balance"],
             "transactions_preserved": sqlite["transaction_hashes"] == live["transaction_hashes"],
         },
-        "dump": {
-            "output": dump_output.get_stdout().trim(),
+        "export": {
+            "ok": saved["ok"],
             "head_seqno": state_document["globals"]["head_seqno"],
             "transaction_count": state_document["history_tx_by_hash"].as_array().map_or(0, Vec::len),
             "message_count": state_document["history_msg_by_hash"].as_array().map_or(0, Vec::len),
@@ -238,7 +212,7 @@ fn sqlite_state_dump_preserves_transactions_and_historical_account_states() {
                 .count(),
         },
         "clean_node_load": {
-            "output": load_output.get_stdout().trim(),
+            "ok": load_output["ok"],
             "head_seqno_preserved": loaded["head_seqno"] == live["head_seqno"],
             "giver_balance_preserved": loaded["giver_balance"] == live["giver_balance"],
             "latest_state_preserved": loaded["latest_balance"] == live["latest_balance"],
@@ -246,7 +220,7 @@ fn sqlite_state_dump_preserves_transactions_and_historical_account_states() {
             "transactions_preserved": loaded["transaction_hashes"] == live["transaction_hashes"],
         },
         "sqlite_load": {
-            "output": sqlite_load_output.get_stdout().trim(),
+            "ok": sqlite_load_output["ok"],
             "head_seqno_preserved": imported_view["head_seqno"] == live["head_seqno"],
             "giver_balance_preserved": imported_view["giver_balance"] == live["giver_balance"],
             "latest_state_preserved": imported_view["latest_balance"] == live["latest_balance"],
@@ -264,7 +238,7 @@ fn sqlite_state_dump_preserves_transactions_and_historical_account_states() {
 
     assertion().eq(
         format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
-        snapbox::file!("snapshots/localnet/test_localnet_sqlite_state_transfer.summary.json"),
+        snapbox::file!("snapshots/localnet/test_localnet_sqlite_snapshot_transfer.summary.json"),
     );
 
     reopened_import.stop();

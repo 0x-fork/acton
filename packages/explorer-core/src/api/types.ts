@@ -1287,11 +1287,6 @@ export interface LocalnetSetConfigResult {
   readonly block_seqno: number
 }
 
-export interface LocalnetCheckpoint {
-  readonly name: string
-  readonly block_seqno: number
-}
-
 export interface V3RunGetMethodStackEntry {
   readonly type: string
   readonly value: unknown
