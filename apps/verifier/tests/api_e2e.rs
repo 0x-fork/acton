@@ -2300,23 +2300,31 @@ async fn verify_rejects_git_control_paths() {
 
 #[tokio::test]
 async fn verify_rejects_source_in_output_directory() {
-    let response = post_verify(
-        app_state(&[], CODE_HASH_ONE),
-        vec![
-            text_part("code_hash", CODE_HASH_ONE),
-            text_part("language", "tolk"),
-            text_part("compile_params", COMPILE_PARAMS_TOLK),
-            text_part(
-                "sources",
-                r#"[{"path":"output/main.tolk","is_entrypoint":true}]"#,
-            ),
-            file_part("files", "output/main.tolk", "text/plain", "fun main() {}"),
-        ],
-    )
-    .await;
+    for path in ["output/main.tolk", "Output/main.tolk", "OUTPUT/main.tolk"] {
+        let sources = serde_json::to_string(&json!([{
+            "path": path,
+            "is_entrypoint": true,
+        }]))
+        .expect("source metadata should serialize");
+        let response = post_verify(
+            app_state(&[], CODE_HASH_ONE),
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", "tolk"),
+                text_part("compile_params", COMPILE_PARAMS_TOLK),
+                owned_text_part("sources", sources),
+                file_part("files", path, "text/plain", "fun main() {}"),
+            ],
+        )
+        .await;
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    assert_error_contains(response, "reserved output directory").await;
+        assert_eq!(
+            response.status(),
+            StatusCode::BAD_REQUEST,
+            "reserved output directory should be rejected: {path}"
+        );
+        assert_error_contains(response, "reserved output directory").await;
+    }
 }
 
 #[tokio::test]
