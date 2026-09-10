@@ -47,11 +47,11 @@ fn example_config_toml_loads() {
     );
     assert_eq!(config.compiler_timeout(), Duration::from_secs(10));
     let upload_limits = config.upload_limits();
-    assert_eq!(upload_limits.max_request_bytes(), 2 * 1024 * 1024);
-    assert_eq!(upload_limits.max_json_file_bytes(), None);
-    assert_eq!(upload_limits.max_tolk_file_bytes(), None);
-    assert_eq!(upload_limits.max_func_file_bytes(), None);
-    assert_eq!(upload_limits.max_tact_file_bytes(), None);
+    assert_eq!(upload_limits.max_request_bytes(), 16 * 1024 * 1024);
+    assert_eq!(upload_limits.max_json_file_bytes(), 1024 * 1024);
+    assert_eq!(upload_limits.max_tolk_file_bytes(), 512 * 1024);
+    assert_eq!(upload_limits.max_func_file_bytes(), 512 * 1024);
+    assert_eq!(upload_limits.max_tact_file_bytes(), 512 * 1024);
 }
 
 #[test]
@@ -70,6 +70,12 @@ fn omitted_network_uses_testnet() {
     assert_eq!(config.network().to_string(), "testnet");
     assert_eq!(config.toncenter_base_url(), "https://testnet.toncenter.com");
     assert_eq!(config.compiler_timeout(), Duration::from_secs(10));
+    let upload_limits = config.upload_limits();
+    assert_eq!(upload_limits.max_request_bytes(), 16 * 1024 * 1024);
+    assert_eq!(upload_limits.max_json_file_bytes(), 1024 * 1024);
+    assert_eq!(upload_limits.max_tolk_file_bytes(), 512 * 1024);
+    assert_eq!(upload_limits.max_func_file_bytes(), 512 * 1024);
+    assert_eq!(upload_limits.max_tact_file_bytes(), 512 * 1024);
     assert_eq!(
         Config::default().compiler_timeout(),
         Duration::from_secs(10)
@@ -103,10 +109,10 @@ max_tact_file_bytes = 400
     let config = Config::load_from_path(config_file.path()).expect("custom upload limits");
     let upload_limits = config.upload_limits();
     assert_eq!(upload_limits.max_request_bytes(), 1000);
-    assert_eq!(upload_limits.max_json_file_bytes(), Some(100));
-    assert_eq!(upload_limits.max_tolk_file_bytes(), Some(200));
-    assert_eq!(upload_limits.max_func_file_bytes(), Some(300));
-    assert_eq!(upload_limits.max_tact_file_bytes(), Some(400));
+    assert_eq!(upload_limits.max_json_file_bytes(), 100);
+    assert_eq!(upload_limits.max_tolk_file_bytes(), 200);
+    assert_eq!(upload_limits.max_func_file_bytes(), 300);
+    assert_eq!(upload_limits.max_tact_file_bytes(), 400);
 }
 
 #[test]
@@ -163,10 +169,10 @@ fn docker_entrypoint_generates_upload_limits() {
         .expect("generated config")
         .upload_limits();
     assert_eq!(limits.max_request_bytes(), 1000);
-    assert_eq!(limits.max_json_file_bytes(), Some(100));
-    assert_eq!(limits.max_tolk_file_bytes(), Some(200));
-    assert_eq!(limits.max_func_file_bytes(), Some(300));
-    assert_eq!(limits.max_tact_file_bytes(), Some(400));
+    assert_eq!(limits.max_json_file_bytes(), 100);
+    assert_eq!(limits.max_tolk_file_bytes(), 200);
+    assert_eq!(limits.max_func_file_bytes(), 300);
+    assert_eq!(limits.max_tact_file_bytes(), 400);
 }
 
 #[test]

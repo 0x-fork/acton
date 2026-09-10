@@ -86,7 +86,7 @@ async fn verification_admission_rejects_ambiguous_and_excessive_uploads_before_p
             "files",
             format!("file{index}.tolk"),
             "text/plain",
-            "",
+            "source",
         ));
     }
     let response = post_verify(state, parts).await;
@@ -106,7 +106,13 @@ async fn verification_admission_rejects_ambiguous_and_excessive_uploads_before_p
 async fn verify_enforces_configured_source_file_size_limit() {
     const CONTENT: &str = "fun main() {}";
 
-    let limits = UploadLimits::new(2 * 1024 * 1024, None, Some(CONTENT.len()), None, None);
+    let limits = UploadLimits::new(
+        2 * 1024 * 1024,
+        usize::MAX,
+        CONTENT.len(),
+        usize::MAX,
+        usize::MAX,
+    );
     let response = post_verify(
         app_state(&[], CODE_HASH_ONE).with_upload_limits(limits),
         valid_verify_parts(),
@@ -114,7 +120,13 @@ async fn verify_enforces_configured_source_file_size_limit() {
     .await;
     assert_eq!(response.status(), StatusCode::OK);
 
-    let limits = UploadLimits::new(2 * 1024 * 1024, None, Some(CONTENT.len() - 1), None, None);
+    let limits = UploadLimits::new(
+        2 * 1024 * 1024,
+        usize::MAX,
+        CONTENT.len() - 1,
+        usize::MAX,
+        usize::MAX,
+    );
     let response = post_verify(
         app_state(&[], CODE_HASH_ONE).with_upload_limits(limits),
         valid_verify_parts(),
@@ -125,13 +137,31 @@ async fn verify_enforces_configured_source_file_size_limit() {
 }
 
 #[tokio::test]
+async fn verify_rejects_empty_source_file() {
+    let response = post_verify(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", ""),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_contains(response, "uploaded file main.tolk must not be empty").await;
+}
+
+#[tokio::test]
 async fn verify_enforces_configured_json_size_limit() {
     let limits = UploadLimits::new(
         2 * 1024 * 1024,
-        Some(COMPILE_PARAMS_TOLK.len()),
-        None,
-        None,
-        None,
+        COMPILE_PARAMS_TOLK.len(),
+        usize::MAX,
+        usize::MAX,
+        usize::MAX,
     );
     let response = post_verify(
         app_state(&[], CODE_HASH_ONE).with_upload_limits(limits),
@@ -145,7 +175,7 @@ async fn verify_enforces_configured_json_size_limit() {
 
 #[tokio::test]
 async fn verify_enforces_configured_request_size_limit() {
-    let limits = UploadLimits::new(128, None, None, None, None);
+    let limits = UploadLimits::new(128, usize::MAX, usize::MAX, usize::MAX, usize::MAX);
     let response = post_verify(
         app_state(&[], CODE_HASH_ONE).with_upload_limits(limits),
         valid_verify_parts(),

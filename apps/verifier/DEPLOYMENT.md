@@ -121,11 +121,11 @@ VERIFIER_TONCENTER_API_KEY=
 VERIFIER_PAYMENT_ADDRESS="0:<64-hex-character-testnet-wallet-address>"
 VERIFIER_PAYMENT_MIN_AMOUNT_NANO=500000000
 VERIFIER_PAYMENT_LEDGER_PATH=/var/lib/verifier/payment-ledger/payment-ledger.sqlite3
-VERIFIER_UPLOAD_MAX_REQUEST_BYTES=2097152
-# VERIFIER_UPLOAD_MAX_JSON_FILE_BYTES=1048576
-# VERIFIER_UPLOAD_MAX_TOLK_FILE_BYTES=524288
-# VERIFIER_UPLOAD_MAX_FUNC_FILE_BYTES=524288
-# VERIFIER_UPLOAD_MAX_TACT_FILE_BYTES=524288
+VERIFIER_UPLOAD_MAX_REQUEST_BYTES=16777216
+VERIFIER_UPLOAD_MAX_JSON_FILE_BYTES=1048576
+VERIFIER_UPLOAD_MAX_TOLK_FILE_BYTES=524288
+VERIFIER_UPLOAD_MAX_FUNC_FILE_BYTES=524288
+VERIFIER_UPLOAD_MAX_TACT_FILE_BYTES=524288
 
 SOURCE_REPOSITORY_URL=git@github.com:i582/test-verify-repo.git
 SOURCE_REPOSITORY_STORAGE_ROOT=sources
@@ -142,10 +142,11 @@ VERIFIER_REGISTRY_INDEX_PATH=/var/lib/verifier/registry-index/registry-index.sql
 `POST /api/v1/verify`; clients pass it in the `X-Verifier-Key` header.
 
 Upload limits are expressed in bytes. `VERIFIER_UPLOAD_MAX_REQUEST_BYTES`
-limits the complete multipart body and defaults to 2 MiB. Per-file limits are
-optional: JSON applies to the `sources` and `compile_params` fields and to
+limits the complete multipart body and defaults to 16 MiB. JSON applies to the
+`sources` and `compile_params` fields and to
 `.json`/`.pkg` files, FunC applies to `.fc`/`.func`, and Tolk and Tact apply to
-their corresponding extensions. When nginx proxies the verifier, configure
+their corresponding extensions. The default JSON limit is 1 MiB; the default
+source-file limit is 512 KiB for each language. When nginx proxies the verifier, configure
 `client_max_body_size` slightly above the verifier request limit to allow for
 multipart framing overhead.
 

@@ -18,10 +18,10 @@ pub(super) fn ensure_file_slot(uploaded_file_count: usize) -> Result<(), ApiErro
 
 pub(super) async fn read_json_part(
     field: Field<'_>,
-    max_bytes: Option<usize>,
+    max_bytes: usize,
     description: &str,
 ) -> Result<String, ApiError> {
-    let content = read_limited_part(field, max_bytes, description).await?;
+    let content = read_limited_part(field, Some(max_bytes), description).await?;
     Ok(String::from_utf8_lossy(&content).into_owned())
 }
 
@@ -36,6 +36,11 @@ pub(super) async fn read_file_part(
         |file_name| format!("uploaded file {file_name}"),
     );
     let content = read_limited_part(field, max_bytes, &description).await?;
+    if content.is_empty() {
+        return Err(ApiError::bad_request(format!(
+            "{description} must not be empty"
+        )));
+    }
 
     Ok(ReceivedFile { file_name, content })
 }
@@ -63,13 +68,13 @@ async fn read_limited_part(
 fn max_file_bytes(upload_limits: UploadLimits, file_name: Option<&str>) -> Option<usize> {
     let extension = Path::new(file_name?).extension()?.to_str()?;
     if extension.eq_ignore_ascii_case("json") || extension.eq_ignore_ascii_case("pkg") {
-        upload_limits.max_json_file_bytes()
+        Some(upload_limits.max_json_file_bytes())
     } else if extension.eq_ignore_ascii_case("tolk") {
-        upload_limits.max_tolk_file_bytes()
+        Some(upload_limits.max_tolk_file_bytes())
     } else if extension.eq_ignore_ascii_case("fc") || extension.eq_ignore_ascii_case("func") {
-        upload_limits.max_func_file_bytes()
+        Some(upload_limits.max_func_file_bytes())
     } else if extension.eq_ignore_ascii_case("tact") {
-        upload_limits.max_tact_file_bytes()
+        Some(upload_limits.max_tact_file_bytes())
     } else {
         None
     }
@@ -81,7 +86,7 @@ mod tests {
 
     #[test]
     fn selects_file_limit_by_extension_case_insensitively() {
-        let limits = UploadLimits::new(100, Some(10), Some(20), Some(30), Some(40));
+        let limits = UploadLimits::new(100, 10, 20, 30, 40);
 
         for path in ["file.json", "file.pkg", "FILE.JSON"] {
             assert_eq!(max_file_bytes(limits, Some(path)), Some(10));
