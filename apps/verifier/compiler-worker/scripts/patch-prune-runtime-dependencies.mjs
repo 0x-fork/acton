@@ -6,40 +6,56 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const nodeModulesDir = path.resolve(scriptDir, "..", "node_modules")
 
 const PRUNE_RULES = [
-  // @tact-lang/opcode ships PDF specifications in reference/, but its runtime
-  // entrypoint and implementation live entirely in dist/ and never read them.
+  // @tact-lang/opcode ships PDF specifications in reference/ and, in older
+  // versions, TypeScript sources and tests in src/. Its runtime lives entirely
+  // in dist/ and never reads either directory.
   {
     packageName: "@tact-lang/opcode",
-    mainPrefix: "dist/",
-    path: "reference",
-  },
-  // Older @tact-lang/opcode packages include their TypeScript sources and tests
-  // in src/, while consumers load the compiled implementation from dist/index.js.
-  {
-    packageName: "@tact-lang/opcode",
-    mainPrefix: "dist/",
-    path: "src",
+    mainPrefixes: ["dist/"],
+    paths: ["reference", "src"],
   },
   // Older @tact-lang/compiler packages ship their original TypeScript sources,
   // tests, and build artifacts, while Node executes only their dist/ entrypoint.
+  // funcCompile.js supplies wasmBinary from funcfiftlib.wasm.js, so the separate
+  // funcfiftlib.wasm shipped by older versions is an unused copy of that binary.
   {
     packageName: "@tact-lang/compiler",
-    mainPrefix: "./dist/",
-    path: "src",
+    mainPrefixes: ["./dist/"],
+    paths: ["src", "dist/func/funcfiftlib.wasm"],
   },
   // @ton/core publishes TypeScript sources, tests, and test data, but its package
   // entrypoint and all runtime imports resolve to files under dist/.
   {
     packageName: "@ton/core",
-    mainPrefix: "dist/",
-    path: "src",
+    mainPrefixes: ["dist/"],
+    paths: ["src"],
   },
   // The legacy ton-core package has the same compiled dist/ layout as @ton/core;
   // its src/ directory is only the published TypeScript source and test material.
   {
     packageName: "ton-core",
-    mainPrefix: "dist/",
-    path: "src",
+    mainPrefixes: ["dist/"],
+    paths: ["src"],
+  },
+  // ohm-js 16 uses index.js -> src/main, and 17 uses dist/ohm.cjs in Node.
+  // These browser bundles are unused by either version's Node entrypoint.
+  {
+    packageName: "ohm-js",
+    mainPrefixes: ["index.js", "./dist/ohm.cjs"],
+    paths: [
+      "dist/ohm.js",
+      "dist/ohm.min.js",
+      "dist/ohm-extras.js",
+      "dist/ohm-extras.min.js",
+    ],
+  },
+  // @tact-lang/opcode installs @ton/sandbox, but the worker's compiler runtime
+  // never imports it. Keep package metadata and licenses so repeated pruning
+  // can still discover and validate the package.
+  {
+    packageName: "@ton/sandbox",
+    mainPrefixes: ["dist/"],
+    paths: ["dist", "jest-environment.js", "jest-reporter.js"],
   },
 ]
 
@@ -59,15 +75,17 @@ function prunePackagePaths(rule) {
     if (
       packageJson.name !== rule.packageName ||
       typeof packageJson.main !== "string" ||
-      !packageJson.main.startsWith(rule.mainPrefix)
+      !rule.mainPrefixes.some((prefix) => packageJson.main.startsWith(prefix))
     ) {
       throw new Error(`Refusing to prune unexpected package at ${packageJsonPath}`)
     }
 
-    rmSync(path.join(packageDir, rule.path), {
-      recursive: true,
-      force: true,
-    })
+    for (const relativePath of rule.paths) {
+      rmSync(path.join(packageDir, relativePath), {
+        recursive: true,
+        force: true,
+      })
+    }
   }
 }
 
