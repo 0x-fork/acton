@@ -5,6 +5,10 @@ import {fileURLToPath} from "node:url"
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const nodeModulesDir = path.resolve(scriptDir, "..", "node_modules")
 
+const FILE_PRESERVE_PATTERNS = [
+  /(^|\.)(licen[sc]e|notice|copying|copyright|thirdpartynotice)/i,
+]
+
 const PRUNE_RULES = [
   // @tact-lang/opcode ships PDF specifications in reference/ and, in older
   // versions, TypeScript sources and tests in src/. Its runtime lives entirely
@@ -23,19 +27,22 @@ const PRUNE_RULES = [
     mainPrefixes: ["./dist/"],
     paths: ["src", "dist/func/funcfiftlib.wasm"],
   },
-  // @ton/core publishes TypeScript sources, tests, and test data, but its package
-  // entrypoint and all runtime imports resolve to files under dist/.
+  // @ton/core publishes TypeScript sources and compiled tests alongside its
+  // runtime. Consumers use dist/, but never load its *.spec.js or *.test.js files.
   {
     packageName: "@ton/core",
     mainPrefixes: ["dist/"],
     paths: ["src"],
+    suffixes: [".spec.js", ".test.js"],
+    preservePatterns: FILE_PRESERVE_PATTERNS,
   },
-  // The legacy ton-core package has the same compiled dist/ layout as @ton/core;
-  // its src/ directory is only the published TypeScript source and test material.
+  // The legacy ton-core package has the same source and compiled test layout.
   {
     packageName: "ton-core",
     mainPrefixes: ["dist/"],
     paths: ["src"],
+    suffixes: [".spec.js", ".test.js"],
+    preservePatterns: FILE_PRESERVE_PATTERNS,
   },
   // ohm-js 16 uses index.js -> src/main, and 17 uses dist/ohm.cjs in Node.
   // These browser bundles are unused by either version's Node entrypoint.
@@ -74,9 +81,7 @@ const PRESERVE_RULES = [
 
 const FILE_PRUNE_RULES = {
   suffixes: [".d.ts", ".map"],
-  preservePatterns: [
-    /(^|\.)(licen[sc]e|notice|copying|copyright|thirdpartynotice)/i,
-  ],
+  preservePatterns: FILE_PRESERVE_PATTERNS,
 }
 
 function main() {
@@ -92,10 +97,10 @@ function main() {
     ),
   )
 
-  pruneDevelopmentFiles(nodeModulesDir, preservedDirectories)
+  pruneDevelopmentFiles(nodeModulesDir, preservedDirectories, FILE_PRUNE_RULES)
 }
 
-function pruneDevelopmentFiles(directory, preservedDirectories) {
+function pruneDevelopmentFiles(directory, preservedDirectories, fileRules) {
   if (preservedDirectories.has(directory)) {
     return
   }
@@ -103,20 +108,20 @@ function pruneDevelopmentFiles(directory, preservedDirectories) {
   for (const entry of readdirSync(directory, {withFileTypes: true})) {
     const entryPath = path.join(directory, entry.name)
     if (entry.isDirectory()) {
-      pruneDevelopmentFiles(entryPath, preservedDirectories)
-    } else if (entry.isFile() && shouldPruneFile(entry.name)) {
-      // The worker executes JavaScript. Remove only declarations and source
-      // maps, keeping package.json, licenses and other runtime assets intact.
+      pruneDevelopmentFiles(entryPath, preservedDirectories, fileRules)
+    } else if (entry.isFile() && shouldPruneFile(entry.name, fileRules)) {
+      // Remove matching development files, keeping package.json, licenses
+      // and other runtime assets intact.
       // Dirent checks deliberately skip symlinks, including linked packages.
       rmSync(entryPath)
     }
   }
 }
 
-function shouldPruneFile(filename) {
+function shouldPruneFile(filename, fileRules) {
   return (
-    FILE_PRUNE_RULES.suffixes.some((suffix) => filename.endsWith(suffix)) &&
-    !FILE_PRUNE_RULES.preservePatterns.some((pattern) => pattern.test(filename))
+    fileRules.suffixes.some((suffix) => filename.endsWith(suffix)) &&
+    !fileRules.preservePatterns.some((pattern) => pattern.test(filename))
   )
 }
 
@@ -142,6 +147,15 @@ function prunePackagePaths(rule) {
         recursive: true,
         force: true,
       })
+    }
+
+    if (rule.suffixes) {
+      // Package-specific file rules must not affect nested dependencies.
+      pruneDevelopmentFiles(
+        packageDir,
+        new Set([path.join(packageDir, "node_modules")]),
+        rule,
+      )
     }
   }
 }

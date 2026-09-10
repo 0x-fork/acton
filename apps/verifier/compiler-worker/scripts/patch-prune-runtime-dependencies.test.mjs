@@ -31,7 +31,9 @@ test("prunes development files while preserving runtime assets, metadata and sym
     ["tact-test", "@tact-lang/compiler", "./dist/index.js"],
     ["tact-test/node_modules/@tact-lang/opcode", "@tact-lang/opcode", "dist/index.js"],
     ["tact-test/node_modules/@ton/sandbox", "@ton/sandbox", "dist/index.js"],
+    ["tact-test/node_modules/core-alias", "@ton/core", "dist/index.js"],
     ["@ton/core", "@ton/core", "dist/index.js"],
+    ["@ton/core/node_modules/other-package", "other-package", "index.js"],
     ["ton-core", "ton-core", "dist/index.js"],
     ["ohm-js", "ohm-js", "index.js"],
   ]) {
@@ -44,6 +46,11 @@ test("prunes development files while preserving runtime assets, metadata and sym
     "tact-test/dist/index.js.map",
     "tact-test/node_modules/@tact-lang/opcode/dist/index.d.ts",
     "@types/node/index.d.ts",
+    "@ton/core/dist/boc/Cell.spec.js",
+    "@ton/core/dist/boc/Cell.test.js",
+    "ton-core/dist/boc/Cell.spec.js",
+    "ton-core/dist/boc/Cell.test.js",
+    "tact-test/node_modules/core-alias/dist/boc/Cell.spec.js",
   ];
   const preserved = [
     "tolk-test/dist/index.d.ts",
@@ -62,6 +69,17 @@ test("prunes development files while preserving runtime assets, metadata and sym
     "@types/node/package.json",
     "@types/node/LICENSE",
     "assets/data.map/runtime.json",
+    "@ton/core/package.json",
+    "@ton/core/dist/index.js",
+    "@ton/core/dist/boc/Cell.js",
+    "@ton/core/LICENSE.spec.js",
+    "@ton/core/node_modules/other-package/index.spec.js",
+    "ton-core/package.json",
+    "ton-core/dist/index.js",
+    "ton-core/dist/boc/Cell.js",
+    "tact-test/node_modules/core-alias/dist/boc/Cell.js",
+    "tact-test/dist/index.spec.js",
+    "ohm-js/src/main.test.js",
   ];
   for (const filename of [...removed, ...preserved]) {
     if (filename.endsWith("package.json")) {
@@ -81,8 +99,14 @@ test("prunes development files while preserving runtime assets, metadata and sym
   const outside = path.join(root, "linked-package");
   mkdirSync(outside);
   writeFileSync(path.join(outside, "index.d.ts"), "linked declaration\n");
+  writeFileSync(path.join(outside, "index.spec.js"), "linked test\n");
   symlinkSync(outside, path.join(modules, "linked-package"), "dir");
   symlinkSync(path.join(outside, "index.d.ts"), path.join(modules, "linked.d.ts"));
+  symlinkSync(outside, path.join(modules, "@ton/core/dist/linked-tests"), "dir");
+  symlinkSync(
+    path.join(outside, "index.spec.js"),
+    path.join(modules, "@ton/core/dist/linked.spec.js"),
+  );
 
   for (let run = 0; run < 2; run++) {
     const result = spawnSync(process.execPath, [script], { encoding: "utf8" });
@@ -101,6 +125,12 @@ test("prunes development files while preserving runtime assets, metadata and sym
       readFileSync(path.join(modules, "linked.d.ts"), "utf8"),
       "linked declaration\n",
     );
+    for (const filename of [
+      "@ton/core/dist/linked-tests/index.spec.js",
+      "@ton/core/dist/linked.spec.js",
+    ]) {
+      assert.equal(readFileSync(path.join(modules, filename), "utf8"), "linked test\n");
+    }
   }
 
   function write(filename, content) {
