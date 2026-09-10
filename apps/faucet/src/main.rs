@@ -172,23 +172,13 @@ async fn main() -> anyhow::Result<()> {
         .data(worker_state)
         .build(send_claim);
 
-    let frontend_url = shared_state
-        .config
-        .github_auth
-        .enabled
-        .then_some(shared_state.config.github_auth.frontend_url.as_str());
-    let cors =
-        handlers::airdrop_cors_layer(frontend_url).context("Failed to configure browser CORS")?;
     let proxy = shared_state.config.server.proxy.clone();
-    let app = handlers::router(shared_state)
-        .layer(
-            ServiceBuilder::new()
-                .layer(middleware::from_fn(enter_request_span))
-                .layer(middleware::from_fn_with_state(proxy, insert_client_ip))
-                .layer(GovernorLayer::default()),
-        )
-        // Preflight requests must not consume the stricter per-claim rate limit.
-        .layer(cors);
+    let app = handlers::router(shared_state).layer(
+        ServiceBuilder::new()
+            .layer(middleware::from_fn(enter_request_span))
+            .layer(middleware::from_fn_with_state(proxy, insert_client_ip))
+            .layer(GovernorLayer::default()),
+    );
 
     let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
