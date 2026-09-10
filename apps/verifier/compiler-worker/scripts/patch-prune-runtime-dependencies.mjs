@@ -59,8 +59,65 @@ const PRUNE_RULES = [
   },
 ]
 
-for (const rule of PRUNE_RULES) {
-  prunePackagePaths(rule)
+const PRESERVE_RULES = [
+  // Tolk patches update declarations alongside the runtime JavaScript.
+  {
+    packageName: "@ton/tolk-js",
+    paths: ["."],
+  },
+  // Tact imports this runtime directory despite its coverage-related name.
+  {
+    packageName: "@tact-lang/compiler",
+    paths: ["dist/asm/coverage"],
+  },
+]
+
+const FILE_PRUNE_RULES = {
+  suffixes: [".d.ts", ".map"],
+  preservePatterns: [
+    /(^|\.)(licen[sc]e|notice|copying|copyright|thirdpartynotice)/i,
+  ],
+}
+
+function main() {
+  for (const rule of PRUNE_RULES) {
+    prunePackagePaths(rule)
+  }
+
+  const preservedDirectories = new Set(
+    PRESERVE_RULES.flatMap((rule) =>
+      findInstalledPackages(nodeModulesDir, rule.packageName).flatMap((packageDir) =>
+        rule.paths.map((relativePath) => path.join(packageDir, relativePath)),
+      ),
+    ),
+  )
+
+  pruneDevelopmentFiles(nodeModulesDir, preservedDirectories)
+}
+
+function pruneDevelopmentFiles(directory, preservedDirectories) {
+  if (preservedDirectories.has(directory)) {
+    return
+  }
+
+  for (const entry of readdirSync(directory, {withFileTypes: true})) {
+    const entryPath = path.join(directory, entry.name)
+    if (entry.isDirectory()) {
+      pruneDevelopmentFiles(entryPath, preservedDirectories)
+    } else if (entry.isFile() && shouldPruneFile(entry.name)) {
+      // The worker executes JavaScript. Remove only declarations and source
+      // maps, keeping package.json, licenses and other runtime assets intact.
+      // Dirent checks deliberately skip symlinks, including linked packages.
+      rmSync(entryPath)
+    }
+  }
+}
+
+function shouldPruneFile(filename) {
+  return (
+    FILE_PRUNE_RULES.suffixes.some((suffix) => filename.endsWith(suffix)) &&
+    !FILE_PRUNE_RULES.preservePatterns.some((pattern) => pattern.test(filename))
+  )
 }
 
 function prunePackagePaths(rule) {
@@ -135,3 +192,5 @@ function findInstalledPackages(rootNodeModulesDir, packageName) {
     visitNodeModules(path.join(packageDir, "node_modules"))
   }
 }
+
+main()
