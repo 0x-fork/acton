@@ -86,7 +86,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({
     ? (searchParams.get("jetton")?.trim() ?? "")
     : ""
   const [mode, setMode] = useState<FaucetMode>(() => (gramFaucetEnabled ? "ton" : "jetton"))
-  const [address, setAddress] = useState("")
+  const [address, setAddress] = useState(() => searchParams.get("address")?.trim() ?? "")
   const [jettonMinter, setJettonMinter] = useState("")
   const [amount, setAmount] = useState("10")
   const [jettonMasters, setJettonMasters] = useState<JettonMaster[]>([])

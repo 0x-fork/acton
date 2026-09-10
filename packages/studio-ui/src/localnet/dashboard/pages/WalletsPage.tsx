@@ -41,18 +41,21 @@ import {
 } from "@acton/explorer-core/hooks/useOpenExplorerPath"
 import type {RuntimeWallet} from "../../wallet/types"
 import {useWalletRuntime} from "../../wallet/useWalletRuntime"
+import {useLocalnetRoutes} from "../../routes"
 
 import styles from "./WalletsPage.module.css"
 
 interface WalletsPageProps {
   readonly client: TonClient
+  readonly faucetEnabled: boolean
 }
 
 type WalletTokensById = Readonly<Record<string, readonly JettonWallet[]>>
 
-export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
+export const WalletsPage: FC<WalletsPageProps> = ({client, faucetEnabled}) => {
   const addressFormat = useAddressFormat()
   const routes = useExplorerRoutePaths()
+  const localnetRoutes = useLocalnetRoutes()
   const openPath = useOpenExplorerPath()
   const [walletTokensById, setWalletTokensById] = useState<WalletTokensById>({})
   const [walletTokensLoading, setWalletTokensLoading] = useState(false)
@@ -222,15 +225,30 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                           {formatWalletVersion(wallet.record.version)}
                         </DataTableCell>
                         <DataTableCell align="right" className={styles.walletBalanceCell}>
-                          <WalletAccountSummary
-                            address={walletAddress}
-                            tokens={walletTokensById[wallet.id] ?? []}
-                            tokensLoading={walletTokensLoading}
-                            balanceState={balanceState}
-                            onOpenTokens={(address, event) =>
-                              openPath(`${routes.addressPath(address)}#tokens`, event)
-                            }
-                          />
+                          <div className={styles.walletBalanceContent}>
+                            {faucetEnabled &&
+                            balanceState?.value === "0" &&
+                            !balanceState.isLoading ? (
+                              <InlineButton
+                                variant="accent"
+                                onClick={() => {
+                                  const search = new URLSearchParams({address: walletAddress})
+                                  openPath(`${localnetRoutes.path("/faucet")}?${search}`)
+                                }}
+                              >
+                                Fund
+                              </InlineButton>
+                            ) : undefined}
+                            <WalletAccountSummary
+                              address={walletAddress}
+                              tokens={walletTokensById[wallet.id] ?? []}
+                              tokensLoading={walletTokensLoading}
+                              balanceState={balanceState}
+                              onOpenTokens={(address, event) =>
+                                openPath(`${routes.addressPath(address)}#tokens`, event)
+                              }
+                            />
+                          </div>
                         </DataTableCell>
                       </DataTableRow>
                     )

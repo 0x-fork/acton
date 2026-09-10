@@ -490,7 +490,12 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "wallets",
                 <DashboardPage>
-                  <WalletsPage client={client} />
+                  <WalletsPage
+                    client={client}
+                    faucetEnabled={
+                      supports(runtime.environment, "testnetFaucet") || runtime.gramFaucetEnabled
+                    }
+                  />
                 </DashboardPage>,
               )}
             />

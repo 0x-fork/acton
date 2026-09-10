@@ -5,7 +5,6 @@ import {ArrowRightLeft} from "lucide-react"
 import {EmptyState, Input} from "@acton/ui"
 
 import {AddressFormats} from "../components/AddressFormats"
-import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 
 import styles from "./AddressConverterPage.module.css"
 
@@ -44,7 +43,6 @@ export function AddressConverterPage({
 
   return (
     <section className={styles.container}>
-      <ExplorerBreadcrumbs items={[{label: "Address Converter"}]} />
       <div className={styles.inputPanel}>
         <Input
           aria-label="Address or explorer link"
