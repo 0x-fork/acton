@@ -6,6 +6,8 @@ use super::ReceivedFile;
 use crate::{config::UploadLimits, error::ApiError};
 
 const MAX_UPLOADED_FILES: usize = 256;
+// TODO: Re-enable this check once empty source files are no longer expected in verification bundles.
+const REJECT_EMPTY_FILES: bool = false;
 
 pub(super) fn ensure_file_slot(uploaded_file_count: usize) -> Result<(), ApiError> {
     if uploaded_file_count >= MAX_UPLOADED_FILES {
@@ -36,7 +38,7 @@ pub(super) async fn read_file_part(
         |file_name| format!("uploaded file {file_name}"),
     );
     let content = read_limited_part(field, max_bytes, &description).await?;
-    if content.is_empty() {
+    if REJECT_EMPTY_FILES && content.is_empty() {
         return Err(ApiError::bad_request(format!(
             "{description} must not be empty"
         )));
