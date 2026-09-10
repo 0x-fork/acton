@@ -951,7 +951,8 @@ enum Commands {
     },
     #[command(
         about = "Run a complete local TON network with real validators and consensus",
-        long_about = "Run a complete TON development environment with local validators, the TON Center v2 API, and a TON Center v3 indexer. It supports workflows that depend on validators, consensus, elections, full-node APIs, or indexed chain data.\n\nFull localnet runs TON nodes and supporting services in Docker. It supports administrative APIs, account imports, and cold snapshots, but starts more slowly and uses more CPU, memory, and disk space. Use `acton simulated-localnet` when startup speed, low resource use, forks, or deterministic network control matter more than validator fidelity"
+        long_about = "Run a complete TON development environment with local validators, the TON Center v2 API, and a TON Center v3 indexer. It supports workflows that depend on validators, consensus, elections, full-node APIs, or indexed chain data.\n\nFull localnet runs TON nodes and supporting services in Docker. It supports administrative APIs, account imports, and cold snapshots, but starts more slowly and uses more CPU, memory, and disk space. Use `acton simulated-localnet` when startup speed, low resource use, forks, or deterministic network control matter more than validator fidelity",
+        after_help = detailed_help_pointer("full-localnet")
     )]
     FullLocalnet {
         #[command(flatten)]
