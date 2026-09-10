@@ -16,7 +16,7 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 
 use crate::{
-    blockchain::{is_valid_code_hash, is_valid_hash, normalize_code_hash, normalize_hash},
+    blockchain::{is_valid_hash, normalize_code_hash, normalize_hash},
     compilers::{CompileGeneratedSource, CompileRequest, CompileSource},
     error::ApiError,
     payment::PaymentAttemptOutcome,
@@ -32,6 +32,8 @@ use crate::{
 
 mod languages;
 mod upload_limits;
+
+use super::validation;
 
 const API_KEY_HEADER: &str = "x-verifier-key";
 const MAX_SOURCE_DIRECTORY_DEPTH: usize = 16;
@@ -157,18 +159,8 @@ async fn handle_multipart(
         ));
     }
 
-    let code_hash = match non_empty_text(code_hash) {
-        Some(code_hash) => {
-            let code_hash = normalize_code_hash(code_hash.trim());
-            if !is_valid_code_hash(&code_hash) {
-                return Err(ApiError::bad_request(
-                    "code_hash must contain exactly 64 hexadecimal characters".to_owned(),
-                ));
-            }
-            Some(code_hash)
-        }
-        None => None,
-    };
+    let address = validation::optional_address(address)?;
+    let code_hash = validation::optional_code_hash(code_hash)?;
 
     let language = language
         .filter(|value| !value.trim().is_empty())
@@ -179,10 +171,7 @@ async fn handle_multipart(
         ));
     }
 
-    let target = VerificationTarget {
-        address: non_empty_text(address),
-        code_hash,
-    };
+    let target = VerificationTarget { address, code_hash };
 
     let resolved_target = state.verification_service().resolve_target(target).await?;
     if let Some(bundle) = state

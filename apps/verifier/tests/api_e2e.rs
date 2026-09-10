@@ -28,11 +28,11 @@ use support::{
     recording_source_storage_app_state_with_generated_sources,
     recording_source_storage_app_state_with_source_map_data, recovering_payment_app_state,
     response_json, text_part, timing_out_compiler_app_state_with_payment_outcomes,
-    toncenter_app_state, unverified_app_state,
+    unverified_app_state,
 };
 
-const ADDRESS_ONE: &str = "EQD0000000000000000000000000000000000000000000000";
-const ADDRESS_TWO: &str = "EQD1111111111111111111111111111111111111111111111";
+const ADDRESS_ONE: &str = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c";
+const ADDRESS_TWO: &str = "EQAREREREREREREREREREREREREREREREREREREREREREeYT";
 const CODE_HASH_ONE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const CODE_HASH_ONE_BASE64: &str = "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=";
 const CODE_HASH_TWO: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -369,6 +369,30 @@ async fn verify_rejects_an_invalid_direct_code_hash_before_claiming_payment() {
 }
 
 #[tokio::test]
+async fn verify_rejects_an_invalid_address_before_claiming_payment() {
+    let response = post_verify_without_payment(
+        app_state(&[], CODE_HASH_ONE),
+        vec![
+            text_part(
+                "address",
+                "db94261627fb6a8282159d45e03d287a6417905887c77d1e6172b4f50a3a9f0p",
+            ),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "invalid TON address"})
+    );
+}
+
+#[tokio::test]
 async fn verify_maps_payment_failures_to_stable_http_contracts() {
     let cases = [
         (
@@ -512,7 +536,7 @@ async fn openapi_json_documents_verifier_api() {
             "200", "400", "401", "402", "404", "409", "413", "502", "503"
         ]
     );
-    assert_eq!(response_statuses(abi), ["200", "404", "502"]);
+    assert_eq!(response_statuses(abi), ["200", "400", "404", "502"]);
     assert_eq!(response_statuses(source), ["200", "400", "404", "502"]);
 }
 
@@ -828,6 +852,18 @@ async fn abi_returns_not_found_when_contract_or_abi_is_missing() {
 }
 
 #[tokio::test]
+async fn abi_rejects_invalid_code_hash() {
+    let response = get(
+        app_state(&[], CODE_HASH_ONE),
+        "/api/v1/abi?code_hash=not-a-code-hash",
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_contains(response, "code_hash must contain exactly 64").await;
+}
+
+#[tokio::test]
 async fn verification_status_reports_unverified_code_hash_without_stored_bundle() {
     let response = get(
         app_state(&[], CODE_HASH_ONE),
@@ -921,6 +957,18 @@ async fn verification_status_rejects_missing_target() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     assert_error_contains(response, "address or code_hash").await;
+}
+
+#[tokio::test]
+async fn verification_status_rejects_invalid_code_hash() {
+    let response = get(
+        app_state(&[], CODE_HASH_ONE),
+        "/api/v1/verification/status?code_hash=not-a-code-hash",
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_error_contains(response, "code_hash must contain exactly 64").await;
 }
 
 #[tokio::test]
@@ -1154,7 +1202,7 @@ async fn verification_source_returns_not_found_when_address_has_no_code_hash() {
 #[tokio::test]
 async fn verification_source_rejects_invalid_address_before_blockchain_lookup() {
     let response = get(
-        toncenter_app_state("not a valid URL", CODE_HASH_ONE),
+        app_state(&[], CODE_HASH_ONE),
         "/api/v1/verification/source?address=db94261627fb6a8282159d45e03d287a6417905887c77d1e6172b4f50a3a9f0p",
     )
     .await;

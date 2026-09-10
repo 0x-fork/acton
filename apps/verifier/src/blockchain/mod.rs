@@ -7,7 +7,6 @@ use reqwest::{Client, RequestBuilder, StatusCode, header::USER_AGENT};
 use serde::Deserialize;
 use std::time::Duration;
 use thiserror::Error;
-use tycho_types::models::{StdAddr, StdAddrFormat};
 
 use crate::config::Config;
 
@@ -72,10 +71,6 @@ impl ToncenterClient {
 #[async_trait]
 impl BlockchainClient for ToncenterClient {
     async fn get_code_hash(&self, address: &str) -> Result<Option<String>, BlockchainError> {
-        let address = address.trim();
-        StdAddr::from_str_ext(address, StdAddrFormat::any())
-            .map_err(|_| BlockchainError::InvalidAddress)?;
-
         let response = self
             .account_states_request(address)
             .send()
@@ -160,8 +155,6 @@ fn bytes_to_lower_hex(bytes: &[u8]) -> String {
 
 #[derive(Debug, Error)]
 pub enum BlockchainError {
-    #[error("invalid TON address")]
-    InvalidAddress,
     #[error("toncenter returned an invalid code hash")]
     InvalidCodeHash,
     #[error("toncenter transport error: {0}")]
@@ -216,16 +209,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invalid_address_is_rejected_before_request() {
-        let client = ToncenterClient::new("not a valid URL".to_owned(), None);
-        let result = client
-            .get_code_hash("db94261627fb6a8282159d45e03d287a6417905887c77d1e6172b4f50a3a9f0p")
-            .await;
-
-        assert!(matches!(result, Err(BlockchainError::InvalidAddress)));
-    }
-
-    #[tokio::test]
     async fn account_lookup_rejects_malformed_hashes_and_normalizes_valid_ones() {
         use axum::{Json, Router, routing::get};
         for (hash, expected) in [
@@ -248,7 +231,7 @@ mod tests {
                 );
             let server = tokio::spawn(async move { axum::serve(listener, router).await });
             let result = ToncenterClient::new(format!("http://{address}"), None)
-                .get_code_hash("0:0000000000000000000000000000000000000000000000000000000000000000")
+                .get_code_hash("0:account")
                 .await;
             server.abort();
             if let Some(expected) = expected {

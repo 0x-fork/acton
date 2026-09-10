@@ -8,10 +8,9 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 use crate::{
-    blockchain::BlockchainError, compilers::CompilerError, payment::PaymentError,
-    registry::RegistryError, registry_index::VerificationIndexError,
-    source_bundle::SourceBundleError, source_storage::SourceStorageError,
-    verification::VerificationError,
+    compilers::CompilerError, payment::PaymentError, registry::RegistryError,
+    registry_index::VerificationIndexError, source_bundle::SourceBundleError,
+    source_storage::SourceStorageError, verification::VerificationError,
 };
 
 const INTERNAL_ERROR_MESSAGE: &str = "internal verifier error";
@@ -128,9 +127,6 @@ impl From<VerificationError> for ApiError {
     fn from(err: VerificationError) -> Self {
         match err {
             VerificationError::CodeHashNotFound { .. } => Self::not_found(err.to_string()),
-            VerificationError::Blockchain(BlockchainError::InvalidAddress) => {
-                Self::bad_request("invalid TON address".to_owned())
-            }
             VerificationError::Blockchain(blockchain_err) => {
                 Self::hidden_bad_gateway(blockchain_err.to_string())
             }

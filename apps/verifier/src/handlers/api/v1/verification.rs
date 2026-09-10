@@ -8,7 +8,6 @@ use serde_json::Value;
 use utoipa::ToSchema;
 
 use crate::{
-    blockchain::normalize_code_hash,
     error::ApiError,
     registry::{
         AbiContractsRequest, LastVerifiedRequest, VerificationStatisticsHistoryReceipt,
@@ -23,6 +22,8 @@ use crate::{
     state::AppState,
     verification::VerificationTarget,
 };
+
+use super::validation;
 
 const DEFAULT_PAGE_LIMIT: usize = 50;
 const MAX_PAGE_LIMIT: usize = 100;
@@ -48,7 +49,7 @@ pub async fn status_handler(
 ) -> Result<impl IntoResponse, ApiError> {
     let resolved_target = state
         .verification_service()
-        .resolve_target(query.into_target())
+        .resolve_target(query.into_target()?)
         .await?;
     let status = state
         .verification_registry()
@@ -84,7 +85,7 @@ pub async fn source_handler(
 ) -> Result<impl IntoResponse, ApiError> {
     let resolved_target = state
         .verification_service()
-        .resolve_target(query.into_target())
+        .resolve_target(query.into_target()?)
         .await?;
     let receipt = state
         .verification_registry()
@@ -185,6 +186,7 @@ pub async fn statistics_history_handler(
     ),
     responses(
         (status = 200, description = "Tolk ABI records indexed from verified contracts", body = AbiContractsResponse),
+        (status = 400, description = "Invalid code hash", body = crate::error::ErrorResponse),
         (status = 404, description = "ABI was not found for the requested code hash", body = crate::error::ErrorResponse),
         (status = 502, description = "Registry lookup failure", body = crate::error::ErrorResponse)
     ),
@@ -194,7 +196,7 @@ pub async fn abi_handler(
     State(state): State<AppState>,
     Query(query): Query<AbiQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let code_hash = non_empty_code_hash(query.code_hash);
+    let code_hash = validation::optional_code_hash(query.code_hash)?;
     let receipt = state
         .verification_registry()
         .abi_contracts(AbiContractsRequest {
@@ -241,20 +243,12 @@ pub(super) struct AbiQuery {
 }
 
 impl VerificationQuery {
-    fn into_target(self) -> VerificationTarget {
-        VerificationTarget {
-            address: non_empty_text(self.address),
-            code_hash: non_empty_text(self.code_hash),
-        }
+    fn into_target(self) -> Result<VerificationTarget, ApiError> {
+        Ok(VerificationTarget {
+            address: validation::optional_address(self.address)?,
+            code_hash: validation::optional_code_hash(self.code_hash)?,
+        })
     }
-}
-
-fn non_empty_text(value: Option<String>) -> Option<String> {
-    value.filter(|value| !value.trim().is_empty())
-}
-
-fn non_empty_code_hash(value: Option<String>) -> Option<String> {
-    non_empty_text(value).map(|value| normalize_code_hash(value.trim()))
 }
 
 fn page_limit(limit: Option<usize>) -> usize {
