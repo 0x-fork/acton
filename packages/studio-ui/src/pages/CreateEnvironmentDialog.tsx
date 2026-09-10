@@ -42,7 +42,6 @@ interface CreateEnvironmentDialogProps {
 interface EnvironmentFormState {
   readonly kind: "actonSimulatedLocalnet" | "fullTonNetwork"
   readonly name: string
-  readonly port: string
   readonly forkNetwork: string
   readonly forkBlockNumber: string
   readonly accounts: readonly string[]
@@ -179,7 +178,6 @@ export function CreateEnvironmentDialog({
           form.kind === "actonSimulatedLocalnet"
             ? {
                 kind: "actonSimulatedLocalnet",
-                port: optionalPositiveInteger(form.port, "Local port"),
                 forkNetwork: form.forkNetwork || undefined,
                 forkBlockNumber: form.forkNetwork
                   ? optionalPositiveInteger(form.forkBlockNumber, "Fork block")
@@ -317,16 +315,6 @@ export function CreateEnvironmentDialog({
           {form.kind === "actonSimulatedLocalnet" ? (
             <>
               <div className={styles.formGrid}>
-                <Input
-                  label="Local port"
-                  description="Leave empty to select the first available port"
-                  type="number"
-                  min={1}
-                  max={65_535}
-                  placeholder="Automatic"
-                  value={form.port}
-                  onChange={event => updateForm("port", event.target.value)}
-                />
                 <Select
                   label="Initial state"
                   description="Start clean or fork an existing TON network"
@@ -474,7 +462,6 @@ function createInitialForm(name: string): EnvironmentFormState {
   return {
     kind: "actonSimulatedLocalnet",
     name,
-    port: "",
     forkNetwork: "",
     forkBlockNumber: "",
     accounts: [],

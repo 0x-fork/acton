@@ -151,7 +151,6 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
           <DataTable
             title="Project wallets"
             titleId="wallets-table-title"
-            minWidth="62rem"
             aria-labelledby="wallets-table-title"
             actions={
               <InlineButton
@@ -174,9 +173,9 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
             <DataTableTable aria-label="Project wallets">
               <DataTableHead>
                 <DataTableRow>
-                  <DataTableHeaderCell columnWidth="16rem">Name</DataTableHeaderCell>
-                  <DataTableHeaderCell columnWidth="21rem">Address</DataTableHeaderCell>
-                  <DataTableHeaderCell columnWidth="8rem">Version</DataTableHeaderCell>
+                  <DataTableHeaderCell>Name</DataTableHeaderCell>
+                  <DataTableHeaderCell>Address</DataTableHeaderCell>
+                  <DataTableHeaderCell>Version</DataTableHeaderCell>
                   <DataTableHeaderCell align="right">Balance</DataTableHeaderCell>
                 </DataTableRow>
               </DataTableHead>
