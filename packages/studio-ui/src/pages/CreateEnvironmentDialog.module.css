@@ -62,6 +62,27 @@
   padding-block: var(--acton-space-2);
 }
 
+.environmentTypeLink {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--acton-color-accent);
+  background: transparent;
+  font: inherit;
+  font-weight: var(--acton-font-weight-medium);
+  cursor: pointer;
+}
+
+.environmentTypeLink:hover {
+  text-decoration: underline;
+}
+
+.environmentTypeLink:focus-visible {
+  border-radius: var(--acton-radius-control-sm);
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
 .dockerRequirement {
   display: flex;
   align-items: flex-start;

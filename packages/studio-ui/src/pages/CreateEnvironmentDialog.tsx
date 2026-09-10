@@ -258,9 +258,35 @@ export function CreateEnvironmentDialog({
           <Select
             label="Environment type"
             description={
-              form.kind === "actonSimulatedLocalnet"
-                ? "Fast local TON environment with compatible blocks, APIs, forks, mining controls, and time travel; Acton's custom simplified implementation, not a real TON network"
-                : "Runs a complete local TON network and full indexer, supports actions, and reproduces full-node API behavior, but starts more slowly and uses more memory and disk space"
+              form.kind === "actonSimulatedLocalnet" ? (
+                <>
+                  Starts instantly, uses very few system resources, and provides TON-compatible
+                  blocks, TON Center-compatible v2/v3 APIs, forks, mining controls, and time travel
+                  without validators or consensus. Use{" "}
+                  <button
+                    type="button"
+                    className={styles.environmentTypeLink}
+                    onClick={() => updateKind("fullTonNetwork")}
+                  >
+                    Full localnet
+                  </button>{" "}
+                  for real TON validators and full-node behavior
+                </>
+              ) : (
+                <>
+                  Runs real TON validators, the TON Center v2 API, and a v3 indexer for validator,
+                  full-node, and indexed chain workflows, but starts more slowly and uses more
+                  resources. Use{" "}
+                  <button
+                    type="button"
+                    className={styles.environmentTypeLink}
+                    onClick={() => updateKind("actonSimulatedLocalnet")}
+                  >
+                    Simulated localnet
+                  </button>{" "}
+                  for instant, lightweight development, forks, and deterministic network control
+                </>
+              )
             }
             value={form.kind}
             autoFocus

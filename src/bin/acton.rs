@@ -941,15 +941,18 @@ enum Commands {
         command: LibraryCommand,
     },
     #[command(
-        about = "Run Acton's simplified TON development environment",
-        long_about = "Run Acton's fast, deterministic TON development environment for local execution, forked-state workflows, and faucet funding. It produces TON-compatible blocks and exposes LiteAPI, TON Center v2/v3, Streaming API, and Emulate API surfaces used by many contract and dApp workflows.\n\nActon simulated localnet is a custom simplified implementation, not a real TON network or validator cluster. It does not model validators, consensus, shard elections, or the full production node and indexer stack.",
+        about = "Run an instant local TON simulation with minimal resource use",
+        long_about = "Run Acton's fast, deterministic TON development environment for local execution, forked-state workflows, and faucet funding. It starts instantly, uses very few system resources, and exposes TON-compatible blocks, LiteAPI, TON Center-compatible v2/v3 APIs, Streaming API, and Emulate API.\n\nSimulated localnet is a simplified implementation for contract and dApp development. It does not run validators, consensus, shard elections, or the full production node and indexer stack. Use `acton full-localnet` when you need real TON validators and full-node behavior",
         after_help = detailed_help_pointer("simulated-localnet")
     )]
     SimulatedLocalnet {
         #[command(subcommand)]
         command: SimulatedLocalnetCommand,
     },
-    #[command(about = "Run and manage real TON development networks")]
+    #[command(
+        about = "Run a complete local TON network with real validators and consensus",
+        long_about = "Run a complete TON development environment with local validators, the TON Center v2 API, and a TON Center v3 indexer. It supports workflows that depend on validators, consensus, elections, full-node APIs, or indexed chain data.\n\nFull localnet runs TON nodes and supporting services in Docker. It supports administrative APIs, account imports, and cold snapshots, but starts more slowly and uses more CPU, memory, and disk space. Use `acton simulated-localnet` when startup speed, low resource use, forks, or deterministic network control matter more than validator fidelity"
+    )]
     FullLocalnet {
         #[command(flatten)]
         args: commands::localnet::LocalnetArgs,
