@@ -35,6 +35,7 @@ interface CreateEnvironmentDialogProps {
   readonly importSourceEnvironments: readonly StudioEnvironment[]
   readonly open: boolean
   readonly walletNames: readonly string[]
+  readonly defaultStartupAccounts?: readonly string[]
   readonly onCreated: (environment: StudioEnvironment) => void
   readonly onOpenChange: (open: boolean) => void
 }
@@ -60,6 +61,7 @@ export function CreateEnvironmentDialog({
   importSourceEnvironments,
   open,
   walletNames,
+  defaultStartupAccounts,
   onCreated,
   onOpenChange,
 }: CreateEnvironmentDialogProps) {
@@ -67,7 +69,7 @@ export function CreateEnvironmentDialog({
   const simulatedDefaultName = defaultEnvironmentName("actonSimulatedLocalnet", environments)
   const fullDefaultName = defaultEnvironmentName("fullTonNetwork", environments)
   const [form, setForm] = useState<EnvironmentFormState>(() =>
-    createInitialForm(simulatedDefaultName),
+    createInitialForm(simulatedDefaultName, defaultStartupAccounts),
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDockerNoticeDismissed, setIsDockerNoticeDismissed] = useState(
@@ -75,18 +77,27 @@ export function CreateEnvironmentDialog({
       globalThis.localStorage.getItem(FULL_LOCALNET_DOCKER_NOTICE_DISMISSED_STORAGE_KEY) === "true",
   )
   const nextImportedAccountId = useRef(1)
+  const wasOpen = useRef(false)
+  const hasInitializedAccounts = useRef(false)
 
   useEffect(() => {
-    if (open) {
-      setForm(createInitialForm(simulatedDefaultName))
+    if (open && !wasOpen.current) {
+      setForm(createInitialForm(simulatedDefaultName, defaultStartupAccounts))
       nextImportedAccountId.current = 1
+      hasInitializedAccounts.current = defaultStartupAccounts !== undefined
+    } else if (open && !hasInitializedAccounts.current && defaultStartupAccounts !== undefined) {
+      // Workspace info can arrive after opening; only prefill accounts that are still untouched.
+      setForm(current => ({...current, accounts: [...new Set(defaultStartupAccounts)]}))
+      hasInitializedAccounts.current = true
     }
-  }, [open, simulatedDefaultName])
+    wasOpen.current = open
+  }, [open, simulatedDefaultName, defaultStartupAccounts])
 
   const updateForm = <Key extends keyof EnvironmentFormState>(
     key: Key,
     value: EnvironmentFormState[Key],
   ) => {
+    if (key === "accounts") hasInitializedAccounts.current = true
     setForm(current => ({...current, [key]: value}))
   }
 
@@ -490,13 +501,13 @@ export function CreateEnvironmentDialog({
   )
 }
 
-function createInitialForm(name: string): EnvironmentFormState {
+function createInitialForm(name: string, accounts: readonly string[] = []): EnvironmentFormState {
   return {
     kind: "actonSimulatedLocalnet",
     name,
     forkNetwork: "",
     forkBlockNumber: "",
-    accounts: [],
+    accounts: [...new Set(accounts)],
     rateLimit: "",
     responseDelayMs: "",
     blockIntervalMs: "",

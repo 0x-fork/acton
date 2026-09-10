@@ -107,6 +107,7 @@ pub struct StudioWorkspace {
     name: String,
     root: PathBuf,
     wallet_names: Vec<String>,
+    default_startup_accounts: Vec<String>,
 }
 
 impl StudioWorkspace {
@@ -115,12 +116,21 @@ impl StudioWorkspace {
             name: name.into(),
             root: root.into(),
             wallet_names: Vec::new(),
+            default_startup_accounts: Vec::new(),
         }
     }
 
     #[must_use]
     pub fn with_wallet_names(mut self, wallet_names: Vec<String>) -> Self {
         self.wallet_names = wallet_names;
+        self
+    }
+
+    /// Supplies the create form's initial selection, never defaults for runtime requests.
+    /// Studio must honor an explicitly cleared selection independently of project CLI settings.
+    #[must_use]
+    pub fn with_default_startup_accounts(mut self, accounts: Vec<String>) -> Self {
+        self.default_startup_accounts = accounts;
         self
     }
 
@@ -320,6 +330,7 @@ impl StudioServer {
                     .map(|workspace| WorkspaceInfo {
                         name: workspace.name.clone(),
                         wallet_names: workspace.wallet_names.clone(),
+                        default_startup_accounts: workspace.default_startup_accounts.clone(),
                     }),
             },
             contract_registry: self.contract_registry.clone(),
@@ -529,6 +540,9 @@ pub struct WorkspaceInfo {
     pub name: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub wallet_names: Vec<String>,
+    /// Suggested create-form selection; submitted environment accounts remain authoritative.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub default_startup_accounts: Vec<String>,
 }
 
 #[derive(Debug, thiserror::Error)]

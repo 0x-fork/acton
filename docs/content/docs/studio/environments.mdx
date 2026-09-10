@@ -107,6 +107,10 @@ This keeps debugging reproducible and prevents one experiment from changing anot
 The selected initial state and startup accounts are fixed when the environment is created. Use a new
 environment when a scenario needs a different fork point or bootstrap set.
 
+For both localnet types, `[localnet].accounts` preselects wallets when the create dialog opens.
+You can change or clear this selection. Studio initializes only the wallets submitted in the form;
+an empty selection creates no project wallets, regardless of the CLI defaults.
+
 ## Create a Full localnet
 
 1. Select **Full localnet** in the create dialog.

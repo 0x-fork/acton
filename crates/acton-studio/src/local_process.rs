@@ -1536,9 +1536,8 @@ fn spawn_localnet(
             .arg("--fork-block-number")
             .arg(fork_block_number.to_string());
     }
-    if !accounts.is_empty() {
-        command.arg("--accounts").arg(accounts.join(","));
-    }
+    // An empty Studio selection must override the CLI's [localnet].accounts defaults too.
+    command.arg("--accounts").arg(accounts.join(","));
     if let Some(rate_limit) = rate_limit {
         command.arg("--rate-limit").arg(rate_limit.to_string());
     }

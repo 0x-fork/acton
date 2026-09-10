@@ -13,7 +13,8 @@ fn server() -> StudioServer {
     StudioServer::new(
         StudioServerConfig::new("test-version").with_workspace(
             StudioWorkspace::new("counter", "/private/workspaces/counter")
-                .with_wallet_names(vec!["deployer".to_owned(), "treasury".to_owned()]),
+                .with_wallet_names(vec!["deployer".to_owned(), "treasury".to_owned()])
+                .with_default_startup_accounts(vec!["treasury".to_owned()]),
         ),
     )
 }
@@ -36,7 +37,7 @@ async fn info_contract_does_not_expose_host_paths_or_deployment_mode() {
     let actual = format!("status: {status}\nbody: {}", String::from_utf8_lossy(&body));
 
     expect![[r#"status: 200 OK
-body: {"protocolVersion":1,"serverVersion":"test-version","workspace":{"name":"counter","walletNames":["deployer","treasury"]}}"#]]
+body: {"protocolVersion":1,"serverVersion":"test-version","workspace":{"name":"counter","walletNames":["deployer","treasury"],"defaultStartupAccounts":["treasury"]}}"#]]
     .assert_eq(&actual);
 }
 

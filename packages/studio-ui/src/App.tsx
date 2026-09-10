@@ -464,6 +464,9 @@ function StudioWorkspace({
             isLoading={environmentsState.isLoading}
             loadError={environmentsState.error}
             walletNames={studioInfo?.workspace?.walletNames ?? []}
+            defaultStartupAccounts={
+              studioInfo ? (studioInfo.workspace?.defaultStartupAccounts ?? []) : undefined
+            }
             onCreateOpenChange={setIsEnvironmentCreateOpen}
             onEnvironmentChange={environmentsState.setEnvironment}
             onOpenEnvironment={openEnvironment}

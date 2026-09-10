@@ -1417,28 +1417,6 @@
   white-space: nowrap;
 }
 
-.settingsBadges {
-  max-width: 56%;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.settingsBadge {
-  min-height: 24px;
-  padding: 3px 8px;
-  border: 1px solid var(--acton-color-border-control);
-  border-radius: 999px;
-  background: var(--acton-color-surface);
-  color: var(--acton-color-text);
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.76rem;
-  font-weight: 550;
-}
-
 .settingsInlineError {
   padding: 10px 18px;
   border-bottom: 1px solid var(--acton-color-border);
@@ -2692,7 +2670,6 @@
   .settingsEditableControl,
   .settingsNumberControl,
   .settingsCopyValue,
-  .settingsBadges,
   .settingsValueWithAction,
   .settingsTextValue,
   .settingsCodeValue {
@@ -2701,7 +2678,6 @@
   }
 
   .settingsCopyValue,
-  .settingsBadges,
   .settingsValueWithAction {
     justify-content: flex-start;
   }

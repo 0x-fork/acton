@@ -454,26 +454,6 @@ export const SettingsPage: FC<SettingsPageProps> = ({
               />
             </>
           ) : undefined}
-
-          {localnetConfig && supports(environment, "wallets") ? (
-            <div className={styles.settingsRow}>
-              <div className={styles.settingsRowCopy}>
-                <strong>Startup accounts</strong>
-                <span>Wallets available as soon as this environment starts</span>
-              </div>
-              <div className={styles.settingsBadges}>
-                {localnetConfig.accounts.length > 0 ? (
-                  localnetConfig.accounts.map(account => (
-                    <span key={account} className={styles.settingsBadge}>
-                      {account}
-                    </span>
-                  ))
-                ) : (
-                  <span className={styles.settingsValueMuted}>None</span>
-                )}
-              </div>
-            </div>
-          ) : undefined}
         </div>
       </section>
 

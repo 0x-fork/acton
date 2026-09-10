@@ -8,6 +8,7 @@ export interface StudioInfo {
   readonly workspace?: {
     readonly name: string
     readonly walletNames?: readonly string[]
+    readonly defaultStartupAccounts?: readonly string[]
   }
 }
 
