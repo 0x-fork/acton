@@ -26,7 +26,8 @@ use support::{
     payment_transaction, post_verify, post_verify_with_api_key, post_verify_without_payment,
     recording_app_state, recording_payment_app_state, recording_source_storage_app_state,
     recording_source_storage_app_state_with_generated_sources,
-    recording_source_storage_app_state_with_source_map_data, recovering_payment_app_state,
+    recording_source_storage_app_state_with_source_map_data,
+    recording_source_storage_app_state_with_used_sources, recovering_payment_app_state,
     response_json, text_part, timing_out_compiler_app_state_with_payment_outcomes,
     unverified_app_state,
 };
@@ -1636,6 +1637,132 @@ async fn verify_returns_source_bundle_hash_on_hash_match() {
     assert_eq!(recorded_snapshot[0].files.len(), 1);
     assert_eq!(recorded_snapshot[0].files[0].0, "main.tolk");
     assert_eq!(recorded_snapshot[0].files[0].1, "fun main() {}");
+}
+
+#[tokio::test]
+async fn verify_retains_only_compiler_used_sources_for_each_language() {
+    for (
+        language,
+        compile_params,
+        sources,
+        retained_path,
+        retained_content_type,
+        retained_content,
+        unused_path,
+        unused_content,
+    ) in [
+        (
+            "tolk",
+            COMPILE_PARAMS_TOLK,
+            r#"[{"path":"main.tolk","is_entrypoint":true},{"path":"unused.tolk","is_entrypoint":false}]"#,
+            "main.tolk",
+            "text/plain",
+            "fun main() {}",
+            "unused.tolk",
+            "fun unused() {}",
+        ),
+        (
+            "func",
+            COMPILE_PARAMS_FUNC,
+            r#"[{"path":"main.fc","is_entrypoint":true,"include_in_command":true},{"path":"unused.fc","is_entrypoint":false}]"#,
+            "main.fc",
+            "text/plain",
+            "() main() {}",
+            "unused.fc",
+            "() unused() {}",
+        ),
+        (
+            "tact",
+            EMPTY_COMPILE_PARAMS,
+            r#"[{"path":"contract.pkg","is_entrypoint":true},{"path":"unused.tact","is_entrypoint":false}]"#,
+            "contract.pkg",
+            "application/json",
+            TACT_PKG_1_6_13,
+            "unused.tact",
+            "contract Unused {}",
+        ),
+    ] {
+        let (state, compiler_requests, storage_requests) =
+            recording_source_storage_app_state_with_used_sources(
+                &[],
+                CODE_HASH_ONE,
+                vec![retained_path.to_owned()],
+            );
+        let response = post_verify(
+            state,
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", language),
+                text_part("compile_params", compile_params),
+                text_part("sources", sources),
+                file_part(
+                    "files",
+                    retained_path,
+                    retained_content_type,
+                    retained_content,
+                ),
+                file_part("files", unused_path, "text/plain", unused_content),
+            ],
+        )
+        .await;
+
+        assert_eq!(response.status(), StatusCode::OK, "language={language}");
+
+        let compiler_requests = compiler_requests
+            .lock()
+            .expect("recorded compiler requests mutex should not be poisoned");
+        assert_eq!(compiler_requests.len(), 1, "language={language}");
+        assert_eq!(compiler_requests[0].sources.len(), 2, "language={language}");
+        drop(compiler_requests);
+
+        let storage_requests = storage_requests
+            .lock()
+            .expect("recorded source storage requests mutex should not be poisoned");
+        assert_eq!(storage_requests.len(), 1, "language={language}");
+        assert_eq!(storage_requests[0].files.len(), 1, "language={language}");
+        assert_eq!(
+            storage_requests[0].files[0].0, retained_path,
+            "language={language}"
+        );
+        drop(storage_requests);
+    }
+}
+
+#[tokio::test]
+async fn verify_rejects_invalid_used_source_report_without_storing_files() {
+    let (state, compiler_requests, storage_requests) =
+        recording_source_storage_app_state_with_used_sources(
+            &[],
+            CODE_HASH_ONE,
+            vec!["missing.tolk".to_owned()],
+        );
+    let response = post_verify(
+        state,
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    assert_error_contains(response, "internal verifier error").await;
+    assert_eq!(
+        compiler_requests
+            .lock()
+            .expect("recorded compiler requests mutex should not be poisoned")
+            .len(),
+        1
+    );
+    assert!(
+        storage_requests
+            .lock()
+            .expect("recorded source storage requests mutex should not be poisoned")
+            .is_empty()
+    );
 }
 
 #[tokio::test]

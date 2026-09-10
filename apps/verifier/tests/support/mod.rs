@@ -31,6 +31,10 @@ mod mock_compiler;
 mod mock_source_storage;
 
 const MULTIPART_BOUNDARY: &str = "verifier-test-boundary";
+type RecordedCompilerRequests = Arc<Mutex<Vec<CompileRequest>>>;
+type RecordedSourceStorageRequests =
+    Arc<Mutex<Vec<mock_source_storage::RecordedSourceStorageRequest>>>;
+
 pub const PAYMENT_ADDRESS: &str =
     "0:1111111111111111111111111111111111111111111111111111111111111111";
 pub const PAYMENT_TX_HASH: &str =
@@ -211,6 +215,34 @@ pub fn recording_source_storage_app_state(
             Arc::new(source_storage),
         ),
         recorded_requests,
+    )
+}
+
+pub fn recording_source_storage_app_state_with_used_sources(
+    code_hashes: &[(&str, &str)],
+    compiled_code_hash: &str,
+    used_source_paths: Vec<String>,
+) -> (
+    AppState,
+    RecordedCompilerRequests,
+    RecordedSourceStorageRequests,
+) {
+    let compiler_service = mock_compiler::MockCompilerService::with_used_source_paths(
+        compiled_code_hash,
+        used_source_paths,
+    );
+    let compiler_requests = compiler_service.recorded_requests();
+    let source_storage = mock_source_storage::MockSourceStorage::confirmed();
+    let storage_requests = source_storage.recorded_requests();
+
+    (
+        app_state_from_parts(
+            Arc::new(mock_blockchain::MockBlockchainClient::new(code_hashes)),
+            Arc::new(compiler_service),
+            Arc::new(source_storage),
+        ),
+        compiler_requests,
+        storage_requests,
     )
 }
 

@@ -19,6 +19,7 @@ impl MockCompilerService {
         Self {
             result: MockCompilerResult::Ok {
                 code_hash: code_hash.to_owned(),
+                used_source_paths: None,
                 generated_sources: Vec::new(),
                 source_map: None,
             },
@@ -33,6 +34,7 @@ impl MockCompilerService {
         Self {
             result: MockCompilerResult::Ok {
                 code_hash: code_hash.to_owned(),
+                used_source_paths: None,
                 generated_sources,
                 source_map: None,
             },
@@ -44,6 +46,7 @@ impl MockCompilerService {
         Self {
             result: MockCompilerResult::Ok {
                 code_hash: code_hash.to_owned(),
+                used_source_paths: None,
                 generated_sources: Vec::new(),
                 source_map: Some(source_map),
             },
@@ -63,6 +66,18 @@ impl MockCompilerService {
     pub fn timing_out(timeout_ms: u128) -> Self {
         Self {
             result: MockCompilerResult::Timeout { timeout_ms },
+            recorded_requests: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    pub fn with_used_source_paths(code_hash: &str, used_source_paths: Vec<String>) -> Self {
+        Self {
+            result: MockCompilerResult::Ok {
+                code_hash: code_hash.to_owned(),
+                used_source_paths: Some(used_source_paths),
+                generated_sources: Vec::new(),
+                source_map: None,
+            },
             recorded_requests: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -92,6 +107,7 @@ impl MockCompilerService {
 enum MockCompilerResult {
     Ok {
         code_hash: String,
+        used_source_paths: Option<Vec<String>>,
         generated_sources: Vec<CompileGeneratedSource>,
         source_map: Option<SourceMapData>,
     },
@@ -119,10 +135,12 @@ impl CompilerService for MockCompilerService {
         match &self.result {
             MockCompilerResult::Ok {
                 code_hash,
+                used_source_paths,
                 generated_sources,
                 source_map,
             } => Ok(CompileOutput {
                 code_hash: code_hash.clone(),
+                used_source_paths: used_source_paths.clone(),
                 generated_sources: generated_sources.clone(),
                 source_map: source_map.clone(),
             }),
@@ -141,6 +159,7 @@ impl CompilerService for MockCompilerService {
                 })?;
                 Ok(CompileOutput {
                     code_hash: code_hash.clone(),
+                    used_source_paths: None,
                     generated_sources: Vec::new(),
                     source_map: None,
                 })

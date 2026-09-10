@@ -110,10 +110,12 @@ impl CompilerService for NodeCompilerService {
         match output {
             WorkerOutput::Ok {
                 code_hash,
+                used_source_paths,
                 generated_sources,
                 source_map,
             } => Ok(CompileOutput {
                 code_hash,
+                used_source_paths,
                 generated_sources,
                 source_map,
             }),
@@ -166,7 +168,7 @@ pub struct CompileRequest {
     pub sources: Vec<CompileSource>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct CompileSource {
     pub path: String,
     pub content: String,
@@ -178,6 +180,7 @@ pub struct CompileSource {
 
 pub struct CompileOutput {
     pub code_hash: String,
+    pub used_source_paths: Option<Vec<String>>,
     pub generated_sources: Vec<CompileGeneratedSource>,
     pub source_map: Option<SourceMapData>,
 }
@@ -193,6 +196,8 @@ pub struct CompileGeneratedSource {
 enum WorkerOutput {
     Ok {
         code_hash: String,
+        #[serde(default)]
+        used_source_paths: Option<Vec<String>>,
         #[serde(default)]
         generated_sources: Vec<CompileGeneratedSource>,
         source_map: Option<SourceMapData>,
@@ -231,6 +236,8 @@ pub enum CompilerError {
     WorkerFailed { status: ExitStatus, stderr: String },
     #[error("failed to parse compiler worker output: {0}")]
     DeserializeOutput(serde_json::Error),
+    #[error("invalid compiler worker output: {0}")]
+    InvalidOutput(String),
     #[error("compile error: {0}")]
     CompileFailed(String),
 }
@@ -306,7 +313,8 @@ mod tests {
                     const request = JSON.parse(input);
                     process.stdout.write(JSON.stringify({
                         status: 'ok',
-                        code_hash: String(request.sources[0].content.length)
+                        code_hash: String(request.sources[0].content.length),
+                        used_source_paths: ['main.tolk']
                     }));
                 });
             });
@@ -316,6 +324,7 @@ mod tests {
         .await
         .expect("full duplex exchange must complete");
         assert_eq!(result.code_hash, "1048576");
+        assert_eq!(result.used_source_paths, Some(vec!["main.tolk".to_owned()]));
     }
 
     #[tokio::test]

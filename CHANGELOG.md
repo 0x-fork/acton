@@ -336,6 +336,10 @@ API, web UI, and `acton verify` CLI integration are included below.
 - The restricted Node.js compiler worker supports multiple compiler versions,
   generated registry loaders, import mappings, compiler ABI data, Tolk source
   maps, Tact package metadata, generated files, and Tact-to-Tolk ABI conversion.
+- Successful verification bundles retain only compiler-consumed uploaded
+  sources. Tolk tracks resolved file reads, FunC uses compiler snapshots, and
+  Tact retains the selected package. The backend validates the dependency
+  report and filters the stored bundle without running the compiler twice.
 - Tact ABI conversion reconstructs omitted storage, deployment and system-cell
   metadata, contract parameters, maps, references, integer formats, and
   compiler-allocated continuation cells.

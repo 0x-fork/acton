@@ -53,6 +53,7 @@ export async function compileTact(input) {
   return {
     status: "ok",
     code_hash: bocBase64CodeHashHex(verificationResult.package.code),
+    used_source_paths: [normalizeSourcePath(pkgSource.path)],
     generated_sources: generated,
   };
 }

@@ -17,7 +17,9 @@ use utoipa::ToSchema;
 
 use crate::{
     blockchain::{is_valid_hash, normalize_code_hash, normalize_hash},
-    compilers::{CompileGeneratedSource, CompileRequest, CompileSource},
+    compilers::{
+        CompileGeneratedSource, CompileOutput, CompileRequest, CompileSource, CompilerError,
+    },
     error::ApiError,
     payment::PaymentAttemptOutcome,
     registry::VerifiedBundleRequest,
@@ -266,36 +268,33 @@ async fn verify_unverified(
     verified_at: Option<u64>,
     payment_tx_hash: Option<String>,
 ) -> Result<Json<VerifyResponse>, ApiError> {
-    let compile_input = prepare_compile_input(&language, &compile_params, sources, files)?;
-    let compiled = state
-        .compiler_service()
-        .compile(CompileRequest {
-            language: compile_input.language.clone(),
-            compiler_version: compile_input.compiler_version.clone(),
-            entrypoint: compile_input.entrypoint.clone(),
-            import_mappings: compile_input.import_mappings.clone(),
-            compile_params: compile_params.clone(),
-            sources: compile_input.compile_sources,
-        })
-        .await?;
+    let CompileInput {
+        configuration,
+        sources: mut retained_sources,
+    } = prepare_compile_input(&language, &compile_params, sources, files)?;
+    let compiled = run_compiler(
+        state,
+        &configuration,
+        &compile_params,
+        retained_sources.clone(),
+    )
+    .await?;
     let compiled_code_hash = normalize_code_hash(&compiled.code_hash);
-    let compiled_source_map_data = compiled.source_map.clone();
     let mut verification_result =
         VerificationResult::from_hashes(&resolved_target.code_hash, &compiled_code_hash);
     let (source_bundle_hash, storage_revision) = match verification_result {
         VerificationResult::Match => {
-            let mut stored_sources = compile_input.sources.clone();
-            let mut storage_files = compile_input.storage_files.clone();
-            merge_generated_sources(
-                &mut stored_sources,
-                &mut storage_files,
-                compiled.generated_sources,
-            )?;
+            if let Some(used_source_paths) = compiled.used_source_paths.clone() {
+                retained_sources = select_used_sources(&retained_sources, &used_source_paths)?;
+            }
+
+            let mut storage_files = storage_files_from_sources(&retained_sources);
+            merge_generated_sources(&mut storage_files, compiled.generated_sources)?;
             let source_bundle_hash = compute_source_bundle_hash(SourceBundleInput {
                 compiler: SourceBundleCompiler {
-                    language: &compile_input.language,
-                    version: &compile_input.compiler_version,
-                    entrypoint: &compile_input.entrypoint,
+                    language: &configuration.language,
+                    version: &configuration.compiler_version,
+                    entrypoint: &configuration.entrypoint,
                     params: &compile_params,
                 },
                 sources: storage_files
@@ -318,13 +317,13 @@ async fn verify_unverified(
                     payment_tx_hash,
                     verified_at,
                     compiler: CompilerMetadata {
-                        language: compile_input.language.clone(),
-                        version: compile_input.compiler_version.clone(),
-                        entrypoint: compile_input.entrypoint.clone(),
+                        language: configuration.language.clone(),
+                        version: configuration.compiler_version.clone(),
+                        entrypoint: configuration.entrypoint.clone(),
                         params: compile_params.clone(),
                     },
                     files: storage_files,
-                    source_map: compiled_source_map_data,
+                    source_map: compiled.source_map,
                 })
                 .await?;
             if !stored.storage.created {
@@ -344,7 +343,7 @@ async fn verify_unverified(
     tracing::info!(
         operation = "verify",
         target = %resolved_target.code_hash,
-        language = %compile_input.language,
+        language = %configuration.language,
         compiled_code_hash = %compiled_code_hash,
         source_bundle_hash,
         outcome = %verification_result,
@@ -358,6 +357,86 @@ async fn verify_unverified(
         source_bundle_hash,
         storage_revision,
     }))
+}
+
+async fn run_compiler(
+    state: &AppState,
+    configuration: &CompileConfiguration,
+    compile_params: &Value,
+    sources: Vec<CompileSource>,
+) -> Result<CompileOutput, CompilerError> {
+    state
+        .compiler_service()
+        .compile(CompileRequest {
+            language: configuration.language.clone(),
+            compiler_version: configuration.compiler_version.clone(),
+            entrypoint: configuration.entrypoint.clone(),
+            import_mappings: configuration.import_mappings.clone(),
+            compile_params: compile_params.clone(),
+            sources,
+        })
+        .await
+}
+
+fn select_used_sources(
+    sources: &[CompileSource],
+    used_source_paths: &[String],
+) -> Result<Vec<CompileSource>, CompilerError> {
+    if used_source_paths.is_empty() {
+        return Err(CompilerError::InvalidOutput(
+            "used_source_paths must contain at least one source".to_owned(),
+        ));
+    }
+    if used_source_paths
+        .windows(2)
+        .any(|paths| paths[0] >= paths[1])
+    {
+        return Err(CompilerError::InvalidOutput(
+            "used_source_paths must be sorted and duplicate-free".to_owned(),
+        ));
+    }
+
+    let available_paths = sources
+        .iter()
+        .map(|source| source.path.as_str())
+        .collect::<BTreeSet<_>>();
+    for path in used_source_paths {
+        if !available_paths.contains(path.as_str()) {
+            return Err(CompilerError::InvalidOutput(format!(
+                "used_source_paths contains a path absent from the compiler request: {path}"
+            )));
+        }
+    }
+
+    let used_paths = used_source_paths
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let selected = sources
+        .iter()
+        .filter(|source| used_paths.contains(source.path.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    if selected.len() != used_source_paths.len() {
+        return Err(CompilerError::InvalidOutput(
+            "used_source_paths could not be mapped to compiler sources".to_owned(),
+        ));
+    }
+
+    Ok(selected)
+}
+
+fn storage_files_from_sources(sources: &[CompileSource]) -> Vec<SourceStorageFile> {
+    sources
+        .iter()
+        .map(|source| SourceStorageFile {
+            path: source.path.clone(),
+            content: source.content.clone(),
+            include_in_command: source.include_in_command,
+            is_stdlib: source.is_stdlib,
+            has_include_directives: source.has_include_directives,
+        })
+        .collect()
 }
 
 fn non_empty_text(value: Option<String>) -> Option<String> {
@@ -380,25 +459,15 @@ fn prepare_compile_input(
     let import_mappings = language_input.import_mappings;
     validate_import_mappings(&import_mappings)?;
     let compile_sources = build_compile_sources(&sources, files)?;
-    let storage_files = compile_sources
-        .iter()
-        .map(|source| SourceStorageFile {
-            path: source.path.clone(),
-            content: source.content.clone(),
-            include_in_command: source.include_in_command,
-            is_stdlib: source.is_stdlib,
-            has_include_directives: source.has_include_directives,
-        })
-        .collect();
 
     Ok(CompileInput {
-        language,
-        compiler_version,
-        import_mappings,
-        entrypoint,
-        compile_sources,
-        sources,
-        storage_files,
+        configuration: CompileConfiguration {
+            language,
+            compiler_version,
+            import_mappings,
+            entrypoint,
+        },
+        sources: compile_sources,
     })
 }
 
@@ -605,7 +674,6 @@ fn build_compile_sources(
 }
 
 fn merge_generated_sources(
-    sources: &mut Vec<SourceMetadata>,
     files: &mut Vec<SourceStorageFile>,
     generated_sources: Vec<CompileGeneratedSource>,
 ) -> Result<(), ApiError> {
@@ -628,19 +696,8 @@ fn merge_generated_sources(
                 has_include_directives: None,
             }),
         }
-
-        if !sources.iter().any(|source| source.path == generated.path) {
-            sources.push(SourceMetadata {
-                path: generated.path,
-                is_entrypoint: false,
-                include_in_command: None,
-                is_stdlib: None,
-                has_include_directives: None,
-            });
-        }
     }
 
-    sources.sort_by(|left, right| left.path.cmp(&right.path));
     files.sort_by(|left, right| left.path.cmp(&right.path));
 
     Ok(())
@@ -658,13 +715,15 @@ impl<'a> SourceBundleSource<'a> {
 }
 
 struct CompileInput {
+    configuration: CompileConfiguration,
+    sources: Vec<CompileSource>,
+}
+
+struct CompileConfiguration {
     language: String,
     compiler_version: String,
     import_mappings: BTreeMap<String, String>,
     entrypoint: String,
-    compile_sources: Vec<CompileSource>,
-    sources: Vec<SourceMetadata>,
-    storage_files: Vec<SourceStorageFile>,
 }
 
 #[derive(Debug)]
@@ -761,7 +820,19 @@ impl std::fmt::Display for VerificationResult {
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_relative_path, validate_source_path};
+    use super::{select_used_sources, validate_relative_path, validate_source_path};
+    use crate::compilers::{CompileSource, CompilerError};
+
+    fn compile_source(path: &str) -> CompileSource {
+        CompileSource {
+            path: path.to_owned(),
+            content: path.to_owned(),
+            is_entrypoint: path == "main.tolk",
+            include_in_command: None,
+            is_stdlib: None,
+            has_include_directives: None,
+        }
+    }
 
     #[test]
     fn source_path_rejects_control_characters() {
@@ -788,6 +859,38 @@ mod tests {
                 validate_relative_path("import mapping target", path).is_err(),
                 "import mapping path should be rejected: {path:?}"
             );
+        }
+    }
+
+    #[test]
+    fn used_source_selection_preserves_only_reported_sources() {
+        let sources = [
+            compile_source("z.tolk"),
+            compile_source("main.tolk"),
+            compile_source("unused.tolk"),
+        ];
+        let selected =
+            select_used_sources(&sources, &["main.tolk".to_owned(), "z.tolk".to_owned()])
+                .expect("valid worker paths should be selected");
+
+        assert_eq!(selected.len(), 2);
+        assert_eq!(selected[0].path, "z.tolk");
+        assert_eq!(selected[1].path, "main.tolk");
+    }
+
+    #[test]
+    fn used_source_selection_rejects_malformed_worker_output() {
+        let sources = [compile_source("main.tolk"), compile_source("unused.tolk")];
+        for paths in [
+            Vec::new(),
+            vec!["unused.tolk".to_owned(), "main.tolk".to_owned()],
+            vec!["main.tolk".to_owned(), "main.tolk".to_owned()],
+            vec!["missing.tolk".to_owned()],
+        ] {
+            assert!(matches!(
+                select_used_sources(&sources, &paths),
+                Err(CompilerError::InvalidOutput(_))
+            ));
         }
     }
 }
