@@ -28,7 +28,7 @@ use support::{
     recording_source_storage_app_state_with_generated_sources,
     recording_source_storage_app_state_with_source_map_data, recovering_payment_app_state,
     response_json, text_part, timing_out_compiler_app_state_with_payment_outcomes,
-    unverified_app_state,
+    toncenter_app_state, unverified_app_state,
 };
 
 const ADDRESS_ONE: &str = "EQD0000000000000000000000000000000000000000000000";
@@ -1149,6 +1149,21 @@ async fn verification_source_returns_not_found_when_address_has_no_code_hash() {
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     assert_error_contains(response, "code_hash was not found").await;
+}
+
+#[tokio::test]
+async fn verification_source_rejects_invalid_address_before_blockchain_lookup() {
+    let response = get(
+        toncenter_app_state("not a valid URL", CODE_HASH_ONE),
+        "/api/v1/verification/source?address=db94261627fb6a8282159d45e03d287a6417905887c77d1e6172b4f50a3a9f0p",
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "invalid TON address"})
+    );
 }
 
 #[tokio::test]
