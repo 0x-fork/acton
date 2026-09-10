@@ -340,6 +340,7 @@ API, web UI, and `acton verify` CLI integration are included below.
   sources. Tolk tracks resolved file reads, FunC uses compiler snapshots, and
   Tact retains the selected package. The backend validates the dependency
   report and filters the stored bundle without running the compiler twice.
+- Verifier source paths now accept `@` and `+` in file and directory names.
 - Tact ABI conversion reconstructs omitted storage, deployment and system-cell
   metadata, contract parameters, maps, references, integer formats, and
   compiler-allocated continuation cells.

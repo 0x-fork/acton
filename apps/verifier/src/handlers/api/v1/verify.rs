@@ -38,6 +38,7 @@ mod upload_limits;
 use super::validation;
 
 const API_KEY_HEADER: &str = "x-verifier-key";
+const ALLOWED_SOURCE_PATH_PUNCTUATION: [u8; 6] = *b"/._-@+";
 const MAX_SOURCE_DIRECTORY_DEPTH: usize = 16;
 const MAX_SOURCE_PATH_CHARS: usize = 128;
 
@@ -490,10 +491,10 @@ fn validate_source_path(path: &str) -> Result<(), ApiError> {
 
 fn validate_source_path_components(path: &str) -> Result<(), ApiError> {
     if !path.bytes().all(|character| {
-        character.is_ascii_alphanumeric() || matches!(character, b'/' | b'.' | b'_' | b'-')
+        character.is_ascii_alphanumeric() || ALLOWED_SOURCE_PATH_PUNCTUATION.contains(&character)
     }) {
         return Err(ApiError::bad_request(
-            "source path components may contain only ASCII letters, numbers, '.', '_' and '-'"
+            "source path components may contain only ASCII letters, numbers, '.', '_', '-', '@' and '+'"
                 .to_owned(),
         ));
     }

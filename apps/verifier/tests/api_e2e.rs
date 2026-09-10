@@ -2522,8 +2522,6 @@ async fn verify_rejects_unsafe_source_paths() {
         ("main.tolk.", "must not end with '.'"),
         ("contracts./main.tolk", "must not end with '.'"),
         ("contracts/file name.tolk", "only ASCII letters"),
-        ("contracts/file@name.tolk", "only ASCII letters"),
-        ("contracts/file+name.tolk", "only ASCII letters"),
         ("contracts/file=name.tolk", "only ASCII letters"),
         ("contracts/file,name.tolk", "only ASCII letters"),
         ("contracts/file:name.tolk", "only ASCII letters"),
@@ -2562,25 +2560,26 @@ async fn verify_rejects_unsafe_source_paths() {
 
 #[tokio::test]
 async fn verify_accepts_portable_ascii_source_path() {
-    let path = "Contracts_123/lib-name.v1.tolk";
-    let sources = serde_json::to_string(&json!([{
-        "path": path,
-        "is_entrypoint": true,
-    }]))
-    .expect("source metadata should serialize");
-    let response = post_verify(
-        app_state(&[], CODE_HASH_ONE),
-        vec![
-            text_part("code_hash", CODE_HASH_ONE),
-            text_part("language", "tolk"),
-            text_part("compile_params", COMPILE_PARAMS_TOLK),
-            owned_text_part("sources", sources),
-            file_part("files", path, "text/plain", "fun main() {}"),
-        ],
-    )
-    .await;
+    for path in ["Contracts_123/lib-name.v1.tolk", "@scope/lib+name.v1.tolk"] {
+        let sources = serde_json::to_string(&json!([{
+            "path": path,
+            "is_entrypoint": true,
+        }]))
+        .expect("source metadata should serialize");
+        let response = post_verify(
+            app_state(&[], CODE_HASH_ONE),
+            vec![
+                text_part("code_hash", CODE_HASH_ONE),
+                text_part("language", "tolk"),
+                text_part("compile_params", COMPILE_PARAMS_TOLK),
+                owned_text_part("sources", sources),
+                file_part("files", path, "text/plain", "fun main() {}"),
+            ],
+        )
+        .await;
 
-    assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.status(), StatusCode::OK, "path={path}");
+    }
 }
 
 #[tokio::test]
