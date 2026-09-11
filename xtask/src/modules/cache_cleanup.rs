@@ -8,7 +8,7 @@ use clap::Args;
 
 const CI_ENV: &str = "CI";
 
-pub(crate) const DEFAULT_LAST_ACCESSED_DELETE_AFTER_DAYS: i64 = 1;
+pub(crate) const DEFAULT_LAST_ACCESSED_DELETE_AFTER_DAYS: i64 = 2;
 pub(crate) const DEFAULT_CREATED_DELETE_AFTER_DAYS: i64 = 3;
 
 #[derive(Args, Debug, Clone, Copy)]
