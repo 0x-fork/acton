@@ -1648,6 +1648,16 @@ fn spawn_localnet(
         command.arg("--mine-empty-blocks");
     }
 
+    // Studio owns the managed environment lifecycle. Keep the child outside the
+    // terminal's foreground process group so one Ctrl+C produces one Studio
+    // shutdown sequence instead of one message from every simulated localnet.
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+
+        command.as_std_mut().process_group(0);
+    }
+
     command
         .spawn()
         .map_err(|error| EnvironmentRuntimeError::Internal {
