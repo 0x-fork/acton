@@ -144,7 +144,6 @@ export interface LocalnetWorkspaceShellState {
   readonly pageDescription: string
   readonly pageTitle: string
   readonly primaryAction?: LocalnetWorkspaceShellAction
-  readonly rpcUrl?: string
 }
 
 export interface LocalnetWorkspaceShellAction {
@@ -271,10 +270,6 @@ const AppContent: FC<AppContentProps> = ({
     }
     return undefined
   }, [localPathname, openAddContract, runtime.environment])
-  const primaryEndpoint =
-    runtime.environment?.endpoints.apiV3 ??
-    runtime.environment?.endpoints.apiV2 ??
-    runtime.environment?.endpoints.control
   const headerActions =
     localPathname === "/network/config"
       ? configActions
@@ -292,9 +287,8 @@ const AppContent: FC<AppContentProps> = ({
       pageDescription,
       pageTitle,
       primaryAction,
-      rpcUrl: primaryEndpoint ? absoluteUrl(primaryEndpoint) : undefined,
     })
-  }, [onShellChange, pageDescription, pageTitle, primaryAction, primaryEndpoint, headerActions])
+  }, [onShellChange, pageDescription, pageTitle, primaryAction, headerActions])
 
   useEffect(() => {
     if (localPathname !== "/contracts") setIsAddContractOpen(false)
@@ -938,14 +932,6 @@ function contractDetailsPageDescription(localPathname: string): string | undefin
   return /^\/contracts\/[^/]+(?:\/(?:abi|raw-abi))?$/.test(localPathname)
     ? "Inspect deployed code, ABI and project artifacts"
     : undefined
-}
-
-function absoluteUrl(value: string): string {
-  try {
-    return new URL(value, globalThis.location.origin).href
-  } catch {
-    return value
-  }
 }
 
 function networkDashboardView(path: "/network" | "/network/nodes" | "/network/validators") {
