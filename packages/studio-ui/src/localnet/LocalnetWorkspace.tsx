@@ -33,6 +33,7 @@ import {SuspendedAddressesPage} from "@acton/explorer-core/pages/SuspendedAddres
 import {TransactionPage} from "@acton/explorer-core/pages/TransactionPage"
 import {AddressBookProvider} from "@acton/explorer-core/hooks/useAddressBook"
 import {MetadataRegistryProvider} from "@acton/explorer-core/metadata/MetadataRegistryProvider"
+import {verifierVerificationUrl} from "@acton/explorer-core/metadata/verifierRegistry"
 import {FaucetPage} from "./dashboard/pages/FaucetPage"
 import {HomePage} from "./dashboard/pages/HomePage"
 import {NetworkConfigPage} from "./dashboard/pages/NetworkConfigPage"
@@ -812,7 +813,7 @@ const AppContent: FC<AppContentProps> = ({
               element={withCapability(
                 "simulator",
                 <DashboardPage embedded>
-                  <CellInspectorPage />
+                  <CellInspectorPage getVerificationUrl={verifierVerificationUrl} />
                 </DashboardPage>,
               )}
             />

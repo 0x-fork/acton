@@ -12,9 +12,14 @@ interface VerifierAbiItem {
   readonly abi?: unknown
 }
 
-const VERIFIER_SOURCE_URL = "https://verifier-staging.ton.org/api/v1/verification/source"
-const VERIFIER_ABI_URL = "https://verifier-staging.ton.org/api/v1/abi"
+const VERIFIER_URL = "https://verifier-staging.ton.org"
+const VERIFIER_SOURCE_URL = `${VERIFIER_URL}/api/v1/verification/source`
+const VERIFIER_ABI_URL = `${VERIFIER_URL}/api/v1/abi`
 const DEFAULT_REQUEST_TIMEOUT_MS = 5000
+
+export function verifierVerificationUrl(codeHash: string): string {
+  return `${VERIFIER_URL}/${encodeURIComponent(codeHash)}`
+}
 
 export interface VerifierMetadataRegistryOptions {
   readonly requestTimeoutMs?: number

@@ -97,7 +97,11 @@ const EMPTY_CELL_INSPECTOR_DRAFT: CellInspectorDraft = {
   customTlbEnabled: false,
 }
 
-export const CellInspectorPage: FC = () => {
+interface CellInspectorPageProps {
+  readonly getVerificationUrl?: (codeHash: string) => string
+}
+
+export const CellInspectorPage: FC<CellInspectorPageProps> = ({getVerificationUrl}) => {
   const metadataRegistry = useMetadataRegistry()
   const resolveVerifiedSourceByCodeHash = useCallback(
     async (codeHash: string): Promise<ContractVerifiedSource | undefined> => {
@@ -338,6 +342,7 @@ export const CellInspectorPage: FC = () => {
               onTabChange={setActiveTab}
               disassembly={disassembly}
               resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+              getVerificationUrl={getVerificationUrl}
             />
           ) : null}
         </section>
@@ -637,6 +642,7 @@ function ResultOutput({
   onTabChange,
   disassembly,
   resolveVerifiedSourceByCodeHash,
+  getVerificationUrl,
 }: {
   readonly result: CellInspectorParseResult
   readonly loading: boolean
@@ -646,6 +652,7 @@ function ResultOutput({
   readonly resolveVerifiedSourceByCodeHash: (
     codeHash: string,
   ) => Promise<ContractVerifiedSource | undefined>
+  readonly getVerificationUrl?: (codeHash: string) => string
 }) {
   if (result.status === "error") {
     return <ErrorOutput message={result.error.message} cause={result.error.cause} />
@@ -765,6 +772,7 @@ function ResultOutput({
           <CodeOutput
             state={disassembly}
             resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+            getVerificationUrl={getVerificationUrl}
           />
         )}
         {visibleActiveTab === "boc" && <BocOutput result={result} />}
@@ -838,11 +846,13 @@ function CodeBlock({
 function CodeOutput({
   state,
   resolveVerifiedSourceByCodeHash,
+  getVerificationUrl,
 }: {
   readonly state: DisassemblyState
   readonly resolveVerifiedSourceByCodeHash: (
     codeHash: string,
   ) => Promise<ContractVerifiedSource | undefined>
+  readonly getVerificationUrl?: (codeHash: string) => string
 }) {
   if (state.loading) {
     return (
@@ -867,6 +877,7 @@ function CodeOutput({
           : undefined
       }
       resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+      verificationUrl={state.codeHash ? getVerificationUrl?.(state.codeHash) : undefined}
     />
   )
 }
