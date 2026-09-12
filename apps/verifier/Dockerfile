@@ -61,6 +61,7 @@ COPY apps/verifier/docker/entrypoint.sh /usr/local/bin/verifier-entrypoint
 
 RUN chmod +x /usr/local/bin/verifier-entrypoint \
     && mkdir -p /etc/verifier /var/lib/verifier/source-repo /var/lib/verifier/registry-index /var/lib/verifier/payment-ledger \
+    && chmod 0700 /var/lib/verifier/source-repo /var/lib/verifier/registry-index /var/lib/verifier/payment-ledger \
     && chown -R node:node /etc/verifier /var/lib/verifier
 
 USER node
