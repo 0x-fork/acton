@@ -161,7 +161,7 @@ check-grammar-security:
 check-ui-security:
   bun audit --audit-level=moderate
 
-check-security: check-deny check-audit check-templates-security check-grammar-security check-ui-security
+check-security: check-deny check-audit check-ui-security check-templates-security check-grammar-security
 
 check-tolk:
     cargo run -- test
