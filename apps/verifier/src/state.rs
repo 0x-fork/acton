@@ -8,7 +8,7 @@ use tracing::instrument::WithSubscriber;
 use crate::{
     blockchain::{BlockchainClient, ToncenterClient},
     compilers::{CompilerService, NodeCompilerService},
-    config::{Config, UploadLimits},
+    config::{Config, DEFAULT_MAX_REQUEST_BYTES},
     payment::{OnchainPaymentVerifier, PaymentError, PaymentVerifier},
     registry::{SourceVerificationRegistry, VerificationRegistry},
     registry_index::{SqliteVerificationIndex, VerificationIndexError},
@@ -23,7 +23,7 @@ pub struct AppState {
     verification_registry: Arc<dyn VerificationRegistry>,
     verification_service: VerificationService,
     payment_verifier: Arc<dyn PaymentVerifier>,
-    upload_limits: UploadLimits,
+    max_request_bytes: usize,
     background_tasks: TaskTracker,
 }
 
@@ -50,7 +50,7 @@ impl AppState {
             payment_verifier,
         )
         .with_api_key(config.api_key())
-        .with_upload_limits(config.upload_limits()))
+        .with_max_request_bytes(config.max_request_bytes()))
     }
 
     #[must_use]
@@ -66,7 +66,7 @@ impl AppState {
             verification_registry,
             verification_service: VerificationService::new(blockchain_client),
             payment_verifier,
-            upload_limits: UploadLimits::default(),
+            max_request_bytes: DEFAULT_MAX_REQUEST_BYTES,
             background_tasks: TaskTracker::new(),
         }
     }
@@ -78,14 +78,14 @@ impl AppState {
     }
 
     #[must_use]
-    pub const fn with_upload_limits(mut self, upload_limits: UploadLimits) -> Self {
-        self.upload_limits = upload_limits;
+    pub const fn with_max_request_bytes(mut self, max_request_bytes: usize) -> Self {
+        self.max_request_bytes = max_request_bytes;
         self
     }
 
     #[must_use]
-    pub const fn upload_limits(&self) -> UploadLimits {
-        self.upload_limits
+    pub const fn max_request_bytes(&self) -> usize {
+        self.max_request_bytes
     }
 
     #[must_use]

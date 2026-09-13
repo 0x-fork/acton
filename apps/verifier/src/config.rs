@@ -17,11 +17,7 @@ const LOCALNET_TONCENTER_BASE_URL: &str = "http://127.0.0.1:5411";
 const DEFAULT_COMPILER_NODE_BIN: &str = "node";
 const DEFAULT_COMPILER_WORKER_PATH: &str = "compiler-worker/compile.mjs";
 const DEFAULT_COMPILER_TIMEOUT_MS: u64 = 10_000;
-const DEFAULT_MAX_UPLOAD_REQUEST_BYTES: usize = 16 * 1024 * 1024;
-const DEFAULT_MAX_JSON_FILE_BYTES: usize = 1024 * 1024;
-const DEFAULT_MAX_TOLK_FILE_BYTES: usize = 512 * 1024;
-const DEFAULT_MAX_FUNC_FILE_BYTES: usize = 512 * 1024;
-const DEFAULT_MAX_TACT_FILE_BYTES: usize = 512 * 1024;
+pub(crate) const DEFAULT_MAX_REQUEST_BYTES: usize = 16 * 1024 * 1024;
 const DEFAULT_SOURCE_REPOSITORY_REMOTE: &str = "origin";
 const DEFAULT_SOURCE_REPOSITORY_STORAGE_ROOT: &str = "sources";
 const DEFAULT_SOURCE_REPOSITORY_COMMIT_ENABLED: bool = true;
@@ -54,7 +50,7 @@ pub struct Config {
     compiler_node_bin: String,
     compiler_worker_path: PathBuf,
     compiler_timeout: Duration,
-    upload_limits: UploadLimits,
+    max_request_bytes: usize,
 }
 
 impl Config {
@@ -207,8 +203,8 @@ impl Config {
     }
 
     #[must_use]
-    pub const fn upload_limits(&self) -> UploadLimits {
-        self.upload_limits
+    pub const fn max_request_bytes(&self) -> usize {
+        self.max_request_bytes
     }
 }
 
@@ -236,73 +232,8 @@ impl Default for Config {
             compiler_node_bin: DEFAULT_COMPILER_NODE_BIN.to_owned(),
             compiler_worker_path: PathBuf::from(DEFAULT_COMPILER_WORKER_PATH),
             compiler_timeout: Duration::from_millis(DEFAULT_COMPILER_TIMEOUT_MS),
-            upload_limits: UploadLimits::default(),
+            max_request_bytes: DEFAULT_MAX_REQUEST_BYTES,
         }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct UploadLimits {
-    request: usize,
-    json_file: usize,
-    tolk_file: usize,
-    func_file: usize,
-    tact_file: usize,
-}
-
-impl UploadLimits {
-    #[must_use]
-    pub const fn new(
-        max_request_bytes: usize,
-        max_json_file_bytes: usize,
-        max_tolk_file_bytes: usize,
-        max_func_file_bytes: usize,
-        max_tact_file_bytes: usize,
-    ) -> Self {
-        Self {
-            request: max_request_bytes,
-            json_file: max_json_file_bytes,
-            tolk_file: max_tolk_file_bytes,
-            func_file: max_func_file_bytes,
-            tact_file: max_tact_file_bytes,
-        }
-    }
-
-    #[must_use]
-    pub const fn max_request_bytes(self) -> usize {
-        self.request
-    }
-
-    #[must_use]
-    pub const fn max_json_file_bytes(self) -> usize {
-        self.json_file
-    }
-
-    #[must_use]
-    pub const fn max_tolk_file_bytes(self) -> usize {
-        self.tolk_file
-    }
-
-    #[must_use]
-    pub const fn max_func_file_bytes(self) -> usize {
-        self.func_file
-    }
-
-    #[must_use]
-    pub const fn max_tact_file_bytes(self) -> usize {
-        self.tact_file
-    }
-}
-
-impl Default for UploadLimits {
-    fn default() -> Self {
-        Self::new(
-            DEFAULT_MAX_UPLOAD_REQUEST_BYTES,
-            DEFAULT_MAX_JSON_FILE_BYTES,
-            DEFAULT_MAX_TOLK_FILE_BYTES,
-            DEFAULT_MAX_FUNC_FILE_BYTES,
-            DEFAULT_MAX_TACT_FILE_BYTES,
-        )
     }
 }
 
@@ -435,23 +366,10 @@ impl ConfigFile {
                     .timeout_ms
                     .unwrap_or(DEFAULT_COMPILER_TIMEOUT_MS),
             ),
-            upload_limits: UploadLimits::new(
-                self.upload_limits
-                    .request
-                    .unwrap_or(DEFAULT_MAX_UPLOAD_REQUEST_BYTES),
-                self.upload_limits
-                    .json_file
-                    .unwrap_or(DEFAULT_MAX_JSON_FILE_BYTES),
-                self.upload_limits
-                    .tolk_file
-                    .unwrap_or(DEFAULT_MAX_TOLK_FILE_BYTES),
-                self.upload_limits
-                    .func_file
-                    .unwrap_or(DEFAULT_MAX_FUNC_FILE_BYTES),
-                self.upload_limits
-                    .tact_file
-                    .unwrap_or(DEFAULT_MAX_TACT_FILE_BYTES),
-            ),
+            max_request_bytes: self
+                .upload_limits
+                .request
+                .unwrap_or(DEFAULT_MAX_REQUEST_BYTES),
         }
     }
 }
@@ -513,14 +431,6 @@ struct CompilerConfig {
 struct UploadLimitsConfig {
     #[serde(rename = "max_request_bytes")]
     request: Option<usize>,
-    #[serde(rename = "max_json_file_bytes")]
-    json_file: Option<usize>,
-    #[serde(rename = "max_tolk_file_bytes")]
-    tolk_file: Option<usize>,
-    #[serde(rename = "max_func_file_bytes")]
-    func_file: Option<usize>,
-    #[serde(rename = "max_tact_file_bytes")]
-    tact_file: Option<usize>,
 }
 
 const fn default_bind_addr() -> SocketAddr {

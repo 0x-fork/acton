@@ -46,12 +46,7 @@ fn example_config_toml_loads() {
         "compiler-worker/compile.mjs"
     );
     assert_eq!(config.compiler_timeout(), Duration::from_secs(10));
-    let upload_limits = config.upload_limits();
-    assert_eq!(upload_limits.max_request_bytes(), 16 * 1024 * 1024);
-    assert_eq!(upload_limits.max_json_file_bytes(), 1024 * 1024);
-    assert_eq!(upload_limits.max_tolk_file_bytes(), 512 * 1024);
-    assert_eq!(upload_limits.max_func_file_bytes(), 512 * 1024);
-    assert_eq!(upload_limits.max_tact_file_bytes(), 512 * 1024);
+    assert_eq!(config.max_request_bytes(), 16 * 1024 * 1024);
 }
 
 #[test]
@@ -70,12 +65,7 @@ fn omitted_network_uses_testnet() {
     assert_eq!(config.network().to_string(), "testnet");
     assert_eq!(config.toncenter_base_url(), "https://testnet.toncenter.com");
     assert_eq!(config.compiler_timeout(), Duration::from_secs(10));
-    let upload_limits = config.upload_limits();
-    assert_eq!(upload_limits.max_request_bytes(), 16 * 1024 * 1024);
-    assert_eq!(upload_limits.max_json_file_bytes(), 1024 * 1024);
-    assert_eq!(upload_limits.max_tolk_file_bytes(), 512 * 1024);
-    assert_eq!(upload_limits.max_func_file_bytes(), 512 * 1024);
-    assert_eq!(upload_limits.max_tact_file_bytes(), 512 * 1024);
+    assert_eq!(config.max_request_bytes(), 16 * 1024 * 1024);
     assert_eq!(
         Config::default().compiler_timeout(),
         Duration::from_secs(10)
@@ -91,28 +81,19 @@ fn compiler_timeout_can_be_overridden() {
 }
 
 #[test]
-fn upload_limits_can_be_overridden() {
+fn upload_request_limit_can_be_overridden() {
     let mut config_file = tempfile::NamedTempFile::new().expect("config file");
     writeln!(
         config_file,
         r"
 [upload_limits]
 max_request_bytes = 1000
-max_json_file_bytes = 100
-max_tolk_file_bytes = 200
-max_func_file_bytes = 300
-max_tact_file_bytes = 400
 "
     )
     .expect("write config");
 
     let config = Config::load_from_path(config_file.path()).expect("custom upload limits");
-    let upload_limits = config.upload_limits();
-    assert_eq!(upload_limits.max_request_bytes(), 1000);
-    assert_eq!(upload_limits.max_json_file_bytes(), 100);
-    assert_eq!(upload_limits.max_tolk_file_bytes(), 200);
-    assert_eq!(upload_limits.max_func_file_bytes(), 300);
-    assert_eq!(upload_limits.max_tact_file_bytes(), 400);
+    assert_eq!(config.max_request_bytes(), 1000);
 }
 
 #[test]
@@ -144,7 +125,7 @@ fn docker_entrypoint_generates_default_and_overridden_compiler_timeout() {
 }
 
 #[test]
-fn docker_entrypoint_generates_upload_limits() {
+fn docker_entrypoint_generates_upload_request_limit() {
     let directory = tempfile::tempdir().expect("config directory");
     let config_path = directory.path().join("config.toml");
     let output = std::process::Command::new("sh")
@@ -153,10 +134,6 @@ fn docker_entrypoint_generates_upload_limits() {
         .env("PATH", std::env::var_os("PATH").expect("PATH"))
         .env("VERIFIER_CONFIG", &config_path)
         .env("VERIFIER_UPLOAD_MAX_REQUEST_BYTES", "1000")
-        .env("VERIFIER_UPLOAD_MAX_JSON_FILE_BYTES", "100")
-        .env("VERIFIER_UPLOAD_MAX_TOLK_FILE_BYTES", "200")
-        .env("VERIFIER_UPLOAD_MAX_FUNC_FILE_BYTES", "300")
-        .env("VERIFIER_UPLOAD_MAX_TACT_FILE_BYTES", "400")
         .output()
         .expect("run entrypoint");
     assert!(
@@ -165,14 +142,8 @@ fn docker_entrypoint_generates_upload_limits() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let limits = Config::load_from_path(&config_path)
-        .expect("generated config")
-        .upload_limits();
-    assert_eq!(limits.max_request_bytes(), 1000);
-    assert_eq!(limits.max_json_file_bytes(), 100);
-    assert_eq!(limits.max_tolk_file_bytes(), 200);
-    assert_eq!(limits.max_func_file_bytes(), 300);
-    assert_eq!(limits.max_tact_file_bytes(), 400);
+    let config = Config::load_from_path(&config_path).expect("generated config");
+    assert_eq!(config.max_request_bytes(), 1000);
 }
 
 #[test]

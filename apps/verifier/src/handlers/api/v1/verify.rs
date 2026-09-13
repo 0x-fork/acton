@@ -58,7 +58,7 @@ const MAX_SOURCE_PATH_CHARS: usize = 128;
         (status = 402, description = "Payment is missing or invalid", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
         (status = 409, description = "Payment is already used or in progress", body = crate::error::ErrorResponse),
-        (status = 413, description = "The request or one of its parts exceeds the configured upload limit", body = crate::error::ErrorResponse),
+        (status = 413, description = "The request exceeds the configured upload limit", body = crate::error::ErrorResponse),
         (status = 502, description = "Compiler, blockchain, payment provider, or source storage failure", body = crate::error::ErrorResponse),
         (status = 503, description = "Payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),
@@ -110,23 +110,13 @@ async fn handle_multipart(
                 language = Some(field.text().await.map_err(ApiError::from)?);
             }
             Some("compile_params") => {
-                let raw_params = upload_limits::read_json_part(
-                    field,
-                    state.upload_limits().max_json_file_bytes(),
-                    "compile_params JSON field",
-                )
-                .await?;
+                let raw_params = field.text().await.map_err(ApiError::from)?;
                 compile_params = serde_json::from_str(&raw_params).map_err(|err| {
                     ApiError::bad_request(format!("invalid compile_params JSON: {err}"))
                 })?;
             }
             Some("sources") => {
-                let raw_sources = upload_limits::read_json_part(
-                    field,
-                    state.upload_limits().max_json_file_bytes(),
-                    "sources JSON field",
-                )
-                .await?;
+                let raw_sources = field.text().await.map_err(ApiError::from)?;
                 sources = Some(
                     serde_json::from_str::<Vec<SourceMetadata>>(&raw_sources).map_err(|err| {
                         ApiError::bad_request(format!("invalid sources JSON: {err}"))
@@ -145,7 +135,7 @@ async fn handle_multipart(
             }
             Some("files") => {
                 upload_limits::ensure_file_slot(files.len())?;
-                files.push(upload_limits::read_file_part(field, state.upload_limits()).await?);
+                files.push(upload_limits::read_file_part(field).await?);
             }
             _ => {}
         }

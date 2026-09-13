@@ -19,7 +19,7 @@ pub fn router() -> Result<Router, StateError> {
 }
 
 pub fn router_with_state(state: AppState) -> Router {
-    let max_request_bytes = state.upload_limits().max_request_bytes();
+    let max_request_bytes = state.max_request_bytes();
     Router::<AppState>::new()
         .route("/healthz", get(handlers::health::handler))
         .route("/robots.txt", get(handlers::robots::handler))

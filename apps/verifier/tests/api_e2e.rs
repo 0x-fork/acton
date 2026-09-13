@@ -11,7 +11,6 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 use verifier::app;
 use verifier::compilers::CompileGeneratedSource;
-use verifier::config::UploadLimits;
 use verifier::payment::{
     OnchainPaymentVerifier, PaymentAttemptOutcome, PaymentError, PaymentLedger, PaymentVerifier,
 };
@@ -104,40 +103,6 @@ async fn verification_admission_rejects_ambiguous_and_excessive_uploads_before_p
 }
 
 #[tokio::test]
-async fn verify_enforces_configured_source_file_size_limit() {
-    const CONTENT: &str = "fun main() {}";
-
-    let limits = UploadLimits::new(
-        2 * 1024 * 1024,
-        usize::MAX,
-        CONTENT.len(),
-        usize::MAX,
-        usize::MAX,
-    );
-    let response = post_verify(
-        app_state(&[], CODE_HASH_ONE).with_upload_limits(limits),
-        valid_verify_parts(),
-    )
-    .await;
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let limits = UploadLimits::new(
-        2 * 1024 * 1024,
-        usize::MAX,
-        CONTENT.len() - 1,
-        usize::MAX,
-        usize::MAX,
-    );
-    let response = post_verify(
-        app_state(&[], CODE_HASH_ONE).with_upload_limits(limits),
-        valid_verify_parts(),
-    )
-    .await;
-    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
-    assert_error_contains(response, "uploaded file main.tolk").await;
-}
-
-#[tokio::test]
 async fn verify_rejects_empty_source_file() {
     let response = post_verify(
         app_state(&[], CODE_HASH_ONE),
@@ -156,29 +121,27 @@ async fn verify_rejects_empty_source_file() {
 }
 
 #[tokio::test]
-async fn verify_enforces_configured_json_size_limit() {
-    let limits = UploadLimits::new(
-        2 * 1024 * 1024,
-        COMPILE_PARAMS_TOLK.len(),
-        usize::MAX,
-        usize::MAX,
-        usize::MAX,
-    );
+async fn verify_allows_a_source_file_larger_than_the_removed_per_file_limit() {
+    let content = format!("// {}\nfun main() {{}}", "x".repeat(512 * 1024));
     let response = post_verify(
-        app_state(&[], CODE_HASH_ONE).with_upload_limits(limits),
-        valid_verify_parts(),
+        app_state(&[], CODE_HASH_ONE).with_max_request_bytes(1024 * 1024),
+        vec![
+            text_part("code_hash", CODE_HASH_ONE),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            owned_file_part("files", "main.tolk", "text/plain", content),
+        ],
     )
     .await;
 
-    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
-    assert_error_contains(response, "sources JSON field").await;
+    assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[tokio::test]
 async fn verify_enforces_configured_request_size_limit() {
-    let limits = UploadLimits::new(128, usize::MAX, usize::MAX, usize::MAX, usize::MAX);
     let response = post_verify(
-        app_state(&[], CODE_HASH_ONE).with_upload_limits(limits),
+        app_state(&[], CODE_HASH_ONE).with_max_request_bytes(128),
         valid_verify_parts(),
     )
     .await;
