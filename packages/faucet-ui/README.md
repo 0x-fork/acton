@@ -24,6 +24,6 @@ The development server uses port 3008 and proxies API requests to
 required. Set `VITE_BACKEND_PROXY_TARGET=http://127.0.0.1:3000` to use a local backend,
 or `VITE_FAUCET_URL` to call a different API directly. The backend's
 `GITHUB_FRONTEND_URL` must point to the frontend that receives the OAuth callback
-(for example, `http://localhost:3008/` or `https://faucet.ton.org/`).
+(for example, `http://127.0.0.1:3008/` or `https://faucet.ton.org/`).
 
 Run `just build-faucet-pow-wasm` from the repository root to regenerate `src/wasm`.
