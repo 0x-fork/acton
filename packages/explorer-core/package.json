@@ -71,8 +71,8 @@
     "generate:config-editor": "bun scripts/generate-config-editor-schema.ts",
     "lint": "biome check --formatter-enabled=false .",
     "lint:fix": "biome check --formatter-enabled=false --write .",
-    "mainnet-config:check": "bun scripts/check-mainnet-config.ts",
-    "mainnet-config:fix": "bun scripts/check-mainnet-config.ts --fix && bun run fmt",
+    "network-config:check": "bun scripts/check-network-config.ts",
+    "network-config:fix": "bun scripts/check-network-config.ts --fix && biome format --write scripts/config-fields",
     "precommit": "bun fmt && bun lint && bun build && bun test",
     "test": "bun test tests"
   },

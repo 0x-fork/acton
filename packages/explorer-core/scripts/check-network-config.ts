@@ -4,8 +4,33 @@ import process from "node:process"
 
 import {parseNetworkConfig} from "../src/api/config"
 
-const DEFAULT_ENDPOINT = "https://toncenter.com/api/v2/getConfigAll"
-const MANIFEST_URL = new URL("./mainnet-config-fields.json", import.meta.url)
+export const NETWORKS = ["mainnet", "testnet"] as const
+export type Network = (typeof NETWORKS)[number]
+
+const NETWORK_SETTINGS: Readonly<
+  Record<
+    Network,
+    {
+      readonly endpoint: string
+      readonly endpointEnvironmentVariable: string
+      readonly apiKeyEnvironmentVariable: string
+      readonly manifestUrl: URL
+    }
+  >
+> = {
+  mainnet: {
+    endpoint: "https://toncenter.com/api/v2/getConfigAll",
+    endpointEnvironmentVariable: "TONCENTER_MAINNET_CONFIG_URL",
+    apiKeyEnvironmentVariable: "TONCENTER_MAINNET_API_KEY",
+    manifestUrl: new URL("./config-fields/mainnet.json", import.meta.url),
+  },
+  testnet: {
+    endpoint: "https://testnet.toncenter.com/api/v2/getConfigAll",
+    endpointEnvironmentVariable: "TONCENTER_TESTNET_CONFIG_URL",
+    apiKeyEnvironmentVariable: "TONCENTER_TESTNET_API_KEY",
+    manifestUrl: new URL("./config-fields/testnet.json", import.meta.url),
+  },
+}
 
 export interface ConfigParameterShape {
   readonly id: number
@@ -13,8 +38,8 @@ export interface ConfigParameterShape {
   readonly parseError?: string
 }
 
-export interface MainnetConfigManifest {
-  readonly network: "mainnet"
+export interface ConfigManifest {
+  readonly network: Network
   readonly parameters: Readonly<Record<string, readonly string[]>>
 }
 
@@ -33,7 +58,7 @@ export function inspectConfigBoc(rawBoc: string): readonly ConfigParameterShape[
 }
 
 export function findConfigAdditions(
-  manifest: MainnetConfigManifest,
+  manifest: ConfigManifest,
   parameters: readonly ConfigParameterShape[],
 ): ConfigAdditions {
   const knownIds = new Set(Object.keys(manifest.parameters).map(Number))
@@ -63,9 +88,9 @@ export function hasConfigAdditions(additions: ConfigAdditions): boolean {
 }
 
 export function mergeConfigManifest(
-  manifest: MainnetConfigManifest,
+  manifest: ConfigManifest,
   parameters: readonly ConfigParameterShape[],
-): MainnetConfigManifest {
+): ConfigManifest {
   const merged: Record<string, readonly string[]> = {...manifest.parameters}
 
   for (const parameter of parameters) {
@@ -76,7 +101,7 @@ export function mergeConfigManifest(
   }
 
   return {
-    network: "mainnet",
+    network: manifest.network,
     parameters: Object.fromEntries(
       Object.entries(merged).sort(([left], [right]) => Number(left) - Number(right)),
     ),
@@ -85,39 +110,50 @@ export function mergeConfigManifest(
 
 async function main(): Promise<void> {
   const options = parseArguments(process.argv.slice(2))
+  const networks = options.network ? [options.network] : NETWORKS
+  for (const network of networks) await auditNetwork(network, options)
+}
+
+async function auditNetwork(
+  network: Network,
+  options: {readonly bocPath?: string; readonly fix: boolean},
+): Promise<void> {
+  const settings = NETWORK_SETTINGS[network]
   const [manifest, rawBoc] = await Promise.all([
-    readManifest(),
-    options.bocPath ? readFile(options.bocPath, "utf8") : fetchLatestMainnetConfig(),
+    readManifest(network),
+    options.bocPath ? readFile(options.bocPath, "utf8") : fetchLatestNetworkConfig(network),
   ])
   const parameters = inspectConfigBoc(rawBoc.trim())
   const additions = findConfigAdditions(manifest, parameters)
 
   if (options.fix) {
     if (!hasConfigAdditions(additions)) {
-      console.log(`Mainnet config is already covered (${parameters.length} parameters)`)
+      console.log(
+        `${capitalize(network)} config is already covered (${parameters.length} parameters)`,
+      )
       return
     }
     if (Object.keys(additions.parseErrors).length > 0) {
       printAdditions(additions)
-      throw new Error("Refusing to update the manifest until every positive parameter parses")
+      throw new Error("Refusing to update the manifest until every config parameter parses")
     }
 
     const updated = mergeConfigManifest(manifest, parameters)
-    await writeFile(MANIFEST_URL, `${JSON.stringify(updated, null, 2)}\n`)
-    console.log(`Updated ${MANIFEST_URL.pathname}`)
+    await writeFile(settings.manifestUrl, `${JSON.stringify(updated, null, 2)}\n`)
+    console.log(`Updated ${settings.manifestUrl.pathname}`)
     return
   }
 
   if (hasConfigAdditions(additions)) {
     printAdditions(additions)
     if (Object.keys(additions.parseErrors).length === 0) {
-      console.error("\nRun `bun mainnet-config:fix` to update the manifest")
+      console.error("\nRun `bun network-config:fix` to update the manifests")
     }
     process.exitCode = 1
     return
   }
 
-  console.log(`Mainnet config is covered (${parameters.length} parameters)`)
+  console.log(`${capitalize(network)} config is covered (${parameters.length} parameters)`)
 }
 
 function collectFieldPaths(value: ParsedValue): readonly string[] {
@@ -163,14 +199,23 @@ function normalizeFieldName(value: string): string {
     .replaceAll(/^_+|_+$/g, "")
 }
 
-async function readManifest(): Promise<MainnetConfigManifest> {
-  return JSON.parse(await readFile(MANIFEST_URL, "utf8")) as MainnetConfigManifest
+async function readManifest(network: Network): Promise<ConfigManifest> {
+  const manifest = JSON.parse(
+    await readFile(NETWORK_SETTINGS[network].manifestUrl, "utf8"),
+  ) as ConfigManifest
+  if (manifest.network !== network) {
+    throw new Error(`Expected ${network} manifest, received ${manifest.network}`)
+  }
+  return manifest
 }
 
-async function fetchLatestMainnetConfig(): Promise<string> {
-  const endpoint = process.env.TONCENTER_MAINNET_CONFIG_URL?.trim() || DEFAULT_ENDPOINT
+async function fetchLatestNetworkConfig(network: Network): Promise<string> {
+  const settings = NETWORK_SETTINGS[network]
+  const endpoint = process.env[settings.endpointEnvironmentVariable]?.trim() || settings.endpoint
   const apiKey =
-    process.env.TONCENTER_API_KEY?.trim() || process.env.EXPLORER_TONCENTER_API_KEY?.trim()
+    process.env[settings.apiKeyEnvironmentVariable]?.trim() ||
+    process.env.TONCENTER_API_KEY?.trim() ||
+    process.env.EXPLORER_TONCENTER_API_KEY?.trim()
   const response = await fetch(endpoint, {
     headers: apiKey ? {"X-API-Key": apiKey} : undefined,
     signal: AbortSignal.timeout(30_000),
@@ -190,9 +235,11 @@ async function fetchLatestMainnetConfig(): Promise<string> {
 }
 
 export function parseArguments(arguments_: readonly string[]): {
+  readonly network?: Network
   readonly bocPath?: string
   readonly fix: boolean
 } {
+  let network: Network | undefined
   let bocPath: string | undefined
   let fix = false
 
@@ -200,6 +247,13 @@ export function parseArguments(arguments_: readonly string[]): {
     const argument = arguments_[index]
     if (argument === "--fix") {
       fix = true
+      continue
+    }
+    if (argument === "--network") {
+      const value = arguments_[index + 1]
+      if (!isNetwork(value)) throw new Error("--network must be mainnet or testnet")
+      network = value
+      index += 1
       continue
     }
     if (argument === "--boc") {
@@ -211,7 +265,16 @@ export function parseArguments(arguments_: readonly string[]): {
     throw new Error(`Unknown argument: ${argument}`)
   }
 
-  return {bocPath, fix}
+  if (bocPath && !network) throw new Error("--boc requires --network")
+  return {network, bocPath, fix}
+}
+
+function isNetwork(value: string | undefined): value is Network {
+  return NETWORKS.some(network => network === value)
+}
+
+function capitalize(value: string): string {
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`
 }
 
 function printAdditions(additions: ConfigAdditions): void {
