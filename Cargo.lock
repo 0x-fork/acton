@@ -5998,6 +5998,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "tasm-core",
  "tokio",
  "tolk-compiler",
  "ton-api",

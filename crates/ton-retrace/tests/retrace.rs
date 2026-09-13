@@ -59,6 +59,20 @@ async fn test_retrace_simple_0() {
 
 #[tokio::test]
 #[ignore = "requires access to mainnet archive APIs"]
+async fn test_retrace_prev_mc_blocks_with_storage_extra() {
+    // Ported from retracer-core-new/src/test/test.spec.ts (PREVMCBLOCKS).
+    assert_retrace(
+        Network::Mainnet,
+        "dfee011f44a906e28ba43f5c6f1027d57573f7dc929fa81fa6544c8013248b41",
+        0,
+        true,
+        true,
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires access to mainnet archive APIs"]
 async fn test_retrace_single_exotic() {
     assert_retrace(
         Network::Mainnet,

@@ -2,6 +2,8 @@
 
 use crate::Network;
 use anyhow::Context;
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
@@ -11,6 +13,7 @@ use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use ton_api::toncenter::{v2, v3};
+use ton_executor::message::{PrevBlockId, PrevBlocksInfo};
 use ton_networks::CustomNetworkUrls;
 use toncenter_keys::api_key as toncenter_api_key;
 use tycho_types::boc::Boc;
@@ -169,6 +172,102 @@ impl TonCenterClient {
         .await
     }
 
+    /// Reconstructs c7 history at the referenced masterchain state, newest first.
+    /// The anchor is included, as is zerostate when fewer than 16 blocks exist.
+    /// Lookups are sequential to respect public API limits; overlapping lists
+    /// share results for the duration of this reconstruction.
+    pub(crate) async fn get_prev_blocks_info(
+        &self,
+        mc_seqno: u32,
+        with_100: bool,
+    ) -> anyhow::Result<PrevBlocksInfo> {
+        async {
+            let mut blocks = HashMap::new();
+            let key_seqno = if mc_seqno == 0 {
+                0
+            } else {
+                let header: v2::BlockHeader = self
+                    .get_v2(
+                        "getBlockHeader",
+                        &[
+                            ("workchain", "-1".to_owned()),
+                            ("shard", "8000000000000000".to_owned()),
+                            ("seqno", mc_seqno.to_string()),
+                        ],
+                    )
+                    .await?;
+                let key_seqno = if header.is_key_block {
+                    mc_seqno
+                } else {
+                    u32::try_from(header.prev_key_block_seqno)
+                        .context("Invalid previous key block seqno")?
+                };
+                anyhow::ensure!(
+                    key_seqno <= mc_seqno,
+                    "Previous key block is after masterchain block {mc_seqno}"
+                );
+                blocks.insert(mc_seqno, prev_block_id(header.id, mc_seqno)?);
+                key_seqno
+            };
+
+            let recent_seqnos = (mc_seqno.saturating_sub(15)..=mc_seqno)
+                .rev()
+                .collect::<Vec<_>>();
+            let hundred_seqnos = if with_100 {
+                (0..=mc_seqno / 100)
+                    .rev()
+                    .take(16)
+                    .map(|seqno| seqno * 100)
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            };
+
+            for seqno in std::iter::once(key_seqno)
+                .chain(recent_seqnos.iter().copied())
+                .chain(hundred_seqnos.iter().copied())
+            {
+                if blocks.contains_key(&seqno) {
+                    continue;
+                }
+
+                // lookupBlock cannot return zerostate; the network's initial ID
+                // is available in getMasterchainInfo instead.
+                let id = if seqno == 0 {
+                    let info: v2::MasterchainInfo = self.get_v2("getMasterchainInfo", &[]).await?;
+                    info.init
+                } else {
+                    self.get_v2(
+                        "lookupBlock",
+                        &[
+                            ("workchain", "-1".to_owned()),
+                            ("shard", "8000000000000000".to_owned()),
+                            ("seqno", seqno.to_string()),
+                        ],
+                    )
+                    .await?
+                };
+                blocks.insert(seqno, prev_block_id(id, seqno)?);
+            }
+
+            Ok(PrevBlocksInfo::new(
+                recent_seqnos
+                    .iter()
+                    .map(|seqno| blocks[seqno].clone())
+                    .collect(),
+                blocks[&key_seqno].clone(),
+                with_100.then(|| {
+                    hundred_seqnos
+                        .iter()
+                        .map(|seqno| blocks[seqno].clone())
+                        .collect()
+                }),
+            ))
+        }
+        .await
+        .with_context(|| format!("Failed to load previous blocks at masterchain block {mc_seqno}"))
+    }
+
     /// Loads raw archival transactions in newest-to-oldest order for replay.
     pub(crate) async fn get_account_transactions(
         &self,
@@ -231,6 +330,38 @@ impl TonCenterClient {
             .await?;
         Boc::decode_base64(cell.bytes).context("Failed to decode shard account cell BOC data")
     }
+}
+
+/// Validates API block IDs before exposing their hashes to contract code in c7.
+fn prev_block_id(id: v2::TonBlockIdExt, expected_seqno: u32) -> anyhow::Result<PrevBlockId> {
+    anyhow::ensure!(
+        id.workchain == -1
+            && (matches!(
+                id.shard.as_str(),
+                "-9223372036854775808" | "8000000000000000"
+            ) || (expected_seqno == 0 && id.shard == "0"))
+            && id.seqno == u64::from(expected_seqno),
+        "TON Center returned an unexpected masterchain block for seqno {expected_seqno}"
+    );
+    let decode_hash = |value: &str| -> anyhow::Result<[u8; 32]> {
+        STANDARD
+            .decode(value)?
+            .try_into()
+            .map_err(|bytes: Vec<u8>| {
+                anyhow::anyhow!(
+                    "Invalid block hash length: expected 32 bytes, got {}",
+                    bytes.len()
+                )
+            })
+    };
+
+    Ok(PrevBlockId {
+        workchain: -1,
+        shard: i64::MIN,
+        seqno: expected_seqno,
+        root_hash: decode_hash(&id.root_hash).context("Invalid masterchain root hash")?,
+        file_hash: decode_hash(&id.file_hash).context("Invalid masterchain file hash")?,
+    })
 }
 
 #[cfg(test)]
@@ -322,6 +453,41 @@ mod tests {
                 destroyed: false,
             }))?,
         })?)
+    }
+
+    #[tokio::test]
+    async fn prev_blocks_at_zerostate_use_the_network_initial_id() -> anyhow::Result<()> {
+        let zero = json!({
+            "@type": "ton.blockIdExt", "workchain": -1, "shard": "0", "seqno": 0,
+            "root_hash": STANDARD.encode([0x11; 32]), "file_hash": STANDARD.encode([0x22; 32]),
+        });
+        let (client, server) = serve_response("200 OK", json!({
+            "ok": true, "@extra": "", "result": {
+                "@type": "blocks.masterchainInfo", "last": zero, "init": zero, "state_root_hash": "",
+            },
+        })).await;
+        let info = client.get_prev_blocks_info(0, true).await?;
+        expect![[r#"
+            (
+                "GET /api/v2/getMasterchainInfo HTTP/1.1",
+                1,
+                1,
+                0,
+                -9223372036854775808,
+                true,
+                true,
+            )
+        "#]]
+        .assert_debug_eq(&(
+            server.await?.lines().next().unwrap(),
+            info.last_mc_blocks.len(),
+            info.last_mc_blocks_100.as_ref().unwrap().len(),
+            info.prev_key_block.seqno,
+            info.prev_key_block.shard,
+            info.last_mc_blocks == vec![info.prev_key_block.clone()],
+            info.last_mc_blocks_100 == Some(vec![info.prev_key_block]),
+        ));
+        Ok(())
     }
 
     fn transaction_response(cell: &Cell) -> Value {

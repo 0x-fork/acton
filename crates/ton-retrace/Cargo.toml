@@ -13,6 +13,7 @@ license = { workspace = true }
 [dependencies]
 ton-api = { workspace = true }
 ton-executor = { workspace = true }
+tasm-core = { workspace = true }
 tvm-logs = { workspace = true }
 tycho-types = { workspace = true }
 num-bigint = { workspace = true }

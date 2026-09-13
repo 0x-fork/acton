@@ -11,14 +11,18 @@ use base64::Engine;
 use base64::engine::general_purpose;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::Arc;
-use ton_executor::message::{EmulationResult, Executor, RunTransactionArgs};
+use std::sync::{Arc, LazyLock};
+use tasm_core::decompile::Disassembler;
+use tasm_core::types::{ArgValue, Instruction};
+use ton_api::toncenter::v3;
+use ton_executor::message::{EmulationResult, Executor, PrevBlocksInfo, RunTransactionArgs};
 use ton_executor::{ExecutorVerbosity, MissingLibrariesContext, missing_library_callback};
 use ton_networks::CustomNetworkUrls;
 pub use ton_networks::Network;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::models::{AccountState, ShardAccount, TickTock, Transaction, TxInfo};
+use tycho_types::models::{BlockchainConfigParams, ConfigParam8};
 use tycho_types::num::Tokens;
 
 /// Fully reproduce (re‑trace) a TON transaction inside a local TON Sandbox
@@ -33,6 +37,8 @@ use tycho_types::num::Tokens;
 /// 3.  Re‑create the exact pre‑tx state by sequentially emulating all earlier
 ///     account transactions that happened inside the same master‑block.
 /// 4.  Emulate the target transaction itself with full VM verbosity.
+///     Load c7 block history when code reads it, and retry with the full history
+///     if dynamically constructed code causes the first replay to diverge.
 /// 5.  Parse the resulting VM log (`c5`, action list, stack trace), compare the
 ///     calculated state‑hash with the on‑chain one and assemble a
 ///     [`TraceResult`] object for the caller.
@@ -59,8 +65,8 @@ use tycho_types::num::Tokens;
 ///
 /// Returns an error if any network lookup fails; if the corresponding shard‑ /
 /// master‑block cannot be found; if deterministic replay
-/// diverges (TVM returns non‑success); or if state‑hash
-/// mismatch is detected after replay.
+/// fails (TVM returns non‑success). A state-hash mismatch after replay is
+/// reported through [`TraceResult::state_update_hash_ok`].
 ///
 /// # Examples
 ///
@@ -167,14 +173,8 @@ pub async fn retrace_base_tx(
 
     // master‑block sequence number that references our shard‑block
     let mc_seqno = block.masterchain_block_ref.seqno;
-    // pseudorandom seed from the master‑block header — TVM needs it for deterministic RNG
-    let rand_seed_vec = general_purpose::STANDARD.decode(block.rand_seed)?;
-    let mut rand_seed: [u8; 32] = [0; 32];
-    for (i, el) in rand_seed.iter_mut().enumerate() {
-        *el = rand_seed_vec.get(i).copied().unwrap_or(0);
-    }
-
     let block_config = get_block_config(&client, mc_seqno).await?;
+    let mut contexts = vec![ReplayBlockContext::new(block, block_config)?];
     let mut shard_account = get_block_account(&client, &base_tx.address, mc_seqno).await?;
 
     // The snapshot records the exact transaction boundary. This also covers
@@ -222,28 +222,98 @@ pub async fn retrace_base_tx(
     // first we emulate all transactions before to get a state that is equal to actual
     // state in blockchain before transaction to emulate
     let balance = account_before_tx.balance.tokens;
-    let (balance, shard_account) = emulate_previous_transactions(
-        &prev_txs_in_block,
-        &shard_account,
-        &balance,
-        libs.as_ref(),
-        &block_config,
-        rand_seed,
-    )?;
-
-    // finally emulate the target transaction
-    let (tx_res, executor_logs) = emulate(
-        &our_tx,
-        &block_config,
-        &shard_account,
-        libs.as_ref(),
-        rand_seed,
-    )?;
-    let res = match tx_res {
-        EmulationResult::Success(res) => res,
-        EmulationResult::Error(err) => {
-            anyhow::bail!("Emulated transaction failed: {:?}", err.error);
+    let mut usage = prev_blocks_usage(
+        code_cell
+            .iter()
+            .chain(loaded_code.iter())
+            .chain(additional_libs.values()),
+    );
+    let mut previous_contexts = None;
+    let (balance, res, executor_logs, state_update_hash_ok) = loop {
+        if usage != PrevBlocksUsage::None && contexts[0].global_version >= 4 {
+            if previous_contexts.is_none() {
+                previous_contexts = Some(
+                    load_previous_block_contexts(
+                        &client,
+                        &prev_txs_in_block,
+                        &our_tx,
+                        &base_tx,
+                        &mut contexts,
+                    )
+                    .await?,
+                );
+            }
+            for context in &mut contexts {
+                // TVM 4–8 has only the recent blocks and key block in this tuple.
+                let with_100 = usage == PrevBlocksUsage::Full && context.global_version >= 9;
+                if context.global_version >= 4
+                    && (context.prev_blocks_info.is_none()
+                        || (with_100
+                            && context
+                                .prev_blocks_info
+                                .as_ref()
+                                .is_some_and(|info| info.last_mc_blocks_100.is_none())))
+                {
+                    context.prev_blocks_info = Some(
+                        client
+                            .get_prev_blocks_info(context.masterchain_ref_seqno()?, with_100)
+                            .await?,
+                    );
+                }
+            }
         }
+        let target_context = &contexts[0];
+
+        // Always restart from the original snapshot: a previous transaction may
+        // have committed a different state without its c7 block history.
+        let attempt = (|| -> anyhow::Result<_> {
+            let (balance, before_target) = emulate_previous_transactions(
+                &prev_txs_in_block,
+                &shard_account,
+                &balance,
+                libs.as_ref(),
+                (0..prev_txs_in_block.len()).map(|index| {
+                    let context = &contexts[previous_contexts
+                        .as_ref()
+                        .map_or(0, |indices| indices[index])];
+                    (
+                        context.config.as_str(),
+                        context.rand_seed,
+                        context.prev_blocks_info.as_ref(),
+                    )
+                }),
+            )?;
+            let (tx_res, executor_logs) = emulate(
+                &our_tx,
+                &target_context.config,
+                &before_target,
+                libs.as_ref(),
+                target_context.rand_seed,
+                target_context.prev_blocks_info.as_ref(),
+            )?;
+            let res = match tx_res {
+                EmulationResult::Success(res) => res,
+                EmulationResult::Error(err) => {
+                    anyhow::bail!("Emulated transaction failed: {}", err.error);
+                }
+            };
+            let emulated_tx: Transaction = Boc::decode_base64(res.transaction.as_ref())?.parse()?;
+            let matches = emulated_tx.state_update.load()?.new == our_tx.state_update.load()?.new;
+            Ok((balance, res, executor_logs, matches))
+        })();
+
+        // Static inspection cannot see continuations built from data/messages.
+        // Retry once with full history, including rejected external messages.
+        // Missing libraries are recovered by the caller before fetching history.
+        if usage == PrevBlocksUsage::Full
+            || contexts.iter().all(|context| context.global_version < 4)
+            || attempt
+                .as_ref()
+                .is_ok_and(|(_, res, _, matches)| *matches || !res.missing_libraries.is_empty())
+        {
+            break attempt?;
+        }
+        usage = PrevBlocksUsage::Full;
     };
     let mut missing_libraries = res.missing_libraries.iter().cloned().collect::<Vec<_>>();
     missing_libraries.sort_unstable();
@@ -253,10 +323,6 @@ pub async fn retrace_base_tx(
 
     let (sender, contract, amount, money, emulated_tx, compute_info) =
         compute_final_data(&res, balance, &base_tx.address)?;
-
-    // check if the emulated transaction hash is equal to one from the real blockchain
-    let state_update_hash_ok =
-        emulated_tx.state_update.load()?.new == our_tx.state_update.load()?.new;
 
     let opcode = tx_opcode(&our_tx);
 
@@ -285,25 +351,210 @@ pub async fn retrace_base_tx(
     })
 }
 
+/// Block-scoped executor inputs reused across attempts and transactions.
+/// Predecessors can belong to different shard blocks under the same MC block;
+/// their random seed and referenced MC state must not come from the target.
+struct ReplayBlockContext {
+    block: v3::Block,
+    config: String,
+    rand_seed: [u8; 32],
+    global_version: u32,
+    prev_blocks_info: Option<PrevBlocksInfo>,
+}
+
+impl ReplayBlockContext {
+    fn new(block: v3::Block, config: String) -> anyhow::Result<Self> {
+        let rand_seed = general_purpose::STANDARD
+            .decode(&block.rand_seed)?
+            .try_into()
+            .map_err(|bytes: Vec<u8>| {
+                anyhow::anyhow!(
+                    "Invalid block random seed length: expected 32 bytes, got {}",
+                    bytes.len()
+                )
+            })?;
+        let params = BlockchainConfigParams::from_raw(Boc::decode_base64(&config)?);
+        let global_version = params
+            .get::<ConfigParam8>()?
+            .map_or(0, |version| version.version);
+        Ok(Self {
+            block,
+            config,
+            rand_seed,
+            global_version,
+            prev_blocks_info: None,
+        })
+    }
+
+    fn masterchain_ref_seqno(&self) -> anyhow::Result<u32> {
+        // The MC block including a shard block is later than the MC state used
+        // for its execution. MC transactions use the preceding MC block.
+        if self.block.workchain == -1 {
+            self.block
+                .seqno
+                .checked_sub(1)
+                .context("Masterchain transaction has no preceding block")
+        } else {
+            u32::try_from(self.block.master_ref_seqno)
+                .context("Invalid masterchain reference seqno")
+        }
+    }
+}
+
+/// Resolves block ownership once, using hashes from the already validated history.
+/// Contexts are shared for transactions in the same block and retained for a retry.
+async fn load_previous_block_contexts(
+    client: &TonCenterClient,
+    previous: &[Transaction],
+    target: &Transaction,
+    base_tx: &BaseTxInfo,
+    contexts: &mut Vec<ReplayBlockContext>,
+) -> anyhow::Result<Vec<usize>> {
+    let mut indices = Vec::with_capacity(previous.len());
+    for (tx, next) in previous
+        .iter()
+        .zip(previous.iter().skip(1).chain(std::iter::once(target)))
+    {
+        let hash = general_purpose::STANDARD.encode(next.prev_trans_hash.as_slice());
+        let response = client
+            .get_transactions(&[("hash", hash.clone()), ("limit", "1".to_owned())])
+            .await
+            .with_context(|| {
+                format!(
+                    "Cannot resolve block for previous transaction at LT {}",
+                    tx.lt
+                )
+            })?;
+        let metadata = response.transactions.first().with_context(|| {
+            format!("Cannot find block for previous transaction at LT {}", tx.lt)
+        })?;
+        anyhow::ensure!(
+            metadata.lt.parse::<u64>()? == tx.lt
+                && metadata.hash == hash
+                && tycho_types::models::StdAddr::from_str(&metadata.account)? == base_tx.address,
+            "TON Center returned unexpected previous transaction metadata at LT {}",
+            tx.lt
+        );
+        let block_id = &metadata.block_ref;
+        let existing = contexts.iter().position(|context| {
+            context.block.workchain == block_id.workchain
+                && context.block.shard == block_id.shard
+                && context.block.seqno == block_id.seqno
+        });
+        let index = if let Some(index) = existing {
+            index
+        } else {
+            let info = BaseTxInfo {
+                address: base_tx.address.clone(),
+                hash: next.prev_trans_hash.0,
+                lt: tx.lt,
+                block: block_id.clone(),
+            };
+            let block = find_shard_block_for_tx(client, &info).await?;
+            let config = get_block_config(client, block.masterchain_block_ref.seqno).await?;
+            contexts.push(ReplayBlockContext::new(block, config)?);
+            contexts.len() - 1
+        };
+        indices.push(index);
+    }
+    Ok(indices)
+}
+
+/// How much c7 history can be established from statically available code.
+/// Unknown code needs the full tuple; runtime-generated code is handled by replay.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+enum PrevBlocksUsage {
+    None,
+    Recent,
+    Full,
+}
+
+/// Inspects decoded instructions, including continuations and method dictionaries.
+/// Literal data cells are not code; a mismatch after replay covers dynamically
+/// constructed continuations without downloading block history for every contract.
+fn prev_blocks_usage<'a>(roots: impl Iterator<Item = &'a Cell>) -> PrevBlocksUsage {
+    static DISASSEMBLER: LazyLock<Disassembler> = LazyLock::new(Disassembler::new);
+
+    fn inspect_arg(arg: &ArgValue) -> PrevBlocksUsage {
+        match arg {
+            ArgValue::Code { code, .. } => inspect(&code.instructions),
+            ArgValue::CodeDictionary(dict) => dict
+                .methods
+                .iter()
+                .map(|method| inspect(&method.instructions))
+                .max()
+                .unwrap_or(PrevBlocksUsage::None),
+            _ => PrevBlocksUsage::None,
+        }
+    }
+
+    fn inspect(instructions: &[Instruction]) -> PrevBlocksUsage {
+        instructions
+            .iter()
+            .map(|instruction| match instruction {
+                Instruction::Plain(plain) => {
+                    let usage = match plain.name.as_str() {
+                        "PREVMCBLOCKS" | "PREVKEYBLOCK" => PrevBlocksUsage::Recent,
+                        "PREVMCBLOCKS_100" | "PREVBLOCKSINFOTUPLE" => PrevBlocksUsage::Full,
+                        _ => PrevBlocksUsage::None,
+                    };
+                    usage.max(
+                        plain
+                            .args
+                            .iter()
+                            .map(inspect_arg)
+                            .max()
+                            .unwrap_or(PrevBlocksUsage::None),
+                    )
+                }
+                Instruction::Ref(reference) => inspect_arg(&reference.code),
+                // The disassembler preserves undecodable code as a slice. Treat it
+                // conservatively rather than assuming it never accesses c7.
+                Instruction::Slice(_) => PrevBlocksUsage::Full,
+                // Library references are inspected through the resolved code roots.
+                Instruction::ExoticCell(_) => PrevBlocksUsage::None,
+            })
+            .max()
+            .unwrap_or(PrevBlocksUsage::None)
+    }
+
+    roots
+        .map(|root| {
+            DISASSEMBLER
+                .decompile_cell(root)
+                .map_or(PrevBlocksUsage::Full, |code| inspect(&code.instructions))
+        })
+        .max()
+        .unwrap_or(PrevBlocksUsage::None)
+}
+
 /// Re-emulates all transactions that occurred in the same account within
 /// the same master-block *before* the target transaction.
 ///
 /// This is necessary because the sandbox starts with an account state from
 /// the *previous* master-block. To get the exact state before our target tx,
 /// we must apply all intermediate transactions in order.
-fn emulate_previous_transactions(
-    prev_txs_in_block: &Vec<Transaction>,
+fn emulate_previous_transactions<'a>(
+    prev_txs_in_block: &[Transaction],
     shard_account: &ShardAccount,
     balance: &Tokens,
     libs: Option<&Cell>,
-    block_config: &str,
-    rand_seed: [u8; 32],
+    contexts: impl Iterator<Item = (&'a str, [u8; 32], Option<&'a PrevBlocksInfo>)>,
 ) -> anyhow::Result<(Tokens, ShardAccount)> {
     let mut balance = *balance;
     let mut shard_account = shard_account.clone();
 
-    for prev_tx in prev_txs_in_block {
-        let (tx_res, _) = emulate(prev_tx, block_config, &shard_account, libs, rand_seed)?;
+    for (prev_tx, (block_config, rand_seed, prev_blocks_info)) in
+        prev_txs_in_block.iter().zip(contexts)
+    {
+        let (tx_res, _) = emulate(
+            prev_tx,
+            block_config,
+            &shard_account,
+            libs,
+            rand_seed,
+            prev_blocks_info,
+        )?;
         let res = match tx_res {
             EmulationResult::Success(res) => res,
             EmulationResult::Error(err) => {
@@ -328,6 +579,7 @@ fn emulate(
     shard_account: &ShardAccount,
     libs: Option<&Cell>,
     rand_seed: [u8; 32],
+    prev_blocks_info: Option<&PrevBlocksInfo>,
 ) -> anyhow::Result<(EmulationResult, Arc<str>)> {
     let (message, is_tock) = match tx.load_info()? {
         TxInfo::Ordinary(_) => {
@@ -360,7 +612,7 @@ fn emulate(
             random_seed: Some(rand_seed),
             ignore_chksig: false,
             debug_enabled: true,
-            prev_blocks_info: None,
+            prev_blocks_info: prev_blocks_info.cloned(),
             is_tick_tock: is_tock.map(|_| true),
             is_tock,
         },
@@ -533,7 +785,7 @@ mod tests {
         for kind in [TickTock::Tick, TickTock::Tock] {
             let (original, expected_account) =
                 reference_transaction(&address, &account, Some(kind), 1_000_000)?;
-            let (replayed, _) = emulate(&original, DEFAULT_CONFIG, &account, None, SEED)?;
+            let (replayed, _) = emulate(&original, DEFAULT_CONFIG, &account, None, SEED, None)?;
             let replayed = success(replayed)?;
             let (sender, contract, amount, money, transaction, compute) =
                 compute_final_data(&replayed, balance, &address)?;
@@ -629,14 +881,13 @@ mod tests {
             reference_transaction(&address, &after_tock, None, 3_000_000)?;
 
         let (balance_before, before_target) = emulate_previous_transactions(
-            &vec![tick, tock],
+            &[tick, tock],
             &account,
             &balance,
             None,
-            DEFAULT_CONFIG,
-            SEED,
+            std::iter::repeat((DEFAULT_CONFIG, SEED, None)),
         )?;
-        let (replayed, _) = emulate(&target, DEFAULT_CONFIG, &before_target, None, SEED)?;
+        let (replayed, _) = emulate(&target, DEFAULT_CONFIG, &before_target, None, SEED, None)?;
         let replayed = success(replayed)?;
         let (sender, contract, amount, _, transaction, compute) =
             compute_final_data(&replayed, balance_before, &address)?;
@@ -689,7 +940,7 @@ mod tests {
         let (mut transaction, _) = reference_transaction(&address, &account, None, 1_000_000)?;
         transaction.in_msg = None;
 
-        let error = emulate(&transaction, DEFAULT_CONFIG, &account, None, SEED).unwrap_err();
+        let error = emulate(&transaction, DEFAULT_CONFIG, &account, None, SEED, None).unwrap_err();
         expect![["No in_message was found in transaction"]].assert_eq(&error.to_string());
         Ok(())
     }
