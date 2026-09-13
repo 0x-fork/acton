@@ -121,7 +121,7 @@ VERIFIER_TONCENTER_API_KEY=
 VERIFIER_PAYMENT_ADDRESS="0:<64-hex-character-testnet-wallet-address>"
 VERIFIER_PAYMENT_MIN_AMOUNT_NANO=500000000
 VERIFIER_PAYMENT_LEDGER_PATH=/var/lib/verifier/payment-ledger/payment-ledger.sqlite3
-VERIFIER_UPLOAD_MAX_REQUEST_BYTES=16777216
+VERIFIER_UPLOAD_MAX_REQUEST_BYTES=524288
 
 SOURCE_REPOSITORY_URL=git@github.com:i582/test-verify-repo.git
 SOURCE_REPOSITORY_STORAGE_ROOT=sources
@@ -138,7 +138,7 @@ VERIFIER_REGISTRY_INDEX_PATH=/var/lib/verifier/registry-index/registry-index.sql
 `POST /api/v1/verify`; clients pass it in the `X-Verifier-Key` header.
 
 `VERIFIER_UPLOAD_MAX_REQUEST_BYTES` is expressed in bytes, limits the complete
-multipart body, and defaults to 16 MiB. When nginx proxies the verifier,
+multipart body, and defaults to 512 KiB. When nginx proxies the verifier,
 configure `client_max_body_size` slightly above the verifier request limit to
 allow for multipart framing overhead.
 

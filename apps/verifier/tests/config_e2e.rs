@@ -46,7 +46,7 @@ fn example_config_toml_loads() {
         "compiler-worker/compile.mjs"
     );
     assert_eq!(config.compiler_timeout(), Duration::from_secs(10));
-    assert_eq!(config.max_request_bytes(), 16 * 1024 * 1024);
+    assert_eq!(config.max_request_bytes(), 512 * 1024);
 }
 
 #[test]
@@ -65,7 +65,7 @@ fn omitted_network_uses_testnet() {
     assert_eq!(config.network().to_string(), "testnet");
     assert_eq!(config.toncenter_base_url(), "https://testnet.toncenter.com");
     assert_eq!(config.compiler_timeout(), Duration::from_secs(10));
-    assert_eq!(config.max_request_bytes(), 16 * 1024 * 1024);
+    assert_eq!(config.max_request_bytes(), 512 * 1024);
     assert_eq!(
         Config::default().compiler_timeout(),
         Duration::from_secs(10)

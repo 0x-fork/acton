@@ -107,7 +107,7 @@ write_generated_config() {
         printf '\n'
 
         printf '[upload_limits]\n'
-        write_optional_int max_request_bytes "${VERIFIER_UPLOAD_MAX_REQUEST_BYTES:-16777216}"
+        write_optional_int max_request_bytes "${VERIFIER_UPLOAD_MAX_REQUEST_BYTES:-524288}"
     } > "$config_path"
 }
 

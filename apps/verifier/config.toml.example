@@ -39,4 +39,4 @@ worker_path = "compiler-worker/compile.mjs"
 timeout_ms = 10000
 
 [upload_limits]
-max_request_bytes = 16777216
+max_request_bytes = 524288
