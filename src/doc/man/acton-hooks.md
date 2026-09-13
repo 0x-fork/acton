@@ -22,7 +22,8 @@ check whether it is active, and remove it again.
 
 Create a `.githooks/` scaffold in the resolved project root.
 
-If `--template` is omitted, Acton opens an interactive selector.
+In a terminal, Acton prompts for the hook and template unless their flags are
+provided. Non-interactive mode defaults to `pre-push` and `default`.
 
 This command only works when the resolved project root already contains a local
 `.git` directory.
@@ -30,6 +31,15 @@ This command only works when the resolved project root already contains a local
 #### Options
 
 {{#options command="acton hooks new"}}
+
+{{#option "`--hook` _hook_" }}
+When Git runs the generated hook.
+
+Possible values: `pre-push`, `pre-commit`
+
+The default is `pre-push`, which runs checks before pushing changes.
+Choose `pre-commit` to run checks before each commit instead.
+{{/option}}
 
 {{#option "`--template` _template_" }}
 Hook scaffold template to create.
@@ -39,14 +49,15 @@ Possible values: `empty`, `default`
 
 {{/options}}
 
-The `default` template creates `.githooks/pre-commit` with this starter hook:
+The `default` template creates `.githooks/pre-push`, or `.githooks/pre-commit`
+when selected, with this starter hook:
 
 ```sh
 #!/bin/sh
 set -e
 if ! command -v acton >/dev/null 2>&1; then
     printf '%s\n' \
-        'pre-commit: acton was not found in PATH' \
+        "${0##*/}: acton was not found in PATH" \
         'Install Acton and add it to PATH in the environment that runs Git' \
         'On Windows, run Git inside the WSL distribution where Acton is installed' \
         "In VS Code, use 'WSL: Reopen Folder in WSL'" \
@@ -60,9 +71,13 @@ acton fmt --check
 The generated hook script uses `/bin/sh`, so the default template assumes a
 POSIX-like shell environment.
 
-If Acton is absent from `PATH`, the hook blocks the commit with exit code 127
+If Acton is absent from `PATH`, the hook blocks the Git operation with exit code 127
 and prints instructions for the Git environment. A failed `acton check` or
-`acton fmt --check` also blocks the commit.
+`acton fmt --check` also blocks the Git operation.
+
+Only the selected hook file is created. Both hooks check the current working
+tree. They do not create a checkout of the staged or pushed revisions.
+The `empty` template creates an empty file for the selected hook.
 
 On Windows, run Git and Acton inside the same WSL distribution. In VS Code,
 use **WSL: Reopen Folder in WSL**. Opening a WSL terminal in a Windows workspace
@@ -80,6 +95,8 @@ run `acton hooks uninstall` first.
 acton hooks new
 acton hooks new --template empty
 acton hooks new --template default
+acton hooks new --hook pre-commit --template default
+acton hooks new --hook pre-push --template empty
 ```
 
 ### acton hooks install

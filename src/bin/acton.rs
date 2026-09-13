@@ -9,7 +9,7 @@ use acton::commands::doctor::doctor_cmd;
 use acton::commands::fmt::fmt_cmd;
 use acton::commands::func2tolk::{default_func2tolk_version, func2tolk_cmd};
 use acton::commands::help::print_command_manual;
-use acton::commands::hooks::{HooksCommand, hooks_cmd};
+use acton::commands::hooks::{GitHook, HooksCommand, hooks_cmd};
 use acton::commands::init::{DEFAULT_APP_DIR, init_cmd};
 use acton::commands::internal::internal_register_contract;
 use acton::commands::library::{fetch_cmd, info_cmd, publish_cmd};
@@ -142,8 +142,16 @@ enum Commands {
             help = "Include the template's TypeScript app scaffold when available"
         )]
         app: bool,
-        #[arg(long, help = "Create and install the default project-local Git hooks")]
-        hooks: bool,
+        #[arg(
+            long,
+            value_enum,
+            num_args = 0..=1,
+            require_equals = true,
+            default_missing_value = "pre-push",
+            value_name = "HOOK",
+            help = "Create and install a Git hook (default: pre-push)"
+        )]
+        hooks: Option<GitHook>,
         #[arg(long, help = "Include an AGENTS.md file with coding-agent guidance")]
         agents: bool,
         #[arg(
