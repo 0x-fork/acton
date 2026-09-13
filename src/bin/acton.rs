@@ -724,6 +724,12 @@ enum Commands {
         #[arg(
             long,
             value_name = "DIR",
+            help = "Directory to save contract BoC files"
+        )]
+        output_boc: Option<String>,
+        #[arg(
+            long,
+            value_name = "DIR",
             help = "Directory to save compiled Fift files"
         )]
         output_fift: Option<String>,
@@ -2308,6 +2314,7 @@ fn main() {
             out_dir,
             gen_dir,
             output_abi,
+            output_boc,
             output_fift,
             output_sources,
             info,
@@ -2318,6 +2325,7 @@ fn main() {
             out_dir,
             gen_dir,
             output_abi,
+            output_boc,
             output_fift,
             output_sources,
             show_info: info,
