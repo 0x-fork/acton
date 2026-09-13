@@ -30,13 +30,21 @@ Hook scaffold template to create.
 Possible values: \fBempty\fR, \fBdefault\fR
 .RE
 .sp
-The \fBdefault\fR template creates \fB\&.githooks/pre\-commit\fR with a starter hook that
-runs:
+The \fBdefault\fR template creates \fB\&.githooks/pre\-commit\fR with this starter hook:
 .sp
 .RS 4
 .nf
 #!/bin/sh
 set \-e
+if ! command \-v acton >/dev/null 2>&1; then
+    printf '%s\(rsn' \(rs
+        'pre\-commit: acton was not found in PATH' \(rs
+        'Install Acton and add it to PATH in the environment that runs Git' \(rs
+        'On Windows, run Git inside the WSL distribution where Acton is installed' \(rs
+        "In VS Code, use 'WSL: Reopen Folder in WSL'" \(rs
+        'See https://ton\-blockchain.github.io/acton/docs/installation' >&2
+    exit 127
+fi
 acton check
 acton fmt \-\-check
 .fi
@@ -44,6 +52,14 @@ acton fmt \-\-check
 .sp
 The generated hook script uses \fB/bin/sh\fR, so the default template assumes a
 POSIX\-like shell environment.
+.sp
+If Acton is absent from \fBPATH\fR, the hook blocks the commit with exit code 127
+and prints instructions for the Git environment. A failed \fBacton check\fR or
+\fBacton fmt \-\-check\fR also blocks the commit.
+.sp
+On Windows, run Git and Acton inside the same WSL distribution. In VS Code,
+use \fBWSL: Reopen Folder in WSL\fR\&. Opening a WSL terminal in a Windows workspace
+does not change the environment for Git commands from the Source Control view.
 .sp
 If \fB\&.githooks/\fR already exists or local hooks are already configured, the
 command fails instead of overwriting existing hooks.

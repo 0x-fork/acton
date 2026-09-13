@@ -118,6 +118,78 @@ fn test_hooks_new_default_non_interactive() {
 
 #[cfg(unix)]
 #[test]
+fn test_default_hook_requires_acton_and_propagates_failures() {
+    use std::fmt::Write as _;
+    use std::os::unix::fs::PermissionsExt;
+
+    // Regression for #1065: missing tools must explain the Git environment without skipping checks.
+    let project = ProjectBuilder::new("hooks-execution")
+        .raw_file(
+            "hook bin/acton",
+            r#"#!/bin/sh
+printf '%s\n' "$*"
+case "$1" in
+    check) exit "$ACTON_HOOK_TEST_CHECK_EXIT" ;;
+    fmt) exit "$ACTON_HOOK_TEST_FMT_EXIT" ;;
+    *) exit 99 ;;
+esac
+"#,
+        )
+        .build();
+    init_git_repo(project.path());
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("hooks")
+        .arg("new")
+        .arg("--template")
+        .arg("default")
+        .run()
+        .success();
+
+    let bin_dir = project.path().join("hook bin");
+    fs::set_permissions(bin_dir.join("acton"), fs::Permissions::from_mode(0o755))
+        .expect("fake Acton must be executable");
+
+    let mut report = String::new();
+    for (scenario, missing_acton, check_exit, fmt_exit) in [
+        ("missing Acton", true, 0, 0),
+        ("check failed", false, 41, 0),
+        ("fmt failed", false, 0, 42),
+        ("success", false, 0, 0),
+    ] {
+        let output = Command::new(project.path().join(".githooks/pre-commit"))
+            .current_dir(project.path())
+            .env(
+                "PATH",
+                if missing_acton {
+                    project.path().join("missing-bin")
+                } else {
+                    bin_dir.clone()
+                },
+            )
+            .env("ACTON_HOOK_TEST_CHECK_EXIT", check_exit.to_string())
+            .env("ACTON_HOOK_TEST_FMT_EXIT", fmt_exit.to_string())
+            .output()
+            .expect("generated hook must run");
+        writeln!(
+            report,
+            "{scenario}\nexit: {}\nstdout:\n{}stderr:\n{}",
+            output.status.code().expect("hook must exit normally"),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        )
+        .expect("hook report must be writable");
+    }
+
+    crate::common::assertion().eq(
+        report.trim_end(),
+        snapbox::file!["snapshots/hooks/test_default_hook_execution.txt"],
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn test_hooks_new_interactive_defaults_to_default() {
     use expectrl::Eof;
     use std::time::Duration;

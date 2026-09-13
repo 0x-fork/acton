@@ -41,9 +41,11 @@ fun onInternalMessage(in: InMessage) {
     createExternalLogMessage({
         dest: destination,
         // A prefixless cell payload must not display its type as an opcode name.
-        body: beginCell().storeRef(
-            beginCell().storeUint(42, 32).storeRef("ext-out inspector demo".toCell()).endCell(),
-        ).endCell(),
+        body: beginCell()
+            .storeRef(
+                beginCell().storeUint(42, 32).storeRef("ext-out inspector demo".toCell()).endCell(),
+            )
+            .endCell(),
     }).send(SEND_MODE_REGULAR);
 }
 

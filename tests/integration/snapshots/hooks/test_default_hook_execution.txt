@@ -1,0 +1,29 @@
+missing Acton
+exit: 127
+stdout:
+stderr:
+pre-commit: acton was not found in PATH
+Install Acton and add it to PATH in the environment that runs Git
+On Windows, run Git inside the WSL distribution where Acton is installed
+In VS Code, use 'WSL: Reopen Folder in WSL'
+See https://ton-blockchain.github.io/acton/docs/installation
+
+check failed
+exit: 41
+stdout:
+check
+stderr:
+
+fmt failed
+exit: 42
+stdout:
+check
+fmt --check
+stderr:
+
+success
+exit: 0
+stdout:
+check
+fmt --check
+stderr:

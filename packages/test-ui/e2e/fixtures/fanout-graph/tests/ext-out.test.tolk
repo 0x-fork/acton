@@ -11,12 +11,15 @@ get fun `test inspect external-out messages`() {
         code: build("ExtOutDemo"),
         data: createEmptyCell(),
     };
-    val result = net.send(sender.address, createMessage({
-        bounce: false,
-        value: ton("2"),
-        dest: { stateInit },
-        body: Trigger { queryId: 42 },
-    }));
+    val result = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("2"),
+            dest: { stateInit },
+            body: Trigger { queryId: 42 },
+        }),
+    );
     result.giveName("Two external-out messages");
     expect(result).toHaveLength(2);
     expect(result.at(0).externals).toHaveLength(2);
