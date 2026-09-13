@@ -243,6 +243,9 @@ pub(crate) fn compute_min_lt(
 ///
 /// Fetches the account state at the end of the preceding master-block (N-1)
 /// and converts it into a [`ShardAccount`] suitable for the TVM executor.
+/// For block 1, `TON Center` cannot serve the zerostate, so replay uses the state
+/// after block 1 as an approximation. The resulting state hash can differ from
+/// the on-chain transaction and is still checked by the caller.
 ///
 /// # Arguments
 ///
@@ -252,7 +255,7 @@ pub(crate) fn compute_min_lt(
 ///
 /// # Returns
 ///
-/// Returns [`ShardAccount`] representing the state on master‑block N‑1.
+/// Returns [`ShardAccount`] at N-1, or at block 1 for the first-block approximation.
 pub(crate) async fn get_block_account(
     net: Network,
     address: &StdAddr,
@@ -265,13 +268,16 @@ pub(crate) async fn get_block_account(
         .first()
         .map(|s| s.seqno)
         .ok_or_else(|| anyhow::anyhow!("No shards found in master block"))?;
-    let prev_block_seqno = block_seqno
+    // TonCenter rejects seqno 0. Match retracer-core's first-block replay while
+    // keeping the state-hash comparison visible to callers.
+    let state_block_seqno = block_seqno
         .checked_sub(1)
-        .ok_or_else(|| anyhow::anyhow!("Cannot fetch account state before block seqno 0"))?;
+        .ok_or_else(|| anyhow::anyhow!("Cannot fetch account state before block seqno 0"))?
+        .max(1);
     let address_str = address.to_string();
 
     let shard_account_cell = client
-        .get_shard_account_cell(prev_block_seqno, &address_str)
+        .get_shard_account_cell(state_block_seqno, &address_str)
         .await?;
 
     let shard_account: ShardAccount = shard_account_cell
@@ -361,6 +367,8 @@ pub(crate) fn tx_opcode(tx: &tycho_types::models::Transaction) -> Option<u32> {
 /// Assembles final execution data from successful emulation results.
 ///
 /// Extracts balance changes, fee breakdown, and compute phase statistics.
+/// Tick-tock has no incoming message, so its contract address comes from the
+/// requested transaction's account, even if execution destroyed the account.
 ///
 /// # Returns
 ///
@@ -370,6 +378,7 @@ pub(crate) fn tx_opcode(tx: &tycho_types::models::Transaction) -> Option<u32> {
 pub(crate) fn compute_final_data(
     res: &RunTransactionResultSuccess,
     balance_before: Tokens,
+    contract_address: &StdAddr,
 ) -> anyhow::Result<(
     Option<IntAddr>,
     IntAddr,
@@ -387,28 +396,32 @@ pub(crate) fn compute_final_data(
     let emulated_tx_cell = Boc::decode_base64(res.transaction.as_ref())?;
     let emulated_tx: tycho_types::models::Transaction = emulated_tx_cell.parse()?;
 
-    let in_msg = emulated_tx
-        .load_in_msg()?
-        .ok_or_else(|| anyhow::anyhow!("No in_message was found in result tx"))?;
+    let (src, dest, amount, compute_phase) = match emulated_tx.load_info()? {
+        TxInfo::Ordinary(info) => {
+            let in_msg = emulated_tx
+                .load_in_msg()?
+                .context("No in_message was found in result tx")?;
 
-    let (src, dest, amount) = match &in_msg.info {
-        MsgInfo::Int(info) => (
-            Some(info.src.clone()),
-            info.dst.clone(),
-            Some(info.value.tokens),
+            let (src, dest, amount) = match in_msg.info {
+                MsgInfo::Int(info) => (Some(info.src), info.dst, Some(info.value.tokens)),
+                MsgInfo::ExtIn(info) => (None, info.dst, None),
+                MsgInfo::ExtOut(_) => anyhow::bail!("External out message as in_msg"),
+            };
+
+            (src, dest, amount, info.compute_phase)
+        }
+        TxInfo::TickTock(info) => (
+            None,
+            IntAddr::Std(contract_address.clone()),
+            None,
+            info.compute_phase,
         ),
-        MsgInfo::ExtIn(info) => (None, info.dst.clone(), None),
-        MsgInfo::ExtOut(_) => anyhow::bail!("External out message as in_msg"),
     };
 
     let sent_total = calculate_sent_total(&emulated_tx);
     let total_fees = emulated_tx.total_fees.tokens;
 
-    let TxInfo::Ordinary(info) = emulated_tx.load_info()? else {
-        anyhow::bail!("Only ordinary transactions are supported");
-    };
-
-    let compute_info = match info.compute_phase {
+    let compute_info = match compute_phase {
         tycho_types::models::ComputePhase::Skipped(_) => ComputeInfo::Skipped,
         tycho_types::models::ComputePhase::Executed(exec) => ComputeInfo::Success {
             success: exec.success,

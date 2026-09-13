@@ -1,9 +1,39 @@
 use crate::types::ComputeInfo;
 use crate::{Network, retrace};
 use std::collections::HashMap;
+use std::time::Duration;
 use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_ENV};
 
 #[tokio::test]
+#[ignore = "requires access to mainnet archive APIs"]
+async fn test_retrace_tick_elector() {
+    assert_retrace(
+        Network::Mainnet,
+        "0c0bb916b6297b75a3fed6dd95d5126bdd293e8e066918482a31238ebba2dc62",
+        0,
+        true,
+        true,
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires access to mainnet archive APIs"]
+async fn test_retrace_tick_elector_first_block() {
+    // The TS scenario expects a hash mismatch: the zerostate is unavailable,
+    // so this replay starts from the account state after block 1.
+    assert_retrace(
+        Network::Mainnet,
+        "31a7668dad7b8a2c2d0e5290e5a0aef69f746f12c405eea133895fe70e063185",
+        0,
+        true,
+        false,
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires access to mainnet archive APIs"]
 async fn test_retrace_709() {
     assert_retrace(
         Network::Mainnet,
@@ -16,6 +46,7 @@ async fn test_retrace_709() {
 }
 
 #[tokio::test]
+#[ignore = "requires access to mainnet archive APIs"]
 async fn test_retrace_simple_0() {
     assert_retrace(
         Network::Mainnet,
@@ -28,6 +59,7 @@ async fn test_retrace_simple_0() {
 }
 
 #[tokio::test]
+#[ignore = "requires access to mainnet archive APIs"]
 async fn test_retrace_single_exotic() {
     assert_retrace(
         Network::Mainnet,
@@ -40,6 +72,7 @@ async fn test_retrace_single_exotic() {
 }
 
 #[tokio::test]
+#[ignore = "requires access to mainnet archive APIs"]
 async fn test_retrace_several_exotic() {
     assert_retrace(
         Network::Mainnet,
@@ -52,6 +85,7 @@ async fn test_retrace_several_exotic() {
 }
 
 #[tokio::test]
+#[ignore = "requires access to mainnet archive APIs"]
 async fn test_retrace_wallet_v5_mismatch() {
     assert_retrace(
         Network::Mainnet,
@@ -64,6 +98,7 @@ async fn test_retrace_wallet_v5_mismatch() {
 }
 
 #[tokio::test]
+#[ignore = "requires access to mainnet archive APIs"]
 async fn test_retrace_wallet_v4() {
     assert_retrace(
         Network::Mainnet,
@@ -76,6 +111,7 @@ async fn test_retrace_wallet_v4() {
 }
 
 #[tokio::test]
+#[ignore = "requires access to mainnet archive APIs"]
 async fn test_retrace_uninit_state_init() {
     assert_retrace(
         Network::Mainnet,
@@ -88,6 +124,7 @@ async fn test_retrace_uninit_state_init() {
 }
 
 #[tokio::test]
+#[ignore = "requires access to mainnet archive APIs"]
 async fn test_retrace_exotic_in_msg() {
     assert_retrace(
         Network::Mainnet,
@@ -99,8 +136,8 @@ async fn test_retrace_exotic_in_msg() {
     .await;
 }
 
-#[ignore] // flaky as hell for some reason
 #[tokio::test]
+#[ignore = "requires access to mainnet archive APIs"]
 async fn test_retrace_lib_load() {
     assert_retrace(
         Network::Mainnet,
@@ -112,8 +149,8 @@ async fn test_retrace_lib_load() {
     .await;
 }
 
-#[ignore] // flaky as hell for some reason
 #[tokio::test]
+#[ignore = "requires access to mainnet archive APIs"]
 async fn test_retrace_v12() {
     assert_retrace(
         Network::Testnet,
@@ -133,11 +170,6 @@ async fn assert_retrace(
     expected_success: bool,
     expected_hash_ok: bool,
 ) {
-    if net != Network::Localnet {
-        // disable for now
-        return;
-    }
-
     // SAFETY: well...
     unsafe {
         std::env::set_var(
@@ -149,9 +181,13 @@ async fn assert_retrace(
             "49efa980ccdcd018fd09d387e63537afd9db4dbb8509d69e7bc2303ca2b2c860",
         );
     }
-    let result = retrace(net, hash, HashMap::default())
-        .await
-        .expect("Retrace failed");
+    let result = tokio::time::timeout(
+        Duration::from_secs(90),
+        retrace(net, hash, HashMap::default()),
+    )
+    .await
+    .expect("Retrace timed out")
+    .expect("Retrace failed");
 
     match result.emulated_tx.compute_info {
         ComputeInfo::Success {

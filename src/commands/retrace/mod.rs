@@ -12,7 +12,7 @@ use std::str::FromStr;
 use ton_retrace::{ComputeInfo, Network, retrace};
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
-use tycho_types::models::{IntAddr, OutAction, RelaxedMsgInfo};
+use tycho_types::models::{IntAddr, OutAction, RelaxedMsgInfo, TickTock, TxInfo};
 
 struct ContractTraceArtifacts {
     code_cell: Cell,
@@ -133,16 +133,14 @@ fn print_retrace_result(
         ComputeInfo::Skipped => false,
     };
 
+    let tx_info = tx.raw.load_info().ok();
+    let action_phase = match &tx_info {
+        Some(TxInfo::Ordinary(info)) => info.action_phase.as_ref(),
+        Some(TxInfo::TickTock(info)) => info.action_phase.as_ref(),
+        None => None,
+    };
     let (action_success, action_exit_code) =
-        if let Ok(tycho_types::models::TxInfo::Ordinary(desc)) = tx.raw.load_info() {
-            if let Some(action) = &desc.action_phase {
-                (action.success, action.result_code)
-            } else {
-                (true, 0)
-            }
-        } else {
-            (true, 0)
-        };
+        action_phase.map_or((true, 0), |action| (action.success, action.result_code));
 
     let is_success = compute_success && action_success;
 
@@ -190,7 +188,13 @@ fn print_retrace_result(
         "Account:".dimmed(),
         format_address(result.in_msg.contract.clone()).cyan()
     );
-    if let Some(sender) = &result.in_msg.sender {
+    if let Some(TxInfo::TickTock(info)) = tx_info {
+        let kind = match info.kind {
+            TickTock::Tick => "Tick",
+            TickTock::Tock => "Tock",
+        };
+        println!("  {:<15} {}", "Type:".dimmed(), kind);
+    } else if let Some(sender) = &result.in_msg.sender {
         println!(
             "  {:<15} {}",
             "Sender:".dimmed(),

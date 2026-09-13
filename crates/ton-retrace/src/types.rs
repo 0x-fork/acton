@@ -62,7 +62,8 @@ pub(crate) struct Description {
     pub desc_type: String,
     pub aborted: bool,
     pub destroyed: bool,
-    pub credit_first: bool,
+    // Only ordinary transactions have a credit phase ordering flag.
+    pub credit_first: Option<bool>,
     pub storage_ph: Option<StoragePhase>,
     pub credit_ph: Option<CreditPhase>,
     pub compute_ph: Option<ComputePhase>,
@@ -196,7 +197,10 @@ pub enum ComputeInfo {
     },
 }
 
-/// Information about the incoming message that triggered the transaction.
+/// Contract address and incoming message details for a retraced transaction.
+///
+/// Tick-tock transactions have no incoming message: only `contract` is populated.
+/// The transaction kind is available in [`TraceEmulatedTx::raw`].
 ///
 /// # Example
 ///
@@ -206,9 +210,9 @@ pub enum ComputeInfo {
 /// ```
 #[derive(Debug, Clone)]
 pub struct TraceInMessage {
-    /// Sender address (None for external messages).
+    /// Sender address (None for external-in and tick-tock transactions).
     pub sender: Option<IntAddr>,
-    /// Contract address that received the message.
+    /// Address of the contract whose transaction was replayed.
     pub contract: IntAddr,
     /// Amount of nanograms sent with the message.
     pub amount: Option<u64>,
@@ -285,7 +289,7 @@ pub struct TraceResult {
     pub code_cell: Option<Cell>,
     /// The code cell as stored in the account state (may be an exotic library cell).
     pub original_code_cell: Option<Cell>,
-    /// Information about the message that triggered this transaction.
+    /// Contract address and message details; tick-tock has no sender, amount or opcode.
     pub in_msg: TraceInMessage,
     /// Detailed breakdown of balances and fees.
     pub money: TraceMoneyResult,
@@ -383,6 +387,47 @@ pub(crate) struct TransactionTransactionsResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deserializes_toncenter_v3_tick_tock_without_credit_phase() {
+        // Tick-tock has neither credit_first nor credit_ph in TonCenter v3.
+        let value = serde_json::json!({
+            "type": "tick_tock",
+            "aborted": false,
+            "destroyed": false,
+            "is_tock": false,
+            "storage_ph": {
+                "storage_fees_collected": "0",
+                "status_change": "unchanged"
+            },
+            "compute_ph": {
+                "skipped": false,
+                "success": true,
+                "exit_code": 0
+            }
+        });
+
+        let description: Description = serde_json::from_value(value).unwrap();
+        let compute = description.compute_ph.unwrap();
+        expect_test::expect![[r#"
+            (
+                "tick_tock",
+                None,
+                Some(
+                    true,
+                ),
+                Some(
+                    0,
+                ),
+            )
+        "#]]
+        .assert_debug_eq(&(
+            description.desc_type,
+            description.credit_first,
+            compute.success,
+            compute.exit_code,
+        ));
+    }
 
     #[test]
     fn deserializes_toncenter_v3_transaction_with_skipped_compute_phase() {

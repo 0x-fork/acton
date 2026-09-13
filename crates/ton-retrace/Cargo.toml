@@ -25,6 +25,10 @@ ton-networks = { workspace = true }
 toncenter-keys = { workspace = true }
 log = { workspace = true }
 
+[dev-dependencies]
+expect-test = { workspace = true }
+tolk-compiler = { workspace = true }
+
 [features]
 only_ci = []
 

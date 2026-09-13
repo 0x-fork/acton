@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use crate::methods::{collect_used_libraries, find_final_actions};
 use crate::methods::{
     compute_final_data, compute_min_lt, find_all_transactions_between, find_full_block_for_seqno,
@@ -16,7 +19,7 @@ use ton_executor::{ExecutorVerbosity, MissingLibrariesContext, missing_library_c
 pub use ton_networks::Network;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
-use tycho_types::models::{AccountState, ShardAccount, Transaction};
+use tycho_types::models::{AccountState, ShardAccount, TickTock, Transaction, TxInfo};
 use tycho_types::num::Tokens;
 
 /// Fully reproduce (re‑trace) a TON transaction inside a local TON Sandbox
@@ -45,7 +48,7 @@ use tycho_types::num::Tokens;
 ///
 /// Returns a [`TraceResult`] containing:
 /// 1. an integrity flag `state_update_hash_ok`
-/// 2. decoded an incoming message (sender / contract / amount)
+/// 2. contract address and incoming message details (absent for tick-tock)
 /// 3. balance delta, gas and fees
 /// 4. full emulated transaction (`emulated_tx`) with
 ///    compute‑phase info, `c5`, action list and raw VM log
@@ -248,7 +251,7 @@ pub async fn retrace_base_tx(
     let (final_actions, c5) = find_final_actions(&res);
 
     let (sender, contract, amount, money, emulated_tx, compute_info) =
-        compute_final_data(&res, balance)?;
+        compute_final_data(&res, balance, &base_tx.address)?;
 
     // check if the emulated transaction hash is equal to one from the real blockchain
     let state_update_hash_ok =
@@ -315,7 +318,9 @@ fn emulate_previous_transactions(
     Ok((balance, shard_account))
 }
 
-/// Helper function to run a single transaction through the TVM executor.
+/// Replays either a message-driven or tick-tock transaction using its original
+/// execution time and kind. The same dispatch is used for preceding transactions
+/// so state reconstruction can include tick-tock calls without inventing messages.
 fn emulate(
     tx: &Transaction,
     block_config: &str,
@@ -323,8 +328,16 @@ fn emulate(
     libs: Option<&Cell>,
     rand_seed: [u8; 32],
 ) -> anyhow::Result<(EmulationResult, Arc<str>)> {
-    let Some(in_msg) = &tx.in_msg else {
-        anyhow::bail!("No in_message was found in transaction")
+    let (message, is_tock) = match tx.load_info()? {
+        TxInfo::Ordinary(_) => {
+            let in_msg = tx
+                .in_msg
+                .as_ref()
+                .context("No in_message was found in transaction")?;
+            (Boc::encode_base64(in_msg), None)
+        }
+        // The native tick-tock entrypoint ignores the message parameter.
+        TxInfo::TickTock(info) => (String::new(), Some(info.kind == TickTock::Tock)),
     };
 
     let emulator = Executor::new(
@@ -337,7 +350,7 @@ fn emulate(
         .context("Cannot register missing library callback")?;
 
     let (mut tx_res, executor_logs) = emulator.run_transaction(
-        &Boc::encode_base64(in_msg),
+        &message,
         &RunTransactionArgs {
             libs: libs.map(Boc::encode_base64),
             shard_account: Boc::encode_base64(to_cell(shard_account)),
@@ -347,8 +360,8 @@ fn emulate(
             ignore_chksig: false,
             debug_enabled: true,
             prev_blocks_info: None,
-            is_tick_tock: None,
-            is_tock: None,
+            is_tick_tock: is_tock.map(|_| true),
+            is_tock,
         },
     )?;
     let mut missing_libraries = Some(missing_libraries_ctx.into_set());
