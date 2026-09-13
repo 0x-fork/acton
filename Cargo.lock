@@ -6000,6 +6000,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tolk-compiler",
+ "ton-api",
  "ton-executor",
  "ton-networks",
  "toncenter-keys",

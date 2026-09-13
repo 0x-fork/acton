@@ -3,9 +3,10 @@ mod tests;
 
 use crate::methods::{collect_used_libraries, find_final_actions};
 use crate::methods::{
-    compute_final_data, compute_min_lt, find_all_transactions_between, find_full_block_for_seqno,
-    find_raw_tx_by_hash, find_shard_block_for_tx, get_block_account, get_block_config, tx_opcode,
+    compute_final_data, find_all_transactions_between, find_shard_block_for_tx, get_block_account,
+    get_block_config, tx_opcode,
 };
+use crate::remote::TonCenterClient;
 use crate::types::{BaseTxInfo, TraceEmulatedTx, TraceInMessage, TraceResult};
 use crate::{ComputeInfo, find_base_tx_by_hash, methods};
 use anyhow::Context;
@@ -150,24 +151,7 @@ pub async fn retrace_base_tx(
     base_tx: BaseTxInfo,
     additional_libs: HashMap<HashBytes, Cell>,
 ) -> anyhow::Result<TraceResult> {
-    let txs = find_raw_tx_by_hash(net.clone(), base_tx.clone()).await?;
-    let Some(tx) = txs.first() else {
-        anyhow::bail!("Cannot find transaction info")
-    };
-
-    let shard = &tx.block;
-    let Some(block) = find_shard_block_for_tx(net.clone(), tx).await? else {
-        anyhow::bail!("Cannot find shard block for transaction")
-    };
-
-    // check if we correctly select master-block
-    if block.root_hash != shard.root_hash {
-        anyhow::bail!(
-            "root_hash mismatch in mc_seqno getter: {} != {}",
-            shard.root_hash,
-            block.root_hash
-        )
-    }
+    let block = find_shard_block_for_tx(net.clone(), &base_tx).await?;
 
     // master‑block sequence number that references our shard‑block
     let mc_seqno = block.masterchain_block_ref.seqno;
@@ -178,28 +162,34 @@ pub async fn retrace_base_tx(
         *el = rand_seed_vec.get(i).copied().unwrap_or(0);
     }
 
-    // load the complete master‑block object (includes the list of shard‑blocks)
-    let full_block = find_full_block_for_seqno(net.clone(), mc_seqno).await?;
+    let block_config = get_block_config(net.clone(), mc_seqno).await?;
+    let mut shard_account = get_block_account(net.clone(), &base_tx.address, mc_seqno).await?;
 
-    // determine the earliest logical‑time (lt) for this account in the same master‑block
-    let min_lt = compute_min_lt(&tx.tx, &base_tx.address, &full_block);
-    // find all transactions between the earliest one and the emulated transaction to correctly
-    // recreate all state before execution of the emulated transaction
-    let mut prev_txs_in_block =
-        find_all_transactions_between(net.clone(), &base_tx, min_lt).await?;
+    // The snapshot records the exact transaction boundary. This also covers
+    // predecessors in earlier shard blocks referenced by the same master block.
+    // Block 1 uses an after-block approximation because zerostate is unavailable;
+    // in that case replay only the target, retaining the state-hash mismatch.
+    let after_lt = if mc_seqno == 1 {
+        base_tx.lt.saturating_sub(1)
+    } else {
+        shard_account.last_trans_lt
+    };
+    if after_lt >= base_tx.lt {
+        anyhow::bail!(
+            "Account snapshot at LT {after_lt} is not before target LT {}",
+            base_tx.lt
+        );
+    }
+    let client = TonCenterClient::new(net.clone())?;
+    let mut prev_txs_in_block = find_all_transactions_between(&client, &base_tx, after_lt).await?;
     // order oldest → newest, and remove the base_tx itself (the one we want to retrace)
     prev_txs_in_block.reverse();
     let Some(our_tx) = prev_txs_in_block.pop() else {
         anyhow::bail!("Cannot find transaction to retrace")
     };
 
-    // retrieve block config to pass it to emulator
-    let block_config = get_block_config(net.clone(), mc_seqno).await?;
-    // load an account snapshot *before* the master‑block N
-    let mut shard_account = get_block_account(net.clone(), &base_tx.address, &full_block).await?;
-
     let (libs, loaded_code) =
-        collect_used_libraries(net, &shard_account, &tx.tx, &additional_libs).await?;
+        collect_used_libraries(net, &shard_account, &our_tx, &additional_libs).await?;
 
     // retrieve code cell if an account in active mode
     let Some(account_before_tx) = shard_account.load_account()? else {
