@@ -1,6 +1,9 @@
-use std::sync::Arc;
+use std::{future::Future, sync::Arc};
 
 use thiserror::Error;
+use tokio::task::JoinHandle;
+use tokio_util::task::TaskTracker;
+use tracing::instrument::WithSubscriber;
 
 use crate::{
     blockchain::{BlockchainClient, ToncenterClient},
@@ -21,6 +24,7 @@ pub struct AppState {
     verification_service: VerificationService,
     payment_verifier: Arc<dyn PaymentVerifier>,
     upload_limits: UploadLimits,
+    background_tasks: TaskTracker,
 }
 
 impl AppState {
@@ -63,6 +67,7 @@ impl AppState {
             verification_service: VerificationService::new(blockchain_client),
             payment_verifier,
             upload_limits: UploadLimits::default(),
+            background_tasks: TaskTracker::new(),
         }
     }
 
@@ -126,9 +131,40 @@ impl AppState {
     /// # Errors
     ///
     /// Returns an error when blockchain history or the payment ledger is unavailable.
-    pub async fn recover_payment_history(&self) -> Result<(), StateError> {
-        self.payment_verifier.recover().await?;
+    pub async fn recover_payment_history(
+        &self,
+        published_transaction_hashes: &[String],
+    ) -> Result<(), StateError> {
+        self.payment_verifier
+            .recover(published_transaction_hashes)
+            .await?;
         Ok(())
+    }
+
+    /// Returns payments referenced by source bundles in the current Git revision.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the registry index is unavailable.
+    pub async fn published_payment_transaction_hashes(&self) -> Result<Vec<String>, StateError> {
+        Ok(self
+            .verification_registry
+            .payment_transaction_hashes()
+            .await?)
+    }
+
+    pub(crate) fn spawn_background_task<F>(&self, task: F) -> JoinHandle<F::Output>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        self.background_tasks.spawn(task.with_current_subscriber())
+    }
+
+    /// Closes the tracker and waits for background verification tasks to finish.
+    pub async fn wait_for_background_tasks(&self) {
+        self.background_tasks.close();
+        self.background_tasks.wait().await;
     }
 }
 

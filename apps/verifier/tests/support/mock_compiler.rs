@@ -4,6 +4,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use tokio::sync::Notify;
 use verifier::compilers::{
     CompileGeneratedSource, CompileOutput, CompileRequest, CompilerError, CompilerService,
 };
@@ -70,6 +71,23 @@ impl MockCompilerService {
         }
     }
 
+    pub fn blocking(code_hash: &str) -> (Self, Arc<Notify>, Arc<Notify>) {
+        let started = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        (
+            Self {
+                result: MockCompilerResult::Blocked {
+                    code_hash: code_hash.to_owned(),
+                    started: Arc::clone(&started),
+                    release: Arc::clone(&release),
+                },
+                recorded_requests: Arc::new(Mutex::new(Vec::new())),
+            },
+            started,
+            release,
+        )
+    }
+
     pub fn with_used_source_paths(code_hash: &str, used_source_paths: Vec<String>) -> Self {
         Self {
             result: MockCompilerResult::Ok {
@@ -117,6 +135,11 @@ enum MockCompilerResult {
     Timeout {
         timeout_ms: u128,
     },
+    Blocked {
+        code_hash: String,
+        started: Arc<Notify>,
+        release: Arc<Notify>,
+    },
     ByCompiler(BTreeMap<(String, String), String>),
 }
 
@@ -150,6 +173,20 @@ impl CompilerService for MockCompilerService {
             MockCompilerResult::Timeout { timeout_ms } => Err(CompilerError::Timeout {
                 timeout_ms: *timeout_ms,
             }),
+            MockCompilerResult::Blocked {
+                code_hash,
+                started,
+                release,
+            } => {
+                started.notify_one();
+                release.notified().await;
+                Ok(CompileOutput {
+                    code_hash: code_hash.clone(),
+                    used_source_paths: None,
+                    generated_sources: Vec::new(),
+                    source_map: None,
+                })
+            }
             MockCompilerResult::ByCompiler(code_hashes) => {
                 let code_hash = code_hashes.get(&compiler).ok_or_else(|| {
                     CompilerError::CompileFailed(format!(

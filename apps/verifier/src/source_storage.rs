@@ -1,6 +1,9 @@
 use std::{
     path::{Component, Path, PathBuf},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -120,6 +123,7 @@ pub struct GitSourceStorage {
     author_name: String,
     author_email: String,
     startup_validated: Arc<OnceCell<()>>,
+    pending_push: Arc<AtomicBool>,
     lock: Arc<Mutex<()>>,
 }
 
@@ -136,6 +140,7 @@ impl GitSourceStorage {
             author_name: config.source_repository_author_name().to_owned(),
             author_email: config.source_repository_author_email().to_owned(),
             startup_validated: Arc::new(OnceCell::new()),
+            pending_push: Arc::new(AtomicBool::new(true)),
             lock: Arc::new(Mutex::new(())),
         }
     }
@@ -143,10 +148,29 @@ impl GitSourceStorage {
     async fn ensure_startup_validated(&self, repo_path: &Path) -> Result<(), SourceStorageError> {
         self.startup_validated
             .get_or_try_init(|| async {
+                ensure_source_repository_initialized(repo_path, &self.storage_root).await?;
+                if self.commit_enabled {
+                    recover_uncommitted_storage(repo_path, &self.storage_root).await?;
+                }
                 ensure_source_repository_clean(repo_path).await?;
-                ensure_source_repository_initialized(repo_path, &self.storage_root).await
+                ensure_current_source_attributes(repo_path, &self.storage_root).await?;
+                Ok(())
             })
             .await?;
+        Ok(())
+    }
+
+    async fn push_pending_head(&self, repo_path: &Path) -> Result<(), SourceStorageError> {
+        if !self.pending_push.load(Ordering::Acquire) {
+            return Ok(());
+        }
+        let branch = match &self.branch {
+            Some(branch) => branch.clone(),
+            None => current_branch(repo_path).await?,
+        };
+        let refspec = format!("HEAD:{branch}");
+        git(repo_path, &["push", &self.remote, &refspec]).await?;
+        self.pending_push.store(false, Ordering::Release);
         Ok(())
     }
 
@@ -159,10 +183,14 @@ impl GitSourceStorage {
             .as_deref()
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
         ensure_git_repo(repo_path).await?;
+        self.ensure_startup_validated(repo_path).await?;
+        if self.commit_enabled {
+            recover_uncommitted_storage(repo_path, &self.storage_root).await?;
+            ensure_source_repository_clean(repo_path).await?;
+        }
 
         let bundle_path = bundle_relative_path(&self.storage_root, &request.code_hash)?;
         let bundle_dir = repo_path.join(&bundle_path);
-        let mut rollback_revision = None;
         let existing_revision = if fs::try_exists(bundle_dir.join("manifest.json"))
             .await
             .map_err(|source| SourceStorageError::ReadDir {
@@ -172,11 +200,6 @@ impl GitSourceStorage {
             let bundle = read_bundle(repo_path, &bundle_path).await?;
             Some(bundle.storage_revision)
         } else {
-            let previous_revision = if self.commit_enabled {
-                Some(git_output(repo_path, &["rev-parse", "HEAD"]).await?)
-            } else {
-                None
-            };
             let write_result = async {
                 let verified_at = request
                     .verified_at
@@ -205,6 +228,7 @@ impl GitSourceStorage {
                             verified_at,
                         )
                         .await?;
+                        self.pending_push.store(true, Ordering::Release);
                     }
                 }
 
@@ -222,8 +246,6 @@ impl GitSourceStorage {
                 }
                 return Err(operation);
             }
-
-            rollback_revision = previous_revision;
             None
         };
 
@@ -234,23 +256,7 @@ impl GitSourceStorage {
         };
 
         if self.commit_enabled && self.push_enabled {
-            let branch = match &self.branch {
-                Some(branch) => branch.clone(),
-                None => current_branch(repo_path).await?,
-            };
-            let refspec = format!("HEAD:{branch}");
-            if let Err(operation) = git(repo_path, &["push", &self.remote, &refspec]).await {
-                if let Some(previous_revision) = rollback_revision
-                    && let Err(cleanup) =
-                        rollback_committed_bundle(repo_path, &previous_revision, &bundle_dir).await
-                {
-                    return Err(SourceStorageError::CleanupFailed {
-                        operation: Box::new(operation),
-                        cleanup: Box::new(cleanup),
-                    });
-                }
-                return Err(operation);
-            }
+            self.push_pending_head(repo_path).await?;
         }
 
         Ok(SourceStorageReceipt { revision, created })
@@ -376,6 +382,9 @@ impl GitSourceStorage {
         ensure_git_repo(repo_path).await?;
         self.ensure_startup_validated(repo_path).await?;
         ensure_current_source_attributes(repo_path, &self.storage_root).await?;
+        if self.commit_enabled && self.push_enabled {
+            self.push_pending_head(repo_path).await?;
+        }
 
         match git_output(repo_path, &["rev-parse", "--verify", "HEAD"]).await {
             Ok(revision) => Ok(Some(revision)),
@@ -507,17 +516,6 @@ async fn cleanup_uncommitted_bundle(
     remove_result
 }
 
-async fn rollback_committed_bundle(
-    repo_path: &Path,
-    previous_revision: &str,
-    bundle_dir: &Path,
-) -> Result<(), SourceStorageError> {
-    let reset_result = git(repo_path, &["reset", "--mixed", previous_revision]).await;
-    let remove_result = remove_bundle_dir(bundle_dir).await;
-    reset_result?;
-    remove_result
-}
-
 async fn remove_bundle_dir(bundle_dir: &Path) -> Result<(), SourceStorageError> {
     match fs::remove_dir_all(bundle_dir).await {
         Ok(()) => Ok(()),
@@ -527,6 +525,47 @@ async fn remove_bundle_dir(bundle_dir: &Path) -> Result<(), SourceStorageError> 
             source,
         }),
     }
+}
+
+async fn recover_uncommitted_storage(
+    repo_path: &Path,
+    storage_root: &str,
+) -> Result<(), SourceStorageError> {
+    let storage_dir = checked_join(repo_path, storage_root)?;
+    if storage_dir == repo_path {
+        return Err(SourceStorageError::InvalidPath {
+            path: storage_dir,
+            message: "source storage root must not be the repository root".to_owned(),
+        });
+    }
+
+    let changes = git_output_untrimmed(
+        repo_path,
+        &[
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--",
+            storage_root,
+        ],
+    )
+    .await?
+    .trim_end_matches(['\r', '\n'])
+    .to_owned();
+    if changes.is_empty() {
+        return Ok(());
+    }
+
+    tracing::warn!(%changes, "recovering interrupted source storage write");
+    git(repo_path, &["reset", "--", storage_root]).await?;
+    if !git_output(repo_path, &["ls-files", "--", storage_root])
+        .await?
+        .is_empty()
+    {
+        git(repo_path, &["checkout", "HEAD", "--", storage_root]).await?;
+    }
+    git(repo_path, &["clean", "-fd", "--", storage_root]).await?;
+    Ok(())
 }
 
 async fn ensure_git_repo(repo_path: &Path) -> Result<(), SourceStorageError> {

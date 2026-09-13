@@ -117,7 +117,7 @@ pub async fn fail_once_source_storage_app_state(
         1_000_000,
     ));
     payment_verifier
-        .recover()
+        .recover(&[])
         .await
         .expect("empty payment history recovery should succeed");
 
@@ -378,6 +378,30 @@ pub fn timing_out_compiler_app_state_with_payment_outcomes(
     )
 }
 
+pub struct BlockingVerificationFixture {
+    pub state: AppState,
+    pub compiler_started: Arc<tokio::sync::Notify>,
+    pub release_compiler: Arc<tokio::sync::Notify>,
+    pub outcomes: Arc<Mutex<Vec<PaymentAttemptOutcome>>>,
+}
+
+pub fn blocking_verification_app_state(compiled_code_hash: &str) -> BlockingVerificationFixture {
+    let (compiler_service, started, release) =
+        mock_compiler::MockCompilerService::blocking(compiled_code_hash);
+    let (payment_verifier, outcomes) = recording_payment_verifier();
+    BlockingVerificationFixture {
+        state: app_state_from_parts_with_payment(
+            Arc::new(mock_blockchain::MockBlockchainClient::new(&[])),
+            Arc::new(compiler_service),
+            Arc::new(mock_source_storage::MockSourceStorage::confirmed()),
+            payment_verifier,
+        ),
+        compiler_started: started,
+        release_compiler: release,
+        outcomes,
+    }
+}
+
 pub async fn get(state: AppState, path: &str) -> Response {
     let request = Request::builder()
         .method(Method::GET)
@@ -463,7 +487,7 @@ impl PaymentVerifier for MockPaymentVerifier {
         self.ready
     }
 
-    async fn recover(&self) -> Result<(), PaymentError> {
+    async fn recover(&self, _published_transaction_hashes: &[String]) -> Result<(), PaymentError> {
         Ok(())
     }
 

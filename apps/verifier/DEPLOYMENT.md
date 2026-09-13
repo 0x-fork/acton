@@ -200,6 +200,7 @@ services:
   verifier:
     image: ghcr.io/ton-blockchain/verifier:latest
     restart: unless-stopped
+    stop_grace_period: 3m
     ports:
       - "3000:3000"
     env_file:
@@ -259,8 +260,10 @@ During startup recovery, `/healthz` returns `503` with this response:
 ```
 
 The server scans the complete payment-wallet history before it becomes ready.
-It marks every funded protocol payment as consumed. It also preserves all
-known replay records. A failed scan retries with an exponential delay.
+It preserves consumed payments, releases interrupted processing claims for
+retry, imports previously unseen funded protocol payments as retryable, and
+marks payments referenced by published source manifests as consumed. A failed
+scan retries with an exponential delay.
 
 One payment permits at most three verification claims. The limit includes a
 claim that resumes after an expired processing lease. Later claims fail as
@@ -270,6 +273,8 @@ Compiler stdin, output and execution share the configured timeout (ten seconds
 by default). Worker output is capped at 16 MiB for stdout and 64 KiB for stderr.
 Git commands time out after 60 seconds and do not accept interactive credentials.
 Keep container memory/process limits and reverse-proxy rate limits enabled.
+The Compose configuration gives active verification tasks up to three minutes
+to finish after `SIGTERM`; interrupted work is recovered on the next startup.
 
 ## Systemd Wrapper
 
@@ -439,9 +444,10 @@ source of truth. If the index volume is lost, the service rebuilds it from the
 Git source repository.
 
 The payment ledger is also derived state. If this volume is lost, the service
-rebuilds it from TON testnet history and marks all funded protocol payments as
-used. Keeping or backing up this volume does not skip the full startup history
-scan.
+rebuilds it from TON testnet history. Funded protocol payments remain claimable
+unless a published source manifest references them; referenced payments are
+restored as consumed. Keeping or backing up this volume does not skip the full
+startup history scan.
 
 The Docker `source-repo` volume is a local clone. The remote Git repository is
 the authoritative source storage after every successful push.

@@ -154,6 +154,97 @@ async fn git_source_storage_rejects_staged_changes_at_startup() -> Result<(), Bo
 }
 
 #[tokio::test]
+async fn git_source_storage_recovers_interrupted_write_after_restart() -> Result<(), Box<dyn Error>>
+{
+    let fixture = GitFixture::new()?;
+    let interrupted_dir = fixture.repo_path.join("sources/ff/interrupted");
+    fs::create_dir_all(&interrupted_dir)?;
+    fs::write(interrupted_dir.join("partial.tolk"), "partial")?;
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            ["add", "--", "sources/ff/interrupted"],
+        )?,
+        "git add interrupted bundle",
+    )?;
+
+    let config = Config::load_from_path(fixture.write_config()?)?;
+    let storage = GitSourceStorage::from_config(&config);
+    let receipt = storage.store_bundle(source_bundle_request()).await?;
+
+    assert!(receipt.created);
+    assert!(!interrupted_dir.exists());
+    assert_eq!(
+        git_output(
+            &fixture.repo_path,
+            ["status", "--porcelain=v1", "--untracked-files=all"]
+        )?,
+        ""
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn git_source_storage_pushes_a_completed_local_commit_during_startup()
+-> Result<(), Box<dyn Error>> {
+    let fixture = GitFixture::new()?;
+    let pending_path = fixture.repo_path.join("sources/pending.txt");
+    fs::create_dir_all(
+        pending_path
+            .parent()
+            .expect("pending file should have a parent"),
+    )?;
+    fs::write(&pending_path, "completed before interruption")?;
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            ["add", "--", "sources/pending.txt"],
+        )?,
+        "git add pending commit",
+    )?;
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            [
+                "-c",
+                "user.name=Verifier Bot",
+                "-c",
+                "user.email=verifier@example.com",
+                "commit",
+                "--no-gpg-sign",
+                "-m",
+                "Pending verifier commit",
+            ],
+        )?,
+        "git commit pending verifier commit",
+    )?;
+    let local_head = git_output(&fixture.repo_path, ["rev-parse", "HEAD"])?;
+
+    let config = Config::load_from_path(fixture.write_config()?)?;
+    let storage = GitSourceStorage::from_config(&config);
+    assert_eq!(storage.current_revision().await?, Some(local_head.clone()));
+
+    assert_eq!(
+        git_output(
+            fixture.temp.path(),
+            [
+                "--git-dir",
+                path_str(&fixture.remote_path)?,
+                "rev-parse",
+                "refs/heads/main",
+            ]
+        )?,
+        local_head
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn git_source_storage_accepts_any_root_commit_message() -> Result<(), Box<dyn Error>> {
     let fixture = GitFixture::new()?;
     assert_success(
@@ -173,6 +264,14 @@ async fn git_source_storage_accepts_any_root_commit_message() -> Result<(), Box<
             ],
         )?,
         "git commit --amend",
+    )?;
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            ["push", "--force", "origin", "main"],
+        )?,
+        "git push amended root",
     )?;
     let config_path = fixture.write_config()?;
     let config = Config::load_from_path(config_path)?;
@@ -586,7 +685,7 @@ async fn git_source_storage_cleans_up_after_commit_failure_and_allows_retry()
 }
 
 #[tokio::test]
-async fn git_source_storage_rolls_back_after_push_failure_and_allows_retry()
+async fn git_source_storage_keeps_commit_after_push_failure_and_retries_push()
 -> Result<(), Box<dyn Error>> {
     let fixture = GitFixture::new()?;
     let config = Config::load_from_path(fixture.write_config()?)?;
@@ -615,10 +714,8 @@ async fn git_source_storage_rolls_back_after_push_failure_and_allows_retry()
         .await
         .expect_err("push should fail when the remote does not exist");
     assert!(matches!(error, SourceStorageError::Git { .. }));
-    assert_eq!(
-        git_output(&fixture.repo_path, ["rev-parse", "HEAD"])?,
-        initial_revision
-    );
+    let pending_revision = git_output(&fixture.repo_path, ["rev-parse", "HEAD"])?;
+    assert_ne!(pending_revision, initial_revision);
     assert_eq!(
         git_output(
             &fixture.repo_path,
@@ -627,7 +724,7 @@ async fn git_source_storage_rolls_back_after_push_failure_and_allows_retry()
         ""
     );
     assert!(
-        !fixture
+        fixture
             .repo_path
             .join("sources")
             .join(CODE_HASH_PREFIX)
@@ -649,8 +746,10 @@ async fn git_source_storage_rolls_back_after_push_failure_and_allows_retry()
         "git remote set-url restored",
     )?;
 
-    let receipt = storage.store_bundle(source_bundle_request()).await?;
-    assert!(receipt.created);
+    assert_eq!(
+        storage.current_revision().await?,
+        Some(pending_revision.clone())
+    );
     assert_eq!(
         git_output(
             fixture.temp.path(),
@@ -661,7 +760,14 @@ async fn git_source_storage_rolls_back_after_push_failure_and_allows_retry()
                 "refs/heads/main",
             ]
         )?,
-        receipt.revision
+        pending_revision
+    );
+
+    let receipt = storage.store_bundle(source_bundle_request()).await?;
+    assert!(!receipt.created);
+    assert_eq!(
+        receipt.revision,
+        git_output(&fixture.repo_path, ["rev-parse", "HEAD"])?
     );
 
     Ok(())

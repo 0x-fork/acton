@@ -218,44 +218,55 @@ async fn handle_multipart(
         .as_ref()
         .map(|claim| claim.transaction_hash.clone());
 
-    let started = Instant::now();
-    let target_hash = resolved_target.code_hash.clone();
-    tracing::info!(
-        operation = "verify",
-        target = %target_hash,
-        outcome = "started",
-        "verification started"
-    );
-    let result = verify_unverified(
-        state,
-        resolved_target,
-        language,
-        compile_params,
-        sources,
-        files,
-        verified_at,
-        payment_tx_hash,
-    )
-    .await;
+    let task_state = state.clone();
+    let task = state.spawn_background_task(async move {
+        let started = Instant::now();
+        let target_hash = resolved_target.code_hash.clone();
+        tracing::info!(
+            operation = "verify",
+            target = %target_hash,
+            outcome = "started",
+            "verification started"
+        );
+        let result = verify_unverified(
+            &task_state,
+            resolved_target,
+            language,
+            compile_params,
+            sources,
+            files,
+            verified_at,
+            payment_tx_hash,
+        )
+        .await;
 
-    tracing::info!(
-        operation = "verify",
-        target = %target_hash,
-        duration_ms = started.elapsed().as_millis(),
-        outcome = if result.is_ok() { "completed" } else { "failed" },
-        "verification finished"
-    );
-
-    if let Some(claim) = payment_claim {
-        let outcome = if result.as_ref().is_err_and(ApiError::is_payment_retryable) {
-            PaymentAttemptOutcome::Retryable
+        let result = if let Some(claim) = payment_claim {
+            let outcome = if result.as_ref().is_err_and(ApiError::is_payment_retryable) {
+                PaymentAttemptOutcome::Retryable
+            } else {
+                PaymentAttemptOutcome::Consumed
+            };
+            match task_state.payment_verifier().finish(&claim, outcome) {
+                Ok(()) => result,
+                Err(error) => Err(ApiError::from(error)),
+            }
         } else {
-            PaymentAttemptOutcome::Consumed
+            result
         };
-        state.payment_verifier().finish(&claim, outcome)?;
-    }
 
-    result
+        tracing::info!(
+            operation = "verify",
+            target = %target_hash,
+            duration_ms = started.elapsed().as_millis(),
+            outcome = if result.is_ok() { "completed" } else { "failed" },
+            "verification finished"
+        );
+
+        result
+    });
+
+    task.await
+        .map_err(|error| ApiError::internal(format!("verification task failed: {error}")))?
 }
 
 #[allow(clippy::too_many_arguments)]

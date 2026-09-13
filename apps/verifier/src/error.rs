@@ -57,6 +57,10 @@ impl ApiError {
         }
     }
 
+    pub(crate) const fn internal(message: String) -> Self {
+        Self::hidden_bad_gateway(message)
+    }
+
     const fn retryable_source_storage(message: String) -> Self {
         Self {
             status: StatusCode::BAD_GATEWAY,

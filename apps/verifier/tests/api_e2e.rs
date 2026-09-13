@@ -19,13 +19,13 @@ use verifier::source_storage::SourceMapData;
 
 use support::{
     PAYMENT_ADDRESS, PAYMENT_TX_HASH, StaticPaymentBlockchainClient, app_state,
-    app_state_with_api_key, fail_once_source_storage_app_state, failing_compiler_app_state,
-    failing_compiler_app_state_with_payment_outcomes, failing_source_storage_app_state,
-    failing_source_storage_app_state_with_payment_outcomes, file_part, get,
-    mapped_compiler_app_state, owned_file_part, owned_text_part, payment_error_app_state,
-    payment_transaction, post_verify, post_verify_with_api_key, post_verify_without_payment,
-    recording_app_state, recording_payment_app_state, recording_source_storage_app_state,
-    recording_source_storage_app_state_with_generated_sources,
+    app_state_with_api_key, blocking_verification_app_state, fail_once_source_storage_app_state,
+    failing_compiler_app_state, failing_compiler_app_state_with_payment_outcomes,
+    failing_source_storage_app_state, failing_source_storage_app_state_with_payment_outcomes,
+    file_part, get, mapped_compiler_app_state, owned_file_part, owned_text_part,
+    payment_error_app_state, payment_transaction, post_verify, post_verify_with_api_key,
+    post_verify_without_payment, recording_app_state, recording_payment_app_state,
+    recording_source_storage_app_state, recording_source_storage_app_state_with_generated_sources,
     recording_source_storage_app_state_with_source_map_data,
     recording_source_storage_app_state_with_used_sources, recovering_payment_app_state,
     response_json, text_part, timing_out_compiler_app_state_with_payment_outcomes,
@@ -1835,7 +1835,7 @@ async fn verify_stores_source_bundle_on_hash_match() {
     assert_eq!(body.storage_revision.as_deref(), Some("mock-revision"));
 
     let source_response = get(
-        state,
+        state.clone(),
         &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
     )
     .await;
@@ -1847,6 +1847,13 @@ async fn verify_stores_source_bundle_on_hash_match() {
             .and_then(|bundle| bundle.payment_tx_hash)
             .as_deref(),
         Some("a07d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394b")
+    );
+    assert_eq!(
+        state
+            .published_payment_transaction_hashes()
+            .await
+            .expect("published payment hashes should be readable"),
+        vec![PAYMENT_TX_HASH.to_owned()]
     );
 }
 
@@ -1982,6 +1989,53 @@ async fn retryable_storage_failure_allows_a_second_request_with_the_same_payment
 }
 
 #[tokio::test]
+async fn verification_finishes_after_the_request_task_is_cancelled() {
+    let fixture = blocking_verification_app_state(CODE_HASH_ONE);
+    let state_after_cancellation = fixture.state.clone();
+    let request_task = tokio::spawn(post_verify(fixture.state, valid_verify_parts()));
+
+    tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        fixture.compiler_started.notified(),
+    )
+    .await
+    .expect("compiler should start before the request is cancelled");
+    request_task.abort();
+    assert!(
+        request_task
+            .await
+            .expect_err("request task should be cancelled")
+            .is_cancelled()
+    );
+
+    fixture.release_compiler.notify_one();
+    tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        state_after_cancellation.wait_for_background_tasks(),
+    )
+    .await
+    .expect("background verification should finish after request cancellation");
+
+    assert_eq!(
+        *fixture
+            .outcomes
+            .lock()
+            .expect("payment outcomes mutex should not be poisoned"),
+        [PaymentAttemptOutcome::Consumed]
+    );
+    assert!(
+        state_after_cancellation
+            .verification_registry()
+            .status(verifier::registry::VerificationStatusRequest {
+                code_hash: CODE_HASH_ONE.to_owned(),
+            })
+            .await
+            .expect("verification status should be readable")
+            .verified
+    );
+}
+
+#[tokio::test]
 async fn verify_returns_bad_request_when_compilation_fails() {
     let response = post_verify(
         failing_compiler_app_state(&[], "Tolk syntax error at main.tolk:1:5"),
@@ -2042,7 +2096,7 @@ async fn internal_compiler_failure_is_hidden_and_consumes_the_payment() {
 }
 
 #[tokio::test]
-async fn restart_rebuilds_consumed_payments_from_file_backed_history() {
+async fn restart_keeps_unclaimed_payments_available_from_file_backed_history() {
     let directory = tempfile::tempdir().expect("temporary ledger directory should be created");
     let ledger_path = directory.path().join("payments.sqlite3");
     let transaction = payment_transaction(PAYMENT_TX_HASH, CODE_HASH_ONE);
@@ -2054,7 +2108,7 @@ async fn restart_rebuilds_consumed_payments_from_file_backed_history() {
         1_000_000,
     );
     first_server
-        .recover()
+        .recover(&[])
         .await
         .expect("initial empty recovery should succeed");
     drop(first_server);
@@ -2069,14 +2123,15 @@ async fn restart_rebuilds_consumed_payments_from_file_backed_history() {
         1_000_000,
     );
     restarted_server
-        .recover()
+        .recover(&[])
         .await
         .expect("restart recovery should rebuild payment history");
 
-    assert!(matches!(
-        restarted_server.claim(PAYMENT_TX_HASH, CODE_HASH_ONE).await,
-        Err(PaymentError::AlreadyUsed)
-    ));
+    let claim = restarted_server
+        .claim(PAYMENT_TX_HASH, CODE_HASH_ONE)
+        .await
+        .expect("payment recovered after restart should remain claimable");
+    assert_eq!(claim.claim_version, 1);
 }
 
 #[tokio::test]
