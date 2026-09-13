@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use ton_api::toncenter::v3;
 use ton_executor::message::RunTransactionResultSuccess;
+use ton_networks::CustomNetworkUrls;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Lazy;
 use tycho_types::dict::Dict;
@@ -24,15 +25,20 @@ use tycho_types::prelude::{Cell, HashBytes};
 ///
 /// * `net`  — network to use
 /// * `hash` — transaction hash to find
+/// * `custom_networks` — V2/V3 endpoints for localnet and custom networks
 ///
 /// # Examples
 ///
 /// ```ignore
-/// let info = find_base_tx_by_hash(Network::Mainnet, "transaction_hash_hex").await?;
+/// let info = find_base_tx_by_hash(Network::Mainnet, "transaction_hash_hex", &Default::default()).await?;
 /// println!("Found tx with lt: {}", info.lt);
 /// ```
-pub async fn find_base_tx_by_hash(net: Network, hash: &str) -> anyhow::Result<BaseTxInfo> {
-    let client = TonCenterClient::new(net.clone())?;
+pub async fn find_base_tx_by_hash(
+    net: Network,
+    hash: &str,
+    custom_networks: &HashMap<String, CustomNetworkUrls>,
+) -> anyhow::Result<BaseTxInfo> {
+    let client = TonCenterClient::new(net.clone(), custom_networks)?;
 
     let resp = client
         .get_transactions(&[("hash", hash.to_owned()), ("limit", "1".to_owned())])
@@ -65,10 +71,9 @@ pub async fn find_base_tx_by_hash(net: Network, hash: &str) -> anyhow::Result<Ba
 /// The header supplies the random seed and the masterchain reference used to
 /// retrieve the configuration and the account state before replay.
 pub(crate) async fn find_shard_block_for_tx(
-    net: Network,
+    client: &TonCenterClient,
     tx: &BaseTxInfo,
 ) -> anyhow::Result<v3::Block> {
-    let client = TonCenterClient::new(net)?;
     client
         .get_blocks(&tx.block)
         .await?
@@ -85,14 +90,16 @@ pub(crate) async fn find_shard_block_for_tx(
 ///
 /// # Arguments
 ///
-/// * `net`   — Network to use.
+/// * `client` — Client for the network being replayed.
 /// * `seqno` — Master-block sequence number.
 ///
 /// # Returns
 ///
 /// Returns the config cell as a base64-encoded `BoC`.
-pub(crate) async fn get_block_config(net: Network, seqno: u32) -> anyhow::Result<String> {
-    let client = TonCenterClient::new(net)?;
+pub(crate) async fn get_block_config(
+    client: &TonCenterClient,
+    seqno: u32,
+) -> anyhow::Result<String> {
     let config = client.get_config_all(seqno).await?;
     Ok(Boc::encode_base64(config))
 }
@@ -181,7 +188,7 @@ pub(crate) async fn find_all_transactions_between(
 ///
 /// # Arguments
 ///
-/// * `net`     — Network to use.
+/// * `client` — Client for the network being replayed.
 /// * `address` — Account address.
 /// * `mc_seqno` — The master-block (N) containing the target transaction.
 ///
@@ -189,12 +196,10 @@ pub(crate) async fn find_all_transactions_between(
 ///
 /// Returns [`ShardAccount`] at N-1, or at block 1 for the first-block approximation.
 pub(crate) async fn get_block_account(
-    net: Network,
+    client: &TonCenterClient,
     address: &StdAddr,
     mc_seqno: u32,
 ) -> anyhow::Result<ShardAccount> {
-    let client = TonCenterClient::new(net)?;
-
     // TonCenter rejects seqno 0. Match retracer-core's first-block replay while
     // keeping the state-hash comparison visible to callers.
     let state_block_seqno = mc_seqno
@@ -372,14 +377,16 @@ pub(crate) fn compute_final_data(
 /// Loads a library cell (T‑lib) by its 256‑bit hash.
 ///
 /// Fetches the library from `TON Center`.
-pub(crate) async fn get_library_by_hash(net: Network, hash: &str) -> anyhow::Result<Cell> {
-    let toncenter = TonCenterClient::new(net)?;
-    let data = toncenter.get_libraries(hash).await?;
+pub(crate) async fn get_library_by_hash(
+    client: &TonCenterClient,
+    hash: &str,
+) -> anyhow::Result<Cell> {
+    let data = client.get_libraries(hash).await?;
     Boc::decode_base64(data).context("Failed to decode library BOC data")
 }
 
 async fn add_maybe_exotic_library(
-    net: Network,
+    client: &TonCenterClient,
     code: Option<Cell>,
 ) -> anyhow::Result<Option<(HashBytes, Cell)>> {
     const EXOTIC_LIBRARY_TAG: u8 = 2;
@@ -400,7 +407,7 @@ async fn add_maybe_exotic_library(
 
     let lib_hash = cs.load_u256()?;
     let lib_hash_hex = format!("{lib_hash:X}");
-    let actual_code = get_library_by_hash(net, &lib_hash_hex).await?;
+    let actual_code = get_library_by_hash(client, &lib_hash_hex).await?;
     Ok(Some((lib_hash, actual_code)))
 }
 
@@ -413,7 +420,7 @@ async fn add_maybe_exotic_library(
 ///
 /// # Arguments
 ///
-/// * `net`             — Network to use.
+/// * `client`          — Client for the network being replayed.
 /// * `account`         — Current account state.
 /// * `tx`              — Incoming transaction.
 /// * `additional_libs` — User-provided libraries to include.
@@ -422,7 +429,7 @@ async fn add_maybe_exotic_library(
 ///
 /// Returns a tuple: (Dictionary cell with resolved libs, Actual code cell if original code was exotic).
 pub(crate) async fn collect_used_libraries(
-    net: Network,
+    client: &TonCenterClient,
     account: &ShardAccount,
     tx: &tycho_types::models::Transaction,
     additional_libs: &HashMap<HashBytes, Cell>,
@@ -440,7 +447,7 @@ pub(crate) async fn collect_used_libraries(
         // cell may itself be a 264‑bit exotic library reference (tag 2).
         // If that’s the case, download the real library code and
         // register it in the `libs` dictionary.
-        if let Some((hash, code)) = add_maybe_exotic_library(net.clone(), state.code).await? {
+        if let Some((hash, code)) = add_maybe_exotic_library(client, state.code).await? {
             libs.insert(hash, code.clone());
             loaded_cell_code = Some(code);
         }
@@ -455,7 +462,7 @@ pub(crate) async fn collect_used_libraries(
         // be an exotic library cell. We must preload such libraries as
         // well, otherwise the sandbox would fail to resolve a library
         // during emulation.
-        if let Some((hash, code)) = add_maybe_exotic_library(net, init.code).await? {
+        if let Some((hash, code)) = add_maybe_exotic_library(client, init.code).await? {
             libs.insert(hash, code.clone());
             loaded_cell_code.get_or_insert(code);
         }

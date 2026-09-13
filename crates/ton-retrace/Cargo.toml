@@ -30,6 +30,10 @@ log = { workspace = true }
 expect-test = { workspace = true }
 tolk-compiler = { workspace = true }
 
+[[test]]
+name = "retrace"
+required-features = ["only_ci"]
+
 [features]
 only_ci = []
 

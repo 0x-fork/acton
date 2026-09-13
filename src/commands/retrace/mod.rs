@@ -2,7 +2,7 @@ use crate::commands::common::error_fmt;
 use crate::formatter::FormatterContext;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
-use acton_config::config::{ActonConfig, project_root as configured_project_root};
+use acton_config::config::{ActonConfig, manifest_path, project_root as configured_project_root};
 use acton_debug::replayer::TolkReplayer;
 use acton_debug::serve_single_replayer_dap;
 use anyhow::{Context, anyhow};
@@ -60,9 +60,16 @@ pub fn retrace_cmd(
         vec![Network::Mainnet, Network::Testnet]
     };
 
+    let config = if manifest_path().exists() {
+        ActonConfig::load_manifest()?
+    } else {
+        ActonConfig::default()
+    };
+    let custom_networks = config.custom_networks();
+
     let mut last_error = None;
     for network in networks {
-        let retrace_future = retrace(network.clone(), &hash, HashMap::new());
+        let retrace_future = retrace(network.clone(), &hash, HashMap::new(), &custom_networks);
         match rt.block_on(retrace_future) {
             Ok(result) => {
                 if let Some(logs_dir) = &logs_dir {

@@ -143,7 +143,7 @@ pub struct TraceMoneyResult {
 /// # Example
 ///
 /// ```ignore
-/// let result = retrace(Network::Mainnet, hash, libs).await?;
+/// let result = retrace(Network::Mainnet, hash, libs, &Default::default()).await?;
 /// if result.state_update_hash_ok {
 ///     println!("Deterministic replay verified!");
 /// }

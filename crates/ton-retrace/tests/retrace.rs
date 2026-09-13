@@ -1,7 +1,6 @@
-use crate::types::ComputeInfo;
-use crate::{Network, retrace};
 use std::collections::HashMap;
 use std::time::Duration;
+use ton_retrace::{ComputeInfo, Network, retrace};
 use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_ENV};
 
 #[tokio::test]
@@ -183,7 +182,7 @@ async fn assert_retrace(
     }
     let result = tokio::time::timeout(
         Duration::from_secs(90),
-        retrace(net, hash, HashMap::default()),
+        retrace(net, hash, HashMap::default(), &HashMap::default()),
     )
     .await
     .expect("Retrace timed out")
