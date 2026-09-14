@@ -38,7 +38,6 @@ import {TonClient} from "@acton/explorer-core/api/client"
 import {getBundledCompilerAbis} from "@acton/explorer-core/api/compilerAbiCatalog"
 import {AddressBookProvider} from "@acton/explorer-core/hooks/useAddressBook"
 import {ExplorerRoutesProvider} from "@acton/explorer-core/hooks/useExplorerRoutes"
-import {useExplorerRoutePaths} from "@acton/explorer-core/hooks/useExplorerRoutePaths"
 import {StaticNetworkInfoProvider} from "@acton/explorer-core/hooks/StaticNetworkInfoProvider"
 import {BrowserMetadataRegistry} from "@acton/explorer-core/metadata/browserRegistry"
 import {BundledAbiRegistry} from "@acton/explorer-core/metadata/bundledAbiRegistry"
@@ -872,7 +871,6 @@ const MobileHeaderRouteSync: FC<{readonly onNavigate: () => void}> = ({onNavigat
 }
 
 const DesktopMoreMenu: FC = () => {
-  const routes = useExplorerRoutePaths()
   const [open, setOpen] = useState(false)
   const closeMenu = () => setOpen(false)
 
@@ -909,19 +907,19 @@ const DesktopMoreMenu: FC = () => {
                 <span className={styles.desktopMoreItemDescription}>Discover active tokens</span>
               </span>
             </Link>
-            <Link className={styles.desktopMoreItem} to={routes.configPath()} onClick={closeMenu}>
+            <Link className={styles.desktopMoreItem} to="/abi" onClick={closeMenu}>
               <span className={styles.desktopMoreItemCopy}>
-                <span className={styles.desktopMoreItemTitle}>Config</span>
+                <span className={styles.desktopMoreItemTitle}>ABI</span>
                 <span className={styles.desktopMoreItemDescription}>
-                  Read protocol parameters and limits
+                  Look up get methods and message types
                 </span>
               </span>
             </Link>
-            <Link className={styles.desktopMoreItem} to="/elections" onClick={closeMenu}>
+            <Link className={styles.desktopMoreItem} to="/sources" onClick={closeMenu}>
               <span className={styles.desktopMoreItemCopy}>
-                <span className={styles.desktopMoreItemTitle}>Elections</span>
+                <span className={styles.desktopMoreItemTitle}>Sources</span>
                 <span className={styles.desktopMoreItemDescription}>
-                  Follow validator elections and rounds
+                  Manage contract source artifacts
                 </span>
               </span>
             </Link>
@@ -1287,11 +1285,11 @@ export const ExplorerApp: FC = () => {
                           <Link className={styles.navLink} to="/blocks">
                             Blocks
                           </Link>
-                          <Link className={styles.navLink} to="/abi">
-                            ABI
+                          <Link className={styles.navLink} to="/elections">
+                            Elections
                           </Link>
-                          <Link className={styles.navLink} to="/sources">
-                            Sources
+                          <Link className={styles.navLink} to="/config">
+                            Config
                           </Link>
                           <DesktopMoreMenu />
                         </nav>
