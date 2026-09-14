@@ -1,4 +1,4 @@
-import {expect, mock, test} from "bun:test"
+import {expect, mock, spyOn, test} from "bun:test"
 
 import {VerifierMetadataRegistry} from "../src/metadata/verifierRegistry"
 
@@ -78,6 +78,8 @@ test("stalled verifier source requests also fall back after the request deadline
 
 test("newly verified ABIs and sources become visible without reloading the registry", async () => {
   const originalFetch = globalThis.fetch
+  const start = Date.now()
+  const clock = spyOn(Date, "now").mockReturnValue(start)
   let verified = false
   let requestCount = 0
   const abi = {contract_name: "NewContract"}
@@ -96,11 +98,72 @@ test("newly verified ABIs and sources become visible without reloading the regis
     expect(await registry.getCompilerAbis([CODE_HASH])).toEqual({[CODE_HASH]: null})
     expect((await registry.getSource({codeHash: CODE_HASH})).verified).toBe(false)
     verified = true
+    clock.mockReturnValue(start + 59_999)
+    expect(await registry.getCompilerAbis([CODE_HASH])).toEqual({[CODE_HASH]: null})
+    expect(requestCount).toBe(2)
+    clock.mockReturnValue(start + 60_000)
     expect((await registry.getCompilerAbis([CODE_HASH]))[CODE_HASH]?.compiler_abi).toEqual(abi)
     expect(await registry.getSource({codeHash: CODE_HASH})).toEqual(source)
+    clock.mockReturnValue(start + 120_000)
     await registry.getCompilerAbis([CODE_HASH])
     await registry.getSource({codeHash: CODE_HASH})
     expect(requestCount).toBe(4)
+  } finally {
+    clock.mockRestore()
+    globalThis.fetch = originalFetch
+  }
+})
+
+test.each([404, 200])("missing verifier ABIs are cached for HTTP %s responses", async status => {
+  const originalFetch = globalThis.fetch
+  const fetch = mockFetch(async () => Response.json({items: []}, {status}))
+  globalThis.fetch = fetch
+  try {
+    const registry = new VerifierMetadataRegistry()
+    expect(await registry.getCompilerAbis([CODE_HASH])).toEqual({[CODE_HASH]: null})
+    expect(await registry.getCompilerAbis([CODE_HASH.toUpperCase()])).toEqual({
+      [CODE_HASH.toUpperCase()]: null,
+    })
+    expect(fetch).toHaveBeenCalledTimes(1)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("overlapping verifier ABI lookups share a request for the same normalized hash", async () => {
+  const originalFetch = globalThis.fetch
+  const response = Promise.withResolvers<Response>()
+  const fetch = mockFetch(() => response.promise)
+  globalThis.fetch = fetch
+  try {
+    const registry = new VerifierMetadataRegistry()
+    const first = registry.getCompilerAbis([CODE_HASH, CODE_HASH.toUpperCase()])
+    const second = registry.getCompilerAbis([CODE_HASH])
+    expect(fetch).toHaveBeenCalledTimes(1)
+    response.resolve(Response.json({error: "not found"}, {status: 404}))
+    expect(await first).toEqual({[CODE_HASH]: null, [CODE_HASH.toUpperCase()]: null})
+    expect(await second).toEqual({[CODE_HASH]: null})
+    await registry.getCompilerAbis([CODE_HASH])
+    expect(fetch).toHaveBeenCalledTimes(1)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test.each([429, 500])("HTTP %s verifier failures do not become cached misses", async status => {
+  const originalFetch = globalThis.fetch
+  const fetch = mockFetch(async () => Response.json({error: "unavailable"}, {status}))
+  globalThis.fetch = fetch
+  try {
+    const registry = new VerifierMetadataRegistry()
+    expect(await registry.getCompilerAbis([CODE_HASH])).toEqual({[CODE_HASH]: null})
+    fetch.mockImplementation(async () =>
+      Response.json({items: [{code_hash: CODE_HASH, abi: {contract_name: "RecoveredContract"}}]}),
+    )
+    expect((await registry.getCompilerAbis([CODE_HASH]))[CODE_HASH]?.compiler_abi).toEqual({
+      contract_name: "RecoveredContract",
+    })
+    expect(fetch).toHaveBeenCalledTimes(2)
   } finally {
     globalThis.fetch = originalFetch
   }

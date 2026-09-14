@@ -16,6 +16,7 @@ const VERIFIER_URL = "https://verifier-staging.ton.org"
 const VERIFIER_SOURCE_URL = `${VERIFIER_URL}/api/v1/verification/source`
 const VERIFIER_ABI_URL = `${VERIFIER_URL}/api/v1/abi`
 const DEFAULT_REQUEST_TIMEOUT_MS = 5000
+const MISSING_ABI_CACHE_TTL_MS = 60_000
 
 export function verifierVerificationUrl(codeHash: string): string {
   return `${VERIFIER_URL}/${encodeURIComponent(codeHash)}`
@@ -25,8 +26,18 @@ export interface VerifierMetadataRegistryOptions {
   readonly requestTimeoutMs?: number
 }
 
+/**
+ * Resolves verifier metadata by code hash and shares concurrent ABI requests.
+ * Verified ABIs are immutable; missing ABIs expire after a minute so newly
+ * published verification becomes visible without polling the same 404 each refresh.
+ * Transport failures are not cached.
+ */
 export class VerifierMetadataRegistry extends NullMetadataRegistry {
-  private readonly compilerAbiCache = new Map<string, ExtendedContractABI>()
+  private readonly compilerAbiCache = new Map<
+    string,
+    {readonly abi: ExtendedContractABI | null; readonly expiresAt: number}
+  >()
+  private readonly compilerAbiRequests = new Map<string, Promise<ExtendedContractABI | null>>()
   private readonly sourceCache = new Map<string, VerificationSourceResponse>()
   private readonly requestTimeoutMs: number
 
@@ -46,17 +57,27 @@ export class VerifierMetadataRegistry extends NullMetadataRegistry {
           result[codeHash] = null
           return
         }
-        if (this.compilerAbiCache.has(normalized)) {
-          result[codeHash] = this.compilerAbiCache.get(normalized) ?? null
+        const cached = this.compilerAbiCache.get(normalized)
+        if (cached && cached.expiresAt > Date.now()) {
+          result[codeHash] = cached.abi
           return
         }
 
         try {
-          const abi = await this.fetchCompilerAbi(normalized)
-          if (abi) {
-            this.compilerAbiCache.set(normalized, abi)
+          let request = this.compilerAbiRequests.get(normalized)
+          if (!request) {
+            request = this.fetchCompilerAbi(normalized)
+              .then(abi => {
+                this.compilerAbiCache.set(normalized, {
+                  abi,
+                  expiresAt: abi ? Number.POSITIVE_INFINITY : Date.now() + MISSING_ABI_CACHE_TTL_MS,
+                })
+                return abi
+              })
+              .finally(() => this.compilerAbiRequests.delete(normalized))
+            this.compilerAbiRequests.set(normalized, request)
           }
-          result[codeHash] = abi
+          result[codeHash] = await request
         } catch (error) {
           console.debug(`Failed to fetch verifier ABI for ${normalized}`, error)
           result[codeHash] = null
