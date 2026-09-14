@@ -73,7 +73,6 @@ import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
-import {isNftItemNsfw} from "../nftSafetyRegistry"
 import {
   countActionsForTrace,
   mergeAutomaticActionPage,
@@ -1812,8 +1811,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   const nftItemTokenInfo = accountTokenInfo.find(info => info.type === "nft_items")
   const nftCollectionTokenInfo = accountTokenInfo.find(info => info.type === "nft_collections")
   const nftItemIsNsfw =
-    nftItemTokenInfo?.is_nsfw === true ||
-    (currentNftItem !== undefined && isNftItemNsfw(currentNftItem))
+    nftItemTokenInfo?.is_nsfw === true || currentNftItem?.is_nsfw === true
   const nftItemName =
     tokenInfoString(nftItemTokenInfo, "name") ||
     contentString(currentNftItem?.content, "name") ||
@@ -1827,9 +1825,6 @@ export const AccountPage: FC<AccountPageProps> = ({
         ...getImageSources(nftItemTokenInfo, NFT_IMAGE_SOURCE_KEYS),
         ...getImageSources(currentNftItem?.content, NFT_IMAGE_SOURCE_KEYS),
       ]
-  const nftItemCollectionName =
-    tokenInfoString(nftItemTokenInfo, "collection_name") ||
-    contentString(currentNftItem?.content, "collection_name")
   const nftItemIsScam = nftItemTokenInfo?.is_scam === true || currentNftItem?.is_scam === true
   const nftItemMetadataJson = currentNftItem
     ? JSON.stringify(
@@ -1874,7 +1869,7 @@ export const AccountPage: FC<AccountPageProps> = ({
   const nftCollectionIsNsfw = nftCollectionTokenInfo?.is_nsfw === true
   const nftCollectionIsScam = nftCollectionTokenInfo?.is_scam === true
   const collectiblePreviews = nftItems.slice(0, 8).map(item => {
-    const imageSources = isNftItemNsfw(item)
+    const imageSources = item.is_nsfw === true
       ? []
       : getImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
     return {
@@ -1882,7 +1877,6 @@ export const AccountPage: FC<AccountPageProps> = ({
       image: imageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE,
       imageSources,
       blurred: item.is_scam === true,
-      collectionName: contentString(item.content, "collection_name"),
       name:
         contentString(item.content, "name") ||
         contentString(item.content, "collection_name") ||
@@ -2276,7 +2270,6 @@ export const AccountPage: FC<AccountPageProps> = ({
                       isScam={nftItemIsScam}
                       ownerAddress={nftItemOwnerAddress}
                       collectionAddress={nftItemCollectionAddress}
-                      collectionName={nftItemCollectionName}
                       index={currentNftItem.index}
                       onAddressClick={handleSearch}
                       onMetadataClick={() => setJettonMetadataOpen(true)}
@@ -2380,7 +2373,6 @@ export const AccountPage: FC<AccountPageProps> = ({
                       alt=""
                       className={`${styles.metadataTokenImage} ${styles.metadataNftImage}`}
                       blurredClassName={styles.blurredImage}
-                      collectionName={nftItemCollectionName}
                       blurred={nftItemIsScam}
                     />
                   ) : (

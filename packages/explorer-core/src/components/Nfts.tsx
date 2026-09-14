@@ -4,7 +4,6 @@ import type {FC} from "react"
 
 import type {NftItem} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
-import {isNftItemNsfw} from "../nftSafetyRegistry"
 
 import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import {NftImage} from "./NftImage"
@@ -84,7 +83,7 @@ export const Nfts: FC<NftsProps> = ({
         {visibleItems.map(item => {
           const name = getNftDisplayName(item)
           const collectionName = getCollectionName(item)
-          const imageSources = isNftItemNsfw(item)
+          const imageSources = item.is_nsfw === true
             ? []
             : getImageSources(item.content, NFT_CARD_IMAGE_SOURCE_KEYS)
           const isScam = item.is_scam === true
@@ -108,7 +107,6 @@ export const Nfts: FC<NftsProps> = ({
                   alt={name}
                   className={styles.nftImage}
                   blurredClassName={styles.blurredImage}
-                  collectionName={collectionName}
                   blurred={isScam}
                 />
                 {isScam && <span className={styles.scamLabel}>SCAM</span>}
