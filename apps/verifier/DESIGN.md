@@ -252,8 +252,11 @@ The compiler deadline covers writing stdin, reading stdout and stderr, and
 waiting for process exit. Both output pipes are drained concurrently. Output
 is limited to 16 MiB on stdout and 64 KiB on stderr; exceeding either limit
 terminates the worker. The default deadline is ten seconds and is configured
-with `compiler.timeout_ms`. Compilation failures, including resource limits,
-consume the current claim under the existing payment policy.
+with `compiler.timeout_ms`. Concurrent worker processes are limited by
+`compiler.max_concurrent_compilations`, which defaults to one. Compilation
+can run without a concurrency limit when this value is `-1`. Compilation failures,
+including resource limits, consume the current claim under the existing payment
+policy.
 
 These limits complement the container's memory and process limits and reverse
 proxy rate limits. They do not provide an independent OS sandbox for each

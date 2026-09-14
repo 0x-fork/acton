@@ -118,6 +118,7 @@ VERIFIER_LOG_LEVEL=info
 VERIFIER_API_KEY=
 VERIFIER_TONCENTER_BASE_URL=https://testnet.toncenter.com
 VERIFIER_TONCENTER_API_KEY=
+VERIFIER_COMPILER_MAX_CONCURRENT_COMPILATIONS=1
 VERIFIER_PAYMENT_ADDRESS="0:<64-hex-character-testnet-wallet-address>"
 VERIFIER_PAYMENT_MIN_AMOUNT_NANO=500000000
 VERIFIER_PAYMENT_LEDGER_PATH=/var/lib/verifier/payment-ledger/payment-ledger.sqlite3
@@ -262,7 +263,10 @@ claim that resumes after an expired processing lease. Later claims fail as
 used without another TON Center request.
 
 Compiler stdin, output and execution share the configured timeout (ten seconds
-by default). Worker output is capped at 16 MiB for stdout and 64 KiB for stderr.
+by default). At most one compilation runs at a time by default; configure
+`VERIFIER_COMPILER_MAX_CONCURRENT_COMPILATIONS` to allow more, or set it to `-1`
+to disable the concurrency limit. Worker output is capped at 16 MiB for stdout
+and 64 KiB for stderr.
 Git commands time out after 60 seconds and do not accept interactive credentials.
 Keep container memory/process limits and reverse-proxy rate limits enabled.
 The Compose configuration gives active verification tasks up to three minutes
