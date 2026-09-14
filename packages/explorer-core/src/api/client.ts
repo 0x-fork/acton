@@ -1,6 +1,5 @@
 import {Cell} from "@ton/core"
 
-import {hashToHex} from "../components/utils"
 import {addressKey, type ExtendedContractABI} from "./compilerAbi"
 import {parseNetworkConfig, type NetworkConfig} from "./config"
 import {
@@ -175,23 +174,6 @@ export interface RawBlockReference {
   readonly seqno: number
   readonly root_hash: string
   readonly file_hash: string
-}
-
-export function buildToncoinBlockDownloadUrl(
-  toncoinOrigin: string,
-  block: RawBlockReference,
-): URL | undefined {
-  const rootHash = hashToHex(block.root_hash)
-  const fileHash = hashToHex(block.file_hash)
-  if (!rootHash || !fileHash) return undefined
-
-  const url = new URL("/download", toncoinOrigin)
-  url.searchParams.append("workchain", block.workchain.toString())
-  url.searchParams.append("shard", block.shard)
-  url.searchParams.append("seqno", block.seqno.toString())
-  url.searchParams.append("roothash", rootHash.toUpperCase())
-  url.searchParams.append("filehash", fileHash.toUpperCase())
-  return url
 }
 
 interface GetTracesOptions {
@@ -955,7 +937,12 @@ export class TonClient {
     return this.request(url, "Failed to fetch blocks")
   }
 
-  async getRawBlockBoc(block: RawBlockReference): Promise<Cell> {
+  /**
+   * Fetches the original block BoC from the selected network's v2 endpoint.
+   * Downloads must retain the exact bytes used to calculate the file hash,
+   * so this method decodes base64 without reserializing the cells.
+   */
+  async getRawBlockBoc(block: RawBlockReference): Promise<Buffer> {
     const url = this.buildUrl(this.v2BaseUrl, "/getBlock")
     url.searchParams.append("workchain", block.workchain.toString())
     url.searchParams.append("shard", v3ShardToV2Shard(block.shard))
@@ -964,11 +951,7 @@ export class TonClient {
     url.searchParams.append("file_hash", block.file_hash)
     url.searchParams.append("archival", "true")
     const response = await this.request<RawBlockResponse>(url, "Failed to fetch raw block")
-    try {
-      return Cell.fromBase64(response.data)
-    } catch {
-      throw new Error("Raw block response contains invalid BoC data")
-    }
+    return Buffer.from(response.data, "base64")
   }
 
   async getMasterchainBlockShards(seqno: number): Promise<V3BlocksResponse> {
