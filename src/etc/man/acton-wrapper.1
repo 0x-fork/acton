@@ -16,12 +16,13 @@ Generate a wrapper for the contract identified by \fB_contract\-name_\fR from
 Use \fB\-\-all\fR to generate wrappers for every contract defined in \fBActon.toml\fR
 without picking a single one.
 .sp
-The wrapper type and default file name use the contract\[cq]s \fBdisplay\-name\fR from
-\fBActon.toml\fR\&. If it is absent or empty, they use the contract ID instead.
-Acton converts this name to PascalCase, treating spaces, underscores, and hyphens
-as word separators. The source file name does not affect the wrapper name.
-For example, \fBdisplay\-name = "First Wallet"\fR produces \fBFirstWallet.gen.tolk\fR
-with a \fBFirstWallet\fR structure, or \fBFirstWallet.gen.ts\fR with a \fBFirstWallet\fR class.
+The wrapper type and default file name use the contract ID from \fBActon.toml\fR\&.
+Acton converts the ID to PascalCase, treating spaces, underscores, and hyphens
+as word separators. Neither \fBdisplay\-name\fR nor the source file name affects
+the generated names.
+For example, \fB[contracts.first_wallet]\fR with \fBdisplay\-name = "Friendly Wallet"\fR
+produces \fBFirstWallet.gen.tolk\fR with a \fBFirstWallet\fR structure, or
+\fBFirstWallet.gen.ts\fR with a \fBFirstWallet\fR class.
 The resulting name must start with an ASCII letter and contain only ASCII letters
 and digits. Acton reports an error if the name is invalid.
 .sp

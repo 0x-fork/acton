@@ -183,7 +183,7 @@ The `[contracts.ID]` in `Acton.toml` is used:
 - To generate the function name (e.g., `Counter` → `counterCompiledCode()`)
 - In console messages and web UI, unless overridden by optional `display-name` in `Acton.toml`
 
-Generated wrapper filenames are based on the source file stem normalized to PascalCase. With the conventional `src = "contracts/Counter.tolk"`, that produces `wrappers/Counter.gen.tolk` and `wrappers-ts/Counter.gen.ts`.
+Generated wrapper filenames and type names use the contract ID converted to PascalCase. For `[contracts.my_counter]`, that produces `wrappers/MyCounter.gen.tolk` and `wrappers-ts/MyCounter.gen.ts` with the type `MyCounter`, regardless of `src` or `display-name`.
 
 Contract IDs should use PascalCase, e.g., `JettonWallet`, `NftCollection`.
 
