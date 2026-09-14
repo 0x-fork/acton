@@ -1951,7 +1951,10 @@ async fn run_project_artifact_coordinator(runtime: &Arc<LocalProcessRuntimeInner
 
         let fingerprint_is_stable =
             changed_at.is_some_and(|changed_at| changed_at.elapsed() >= PROJECT_ARTIFACT_DEBOUNCE);
+        // Standalone Studio still publishes stored artifacts, but cannot build
+        // project sources until an Acton manifest appears in the workspace.
         if fingerprint_is_stable
+            && runtime.workspace_root.join("Acton.toml").is_file()
             && !state.is_current_fingerprint(&fingerprint)
             && failed_build_fingerprint.as_ref() != Some(&fingerprint)
             && has_artifact_publication_target(runtime).await

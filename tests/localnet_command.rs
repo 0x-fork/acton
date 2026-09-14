@@ -36,6 +36,7 @@ mod studio;
 
 // Independent temporary projects share the host port space. Serialize fixtures
 // until their mock APIs are gone; each scenario can still run several services.
+// Nextest uses separate processes, coordinated by the localnet-serial test group.
 static FIXTURE_PORTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 struct Service {

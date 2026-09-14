@@ -12,9 +12,9 @@ use crate::support::toncenter::{
     append_localnet_with_base_url as append_localnet_network, build_internal_message_boc,
     extract_canonical_addr_marker, format_captured_requests, jetton_v1_action_project,
     mocked_config_boc64, mocked_global_version_cell, nft_v1_action_project,
-    run_localnet_action_project, spawn_toncenter_v2_mock_with_capture, test_std_addr,
-    toncenter_v2_block_header_ok_response, toncenter_v2_config_all_ok_response,
-    with_nft_v1_action_fixtures,
+    run_localnet_action_project, spawn_toncenter_mock_with_capture,
+    spawn_toncenter_v2_mock_with_capture, test_std_addr, toncenter_v2_block_header_ok_response,
+    toncenter_v2_config_all_ok_response, with_nft_v1_action_fixtures,
 };
 use acton::wallets;
 use base64::Engine;
@@ -22,7 +22,6 @@ use reqwest::blocking::Client;
 use serde_json::{Value, json};
 use std::fmt::Write as _;
 use std::fs;
-use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::thread;
@@ -2208,39 +2207,16 @@ fn localnet_status_json_reports_stopped_node() {
 #[test]
 fn localnet_status_json_reports_stopped_for_non_localnet_http_server() {
     let project = ProjectBuilder::new("localnet-status-non-localnet-http").build();
-    let listener = TcpListener::bind("127.0.0.1:0").expect("failed to bind fake status server");
-    listener
-        .set_nonblocking(true)
-        .expect("failed to make fake status server non-blocking");
-    let port = listener
-        .local_addr()
-        .expect("failed to resolve fake status server address")
-        .port();
-    let server = thread::spawn(move || {
-        let deadline = Instant::now() + Duration::from_secs(5);
-        loop {
-            match listener.accept() {
-                Ok((mut stream, _)) => {
-                    let mut request = [0u8; 1024];
-                    let _ = stream.read(&mut request);
-                    let body = "<html>not an acton simulator</html>";
-                    let response = format!(
-                        "HTTP/1.1 200 OK\r\ncontent-type: text/html\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
-                        body.len(),
-                        body
-                    );
-                    stream
-                        .write_all(response.as_bytes())
-                        .expect("failed to write fake status response");
-                    return;
-                }
-                Err(err) if err.kind() == ErrorKind::WouldBlock && Instant::now() < deadline => {
-                    thread::sleep(Duration::from_millis(10));
-                }
-                Err(err) => panic!("failed to accept fake status request: {err}"),
-            }
-        }
-    });
+    // The shared HTTP fixture consumes the complete request before responding.
+    // Replying after an unchecked nonblocking read races the client's send.
+    let (url, server, _) = spawn_toncenter_mock_with_capture(vec![(
+        200,
+        "<html>not an acton simulator</html>".to_owned(),
+    )]);
+    let port = reqwest::Url::parse(&url)
+        .expect("valid fake status server URL")
+        .port()
+        .expect("fake status server port");
 
     let output = project
         .acton()
