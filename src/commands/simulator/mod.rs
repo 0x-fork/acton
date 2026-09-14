@@ -30,11 +30,11 @@ use tycho_types::models::{
 
 const STARTUP_DEPLOY_TRANSFER_NANOGRAMS: u128 = 50_000_000; // 0.05 GRAM
 pub(crate) const LOCALNET_AUTH_TOKEN_ENV: &str = LOCALNET_API_KEY_ENV;
-pub use snapshot::{SnapshotCommand, simulated_localnet_snapshot_cmd};
-pub use status::simulated_localnet_status_cmd;
+pub use snapshot::{SnapshotCommand, simulator_snapshot_cmd};
+pub use status::simulator_status_cmd;
 
 #[allow(clippy::too_many_arguments)]
-pub async fn simulated_localnet_start_cmd(
+pub async fn simulator_start_cmd(
     port: u16,
     db_path: Option<String>,
     fork_net: Option<String>,
@@ -51,7 +51,7 @@ pub async fn simulated_localnet_start_cmd(
     liteapi_port: Option<u16>,
 ) -> anyhow::Result<()> {
     println!(
-        "      {} Acton simulated localnet is a custom simplified implementation, not a real TON network",
+        "      {} Acton Simulator is a custom simplified implementation, not a real TON network",
         "Notice".yellow().bold()
     );
     println!(
@@ -84,7 +84,7 @@ pub async fn simulated_localnet_start_cmd(
             || {
                 ton_localnet::snapshots::SnapshotStore::new(
                     acton_config::config::project_root()
-                        .join(format!(".acton/simulated-localnet/{port}/snapshots")),
+                        .join(format!(".acton/simulator/{port}/snapshots")),
                 )
             },
             |path| ton_localnet::snapshots::SnapshotStore::for_database(std::path::Path::new(path)),
@@ -101,7 +101,7 @@ pub async fn simulated_localnet_start_cmd(
         },
     ));
     let startup_accounts = setup_startup_accounts(&node, &accounts, no_mining).await?;
-    let auth_token = require_auth.then(simulated_localnet_auth_token);
+    let auth_token = require_auth.then(simulator_auth_token);
     let run_result = run_server(
         node.clone(),
         ServerArgs {
@@ -123,12 +123,12 @@ pub async fn simulated_localnet_start_cmd(
         return match error {
             ServerError::Bind { address, source } => Err(anyhow::Error::new(source).context(
                 format!(
-                    "Failed to start Acton simulated localnet on {address}\nSet another port with [localnet].port in Acton.toml\nOr stop the process currently listening on that port"
+                    "Failed to start Acton Simulator on {address}\nSet another port with [localnet].port in Acton.toml\nOr stop the process currently listening on that port"
                 ),
             )),
             ServerError::LiteApiBind { address, source } => Err(anyhow::Error::new(source).context(
                 format!(
-                    "Failed to start Acton simulated localnet LiteAPI on {address}\nSet another localnet port with [localnet].port in Acton.toml so the next port is free\nOr stop the process currently listening on that port"
+                    "Failed to start Acton Simulator LiteAPI on {address}\nSet another localnet port with [localnet].port in Acton.toml so the next port is free\nOr stop the process currently listening on that port"
                 ),
             )),
             error => Err(error.into()),
@@ -136,7 +136,7 @@ pub async fn simulated_localnet_start_cmd(
     }
 
     println!(
-        "     {} Acton simulated localnet gracefully",
+        "     {} Acton Simulator gracefully",
         "Stopped".green().bold()
     );
 
@@ -342,7 +342,7 @@ fn format_std_address(address: &StdAddr, network: &Network) -> String {
     .to_string()
 }
 
-pub async fn simulated_localnet_airdrop_cmd(
+pub async fn simulator_airdrop_cmd(
     address: &str,
     amount_grams: f64,
     port: u16,
@@ -397,7 +397,7 @@ pub async fn simulated_localnet_airdrop_cmd(
     Ok(())
 }
 
-pub async fn simulated_localnet_mine_cmd(
+pub async fn simulator_mine_cmd(
     blocks: u32,
     port: u16,
     auth_token: Option<String>,
@@ -434,7 +434,7 @@ pub async fn simulated_localnet_mine_cmd(
     Ok(())
 }
 
-pub async fn simulated_localnet_increase_time_cmd(
+pub async fn simulator_increase_time_cmd(
     seconds: u64,
     port: u16,
     auth_token: Option<String>,
@@ -451,7 +451,7 @@ pub async fn simulated_localnet_increase_time_cmd(
     Ok(())
 }
 
-pub async fn simulated_localnet_set_time_cmd(
+pub async fn simulator_set_time_cmd(
     timestamp: u32,
     port: u16,
     auth_token: Option<String>,
@@ -468,7 +468,7 @@ pub async fn simulated_localnet_set_time_cmd(
     Ok(())
 }
 
-pub async fn simulated_localnet_set_next_block_timestamp_cmd(
+pub async fn simulator_set_next_block_timestamp_cmd(
     timestamp: u32,
     port: u16,
     auth_token: Option<String>,
@@ -641,8 +641,8 @@ fn print_clock_update(action: &str, result: &serde_json::Value) {
     }
 }
 
-fn simulated_localnet_auth_token() -> String {
-    simulated_localnet_auth_token_from_env().unwrap_or_else(generate_simulated_localnet_auth_token)
+fn simulator_auth_token() -> String {
+    simulator_auth_token_from_env().unwrap_or_else(generate_simulator_auth_token)
 }
 
 pub(crate) fn resolve_localnet_auth_token(auth_token: Option<String>) -> Option<String> {
@@ -651,10 +651,10 @@ pub(crate) fn resolve_localnet_auth_token(auth_token: Option<String>) -> Option<
             let token = token.trim().to_owned();
             (!token.is_empty()).then_some(token)
         })
-        .or_else(simulated_localnet_auth_token_from_env)
+        .or_else(simulator_auth_token_from_env)
 }
 
-fn simulated_localnet_auth_token_from_env() -> Option<String> {
+fn simulator_auth_token_from_env() -> Option<String> {
     std::env::var(LOCALNET_AUTH_TOKEN_ENV)
         .ok()
         .and_then(|token| {
@@ -663,7 +663,7 @@ fn simulated_localnet_auth_token_from_env() -> Option<String> {
         })
 }
 
-fn generate_simulated_localnet_auth_token() -> String {
+fn generate_simulator_auth_token() -> String {
     let mut bytes = [0_u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut bytes);
     hex::encode(bytes)

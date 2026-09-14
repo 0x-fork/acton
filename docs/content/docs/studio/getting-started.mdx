@@ -3,14 +3,14 @@ title: "Getting Started"
 description: "Start Acton Studio for a project and complete a first test and local environment workflow"
 ---
 
-This guide starts Studio for an existing Acton project, runs a test suite, creates a Simulated
-localnet, and connects the project to that network.
+This guide starts Studio for an existing Acton project, runs a test suite, creates a Simulator,
+and connects the project to that environment.
 
 ## Prerequisites
 
 - [Acton installed](/docs/installation)
 - an Acton project with an `Acton.toml` file
-- Docker only if you plan to create a Full localnet
+- Docker only if you plan to create a Localnet
 
 If you do not have a project yet, create one first:
 
@@ -74,19 +74,19 @@ After the run finishes:
 You can also run `acton test` in another terminal. Studio records the run automatically while the
 daemon for this project is available.
 
-## 4. Create a Simulated localnet
+## 4. Create a Simulator
 
-Open **Virtual Environments**, select **Create environment**, and keep **Simulated localnet** selected.
+Open **Virtual Environments**, select **Create environment**, and keep **Simulator** selected.
 
 <figure className="theme-image my-6">
   <img
     src="/docs/studio/create-environment-light.png"
-    alt="Create environment dialog in light theme configured for a Simulated localnet"
+    alt="Create environment dialog in light theme configured for a Simulator"
     className="theme-image-light rounded-lg border shadow-sm"
   />
   <img
     src="/docs/studio/create-environment-dark.png"
-    alt="Create environment dialog in dark theme configured for a Simulated localnet"
+    alt="Create environment dialog in dark theme configured for a Simulator"
     className="theme-image-dark rounded-lg border shadow-sm"
   />
 </figure>

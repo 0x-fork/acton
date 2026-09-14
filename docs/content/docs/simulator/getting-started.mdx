@@ -3,14 +3,14 @@ title: "Getting Started"
 description: "Start Acton local development node, use faucet, and run a minimal local workflow"
 ---
 
-The `acton simulated-localnet` command starts a fast local environment with TON-compatible
+The `acton simulator` command starts a fast local environment with TON-compatible
 blocks, LiteAPI, TON Center v2/v3, Streaming API, and Emulate API. It is Acton's custom
 simplified implementation, not a real TON network or validator cluster.
 
 ## Start the Node
 
 ```bash
-acton simulated-localnet start
+acton simulator start
 ```
 
 By default, the node listens on port `5411` (or `[localnet].port` from `Acton.toml`).
@@ -37,25 +37,25 @@ The same block metadata is available through the TON Center v3-compatible
 Use the built-in faucet command:
 
 ```bash
-acton simulated-localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM
+acton simulator airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM
 ```
 
 Set a custom amount:
 
 ```bash
-acton simulated-localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --amount 50
+acton simulator airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --amount 50
 ```
 
 ## Use a Custom Port
 
 ```bash
-acton simulated-localnet start --port 3010
+acton simulator start --port 3010
 ```
 
 Then target the same port for CLI helpers:
 
 ```bash
-acton simulated-localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --port 3010
+acton simulator airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --port 3010
 ```
 
 ## Mine Blocks Manually
@@ -63,14 +63,14 @@ acton simulated-localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kww
 Use `--no-mining` when you want full control over block production:
 
 ```bash
-acton simulated-localnet start --no-mining
+acton simulator start --no-mining
 ```
 
 Accepted messages stay queued until you mine blocks:
 
 ```bash
-acton simulated-localnet mine
-acton simulated-localnet mine 5
+acton simulator mine
+acton simulator mine 5
 ```
 
 You can also store the mode in `Acton.toml`:
@@ -86,25 +86,25 @@ Localnet uses a virtual clock for block and transaction timestamps. Move it
 forward without waiting for wall-clock time:
 
 ```bash
-acton simulated-localnet increase-time 3600
-acton simulated-localnet mine
+acton simulator increase-time 3600
+acton simulator mine
 ```
 
 Set the current virtual Unix time:
 
 ```bash
-acton simulated-localnet set-time 1710000000
+acton simulator set-time 1710000000
 ```
 
 Set a one-shot timestamp for only the next mined block:
 
 ```bash
-acton simulated-localnet set-next-block-timestamp 1710000600
-acton simulated-localnet mine
+acton simulator set-next-block-timestamp 1710000600
+acton simulator mine
 ```
 
 The requested timestamp cannot be lower than the latest mined block time.
-`acton simulated-localnet status` reports the current virtual time, offset, and any
+`acton simulator status` reports the current virtual time, offset, and any
 pending next-block timestamp.
 
 ## Simulate API Latency
@@ -113,7 +113,7 @@ Use `--response-delay-ms` when you need local API requests to behave more like
 a slower remote provider:
 
 ```bash
-acton simulated-localnet start --response-delay-ms 300
+acton simulator start --response-delay-ms 300
 ```
 
 This delays `/api/v2`, `/api/v3`, and `/api/emulate/v1` responses. Streaming
@@ -147,6 +147,6 @@ Saved snapshots remain available after shutdown. Create a snapshot before stoppi
 
 ## Next Steps
 
-- Learn how to [fork from testnet/mainnet](/docs/simulated-localnet/forking-from-network).
-- Configure [startup accounts](/docs/simulated-localnet/startup-accounts).
-- Add [persistence and snapshots](/docs/simulated-localnet/persistence-and-snapshots).
+- Learn how to [fork from testnet/mainnet](/docs/simulator/forking-from-network).
+- Configure [startup accounts](/docs/simulator/startup-accounts).
+- Add [persistence and snapshots](/docs/simulator/persistence-and-snapshots).

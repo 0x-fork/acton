@@ -421,6 +421,6 @@ wallets, the keyring ID usually matches the wallet name.
 
 ## See Also
 
-- `acton help full-localnet`
+- `acton help localnet`
 - [Wallet command guide](https://ton-blockchain.github.io/acton/docs/commands/wallet)
 - [Wallet management guide](https://ton-blockchain.github.io/acton/docs/wallets)

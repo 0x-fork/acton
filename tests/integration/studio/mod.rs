@@ -177,7 +177,7 @@ impl StudioCliProcess {
 
         let child_shutdown_messages = String::from_utf8_lossy(&output.stdout)
             .lines()
-            .filter(|line| line.contains("Acton simulated localnet gracefully"))
+            .filter(|line| line.contains("Acton Simulator gracefully"))
             .collect::<Vec<_>>()
             .join("\n");
         expect_test::expect![""].assert_eq(&child_shutdown_messages);

@@ -1,16 +1,16 @@
-ACTON-FULL-LOCALNET(1)
+ACTON-LOCALNET(1)
 
 NAME
-       acton-full-localnet — Run and manage a local TON network with real
+       acton-localnet — Run and manage a local TON network with real
        validators
 
 SYNOPSIS
-       acton full-localnet [options] command
+       acton localnet [options] command
 
 DESCRIPTION
-       Full localnet runs TON validators, consensus, elections, and a TON
-       Center v2/v3 API stack in Docker. Use it to develop contracts and
-       applications that depend on full-node behavior or indexed chain data.
+       Localnet runs TON validators, consensus, elections, and a TON Center
+       v2/v3 API stack in Docker. Use it to develop contracts and applications
+       that depend on full-node behavior or indexed chain data.
 
        Each named network has its own blockchain, ports, nodes, and snapshots.
        Acton manages the Docker containers and a local control service. The CLI
@@ -19,10 +19,9 @@ DESCRIPTION
        The network starts with a genesis validator. You can add full nodes and
        validators while it runs. Local funds are measured in GRAM.
 
-       Use acton simulated-localnet for fast local execution, public-network
-       forks, or manual control of blocks and time. Full localnet uses real TON
-       block production and requires more CPU, memory, disk space, and startup
-       time.
+       Use acton simulator for fast local execution, public-network forks, or
+       manual control of blocks and time. Localnet uses real TON block
+       production and requires more CPU, memory, disk space, and startup time.
 
 QUICK START
        Install Docker Desktop or Docker Engine with Compose v2. Start the
@@ -33,7 +32,7 @@ QUICK START
 
        Start a network in the current project:
 
-           acton full-localnet start dev
+           acton localnet start dev
 
        Acton creates the network, downloads missing images, starts the
        containers, and waits for the node and APIs to become ready. The first
@@ -43,15 +42,15 @@ QUICK START
        Keep this terminal open while you work. Press Ctrl-C to stop the network
        gracefully. To run it in the background instead, use:
 
-           acton full-localnet start dev --detach
-           acton full-localnet status dev
-           acton full-localnet stop dev
+           acton localnet start dev --detach
+           acton localnet status dev
+           acton localnet stop dev
 
-       Run acton full-localnet start dev again to resume the saved blockchain.
+       Run acton localnet start dev again to resume the saved blockchain.
 
 SELECTING A NETWORK
        Most subcommands accept a network name or ID. Names are scoped to the
-       state directory. Use acton full-localnet list to find saved networks.
+       state directory. Use acton localnet list to find saved networks.
 
        When you omit the network, Acton selects the only saved network. If
        several networks exist, an interactive terminal shows a selector.
@@ -64,12 +63,12 @@ SELECTING A NETWORK
        For node and snapshot commands, put the network before the nested
        action:
 
-           acton full-localnet node dev add worker
-           acton full-localnet snapshot dev list
+           acton localnet node dev add worker
+           acton localnet snapshot dev list
 
        The operation command selects its network with --network:
 
-           acton full-localnet operation <OPERATION_ID> --network dev
+           acton localnet operation <OPERATION_ID> --network dev
 
 OPTIONS
        --state-dir path
@@ -91,11 +90,11 @@ OPTIONS
            whether a saved network is running.
 
 SUBCOMMANDS
-   acton full-localnet start
+   acton localnet start
        Create or resume a network and wait for its APIs.
 
       Synopsis
-          acton full-localnet start [name] [options]
+          acton localnet start [name] [options]
 
           If this command launches the control service, it stays in the
           foreground until shutdown. Ctrl-C stops the service and network
@@ -148,89 +147,89 @@ SUBCOMMANDS
               import into the initial blockchain state. See Account Imports for
               the format.
 
-   acton full-localnet create
+   acton localnet create
        Save a stopped network definition without starting Docker containers.
        Use this when you want to reserve the name, ports, and genesis inputs
        before the first start.
 
       Synopsis
-          acton full-localnet create [name] [options]
+          acton localnet create [name] [options]
 
           Accepts the creation options documented under start: --port-base,
           --block-time-ms, --election-time-seconds, --accounts, and
           --accounts-file. The default name is localnet. Wallets and import
           files are read when the definition is created.
 
-              acton full-localnet create staging --port-base 19100
-              acton full-localnet start staging --detach
+              acton localnet create staging --port-base 19100
+              acton localnet start staging --detach
 
-   acton full-localnet list
+   acton localnet list
        List saved network definitions as a JSON array. This command works while
        Docker is stopped and does not start any services.
 
       Synopsis
-          acton full-localnet list
+          acton localnet list
 
           Use status to check a network’s current runtime state.
 
-   acton full-localnet status
+   acton localnet status
        Show network status, endpoint URLs, and state location. With --json, the
        record also includes nodes, operations, configuration, and diagnostic
        details.
 
       Synopsis
-          acton full-localnet status [network]
+          acton localnet status [network]
 
           This command can inspect a network while its control service is
           stopped. It does not start the network. Endpoint URLs remain in the
           record while the corresponding services are stopped.
 
-   acton full-localnet stop
+   acton localnet stop
        Stop the selected network and its control service gracefully. Blockchain
        data and snapshots remain available for the next start.
 
       Synopsis
-          acton full-localnet stop [network]
+          acton localnet stop [network]
 
-   acton full-localnet shutdown
+   acton localnet shutdown
        Shut down the selected network and its control service. Like stop, this
        command preserves persistent data and waits for shutdown to finish.
 
       Synopsis
-          acton full-localnet shutdown [network]
+          acton localnet shutdown [network]
 
-   acton full-localnet delete
+   acton localnet delete
        Delete the network’s containers, blockchain volumes, and snapshot
        archives. This removes the network from the list of available networks.
 
       Synopsis
-          acton full-localnet delete [network] [--yes]
+          acton localnet delete [network] [--yes]
 
           The command asks for confirmation in an interactive terminal. Pass
           --yes to confirm deletion in a script. Use stop when you intend to
           resume the network later.
 
-   acton full-localnet logs
+   acton localnet logs
        Show the last lines of the saved network operation log. This command
        reads the log once and exits. It also works when the control service is
        stopped.
 
       Synopsis
-          acton full-localnet logs [network] [--tail lines]
+          acton localnet logs [network] [--tail lines]
 
           --tail defaults to 100 lines. With --json, the result is an object
           with a logs string.
 
-              acton full-localnet logs dev --tail 200
+              acton localnet logs dev --tail 200
 
-   acton full-localnet node
+   acton localnet node
        Manage additional full nodes and validator participation. Start the
        network before managing its nodes. Use status --json to find node IDs.
        The genesis validator belongs to the network and cannot be removed with
        node remove.
 
       Synopsis
-          acton full-localnet node [network] command
+          acton localnet node [network] command
 
       Subcommands
           o  add <name> [--validator] joins a new full node and prints its ID.
@@ -254,21 +253,21 @@ SUBCOMMANDS
           elected validator. Use the observability dashboard to inspect
           election membership.
 
-              acton full-localnet node dev add validator-b --validator
-              acton full-localnet status dev --json
-              acton full-localnet node dev leave-validation <NODE_ID>
+              acton localnet node dev add validator-b --validator
+              acton localnet status dev --json
+              acton localnet node dev leave-validation <NODE_ID>
 
           After the node leaves both elected sets, remove it:
 
-              acton full-localnet node dev remove <NODE_ID> --yes
+              acton localnet node dev remove <NODE_ID> --yes
 
-   acton full-localnet snapshot
-       Save and restore the blockchain state and node topology. Full localnet
+   acton localnet snapshot
+       Save and restore the blockchain state and node topology. Localnet
        snapshots are compressed archives of node databases stored in Docker
        volumes.
 
       Synopsis
-          acton full-localnet snapshot [network] command
+          acton localnet snapshot [network] command
 
       Subcommands
           o  list prints saved snapshots with their IDs, names, creation times,
@@ -299,16 +298,16 @@ SUBCOMMANDS
           for the current databases, compressed archives, and temporary restore
           backups. Restoration rebuilds indexed data from the saved blockchain.
 
-              acton full-localnet snapshot dev create before-upgrade
-              acton full-localnet snapshot dev list
-              acton full-localnet snapshot dev restore <SNAPSHOT_ID> --yes
+              acton localnet snapshot dev create before-upgrade
+              acton localnet snapshot dev list
+              acton localnet snapshot dev restore <SNAPSHOT_ID> --yes
 
-   acton full-localnet operation
+   acton localnet operation
        Inspect a saved operation or wait for it to finish. Operations record
        progress phases, timing, results, and errors for network changes.
 
       Synopsis
-          acton full-localnet operation id [--network network] [--wait]
+          acton localnet operation id [--network network] [--wait]
 
           Without --wait, this command prints the saved operation record as
           JSON. With --wait, it waits for a running operation and exits with an
@@ -319,17 +318,17 @@ SUBCOMMANDS
           status. Startup, node changes, and snapshot commands already wait for
           their operations.
 
-              acton full-localnet operation <OPERATION_ID> --network dev --wait
+              acton localnet operation <OPERATION_ID> --network dev --wait
 
 STARTUP ACCOUNTS
        Create a development wallet, then select it when you create the network:
 
            acton wallet new --name deployer --local
-           acton full-localnet start dev --accounts deployer --detach
+           acton localnet start dev --accounts deployer --detach
 
        For several wallets, use a comma-separated list:
 
-           acton full-localnet start wallets --accounts deployer,alice,bob --detach
+           acton localnet start wallets --accounts deployer,alice,bob --detach
 
        You can set the default CLI selection in Acton.toml:
 
@@ -346,9 +345,9 @@ STARTUP ACCOUNTS
        balance, or create a new network for a different initial selection.
 
        The [localnet].accounts default applies to CLI creation. Studio uses the
-       wallet selection submitted in its creation form. Full localnet timing
-       and ports come from the creation flags above, rather than other
-       [localnet] settings.
+       wallet selection submitted in its creation form. Localnet timing and
+       ports come from the creation flags above, rather than other [localnet]
+       settings.
 
 ACCOUNT IMPORTS
        Use --accounts-file to include existing contract states in the
@@ -361,7 +360,7 @@ ACCOUNT IMPORTS
        addresses. Imported accounts and startup wallets share the same initial
        address space.
 
-           acton full-localnet start imported --accounts-file accounts.json --detach
+           acton localnet start imported --accounts-file accounts.json --detach
 
        Imports copy account state into a new local blockchain. They do not load
        public-network transaction history or fetch later changes from that
@@ -435,15 +434,15 @@ AUTOMATION
        for automated jobs. Wait for start to succeed before sending API
        requests.
 
-           acton full-localnet --state-dir /tmp/acton-ci --json \
+           acton localnet --state-dir /tmp/acton-ci --json \
              start ci --port-base 19200 --detach
-           acton full-localnet --state-dir /tmp/acton-ci --json status ci
-           acton full-localnet --state-dir /tmp/acton-ci stop ci
+           acton localnet --state-dir /tmp/acton-ci --json status ci
+           acton localnet --state-dir /tmp/acton-ci stop ci
 
        For a fresh blockchain per job, choose a unique network name and delete
        that network during job cleanup:
 
-           acton full-localnet --state-dir /tmp/acton-ci delete ci --yes
+           acton localnet --state-dir /tmp/acton-ci delete ci --yes
 
        Successful start output is a network record. Mutating commands return an
        operation record in JSON mode. Progress and diagnostics go to stderr.
@@ -472,8 +471,8 @@ TROUBLESHOOTING
    Startup or restore is taking too long
        Inspect status and the operation log:
 
-           acton full-localnet status dev --json
-           acton full-localnet logs dev --tail 200
+           acton localnet status dev --json
+           acton localnet logs dev --tail 200
 
        Check available Docker disk space and memory. Startup includes readiness
        checks for the TON node and APIs. Restore also rebuilds the indexer. Use
@@ -517,6 +516,6 @@ PROJECT OPTIONS
            This conflicts with --manifest-path.
 
 SEE ALSO
-       acton(1), acton-simulated-localnet(1), acton-wallet(1), acton-script(1),
+       acton(1), acton-simulator(1), acton-wallet(1), acton-script(1),
        acton-rpc(1)
 

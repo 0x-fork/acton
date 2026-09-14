@@ -110,13 +110,13 @@ The early `v0 -> v1 -> v0 -> v1` rollback means this history cannot be found saf
 | --- | --- | --- |
 | [`db94261627fb6a8282159d45e03d287a6417905887c77d1e6172b4f50a3a9f0e`](https://actonscan.com/verified/db94261627fb6a8282159d45e03d287a6417905887c77d1e6172b4f50a3a9f0e?network=testnet) | Root entrypoint `comment_payer_hl.tolk` with a `main` marker and generated ABI under `output`; source-tree toggle must not overlap the first file or marker, including at narrow desktop widths | 2026-09-14 |
 
-## Full localnet
+## Localnet
 
 These accounts belong to an isolated local test environment, not a public network. Recreate the imported account from the fixture in `crates/acton-studio/src/local_process/imports/tests.rs` when the environment is no longer available
 
 | Address | What to verify | Last checked |
 | --- | --- | --- |
-| `kQBFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRdNV` | After importing into a running full localnet, Explorer shows an active account with 1 GRAM and no transaction history; Contracts shows its imported name. Verified on two running nodes, with code and data matching the source and an unrelated account preserved | 2026-09-07 |
+| `kQBFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRdNV` | After importing into a running localnet, Explorer shows an active account with 1 GRAM and no transaction history; Contracts shows its imported name. Verified on two running nodes, with code and data matching the source and an unrelated account preserved | 2026-09-07 |
 
 ## Adding an entry
 

@@ -1,14 +1,14 @@
 '\" t
-.TH "ACTON\-FULL\-LOCALNET" "1"
+.TH "ACTON\-LOCALNET" "1"
 .nh
 .ad l
 .ss \n[.ss] 0
 .SH "NAME"
-acton\-full\-localnet \[em] Run and manage a local TON network with real validators
+acton\-localnet \[em] Run and manage a local TON network with real validators
 .SH "SYNOPSIS"
-\fBacton full\-localnet\fR [\fIoptions\fR] \fIcommand\fR
+\fBacton localnet\fR [\fIoptions\fR] \fIcommand\fR
 .SH "DESCRIPTION"
-Full localnet runs TON validators, consensus, elections, and a TON Center
+Localnet runs TON validators, consensus, elections, and a TON Center
 v2/v3 API stack in Docker. Use it to develop contracts and applications that
 depend on full\-node behavior or indexed chain data.
 .sp
@@ -19,8 +19,8 @@ works independently of Acton Studio.
 The network starts with a genesis validator. You can add full nodes and
 validators while it runs. Local funds are measured in GRAM.
 .sp
-Use \fBacton simulated\-localnet\fR for fast local execution, public\-network
-forks, or manual control of blocks and time. Full localnet uses real TON
+Use \fBacton simulator\fR for fast local execution, public\-network
+forks, or manual control of blocks and time. Localnet uses real TON
 block production and requires more CPU, memory, disk space, and startup time.
 .SH "QUICK START"
 Install Docker Desktop or Docker Engine with Compose v2. Start the engine
@@ -37,7 +37,7 @@ Start a network in the current project:
 .sp
 .RS 4
 .nf
-acton full\-localnet start dev
+acton localnet start dev
 .fi
 .RE
 .sp
@@ -50,16 +50,16 @@ gracefully. To run it in the background instead, use:
 .sp
 .RS 4
 .nf
-acton full\-localnet start dev \-\-detach
-acton full\-localnet status dev
-acton full\-localnet stop dev
+acton localnet start dev \-\-detach
+acton localnet status dev
+acton localnet stop dev
 .fi
 .RE
 .sp
-Run \fBacton full\-localnet start dev\fR again to resume the saved blockchain.
+Run \fBacton localnet start dev\fR again to resume the saved blockchain.
 .SH "SELECTING A NETWORK"
 Most subcommands accept a network name or ID. Names are scoped to the state
-directory. Use \fBacton full\-localnet list\fR to find saved networks.
+directory. Use \fBacton localnet list\fR to find saved networks.
 .sp
 When you omit the network, Acton selects the only saved network. If several
 networks exist, an interactive terminal shows a selector. Non\-interactive
@@ -72,8 +72,8 @@ For node and snapshot commands, put the network before the nested action:
 .sp
 .RS 4
 .nf
-acton full\-localnet node dev add worker
-acton full\-localnet snapshot dev list
+acton localnet node dev add worker
+acton localnet snapshot dev list
 .fi
 .RE
 .sp
@@ -81,7 +81,7 @@ The \fBoperation\fR command selects its network with \fB\-\-network\fR:
 .sp
 .RS 4
 .nf
-acton full\-localnet operation <OPERATION_ID> \-\-network dev
+acton localnet operation <OPERATION_ID> \-\-network dev
 .fi
 .RE
 .SH "OPTIONS"
@@ -106,10 +106,10 @@ Network records include \fBid\fR, \fBname\fR, \fBstatus\fR, \fBendpoints\fR, \fB
 whether a saved network is running.
 .RE
 .SH "SUBCOMMANDS"
-.SS "acton full-localnet start"
+.SS "acton localnet start"
 Create or resume a network and wait for its APIs.
 .SS "Synopsis"
-\fBacton full\-localnet start\fR [\fIname\fR] [\fIoptions\fR]
+\fBacton localnet start\fR [\fIname\fR] [\fIoptions\fR]
 .sp
 If this command launches the control service, it stays in the foreground
 until shutdown. Ctrl\-C stops the service and network gracefully. If a service
@@ -166,12 +166,12 @@ list. See \fBStartup Accounts\fR for wallet setup and persistence.
 JSON file containing an array of hexadecimal \fBShardAccount\fR BoCs to import
 into the initial blockchain state. See \fBAccount Imports\fR for the format.
 .RE
-.SS "acton full-localnet create"
+.SS "acton localnet create"
 Save a stopped network definition without starting Docker containers.
 Use this when you want to reserve the name, ports, and genesis inputs before
 the first start.
 .SS "Synopsis"
-\fBacton full\-localnet create\fR [\fIname\fR] [\fIoptions\fR]
+\fBacton localnet create\fR [\fIname\fR] [\fIoptions\fR]
 .sp
 Accepts the creation options documented under \fBstart\fR: \fB\-\-port\-base\fR,
 \fB\-\-block\-time\-ms\fR, \fB\-\-election\-time\-seconds\fR, \fB\-\-accounts\fR, and \fB\-\-accounts\-file\fR\&.
@@ -180,65 +180,65 @@ definition is created.
 .sp
 .RS 4
 .nf
-acton full\-localnet create staging \-\-port\-base 19100
-acton full\-localnet start staging \-\-detach
+acton localnet create staging \-\-port\-base 19100
+acton localnet start staging \-\-detach
 .fi
 .RE
-.SS "acton full-localnet list"
+.SS "acton localnet list"
 List saved network definitions as a JSON array. This command works while
 Docker is stopped and does not start any services.
 .SS "Synopsis"
-\fBacton full\-localnet list\fR
+\fBacton localnet list\fR
 .sp
 Use \fBstatus\fR to check a network\[cq]s current runtime state.
-.SS "acton full-localnet status"
+.SS "acton localnet status"
 Show network status, endpoint URLs, and state location. With \fB\-\-json\fR, the
 record also includes nodes, operations, configuration, and diagnostic details.
 .SS "Synopsis"
-\fBacton full\-localnet status\fR [\fInetwork\fR]
+\fBacton localnet status\fR [\fInetwork\fR]
 .sp
 This command can inspect a network while its control service is stopped.
 It does not start the network. Endpoint URLs remain in the record while
 the corresponding services are stopped.
-.SS "acton full-localnet stop"
+.SS "acton localnet stop"
 Stop the selected network and its control service gracefully. Blockchain
 data and snapshots remain available for the next start.
 .SS "Synopsis"
-\fBacton full\-localnet stop\fR [\fInetwork\fR]
-.SS "acton full-localnet shutdown"
+\fBacton localnet stop\fR [\fInetwork\fR]
+.SS "acton localnet shutdown"
 Shut down the selected network and its control service. Like \fBstop\fR, this
 command preserves persistent data and waits for shutdown to finish.
 .SS "Synopsis"
-\fBacton full\-localnet shutdown\fR [\fInetwork\fR]
-.SS "acton full-localnet delete"
+\fBacton localnet shutdown\fR [\fInetwork\fR]
+.SS "acton localnet delete"
 Delete the network\[cq]s containers, blockchain volumes, and snapshot archives.
 This removes the network from the list of available networks.
 .SS "Synopsis"
-\fBacton full\-localnet delete\fR [\fInetwork\fR] [\fB\-\-yes\fR]
+\fBacton localnet delete\fR [\fInetwork\fR] [\fB\-\-yes\fR]
 .sp
 The command asks for confirmation in an interactive terminal. Pass \fB\-\-yes\fR
 to confirm deletion in a script. Use \fBstop\fR when you intend to resume the
 network later.
-.SS "acton full-localnet logs"
+.SS "acton localnet logs"
 Show the last lines of the saved network operation log. This command reads
 the log once and exits. It also works when the control service is stopped.
 .SS "Synopsis"
-\fBacton full\-localnet logs\fR [\fInetwork\fR] [\fB\-\-tail\fR \fIlines\fR]
+\fBacton localnet logs\fR [\fInetwork\fR] [\fB\-\-tail\fR \fIlines\fR]
 .sp
 \fB\-\-tail\fR defaults to 100 lines. With \fB\-\-json\fR, the result is an object with
 a \fBlogs\fR string.
 .sp
 .RS 4
 .nf
-acton full\-localnet logs dev \-\-tail 200
+acton localnet logs dev \-\-tail 200
 .fi
 .RE
-.SS "acton full-localnet node"
+.SS "acton localnet node"
 Manage additional full nodes and validator participation. Start the network
 before managing its nodes. Use \fBstatus \-\-json\fR to find node IDs. The genesis
 validator belongs to the network and cannot be removed with \fBnode remove\fR\&.
 .SS "Synopsis"
-\fBacton full\-localnet node\fR [\fInetwork\fR] \fIcommand\fR
+\fBacton localnet node\fR [\fInetwork\fR] \fIcommand\fR
 .SS "Subcommands"
 .sp
 .RS 4
@@ -267,9 +267,9 @@ Use the observability dashboard to inspect election membership.
 .sp
 .RS 4
 .nf
-acton full\-localnet node dev add validator\-b \-\-validator
-acton full\-localnet status dev \-\-json
-acton full\-localnet node dev leave\-validation <NODE_ID>
+acton localnet node dev add validator\-b \-\-validator
+acton localnet status dev \-\-json
+acton localnet node dev leave\-validation <NODE_ID>
 .fi
 .RE
 .sp
@@ -277,14 +277,14 @@ After the node leaves both elected sets, remove it:
 .sp
 .RS 4
 .nf
-acton full\-localnet node dev remove <NODE_ID> \-\-yes
+acton localnet node dev remove <NODE_ID> \-\-yes
 .fi
 .RE
-.SS "acton full-localnet snapshot"
-Save and restore the blockchain state and node topology. Full localnet
+.SS "acton localnet snapshot"
+Save and restore the blockchain state and node topology. Localnet
 snapshots are compressed archives of node databases stored in Docker volumes.
 .SS "Synopsis"
-\fBacton full\-localnet snapshot\fR [\fInetwork\fR] \fIcommand\fR
+\fBacton localnet snapshot\fR [\fInetwork\fR] \fIcommand\fR
 .SS "Subcommands"
 .sp
 .RS 4
@@ -322,16 +322,16 @@ Restoration rebuilds indexed data from the saved blockchain.
 .sp
 .RS 4
 .nf
-acton full\-localnet snapshot dev create before\-upgrade
-acton full\-localnet snapshot dev list
-acton full\-localnet snapshot dev restore <SNAPSHOT_ID> \-\-yes
+acton localnet snapshot dev create before\-upgrade
+acton localnet snapshot dev list
+acton localnet snapshot dev restore <SNAPSHOT_ID> \-\-yes
 .fi
 .RE
-.SS "acton full-localnet operation"
+.SS "acton localnet operation"
 Inspect a saved operation or wait for it to finish. Operations record
 progress phases, timing, results, and errors for network changes.
 .SS "Synopsis"
-\fBacton full\-localnet operation\fR \fIid\fR [\fB\-\-network\fR \fInetwork\fR] [\fB\-\-wait\fR]
+\fBacton localnet operation\fR \fIid\fR [\fB\-\-network\fR \fInetwork\fR] [\fB\-\-wait\fR]
 .sp
 Without \fB\-\-wait\fR, this command prints the saved operation record as JSON.
 With \fB\-\-wait\fR, it waits for a running operation and exits with an error if
@@ -342,7 +342,7 @@ Startup, node changes, and snapshot commands already wait for their operations.
 .sp
 .RS 4
 .nf
-acton full\-localnet operation <OPERATION_ID> \-\-network dev \-\-wait
+acton localnet operation <OPERATION_ID> \-\-network dev \-\-wait
 .fi
 .RE
 .SH "STARTUP ACCOUNTS"
@@ -351,7 +351,7 @@ Create a development wallet, then select it when you create the network:
 .RS 4
 .nf
 acton wallet new \-\-name deployer \-\-local
-acton full\-localnet start dev \-\-accounts deployer \-\-detach
+acton localnet start dev \-\-accounts deployer \-\-detach
 .fi
 .RE
 .sp
@@ -359,7 +359,7 @@ For several wallets, use a comma\-separated list:
 .sp
 .RS 4
 .nf
-acton full\-localnet start wallets \-\-accounts deployer,alice,bob \-\-detach
+acton localnet start wallets \-\-accounts deployer,alice,bob \-\-detach
 .fi
 .RE
 .sp
@@ -381,7 +381,7 @@ the account selection. Use a snapshot to restore a prepared test balance,
 or create a new network for a different initial selection.
 .sp
 The \fB[localnet].accounts\fR default applies to CLI creation. Studio uses the
-wallet selection submitted in its creation form. Full localnet timing and
+wallet selection submitted in its creation form. Localnet timing and
 ports come from the creation flags above, rather than other \fB[localnet]\fR settings.
 .SH "ACCOUNT IMPORTS"
 Use \fB\-\-accounts\-file\fR to include existing contract states in the zerostate.
@@ -394,7 +394,7 @@ Imported accounts and startup wallets share the same initial address space.
 .sp
 .RS 4
 .nf
-acton full\-localnet start imported \-\-accounts\-file accounts.json \-\-detach
+acton localnet start imported \-\-accounts\-file accounts.json \-\-detach
 .fi
 .RE
 .sp
@@ -483,10 +483,10 @@ for automated jobs. Wait for \fBstart\fR to succeed before sending API requests.
 .sp
 .RS 4
 .nf
-acton full\-localnet \-\-state\-dir /tmp/acton\-ci \-\-json \(rs
+acton localnet \-\-state\-dir /tmp/acton\-ci \-\-json \(rs
   start ci \-\-port\-base 19200 \-\-detach
-acton full\-localnet \-\-state\-dir /tmp/acton\-ci \-\-json status ci
-acton full\-localnet \-\-state\-dir /tmp/acton\-ci stop ci
+acton localnet \-\-state\-dir /tmp/acton\-ci \-\-json status ci
+acton localnet \-\-state\-dir /tmp/acton\-ci stop ci
 .fi
 .RE
 .sp
@@ -495,7 +495,7 @@ that network during job cleanup:
 .sp
 .RS 4
 .nf
-acton full\-localnet \-\-state\-dir /tmp/acton\-ci delete ci \-\-yes
+acton localnet \-\-state\-dir /tmp/acton\-ci delete ci \-\-yes
 .fi
 .RE
 .sp
@@ -523,8 +523,8 @@ Inspect status and the operation log:
 .sp
 .RS 4
 .nf
-acton full\-localnet status dev \-\-json
-acton full\-localnet logs dev \-\-tail 200
+acton localnet status dev \-\-json
+acton localnet logs dev \-\-tail 200
 .fi
 .RE
 .sp
@@ -576,4 +576,4 @@ defaults.
 This conflicts with \fB\-\-manifest\-path\fR\&.
 .RE
 .SH "SEE ALSO"
-acton(1), acton\-simulated\-localnet(1), acton\-wallet(1), acton\-script(1), acton\-rpc(1)
+acton(1), acton\-simulator(1), acton\-wallet(1), acton\-script(1), acton\-rpc(1)

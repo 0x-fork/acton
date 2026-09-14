@@ -202,7 +202,7 @@ pub async fn export_snapshot(
 ) -> Response {
     json_download_response(
         node.export_snapshot(payload.id).await,
-        "attachment; filename=acton-simulated-localnet-snapshot.json",
+        "attachment; filename=acton-simulator-snapshot.json",
     )
     .await
 }
@@ -296,7 +296,7 @@ pub async fn set_config_param(
         operation = "update_config",
         target = payload.index,
         phase = "applying",
-        "simulated localnet config update started"
+        "simulator config update started"
     );
 
     let result = node
@@ -309,7 +309,7 @@ pub async fn set_config_param(
         outcome = if result.is_ok() { "applied" } else { "failed" },
         block_seqno = result.as_ref().ok().map(|result| result.block_seqno),
         error = result.as_ref().err().map(|error| format!("{error:#}")),
-        "simulated localnet config update finished"
+        "simulator config update finished"
     );
 
     handle_result(async { result }, |res| {

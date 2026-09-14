@@ -32,7 +32,7 @@ pub enum SnapshotCommand {
 }
 
 /// Uses the node control API so CLI and Studio share snapshot validation and ownership.
-pub async fn simulated_localnet_snapshot_cmd(
+pub async fn simulator_snapshot_cmd(
     command: SnapshotCommand,
     port: u16,
     auth_token: Option<String>,

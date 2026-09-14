@@ -1,33 +1,32 @@
-ACTON-SIMULATED-LOCALNET(1)
+ACTON-SIMULATOR(1)
 
 NAME
-       acton-simulated-localnet — Run Acton’s simplified TON development
-       environment
+       acton-simulator — Run Acton’s simplified TON development environment
 
 SYNOPSIS
-       acton simulated-localnet [options] command
+       acton simulator [options] command
 
 DESCRIPTION
-       Acton simulated localnet is a fast, deterministic TON development
-       environment for local execution, forked-state development, and
-       faucet-based funding. It produces TON-compatible blocks and provides
-       LiteAPI, TON Center v2/v3, Streaming API, and Emulate API surfaces used
-       by many contract and dApp workflows.
+       Acton Simulator is a fast, deterministic TON development environment for
+       local execution, forked-state development, and faucet-based funding. It
+       produces TON-compatible blocks and provides LiteAPI, TON Center v2/v3,
+       Streaming API, and Emulate API surfaces used by many contract and dApp
+       workflows.
 
        It is Acton’s custom simplified implementation, not a real TON network
        or validator cluster. It does not model validators, consensus, shard
        elections, or the full production node and indexer stack.
 
 SUBCOMMANDS
-   acton simulated-localnet start
+   acton simulator start
        Start Acton’s simplified TON development environment.
 
       Synopsis
-          acton simulated-localnet start [options]
+          acton simulator start [options]
 
       Options
           --port port
-              Simulated localnet HTTP port.
+              Simulator HTTP port.
 
           --fork-net network
               Remote network to use for forked account resolution.
@@ -64,13 +63,13 @@ SUBCOMMANDS
 
           --no-mining
               Disable automatic block production. Mine blocks manually with
-              acton simulated-localnet mine or POST /acton_mine.
+              acton simulator mine or POST /acton_mine.
 
           --snapshots-dir path
               Directory for persistent JSON snapshots. Defaults to a .snapshots
               directory next to the SQLite database, or
-              .acton/simulated-localnet/<port>/snapshots inside the project
-              when no database is configured.
+              .acton/simulator/<port>/snapshots inside the project when no
+              database is configured.
 
           --liteapi
               Start the LiteAPI server on the TCP port immediately after the
@@ -84,11 +83,11 @@ SUBCOMMANDS
               Require a token for all Localnet HTTP API, control, emulate, and
               streaming endpoints. The server prints the token on startup.
 
-   acton simulated-localnet airdrop
+   acton simulator airdrop
        Send GRAM from the local faucet to an address.
 
       Synopsis
-          acton simulated-localnet airdrop [options] address
+          acton simulator airdrop [options] address
 
       Options
           address
@@ -98,51 +97,51 @@ SUBCOMMANDS
               Amount of GRAM to request.
 
           -p, --port port
-              Simulated localnet HTTP port.
+              Simulator HTTP port.
 
           --auth-token token
               Localnet API token for a server started with --require-auth. If
               omitted, Acton reads ACTON_LOCALNET_AUTH_TOKEN.
 
-   acton simulated-localnet mine
+   acton simulator mine
        Mine localnet blocks manually.
 
       Synopsis
-          acton simulated-localnet mine [options] [n]
+          acton simulator mine [options] [n]
 
       Options
           n
               Number of blocks to mine. Defaults to 1.
 
           -p, --port port
-              Simulated localnet HTTP port.
+              Simulator HTTP port.
 
           --auth-token token
               Localnet API token for a server started with --require-auth. If
               omitted, Acton reads ACTON_LOCALNET_AUTH_TOKEN.
 
-   acton simulated-localnet increase-time
+   acton simulator increase-time
        Increase the localnet virtual clock.
 
       Synopsis
-          acton simulated-localnet increase-time [options] seconds
+          acton simulator increase-time [options] seconds
 
       Options
           seconds
               Seconds to add to the virtual localnet clock.
 
           -p, --port port
-              Simulated localnet HTTP port.
+              Simulator HTTP port.
 
           --auth-token token
               Localnet API token for a server started with --require-auth. If
               omitted, Acton reads ACTON_LOCALNET_AUTH_TOKEN.
 
-   acton simulated-localnet set-time
+   acton simulator set-time
        Set the localnet virtual clock.
 
       Synopsis
-          acton simulated-localnet set-time [options] timestamp
+          acton simulator set-time [options] timestamp
 
       Options
           timestamp
@@ -150,17 +149,17 @@ SUBCOMMANDS
               latest mined block time.
 
           -p, --port port
-              Simulated localnet HTTP port.
+              Simulator HTTP port.
 
           --auth-token token
               Localnet API token for a server started with --require-auth. If
               omitted, Acton reads ACTON_LOCALNET_AUTH_TOKEN.
 
-   acton simulated-localnet set-next-block-timestamp
+   acton simulator set-next-block-timestamp
        Set a one-shot timestamp for the next localnet block.
 
       Synopsis
-          acton simulated-localnet set-next-block-timestamp [options] timestamp
+          acton simulator set-next-block-timestamp [options] timestamp
 
       Options
           timestamp
@@ -169,21 +168,21 @@ SUBCOMMANDS
               cannot be lower than the latest mined block time.
 
           -p, --port port
-              Simulated localnet HTTP port.
+              Simulator HTTP port.
 
           --auth-token token
               Localnet API token for a server started with --require-auth. If
               omitted, Acton reads ACTON_LOCALNET_AUTH_TOKEN.
 
-   acton simulated-localnet status
+   acton simulator status
        Inspect the current localnet status.
 
       Synopsis
-          acton simulated-localnet status [options]
+          acton simulator status [options]
 
       Options
           -p, --port port
-              Simulated localnet HTTP port.
+              Simulator HTTP port.
 
           --json
               Print machine-readable JSON.
@@ -192,11 +191,11 @@ SUBCOMMANDS
               Localnet API token for a server started with --require-auth. If
               omitted, Acton reads ACTON_LOCALNET_AUTH_TOKEN.
 
-   acton simulated-localnet snapshot
+   acton simulator snapshot
        Save and restore persistent JSON snapshots of a localnet.
 
       Synopsis
-          acton simulated-localnet snapshot [options] command
+          acton simulator snapshot [options] command
 
       Subcommands
           o  create [name] saves the current network state
@@ -259,13 +258,13 @@ TON CENTER API KEYS
        variables only for one-off overrides or CI.
 
 LOCALNET API AUTH
-       acton simulated-localnet start --require-auth protects every Localnet
-       HTTP route under /api/*, /acton_*, /api/emulate/*, and /api/streaming/*.
-       Static UI files remain public, but the bundled UI does not receive the
-       token from the server. When a protected API request returns 401, the
-       bundled UI shows a token overlay; paste the printed token there before
-       using protected API views. The key button in the sidebar footer reopens
-       the same overlay.
+       acton simulator start --require-auth protects every Localnet HTTP route
+       under /api/*, /acton_*, /api/emulate/*, and /api/streaming/*. Static UI
+       files remain public, but the bundled UI does not receive the token from
+       the server. When a protected API request returns 401, the bundled UI
+       shows a token overlay; paste the printed token there before using
+       protected API views. The key button in the sidebar footer reopens the
+       same overlay.
 
        When auth is enabled, the server prints a localnet API token. Pass it as
        either:
@@ -285,8 +284,8 @@ LOCALNET API AUTH
 RUNTIME MODEL
        o  fork mode allows local development against remote chain state
 
-       o  acton simulated-localnet start runs in the foreground until the
-          process is stopped
+       o  acton simulator start runs in the foreground until the process is
+          stopped
 
        o  Acton starts an HTTP server on 127.0.0.1:<port> for localnet API,
           control endpoints, and the bundled localnet UI
@@ -302,13 +301,13 @@ RUNTIME MODEL
           transactions are queued
 
        o  --no-mining or [localnet].no-mining = true disables automatic block
-          production; use acton simulated-localnet mine [N] or POST /acton_mine
-          to create blocks manually
+          production; use acton simulator mine [N] or POST /acton_mine to
+          create blocks manually
 
        o  localnet has a virtual clock for block and transaction time; use
-          acton simulated-localnet increase-time, acton simulated-localnet
-          set-time, or acton simulated-localnet set-next-block-timestamp to
-          move it without waiting for real time
+          acton simulator increase-time, acton simulator set-time, or acton
+          simulator set-next-block-timestamp to move it without waiting for
+          real time
 
        o  messages accepted through send_boc, acton_sendInternalMessage, or the
           faucet are queued and included on a later automatic or manually mined
@@ -400,8 +399,8 @@ CONTROL ENDPOINTS
           updates simulated network latency; use 0 to disable response delay
 
        Acton Studio exposes the same parameter editor under Config in the
-       Network section for simulated localnet environments. Changes preserve
-       all other parameters and historical configs.
+       Network section for simulator environments. Changes preserve all other
+       parameters and historical configs.
 
        TON Center-compatible message endpoints such as /api/v2/sendBoc and
        /api/v3/message accept external-in messages only. Use
@@ -430,8 +429,8 @@ PERSISTENCE
 
 EXIT STATUS
        o  0: The selected localnet subcommand completed successfully. For acton
-          simulated-localnet status, this also includes the selected port not
-          running; use --json and inspect running for automation.
+          simulator status, this also includes the selected port not running;
+          use --json and inspect running for automation.
 
        o  1: Startup failed because port binding, database setup, remote fork
           initialization, faucet handling, or a status/control query failed.
@@ -458,39 +457,39 @@ PROJECT OPTIONS
 EXAMPLES
        1. Start with defaults:
 
-              acton simulated-localnet start
+              acton simulator start
 
        2. Fork from testnet at a historical block:
 
-              acton simulated-localnet start --fork-net testnet --fork-block-number 55000000
+              acton simulator start --fork-net testnet --fork-block-number 55000000
 
        3. Use a dedicated snapshot directory:
 
-              acton simulated-localnet start --snapshots-dir snapshots
+              acton simulator start --snapshots-dir snapshots
 
        4. Airdrop local funds:
 
-              acton simulated-localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --amount 25
+              acton simulator airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --amount 25
 
        5. Start a local integration node with pre-funded accounts:
 
-              acton simulated-localnet start --accounts deployer,user --db-path build/localnet.db
+              acton simulator start --accounts deployer,user --db-path build/localnet.db
 
        6. Inspect a running localnet:
 
-              acton simulated-localnet status --json
+              acton simulator status --json
 
        7. Save and share a snapshot:
 
-              acton simulated-localnet snapshot create before-upgrade
-              acton simulated-localnet snapshot list --json
-              acton simulated-localnet snapshot restore <SNAPSHOT_ID>
-              acton simulated-localnet snapshot export <SNAPSHOT_ID> --out snapshots/before-upgrade.json
-              acton simulated-localnet snapshot import snapshots/before-upgrade.json
+              acton simulator snapshot create before-upgrade
+              acton simulator snapshot list --json
+              acton simulator snapshot restore <SNAPSHOT_ID>
+              acton simulator snapshot export <SNAPSHOT_ID> --out snapshots/before-upgrade.json
+              acton simulator snapshot import snapshots/before-upgrade.json
 
 SEE ALSO
        o  acton help wallet
 
-       o  Simulated localnet guide
-          <https://ton-blockchain.github.io/acton/docs/simulated-localnet/overview>
+       o  Simulator guide
+          <https://ton-blockchain.github.io/acton/docs/simulator/overview>
 

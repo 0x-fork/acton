@@ -3,10 +3,10 @@ title: "API compatibility"
 description: "Coverage matrix for Acton's simulated LiteAPI, TON Center v2/v3, Streaming API, and Emulate API surfaces"
 ---
 
-Acton simulated localnet implements the TON-compatible surfaces listed on this page for local
+Acton Simulator implements the TON-compatible surfaces listed on this page for local
 contract and dApp workflows. It is Acton's custom simplified implementation, not a real TON
 network. Use the coverage matrices to decide whether a workflow can use the simulation or
-requires a Full localnet.
+requires a Localnet.
 
 ## TON Center v2 Coverage Matrix
 
@@ -98,7 +98,7 @@ message bodies retain `body_raw` and use `parsed_body_type: "unknown"`.
 
 ## Streaming API v2
 
-Acton simulated localnet supports a TON Center Streaming API v2-compatible
+Acton Simulator supports a TON Center Streaming API v2-compatible
 subset for local tools and the bundled explorer UI. For protocol details,
 request fields, finality behavior, and notification schemas, use the
 [official TON Center Streaming API documentation](https://docs.ton.org/api/streaming/overview).

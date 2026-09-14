@@ -38,12 +38,12 @@ Built for **humans**. Perfect for **AI**.
   storage changes, actions, and value flow.
 - **Build the dApp.** Once the contracts are tested, generate TypeScript
   wrappers and connect them to the client application.
-- **Run locally.** Start `acton simulated-localnet` to run the contracts and client
+- **Run locally.** Start `acton simulator` to run the contracts and client
   together on a fast simulated TON network, with an optional fork when you need
   state from a public network. You keep full control over network state and
   block production, and can run the same environment in CI.
-- **Move beyond simulation.** When `acton simulated-localnet` is not enough, use
-  `acton full-localnet` to start real TON nodes and the supporting network stack
+- **Move beyond simulation.** When `acton simulator` is not enough, use
+  `acton localnet` to start real TON nodes and the supporting network stack
   on your computer, then test the dApp locally before moving to Testnet.
 - **Work visually.** Acton Studio brings test history, local environments,
   explorer views, wallets, and message simulation into one browser workspace

@@ -1,9 +1,9 @@
 ---
-title: "Acton simulated localnet"
+title: "Acton Simulator"
 description: "Use Acton's simplified TON simulation with compatible blocks and APIs for local development"
 ---
 
-`acton simulated-localnet` is a fast, deterministic TON development environment for local
+`acton simulator` is a fast, deterministic TON development environment for local
 execution, forked-state workflows, and faucet-based funding. It produces TON-compatible
 basechain and masterchain block cells and exposes compatible LiteAPI, TON Center v2,
 TON Center v3, Streaming API, and Emulate API surfaces.
@@ -11,7 +11,7 @@ TON Center v3, Streaming API, and Emulate API surfaces.
 This covers a large part of contract and dApp development. The environment is Acton's custom
 simplified implementation, **not a real TON network or validator cluster**. It does not model
 validators, consensus, shard elections, or the full production node and indexer stack. Use a
-Full localnet when the behavior under test depends on those parts of TON.
+Localnet when the behavior under test depends on those parts of TON.
 
 ## Why use it
 
@@ -32,22 +32,22 @@ The local node serves a bundled explorer UI from the same HTTP server as the API
 ## Learn more
 
 <Cards>
-  <Card href="/docs/simulated-localnet/getting-started" title="Getting Started">
+  <Card href="/docs/simulator/getting-started" title="Getting Started">
     Start the node, send your first airdrop, and verify that the API is available.
   </Card>
-  <Card href="/docs/simulated-localnet/forking-from-network" title="Forking from Network">
+  <Card href="/docs/simulator/forking-from-network" title="Forking from Network">
     Use testnet or mainnet state locally, including historical forks at a specific block.
   </Card>
-  <Card href="/docs/simulated-localnet/startup-accounts" title="Startup Accounts">
+  <Card href="/docs/simulator/startup-accounts" title="Startup Accounts">
     Auto-fund and auto-deploy configured wallets on node startup.
   </Card>
-  <Card href="/docs/simulated-localnet/persistence-and-snapshots" title="Persistence and State">
+  <Card href="/docs/simulator/persistence-and-snapshots" title="Persistence and State">
     Persist chain state to SQLite and save JSON snapshots for repeatable scenarios.
   </Card>
-  <Card href="/docs/simulated-localnet/api-compatibility" title="API Compatibility">
+  <Card href="/docs/simulator/api-compatibility" title="API Compatibility">
     Use TON Center-compatible v2/v3, Streaming API, and control endpoints.
   </Card>
-  <Card href="/docs/simulated-localnet/liteapi-support" title="LiteAPI Support">
+  <Card href="/docs/simulator/liteapi-support" title="LiteAPI Support">
     Connect LiteServer-compatible tools and check supported binary API methods.
   </Card>
 </Cards>

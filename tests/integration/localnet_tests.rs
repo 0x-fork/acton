@@ -521,7 +521,7 @@ fn localnet_start_port_conflict_is_reported_with_hint() {
 
     let output = project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("start")
         .arg("--port")
         .arg(&port)
@@ -532,7 +532,7 @@ fn localnet_start_port_conflict_is_reported_with_hint() {
 
     output
         .assert_not_contains("Starting Localnet server")
-        .assert_stderr_contains("Failed to start Acton simulated localnet on 127.0.0.1:")
+        .assert_stderr_contains("Failed to start Acton Simulator on 127.0.0.1:")
         .assert_stderr_contains("Set another port with [localnet].port in Acton.toml")
         .assert_stderr_contains("Or stop the process currently listening on that port")
         .assert_stderr_snapshot_matches(
@@ -785,7 +785,7 @@ fn localnet_no_mining_mines_only_on_request() {
 
     project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("mine")
         .arg("2")
         .arg("--port")
@@ -880,7 +880,7 @@ fn localnet_manual_mining_time_controls_update_blocks_and_transactions() {
     let next_block_timestamp_arg = next_block_timestamp.to_string();
     project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("set-next-block-timestamp")
         .arg(&next_block_timestamp_arg)
         .arg("--port")
@@ -1794,7 +1794,7 @@ fn localnet_require_auth_protects_http_api() {
 
     let status_output = project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("status")
         .arg("--json")
         .arg("--port")
@@ -1808,7 +1808,7 @@ fn localnet_require_auth_protects_http_api() {
 
     project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("airdrop")
         .arg(V3_TRANSACTIONS_TEST_ACCOUNT_A)
         .arg("--amount")
@@ -2139,7 +2139,7 @@ fn localnet_status_json_reports_running_node_details() {
     let node = project.localnet().start();
     let output = project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("status")
         .arg("--json")
         .arg("--port")
@@ -2164,7 +2164,7 @@ fn localnet_status_human_reports_running_node_details() {
     let node = project.localnet().start();
     let output = project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("status")
         .arg("--port")
         .arg(&node.port().to_string())
@@ -2188,7 +2188,7 @@ fn localnet_status_json_reports_stopped_node() {
 
     let output = project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("status")
         .arg("--json")
         .arg("--port")
@@ -2223,7 +2223,7 @@ fn localnet_status_json_reports_stopped_for_non_localnet_http_server() {
                 Ok((mut stream, _)) => {
                     let mut request = [0u8; 1024];
                     let _ = stream.read(&mut request);
-                    let body = "<html>not an acton simulated-localnet</html>";
+                    let body = "<html>not an acton simulator</html>";
                     let response = format!(
                         "HTTP/1.1 200 OK\r\ncontent-type: text/html\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
                         body.len(),
@@ -2244,7 +2244,7 @@ fn localnet_status_json_reports_stopped_for_non_localnet_http_server() {
 
     let output = project
         .acton()
-        .arg("simulated-localnet")
+        .arg("simulator")
         .arg("status")
         .arg("--json")
         .arg("--port")

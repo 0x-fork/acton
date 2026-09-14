@@ -11,7 +11,7 @@ points as JSON files, including volatile state such as pending messages and virt
 Use a database file when you want state continuity across runs:
 
 ```bash
-acton simulated-localnet start --db-path .acton/localnet.db
+acton simulator start --db-path .acton/localnet.db
 ```
 
 To make persistence the project default, configure the same path in
@@ -39,12 +39,12 @@ derived token/NFT caches belong to the running process. Create a snapshot of the
 Create a snapshot, then use its returned ID to restore or export it:
 
 ```bash
-acton simulated-localnet snapshot create before-upgrade
-acton simulated-localnet snapshot list --json
-acton simulated-localnet snapshot restore <SNAPSHOT_ID>
-acton simulated-localnet snapshot export <SNAPSHOT_ID> --out snapshots/before-upgrade.json
-acton simulated-localnet snapshot import snapshots/before-upgrade.json --name imported
-acton simulated-localnet snapshot delete <SNAPSHOT_ID>
+acton simulator snapshot create before-upgrade
+acton simulator snapshot list --json
+acton simulator snapshot restore <SNAPSHOT_ID>
+acton simulator snapshot export <SNAPSHOT_ID> --out snapshots/before-upgrade.json
+acton simulator snapshot import snapshots/before-upgrade.json --name imported
+acton simulator snapshot delete <SNAPSHOT_ID>
 ```
 
 Each snapshot is an immutable JSON file. Saving or restoring runs in the same queue
@@ -56,7 +56,7 @@ output file. Failed writes cannot truncate an existing export or publish a parti
 
 With a database, snapshots live in a sibling directory: `localnet.sqlite` uses
 `localnet.snapshots/`. Without a database, the default is
-`.acton/simulated-localnet/<port>/snapshots/` under the project root. Use
+`.acton/simulator/<port>/snapshots/` under the project root. Use
 `--snapshots-dir <path>` at startup to choose another location.
 
 Snapshots survive node restarts. Use the same directory on the next run to access them.
@@ -84,8 +84,8 @@ snapshot can also bring back explorer-oriented metadata and local admin state.
 
 ## Studio
 
-Open **Snapshots** in a simulated environment to create, restore, delete, import, or
-download snapshots. The page uses the same workflow as Full localnet. Simulated
+Open **Snapshots** in a Simulator environment to create, restore, delete, import, or
+download snapshots. The page uses the same workflow as Localnet. Simulator
 snapshots use JSON files and do not stop a running environment.
 
 Listing, importing, downloading, and deleting also work while the environment is

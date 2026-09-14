@@ -272,7 +272,7 @@ Configures shared defaults for the localnet target and local development service
 | `rate-limit`        | `integer`  | -       | Maximum `/api` requests per second to simulate provider limits (`429` on overflow).                                         |
 | `response-delay-ms` | `integer`  | -       | Response delay for `/api/v2`, `/api/v3`, and `/api/emulate/v1` endpoints; streaming/control/UI are not delayed.             |
 | `block-time-ms` | `integer`  | `500`   | Block production interval in milliseconds when automatic mining is enabled.                                                 |
-| `no-mining`         | `boolean`  | `false` | Disable automatic block production; mine blocks manually with `acton simulated-localnet mine` or `/acton_mine`.                       |
+| `no-mining`         | `boolean`  | `false` | Disable automatic block production; mine blocks manually with `acton simulator mine` or `/acton_mine`.                       |
 
 The localnet fork uses the network configuration from the resolved masterchain
 block. When `fork-block-number` is set, it also uses that block's Unix time;
@@ -293,7 +293,7 @@ block-time-ms = 500
 no-mining = false
 ```
 
-`acton simulated-localnet start --port <PORT>`, `--db-path <PATH>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, `--accounts <NAME[,NAME...]>`, `--rate-limit <RPS>`, `--response-delay-ms <MS>`, `--block-time-ms <MS>`, and `--no-mining` override these values for a single run. If `[localnet].no-mining = true`, there is no CLI flag that turns automatic mining back on for that run.
+`acton simulator start --port <PORT>`, `--db-path <PATH>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, `--accounts <NAME[,NAME...]>`, `--rate-limit <RPS>`, `--response-delay-ms <MS>`, `--block-time-ms <MS>`, and `--no-mining` override these values for a single run. If `[localnet].no-mining = true`, there is no CLI flag that turns automatic mining back on for that run.
 
 ## `[test]`
 
