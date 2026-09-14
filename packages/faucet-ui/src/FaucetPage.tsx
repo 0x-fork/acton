@@ -178,6 +178,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
   const [authBusy, setAuthBusy] = useState(true)
   const activeRunRef = useRef<FaucetRun | undefined>(undefined)
   const activeToastRef = useRef<string | undefined>(undefined)
+  const authToastRef = useRef<string | undefined>(undefined)
   const authInitializationRef = useRef<Promise<FaucetAuthInitializationResult> | undefined>(
     undefined,
   )
@@ -261,14 +262,14 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
           Boolean(initialAuthParams.error || (initialAuthParams.grant && sessionError)),
         )
         const toast = faucetAuthToast(initialAuthParams, session, sessionError)
-        if (toast) showToast(toast)
+        if (toast) authToastRef.current = showToast(toast)
         clearGitHubRedirectParams(initialAuthParams, setSearchParams)
       })
       .catch(error => {
         if (cancelled) return
         authResultHandledRef.current = true
         if (initialAuthParams.grant) {
-          showToast({
+          authToastRef.current = showToast({
             variant: "error",
             title: "GitHub connection failed",
             description: error instanceof Error ? error.message : "Unable to connect GitHub",
@@ -316,6 +317,14 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
 
   const handleConnectGitHub = () => {
     if (running || authBusy) return
+
+    clearFaucetSession()
+    setGitHubSession(undefined)
+    setGitHubConnectionFailed(false)
+    if (authToastRef.current) {
+      dismissToast(authToastRef.current)
+      authToastRef.current = undefined
+    }
 
     writeGitHubReturnState(
       address,
@@ -647,6 +656,20 @@ const GitHubLimitsCard: FC<GitHubLimitsCardProps> = props => {
   const {status, session, connectionFailed} = props
   if (!status?.enabled) return null
 
+  const period = formatRecurringPeriod(props.requestWindowMs)
+  let title = "Higher limits"
+  let description = `Connect GitHub to unlock up to ${status.establishedMaxRequests} requests ${period}`
+  let buttonLabel = "Connect GitHub"
+  if (session) {
+    title = `Connected as @${session.login}`
+    description = `${tierLabel(session)} tier · ${session.maxRequests} requests ${period}`
+    buttonLabel = "Disconnect"
+  } else if (connectionFailed) {
+    title = "GitHub is not connected"
+    description = `Reconnect GitHub for higher limits, or continue as a guest with ${status.guestMaxRequests} requests ${period}`
+    buttonLabel = "Reconnect GitHub"
+  }
+
   return (
     <section className={styles.githubCard} aria-label="GitHub faucet limits">
       <div className={styles.githubCopy}>
@@ -654,20 +677,8 @@ const GitHubLimitsCard: FC<GitHubLimitsCardProps> = props => {
           <Github size={18} aria-hidden="true" />
         </span>
         <div>
-          <h2>
-            {session
-              ? `Connected as @${session.login}`
-              : connectionFailed
-                ? "GitHub is not connected"
-                : "Higher limits"}
-          </h2>
-          <p>
-            {session
-              ? `${tierLabel(session)} tier · ${session.maxRequests} requests ${formatRecurringPeriod(props.requestWindowMs)}`
-              : connectionFailed
-                ? `Reconnect GitHub for higher limits, or continue as a guest with ${status.guestMaxRequests} requests ${formatRecurringPeriod(props.requestWindowMs)}`
-                : `Connect GitHub to unlock up to ${status.establishedMaxRequests} requests ${formatRecurringPeriod(props.requestWindowMs)}`}
-          </p>
+          <h2>{title}</h2>
+          <p>{description}</p>
         </div>
       </div>
       <Button
@@ -678,7 +689,7 @@ const GitHubLimitsCard: FC<GitHubLimitsCardProps> = props => {
         disabled={props.disabled}
         onClick={session ? props.onDisconnect : props.onConnect}
       >
-        {session ? "Disconnect" : connectionFailed ? "Reconnect GitHub" : "Connect GitHub"}
+        {buttonLabel}
       </Button>
     </section>
   )
@@ -880,15 +891,15 @@ function faucetAuthToast(
   }
   if (!params.grant) return undefined
   if (sessionError) {
+    const errorMessage =
+      sessionError instanceof Error ? sessionError.message : "Unable to connect GitHub"
     return {
       variant: "error",
       title: "GitHub connection failed",
       description:
         sessionError instanceof FaucetRequestError && sessionError.status === 401
           ? "Sign-in is invalid or expired. Select Reconnect GitHub, or continue as a guest"
-          : sessionError instanceof Error
-            ? sessionError.message
-            : "Unable to connect GitHub",
+          : errorMessage,
       durationMs: 8000,
     }
   }

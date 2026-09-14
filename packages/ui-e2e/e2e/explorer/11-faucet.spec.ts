@@ -320,6 +320,90 @@ test.describe("Testnet faucet", () => {
     await expect(page.getByRole("button", {name: "Disconnect"})).toBeVisible()
   })
 
+  test("reconnects after a rejected GitHub grant with a cleared session and preserved form", async ({
+    page,
+  }) => {
+    const staleToken = "stale-session-token-with-enough-entropy"
+    await page.addInitScript(
+      ({key, token}) => {
+        if (location.hash === "#github_grant=expired-grant") {
+          sessionStorage.setItem(key, token)
+        }
+      },
+      {key: SESSION_KEY, token: staleToken},
+    )
+    await page.unroute(AUTH_STATUS_URL)
+
+    let oauthDeviceUid: string | null = null
+    await page.route(AUTH_STATUS_URL, async route => {
+      const origin = route.request().headers().origin ?? "*"
+      if (route.request().method() === "OPTIONS") {
+        await route.fulfill({status: 204, headers: faucetCorsHeaders(origin)})
+        return
+      }
+      if (oauthDeviceUid !== null) {
+        expect(await page.evaluate(key => sessionStorage.getItem(key), SESSION_KEY)).toBeNull()
+      }
+      await route.fulfill({json: authStatus(true)})
+    })
+    await page.route("https://faucet.ton.org/auth/github/start?*", async route => {
+      oauthDeviceUid = new URL(route.request().url()).searchParams.get("device_uid")
+      expect(oauthDeviceUid).toBe(DEVICE_UID)
+      await route.fulfill({
+        status: 302,
+        headers: {location: new URL("/faucet#github_grant=fresh-grant", page.url()).toString()},
+      })
+    })
+    await page.route("https://faucet.ton.org/auth/exchange", async route => {
+      const request = route.request()
+      const origin = request.headers().origin ?? "*"
+      if (request.method() === "OPTIONS") {
+        await route.fulfill({status: 204, headers: faucetCorsHeaders(origin)})
+        return
+      }
+      const {grant} = request.postDataJSON()
+      if (grant === "expired-grant") {
+        await route.fulfill({status: 401, json: {error: "Invalid or expired GitHub session"}})
+        return
+      }
+
+      expect(grant).toBe("fresh-grant")
+      expect(request.headers()["x-device-uid"]).toBe(oauthDeviceUid)
+      expect(request.headers().authorization).toBeUndefined()
+      await route.fulfill({
+        json: githubSessionResponse("fresh-session-token-with-enough-entropy"),
+      })
+    })
+
+    await page.goto(`/faucet?network=testnet&address=${ADDRESS}#github_grant=expired-grant`)
+    const card = page.getByRole("region", {name: "GitHub faucet limits"})
+    await expect(card).toMatchAriaSnapshot(`
+      - region "GitHub faucet limits":
+        - heading "GitHub is not connected" [level=2]
+        - paragraph: Reconnect GitHub for higher limits, or continue as a guest with 2 requests per hour
+        - button "Reconnect GitHub"
+    `)
+    const notifications = page.getByRole("region", {name: "Notifications"})
+    await expect(notifications.getByText("GitHub connection failed", {exact: true})).toHaveCount(1)
+    await expect.poll(() => new URL(page.url()).hash).toBe("")
+    expect(await page.evaluate(key => sessionStorage.getItem(key), SESSION_KEY)).toBe(staleToken)
+    await page.getByRole("button", {name: "Reconnect GitHub"}).click()
+
+    await expect(card).toMatchAriaSnapshot(`
+      - region "GitHub faucet limits":
+        - heading "Connected as @acton-dev" [level=2]
+        - paragraph: Verified tier · 4 requests per hour
+        - button "Disconnect"
+    `)
+    await expect(page.getByLabel("TON address")).toHaveValue(ADDRESS)
+    await expect(page.getByRole("button", {name: "Testnet", exact: true})).toBeVisible()
+    await expect(notifications.getByText("GitHub connection failed", {exact: true})).toHaveCount(0)
+    await expect(notifications.getByText("GitHub connected", {exact: true})).toHaveCount(1)
+    expect(await page.evaluate(key => sessionStorage.getItem(key), SESSION_KEY)).toBe(
+      "fresh-session-token-with-enough-entropy",
+    )
+  })
+
   test("does not retain a token from a malformed GitHub grant response", async ({page}) => {
     const token = "opaque-session-token-with-enough-entropy"
     await page.unroute(AUTH_STATUS_URL)
