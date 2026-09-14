@@ -149,9 +149,7 @@ impl GitSourceStorage {
         self.startup_validated
             .get_or_try_init(|| async {
                 ensure_source_repository_initialized(repo_path, &self.storage_root).await?;
-                if self.commit_enabled {
-                    recover_uncommitted_storage(repo_path, &self.storage_root).await?;
-                }
+                recover_uncommitted_storage(repo_path, &self.storage_root).await?;
                 ensure_source_repository_clean(repo_path).await?;
                 ensure_current_source_attributes(repo_path, &self.storage_root).await?;
                 Ok(())
@@ -184,19 +182,37 @@ impl GitSourceStorage {
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
         ensure_git_repo(repo_path).await?;
         self.ensure_startup_validated(repo_path).await?;
-        if self.commit_enabled {
-            recover_uncommitted_storage(repo_path, &self.storage_root).await?;
-            ensure_source_repository_clean(repo_path).await?;
-        }
 
         let bundle_path = bundle_relative_path(&self.storage_root, &request.code_hash)?;
         let bundle_dir = repo_path.join(&bundle_path);
-        let existing_revision = if fs::try_exists(bundle_dir.join("manifest.json"))
-            .await
-            .map_err(|source| SourceStorageError::ReadDir {
-                path: bundle_dir.clone(),
-                source,
-            })? {
+        let has_existing_bundle = if self.commit_enabled {
+            let committed = git_has_committed_files(repo_path, &bundle_path).await?;
+            if !committed
+                && fs::try_exists(&bundle_dir).await.map_err(|source| {
+                    SourceStorageError::ReadDir {
+                        path: bundle_dir.clone(),
+                        source,
+                    }
+                })?
+            {
+                tracing::warn!(
+                    code_hash = %request.code_hash,
+                    bundle_path,
+                    "removing an uncommitted source bundle left by an interrupted verification"
+                );
+                cleanup_uncommitted_bundle(repo_path, &bundle_path, &bundle_dir).await?;
+            }
+            committed
+        } else {
+            fs::try_exists(bundle_dir.join("manifest.json"))
+                .await
+                .map_err(|source| SourceStorageError::ReadDir {
+                    path: bundle_dir.clone(),
+                    source,
+                })?
+        };
+
+        let existing_revision = if has_existing_bundle {
             let bundle = read_bundle(repo_path, &bundle_path).await?;
             Some(bundle.storage_revision)
         } else {
@@ -556,7 +572,11 @@ async fn recover_uncommitted_storage(
         return Ok(());
     }
 
-    tracing::warn!(%changes, "recovering interrupted source storage write");
+    tracing::warn!(
+        storage_root,
+        %changes,
+        "recovering interrupted source storage writes at startup"
+    );
     git(repo_path, &["reset", "--", storage_root]).await?;
     if !git_output(repo_path, &["ls-files", "--", storage_root])
         .await?
@@ -943,6 +963,18 @@ async fn git_has_staged_changes(
             &output,
         )),
     }
+}
+
+async fn git_has_committed_files(
+    repo_path: &Path,
+    bundle_path: &str,
+) -> Result<bool, SourceStorageError> {
+    git_output(
+        repo_path,
+        &["ls-tree", "-r", "--name-only", "HEAD", "--", bundle_path],
+    )
+    .await
+    .map(|output| !output.is_empty())
 }
 
 async fn git_with_author(

@@ -187,6 +187,75 @@ async fn git_source_storage_recovers_interrupted_write_after_restart() -> Result
 }
 
 #[tokio::test]
+async fn git_source_storage_recovers_interrupted_target_after_startup() -> Result<(), Box<dyn Error>>
+{
+    let fixture = GitFixture::new()?;
+    let config = Config::load_from_path(fixture.write_config()?)?;
+    let storage = GitSourceStorage::from_config(&config);
+    assert!(storage.current_revision().await?.is_some());
+
+    let bundle_path = format!(
+        "sources/{CODE_HASH_PREFIX}/{}",
+        &CODE_HASH[CODE_HASH_PREFIX.len()..]
+    );
+    let interrupted_dir = fixture.repo_path.join(&bundle_path);
+    fs::create_dir_all(&interrupted_dir)?;
+    fs::write(interrupted_dir.join("partial.tolk"), "partial")?;
+    assert_success(
+        run_command(
+            &fixture.repo_path,
+            "git",
+            ["add", "--", bundle_path.as_str()],
+        )?,
+        "git add interrupted target bundle",
+    )?;
+
+    let receipt = storage.store_bundle(source_bundle_request()).await?;
+
+    assert!(receipt.created);
+    assert!(!interrupted_dir.join("partial.tolk").exists());
+    assert!(interrupted_dir.join("manifest.json").is_file());
+    assert_eq!(
+        git_output(
+            &fixture.repo_path,
+            ["status", "--porcelain=v1", "--untracked-files=all"]
+        )?,
+        ""
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn git_source_storage_recovers_at_startup_when_commit_and_push_are_disabled()
+-> Result<(), Box<dyn Error>> {
+    let fixture = GitFixture::new()?;
+    let interrupted_dir = fixture.repo_path.join("sources/ff/interrupted");
+    fs::create_dir_all(&interrupted_dir)?;
+    fs::write(interrupted_dir.join("partial.tolk"), "partial")?;
+
+    let config_path = fixture.write_config()?;
+    let mut config_toml = fs::read_to_string(&config_path)?;
+    config_toml.push_str("commit_enabled = false\npush_enabled = false\n");
+    fs::write(&config_path, config_toml)?;
+
+    let config = Config::load_from_path(config_path)?;
+    let storage = GitSourceStorage::from_config(&config);
+    assert!(storage.current_revision().await?.is_some());
+
+    assert!(!interrupted_dir.exists());
+    assert_eq!(
+        git_output(
+            &fixture.repo_path,
+            ["status", "--porcelain=v1", "--untracked-files=all"]
+        )?,
+        ""
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn git_source_storage_pushes_a_completed_local_commit_during_startup()
 -> Result<(), Box<dyn Error>> {
     let fixture = GitFixture::new()?;
