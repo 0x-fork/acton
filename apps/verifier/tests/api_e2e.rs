@@ -840,6 +840,7 @@ async fn verification_status_reports_unverified_code_hash_without_stored_bundle(
     let body = response_json::<VerificationStatusResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(!body.verified);
+    assert_eq!(body.status, "unverified");
 }
 
 #[tokio::test]
@@ -869,6 +870,7 @@ async fn verification_status_reports_verified_after_successful_verify() {
     let body = response_json::<VerificationStatusResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(body.verified);
+    assert_eq!(body.status, "verified");
 }
 
 #[tokio::test]
@@ -898,6 +900,7 @@ async fn verification_status_resolves_code_hash_from_address() {
     let body = response_json::<VerificationStatusResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(body.verified);
+    assert_eq!(body.status, "verified");
 }
 
 #[tokio::test]
@@ -913,6 +916,85 @@ async fn verification_status_reports_unverified_contract() {
     let body = response_json::<VerificationStatusResponse>(response).await;
     assert_eq!(body.code_hash, CODE_HASH_ONE);
     assert!(!body.verified);
+    assert_eq!(body.status, "unverified");
+}
+
+#[tokio::test]
+async fn verification_status_reports_compiler_queue_progress() {
+    let fixture = blocking_verification_app_state(CODE_HASH_ONE);
+    let state = fixture.state.with_api_key(Some(API_KEY));
+    let first_request = tokio::spawn(post_verify_with_api_key(
+        state.clone(),
+        valid_verify_parts(),
+        API_KEY,
+    ));
+
+    tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        fixture.compiler_started.notified(),
+    )
+    .await
+    .expect("first compiler should start");
+
+    let second_request = tokio::spawn(post_verify_with_api_key(
+        state.clone(),
+        vec![
+            text_part("code_hash", CODE_HASH_TWO),
+            text_part("language", "tolk"),
+            text_part("compile_params", COMPILE_PARAMS_TOLK),
+            text_part("sources", SOURCES_MAIN),
+            file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+        API_KEY,
+    ));
+
+    let queued = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        loop {
+            let response = get(
+                state.clone(),
+                &format!("/api/v1/verification/status?code_hash={CODE_HASH_TWO}"),
+            )
+            .await;
+            let body = response_json::<VerificationStatusResponse>(response).await;
+            if body.status == "queued" {
+                break body;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("second verification should enter the compiler queue");
+    assert!(!queued.verified);
+
+    fixture.release_compiler.notify_one();
+    let first_response = first_request.await.expect("first request should finish");
+    assert_eq!(first_response.status(), StatusCode::OK);
+
+    tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        fixture.compiler_started.notified(),
+    )
+    .await
+    .expect("second compiler should start after the slot is released");
+    let response = get(
+        state.clone(),
+        &format!("/api/v1/verification/status?code_hash={CODE_HASH_TWO}"),
+    )
+    .await;
+    let compiling = response_json::<VerificationStatusResponse>(response).await;
+    assert_eq!(compiling.status, "compiling");
+
+    fixture.release_compiler.notify_one();
+    let second_response = second_request.await.expect("second request should finish");
+    assert_eq!(second_response.status(), StatusCode::OK);
+
+    let response = get(
+        state,
+        &format!("/api/v1/verification/status?code_hash={CODE_HASH_TWO}"),
+    )
+    .await;
+    let completed = response_json::<VerificationStatusResponse>(response).await;
+    assert_eq!(completed.status, "unverified");
 }
 
 #[tokio::test]
@@ -2851,6 +2933,7 @@ struct VerifyResponse {
 struct VerificationStatusResponse {
     code_hash: String,
     verified: bool,
+    status: String,
 }
 
 #[derive(Debug, Deserialize)]

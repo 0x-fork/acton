@@ -7,8 +7,11 @@ use tracing::instrument::WithSubscriber;
 
 use crate::{
     blockchain::{BlockchainClient, ToncenterClient},
-    compilers::{CompilerService, NodeCompilerService},
-    config::{Config, DEFAULT_MAX_REQUEST_BYTES},
+    compilation_queue::{CompilationQueue, CompilationStatus},
+    compilers::{
+        CompileOutput, CompileRequest, CompilerError, CompilerService, NodeCompilerService,
+    },
+    config::{Config, DEFAULT_MAX_CONCURRENT_COMPILATIONS, DEFAULT_MAX_REQUEST_BYTES},
     payment::{OnchainPaymentVerifier, PaymentError, PaymentVerifier},
     registry::{SourceVerificationRegistry, VerificationRegistry},
     registry_index::{SqliteVerificationIndex, VerificationIndexError},
@@ -23,6 +26,7 @@ pub struct AppState {
     verification_registry: Arc<dyn VerificationRegistry>,
     verification_service: VerificationService,
     payment_verifier: Arc<dyn PaymentVerifier>,
+    compilation_queue: CompilationQueue,
     max_request_bytes: usize,
     background_tasks: TaskTracker,
 }
@@ -50,6 +54,7 @@ impl AppState {
             payment_verifier,
         )
         .with_api_key(config.api_key())
+        .with_max_concurrent_compilations(config.max_concurrent_compilations())
         .with_max_request_bytes(config.max_request_bytes()))
     }
 
@@ -66,6 +71,7 @@ impl AppState {
             verification_registry,
             verification_service: VerificationService::new(blockchain_client),
             payment_verifier,
+            compilation_queue: CompilationQueue::new(Some(DEFAULT_MAX_CONCURRENT_COMPILATIONS)),
             max_request_bytes: DEFAULT_MAX_REQUEST_BYTES,
             background_tasks: TaskTracker::new(),
         }
@@ -84,6 +90,15 @@ impl AppState {
     }
 
     #[must_use]
+    pub fn with_max_concurrent_compilations(
+        mut self,
+        max_concurrent_compilations: Option<usize>,
+    ) -> Self {
+        self.compilation_queue = CompilationQueue::new(max_concurrent_compilations);
+        self
+    }
+
+    #[must_use]
     pub const fn max_request_bytes(&self) -> usize {
         self.max_request_bytes
     }
@@ -96,9 +111,18 @@ impl AppState {
             .is_some_and(|(expected, actual)| expected == actual)
     }
 
+    pub(crate) async fn compile(
+        &self,
+        code_hash: &str,
+        request: CompileRequest,
+    ) -> Result<CompileOutput, CompilerError> {
+        let _permit = self.compilation_queue.acquire(code_hash).await?;
+        self.compiler_service.compile(request).await
+    }
+
     #[must_use]
-    pub fn compiler_service(&self) -> &dyn CompilerService {
-        self.compiler_service.as_ref()
+    pub(crate) fn compilation_status(&self, code_hash: &str) -> Option<CompilationStatus> {
+        self.compilation_queue.status(code_hash)
     }
 
     #[must_use]

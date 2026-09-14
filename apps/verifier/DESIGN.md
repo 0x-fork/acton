@@ -384,6 +384,8 @@ Status responses include:
 
 - `code_hash`
 - `verified`
+- `status`: `unverified`, `queued`, `compiling`, or `verified`; `queued` means
+  that the request is waiting for a compiler concurrency slot
 
 Source responses include:
 

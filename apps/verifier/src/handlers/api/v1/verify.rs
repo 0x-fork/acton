@@ -276,6 +276,7 @@ async fn verify_unverified(
     } = prepare_compile_input(&language, &compile_params, sources, files)?;
     let compiled = run_compiler(
         state,
+        &resolved_target.code_hash,
         &configuration,
         &compile_params,
         retained_sources.clone(),
@@ -363,20 +364,23 @@ async fn verify_unverified(
 
 async fn run_compiler(
     state: &AppState,
+    code_hash: &str,
     configuration: &CompileConfiguration,
     compile_params: &Value,
     sources: Vec<CompileSource>,
 ) -> Result<CompileOutput, CompilerError> {
     state
-        .compiler_service()
-        .compile(CompileRequest {
-            language: configuration.language.clone(),
-            compiler_version: configuration.compiler_version.clone(),
-            entrypoint: configuration.entrypoint.clone(),
-            import_mappings: configuration.import_mappings.clone(),
-            compile_params: compile_params.clone(),
-            sources,
-        })
+        .compile(
+            code_hash,
+            CompileRequest {
+                language: configuration.language.clone(),
+                compiler_version: configuration.compiler_version.clone(),
+                entrypoint: configuration.entrypoint.clone(),
+                import_mappings: configuration.import_mappings.clone(),
+                compile_params: compile_params.clone(),
+                sources,
+            },
+        )
         .await
 }
 
