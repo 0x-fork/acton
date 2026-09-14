@@ -104,9 +104,13 @@ export async function requestFaucetAuthStatus(
   }
 }
 
+/**
+ * OAuth stores the query UID verbatim, so it must match the normalized UID
+ * that the faucet's request middleware supplies when exchanging the grant
+ */
 export function githubAuthorizationUrl(baseUrl?: string): string {
   const url = new URL("auth/github/start", faucetBaseUrl(baseUrl))
-  url.searchParams.set("device_uid", faucetDeviceUid())
+  url.searchParams.set("device_uid", faucetDeviceUid().replaceAll("-", "").toLowerCase())
   return url.toString()
 }
 

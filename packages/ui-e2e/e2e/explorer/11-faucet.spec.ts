@@ -4,7 +4,7 @@ import {prepareVisualPage} from "../support/visual"
 
 const ADDRESS = `0:${"11".repeat(32)}`
 const MAINNET_ADDRESS = "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACgQ"
-const DEVICE_UID = "12345678-1234-1234-1234-123456789abc"
+const DEVICE_UID = "12345678-1234-1234-1234-123456789ABC"
 const ADDRESS_HISTORY_KEY = "actonscanFaucetAddressHistory"
 const REQUEST_HISTORY_KEY = "actonscanFaucetRequestHistory"
 const SESSION_KEY = "actonscanFaucetSession"
@@ -348,7 +348,7 @@ test.describe("Testnet faucet", () => {
     })
     await page.route("https://faucet.ton.org/auth/github/start?*", async route => {
       oauthDeviceUid = new URL(route.request().url()).searchParams.get("device_uid")
-      expect(oauthDeviceUid).toBe(DEVICE_UID)
+      expect(oauthDeviceUid).toBe("12345678123412341234123456789abc")
       await route.fulfill({
         status: 302,
         headers: {location: new URL("/faucet#github_grant=fresh-grant", page.url()).toString()},
@@ -368,7 +368,12 @@ test.describe("Testnet faucet", () => {
       }
 
       expect(grant).toBe("fresh-grant")
-      expect(request.headers()["x-device-uid"]).toBe(oauthDeviceUid)
+      // Match the faucet middleware before comparing the header UID with the stored OAuth UID.
+      const deviceUid = request.headers()["x-device-uid"]?.replaceAll("-", "").toLowerCase()
+      if (deviceUid !== oauthDeviceUid) {
+        await route.fulfill({status: 401, json: {error: "Invalid or expired GitHub session"}})
+        return
+      }
       expect(request.headers().authorization).toBeUndefined()
       await route.fulfill({
         json: githubSessionResponse("fresh-session-token-with-enough-entropy"),
