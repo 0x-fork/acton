@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     path::{Component, Path, PathBuf},
     sync::{
         Arc,
@@ -123,6 +124,7 @@ pub struct GitSourceStorage {
     author_name: String,
     author_email: String,
     startup_validated: Arc<OnceCell<()>>,
+    shard_dirs: Arc<Mutex<HashSet<String>>>,
     pending_push: Arc<AtomicBool>,
     lock: Arc<Mutex<()>>,
 }
@@ -140,6 +142,7 @@ impl GitSourceStorage {
             author_name: config.source_repository_author_name().to_owned(),
             author_email: config.source_repository_author_email().to_owned(),
             startup_validated: Arc::new(OnceCell::new()),
+            shard_dirs: Arc::new(Mutex::new(HashSet::new())),
             pending_push: Arc::new(AtomicBool::new(true)),
             lock: Arc::new(Mutex::new(())),
         }
@@ -152,9 +155,35 @@ impl GitSourceStorage {
                 recover_uncommitted_storage(repo_path, &self.storage_root).await?;
                 ensure_source_repository_clean(repo_path).await?;
                 ensure_current_source_attributes(repo_path, &self.storage_root).await?;
+                let shard_dirs = discover_shard_dirs(repo_path, &self.storage_root).await?;
+                tracing::debug!(
+                    shard_count = shard_dirs.len(),
+                    "cached source storage shard directories"
+                );
+                *self.shard_dirs.lock().await = shard_dirs;
                 Ok(())
             })
             .await?;
+        Ok(())
+    }
+
+    async fn ensure_shard_dir(
+        &self,
+        repo_path: &Path,
+        shard: &str,
+    ) -> Result<(), SourceStorageError> {
+        if self.shard_dirs.lock().await.contains(shard) {
+            return Ok(());
+        }
+
+        let shard_dir = repo_path.join(&self.storage_root).join(shard);
+        fs::create_dir_all(&shard_dir)
+            .await
+            .map_err(|source| SourceStorageError::CreateDir {
+                path: shard_dir,
+                source,
+            })?;
+        self.shard_dirs.lock().await.insert(shard.to_owned());
         Ok(())
     }
 
@@ -220,7 +249,16 @@ impl GitSourceStorage {
                 let verified_at = request
                     .verified_at
                     .map_or_else(current_unix_timestamp, Ok)?;
+                let (shard, _) = request.code_hash.split_at(2);
+                self.ensure_shard_dir(repo_path, shard).await?;
+
                 let files_dir = bundle_dir.join("files");
+                fs::create_dir_all(&bundle_dir).await.map_err(|source| {
+                    SourceStorageError::CreateDir {
+                        path: bundle_dir.clone(),
+                        source,
+                    }
+                })?;
                 fs::create_dir_all(&files_dir).await.map_err(|source| {
                     SourceStorageError::CreateDir {
                         path: files_dir.clone(),
@@ -308,53 +346,19 @@ impl GitSourceStorage {
             .as_deref()
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
         ensure_git_repo(repo_path).await?;
+        self.ensure_startup_validated(repo_path).await?;
 
         let storage_dir = repo_path.join(&self.storage_root);
-        if !fs::try_exists(&storage_dir)
+        let shard_dirs = self
+            .shard_dirs
+            .lock()
             .await
-            .map_err(|source| SourceStorageError::ReadDir {
-                path: storage_dir.clone(),
-                source,
-            })?
-        {
-            return Ok(Vec::new());
-        }
-
-        let mut shard_entries =
-            fs::read_dir(&storage_dir)
-                .await
-                .map_err(|source| SourceStorageError::ReadDir {
-                    path: storage_dir.clone(),
-                    source,
-                })?;
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
         let mut code_hashes = Vec::new();
-        while let Some(shard_entry) =
-            shard_entries
-                .next_entry()
-                .await
-                .map_err(|source| SourceStorageError::ReadDir {
-                    path: storage_dir.clone(),
-                    source,
-                })?
-        {
-            let file_type =
-                shard_entry
-                    .file_type()
-                    .await
-                    .map_err(|source| SourceStorageError::ReadDir {
-                        path: shard_entry.path(),
-                        source,
-                    })?;
-            if !file_type.is_dir() {
-                continue;
-            }
-
-            let shard = shard_entry.file_name().to_string_lossy().into_owned();
-            if shard.len() != 2 {
-                continue;
-            }
-
-            let shard_dir = shard_entry.path();
+        for shard in shard_dirs {
+            let shard_dir = storage_dir.join(&shard);
             let mut bundle_entries =
                 fs::read_dir(&shard_dir)
                     .await
@@ -541,6 +545,57 @@ async fn remove_bundle_dir(bundle_dir: &Path) -> Result<(), SourceStorageError> 
             source,
         }),
     }
+}
+
+async fn discover_shard_dirs(
+    repo_path: &Path,
+    storage_root: &str,
+) -> Result<HashSet<String>, SourceStorageError> {
+    let storage_dir = checked_join(repo_path, storage_root)?;
+    if !fs::try_exists(&storage_dir)
+        .await
+        .map_err(|source| SourceStorageError::ReadDir {
+            path: storage_dir.clone(),
+            source,
+        })?
+    {
+        return Ok(HashSet::new());
+    }
+
+    let mut entries =
+        fs::read_dir(&storage_dir)
+            .await
+            .map_err(|source| SourceStorageError::ReadDir {
+                path: storage_dir.clone(),
+                source,
+            })?;
+    let mut shard_dirs = HashSet::new();
+    while let Some(entry) =
+        entries
+            .next_entry()
+            .await
+            .map_err(|source| SourceStorageError::ReadDir {
+                path: storage_dir.clone(),
+                source,
+            })?
+    {
+        let file_type = entry
+            .file_type()
+            .await
+            .map_err(|source| SourceStorageError::ReadDir {
+                path: entry.path(),
+                source,
+            })?;
+        if !file_type.is_dir() {
+            continue;
+        }
+
+        let shard = entry.file_name().to_string_lossy().into_owned();
+        if shard.len() == 2 {
+            shard_dirs.insert(shard);
+        }
+    }
+    Ok(shard_dirs)
 }
 
 async fn recover_uncommitted_storage(

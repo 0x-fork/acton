@@ -67,6 +67,8 @@ async fn git_source_storage_uses_configured_storage_root() -> Result<(), Box<dyn
             .is_file()
     );
     assert_eq!(storage.list_code_hashes().await?, vec![CODE_HASH]);
+    let restarted_storage = GitSourceStorage::from_config(&config);
+    assert_eq!(restarted_storage.list_code_hashes().await?, vec![CODE_HASH]);
     let stored_bundle = storage
         .load_bundle(CODE_HASH)
         .await?
