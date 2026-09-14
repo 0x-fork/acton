@@ -61,9 +61,11 @@ import {
   NFT_CARD_IMAGE_SOURCE_KEYS,
   NFT_COLLECTION_CARD_IMAGE_SOURCE_KEYS,
   NFT_IMAGE_SOURCE_KEYS,
+  NFT_PLACEHOLDER_IMAGE,
   TOKEN_IMAGE_SOURCE_KEYS,
   TOKEN_PLACEHOLDER_IMAGE,
   getImageSources,
+  getNftImageSources,
   replaceBrokenImageWithFallback,
 } from "../components/imageFallbacks"
 import {mergeAccountDomains, normalizeAddress, toRawAddress} from "../components/utils"
@@ -1810,8 +1812,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     : undefined
   const nftItemTokenInfo = accountTokenInfo.find(info => info.type === "nft_items")
   const nftCollectionTokenInfo = accountTokenInfo.find(info => info.type === "nft_collections")
-  const nftItemIsNsfw =
-    nftItemTokenInfo?.is_nsfw === true || currentNftItem?.is_nsfw === true
+  const nftItemIsNsfw = nftItemTokenInfo?.is_nsfw === true || currentNftItem?.is_nsfw === true
   const nftItemName =
     tokenInfoString(nftItemTokenInfo, "name") ||
     contentString(currentNftItem?.content, "name") ||
@@ -1822,8 +1823,8 @@ export const AccountPage: FC<AccountPageProps> = ({
   const nftItemImageSources = nftItemIsNsfw
     ? []
     : [
-        ...getImageSources(nftItemTokenInfo, NFT_IMAGE_SOURCE_KEYS),
-        ...getImageSources(currentNftItem?.content, NFT_IMAGE_SOURCE_KEYS),
+        ...getNftImageSources(nftItemTokenInfo, NFT_IMAGE_SOURCE_KEYS),
+        ...getNftImageSources(currentNftItem?.content, NFT_IMAGE_SOURCE_KEYS),
       ]
   const nftItemIsScam = nftItemTokenInfo?.is_scam === true || currentNftItem?.is_scam === true
   const nftItemMetadataJson = currentNftItem
@@ -1869,12 +1870,11 @@ export const AccountPage: FC<AccountPageProps> = ({
   const nftCollectionIsNsfw = nftCollectionTokenInfo?.is_nsfw === true
   const nftCollectionIsScam = nftCollectionTokenInfo?.is_scam === true
   const collectiblePreviews = nftItems.slice(0, 8).map(item => {
-    const imageSources = item.is_nsfw === true
-      ? []
-      : getImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
+    const imageSources =
+      item.is_nsfw === true ? [] : getNftImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
     return {
       address: item.address,
-      image: imageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE,
+      image: imageSources[0] ?? NFT_PLACEHOLDER_IMAGE,
       imageSources,
       blurred: item.is_scam === true,
       name:

@@ -5,9 +5,8 @@ import type {FC} from "react"
 import type {NftItem} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
-import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import {NftImage} from "./NftImage"
-import {NFT_CARD_IMAGE_SOURCE_KEYS, getImageSources} from "./imageFallbacks"
+import {NFT_CARD_IMAGE_SOURCE_KEYS, getNftImageSources} from "./imageFallbacks"
 import styles from "./Nfts.module.css"
 
 interface NftsProps {
@@ -83,9 +82,10 @@ export const Nfts: FC<NftsProps> = ({
         {visibleItems.map(item => {
           const name = getNftDisplayName(item)
           const collectionName = getCollectionName(item)
-          const imageSources = item.is_nsfw === true
-            ? []
-            : getImageSources(item.content, NFT_CARD_IMAGE_SOURCE_KEYS)
+          const imageSources =
+            item.is_nsfw === true
+              ? []
+              : getNftImageSources(item.content, NFT_CARD_IMAGE_SOURCE_KEYS)
           const isScam = item.is_scam === true
 
           return (
@@ -112,13 +112,14 @@ export const Nfts: FC<NftsProps> = ({
                 {isScam && <span className={styles.scamLabel}>SCAM</span>}
               </div>
               <div className={styles.nftInfo}>
-                {collectionName && <div className={styles.collectionName}>{collectionName}</div>}
-                <div className={styles.nftName}>{name}</div>
-                <div className={styles.nftMetaLine}>
-                  <span>#{item.index}</span>
-                  <span className={styles.nftAddress}>
-                    <ExplorerAddressChip address={item.address} copyable={false} variant="plain" />
-                  </span>
+                <div className={styles.collectionName} title={collectionName}>
+                  {collectionName ||
+                    (item.collection_address || item.collection?.address
+                      ? "Unknown collection"
+                      : "No collection")}
+                </div>
+                <div className={styles.nftName} title={name}>
+                  {name}
                 </div>
               </div>
             </div>

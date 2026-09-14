@@ -1,7 +1,7 @@
 import {useEffect, useState} from "react"
-import type {FC, ImgHTMLAttributes, SyntheticEvent} from "react"
+import type {FC, ImgHTMLAttributes} from "react"
 
-import {TOKEN_PLACEHOLDER_IMAGE, deduplicateImageSources} from "./imageFallbacks"
+import {NFT_PLACEHOLDER_IMAGE, deduplicateImageSources} from "./imageFallbacks"
 
 interface NftImageProps
   extends Omit<ImgHTMLAttributes<HTMLImageElement>, "onError" | "src" | "srcSet"> {
@@ -12,18 +12,10 @@ interface NftImageProps
 
 interface ResolvedNftImage {
   readonly src: string
-  readonly blurred: boolean
+  readonly sourcesKey: string
 }
 
-const getInitialImage = (sources: readonly string[], blurred: boolean): ResolvedNftImage => {
-  const primarySource = sources[0]
-  if (!primarySource) {
-    return {src: TOKEN_PLACEHOLDER_IMAGE, blurred: false}
-  }
-
-  return {src: primarySource, blurred}
-}
-
+/** Keeps local artwork visible until a candidate loads, so failed URLs never flash a broken image. */
 export const NftImage: FC<NftImageProps> = ({
   sources,
   blurred = false,
@@ -33,31 +25,43 @@ export const NftImage: FC<NftImageProps> = ({
   ...imageProps
 }) => {
   const sourcesKey = deduplicateImageSources(sources).join("\u0000")
-  const [image, setImage] = useState<ResolvedNftImage>(() => getInitialImage(sources, blurred))
+  const [image, setImage] = useState<ResolvedNftImage>()
+  const loadedSource = image?.sourcesKey === sourcesKey ? image.src : undefined
 
   useEffect(() => {
     const imageSources = sourcesKey ? sourcesKey.split("\u0000") : []
-    setImage(getInitialImage(imageSources, blurred))
-  }, [blurred, sourcesKey])
+    if (imageSources.length === 0) return
 
-  const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
-    const imageSources = sourcesKey ? sourcesKey.split("\u0000") : []
-    const currentSource = event.currentTarget.getAttribute("src")
-    const currentIndex = currentSource ? imageSources.indexOf(currentSource) : -1
-    const nextSource = imageSources[currentIndex + 1]
-    setImage({
-      src: nextSource ?? TOKEN_PLACEHOLDER_IMAGE,
-      blurred: nextSource !== undefined && blurred,
-    })
-  }
+    const candidate = new Image()
+    let sourceIndex = 0
+    candidate.onload = () => setImage({src: imageSources[sourceIndex], sourcesKey})
+    candidate.onerror = () => {
+      sourceIndex += 1
+      if (sourceIndex < imageSources.length) {
+        candidate.src = imageSources[sourceIndex]
+      }
+    }
+    candidate.src = imageSources[sourceIndex]
+
+    // A previous NFT must not replace the current image after its metadata or route changes.
+    return () => {
+      candidate.onload = null
+      candidate.onerror = null
+    }
+  }, [sourcesKey])
 
   return (
     <img
       {...imageProps}
-      src={image.src}
+      src={loadedSource ?? NFT_PLACEHOLDER_IMAGE}
       alt={alt}
-      className={`${className}${image.blurred ? ` ${blurredClassName}` : ""}`}
-      onError={handleImageError}
+      className={`${className}${loadedSource && blurred ? ` ${blurredClassName}` : ""}`}
+      onError={event => {
+        if (event.currentTarget.getAttribute("src") === NFT_PLACEHOLDER_IMAGE) return
+
+        event.currentTarget.src = NFT_PLACEHOLDER_IMAGE
+        setImage(undefined)
+      }}
     />
   )
 }
