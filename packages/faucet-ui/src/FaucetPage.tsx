@@ -174,12 +174,14 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
   const [usage, setUsage] = useState<FaucetUsage>(() => readFaucetUsage())
   const [authStatus, setAuthStatus] = useState<FaucetAuthStatus | undefined>(undefined)
   const [githubSession, setGitHubSession] = useState<FaucetSession | undefined>(undefined)
+  const [githubConnectionFailed, setGitHubConnectionFailed] = useState(false)
   const [authBusy, setAuthBusy] = useState(true)
   const activeRunRef = useRef<FaucetRun | undefined>(undefined)
   const activeToastRef = useRef<string | undefined>(undefined)
   const authInitializationRef = useRef<Promise<FaucetAuthInitializationResult> | undefined>(
     undefined,
   )
+  const authResultHandledRef = useRef(false)
   const requestLimit =
     githubSession?.maxRequests ?? authStatus?.guestMaxRequests ?? FAUCET_REQUEST_LIMIT
   const requestWindowMs = (authStatus?.windowSeconds ?? FAUCET_REQUEST_WINDOW_MS / 1000) * 1000
@@ -239,6 +241,9 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
   )
 
   useEffect(() => {
+    // Clearing OAuth parameters changes the router callback; handle the result only once.
+    if (authResultHandledRef.current) return
+
     let cancelled = false
     authInitializationRef.current ??= initializeFaucetAuth(
       initialAuthParams.grant,
@@ -249,14 +254,19 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
     void authInitializationRef.current
       .then(({status, session, sessionError}) => {
         if (cancelled) return
+        authResultHandledRef.current = true
         setAuthStatus(status)
         setGitHubSession(session)
+        setGitHubConnectionFailed(
+          Boolean(initialAuthParams.error || (initialAuthParams.grant && sessionError)),
+        )
         const toast = faucetAuthToast(initialAuthParams, session, sessionError)
         if (toast) showToast(toast)
         clearGitHubRedirectParams(initialAuthParams, setSearchParams)
       })
       .catch(error => {
         if (cancelled) return
+        authResultHandledRef.current = true
         if (initialAuthParams.grant) {
           showToast({
             variant: "error",
@@ -559,6 +569,7 @@ export const FaucetPage: FC<FaucetPageProps> = props => {
           <GitHubLimitsCard
             status={authStatus}
             session={githubSession}
+            connectionFailed={githubConnectionFailed}
             requestWindowMs={requestWindowMs}
             busy={authBusy}
             disabled={running}
@@ -624,6 +635,7 @@ interface FaucetStepProps {
 interface GitHubLimitsCardProps {
   readonly status?: FaucetAuthStatus
   readonly session?: FaucetSession
+  readonly connectionFailed: boolean
   readonly requestWindowMs: number
   readonly busy: boolean
   readonly disabled: boolean
@@ -632,7 +644,7 @@ interface GitHubLimitsCardProps {
 }
 
 const GitHubLimitsCard: FC<GitHubLimitsCardProps> = props => {
-  const {status, session} = props
+  const {status, session, connectionFailed} = props
   if (!status?.enabled) return null
 
   return (
@@ -642,11 +654,19 @@ const GitHubLimitsCard: FC<GitHubLimitsCardProps> = props => {
           <Github size={18} aria-hidden="true" />
         </span>
         <div>
-          <h2>{session ? `Connected as @${session.login}` : "Higher limits"}</h2>
+          <h2>
+            {session
+              ? `Connected as @${session.login}`
+              : connectionFailed
+                ? "GitHub is not connected"
+                : "Higher limits"}
+          </h2>
           <p>
             {session
               ? `${tierLabel(session)} tier · ${session.maxRequests} requests ${formatRecurringPeriod(props.requestWindowMs)}`
-              : `Connect GitHub to unlock up to ${status.establishedMaxRequests} requests ${formatRecurringPeriod(props.requestWindowMs)}`}
+              : connectionFailed
+                ? `Reconnect GitHub for higher limits, or continue as a guest with ${status.guestMaxRequests} requests ${formatRecurringPeriod(props.requestWindowMs)}`
+                : `Connect GitHub to unlock up to ${status.establishedMaxRequests} requests ${formatRecurringPeriod(props.requestWindowMs)}`}
           </p>
         </div>
       </div>
@@ -658,7 +678,7 @@ const GitHubLimitsCard: FC<GitHubLimitsCardProps> = props => {
         disabled={props.disabled}
         onClick={session ? props.onDisconnect : props.onConnect}
       >
-        {session ? "Disconnect" : "Connect GitHub"}
+        {session ? "Disconnect" : connectionFailed ? "Reconnect GitHub" : "Connect GitHub"}
       </Button>
     </section>
   )
@@ -854,7 +874,7 @@ function faucetAuthToast(
     return {
       variant: "error",
       title: "GitHub connection failed",
-      description: "Authorization was cancelled or expired",
+      description: "Authorization was cancelled or expired. Select Reconnect GitHub to try again",
       durationMs: 8000,
     }
   }
@@ -864,7 +884,11 @@ function faucetAuthToast(
       variant: "error",
       title: "GitHub connection failed",
       description:
-        sessionError instanceof Error ? sessionError.message : "Unable to connect GitHub",
+        sessionError instanceof FaucetRequestError && sessionError.status === 401
+          ? "Sign-in is invalid or expired. Select Reconnect GitHub, or continue as a guest"
+          : sessionError instanceof Error
+            ? sessionError.message
+            : "Unable to connect GitHub",
       durationMs: 8000,
     }
   }
