@@ -587,18 +587,18 @@ fun impl.toPredicate<T>(field: (T -> bool) | T | null): tuple {
 /// If not (most common), fast FFI path will be used.
 fun SearchParams.__hasPredicates(self): bool {
     return impl.isPredicate(self.to) | impl.isPredicate(self.from) | impl.isPredicate(self.value) |
-    impl.isPredicate(self.exitCode) |
-    impl.isPredicate(self.success) |
-    impl.isPredicate(self.aborted) |
-    impl.isPredicate(self.deploy) |
-    impl.isPredicate(self.bounce) |
-    impl.isPredicate(self.bounced) |
-    impl.isPredicate(self.opcode) |
-    impl.isPredicate(self.actionExitCode) |
-    impl.isPredicate(self.computePhaseSkipped) |
-    impl.isPredicate(self.body) |
-    impl.isPredicate(self.state_init) |
-    impl.isPredicate(self.sendMode);
+        impl.isPredicate(self.exitCode) |
+        impl.isPredicate(self.success) |
+        impl.isPredicate(self.aborted) |
+        impl.isPredicate(self.deploy) |
+        impl.isPredicate(self.bounce) |
+        impl.isPredicate(self.bounced) |
+        impl.isPredicate(self.opcode) |
+        impl.isPredicate(self.actionExitCode) |
+        impl.isPredicate(self.computePhaseSkipped) |
+        impl.isPredicate(self.body) |
+        impl.isPredicate(self.state_init) |
+        impl.isPredicate(self.sendMode);
 }
 
 /// Convert SearchParams to a tuple of plain nullable scalar values for the fast FFI path.
