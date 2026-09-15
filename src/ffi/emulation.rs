@@ -1,7 +1,7 @@
 use super::SearchParamIndex;
 use crate::commands::common::error_fmt;
 use crate::context::{
-    AssertFailure, CompilationResult, Context, DebugStopRequested, FailedSendMessageResult,
+    CompilationResult, Context, DebugStopRequested, FailedSendMessageResult,
     GetMethodAssertFailure, KnownAddress, MessageIterState, ParsedSearchParams, PendingMessageStep,
     SearchField, Wallet, code_lookup_hash, compile_project_contract_with_cache,
     is_treasury_code_hash, to_cell,
@@ -2652,65 +2652,80 @@ fn run_get_method_impl(
 
     match result {
         GetMethodResult::Success(result) => {
-            ctx.chain
-                .emulations
-                .save_get_method(&ctx.env.running_id, result.clone());
-
             let cell =
                 Boc::decode_base64(result.stack.as_ref()).context("Failed to decode stack BoC")?;
             let tuple = Tuple::deserialize(&cell).context("Failed to deserialize tuple")?;
 
-            if result.vm_exit_code != 0 && result.vm_exit_code != 1 {
-                let get_method = abi
-                    .as_deref()
-                    .and_then(|abi| abi.find_get_method_by_id(method_id));
+            let get_method = abi
+                .as_deref()
+                .and_then(|abi| abi.find_get_method_by_id(method_id));
 
-                let id_presentation = format!("({id})");
-                let id_presentation = id_presentation.dimmed();
+            let id_presentation = format!("({id})");
+            let id_presentation = id_presentation.dimmed();
 
-                let get_method_presentation = if let Some(get_method) = get_method {
-                    format!("{} {id_presentation}", get_method.name.yellow())
-                } else if name.is_empty() {
-                    format!("'' {id_presentation}")
-                } else {
-                    format!("{} {id_presentation}", name.yellow())
-                };
+            let get_method_presentation = if let Some(get_method) = get_method {
+                format!("{} {id_presentation}", get_method.name.yellow())
+            } else if name.is_empty() {
+                format!("'' {id_presentation}")
+            } else {
+                format!("{} {id_presentation}", name.yellow())
+            };
 
-                let suggested_name = if result.vm_exit_code == 11 {
-                    // TODO: right now get methods may not include all get methods
-                    let get_methods: Vec<&str> = abi
-                        .as_ref()
-                        .map(|abi| abi.get_methods.iter().map(|m| m.name.as_str()).collect())
-                        .unwrap_or_default();
-                    suggest_name(&name, &get_methods).map(ToOwned::to_owned)
-                } else {
-                    None
-                };
+            let suggested_name = if result.vm_exit_code == 11 {
+                // TODO: right now get methods may not include all get methods
+                let get_methods: Vec<&str> = abi
+                    .as_ref()
+                    .map(|abi| abi.get_methods.iter().map(|m| m.name.as_str()).collect())
+                    .unwrap_or_default();
+                suggest_name(&name, &get_methods).map(ToOwned::to_owned)
+            } else {
+                None
+            };
 
-                let location =
-                    retrace::find_exception_info(&result.vm_log, &source_map).map(|info| info.loc);
+            let location = if result.vm_exit_code != 0 && result.vm_exit_code != 1 {
+                retrace::find_exception_info(&result.vm_log, &source_map).map(|info| info.loc)
+            } else {
+                None
+            };
 
-                *ctx.asserts.assert_failure =
-                    Some(AssertFailure::GetMethod(GetMethodAssertFailure {
+            // Keep each invocation's context until a caller unwraps or asserts its result.
+            // Successful executions also need diagnostics when an expected exit code differs.
+            ctx.chain
+                .emulations
+                .save_get_method(&ctx.env.running_id, result.clone());
+            let diagnostic_id =
+                ctx.chain
+                    .emulations
+                    .save_get_method_diagnostic(GetMethodAssertFailure {
+                        message: None,
                         get_method_presentation,
                         vm_exit_code: result.vm_exit_code,
                         suggested_name,
                         vm_log: result.vm_log,
                         missing_libraries,
                         source_map,
-                        abi: abi.clone(),
+                        abi,
                         caller_trace: None,
                         location,
-                    }));
+                    });
 
-                stack.push(TupleItem::Null);
-                return Ok(());
-            }
-
-            stack.push(TupleItem::Tuple(tuple));
+            // Keep the method's stack nested so metadata never participates in Ret decoding.
+            let gas_used = result
+                .gas_used
+                .parse::<u64>()
+                .context("Invalid gas usage returned by get-method executor")?;
+            stack.push(TupleItem::Tuple(Tuple(vec![
+                TupleItem::Tuple(tuple),
+                TupleItem::Int(gas_used.into()),
+                TupleItem::Int(result.vm_exit_code.into()),
+                TupleItem::Int(diagnostic_id.into()),
+            ])));
         }
         GetMethodResult::Error(result) => {
-            println!("Error: {}", result.error);
+            anyhow::bail!(
+                "Cannot execute get method {method_id} at {addr}: {}",
+                result.error
+            );
         }
     }
 

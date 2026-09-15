@@ -72,10 +72,10 @@ Returns `null` for malformed or too-short body data:
 - body does not contain the `TlbEither` branch bit;
 - body marks `TlbEitherRight` but does not contain a body reference;
 - decoded body has fewer than 32 bits for the first opcode;
-- [skipBounce](#tlbmessagerelaxedgenericloadopcode) is true, first opcode is a bounce prefix (`0xFFFFFFFF` or `0xFFFFFFFE`),
-  and fewer than 32 bits remain for the second opcode.
+- [skipBounce](#tlbmessagerelaxedgenericloadopcode) is true and the original bounced payload is missing or too short.
 
-If [skipBounce](#tlbmessagerelaxedgenericloadopcode) is true, bounce prefixes `0xFFFFFFFF` and `0xFFFFFFFE` are skipped.
+If [skipBounce](#tlbmessagerelaxedgenericloadopcode) is true, `0xFFFFFFFF` is skipped inline, while `0xFFFFFFFE`
+loads the original body from the first reference. For other prefixes, returns the first 32-bit opcode.
 
 Example:
 ```tolk
@@ -116,7 +116,7 @@ Loads the opcode of the message.
 
 Same behavior as [TlbMessageRelaxedGeneric.loadOpcode](#tlbmessagerelaxedgenericloadopcode):
 - returns the first 32-bit opcode by default;
-- if [skipBounce](#tlbmessagerelaxedgenericloadopcode) is true, bounce prefixes `0xFFFFFFFF` and `0xFFFFFFFE` are skipped;
+- if [skipBounce](#tlbmessagerelaxedgenericloadopcode) is true, legacy and rich bounce envelopes are unwrapped;
 - returns `null` for malformed or too-short body data.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/types/message.tolk#L88" />

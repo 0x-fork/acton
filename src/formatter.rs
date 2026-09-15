@@ -13,7 +13,8 @@ use crate::retrace::{
 use acton_config::color::{OwoColorize, colors_enabled};
 use acton_config::test::BacktraceMode;
 use acton_debug::{
-    PrettyAddressFormat, PrettyRenderOptions, RenderedValue, exit_codes, render_tuple_as_tolk_type,
+    PrettyAddressFormat, PrettyRenderOptions, RenderedValue, exit_codes, is_internal_function_name,
+    render_tuple_as_tolk_type,
 };
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -2142,14 +2143,17 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
 
     #[must_use]
     pub(crate) fn format_backtrace(backtrace: &[TolkBacktraceFrame]) -> Vec<String> {
-        let max_function_name_len = backtrace
+        // Internal helpers should neither appear in user traces nor widen visible frames.
+        let visible_frames = backtrace
             .iter()
+            .filter(|frame| !is_internal_function_name(&frame.function_name));
+        let max_function_name_len = visible_frames
+            .clone()
             .map(|frame| frame.function_name.len() + 2)
             .max()
             .unwrap_or(0);
 
-        backtrace
-            .iter()
+        visible_frames
             .map(|frame| {
                 format!(
                     "{:<width$} at {}",
@@ -3510,6 +3514,10 @@ impl FormatterContext<'_> {
 
     #[must_use]
     pub fn format_get_method_assert_failure_title(failure: &GetMethodAssertFailure) -> String {
+        if let Some(message) = &failure.message {
+            return format!("Get method {}: {message}", failure.get_method_presentation);
+        }
+
         if failure.vm_exit_code == 11 {
             if let Some(suggested_name) = &failure.suggested_name {
                 return format!(
@@ -3540,7 +3548,8 @@ impl FormatterContext<'_> {
     pub fn format_get_method_assert_failure(&self, failure: &GetMethodAssertFailure) -> String {
         let mut output = Self::format_get_method_assert_failure_title(failure);
 
-        if (failure.vm_exit_code == 11 || failure.vm_exit_code == 2)
+        if failure.message.is_none()
+            && (failure.vm_exit_code == 11 || failure.vm_exit_code == 2)
             && failure.missing_libraries.is_empty()
         {
             return output;

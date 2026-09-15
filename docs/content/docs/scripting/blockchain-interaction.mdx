@@ -302,6 +302,37 @@ fun main() {
 }
 ```
 
+Use `net.runGetMethodExt()` to inspect gas usage and the VM exit code.
+Call `unwrap()` to check success and decode the result:
+
+```tolk
+val execution = net.runGetMethodExt<int>(counterAddress, "currentCounter");
+val currentValue = execution.unwrap();
+println("Counter value: {}", currentValue);
+println("Gas used: {}", execution.meta.gasUsed);
+```
+
+`GetMethodResult<Ret>.meta` contains `gasUsed` and `exitCode` for the contract's
+get-method execution. `isSuccess()` returns `true` for VM exit codes `0` and `1`.
+Neither metadata access nor `isSuccess()` decodes the result as `Ret`.
+
+On VM failure, `unwrap()` reports the getter's error and stops execution.
+For a successful nullable getter, `unwrap()` can return `null`.
+If `Ret` does not match the saved stack, `unwrap()` reports a decoding error.
+Repeated calls to `unwrap()` decode the same saved stack.
+
+In tests, use `toHaveExitCode()` to check an expected failure with getter diagnostics:
+
+```tolk
+val execution = net.runGetMethodExt<int>(contractAddress, "restrictedGetter");
+expect(execution).toHaveExitCode(123);
+expect(execution.meta.gasUsed).toBeLess(1000);
+```
+
+`net.runGetMethod()` checks success and decodes the result before returning it.
+Both functions throw if the contract is not deployed, has no code, or the emulator
+cannot run.
+
 ### Local vs remote state
 
 By default, `net.runGetMethod()` queries the **local emulator state** when the script runs without `--net`. To query **real deployed contracts** without broadcasting, use the `--fork-net` flag:

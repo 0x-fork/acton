@@ -1046,7 +1046,50 @@ fun net.disableBroadcast(): void {
 /// ```tolk
 /// val data = net.runGetMethod<JettonDataReply>(wallet.address, "get_jetton_data");
 /// ```
+/// Use [net.runGetMethodExt] to also obtain gas usage and the VM exit code.
 fun net.runGetMethod<Ret>(addr: address, idOrName: int | string, args: array<unknown> = []): Ret {
+    return net.runGetMethodExt<Ret>(addr, idOrName, args).unwrap();
+}
+
+/// Execution metadata from a completed get-method invocation, including VM failures.
+/// These values describe the contract execution, excluding the calling test or script.
+struct GetMethodMeta {
+    /// Gas consumed by the get-method execution in the VM.
+    gasUsed: int
+    /// VM exit code: `0` and `1` indicate success; other codes indicate failure.
+    exitCode: int
+}
+
+/// A completed get-method execution with metadata and a stack to decode as Ret.
+///
+/// Use `unwrap()` to read the typed value or report a VM failure.
+/// Metadata is available before decoding, including when Ret does not match the stack.
+/// Each result retains its own diagnostics for the lifetime of the test or script.
+struct GetMethodResult<Ret> {
+    /// Gas usage and exit code from this contract execution.
+    meta: GetMethodMeta
+    private stack: tuple
+    private methodName: string
+    private diagnosticId: int
+}
+
+/// Run a get method and return its execution result without decoding the stack as Ret.
+///
+/// Accepts the same address, method name or ID, and arguments as [net.runGetMethod].
+/// VM failures return a [GetMethodResult] with gas usage and the VM exit code.
+/// Throws if the contract is not deployed, has no code, or the emulator cannot run.
+/// Call `unwrap()` to check success and decode the stack as Ret.
+///
+/// ```tolk
+/// val execution = net.runGetMethodExt<coins>(wallet.address, "get_balance");
+/// val balance = execution.unwrap();
+/// expect(execution.meta.gasUsed).toBeLess(1000);
+/// ```
+fun net.runGetMethodExt<Ret>(
+    addr: address,
+    idOrName: int | string,
+    args: array<unknown> = [],
+): GetMethodResult<Ret> {
     val (methodId, methodName) = match (idOrName) {
         int => (idOrName, ""),
         string => ((ffi.crc16(idOrName) & 0xffff) | 0x10000, idOrName),
@@ -1056,32 +1099,76 @@ fun net.runGetMethod<Ret>(addr: address, idOrName: int | string, args: array<unk
     val code = ffi.getDeployedCode(addr.toCell());
     assert (code != null) throw CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE;
 
-    val res = ffi.runGetMethod(
+    val [stack, gasUsed, exitCode, diagnosticId] = ffi.runGetMethod(
         addr.toCell(),
         code,
         methodId,
         methodName,
         args,
     );
-    if (res == null) {
-        // actual error will be processed by test framework, just halt execution
-        throw 0;
+    return GetMethodResult<Ret>.__create(
+        stack,
+        GetMethodMeta { gasUsed, exitCode },
+        methodName,
+        diagnosticId,
+    );
+}
+
+// Tolk only permits initializing private fields from methods of their owning type.
+@inline
+fun GetMethodResult<Ret>.__create(
+    stack: tuple,
+    meta: GetMethodMeta,
+    methodName: string,
+    diagnosticId: int,
+): GetMethodResult<Ret> {
+    return GetMethodResult<Ret> { meta, stack, methodName, diagnosticId };
+}
+
+/// Returns whether the VM completed with exit code 0 or 1.
+/// This check does not decode the stack or validate it against Ret.
+fun GetMethodResult<Ret>.isSuccess(self): bool {
+    return self.meta.exitCode == 0 || self.meta.exitCode == 1;
+}
+
+/// Decode the saved stack as Ret, reporting VM failures with the getter's diagnostics.
+/// Successful nullable getters return null as a value of Ret.
+/// An incompatible Ret causes a decoding error. Metadata is available before this call.
+/// Repeated calls decode the same stack without executing the getter again.
+fun GetMethodResult<Ret>.unwrap(self): Ret {
+    if (!self.isSuccess()) {
+        self.__fail();
     }
+
     try {
-        return Ret.fromTuple(res);
+        return Ret.fromTuple(self.stack);
     } catch (e) {
         if (e == 7) {
             Assert.fail(
                 format(
                     "Get method '{}' returned '{}' that cannot be deserialized to '{}'. Make sure you passed all parameters to the get method.",
-                    methodName,
-                    res,
+                    self.methodName,
+                    self.stack,
                     reflect.typeNameOf<Ret>(),
                 ),
             );
         }
 
         throw e;
+    }
+}
+
+fun GetMethodResult<Ret>.__fail(self, expectedExitCode: int? = null): never {
+    ffi.failGetMethod(self.diagnosticId, expectedExitCode);
+    // The test framework reports the stored getter diagnostics after execution stops.
+    throw 0;
+}
+
+/// Expect a specific VM exit code without decoding the saved stack.
+/// A mismatch reports the expected code and the getter's execution diagnostics.
+fun Expectation<GetMethodResult<Ret>>.toHaveExitCode(self, exitCode: int): void {
+    if (self.value.meta.exitCode != exitCode) {
+        self.value.__fail(exitCode);
     }
 }
 
@@ -1569,7 +1656,7 @@ fun ffi.runGetMethod(
     methodId: int,
     methodName: string,
     args: tuple,
-): tuple?
+): [tuple, int, int, int]
     asm "8 EXTCALL"
 
 fun ffi.isDeployed(addr: cell): bool
@@ -1621,6 +1708,9 @@ fun ffi.failExternalSendNotAccepted(
     error: tuple,
 ): tuple?
     asm "109 EXTCALL"
+
+fun ffi.failGetMethod(diagnosticId: int, expectedExitCode: int?): void
+    asm "110 EXTCALL"
 
 fun ffi.loadLibrary(hash: string): cell?
     asm "21 EXTCALL"

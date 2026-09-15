@@ -54,7 +54,7 @@ struct TlbMessageRelaxedGeneric {
 /// - [skipBounce] is true and the original bounced payload is missing or too short.
 ///
 /// If [skipBounce] is true, `0xFFFFFFFF` is skipped inline, while `0xFFFFFFFE`
-/// loads the original body from the first reference. Other prefixes are unchanged.
+/// loads the original body from the first reference. For other prefixes, returns the first 32-bit opcode.
 ///
 /// Example:
 /// ```tolk

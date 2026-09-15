@@ -1121,7 +1121,7 @@ Step 61 (step_in):
      50| }
   Variables:
     self: Counter
-      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6 (last seen)
       init = <optimized out>
     (return value): int = 7
   Registers:
@@ -1136,7 +1136,7 @@ Step 62 (step_in):
     109| }
   Variables:
     counter: Counter
-      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6 (last seen)
       init = <optimized out>
     deployer: Treasury = (last seen)
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
