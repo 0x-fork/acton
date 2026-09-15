@@ -116,6 +116,7 @@ Example `/opt/ton-verifier/verifier.env`:
 VERIFIER_NETWORK=testnet
 VERIFIER_LOG_LEVEL=info
 VERIFIER_API_KEY=
+VERIFIER_READ_ONLY=false
 VERIFIER_TONCENTER_BASE_URL=https://testnet.toncenter.com
 VERIFIER_TONCENTER_API_KEY=
 VERIFIER_COMPILER_MAX_CONCURRENT_COMPILATIONS=1
@@ -137,6 +138,11 @@ VERIFIER_REGISTRY_INDEX_PATH=/var/lib/verifier/registry-index/registry-index.sql
 
 `VERIFIER_API_KEY` protects the optional `verified_at` field on
 `POST /api/v1/verify`; clients pass it in the `X-Verifier-Key` header.
+
+Set `VERIFIER_READ_ONLY=true` during maintenance to disable verification of new
+code hashes. `/api/v1/take_ticket` and `/api/v1/verify` return `503` for new
+contracts, while already verified contracts and all lookup endpoints remain
+available.
 
 `VERIFIER_UPLOAD_MAX_REQUEST_BYTES` is expressed in bytes, limits the complete
 multipart body, and defaults to 512 KiB. When nginx proxies the verifier,

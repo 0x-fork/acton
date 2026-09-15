@@ -226,6 +226,21 @@ async fn take_ticket_returns_a_testnet_payment_bound_to_the_code_hash() {
 }
 
 #[tokio::test]
+async fn take_ticket_rejects_new_contracts_in_read_only_mode() {
+    let response = post_take_ticket(
+        app_state(&[], CODE_HASH_ONE).with_read_only(true),
+        CODE_HASH_ONE,
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "verifier_read_only: verification of new contracts is disabled"})
+    );
+}
+
+#[tokio::test]
 async fn take_ticket_rejects_an_invalid_code_hash() {
     let response = post_take_ticket(app_state(&[], CODE_HASH_ONE), "not-a-code-hash").await;
 
@@ -266,6 +281,21 @@ async fn verify_requires_a_payment_for_unverified_code() {
     assert_eq!(
         response_json::<Value>(response).await,
         json!({"error": "missing required field: tx_hash"})
+    );
+}
+
+#[tokio::test]
+async fn verify_rejects_new_contracts_in_read_only_mode_before_payment() {
+    let response = post_verify(
+        payment_error_app_state(CODE_HASH_ONE, PaymentError::AlreadyUsed).with_read_only(true),
+        valid_verify_parts(),
+    )
+    .await;
+
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        response_json::<Value>(response).await,
+        json!({"error": "verifier_read_only: verification of new contracts is disabled"})
     );
 }
 
@@ -434,6 +464,35 @@ async fn take_ticket_skips_payment_for_already_verified_code() {
     assert!(body["source_bundle_hash"].is_string());
     assert!(body["storage_revision"].is_string());
     assert!(body.get("payment_address").is_none());
+}
+
+#[tokio::test]
+async fn read_only_mode_keeps_already_verified_contracts_available() {
+    let state = app_state(&[], CODE_HASH_ONE);
+    let verify_response = post_verify(state.clone(), valid_verify_parts()).await;
+    assert_eq!(verify_response.status(), StatusCode::OK);
+
+    let read_only_state = state.with_read_only(true);
+    let response = post_take_ticket(read_only_state.clone(), CODE_HASH_ONE).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response_json::<Value>(response).await["status"],
+        "already_verified"
+    );
+
+    let response = post_verify(read_only_state.clone(), valid_verify_parts()).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response_json::<Value>(response).await["verification_result"],
+        "already_verified"
+    );
+
+    let response = get(
+        read_only_state,
+        &format!("/api/v1/verification/source?code_hash={CODE_HASH_ONE}"),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[tokio::test]

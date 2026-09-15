@@ -32,6 +32,7 @@ const DEFAULT_PAYMENT_LEDGER_PATH: &str = "verifier-payments.sqlite3";
 pub struct Config {
     bind_addr: SocketAddr,
     api_key: Option<String>,
+    read_only: bool,
     logging_level: String,
     network: TonNetwork,
     toncenter_base_url: Option<String>,
@@ -105,6 +106,11 @@ impl Config {
     #[must_use]
     pub fn api_key(&self) -> Option<&str> {
         self.api_key.as_deref()
+    }
+
+    #[must_use]
+    pub const fn read_only(&self) -> bool {
+        self.read_only
     }
 
     #[must_use]
@@ -220,6 +226,7 @@ impl Default for Config {
         Self {
             bind_addr: default_bind_addr(),
             api_key: None,
+            read_only: false,
             logging_level: DEFAULT_LOG_LEVEL.to_owned(),
             network: TonNetwork::Testnet,
             toncenter_base_url: None,
@@ -334,6 +341,7 @@ impl ConfigFile {
         Ok(Config {
             bind_addr: self.server.bind_addr.unwrap_or_else(default_bind_addr),
             api_key: self.server.api_key.filter(|api_key| !api_key.is_empty()),
+            read_only: self.server.read_only.unwrap_or(false),
             logging_level: self
                 .logging
                 .level
@@ -403,6 +411,7 @@ impl ConfigFile {
 struct ServerConfig {
     bind_addr: Option<SocketAddr>,
     api_key: Option<String>,
+    read_only: Option<bool>,
 }
 
 #[derive(Debug, Default, Deserialize)]

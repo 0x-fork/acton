@@ -60,7 +60,7 @@ const MAX_SOURCE_PATH_CHARS: usize = 128;
         (status = 409, description = "Payment is already used or in progress", body = crate::error::ErrorResponse),
         (status = 413, description = "The request exceeds the configured upload limit", body = crate::error::ErrorResponse),
         (status = 502, description = "Compiler, blockchain, payment provider, or source storage failure", body = crate::error::ErrorResponse),
-        (status = 503, description = "Payment history recovery is in progress", body = crate::error::ErrorResponse)
+        (status = 503, description = "Verifier is read-only or payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),
     params(
         ("X-Verifier-Key" = Option<String>, Header, description = "API key used to authorize verified_at and verification without payment")
@@ -182,6 +182,10 @@ async fn handle_multipart(
             source_bundle_hash: Some(bundle.manifest.source_bundle_hash),
             storage_revision: Some(bundle.storage_revision),
         }));
+    }
+
+    if state.read_only() {
+        return Err(ApiError::read_only());
     }
 
     let payment_claim = if has_valid_api_key {

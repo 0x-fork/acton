@@ -68,6 +68,7 @@ write_generated_config() {
         printf '[server]\n'
         printf 'bind_addr = "%s"\n' "$(toml_escape "${VERIFIER_BIND_ADDR:-0.0.0.0:3000}")"
         write_optional_string api_key "${VERIFIER_API_KEY:-}"
+        printf 'read_only = %s\n' "${VERIFIER_READ_ONLY:-false}"
         printf '\n'
 
         printf '[logging]\n'

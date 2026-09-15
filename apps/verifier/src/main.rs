@@ -15,9 +15,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!(
         %addr,
         network = %config.network(),
+        read_only = config.read_only(),
         toncenter_base_url = %config.toncenter_base_url(),
         "starting verifier backend"
     );
+
+    if config.read_only() {
+        tracing::warn!(
+            "verifier read-only mode is enabled; new contract verifications will be rejected"
+        );
+    }
 
     let state = AppState::from_config(&config)?;
     let published_payment_transaction_hashes = if config.source_repository_path().is_some() {

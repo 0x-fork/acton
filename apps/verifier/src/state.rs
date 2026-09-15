@@ -22,6 +22,7 @@ use crate::{
 #[derive(Clone)]
 pub struct AppState {
     api_key: Option<String>,
+    read_only: bool,
     compiler_service: Arc<dyn CompilerService>,
     verification_registry: Arc<dyn VerificationRegistry>,
     verification_service: VerificationService,
@@ -54,6 +55,7 @@ impl AppState {
             payment_verifier,
         )
         .with_api_key(config.api_key())
+        .with_read_only(config.read_only())
         .with_max_concurrent_compilations(config.max_concurrent_compilations())
         .with_max_request_bytes(config.max_request_bytes()))
     }
@@ -67,6 +69,7 @@ impl AppState {
     ) -> Self {
         Self {
             api_key: None,
+            read_only: false,
             compiler_service,
             verification_registry,
             verification_service: VerificationService::new(blockchain_client),
@@ -80,6 +83,12 @@ impl AppState {
     #[must_use]
     pub fn with_api_key(mut self, api_key: Option<&str>) -> Self {
         self.api_key = api_key.map(ToOwned::to_owned);
+        self
+    }
+
+    #[must_use]
+    pub const fn with_read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
         self
     }
 
@@ -109,6 +118,11 @@ impl AppState {
             .as_deref()
             .zip(api_key)
             .is_some_and(|(expected, actual)| expected == actual)
+    }
+
+    #[must_use]
+    pub const fn read_only(&self) -> bool {
+        self.read_only
     }
 
     pub(crate) async fn compile(

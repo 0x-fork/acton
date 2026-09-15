@@ -16,6 +16,7 @@ use crate::{
 const INTERNAL_ERROR_MESSAGE: &str = "internal verifier error";
 const RETRYABLE_SOURCE_STORAGE_ERROR: &str =
     "verification_retryable: source storage is temporarily unavailable";
+const READ_ONLY_ERROR: &str = "verifier_read_only: verification of new contracts is disabled";
 
 #[derive(Debug)]
 pub struct ApiError {
@@ -109,6 +110,10 @@ impl ApiError {
             public_fallback: INTERNAL_ERROR_MESSAGE,
             payment_retryable: false,
         }
+    }
+
+    pub fn read_only() -> Self {
+        Self::service_unavailable(READ_ONLY_ERROR.to_owned())
     }
 
     #[must_use]

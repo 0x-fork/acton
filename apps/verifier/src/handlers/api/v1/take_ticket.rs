@@ -17,7 +17,7 @@ use super::validation;
         (status = 200, description = "Verification status or testnet payment quote", body = TakeTicketResponse),
         (status = 400, description = "Invalid code hash", body = crate::error::ErrorResponse),
         (status = 502, description = "Verification registry failure", body = crate::error::ErrorResponse),
-        (status = 503, description = "Payment history recovery is in progress", body = crate::error::ErrorResponse)
+        (status = 503, description = "Verifier is read-only or payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),
     tag = "verification"
 )]
@@ -40,6 +40,10 @@ pub async fn handler(
             source_bundle_hash: bundle.manifest.source_bundle_hash,
             storage_revision: bundle.storage_revision,
         }));
+    }
+
+    if state.read_only() {
+        return Err(ApiError::read_only());
     }
 
     if !state.payment_verifier().is_ready() {

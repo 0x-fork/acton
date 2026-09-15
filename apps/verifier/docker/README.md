@@ -57,6 +57,9 @@ use raw basechain form. At startup, the service rebuilds the payment ledger
 from wallet history and reports `503` until the scan is complete. This example
 sets the minimum payment to `0.5 GRAM`.
 
+Set `VERIFIER_READ_ONLY=true` to reject tickets and submissions for new code
+hashes while keeping verified source and metadata lookups available.
+
 Or mount a full TOML config:
 
 ```bash

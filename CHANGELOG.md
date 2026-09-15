@@ -362,6 +362,8 @@ API, web UI, and `acton verify` CLI integration are included below.
   configurable storage roots and independent commit/push controls, preserves
   exact source bytes, rejects dirty repositories at startup, and supports
   API-key-protected historical timestamp imports.
+- Verifier deployments can enter read-only mode to reject tickets and source
+  submissions for new code hashes while continuing to serve existing bundles.
 - Compiler execution clears inherited environment variables, limits file
   access through the Node permission model, disables writes and unsafe runtime
   features, and patches older Emscripten compilers for the restricted loader.

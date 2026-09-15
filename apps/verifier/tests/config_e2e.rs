@@ -15,6 +15,7 @@ fn example_config_toml_loads() {
             .expect("test bind address should be valid")
     );
     assert_eq!(config.api_key(), None);
+    assert!(!config.read_only());
     assert_eq!(config.logging_level(), "info");
     assert_eq!(config.network().to_string(), "testnet");
     assert_eq!(config.toncenter_base_url(), "https://testnet.toncenter.com");
@@ -63,6 +64,7 @@ fn omitted_network_uses_testnet() {
     let config = Config::load_from_path(config_file.path()).expect("default config should load");
 
     assert_eq!(config.logging_level(), "debug");
+    assert!(!config.read_only());
     assert_eq!(config.network().to_string(), "testnet");
     assert_eq!(config.toncenter_base_url(), "https://testnet.toncenter.com");
     assert_eq!(config.compiler_timeout(), Duration::from_secs(10));
@@ -191,6 +193,28 @@ fn docker_entrypoint_generates_upload_request_limit() {
 }
 
 #[test]
+fn docker_entrypoint_generates_read_only_mode() {
+    let directory = tempfile::tempdir().expect("config directory");
+    let config_path = directory.path().join("config.toml");
+    let output = std::process::Command::new("sh")
+        .args(["docker/entrypoint.sh", "true"])
+        .env_clear()
+        .env("PATH", std::env::var_os("PATH").expect("PATH"))
+        .env("VERIFIER_CONFIG", &config_path)
+        .env("VERIFIER_READ_ONLY", "true")
+        .output()
+        .expect("run entrypoint");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let config = Config::load_from_path(&config_path).expect("generated config");
+    assert!(config.read_only());
+}
+
+#[test]
 fn non_testnet_networks_are_rejected() {
     for network in ["mainnet", "localnet"] {
         let mut config_file =
@@ -220,6 +244,7 @@ fn source_repository_config_loads_from_toml() {
         r#"
 [server]
 api_key = "migration-api-key"
+read_only = true
 
 [logging]
 level = "debug"
@@ -259,6 +284,7 @@ ledger_path = "/tmp/verifier-payments.sqlite3"
 
     assert_eq!(config.logging_level(), "debug");
     assert_eq!(config.api_key(), Some("migration-api-key"));
+    assert!(config.read_only());
     assert_eq!(config.network().to_string(), "testnet");
     assert_eq!(config.toncenter_base_url(), "http://127.0.0.1:5412");
     assert_eq!(config.toncenter_api_key(), Some("test-key"));

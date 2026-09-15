@@ -119,6 +119,11 @@ payment claim.
 `POST /api/v1/take_ticket` accepts a code hash. If the code hash is verified,
 the endpoint returns the stored bundle metadata. No payment is necessary.
 
+When `server.read_only` is enabled, `/take_ticket` and `/verify` return `503`
+for code hashes that are not already registered. Existing bundles and all read
+endpoints remain available, and repeated submissions still return
+`already_verified`.
+
 For new code, the endpoint returns:
 
 - The testnet payment address.
