@@ -4,6 +4,16 @@ use crate::common::{check, check_with_width};
 use expect_test::expect;
 
 #[test]
+fn test_multiline_string_preserves_whitespace_only_lines() {
+    check(
+        "fun test() { val text = \"\"\"hello\n    \n\t \nworld\"\"\";\n\nreturn text; }",
+        expect![
+            "fun test() {\n    val text = \"\"\"hello\n    \n\t \nworld\"\"\";\n\n    return text;\n}"
+        ],
+    );
+}
+
+#[test]
 fn test_assignment() {
     check(
         "fun test() { x = 10; }",
@@ -60,12 +70,12 @@ fun foo() {
         expect![[r"
             fun foo() {
                 return 6 +
-                // comment 1
-                4 * 5 +
-                3 +
-                // comment 2
-                2 +
-                1;
+                    // comment 1
+                    4 * 5 +
+                    3 +
+                    // comment 2
+                    2 +
+                    1;
             }"]],
     );
 }
@@ -81,8 +91,8 @@ fun foo() {
         expect![[r"
             fun foo() {
                 return 1 +
-                // comment
-                2;
+                    // comment
+                    2;
             }"]],
     );
 }
@@ -99,10 +109,10 @@ fun foo() {
         expect![[r"
             fun foo() {
                 return 1 +
-                // comment 1
-                2 * 3 +
-                // comment 2
-                4;
+                    // comment 1
+                    2 * 3 +
+                    // comment 2
+                    4;
             }"]],
     );
 }
@@ -119,7 +129,7 @@ fun foo() {
         expect![[r"
             fun foo() {
                 return 1 + 2 // comment
-                + 3;
+                    + 3;
             }"]],
     );
 }
@@ -137,15 +147,36 @@ fn test_null_coalescing_operator() {
 }
 
 #[test]
+fn test_binary_operator_continuations_are_indented() {
+    check_with_width(
+        r"
+            fun test() {
+                val result = firstLongCondition && secondLongCondition && thirdLongCondition;
+                val sum = firstLongOperand + secondLongOperand + thirdLongOperand;
+            }
+        ",
+        expect![[r"
+            fun test() {
+                val result = firstLongCondition &&
+                    secondLongCondition &&
+                    thirdLongCondition;
+                val sum = firstLongOperand +
+                    secondLongOperand +
+                    thirdLongOperand;
+            }"]],
+        40,
+    );
+}
+
+#[test]
 fn test_binary_operator_breaking() {
-    // TODO:
     check_with_width(
         "fun test() { x = a + b + c + d; }",
         expect![[r"
-                fun test() {
-                    x = a + b + c +
+            fun test() {
+                x = a + b + c +
                     d;
-                }"]],
+            }"]],
         20,
     );
 }
@@ -2225,11 +2256,11 @@ fn test_complex_expression_combination_with_breaking() {
                     INIT_ORDER_BIT_OVERHEAD + orderBits + signersBits,
                     INIT_ORDER_CELL_OVERHEAD + orderCells + signersCells,
                 ) +
-                calculateForwardFee(
-                    BASECHAIN,
-                    EXECUTE_ORDER_BIT_OVERHEAD + orderBits,
-                    EXECUTE_ORDER_CELL_OVERHEAD + orderCells,
-                );
+                    calculateForwardFee(
+                        BASECHAIN,
+                        EXECUTE_ORDER_BIT_OVERHEAD + orderBits,
+                        EXECUTE_ORDER_CELL_OVERHEAD + orderCells,
+                    );
             }"]],
         80,
     );
@@ -2449,7 +2480,7 @@ fn test_complex_expression_combination_with_breaking() {
         expect![[r"
             fun main() {
                 val minWithForward = calcMinimalTransferAmount(DEFAULT_FORWARD_TON_AMOUNT, fwdFee) +
-                MIN_EDGE_DELTA;
+                    MIN_EDGE_DELTA;
             }"]],
         100,
     );

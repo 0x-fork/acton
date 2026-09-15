@@ -51,6 +51,8 @@ struct ItemDocInfo<'tree, 'a, 'ctx> {
     group_max_width: usize,
 }
 
+/// Prints list items and owns their outer comments and separators. Item printers must
+/// leave those comments to this function so separators precede inline line comments.
 pub fn print_list<'a, 'tree, T, F, N, P>(
     ctx: &Context<'tree>,
     items: &[T],
@@ -270,6 +272,30 @@ where
 pub fn print_comment_node<'a>(ctx: &Context<'_>, comment: &Node) -> RcDoc<'a> {
     let text = comment.utf8_text(ctx.code.as_ref().as_ref()).unwrap_or("");
     RcDoc::text(text.to_owned())
+}
+
+/// Finds comments inside an empty list or body, where there is no item to own them.
+pub(crate) fn collect_lonely_comments(node: Node<'_>) -> Vec<Node<'_>> {
+    node.named_children(&mut node.walk())
+        .filter(|node| node.kind() == "comment")
+        .collect()
+}
+
+/// Preserves explicit list layout without treating newlines inside an item as list separators.
+pub(crate) fn list_has_top_level_newline<'tree>(
+    ctx: &Context<'_>,
+    node: Node<'tree>,
+    items: impl IntoIterator<Item = Node<'tree>>,
+) -> bool {
+    let source = ctx.code.as_bytes();
+    let mut previous_end = node.start_byte().saturating_add(1);
+    for item in items {
+        if source[previous_end..item.start_byte()].contains(&b'\n') {
+            return true;
+        }
+        previous_end = item.end_byte();
+    }
+    source[previous_end..node.end_byte().saturating_sub(1)].contains(&b'\n')
 }
 
 #[must_use]

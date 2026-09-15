@@ -29,7 +29,8 @@ pub fn print_type<'a>(ctx: &Context<'_>, typ: &Type) -> Option<RcDoc<'a>> {
     Some(RcDoc::concat(docs))
 }
 
-fn print_type_naked<'a>(ctx: &Context<'_>, typ: &Type) -> Option<RcDoc<'a>> {
+/// Prints a type whose outer comments are owned by its enclosing list or wrapper.
+pub(crate) fn print_type_naked<'a>(ctx: &Context<'_>, typ: &Type) -> Option<RcDoc<'a>> {
     match typ {
         Type::TypeIdent(ident) => Some(common::print_node_text(ctx, &ident.0)?),
         Type::TypeInstantiatedTs(inst) => print_type_instantiated_ts(ctx, inst),
@@ -154,27 +155,28 @@ pub fn print_parenthesized_type<'a>(
 #[must_use]
 pub fn print_tensor_type<'a>(ctx: &Context<'_>, tensor: &TensorType) -> Option<RcDoc<'a>> {
     let elements: Vec<_> = tensor.elements().collect();
-    print_tuple_tensor_type(ctx, &elements, "(", ")")
+    print_tuple_tensor_type(ctx, &elements, tensor.0, "(", ")")
 }
 
 #[must_use]
 pub fn print_tuple_type<'a>(ctx: &Context<'_>, tuple: &TupleType) -> Option<RcDoc<'a>> {
     let elements: Vec<_> = tuple.elements().collect();
-    print_tuple_tensor_type(ctx, &elements, "[", "]")
+    print_tuple_tensor_type(ctx, &elements, tuple.0, "[", "]")
 }
 
 fn print_tuple_tensor_type<'a>(
     ctx: &Context,
     elements: &[Type],
+    node: tree_sitter::Node<'_>,
     open_quote: &'a str,
     close_quote: &'a str,
 ) -> Option<RcDoc<'a>> {
     common::print_list(
         ctx,
         elements,
-        print_type,
+        print_type_naked,
         Type::syntax,
-        |_| vec![],
+        |_| common::collect_lonely_comments(node),
         common::ListOptions {
             brackets: (RcDoc::text(open_quote), RcDoc::text(close_quote)),
             never_break_if_items_lt: 3,
@@ -203,25 +205,22 @@ pub fn print_type_instantiated_ts<'a>(
     let args = inst.arguments()?;
     let types: Vec<_> = args.types().collect();
 
-    if let [single_type] = types.as_slice()
-        && single_type_argument_should_stay_inline(single_type)
-    {
-        let single_type_doc = print_type(ctx, single_type)?;
-        return Some(RcDoc::concat([
-            name_doc,
-            RcDoc::text("<"),
-            single_type_doc,
-            RcDoc::text(">"),
-        ]));
-    }
-
     let types_doc = common::print_list(
         ctx,
         &types,
-        print_type,
+        print_type_naked,
         Type::syntax,
         |_| vec![],
-        common::ListOptions::triangle_bracket_list(),
+        common::ListOptions {
+            never_break_if_items_lt: if matches!(types.as_slice(), [single_type]
+                if single_type_argument_should_stay_inline(single_type))
+            {
+                2
+            } else {
+                0
+            },
+            ..common::ListOptions::triangle_bracket_list()
+        },
     )?;
 
     Some(RcDoc::concat([name_doc, types_doc]))

@@ -6,6 +6,130 @@ use expect_test::expect;
 // Healthy tests to check if nothing is broken while formatting
 
 #[test]
+fn test_binary_condition_uses_the_if_header_indentation() {
+    check_with_width(
+        r"
+            fun test() {
+                if (
+                    (storage.currectElections == null) || (srcWcAndHash.0 != -1) ||
+                        (srcWcAndHash.1 != configAddr)
+                ) {}
+            }
+        ",
+        expect![[r"
+            fun test() {
+                if (
+                    (storage.currectElections == null) || (srcWcAndHash.0 != -1) ||
+                    (srcWcAndHash.1 != configAddr)
+                ) {}
+            }"]],
+        100,
+    );
+}
+
+#[test]
+fn test_binary_expressions_use_control_flow_header_indentation() {
+    check_with_width(
+        r"
+            fun test() {
+                while (firstLongCondition && secondLongCondition && thirdLongCondition) {}
+                do {} while (firstLongCondition && secondLongCondition && thirdLongCondition);
+                assert (firstLongCondition && secondLongCondition && thirdLongCondition) throw 1000;
+                repeat (firstLongOperand + secondLongOperand + thirdLongOperand) {}
+                match (firstLongOperand + secondLongOperand + thirdLongOperand) {
+                    else => return 0
+                }
+            }
+        ",
+        expect![[r"
+            fun test() {
+                while (
+                    firstLongCondition &&
+                    secondLongCondition &&
+                    thirdLongCondition
+                ) {}
+                do {} while (
+                    firstLongCondition &&
+                    secondLongCondition &&
+                    thirdLongCondition
+                );
+                assert (
+                    firstLongCondition &&
+                    secondLongCondition &&
+                    thirdLongCondition
+                ) throw 1000;
+                repeat (
+                    firstLongOperand +
+                    secondLongOperand +
+                    thirdLongOperand
+                ) {}
+                match (
+                    firstLongOperand +
+                    secondLongOperand +
+                    thirdLongOperand
+                ) {
+                    else => return 0,
+                }
+            }"]],
+        40,
+    );
+}
+
+#[test]
+fn test_binary_condition_comments_use_the_header_indentation() {
+    check(
+        r"
+            fun test() {
+                if (firstLongCondition // condition
+                    && secondLongCondition) {}
+            }
+        ",
+        expect![[r"
+            fun test() {
+                if (
+                    firstLongCondition // condition
+                    && secondLongCondition
+                ) {}
+            }"]],
+    );
+}
+
+#[test]
+fn test_binary_continuations_outside_headers_keep_their_indentation() {
+    check_with_width(
+        r"
+            fun test() {
+                return firstLongOperand + secondLongOperand + thirdLongOperand;
+            }
+            fun another() {
+                if (check(firstLongOperand + secondLongOperand + thirdLongOperand)) {}
+                assert(ready, firstLongOperand + secondLongOperand + thirdLongOperand);
+            }
+        ",
+        expect![[r"
+            fun test() {
+                return firstLongOperand +
+                    secondLongOperand +
+                    thirdLongOperand;
+            }
+
+            fun another() {
+                if (
+                    check(
+                        firstLongOperand +
+                            secondLongOperand +
+                            thirdLongOperand,
+                    )
+                ) {}
+                assert(ready, firstLongOperand +
+                    secondLongOperand +
+                    thirdLongOperand);
+            }"]],
+        40,
+    );
+}
+
+#[test]
 fn test_if_statement() {
     check(
         "fun test() { if (true) { return 1; } else { return 0; } }",
@@ -955,13 +1079,13 @@ fn test_line_breaking_complex_expression_small_width() {
     check_with_width(
         "fun test() { x = a + b + c + d + e + f + g; }",
         expect![[r"
-                fun test() {
-                    x = a + b + c +
+            fun test() {
+                x = a + b + c +
                     d +
                     e +
                     f +
                     g;
-                }"]],
+            }"]],
         20,
     );
 }

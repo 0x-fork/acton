@@ -1,5 +1,5 @@
 use crate::pretty::RcDoc;
-use crate::{Context, common, exprs};
+use crate::{Context, comments, common, exprs};
 use tolk_syntax::{
     Assert, Block, CatchClause, DoWhile, ExprStmt, If, IfAlt, MatchStmt, Repeat, Return, Stmt,
     Throw, TryCatch, While,
@@ -76,7 +76,12 @@ fn print_if_statement<'a>(ctx: &Context<'_>, if_stmt: &If) -> Option<RcDoc<'a>> 
     ];
 
     if let Some(alternative) = alternative {
-        docs.push(RcDoc::text(" else "));
+        let next_node = match &alternative {
+            IfAlt::If(next_if) => next_if.0,
+            IfAlt::Block(block) => block.0,
+        };
+        docs.push(print_block_continuation(ctx, &body, Some(next_node)));
+        docs.push(RcDoc::text("else "));
         match alternative {
             IfAlt::If(next_if) => {
                 docs.push(print_if_statement(ctx, &next_if)?);
@@ -88,6 +93,35 @@ fn print_if_statement<'a>(ctx: &Context<'_>, if_stmt: &If) -> Option<RcDoc<'a>> 
     }
 
     Some(RcDoc::concat(docs))
+}
+
+fn print_block_continuation<'a>(
+    ctx: &Context<'_>,
+    block: &Block,
+    next_node: Option<tree_sitter::Node<'_>>,
+) -> RcDoc<'a> {
+    // The enclosing statement owns comments between its branches; the block printer
+    // only owns comments inside the braces. Keep continuation keywords out of `//` comments.
+    let block_comments = ctx.comments.get(&block.0);
+    let mut between = vec![];
+    comments::print_trailing_comments(ctx, &mut between, block_comments);
+    comments::print_leading_comments(
+        ctx,
+        &mut between,
+        next_node.and_then(|node| ctx.comments.get(&node)),
+    );
+
+    let mut docs = vec![];
+    comments::print_inline_comments(ctx, &mut docs, block_comments);
+    docs.push(
+        if !between.is_empty() || comments::has_inline_line_comments_on_node(ctx, block.0) {
+            RcDoc::hardline()
+        } else {
+            RcDoc::space()
+        },
+    );
+    docs.extend(between);
+    RcDoc::concat(docs)
 }
 
 fn print_while_statement<'a>(ctx: &Context<'_>, while_stmt: &While) -> Option<RcDoc<'a>> {
@@ -136,8 +170,9 @@ fn print_do_while_statement<'a>(ctx: &Context<'_>, do_while: &DoWhile) -> Option
     Some(RcDoc::concat([
         RcDoc::text("do "),
         body_doc,
+        print_block_continuation(ctx, &body, None),
         RcDoc::group(RcDoc::concat([
-            RcDoc::text(" while ("),
+            RcDoc::text("while ("),
             RcDoc::concat([RcDoc::line_(), condition_doc]).nest(4),
             RcDoc::line_(),
             RcDoc::text(");"),
@@ -185,6 +220,14 @@ pub(crate) fn print_throw_statement<'a>(ctx: &Context, throw_stmt: &Throw) -> Op
     ]))
 }
 
+/// The throw form gives the condition its own indented header; the comma form uses call layout.
+pub(crate) fn assert_uses_throw_syntax(assert_stmt: &Assert) -> bool {
+    assert_stmt
+        .0
+        .children(&mut assert_stmt.0.walk())
+        .any(|child| child.kind() == "throw")
+}
+
 fn print_assert_statement<'a>(ctx: &Context<'_>, assert_stmt: &Assert) -> Option<RcDoc<'a>> {
     let condition = assert_stmt.condition()?;
     let exc_no = assert_stmt.expr()?;
@@ -192,14 +235,7 @@ fn print_assert_statement<'a>(ctx: &Context<'_>, assert_stmt: &Assert) -> Option
     let condition_doc = exprs::print_expression(ctx, &condition)?;
     let exc_no_doc = exprs::print_expression(ctx, &exc_no)?;
 
-    // TODO: better way?
-    // Check if it's the throw form: assert(...) throw ...
-    let has_throw = assert_stmt
-        .0
-        .children(&mut assert_stmt.0.walk())
-        .any(|child| child.kind() == "throw");
-
-    if has_throw {
+    if assert_uses_throw_syntax(assert_stmt) {
         Some(RcDoc::group(RcDoc::concat([
             RcDoc::text("assert ("),
             RcDoc::concat([RcDoc::line_(), condition_doc]).nest(4),
@@ -229,7 +265,8 @@ fn print_try_catch_statement<'a>(ctx: &Context, try_catch: &TryCatch) -> Option<
     Some(RcDoc::concat([
         RcDoc::text("try "),
         body_doc,
-        RcDoc::text(" catch "),
+        print_block_continuation(ctx, &body, Some(catch.0)),
+        RcDoc::text("catch "),
         catch_doc,
     ]))
 }
