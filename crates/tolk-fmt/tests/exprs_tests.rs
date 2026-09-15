@@ -195,6 +195,33 @@ fn test_unary_operator() {
 }
 
 #[test]
+fn test_unary_signs_do_not_form_increment_or_decrement_tokens() {
+    check(
+        r"
+            fun test(x: int) {
+                val negative = - -x;
+                val positive = + +x;
+                val repeated = - - -x;
+                val literal = + +42;
+                val mixed = - +x;
+                val parenthesized = -(-x);
+                val logical = ! !true;
+            }
+        ",
+        expect![[r"
+            fun test(x: int) {
+                val negative = - -x;
+                val positive = + +x;
+                val repeated = - - -x;
+                val literal = + +42;
+                val mixed = -+x;
+                val parenthesized = -(-x);
+                val logical = !!true;
+            }"]],
+    );
+}
+
+#[test]
 fn test_ternary_operator() {
     check(
         "fun test() { x = a ? b : c; }",
@@ -1554,6 +1581,33 @@ fn test_match_expression_nested() {
                         else => null,
                     };
                 }"]],
+    );
+}
+
+#[test]
+fn test_lambda_parameter_defaults_are_preserved() {
+    check(
+        r#"
+            fun test() {
+                val compute = fun(x: int = 123): int { return x; };
+                val describe = fun(enabled: bool = true, label: string = "default", amount: int = 1 + 2) {
+                    return (enabled, label, amount);
+                };
+            }
+        "#,
+        expect![[r#"
+            fun test() {
+                val compute = fun(x: int = 123): int {
+                    return x;
+                };
+                val describe = fun(
+                    enabled: bool = true,
+                    label: string = "default",
+                    amount: int = 1 + 2,
+                ) {
+                    return (enabled, label, amount);
+                };
+            }"#]],
     );
 }
 

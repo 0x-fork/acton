@@ -212,9 +212,10 @@ pub fn print_source_file<'a>(ctx: &Context<'_>, file: &SourceFile) -> Option<RcD
         } else {
             comments::print_leading_comments(ctx, &mut docs, comments);
 
-            let Some(doc) = print_decl(ctx, &top_level) else {
-                continue;
-            };
+            // The parser accepts unfinished declarations while editing. Keep their
+            // source when a printer cannot handle them, so formatting cannot erase code.
+            let doc = print_decl(ctx, &top_level)
+                .unwrap_or_else(|| common::print_original_node_text_inline(ctx, &node));
             docs.push(doc);
 
             comments::print_inline_comments(ctx, &mut docs, comments);
@@ -286,9 +287,8 @@ fn print_source_file_preserving_order<'a>(
         } else {
             comments::print_leading_comments(ctx, &mut docs, comments);
 
-            let Some(doc) = print_decl(ctx, top_level) else {
-                continue;
-            };
+            let doc = print_decl(ctx, top_level)
+                .unwrap_or_else(|| common::print_original_node_text_inline(ctx, &node));
             docs.push(doc);
 
             comments::print_inline_comments(ctx, &mut docs, comments);
@@ -308,6 +308,8 @@ fn print_source_file_preserving_order<'a>(
     Some(RcDoc::concat(docs))
 }
 
+/// An incomplete declaration may lack a required component. Callers must preserve
+/// the original node when printing returns `None`, including during range formatting.
 #[must_use]
 pub fn print_decl<'a>(ctx: &Context<'_>, decl: &TopLevel) -> Option<RcDoc<'a>> {
     match decl {
@@ -831,7 +833,7 @@ impl ParameterTrait for LambdaParameter<'_> {
     where
         Self: 't,
     {
-        None
+        self.default()
     }
 }
 

@@ -7,6 +7,58 @@ use crate::common::{
 use expect_test::expect;
 
 #[test]
+fn test_incomplete_function_is_preserved() {
+    check("fun unfinished", expect!["fun unfinished"]);
+    check(
+        "fun unfinished(value: int):",
+        expect!["fun unfinished(value: int):"],
+    );
+    check(
+        "fun unfinished(value: int): int",
+        expect!["fun unfinished(value: int): int"],
+    );
+    check(
+        "fun unfinished() { if (true) }",
+        expect!["fun unfinished() { if (true) }"],
+    );
+}
+
+#[test]
+fn test_incomplete_declarations_preserve_comments_and_neighbors() {
+    check(
+        r"fun before(){return 1;}
+
+// Function in progress
+@inline
+fun    unfinished<T>(
+    value: T,
+): T // needs a body
+
+// Method in progress
+fun int.unfinished(self): int
+
+fun after(){return 2;}",
+        expect![[r"
+            fun before() {
+                return 1;
+            }
+
+            // Function in progress
+            @inline
+            fun    unfinished<T>(
+                value: T,
+            ): T // needs a body
+
+            // Method in progress
+            fun int.unfinished(self): int
+
+            fun after() {
+                return 2;
+            }"]],
+    );
+}
+
+#[test]
 fn test_function_parameters_comments() {
     check(
         "fun test(

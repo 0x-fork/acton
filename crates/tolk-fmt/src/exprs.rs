@@ -520,12 +520,22 @@ pub fn print_binary_operator<'a>(ctx: &Context<'_>, binary: &Bin) -> Option<RcDo
     ])))
 }
 
+/// Keeps adjacent signs separate so the compiler cannot read them as `++` or `--`.
 #[must_use]
 pub fn print_unary_operator<'a>(ctx: &Context<'_>, unary: &Unary) -> Option<RcDoc<'a>> {
     let op = unary.operator_name(ctx.code.as_ref().as_ref()).to_string();
     let arg = unary.argument()?;
     let arg_doc = print_expression(ctx, &arg)?;
-    Some(RcDoc::concat([RcDoc::text(op), arg_doc]))
+    let separator = if matches!(&arg, Expr::Unary(inner)
+        if matches!(op.as_str(), "+" | "-")
+            && inner.operator_name(ctx.code.as_ref().as_ref()) == op)
+    {
+        RcDoc::space()
+    } else {
+        RcDoc::nil()
+    };
+
+    Some(RcDoc::concat([RcDoc::text(op), separator, arg_doc]))
 }
 
 #[must_use]
