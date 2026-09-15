@@ -3,9 +3,12 @@ import {createRoot} from "react-dom/client"
 import {AppShell} from "../components/AppShell"
 import {SearchBox} from "../components/SearchBox"
 import {createVerifierApi} from "../lib/api"
+import {clearLegacyVerifierStorage} from "../lib/legacy-storage"
 import {getPathLookupValue} from "../lib/target"
 import {VerifiedContractPage} from "../pages/VerifiedContractPage"
 import "../global.css"
+
+clearLegacyVerifierStorage()
 
 const api = createVerifierApi()
 

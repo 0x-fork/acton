@@ -1,7 +1,10 @@
 import {createRoot} from "react-dom/client"
 
+import {clearLegacyVerifierStorage} from "../lib/legacy-storage"
 import {HomePage} from "../pages/HomePage"
 import "../global.css"
+
+clearLegacyVerifierStorage()
 
 const root = document.getElementById("root")
 if (!root) throw new Error("Verifier root element was not found")
