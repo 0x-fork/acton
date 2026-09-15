@@ -200,9 +200,11 @@ attempt also becomes claimable again while it remains within the three-attempt
 limit.
 
 Another request can verify the code after ticket issuance but before source
-submission. In this race, `/verify` returns `already_verified` without claiming
-the payment. The payment cannot verify another code hash and recovery later
-marks it as consumed.
+submission. A request without a payment transaction returns `already_verified`
+immediately. When a payment transaction is supplied, `/verify` claims it and
+checks the registry again before compilation. If the code hash is already
+verified, compilation is skipped, the normal payment finalization marks the
+claim as `consumed`, and the request returns `already_verified`.
 
 The payment ledger is a local SQLite database. The current claim and recovery
 protocol supports one write-capable verifier process for each payment wallet.

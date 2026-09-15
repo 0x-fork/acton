@@ -37,6 +37,8 @@ const CODE_HASH_ONE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 const CODE_HASH_ONE_BASE64: &str = "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=";
 const CODE_HASH_TWO: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const CODE_HASH_THREE: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const PAYMENT_TX_HASH_TWO: &str =
+    "b17d951a702b910d5f65b710ca8ce9667bd0f3d803cf848e01f75744a08d394c";
 const API_KEY: &str = "migration-api-key";
 const ORIGINAL_VERIFIED_AT: &str = "1678647600000";
 const COMPILE_PARAMS_TOLK: &str = r#"{"compiler_version":"1.4.1"}"#;
@@ -2140,6 +2142,34 @@ async fn verification_finishes_after_the_request_task_is_cancelled() {
             .await
             .expect("verification status should be readable")
             .verified
+    );
+}
+
+#[tokio::test]
+async fn an_outstanding_payment_is_consumed_when_the_code_hash_is_already_verified() {
+    let (state, outcomes) = recording_payment_app_state(CODE_HASH_ONE);
+
+    let first_response = post_verify(state.clone(), valid_verify_parts()).await;
+    assert_eq!(first_response.status(), StatusCode::OK);
+
+    let mut second_parts = valid_verify_parts();
+    second_parts.push(text_part("tx_hash", PAYMENT_TX_HASH_TWO));
+    let second_response = post_verify_without_payment(state, second_parts).await;
+    assert_eq!(second_response.status(), StatusCode::OK);
+    assert_eq!(
+        response_json::<VerifyResponse>(second_response)
+            .await
+            .verification_result,
+        "already_verified"
+    );
+    assert_eq!(
+        *outcomes
+            .lock()
+            .expect("payment outcomes mutex should not be poisoned"),
+        [
+            PaymentAttemptOutcome::Consumed,
+            PaymentAttemptOutcome::Consumed
+        ]
     );
 }
 
