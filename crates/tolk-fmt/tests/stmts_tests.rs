@@ -11,7 +11,7 @@ fn test_binary_condition_uses_the_if_header_indentation() {
         r"
             fun test() {
                 if (
-                    (storage.currectElections == null) || (srcWcAndHash.0 != -1) ||
+                    (storage.currentElections == null) || (srcWcAndHash.0 != -1) ||
                         (srcWcAndHash.1 != configAddr)
                 ) {}
             }
@@ -19,7 +19,7 @@ fn test_binary_condition_uses_the_if_header_indentation() {
         expect![[r"
             fun test() {
                 if (
-                    (storage.currectElections == null) || (srcWcAndHash.0 != -1) ||
+                    (storage.currentElections == null) || (srcWcAndHash.0 != -1) ||
                     (srcWcAndHash.1 != configAddr)
                 ) {}
             }"]],
