@@ -256,6 +256,9 @@ Actonscan. Clients solve a proof-of-work challenge before submitting a claim.
 
 - Transaction details show decoded storage, storage diffs, final account
   balances, actions, and gas and fee summaries.
+- Transaction details in Test UI and Studio tests link to the selected
+  transaction's logs. The Logs tab scrolls to the transaction and expands its
+  VM or executor log.
 - Trace overviews show value flow across accounts. Treasury deployment traces
   can be collapsed.
 
