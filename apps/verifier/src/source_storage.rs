@@ -151,6 +151,7 @@ impl GitSourceStorage {
     async fn ensure_startup_validated(&self, repo_path: &Path) -> Result<(), SourceStorageError> {
         self.startup_validated
             .get_or_try_init(|| async {
+                ensure_git_repo(repo_path).await?;
                 ensure_source_repository_initialized(repo_path, &self.storage_root).await?;
                 recover_uncommitted_storage(repo_path, &self.storage_root).await?;
                 ensure_source_repository_clean(repo_path).await?;
@@ -209,7 +210,6 @@ impl GitSourceStorage {
             .repo_path
             .as_deref()
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
-        ensure_git_repo(repo_path).await?;
         self.ensure_startup_validated(repo_path).await?;
 
         let bundle_path = bundle_relative_path(&self.storage_root, &request.code_hash)?;
@@ -324,7 +324,7 @@ impl GitSourceStorage {
             .repo_path
             .as_deref()
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
-        ensure_git_repo(repo_path).await?;
+        self.ensure_startup_validated(repo_path).await?;
 
         let bundle_path = bundle_relative_path(&self.storage_root, code_hash)?;
         let bundle_dir = repo_path.join(&bundle_path);
@@ -345,7 +345,6 @@ impl GitSourceStorage {
             .repo_path
             .as_deref()
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
-        ensure_git_repo(repo_path).await?;
         self.ensure_startup_validated(repo_path).await?;
 
         let storage_dir = repo_path.join(&self.storage_root);
@@ -399,9 +398,7 @@ impl GitSourceStorage {
             .repo_path
             .as_deref()
             .ok_or(SourceStorageError::MissingConfig("source_repository.path"))?;
-        ensure_git_repo(repo_path).await?;
         self.ensure_startup_validated(repo_path).await?;
-        ensure_current_source_attributes(repo_path, &self.storage_root).await?;
         if self.commit_enabled && self.push_enabled {
             self.push_pending_head(repo_path).await?;
         }
