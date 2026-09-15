@@ -84,6 +84,46 @@ fn test_asm_comments() {
 }
 
 #[test]
+fn test_asm_line_comment_preserves_next_instruction() {
+    check_with_width(
+        r#"fun two(): int asm "ONE" // first instruction
+            "INC";"#,
+        expect![[r#"
+            fun two(): int
+                asm
+                    "ONE" // first instruction
+                    "INC""#]],
+        1000,
+    );
+}
+
+#[test]
+fn test_asm_line_comments_preserve_following_literals() {
+    check(
+        r#"fun four(): int asm "ONE" "INC" // second instruction
+            """INC""" // third instruction
+            "INC";"#,
+        expect![[r#"
+            fun four(): int
+                asm
+                    "ONE"
+                    "INC" // second instruction
+                    """INC""" // third instruction
+                    "INC""#]],
+    );
+}
+
+#[test]
+fn test_asm_block_comment_keeps_instructions_inline() {
+    check(
+        r#"fun two(): int asm "ONE" /* first instruction */ "INC";"#,
+        expect![[r#"
+            fun two(): int
+                asm "ONE" /* first instruction */ "INC""#]],
+    );
+}
+
+#[test]
 fn test_annotation_comments() {
     check(
         "// leading list

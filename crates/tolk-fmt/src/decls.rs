@@ -1006,6 +1006,8 @@ fn print_function_body<'a>(ctx: &Context<'_>, body: &FuncBody) -> Option<RcDoc<'
     }
 }
 
+/// Preserves instruction literals and their comments. A line comment must end
+/// before the next literal, even when the whole body would fit on one line.
 #[must_use]
 pub fn print_asm_body<'a>(ctx: &Context<'_>, asm: &AsmBody) -> Option<RcDoc<'a>> {
     let mut parts = vec![RcDoc::text("asm")];
@@ -1065,7 +1067,11 @@ pub fn print_asm_body<'a>(ctx: &Context<'_>, asm: &AsmBody) -> Option<RcDoc<'a>>
 
         let is_last = i == instructions.len() - 1;
         if !is_last {
-            inst_docs.push(RcDoc::line());
+            inst_docs.push(if comments::has_inline_line_comments_on_node(ctx, *node) {
+                RcDoc::hardline()
+            } else {
+                RcDoc::line()
+            });
         }
 
         if let Some(c) = comments
