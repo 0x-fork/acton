@@ -141,21 +141,23 @@ format("{:gram}", true); // "true"
 fun parseInt(x: string): int
 ```
 
-Parse a decimal string into an int value.
+Parse a decimal, hexadecimal (`0x`), or binary (`0b`) string into an int value.
 
 Leading and trailing whitespace is ignored before parsing.
-After trimming, accepts an optional leading sign followed by decimal digits.
-Invalid input (non-numeric characters, empty string, whitespace-only string)
-fails with an error.
+Accepts an optional leading `+` or `-` before the digits or base prefix.
+Underscores are ignored within the number, as in Tolk integer literals.
+Invalid digits, an empty string, or a whitespace-only string
+cause an error.
 
 Example:
 ```tolk
 val n = parseInt("12345");
 val negative = parseInt("-42");
+val hex = parseInt("0xff");
 val withWhitespace = parseInt(" 42 ");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L149" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L151" />
 
 ## `parseAddress`
 
@@ -177,7 +179,7 @@ Example:
 val address = parseAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L168" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L170" />
 
 ## `parseCellFromHex`
 
@@ -191,7 +193,7 @@ Decode a root cell from hex-encoded BOC bytes.
 Invalid or malformed input (including non-BOC payloads) fails with an error like
 `Failed to decode cell hex <input>`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L178" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L180" />
 
 ## `parseCellFromBase64`
 
@@ -208,5 +210,5 @@ Decode a root cell from base64-encoded BOC bytes.
 Invalid or malformed input (including non-BOC payloads) fails with an error like
 `Failed to decode cell base64 <input>`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L189" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/fmt.tolk#L191" />
 

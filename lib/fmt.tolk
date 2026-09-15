@@ -133,17 +133,19 @@ fun format<T1 = void, T2 = void, T3 = void, T4 = void, T5 = void>(
     );
 }
 
-/// Parse a decimal string into an int value.
+/// Parse a decimal, hexadecimal (`0x`), or binary (`0b`) string into an int value.
 ///
 /// Leading and trailing whitespace is ignored before parsing.
-/// After trimming, accepts an optional leading sign followed by decimal digits.
-/// Invalid input (non-numeric characters, empty string, whitespace-only string)
-/// fails with an error.
+/// Accepts an optional leading `+` or `-` before the digits or base prefix.
+/// Underscores are ignored within the number, as in Tolk integer literals.
+/// Invalid digits, an empty string, or a whitespace-only string
+/// cause an error.
 ///
 /// Example:
 /// ```tolk
 /// val n = parseInt("12345");
 /// val negative = parseInt("-42");
+/// val hex = parseInt("0xff");
 /// val withWhitespace = parseInt(" 42 ");
 /// ```
 fun parseInt(x: string): int {

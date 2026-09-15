@@ -122,6 +122,9 @@ fun promptInt(message: string, default: string = "", placeholder: string = ""): 
 
 Prompts the user for an integer.
 
+Accepts the same decimal, hexadecimal (`0x`), and binary (`0b`) input as [parseInt](/docs/standard_library/fmt#parseint).
+These formats also apply to `default`.
+
 Interactive behavior:
 - Invalid input is rejected by the host prompt validator until the user
   corrects it.
@@ -132,7 +135,7 @@ Non-interactive behavior:
 - If the selected value is empty or invalid, execution fails with the same
   integer parser error as `parseInt(...)`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L104" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L107" />
 
 ## `promptAddress`
 
@@ -156,7 +159,7 @@ Non-interactive behavior:
 - If the selected value is empty or invalid, execution fails with the same
   address parser error as `parseAddress(...)`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L119" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L122" />
 
 ## `promptWallet`
 
@@ -183,5 +186,5 @@ Example:
 val walletName = promptWallet("Select a wallet:");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L149" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L152" />
 

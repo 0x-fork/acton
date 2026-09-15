@@ -92,6 +92,9 @@ fun confirm(message: string, default: bool, helpMessage: string): bool {
 
 /// Prompts the user for an integer.
 ///
+/// Accepts the same decimal, hexadecimal (`0x`), and binary (`0b`) input as [parseInt].
+/// These formats also apply to `default`.
+///
 /// Interactive behavior:
 /// - Invalid input is rejected by the host prompt validator until the user
 ///   corrects it.

@@ -1,6 +1,8 @@
 use crate::commands::common::{error_fmt, format_nanograms};
 use crate::context::{BuildCache, Context, to_cell};
-use crate::ffi::emulation::{compilation_result_for_code, normalize_address_input};
+use crate::ffi::emulation::{
+    compilation_result_for_code, normalize_address_input, parse_integer_input,
+};
 use crate::formatter::FormatterContext;
 use acton_config::color::OwoColorize;
 use acton_debug::render_tuple_item_as_tolk_type;
@@ -809,13 +811,6 @@ fn prompt_impl(
     Ok(())
 }
 
-fn parse_prompt_int(input: &str) -> anyhow::Result<BigInt> {
-    input
-        .trim()
-        .parse::<BigInt>()
-        .with_context(|| format!("Failed to parse integer from '{input}'"))
-}
-
 extension!(prompt_int in (Context) with (default: String, placeholder: String, message: String) using prompt_int_impl);
 fn prompt_int_impl(
     _ctx: &mut Context,
@@ -831,7 +826,7 @@ fn prompt_int_impl(
         }
 
         text.with_validator(|input: &str| {
-            if parse_prompt_int(input).is_ok() {
+            if parse_integer_input(input).is_ok() {
                 Ok(Validation::Valid)
             } else {
                 Ok(Validation::Invalid(ErrorMessage::Custom(
@@ -845,7 +840,7 @@ fn prompt_int_impl(
         default
     };
 
-    stack.push(TupleItem::Int(parse_prompt_int(&input)?));
+    stack.push(TupleItem::Int(parse_integer_input(&input)?));
     Ok(())
 }
 

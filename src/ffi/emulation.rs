@@ -25,7 +25,7 @@ use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use log::{debug, info, warn};
 use num_bigint::{BigInt, Sign};
-use num_traits::ToPrimitive;
+use num_traits::{Num, ToPrimitive};
 use path_absolutize::Absolutize;
 use rand::RngCore;
 use std::collections::{HashMap, HashSet};
@@ -36,6 +36,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
+use tolk_syntax::ast::expressions::parse_tolk_int_literal;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton_api::{Network, TonApiClient, toncenter::v3};
@@ -2917,12 +2918,28 @@ fn parse_cell_from_base64_impl(
 
 extension!(parse_int in (Context) with (x: String) using parse_int_impl);
 fn parse_int_impl(_: &mut Context, stack: &mut Tuple, x: String) -> anyhow::Result<()> {
-    let value = x
-        .trim()
-        .parse::<BigInt>()
-        .with_context(|| format!("Failed to parse integer from '{x}'"))?;
-    stack.push(TupleItem::Int(value));
+    stack.push(TupleItem::Int(parse_integer_input(&x)?));
     Ok(())
+}
+
+/// Keeps runtime integer parsing and prompt validation consistent with Tolk literals.
+/// Trims user input, handles a leading sign, and preserves parser diagnostics on failure.
+pub(super) fn parse_integer_input(input: &str) -> anyhow::Result<BigInt> {
+    let trimmed = input.trim();
+    let unsigned = trimmed.strip_prefix(['+', '-']).unwrap_or(trimmed);
+    let value = if let Some(literal) = parse_tolk_int_literal(unsigned) {
+        BigInt::from_str_radix(literal.digits(), literal.radix()).map(|value| {
+            if trimmed.starts_with('-') {
+                -value
+            } else {
+                value
+            }
+        })
+    } else {
+        trimmed.parse::<BigInt>()
+    };
+
+    value.with_context(|| format!("Failed to parse integer from '{input}'"))
 }
 
 extension!(load_library_by_hash in (Context) with (hash: String) using load_library_by_hash_impl);
