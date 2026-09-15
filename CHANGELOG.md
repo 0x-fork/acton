@@ -283,6 +283,8 @@ Actonscan. Clients solve a proof-of-work challenge before submitting a claim.
 - `format` and `println` support binary output, hexadecimal prefixes, width,
   fill, alignment, and sign-aware zero padding. ANSI escapes do not affect
   padding width.
+- `BigArray<T>` values display as flat arrays with their element type instead
+  of exposing internal chunks. Arrays stored as elements remain nested.
 - `parseInt` and `promptInt` accept decimal, hexadecimal (`0x`), and binary
   (`0b`) values with signs and underscore separators. Prompt defaults use the
   same parser.
