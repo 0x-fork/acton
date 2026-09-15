@@ -5879,6 +5879,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "ton-language-server-core",
+ "tower 0.5.2",
  "tower-lsp",
  "tracing",
  "tycho-types",
