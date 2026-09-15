@@ -149,7 +149,7 @@ impl OnchainPaymentVerifier {
     /// Returns an error when payment configuration is missing or invalid, or when the ledger
     /// cannot be opened.
     pub fn from_config(config: &Config) -> Result<Self, PaymentError> {
-        if config.network() != TonNetwork::Testnet {
+        if config.payment_primary_network() != TonNetwork::Testnet {
             return Err(PaymentError::UnsupportedNetwork);
         }
         let payment_address = config
@@ -953,7 +953,7 @@ fn load_aligned_bytes(slice: &mut CellSlice<'_>) -> Option<Vec<u8>> {
 
 #[derive(Debug, Error)]
 pub enum PaymentError {
-    #[error("the TON verifier supports only TON testnet")]
+    #[error("payment verification supports only TON testnet")]
     UnsupportedNetwork,
     #[error("missing required verifier configuration: {0}")]
     MissingConfiguration(&'static str),

@@ -34,8 +34,8 @@ impl ToncenterClient {
     #[must_use]
     pub fn from_config(config: &Config) -> Self {
         Self::new(
-            config.toncenter_base_url().to_owned(),
-            config.toncenter_api_key().map(ToOwned::to_owned),
+            config.toncenter_testnet_base_url().to_owned(),
+            config.toncenter_testnet_api_key().map(ToOwned::to_owned),
         )
     }
 

@@ -113,13 +113,13 @@ sudo install -m 600 /dev/null /opt/ton-verifier/verifier.env
 Example `/opt/ton-verifier/verifier.env`:
 
 ```bash
-VERIFIER_NETWORK=testnet
 VERIFIER_LOG_LEVEL=info
 VERIFIER_API_KEY=
 VERIFIER_READ_ONLY=false
-VERIFIER_TONCENTER_BASE_URL=https://testnet.toncenter.com
-VERIFIER_TONCENTER_API_KEY=
+VERIFIER_TONCENTER_TESTNET_BASE_URL=https://testnet.toncenter.com
+VERIFIER_TONCENTER_TESTNET_API_KEY=
 VERIFIER_COMPILER_MAX_CONCURRENT_COMPILATIONS=1
+VERIFIER_PAYMENT_PRIMARY_NETWORK=testnet
 VERIFIER_PAYMENT_ADDRESS="0:<64-hex-character-testnet-wallet-address>"
 VERIFIER_PAYMENT_MIN_AMOUNT_NANO=500000000
 VERIFIER_PAYMENT_LEDGER_PATH=/var/lib/verifier/payment-ledger/payment-ledger.sqlite3
@@ -153,6 +153,10 @@ The payment verifier supports only TON testnet. `VERIFIER_PAYMENT_ADDRESS` must
 use the raw basechain form `0:<64 hex characters>`. The minimum amount is in
 nanoGRAM and must be more than zero. This example sets the amount to
 `0.5 GRAM`.
+
+`VERIFIER_PAYMENT_PRIMARY_NETWORK` accepts `testnet` or `mainnet`. Only
+`testnet` payments are supported for now; selecting `mainnet` prevents the
+verifier from starting with an explicit payment verification error.
 
 ## Configure GitHub Source Storage
 
@@ -494,14 +498,13 @@ Common causes:
 
 Check:
 
-- `VERIFIER_NETWORK` is `testnet`.
-- `VERIFIER_TONCENTER_BASE_URL` is reachable from inside the container.
-- `VERIFIER_TONCENTER_API_KEY` is set if your endpoint requires it.
+- `VERIFIER_TONCENTER_TESTNET_BASE_URL` is reachable from inside the container.
+- `VERIFIER_TONCENTER_TESTNET_API_KEY` is set if your endpoint requires it.
 
 Connectivity check:
 
 ```bash
-docker compose exec verifier node -e "const u=new URL('/api/v3/transactions',process.env.VERIFIER_TONCENTER_BASE_URL);u.searchParams.set('account',process.env.VERIFIER_PAYMENT_ADDRESS);u.searchParams.set('limit','1');fetch(u,{headers:{'X-API-Key':process.env.VERIFIER_TONCENTER_API_KEY||''}}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(()=>console.log('ok')).catch(e=>{console.error(e);process.exit(1)})"
+docker compose exec verifier node -e "const u=new URL('/api/v3/transactions',process.env.VERIFIER_TONCENTER_TESTNET_BASE_URL);u.searchParams.set('account',process.env.VERIFIER_PAYMENT_ADDRESS);u.searchParams.set('limit','1');fetch(u,{headers:{'X-API-Key':process.env.VERIFIER_TONCENTER_TESTNET_API_KEY||''}}).then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(()=>console.log('ok')).catch(e=>{console.error(e);process.exit(1)})"
 ```
 
 ### Compiler fails
