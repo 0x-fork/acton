@@ -772,7 +772,7 @@ fn wait_for_verifier_payment(
     let message_hash = hex::encode(normalized_external_hash.as_slice());
 
     for attempt in 1..=ATTEMPTS {
-        match client.get_traces_by_msg_hash(&message_hash, 1) {
+        match client.get_traces_by_msg_hash(&message_hash, 1, None) {
             Ok(traces) => {
                 for trace in traces {
                     if trace.is_incomplete {

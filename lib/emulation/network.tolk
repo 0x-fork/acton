@@ -376,6 +376,7 @@ fun SendResultList.hideTraceFromUi(self): void {
 /// actually delivered to the network is identified by its TEP-467 normalized hash
 /// (returned by `sendBocReturnHash` at send time), and the destination account's recent
 /// transactions are scanned until one with a matching `inMessage` shows up.
+/// Only transactions created at or after the script's start time are eligible.
 ///
 /// Returns the matched [SendResult] rebuilt from the on-chain transaction if found, or `null`
 /// otherwise. Fields that cannot be reconstructed from a single on-chain transaction
@@ -439,6 +440,7 @@ fun SendResultList.waitForFirstTransaction(
 /// Unlike [SendResultList.waitForFirstTransaction], this method follows all descendant
 /// transactions (children, grandchildren, ...) using toncenter's traces API and returns
 /// them as a fresh [SendResultList].
+/// Only traces that started at or after the script's start time are eligible.
 ///
 /// In emulation mode (without `--net`), the trace is already fully processed locally, so
 /// the method returns `self` as-is (or `null` if the list is empty).

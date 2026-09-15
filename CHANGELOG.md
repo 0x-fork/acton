@@ -171,7 +171,9 @@ Actonscan. Clients solve a proof-of-work challenge before submitting a claim.
   New scaffolds default to `pre-push`. Hook errors explain how to make Acton
   available in Git and WSL environments.
 - Nested `runGetMethod` assertion failures now make scripts exit with a failing
-  status. Transaction waits skip transactions observed before script execution.
+  status.
+- `waitForFirstTransaction()` and `waitForTrace()` ignore earlier executions
+  when the same external message is sent again in a new script run.
 - Script traces use the script ABI when contract metadata is unavailable.
   Missing-library, unreachable-endpoint, and broadcast failures have clearer
   diagnostics. Script links use Actonscan by default.
