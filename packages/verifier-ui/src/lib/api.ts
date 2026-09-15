@@ -79,6 +79,11 @@ export interface CodeHashMatch {
   readonly code_hash: string
 }
 
+interface ErrorResponse {
+  readonly error?: string
+  readonly matches?: readonly CodeHashMatch[]
+}
+
 export class ApiRequestError extends Error {
   readonly status: number
   readonly matches: readonly CodeHashMatch[]
@@ -116,15 +121,12 @@ export function createVerifierApi({
       },
     })
 
-    const body = (await response.json().catch(() => undefined)) as unknown
+    const body = (await response.json().catch(() => ({}))) as ErrorResponse & T
     if (!response.ok) {
-      const errorBody = isRecord(body) ? body : undefined
       throw new ApiRequestError(
         response.status,
-        typeof errorBody?.error === "string"
-          ? errorBody.error
-          : `Request failed: ${response.status}`,
-        readCodeHashMatches(errorBody?.matches),
+        body.error ?? `Request failed: ${response.status}`,
+        body.matches ?? [],
       )
     }
 
@@ -151,20 +153,4 @@ export function createVerifierApi({
       )
     },
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
-
-function readCodeHashMatches(value: unknown): readonly CodeHashMatch[] {
-  if (!Array.isArray(value)) return []
-
-  return value.filter((match): match is CodeHashMatch => {
-    if (!isRecord(match)) return false
-    return (
-      (match.network === "mainnet" || match.network === "testnet") &&
-      typeof match.code_hash === "string"
-    )
-  })
 }
