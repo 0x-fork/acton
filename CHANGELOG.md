@@ -219,6 +219,8 @@ Actonscan. Clients solve a proof-of-work challenge before submitting a claim.
   to tests.
 - Added inclusive `toBeInRange` and `lisp_list<T>` containment, emptiness,
   and length matchers.
+- `toBeApproxEqRel` accepts `maxDeltaDenominator` for finer relative precision.
+  The default is `100` for percentages. Use `1_000_000` for millionths.
 
 ### Gas Profiling and Benchmarks
 
