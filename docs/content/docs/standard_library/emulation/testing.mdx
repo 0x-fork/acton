@@ -228,18 +228,18 @@ To create a treasury, use the [testing.treasury](#testingtreasury) method.
 ## `testing.treasury`
 
 ```tolk
-fun testing.treasury(name: string): Treasury
+fun testing.treasury(name: string, workchain: int8 = BASECHAIN): Treasury
 ```
 
-Create a treasury with a specified name.
+Create and fund a treasury in the specified workchain (basechain by default).
 
-Calling this method with same name will return the same treasury (the same address).
+Each call sends 10000 GRAM, minus fees, to the address derived from name and workchain.
 
 Example:
 ```tolk
 get fun `test mint`() {
     val treasury = testing.treasury("treasury");
-    // ...
+    val masterchainTreasury = testing.treasury("owner", MASTERCHAIN);
 }
 ```
 

@@ -165,20 +165,20 @@ struct Treasury {
     address: address
 }
 
-/// Create a treasury with a specified name.
+/// Create and fund a treasury in the specified workchain (basechain by default).
 ///
-/// Calling this method with same name will return the same treasury (the same address).
+/// Each call sends 10000 GRAM, minus fees, to the address derived from name and workchain.
 ///
 /// Example:
 /// ```tolk
 /// get fun `test mint`() {
 ///     val treasury = testing.treasury("treasury");
-///     // ...
+///     val masterchainTreasury = testing.treasury("owner", MASTERCHAIN);
 /// }
 /// ```
 ///
 /// Note: in scripts always use [scripts.wallet] instead.
-fun testing.treasury(name: string): Treasury {
+fun testing.treasury(name: string, workchain: int8 = BASECHAIN): Treasury {
     if (net.isBroadcasting()) {
         Assert.fail("Cannot use treasury with `--net`, don't use `testing.treasury()` in scripts, use `scripts.wallet()` instead");
     }
@@ -189,13 +189,13 @@ fun testing.treasury(name: string): Treasury {
     };
 
     val deployer = address("0:0000000000000000000000000000000000000000000000000000000000000000");
-    val address = AutoDeployAddress { stateInit }.calculateAddress();
+    val address = AutoDeployAddress { workchain, stateInit }.calculateAddress();
     net.registerAddress(address, name);
 
     val deployMsg = createMessage({
         bounce: false,
         value: grams("10000"),
-        dest: { workchain: 0, stateInit },
+        dest: { workchain, stateInit },
     });
     // Deploy treasury
     net.send(deployer, deployMsg);
