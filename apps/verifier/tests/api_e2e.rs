@@ -209,7 +209,7 @@ async fn healthz_reports_payment_history_recovery() {
 }
 
 #[tokio::test]
-async fn take_ticket_returns_a_testnet_payment_bound_to_the_code_hash() {
+async fn take_ticket_returns_a_payment_bound_to_the_code_hash() {
     let response = post_take_ticket(app_state(&[], CODE_HASH_ONE), CODE_HASH_ONE_BASE64).await;
 
     assert_eq!(response.status(), StatusCode::OK);
@@ -218,6 +218,7 @@ async fn take_ticket_returns_a_testnet_payment_bound_to_the_code_hash() {
         json!({
             "status": "payment_required",
             "code_hash": CODE_HASH_ONE,
+            "network": "testnet",
             "payment_address": "0:1111111111111111111111111111111111111111111111111111111111111111",
             "amount_nano": "10000000",
             "comment": format!("acton-verify:v1:{CODE_HASH_ONE}")
@@ -392,7 +393,7 @@ async fn verify_maps_payment_failures_to_stable_http_contracts() {
         (
             PaymentError::TransactionNotFound,
             StatusCode::PAYMENT_REQUIRED,
-            "payment_not_found: transaction was not found on TON testnet".to_owned(),
+            "payment_not_found: transaction was not found on the configured TON network".to_owned(),
         ),
         (
             PaymentError::InvalidTransaction,

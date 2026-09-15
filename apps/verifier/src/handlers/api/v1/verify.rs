@@ -781,7 +781,7 @@ pub(super) struct VerifyMultipartRequest {
     /// Requires a valid `X-Verifier-Key` header.
     #[schema(nullable = false, example = 1_700_000_000_000_u64)]
     verified_at: Option<u64>,
-    /// Finalized TON testnet transaction hash for this verification attempt.
+    /// Finalized TON transaction hash for this verification attempt.
     tx_hash: Option<String>,
     #[schema(
         value_type = String,

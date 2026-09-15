@@ -8,7 +8,7 @@ use serde::Deserialize;
 use std::time::Duration;
 use thiserror::Error;
 
-use crate::config::Config;
+use crate::config::{Config, TonNetwork};
 
 const TONCENTER_API_KEY_HEADER: &str = "X-API-Key";
 const CODE_HASH_BYTES: usize = 32;
@@ -33,10 +33,21 @@ pub struct ToncenterClient {
 impl ToncenterClient {
     #[must_use]
     pub fn from_config(config: &Config) -> Self {
-        Self::new(
-            config.toncenter_testnet_base_url().to_owned(),
-            config.toncenter_testnet_api_key().map(ToOwned::to_owned),
-        )
+        Self::for_network(config, TonNetwork::Testnet)
+    }
+
+    #[must_use]
+    pub fn for_network(config: &Config, network: TonNetwork) -> Self {
+        match network {
+            TonNetwork::Mainnet => Self::new(
+                config.toncenter_mainnet_base_url().to_owned(),
+                config.toncenter_mainnet_api_key().map(ToOwned::to_owned),
+            ),
+            TonNetwork::Testnet => Self::new(
+                config.toncenter_testnet_base_url().to_owned(),
+                config.toncenter_testnet_api_key().map(ToOwned::to_owned),
+            ),
+        }
     }
 
     #[must_use]
@@ -183,10 +194,15 @@ struct AccountState {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
     use reqwest::header::USER_AGENT;
 
+    use crate::config::{Config, TonNetwork};
+
     use super::{
-        BlockchainClient, BlockchainError, ToncenterClient, normalize_code_hash, user_agent,
+        BlockchainClient, BlockchainError, TONCENTER_API_KEY_HEADER, ToncenterClient,
+        normalize_code_hash, user_agent,
     };
 
     #[test]
@@ -206,6 +222,42 @@ mod tests {
                 .and_then(|value| value.to_str().ok()),
             Some(expected_user_agent.as_str())
         );
+    }
+
+    #[test]
+    fn toncenter_client_uses_the_selected_network_settings() {
+        let mut config_file = tempfile::NamedTempFile::new().expect("config file");
+        writeln!(
+            config_file,
+            r#"
+[toncenter]
+mainnet_base_url = "https://mainnet.example.com"
+mainnet_api_key = "mainnet-key"
+testnet_base_url = "https://testnet.example.com"
+testnet_api_key = "testnet-key"
+"#
+        )
+        .expect("write config");
+        let config = Config::load_from_path(config_file.path()).expect("load config");
+
+        for (network, expected_host, expected_api_key) in [
+            (TonNetwork::Mainnet, "mainnet.example.com", "mainnet-key"),
+            (TonNetwork::Testnet, "testnet.example.com", "testnet-key"),
+        ] {
+            let request = ToncenterClient::for_network(&config, network)
+                .account_states_request("0:account")
+                .build()
+                .expect("request");
+            assert_eq!(request.url().host_str(), Some(expected_host));
+            assert_eq!(request.url().path(), "/api/v3/accountStates");
+            assert_eq!(
+                request
+                    .headers()
+                    .get(TONCENTER_API_KEY_HEADER)
+                    .and_then(|value| value.to_str().ok()),
+                Some(expected_api_key)
+            );
+        }
     }
 
     #[tokio::test]

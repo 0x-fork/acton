@@ -164,7 +164,7 @@ impl AppState {
         Ok(())
     }
 
-    /// Rebuilds payment replay state from TON testnet history.
+    /// Rebuilds payment replay state from TON history.
     ///
     /// # Errors
     ///

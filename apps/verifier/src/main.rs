@@ -16,6 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         %addr,
         payment_primary_network = %config.payment_primary_network(),
         read_only = config.read_only(),
+        toncenter_mainnet_base_url = %config.toncenter_mainnet_base_url(),
         toncenter_testnet_base_url = %config.toncenter_testnet_base_url(),
         "starting verifier backend"
     );

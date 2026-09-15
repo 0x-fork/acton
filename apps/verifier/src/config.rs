@@ -5,8 +5,9 @@ use std::{
     time::Duration,
 };
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use utoipa::ToSchema;
 
 const DEFAULT_CONFIG_PATH: &str = "config.toml";
 const CONFIG_PATH_ENV: &str = "VERIFIER_CONFIG";
@@ -33,6 +34,8 @@ pub struct Config {
     api_key: Option<String>,
     read_only: bool,
     logging_level: String,
+    toncenter_mainnet_base_url: Option<String>,
+    toncenter_mainnet_api_key: Option<String>,
     toncenter_testnet_base_url: Option<String>,
     toncenter_testnet_api_key: Option<String>,
     source_repository_path: Option<PathBuf>,
@@ -108,6 +111,18 @@ impl Config {
     #[must_use]
     pub fn logging_level(&self) -> &str {
         &self.logging_level
+    }
+
+    #[must_use]
+    pub fn toncenter_mainnet_base_url(&self) -> &str {
+        self.toncenter_mainnet_base_url
+            .as_deref()
+            .unwrap_or(TonNetwork::Mainnet.default_toncenter_base_url())
+    }
+
+    #[must_use]
+    pub fn toncenter_mainnet_api_key(&self) -> Option<&str> {
+        self.toncenter_mainnet_api_key.as_deref()
     }
 
     #[must_use]
@@ -220,6 +235,8 @@ impl Default for Config {
             api_key: None,
             read_only: false,
             logging_level: DEFAULT_LOG_LEVEL.to_owned(),
+            toncenter_mainnet_base_url: None,
+            toncenter_mainnet_api_key: None,
             toncenter_testnet_base_url: None,
             toncenter_testnet_api_key: None,
             source_repository_path: None,
@@ -244,7 +261,7 @@ impl Default for Config {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum TonNetwork {
     Mainnet,
@@ -326,6 +343,8 @@ impl ConfigFile {
                 .logging
                 .level
                 .unwrap_or_else(|| DEFAULT_LOG_LEVEL.to_owned()),
+            toncenter_mainnet_base_url: self.toncenter.mainnet_base_url,
+            toncenter_mainnet_api_key: self.toncenter.mainnet_api_key,
             toncenter_testnet_base_url: self.toncenter.testnet_base_url,
             toncenter_testnet_api_key: self.toncenter.testnet_api_key,
             source_repository_path: self.source_repository.path,
@@ -401,6 +420,8 @@ struct LoggingConfig {
 
 #[derive(Debug, Default, Deserialize)]
 struct ToncenterConfig {
+    mainnet_base_url: Option<String>,
+    mainnet_api_key: Option<String>,
     testnet_base_url: Option<String>,
     testnet_api_key: Option<String>,
 }

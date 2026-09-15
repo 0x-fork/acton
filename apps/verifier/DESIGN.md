@@ -18,9 +18,9 @@ rebuilt from the Git repository by scanning
 where `code_hash_prefix` is the first two characters of the code hash and
 `code_hash_suffix` is the rest. The storage root defaults to `sources`.
 
-The verifier uses TON testnet payments to limit automated spam. A separate
-SQLite ledger prevents payment replay. The backend rebuilds this ledger from
-the payment wallet history after each restart.
+The verifier uses TON payments on the configured network to limit automated
+spam. A separate SQLite ledger prevents payment replay. The backend rebuilds
+this ledger from the payment wallet history after each restart.
 
 ## Goals
 
@@ -31,7 +31,8 @@ the payment wallet history after each restart.
 - Keep exactly one current source bundle for each code hash.
 - Make the registry rebuildable from Git without relying on process-local state.
 - Keep the registry implementation pluggable behind Rust traits.
-- Require one testnet payment for each new public verification attempt.
+- Require one payment on the configured network for each new public
+  verification attempt.
 - Bind each payment to one code hash through the transaction comment.
 - Rebuild payment replay state from TON history after a server restart.
 
@@ -99,10 +100,10 @@ Responsibilities:
 
 ### Payment Verification
 
-`acton verify` uses TON verifier and pays for verification on TON testnet.
-Verification records are keyed by code hash, so the same verified code can be
-used on any TON network. Address lookups through this backend use its configured
-testnet provider.
+The verifier backend supports payments on TON mainnet and testnet. The current
+`acton verify` client remains testnet-only. Verification records are keyed by
+code hash, so the same verified code can be used on any TON network. Address
+lookups through this backend use its configured testnet provider.
 
 Acton validates portable source paths before payment. Uploads accept at most
 256 files. Source paths are relative, at most 128 ASCII characters, and contain
@@ -126,7 +127,7 @@ endpoints remain available, and repeated submissions still return
 
 For new code, the endpoint returns:
 
-- The testnet payment address.
+- The payment network and address.
 - The minimum amount in nanoGRAM.
 - The exact comment `acton-verify:v1:<code_hash>`.
 
@@ -174,10 +175,11 @@ transaction hash in lowercase hexadecimal form. The source manifest and lookup
 API include this hash. The verifier UI links the hash to Actonscan testnet.
 
 At startup, the payment verifier is not ready. It reads every page of incoming
-testnet history up to a captured chain tip. It preserves `consumed` ledger
-entries, releases interrupted `processing` claims as `retryable`, and adds
-previously unseen funded protocol payments as `retryable`. It then marks every
-payment referenced by the published source manifests as `consumed`. The merge
+history on the selected payment network up to a captured chain tip. It
+preserves `consumed` ledger entries, releases interrupted `processing` claims
+as `retryable`, and adds previously unseen funded protocol payments as
+`retryable`. It then marks every payment referenced by the published source
+manifests as `consumed`. The merge
 never deletes existing replay evidence.
 
 The startup scan ignores payments below the configured minimum. These payments
@@ -336,7 +338,7 @@ not expose a base64 source-content field.
 1. Acton compiles the local contract and computes its code hash.
 2. Acton sends the code hash to `/take_ticket`.
 3. If the code hash is verified, Acton stops successfully without payment.
-4. For new code, the backend returns a testnet payment quote.
+4. For new code, the backend returns a payment quote with its network.
 5. Acton validates source paths, gets wallet approval and sends the payment with the exact comment.
 6. Acton waits for the finalized recipient transaction.
 7. Acton sends the sources and recipient transaction hash to `/verify`.
@@ -445,7 +447,8 @@ Important cases:
 - Git write fails: verification request fails.
 - Stored bundle cannot be re-read or validated: verification request fails.
 - Backend process state is lost: the registry is rebuilt from Git.
-- Payment database state is lost: the ledger is rebuilt from testnet history.
+- Payment database state is lost: the ledger is rebuilt from history on the
+  selected payment network.
 - Git content is unavailable: source lookup is temporarily unavailable.
 
 The backend keeps writes deterministic by using `code_hash` as the storage key

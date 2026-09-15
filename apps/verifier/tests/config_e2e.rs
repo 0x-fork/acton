@@ -2,8 +2,8 @@ use std::io::Write;
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use verifier::config::Config;
-use verifier::payment::OnchainPaymentVerifier;
+use verifier::config::{Config, TonNetwork};
+use verifier::payment::{OnchainPaymentVerifier, PaymentVerifier};
 
 #[test]
 fn example_config_toml_loads() {
@@ -18,6 +18,8 @@ fn example_config_toml_loads() {
     assert_eq!(config.api_key(), None);
     assert!(!config.read_only());
     assert_eq!(config.logging_level(), "info");
+    assert_eq!(config.toncenter_mainnet_base_url(), "https://toncenter.com");
+    assert_eq!(config.toncenter_mainnet_api_key(), None);
     assert_eq!(
         config.toncenter_testnet_base_url(),
         "https://testnet.toncenter.com"
@@ -69,6 +71,7 @@ fn omitted_payment_primary_network_uses_testnet() {
 
     assert_eq!(config.logging_level(), "debug");
     assert!(!config.read_only());
+    assert_eq!(config.toncenter_mainnet_base_url(), "https://toncenter.com");
     assert_eq!(
         config.toncenter_testnet_base_url(),
         "https://testnet.toncenter.com"
@@ -230,7 +233,12 @@ fn docker_entrypoint_generates_toncenter_and_payment_settings() {
         .env_clear()
         .env("PATH", std::env::var_os("PATH").expect("PATH"))
         .env("VERIFIER_CONFIG", &config_path)
-        .env("VERIFIER_PAYMENT_PRIMARY_NETWORK", "testnet")
+        .env("VERIFIER_PAYMENT_PRIMARY_NETWORK", "mainnet")
+        .env(
+            "VERIFIER_TONCENTER_MAINNET_BASE_URL",
+            "https://mainnet.example.com",
+        )
+        .env("VERIFIER_TONCENTER_MAINNET_API_KEY", "mainnet-key")
         .env(
             "VERIFIER_TONCENTER_TESTNET_BASE_URL",
             "https://testnet.example.com",
@@ -246,30 +254,46 @@ fn docker_entrypoint_generates_toncenter_and_payment_settings() {
 
     let config = Config::load_from_path(&config_path).expect("generated config");
     assert_eq!(
+        config.toncenter_mainnet_base_url(),
+        "https://mainnet.example.com"
+    );
+    assert_eq!(config.toncenter_mainnet_api_key(), Some("mainnet-key"));
+    assert_eq!(
         config.toncenter_testnet_base_url(),
         "https://testnet.example.com"
     );
     assert_eq!(config.toncenter_testnet_api_key(), Some("testnet-key"));
-    assert_eq!(config.payment_primary_network().to_string(), "testnet");
+    assert_eq!(config.payment_primary_network(), TonNetwork::Mainnet);
 }
 
 #[test]
-fn mainnet_payment_network_is_rejected_by_payment_verifier() {
-    let mut config_file =
-        tempfile::NamedTempFile::new().expect("temporary config file should be created");
-    writeln!(config_file, "[payment]\nprimary_network = \"mainnet\"")
-        .expect("temporary config should be writable");
-    config_file
-        .flush()
-        .expect("temporary config should be flushed");
+fn mainnet_payment_network_is_supported() {
+    let directory = tempfile::tempdir().expect("temporary directory should be created");
+    let config_path = directory.path().join("config.toml");
+    let ledger_path = directory.path().join("payments.sqlite3");
+    std::fs::write(
+        &config_path,
+        format!(
+            r#"
+[payment]
+primary_network = "mainnet"
+address = "0:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+min_amount_nano = 10000000
+ledger_path = "{}"
+"#,
+            ledger_path.display()
+        ),
+    )
+    .expect("temporary config should be writable");
 
-    let config = Config::load_from_path(config_file.path()).expect("mainnet config should parse");
-    let error = OnchainPaymentVerifier::from_config(&config)
-        .err()
-        .expect("mainnet payments should be rejected");
+    let config = Config::load_from_path(&config_path).expect("mainnet config should parse");
+    let verifier =
+        OnchainPaymentVerifier::from_config(&config).expect("mainnet payments should be supported");
     assert_eq!(
-        error.to_string(),
-        "payment verification supports only TON testnet"
+        verifier
+            .quote("a873d8c2d163f7fa10bbe38769706f0554505e8ea2dcea3f115288db8becf2ab")
+            .network,
+        TonNetwork::Mainnet
     );
 }
 
@@ -288,6 +312,8 @@ read_only = true
 level = "debug"
 
 [toncenter]
+mainnet_base_url = "http://127.0.0.1:5413"
+mainnet_api_key = "mainnet-key"
 testnet_base_url = "http://127.0.0.1:5412"
 testnet_api_key = "test-key"
 
@@ -321,6 +347,8 @@ ledger_path = "/tmp/verifier-payments.sqlite3"
     assert_eq!(config.logging_level(), "debug");
     assert_eq!(config.api_key(), Some("migration-api-key"));
     assert!(config.read_only());
+    assert_eq!(config.toncenter_mainnet_base_url(), "http://127.0.0.1:5413");
+    assert_eq!(config.toncenter_mainnet_api_key(), Some("mainnet-key"));
     assert_eq!(config.toncenter_testnet_base_url(), "http://127.0.0.1:5412");
     assert_eq!(config.toncenter_testnet_api_key(), Some("test-key"));
     assert_eq!(

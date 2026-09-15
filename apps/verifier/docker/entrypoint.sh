@@ -75,6 +75,8 @@ write_generated_config() {
         printf 'level = "%s"\n\n' "$(toml_escape "${VERIFIER_LOG_LEVEL:-info}")"
 
         printf '[toncenter]\n'
+        write_optional_string mainnet_base_url "${VERIFIER_TONCENTER_MAINNET_BASE_URL:-}"
+        write_optional_string mainnet_api_key "${VERIFIER_TONCENTER_MAINNET_API_KEY:-}"
         write_optional_string testnet_base_url "${VERIFIER_TONCENTER_TESTNET_BASE_URL:-}"
         write_optional_string testnet_api_key "${VERIFIER_TONCENTER_TESTNET_API_KEY:-}"
         printf '\n'
