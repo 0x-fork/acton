@@ -4,18 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-This development cycle expands Acton from a contract CLI into a broader TON
-development platform. It adds Acton Studio, a full local TON network, Actonscan,
-source verification, a testnet faucet, a native language server, substantially
-more capable RPC and localnet tooling, and a shared explorer and transaction UI.
+Acton adds Studio, an in-process simulator, a full local TON network, Actonscan,
+source verification, a testnet faucet, and a native language server. RPC,
+testing, and contract inspection support these environments through shared
+APIs and UI components.
 
-`acton simulated-localnet` remains the lightweight in-process simulator. Acton Studio can
-manage both simulator environments and full local TON networks; those full
-networks are powered by the separate Localton runtime. The verifier service,
+`acton simulator` runs the lightweight in-process simulator. `acton localnet`
+and Acton Studio manage full local TON networks through the separate Localton
+runtime. Studio also manages simulator environments. The verifier service,
 API, web UI, and `acton verify` CLI integration are included below.
 
 ### Breaking Changes and Migration
 
+- `acton verify` uses the new verifier service on TON testnet, with a payment
+  ticket bound to the compiled code hash.
 - TON Connect approvals no longer start a local browser bridge, and
   `--tonconnect-port` was removed from script, library, and verifier commands.
   Acton now lets users select a compatible wallet and prints its native QR code
@@ -36,6 +38,9 @@ API, web UI, and `acton verify` CLI integration are included below.
 - Regenerate generated wrappers. `fromStorage(...)` now accepts an optional
   workchain, deployments preserve workchain and shard settings, and generated
   contracts expose the new `toShard` state used for non-basechain deployment.
+- Generated Tolk and TypeScript wrapper names now use the PascalCase contract
+  ID from `Acton.toml`, independent of `src` and `display-name`.
+  Update wrapper imports and type references after regeneration.
 - Actonscan is now the default explorer for links printed by `acton script`.
 - Custom networks default to TON global id `-3` for Wallet V5 derivation. This
   can change Wallet V5 addresses on custom networks that previously inherited
@@ -70,20 +75,26 @@ API, web UI, and `acton verify` CLI integration are included below.
   verifier outages.
 - Added `acton doc abi <contract-or-code-hash>` for formatted compiler ABI JSON
   from project contracts, the built-in ABI catalog, or the verifier.
-- Added `acton full-localnet` for project-scoped real TON networks backed by Docker
-  and Localton. It can create, start, list, inspect, stop, gracefully shut down,
-  and delete named networks; tail durable logs; inspect or wait for operations;
-  manage nodes and validator participation; and create, restore, or delete cold
-  snapshots. State is stored under `<project>/.acton-localnet`, ambiguous
-  commands offer interactive network selection, and `--json` provides
-  machine-readable output.
+- Added `acton localnet` for project-scoped real TON networks backed by Docker
+  and Localton. It manages named networks, nodes, validator participation,
+  cold snapshots, logs, and operation progress. State is stored under
+  `<project>/.acton-localnet`. Ambiguous commands offer interactive network
+  selection, and `--json` provides machine-readable output.
 - `acton build --output-sources <DIR>` and `[build].output-sources` now emit
   `<contract>.source.json` registration artifacts with source, ABI, code hash,
   compiler, and debug metadata. Precompiled BoC contracts do not emit source
   bundles.
+- Added `acton build --output-boc <DIR>` and `[build].output-boc` to export
+  compiled and precompiled contracts as `<contract-name>.boc` files.
+  This export supplements each contract's configured output path.
 - Per-contract Tolk and TypeScript wrapper settings are available under
   `[contracts.<name>.wrappers.*]`. Fields inherit independently from project
   defaults, while CLI flags keep highest priority.
+- Wrapper generation rejects invalid or conflicting wrapper names before
+  writing files, including collisions after PascalCase conversion.
+- `acton new` and `acton hooks new` can generate `pre-push` or `pre-commit`
+  checks. New scaffolds default to `pre-push` and explain missing Acton
+  installations in Git and WSL environments.
 - `acton test` accepts multiple files and directories in one invocation and
   deduplicates overlapping selections across normal, coverage, profiling, gas,
   and mutation runs.
@@ -94,12 +105,19 @@ API, web UI, and `acton verify` CLI integration are included below.
   the script ABI for message decoding, and provides clearer missing-library,
   broadcast, network, and toolchain diagnostics.
 - Linux release binaries no longer expose conflicting OpenSSL symbols through
-  bundled TON objects. Acton HTTP clients also send an `acton/<version>` user
-  agent. The bundled ABI catalog and executor network configuration received
-  repeated data updates.
+  bundled TON objects. Acton HTTP clients send an `acton/<version>` user agent.
+  Updated the bundled ABI catalog and executor network configuration.
 
 ### Testing, Emulation, Debugging, and Profiling
 
+- Added `net.runGetMethodExt<Ret>()`, which returns `GetMethodResult<Ret>`
+  with `meta.gasUsed` and `meta.exitCode`, including failed VM executions.
+  `isSuccess()` checks the exit code, and `unwrap()` checks success and
+  decodes the saved stack. `toHaveExitCode()` checks expected getter failures.
+- Added `testing.createExternalTraceIterationCursor()` for step-by-step
+  execution of external-in messages and their descendants.
+- `testing.treasury(name, workchain)` can create treasuries outside the
+  basechain, including the masterchain. The workchain defaults to `BASECHAIN`.
 - Added source-level gas profiles through `--gas-profile`,
   `--gas-profile-format cpuprofile|collapsed`, and
   `--gas-profile-include-tests`. Test UI renders contract and per-test
@@ -115,7 +133,7 @@ API, web UI, and `acton verify` CLI integration are included below.
 - Added inclusive `toBeInRange`, `lisp_list<T>` containment, emptiness, and
   length matchers, plus broader transaction, external-message, rollback,
   backtrace, fuzzing, snapshot, and mutation coverage.
-- Forked tests, scripts, and localnet now resolve account state, blockchain
+- Forked tests, scripts, and Simulator resolve account state, blockchain
   configuration, libraries, time, and block context from one pinned
   masterchain snapshot. Per-seqno account, library, and configuration caches are
   reused across runs and can fall back to stale data during provider outages.
@@ -123,12 +141,17 @@ API, web UI, and `acton verify` CLI integration are included below.
   discovery and registration in forked tests, scripts, localnet, RPC, and
   source/ABI lookup.
 - Get-method emulation now exposes the account's actual balance. Nonexistent or
-  uninitialized localnet accounts return exit code `-13`, and local execution
+  uninitialized Simulator accounts return exit code `-13`, and local execution
   honors current time and network configuration more consistently.
 - Debug and retrace views gained Tolk source stepping, TASM instructions, stack
   and cell inspectors, source locations, debug values, exit-code lenses, trace
   selection, and browser-side source tracing through the source-trace WASM
   package.
+- Retrace now supports tick-tock transactions, localnet, and custom networks
+  through configured TON Center endpoints. Replay loads previous masterchain
+  block context and checks account-history continuity before execution.
+- Gas profiles identify messages without opcode prefixes through their ABI.
+  Failure backtraces hide internal `__` helper frames from call-site lists.
 - Test UI gained decoded storage, storage diffs, end balances, trace-wide value
   flow, gas and fee summaries, transaction actions, contract display names,
   treasury-trace collapsing, richer failure diagnostics, and broad Playwright
@@ -145,13 +168,33 @@ API, web UI, and `acton verify` CLI integration are included below.
 - Extended `format(...)` and `println(...)` with binary output, prefixed
   hexadecimal, fixed width, custom fill, alignment, and sign- or prefix-aware
   zero padding that ignores ANSI escape sequences.
+- `parseInt()` and `promptInt()` accept decimal, hexadecimal (`0x`), and
+  binary (`0b`) input, with optional signs and underscore separators.
+  Prompt defaults use the same parser.
+- Rich bounced messages with prefix `0xfffffffe` now expose their original
+  payloads in `println`, RPC traces, message matchers, profiling, and indexing.
+  Legacy `0xffffffff` bounced bodies remain supported.
 - Dynamic pack/unpack and rendering now cover `bitsN`, bit-string map keys,
   `addr_none`, maps, generic containers, large numeric values, and legacy empty
   TON Center list values more consistently.
 - Added linter rule `E031`, `unnecessary-not-null-assertion`, with a safe
   automatic fix. Compiler and linter diagnostics are also available through the
   language server.
+- `acton check` now tracks mutations through generic method receivers,
+  avoiding incorrect suggestions to make mutable variables immutable.
 - `tolkfmt` now preserves comments placed between annotations and declarations.
+- Fixed formatter data loss in incomplete functions and methods, lambda
+  defaults, comment-only files, and whitespace-only lines inside multiline
+  strings. Consecutive unary signs retain the spaces required for valid syntax.
+- Fixed lost or duplicated comments in empty lists, generic arguments, tuples,
+  and control-flow branches. ASM instructions, assert delimiters, and union
+  variants remain outside preceding line comments.
+- `fmt-ignore` now preserves separators between list items. The parser and
+  formatter accept empty tuple types, semicolon-separated enum members,
+  statements directly in match arms, escaped triple quotes, and `(| int)`.
+- Improved method-chain layout after struct literals and continuation
+  indentation in binary expressions and control-flow conditions.
+  Parenthesized types with line comments use separate indented lines.
 - Fixed the emulation config map (`BlockchainConfigMap`) to key parameters by a
   signed 32-bit id, matching TON's `Hashmap 32 ^Cell = ConfigParams`. This lets
   `setParamRaw`/`getParamRaw` address out-of-consensus **negative** config
@@ -166,7 +209,7 @@ API, web UI, and `acton verify` CLI integration are included below.
   wallet signing are unauthenticated.
 - Studio discovers the selected project, contracts, source artifacts, ABIs, and
   supported V4R2 and V5R1 wallets. It can deploy contracts and route project
-  mainnet, testnet, simulator, and full-network requests through persistent
+  mainnet, testnet, Simulator, and Localnet requests through persistent
   virtual environments.
 - Added stored test runs with suites, logs, traces, coverage, gas profiles, and
   mutation events. `acton test` reports this data to a matching Studio instance
@@ -179,24 +222,40 @@ API, web UI, and `acton verify` CLI integration are included below.
   endpoints. Shutdown progress remains visible while Studio gracefully stops
   its environments. Captured calls are available at
   `GET /api/v1/environments/{environment_id}/api-calls` for every environment.
-- Full Local TON environments can import selected addresses, bootstrap the V3
-  indexer, expose account actions, and manage cold snapshots. New environments
-  use the test-only chain id `-3`. Settings remain visible while an environment
-  is stopped.
-- Full-network creation accepts block and election timing controls. Its
+- Localnet environments can import selected addresses at creation or after
+  startup, initialize project wallets with test balances, and bootstrap the V3
+  indexer. They use the test-only chain id `-3` and support cold snapshots.
+  Studio provides account selection, wallet funding, and the correct Jetton
+  minter for each fork.
+- Added a Localnet activity generator for transfers, batches, Jettons, and
+  NFTs, with saved workload settings, concurrency controls, and run statistics.
+- Added Localnet administrative account edits through coordinated hardforks:
+  change balances, code, data, or complete account state, and freeze or delete
+  accounts. Failed operations attempt recovery from node snapshots.
+- Studio can edit blockchain configuration in Simulator and Localnet,
+  start and stop individual nodes, and show validator performance and stakes.
+- Added Localnet health diagnostics, Docker image details, startup logs, and
+  persistent operation progress. Settings remain available for stopped
+  environments, and shutdown targets only the managed network.
+- Added environment favorites, collapsible network groups, connection-loss
+  feedback, and browser-tab reuse after Studio restarts.
+  Testnet environments expose faucet funding through Studio.
+- Localnet creation accepts block and election timing controls. Its
   Network pages show topology, node and validator state, elections, block
-  authors, block-time measurements, transaction throughput, and pending queue
-  data, and can promote an existing full node to a validator.
+  authors, block timing, transaction throughput, and pending queues.
+  Existing full nodes can be promoted to validators.
 - Packaged Studio builds can access mainnet and testnet without separate runtime
   TON Center API-key configuration.
 - Studio gained explorer, tests, contracts, simulator tools, debugger, faucet,
   wallets, snapshots, API reference, configuration, control API, settings, and
   troubleshooting pages, plus a complete documentation section.
 
-### Localnet Simulator
+### Simulator
 
+- Added `acton simulator` for an in-process TON development node with local
+  execution, remote-state forks, startup wallet funding, and TON-compatible APIs.
 - Added interval and manual block production with `--block-time-ms`,
-  `--no-mining`, `acton simulated-localnet mine`, `/acton_mine`, and optional empty-block
+  `--no-mining`, `acton simulator mine`, `/acton_mine`, and optional empty-block
   mining. Submitted messages are queued into blocks, and automatic mining runs
   only while messages are pending unless empty-block mining is enabled.
   Generated blocks include a simplified masterchain, state updates, Merkle
@@ -207,11 +266,14 @@ API, web UI, and `acton verify` CLI integration are included below.
   blockchain configuration through the control API.
 - Added optional API authentication through `--require-auth`, bearer tokens,
   `X-API-Key`, and WebSocket query tokens. Static UI assets remain public.
-- Added persistent SQLite state through `[localnet].db-path`, state file
-  dump/load through `acton simulated-localnet state`, and named in-memory checkpoints
-  through `acton simulated-localnet checkpoint`, including import and export over HTTP.
-  Imports validate histories, hashes, references, transactions, messages,
-  queues, and configuration before atomic replacement.
+- Added persistent SQLite state through `[localnet].db-path` and saved JSON
+  snapshots through `acton simulator snapshot` and Studio.
+  Snapshots support create, list, restore, delete, import, and export operations
+  and survive node restarts. Imports check histories, hashes, references,
+  transactions, messages, queues, and configuration before saving.
+  Import saves a snapshot without changing the running state. Restore applies
+  the saved state to the node.
+  Running nodes can save pending messages and virtual time without stopping.
 - Added typed TON Center v2, v3, Emulation, and Streaming APIs with stable error
   models, browser CORS, SSE and WebSocket subscriptions, paged histories, rate
   limiting, configurable latency, and API-call timing. Metadata lookup supports
@@ -221,6 +283,7 @@ API, web UI, and `acton verify` CLI integration are included below.
   accounts, wallet and token data, masterchain and shard state, fee estimation,
   Jetton and NFT activity, DNS, multisig, vesting, pending data, address books,
   metadata, and Ton Connect emulation.
+- Added TON Center v2 `getBlock` support for simulator block downloads.
 - Added an optional LiteServer-compatible binary API for blocks, accounts,
   transactions, configuration, libraries, message submission, and get methods.
   Enable it with `--liteapi`; its default port is the HTTP port plus one, and
@@ -237,15 +300,16 @@ API, web UI, and `acton verify` CLI integration are included below.
   pagination, Jetton and NFT indexing, metadata, bounce handling, and graceful
   streaming shutdown.
 
-### Full Local TON and Indexing
+### Localnet and Indexing
 
 - Added Localton, a persistent isolated TON network with a genesis validator,
   DHT server, LiteServer, keys, zerostate, wallet management, validators,
   election participation, staking, rewards, hardfork configuration, raw
   LiteServer commands, and optional external messages.
-- Localton supports wallet V1, V2, V3, V4R2, V5R1, and Highload V2; node and
-  validator management; configuration, admin, faucet, API v2, and LiteServer
-  endpoints; and cold snapshot create, list, restore, and delete operations.
+- Localton supports wallet V1, V2, V3, V4R2, V5R1, and Highload V2, with
+  configuration, admin, faucet, API v2, and LiteServer endpoints.
+  Cold snapshots support create, list, restore, and delete operations.
+  Restoration restores node data and rebuilds the indexer.
 - Added a full Docker Compose stack with validators, API v2 and v3, PostgreSQL,
   Redis, a V3 worker, action classifier, and generated OpenAPI documents.
 - Localton can bootstrap nodes on separate hosts from a standard TON global
@@ -257,6 +321,8 @@ API, web UI, and `acton verify` CLI integration are included below.
   `--advertise-ip` validation, and a standalone command for installing the
   pinned TON binaries into a shared per-user cache. It ships with TON
   `v2026.08`.
+- Nodes can bootstrap after administrative hardforks. Docker context detection
+  supports Docker 20.10 and later.
 - Added Localton observability APIs and a dashboard with signed per-node
   telemetry, topology and geographic maps, synchronization and election state,
   block production timing, transaction throughput, and pending queue data.
@@ -288,6 +354,8 @@ API, web UI, and `acton verify` CLI integration are included below.
 - Explorer search can recover addresses, transactions, and blocks from pasted
   explorer URLs, recognizes USDT as an alias for Tether USD, and can be focused
   with `Ctrl+K` or `Cmd+K`.
+- Search includes tokens from `ton-assets`, and token lists place USD₮
+  first. Added an address converter for raw and user-friendly address forms.
 - Added a generated, network-specific address registry merged from public and
   Acton-maintained sources, weekly update automation, multi-source name
   tooltips, and JSON import/export for favorites and local names.
@@ -298,10 +366,17 @@ API, web UI, and `acton verify` CLI integration are included below.
 - Network configuration views decode the ConfigParam 30 consensus
   extension, ConfigParam 46 validator registry, ConfigParam -123 Wallet TG
   bytecode, and typed election timing fields.
+- Added validator election pages for public and local networks, with election
+  phases, timelines, current-round stakes, and validator details.
+  Configuration views include TL-B schemas for current and historical mainnet
+  and testnet parameter layouts.
 - Transaction inspection combines message flow, action overviews, value flow,
   transaction trees, external-in metadata, state changes, raw details, source,
   TASM, retracing, and cell inspection. Stable contract letters connect decoded
   addresses to tree nodes.
+- Transaction trees expose external-out message details. Action views
+  recognize `gasless_request` and `change_wallet_key` and show DNS names in
+  domain history. Block downloads use the selected network's API.
 - Large traces now use previews, lazy body decoding, incremental branch loads,
   memoized panels, deferred node details, and visible-action name resolution.
   Partial traces reconstruct the causal path and clearly mark omitted segments.
@@ -309,15 +384,26 @@ API, web UI, and `acton verify` CLI integration are included below.
   with multiple roots, compiler ABI or custom TL-B parsing, canonical block
   schemas, disassembly, raw cells, verified source, saved drafts, and exotic
   cell fallback.
+- Cell Inspector can decode DNS records and Jetton metadata with dedicated
+  parsers.
 - ABI and source catalogs accept drag-and-drop imports from Acton project
   directories and `acton build` artifacts.
+- ABI views preserve generic parameters, nested types, escaped names,
+  default values, enum encoding, and custom serialization metadata.
+  Decoded get-method results retain enum names. Known Jetton and NFT
+  interfaces can use standard ABIs without an exact code-hash match.
 - Added Emulate for ABI-built or raw internal and external messages, account
-  overrides, time and signature settings, enriched traces, state changes,
-  debugging, localnet submission, editing an existing message, and 30-day
-  shareable emulations.
-- Added token, NFT, wallet, vesting, locker, and multisig-specific views;
-  minting, DNS renew, approval, signer, schedule, order, safety, collection, and
-  holder experiences; and an NSFW registry using anonymized hashes.
+  overrides, and time and signature settings. Results include traces, state
+  changes, debugging, localnet submission, and 30-day shareable emulations.
+  Existing messages can be edited. Wallet V4 and V5 have dedicated message editors.
+  Shared URLs preserve the internal or external message mode.
+- Added dedicated views for tokens, NFTs, wallets, vesting contracts, lockers,
+  and multisigs. They expose minting, DNS renewal, approvals, signers,
+  schedules, orders, collections, and holders.
+- Added nominator and single-nominator pool overviews with validator details,
+  stake balances, reward shares, and pending balances.
+- Fragment NFTs show Telegram usernames and anonymous numbers. NFT cards
+  include DNS artwork and a filter for items without metadata.
 - Added favorites for accounts, blocks, and transactions; exact bigint GRAM and
   token formatting; streaming account updates; historical navigation; lazy
   account and block loading; copy actions; QR and address variants; Open Graph
@@ -326,13 +412,17 @@ API, web UI, and `acton verify` CLI integration are included below.
   network TPS panel backed by the Actonscan backend.
 - Repeated ABI catalog updates added hundreds of opcode and code-hash mappings,
   substantially reducing unknown messages in sampled traces.
+- Shared concurrent verifier ABI lookups and short-lived caching of missing
+  ABIs reduce repeated requests. RPC ABI caches are isolated by verifier
+  endpoint, and source views refresh verification metadata.
 
 ### Source Verifier
 
-- Added the verifier service, API, and web UI for Tolk, FunC, and Tact. The
-  service recompiles submitted source, compares its code hash with an address
-  or supplied hash, and stores an immutable source bundle in a Git-backed
-  registry. `acton verify` uses this service on TON testnet.
+- Added the verifier service at `verifier.ton.org`, with an API and web UI for
+  Tolk, FunC, and Tact. The service recompiles source and checks its code hash
+  against a supplied hash or deployed contract. The registry stores immutable
+  source bundles in Git.
+  `acton verify` uses this service on TON testnet.
 - The restricted Node.js compiler worker supports multiple compiler versions,
   generated registry loaders, import mappings, compiler ABI data, Tolk source
   maps, Tact package metadata, generated files, and Tact-to-Tolk ABI conversion.
@@ -340,7 +430,7 @@ API, web UI, and `acton verify` CLI integration are included below.
   sources. Tolk tracks resolved file reads, FunC uses compiler snapshots, and
   Tact retains the selected package. The backend validates the dependency
   report and filters the stored bundle without running the compiler twice.
-- Verifier source paths now accept `@` and `+` in file and directory names.
+- Verifier source paths accept `@` and `+` in file and directory names.
 - Tact ABI conversion reconstructs omitted storage, deployment and system-cell
   metadata, contract parameters, maps, references, integer formats, and
   compiler-allocated continuation cells.
@@ -358,24 +448,36 @@ API, web UI, and `acton verify` CLI integration are included below.
   case-insensitively for duplicates, and reject traversal, Git control paths,
   multiple source extensions, invalid language extensions, and other
   non-portable forms.
+- Uploads have a configurable total multipart limit, defaulting to 512 KiB,
+  and bounded source-directory depth. Invalid addresses and malformed
+  verification responses are rejected before further processing.
 - The source registry can rebuild its SQLite index from Git, supports
   configurable storage roots and independent commit/push controls, preserves
   exact source bytes, rejects dirty repositories at startup, and supports
   API-key-protected historical timestamp imports.
+- Source storage is sharded by code-hash prefix. Repository checks run at
+  startup, and cached shard discovery reduces work during registration.
+- Source publication and payment claims recover after interrupted writes
+  and restarts. The payment ledger rebuilds from wallet history and published
+  manifests before the service accepts new verification attempts.
 - Verifier deployments can enter read-only mode to reject tickets and source
   submissions for new code hashes while continuing to serve existing bundles.
 - Compiler execution clears inherited environment variables, limits file
   access through the Node permission model, disables writes and unsafe runtime
   features, and patches older Emscripten compilers for the restricted loader.
+- Compiler execution has a configurable concurrency limit and a default
+  10-second timeout. Verification status reports compilation queue state and
+  position. Compiler output and Git operations also have resource limits.
 - Added the shared verifier UI and Actonscan verified-contract catalog with
   source browsing, downloads, compiler links, ABI and source-map views,
   pagination, statistics, charts, Open Graph images, and local Explorer links.
 - Public verification uses one finalized TON testnet payment per new
   verification attempt, bound to its code hash. `/api/v1/take_ticket` returns
   the destination, minimum amount, and required comment. Each payment can
-  authorize only one attempt. Authenticated API-key submissions bypass the
-  payment requirement, and accepted bundles expose the payment transaction
-  hash.
+  authorize one completed attempt for that code hash. Interrupted claims and
+  retryable storage failures allow retries, with at most three claims per
+  payment. Authenticated API-key submissions bypass the payment requirement, and
+  accepted bundles expose the payment transaction hash.
 - The `acton verify` flow uploads normalized multipart bundles,
   validates optional deployed addresses, obtains and pays testnet tickets,
   supports retrying with `--payment-tx-hash`, retries transient failures, and
@@ -399,6 +501,9 @@ API, web UI, and `acton verify` CLI integration are included below.
 - Added the Actonscan Testnet Faucet page with browser/WASM proof-of-work,
   address and usage history, testnet validation, GitHub connection, recoverable
   redirects and sessions, and links to the equivalent CLI workflow.
+- GitHub reconnection resets stale sessions and normalizes device IDs.
+  The faucet reconnects to Redis automatically and reports Redis and SQLite
+  health through service probes.
 - Faucet deployments can enter read-only mode for challenge and claim endpoints
   during maintenance.
 
@@ -469,6 +574,7 @@ API, web UI, and `acton verify` CLI integration are included below.
 - Explorer, Studio, Test UI, verifier, and transaction views were migrated to
   the shared packages, improving accessibility, responsive behavior, consistent
   copy actions, exact formatting, loading states, and theme startup.
+- Faucet UI is shared between Actonscan and Studio through `@acton/faucet-ui`.
 - JavaScript and CSS linting moved from ESLint to Biome, and the frontend
   toolchain now uses Bun 1.4. Bun installs use hardened configuration, pinned
   versions, minimum release ages, and `bun ci`. Project templates gained safer
@@ -477,20 +583,22 @@ API, web UI, and `acton verify` CLI integration are included below.
   application and Docker checks, source-trace and grammar WASM builds, address
   registry updates, label automation, and path-aware CI for Studio, Actonscan,
   Localton, verifier, faucet, UI, templates, and VS Code.
-- Updated vulnerable Rust, JavaScript, template, docs, Tree-sitter, and compiler
-  dependencies and refreshed generated locks and snapshots without assigning
-  unsupported vulnerability claims to dependency-only commits.
+- Added automatic updates for network configuration fixtures and TL-B
+  configuration schemas. Verifier images omit unused compiler package files
+  and deduplicate identical WASM payloads.
+- Updated Rust, JavaScript, template, docs, Tree-sitter, and compiler
+  dependencies, including security updates.
 - Application project layouts, Docker metadata, toolchains, deny policies,
   release workflows, crate metadata, generated assets, and dependency rules
   were aligned across Actonscan, Localton, verifier, faucet, and the workspace.
 
 ### Documentation and Distribution
 
-- Documentation was expanded for Studio, full localnet, simulated localnet,
-  LiteAPI, state and checkpoints, RPC, gas profiling, paid verification,
-  testing, source artifacts, wrappers, standard-library availability, agent
-  skills, IDEs, deployment, and the new UI tools. Preview deployments now opt
-  out of search indexing.
+- Documentation was expanded for Studio, Localnet, Simulator, LiteAPI,
+  persistent snapshots, RPC, gas profiling, and paid verification.
+  It also covers testing, source artifacts, wrappers, standard-library
+  availability, agent skills, IDEs, deployment, and the UI tools.
+  Preview deployments opt out of search indexing.
 - Embedded Studio and Test UI assets are precompressed with gzip. Project
   templates are packed into one deterministic Zstandard archive, and bundled
   TVM instruction data is compressed and loaded lazily to reduce binary size.
