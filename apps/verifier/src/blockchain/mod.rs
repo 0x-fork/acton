@@ -32,11 +32,6 @@ pub struct ToncenterClient {
 
 impl ToncenterClient {
     #[must_use]
-    pub fn from_config(config: &Config) -> Self {
-        Self::for_network(config, TonNetwork::Testnet)
-    }
-
-    #[must_use]
     pub fn for_network(config: &Config, network: TonNetwork) -> Self {
         match network {
             TonNetwork::Mainnet => Self::new(
@@ -76,6 +71,51 @@ impl ToncenterClient {
         }
 
         request
+    }
+}
+
+#[derive(Clone)]
+pub struct MultiNetworkToncenterClient {
+    mainnet: ToncenterClient,
+    testnet: ToncenterClient,
+}
+
+impl MultiNetworkToncenterClient {
+    #[must_use]
+    pub fn from_config(config: &Config) -> Self {
+        Self {
+            mainnet: ToncenterClient::for_network(config, TonNetwork::Mainnet),
+            testnet: ToncenterClient::for_network(config, TonNetwork::Testnet),
+        }
+    }
+
+    #[must_use]
+    pub const fn new(mainnet: ToncenterClient, testnet: ToncenterClient) -> Self {
+        Self { mainnet, testnet }
+    }
+}
+
+#[async_trait]
+impl BlockchainClient for MultiNetworkToncenterClient {
+    async fn get_code_hash(&self, address: &str) -> Result<Option<String>, BlockchainError> {
+        let (mainnet, testnet) = tokio::join!(
+            self.mainnet.get_code_hash(address),
+            self.testnet.get_code_hash(address),
+        );
+        let mainnet = mainnet?;
+        let testnet = testnet?;
+
+        match (mainnet, testnet) {
+            (Some(mainnet_code_hash), Some(testnet_code_hash)) => {
+                Err(BlockchainError::AddressFoundOnBothNetworks {
+                    address: address.to_owned(),
+                    mainnet_code_hash,
+                    testnet_code_hash,
+                })
+            }
+            (Some(code_hash), None) | (None, Some(code_hash)) => Ok(Some(code_hash)),
+            (None, None) => Ok(None),
+        }
     }
 }
 
@@ -166,6 +206,12 @@ fn bytes_to_lower_hex(bytes: &[u8]) -> String {
 
 #[derive(Debug, Error)]
 pub enum BlockchainError {
+    #[error("address {address} has code_hash on both TON mainnet and testnet")]
+    AddressFoundOnBothNetworks {
+        address: String,
+        mainnet_code_hash: String,
+        testnet_code_hash: String,
+    },
     #[error("toncenter returned an invalid code hash")]
     InvalidCodeHash,
     #[error("toncenter transport error: {0}")]
@@ -201,8 +247,8 @@ mod tests {
     use crate::config::{Config, TonNetwork};
 
     use super::{
-        BlockchainClient, BlockchainError, TONCENTER_API_KEY_HEADER, ToncenterClient,
-        normalize_code_hash, user_agent,
+        BlockchainClient, BlockchainError, MultiNetworkToncenterClient, TONCENTER_API_KEY_HEADER,
+        ToncenterClient, normalize_code_hash, user_agent,
     };
 
     #[test]
@@ -292,6 +338,78 @@ testnet_api_key = "testnet-key"
                 assert!(matches!(result, Err(BlockchainError::InvalidCodeHash)));
             }
         }
+    }
+
+    #[tokio::test]
+    async fn multi_network_lookup_finds_one_network_and_rejects_duplicates() {
+        use axum::{Json, Router, extract::Query, routing::get};
+        use std::collections::HashMap;
+
+        const MAINNET_HASH: &str =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const TESTNET_HASH: &str =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("listener");
+        let server_address = listener.local_addr().expect("address");
+        let router = Router::new()
+            .route(
+                "/mainnet/api/v3/accountStates",
+                get(|Query(query): Query<HashMap<String, String>>| async move {
+                    let code_hash = match query.get("address").map(String::as_str) {
+                        Some("mainnet-only" | "duplicate") => Some(MAINNET_HASH),
+                        _ => None,
+                    };
+                    Json(serde_json::json!({
+                        "accounts": code_hash.map(|code_hash| vec![serde_json::json!({
+                            "code_hash": code_hash
+                        })]).unwrap_or_default()
+                    }))
+                }),
+            )
+            .route(
+                "/testnet/api/v3/accountStates",
+                get(|Query(query): Query<HashMap<String, String>>| async move {
+                    let code_hash = match query.get("address").map(String::as_str) {
+                        Some("testnet-only" | "duplicate") => Some(TESTNET_HASH),
+                        _ => None,
+                    };
+                    Json(serde_json::json!({
+                        "accounts": code_hash.map(|code_hash| vec![serde_json::json!({
+                            "code_hash": code_hash
+                        })]).unwrap_or_default()
+                    }))
+                }),
+            );
+        let server = tokio::spawn(async move { axum::serve(listener, router).await });
+        let client = MultiNetworkToncenterClient::new(
+            ToncenterClient::new(format!("http://{server_address}/mainnet"), None),
+            ToncenterClient::new(format!("http://{server_address}/testnet"), None),
+        );
+
+        assert_eq!(
+            client.get_code_hash("mainnet-only").await.expect("lookup"),
+            Some(MAINNET_HASH.to_owned())
+        );
+        assert_eq!(
+            client.get_code_hash("testnet-only").await.expect("lookup"),
+            Some(TESTNET_HASH.to_owned())
+        );
+        assert_eq!(client.get_code_hash("missing").await.expect("lookup"), None);
+        assert!(matches!(
+            client.get_code_hash("duplicate").await,
+            Err(BlockchainError::AddressFoundOnBothNetworks {
+                address,
+                mainnet_code_hash,
+                testnet_code_hash,
+            }) if address == "duplicate"
+                && mainnet_code_hash == MAINNET_HASH
+                && testnet_code_hash == TESTNET_HASH
+        ));
+
+        server.abort();
     }
 
     #[test]

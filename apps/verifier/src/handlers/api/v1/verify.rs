@@ -57,7 +57,7 @@ const MAX_SOURCE_PATH_CHARS: usize = 128;
         (status = 401, description = "A valid API key is required to set verified_at or skip payment", body = crate::error::ErrorResponse),
         (status = 402, description = "Payment is missing or invalid", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
-        (status = 409, description = "Payment is already used or in progress", body = crate::error::ErrorResponse),
+        (status = 409, description = "Payment is already used or in progress, or the address exists on both TON networks", body = crate::error::ErrorResponse),
         (status = 413, description = "The request exceeds the configured upload limit", body = crate::error::ErrorResponse),
         (status = 502, description = "Compiler, blockchain, payment provider, or source storage failure", body = crate::error::ErrorResponse),
         (status = 503, description = "Verifier is read-only or payment history recovery is in progress", body = crate::error::ErrorResponse)

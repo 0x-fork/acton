@@ -561,7 +561,10 @@ async fn openapi_json_documents_verifier_api() {
         ]
     );
     assert_eq!(response_statuses(abi), ["200", "400", "404", "502"]);
-    assert_eq!(response_statuses(source), ["200", "400", "404", "502"]);
+    assert_eq!(
+        response_statuses(source),
+        ["200", "400", "404", "409", "502"]
+    );
 }
 
 #[tokio::test]

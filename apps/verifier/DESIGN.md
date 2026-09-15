@@ -103,7 +103,9 @@ Responsibilities:
 The verifier backend supports payments on TON mainnet and testnet. The current
 `acton verify` client remains testnet-only. Verification records are keyed by
 code hash, so the same verified code can be used on any TON network. Address
-lookups through this backend use its configured testnet provider.
+lookups query both configured TON Center providers. If an address exists on
+both networks, the backend returns `409 Conflict` with a `matches` array that
+contains the network and code hash for both variants.
 
 Acton validates portable source paths before payment. Uploads accept at most
 256 files. Source paths are relative, at most 128 ASCII characters, and contain

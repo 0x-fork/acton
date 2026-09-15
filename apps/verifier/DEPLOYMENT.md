@@ -4,15 +4,16 @@ This document describes how to deploy the verifier backend as a Docker service o
 
 The Docker image contains the verifier backend, Node.js, the compiler worker,
 Git, and OpenSSH. It does not run a TON node. The verifier needs TON Center v3
-endpoints for testnet address lookup and payment verification on the selected
-network.
+endpoints for address lookup on both networks and payment verification on the
+selected network.
 
 ## Architecture
 
 At runtime the service needs:
 
 - Verifier HTTP backend exposed on port `3000`.
-- TON Center-compatible API endpoint for address-to-code-hash resolution.
+- TON Center-compatible API endpoints for address-to-code-hash resolution on
+  mainnet and testnet.
 - Wallet address on the selected network that receives verification payments.
 - SQLite payment ledger that prevents transaction replay.
 - Git source repository for verified source bundles.
@@ -499,7 +500,7 @@ Common causes:
 Check:
 
 - `VERIFIER_PAYMENT_PRIMARY_NETWORK` selects the intended network.
-- `VERIFIER_TONCENTER_TESTNET_BASE_URL` is reachable for address lookup.
+- Both TON Center URLs are reachable for address lookup.
 - The TON Center URL matching the selected payment network is reachable for
   payment verification.
 - The corresponding API keys are set if the endpoints require them.
