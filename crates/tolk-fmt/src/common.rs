@@ -5,6 +5,8 @@ use tree_sitter::Node;
 
 pub struct ListOptions<'a> {
     pub separator: RcDoc<'a>,
+    /// Some fixed-arity forms, such as `assert(condition, code)`, reject a trailing comma.
+    pub trailing_separator: bool,
     pub brackets: (RcDoc<'a>, RcDoc<'a>),
     pub multiline_threshold: usize,
     pub single_line_edge_space: bool,
@@ -15,6 +17,7 @@ impl Default for ListOptions<'_> {
     fn default() -> Self {
         Self {
             separator: RcDoc::text(","),
+            trailing_separator: true,
             brackets: (RcDoc::text("("), RcDoc::text(")")),
             multiline_threshold: 5,
             single_line_edge_space: false,
@@ -159,7 +162,12 @@ where
         }
 
         let doc = item_printer(ctx, item)?;
-        let width = doc_width(&doc) + sep_width;
+        let width = doc_width(&doc)
+            + if i + 1 < items.len() || options.trailing_separator {
+                sep_width
+            } else {
+                0
+            };
 
         let has_inline =
             comments.is_some_and(|cs| cs.iter().any(|c| c.kind == CommentKind::Inline));
@@ -208,7 +216,7 @@ where
         docs.push(info.doc);
 
         if is_last {
-            if !force_single_line {
+            if !force_single_line && options.trailing_separator {
                 docs.push(RcDoc::flat_alt(options.separator.clone(), RcDoc::nil()));
             }
         } else {

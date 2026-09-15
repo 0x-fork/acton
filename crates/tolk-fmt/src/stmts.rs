@@ -1,8 +1,8 @@
 use crate::pretty::RcDoc;
 use crate::{Context, comments, common, exprs};
 use tolk_syntax::{
-    Assert, Block, CatchClause, DoWhile, ExprStmt, If, IfAlt, MatchStmt, Repeat, Return, Stmt,
-    Throw, TryCatch, While,
+    Assert, Block, CatchClause, DoWhile, Expr, ExprStmt, If, IfAlt, MatchStmt, Repeat, Return,
+    Stmt, Throw, TryCatch, While,
 };
 
 #[must_use]
@@ -241,29 +241,57 @@ pub(crate) fn assert_uses_throw_syntax(assert_stmt: &Assert) -> bool {
 fn print_assert_statement<'a>(ctx: &Context<'_>, assert_stmt: &Assert) -> Option<RcDoc<'a>> {
     let condition = assert_stmt.condition()?;
     let exc_no = assert_stmt.expr()?;
+    let uses_throw = assert_uses_throw_syntax(assert_stmt);
 
-    let condition_doc = exprs::print_expression(ctx, &condition)?;
-    let exc_no_doc = exprs::print_expression(ctx, &exc_no)?;
-
-    if assert_uses_throw_syntax(assert_stmt) {
-        Some(RcDoc::group(RcDoc::concat([
-            RcDoc::text("assert ("),
-            RcDoc::concat([RcDoc::line_(), condition_doc]).nest(4),
-            RcDoc::line_(),
-            RcDoc::text(") throw "),
-            exc_no_doc,
-            RcDoc::text(statement_terminator(assert_stmt.0)),
-        ])))
+    // A commented argument list owns its comments so delimiters stay outside `//`.
+    // Keep the existing compact layout when no parenthesized argument has attached comments.
+    let args = [condition, exc_no];
+    let args = if uses_throw { &args[..1] } else { &args[..] };
+    let args_doc = if args
+        .iter()
+        .any(|arg| ctx.comments.contains_key(&arg.syntax()))
+    {
+        common::print_list(
+            ctx,
+            args,
+            exprs::print_expression_naked,
+            Expr::syntax,
+            |_| vec![],
+            common::ListOptions {
+                trailing_separator: false,
+                ..Default::default()
+            },
+        )?
     } else {
-        Some(RcDoc::group(RcDoc::concat([
-            RcDoc::text("assert("),
-            condition_doc,
-            RcDoc::text(", "),
-            exc_no_doc,
-            RcDoc::text(")"),
-            RcDoc::text(statement_terminator(assert_stmt.0)),
-        ])))
+        let condition_doc = exprs::print_expression(ctx, &condition)?;
+        if uses_throw {
+            RcDoc::concat([
+                RcDoc::text("("),
+                RcDoc::concat([RcDoc::line_(), condition_doc]).nest(4),
+                RcDoc::line_(),
+                RcDoc::text(")"),
+            ])
+        } else {
+            RcDoc::concat([
+                RcDoc::text("("),
+                condition_doc,
+                RcDoc::text(", "),
+                exprs::print_expression(ctx, &exc_no)?,
+                RcDoc::text(")"),
+            ])
+        }
+    };
+
+    let mut docs = vec![
+        RcDoc::text(if uses_throw { "assert " } else { "assert" }),
+        args_doc,
+    ];
+    if uses_throw {
+        docs.push(RcDoc::text(" throw "));
+        docs.push(exprs::print_expression(ctx, &exc_no)?);
     }
+    docs.push(RcDoc::text(statement_terminator(assert_stmt.0)));
+    Some(RcDoc::group(RcDoc::concat(docs)))
 }
 
 fn print_try_catch_statement<'a>(ctx: &Context, try_catch: &TryCatch) -> Option<RcDoc<'a>> {

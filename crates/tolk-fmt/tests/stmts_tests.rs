@@ -581,6 +581,82 @@ fn test_assert_comma_syntax() {
 }
 
 #[test]
+fn test_assert_comma_syntax_preserves_condition_comments() {
+    check(
+        r"
+            fun test(min: int, max: int, expected: int) {
+                assert(
+                    (min == expected) && // No seqNr skipped
+                    (max >= min), // valid root range
+                    100
+                );
+            }
+        ",
+        expect![[r"
+            fun test(min: int, max: int, expected: int) {
+                assert(
+                    (min == expected) &&
+                        // No seqNr skipped
+                        (max >= min), // valid root range
+                    100
+                );
+            }"]],
+    );
+}
+
+#[test]
+fn test_assert_comma_syntax_preserves_argument_comments() {
+    check(
+        r"
+            fun test(ready: bool, errorCode: int) {
+                assert(
+                    // Check readiness
+                    ready, // condition
+                    // Report failure
+                    errorCode // error code
+                );
+            }
+        ",
+        expect![[r"
+            fun test(ready: bool, errorCode: int) {
+                assert(
+                    // Check readiness
+                    ready,    // condition
+                    // Report failure
+                    errorCode // error code
+                );
+            }"]],
+    );
+}
+
+#[test]
+fn test_assert_comma_syntax_preserves_comments_in_match_arm() {
+    check(
+        r"
+            fun test(value: int) {
+                match (value) {
+                    0 => assert(
+                        value > 0, // condition
+                        100 // error code
+                    ),
+                    else => {}
+                }
+            }
+        ",
+        expect![[r"
+            fun test(value: int) {
+                match (value) {
+                    0 => assert(
+                        value > 0, // condition
+                        100        // error code
+                    ),
+                    else => {}
+                }
+            }"]],
+    );
+}
+
+#[test]
 fn test_assert_throw_syntax() {
     check(
         "fun test() { assert (x > 0) throw 100; }",
@@ -589,6 +665,27 @@ fn test_assert_throw_syntax() {
                     assert (x > 0) throw 100;
                 }"]],
     );
+}
+
+#[test]
+fn test_assert_throw_syntax_preserves_condition_comments() {
+    for width in [40, 80, 100] {
+        check_with_width(
+            r"
+                fun test(ready: bool) {
+                    assert(ready) // condition
+                        throw 100;
+                }
+            ",
+            expect![[r"
+                fun test(ready: bool) {
+                    assert (
+                        ready // condition
+                    ) throw 100;
+                }"]],
+            width,
+        );
+    }
 }
 
 #[test]
