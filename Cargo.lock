@@ -6005,6 +6005,7 @@ dependencies = [
  "ton-executor",
  "ton-networks",
  "toncenter-keys",
+ "tvm-ffi",
  "tvm-logs",
  "tycho-types",
 ]

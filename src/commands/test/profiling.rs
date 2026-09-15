@@ -194,10 +194,7 @@ fn decode_declared_message_name(
         MsgInfo::ExtOut(_) => return None,
     };
 
-    let mut body = in_message.body;
-    if bounced && body.skip_first(32, 0).is_err() {
-        return None;
-    }
+    let body = tvm_ffi::message::original_message_body(in_message.body, bounced)?;
     let opcode = {
         let mut parser = body;
         parser.load_u32().ok()

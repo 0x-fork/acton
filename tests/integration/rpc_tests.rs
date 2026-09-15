@@ -1036,6 +1036,30 @@ fn test_rpc_trace_uses_v3_traces_and_formatter_context() {
         .as_str()
         .expect("build artifact must contain code_boc64");
 
+    let mut rich_body = CellBuilder::new();
+    rich_body.store_u32(0xffff_fffe).unwrap();
+    rich_body
+        .store_reference(Boc::decode_base64(counter_increase_body_boc64(5)).unwrap())
+        .unwrap();
+    let mut original_info = CellBuilder::new();
+    original_info.store_zeros(101).unwrap();
+    rich_body
+        .store_reference(original_info.build().unwrap())
+        .unwrap();
+    rich_body.store_u8(0).unwrap();
+    rich_body.store_u32((-14_i32) as u32).unwrap();
+    rich_body.store_bit_zero().unwrap();
+    let mut rich_response = toncenter_v3_trace_ok_response(
+        MATCHED_INFO_ADDRESS,
+        MATCHED_INFO_OWNER_ADDRESS,
+        &Boc::encode_base64(rich_body.build().unwrap()),
+    );
+    let mut rich_trace: JsonValue = serde_json::from_str(&rich_response.body).unwrap();
+    let in_msg = &mut rich_trace["traces"][0]["transactions"][TRACE_ROOT_HASH]["in_msg"];
+    in_msg["bounced"] = true.into();
+    in_msg["bounce"] = false.into();
+    rich_response.body = rich_trace.to_string();
+
     let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
         toncenter_v3_trace_ok_response(
             MATCHED_INFO_ADDRESS,
@@ -1052,6 +1076,12 @@ fn test_rpc_trace_uses_v3_traces_and_formatter_context() {
             MATCHED_INFO_OWNER_ADDRESS,
             &counter_increase_body_boc64(5),
         ),
+        toncenter_v3_account_states_ok_response(
+            MATCHED_INFO_ADDRESS,
+            MATCHED_INFO_OWNER_ADDRESS,
+            code_boc64,
+        ),
+        rich_response,
         toncenter_v3_account_states_ok_response(
             MATCHED_INFO_ADDRESS,
             MATCHED_INFO_OWNER_ADDRESS,
@@ -1102,6 +1132,26 @@ fn test_rpc_trace_uses_v3_traces_and_formatter_context() {
         "integration/snapshots/rpc/test_rpc_trace_v3_tree_show_bodies.stdout.txt",
     );
 
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("--color")
+        .arg("never")
+        .arg("rpc")
+        .arg("trace")
+        .arg(TRACE_ROOT_HASH)
+        .arg("--net")
+        .arg("custom:mock")
+        .arg("--show-bodies")
+        .arg("--verbose")
+        .env("MOCK_API_KEY", "custom-mock-api-key")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_trace_rich_bounce_verbose.stdout.txt",
+        );
+
     mock_handle.join().expect("mock server thread must finish");
 
     let captured = captured
@@ -1109,10 +1159,10 @@ fn test_rpc_trace_uses_v3_traces_and_formatter_context() {
         .expect("captured requests mutex should not be poisoned");
     assert_eq!(
         captured.len(),
-        4,
-        "expected exactly four TON Center requests"
+        6,
+        "expected exactly six TON Center requests"
     );
-    for request_idx in [0, 2] {
+    for request_idx in [0, 2, 4] {
         assert_eq!(captured[request_idx].method, "GET");
         assert_eq!(
             captured[request_idx].path,
@@ -1125,7 +1175,7 @@ fn test_rpc_trace_uses_v3_traces_and_formatter_context() {
             "rpc trace should send TON Center API keys for custom networks from MOCK_API_KEY",
         );
     }
-    for request_idx in [1, 3] {
+    for request_idx in [1, 3, 5] {
         assert_eq!(captured[request_idx].method, "GET");
         assert!(
             captured[request_idx]

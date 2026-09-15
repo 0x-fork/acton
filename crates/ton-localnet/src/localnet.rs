@@ -3219,17 +3219,8 @@ pub(crate) fn convert_to_message_struct(
         _ => (0, 0, false, false, Vec::new()),
     };
 
-    // Extract opcode, skipping the bounce prefix for bounced internal messages.
-    let mut opcode = None;
-    let mut body_slice = msg.body;
-    if bounced {
-        let _ = body_slice.load_uint(32);
-    }
-    if body_slice.size_bits() >= 32
-        && let Ok(op) = body_slice.load_uint(32)
-    {
-        opcode = Some(op as u32);
-    }
+    let opcode = tvm_ffi::message::original_message_body(msg.body, bounced)
+        .and_then(|mut body| body.load_u32().ok());
 
     let mut init_state_bytes = Vec::new();
     if let Some(init) = msg.init {
@@ -3606,6 +3597,31 @@ mod tests {
         let mapped =
             convert_to_message_struct(&message_meta(hash), &message).expect("message must map");
 
+        assert_eq!(mapped.opcode, Some(REGULAR_OPCODE));
+        assert!(mapped.bounced);
+    }
+
+    #[test]
+    fn convert_to_message_struct_extracts_rich_bounced_opcode_from_original_body() {
+        let mut message: OwnedMessage =
+            BocRepr::decode(internal_message_boc(true, &[REGULAR_OPCODE])).unwrap();
+        let original_body =
+            CellBuilder::build_from(message.body.0.apply(&message.body.1).unwrap()).unwrap();
+        let mut rich = CellBuilder::new();
+        rich.store_u32(0xffff_fffe).unwrap();
+        rich.store_reference(original_body).unwrap();
+        let mut original_info = CellBuilder::new();
+        original_info.store_zeros(101).unwrap();
+        rich.store_reference(original_info.build().unwrap())
+            .unwrap();
+        rich.store_u8(0).unwrap();
+        rich.store_u32((-14_i32) as u32).unwrap();
+        rich.store_bit_zero().unwrap();
+        message.body = CellSliceParts::from(rich.build().unwrap());
+        let message: BocBytes = BocRepr::encode(message).unwrap().into();
+
+        let hash = message.hash().unwrap();
+        let mapped = convert_to_message_struct(&message_meta(hash), &message).unwrap();
         assert_eq!(mapped.opcode, Some(REGULAR_OPCODE));
         assert!(mapped.bounced);
     }

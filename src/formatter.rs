@@ -28,6 +28,7 @@ use tolk_compiler::dynamic_unpack::{self, UnpackedValue};
 use tolk_compiler::types_kernel::TyIdx;
 use tolk_source_map::SourceLocation;
 use ton_api::Network;
+use tvm_ffi::message::original_message_body;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes};
@@ -1260,10 +1261,10 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         direction: MessageBodyDirection,
         bounced: bool,
     ) -> Option<DecodedMessageBody> {
-        let (opcode, body_tail) = Self::opcode_and_body_tail_after_bounce_prefix(body, bounced)
-            .map_or((None, None), |(opcode, body_tail)| {
-                (Some(opcode), Some(body_tail))
-            });
+        let body = original_message_body(body, bounced)?;
+        let mut parser = body;
+        let opcode = parser.load_u32().ok();
+        let body_tail = opcode.map(|_| parser);
 
         if let Some(decoded) = Self::try_decode_text_comment_body(opcode, body_tail) {
             return Some(decoded);
@@ -1276,12 +1277,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         };
         for abi in abis {
             let body_candidates = Self::compiler_message_candidates(&abi, direction, opcode);
-            if let Some(decoded) = self.try_decode_message_body_types(
-                body,
-                &abi,
-                body_candidates,
-                if bounced { 32 } else { 0 },
-            ) {
+            if let Some(decoded) = self.try_decode_message_body_types(body, &abi, body_candidates) {
                 return Some(decoded);
             }
         }
@@ -1540,22 +1536,6 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         })
     }
 
-    fn opcode_after_bounce_prefix(body: CellSlice<'_>, bounced: bool) -> Option<u32> {
-        Self::opcode_and_body_tail_after_bounce_prefix(body, bounced).map(|(opcode, _)| opcode)
-    }
-
-    fn opcode_and_body_tail_after_bounce_prefix(
-        body: CellSlice<'_>,
-        bounced: bool,
-    ) -> Option<(u32, CellSlice<'_>)> {
-        let mut parser = body;
-        if bounced {
-            parser.load_u32().ok()?;
-        }
-        let opcode = parser.load_u32().ok()?;
-        Some((opcode, parser))
-    }
-
     fn try_decode_text_comment_body(
         opcode: Option<u32>,
         body_tail: Option<CellSlice<'_>>,
@@ -1597,17 +1577,12 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         body: CellSlice<'_>,
         abi: &ContractABI,
         candidates: I,
-        prefix_to_skip: u16,
     ) -> Option<DecodedMessageBody>
     where
         I: IntoIterator<Item = TyIdx>,
     {
         for body_ty_idx in candidates {
             let mut parser = body;
-            if prefix_to_skip > 0 && parser.skip_first(prefix_to_skip, 0).is_err() {
-                continue;
-            }
-
             let Ok(data) = dynamic_unpack::unpack_from_slice(&mut parser, abi, body_ty_idx) else {
                 continue;
             };
@@ -2530,11 +2505,11 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             RelaxedMsgInfo::Int(info) => info.bounced,
             RelaxedMsgInfo::ExtOut(_) => false,
         };
-        Self::opcode_after_bounce_prefix(in_msg.body, bounced)
+        Self::opcode_from_body(in_msg.body, bounced)
     }
 
     fn opcode_from_body(body: CellSlice<'_>, bounced: bool) -> Option<u32> {
-        Self::opcode_after_bounce_prefix(body, bounced)
+        original_message_body(body, bounced)?.load_u32().ok()
     }
 
     fn color_message_name(name: &str) -> String {

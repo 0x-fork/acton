@@ -2102,16 +2102,14 @@ fn transaction_matches_predicates(
         if let MsgInfo::Int(info) = &in_msg.info {
             check!(predicates.bounced, bool_item(info.bounced));
             if let Some(ref field) = predicates.opcode {
-                let mut slice = in_msg.body;
-                let Ok(mut opcode) = slice.load_u32() else {
+                let opcode = tvm_ffi::message::original_message_body(
+                    in_msg.body,
+                    info.bounced && predicates.bounced.is_some(),
+                )
+                .and_then(|mut body| body.load_u32().ok());
+                let Some(opcode) = opcode else {
                     return Ok(false);
                 };
-                if info.bounced && predicates.bounced.is_some() {
-                    let Ok(bounced_opcode) = slice.load_u32() else {
-                        return Ok(false);
-                    };
-                    opcode = bounced_opcode;
-                }
                 if !call_predicate(executor, &field.predicate, int_item(i64::from(opcode)))? {
                     return Ok(false);
                 }
@@ -2218,16 +2216,14 @@ fn transaction_matches_scalar_params(
 
         if let MsgInfo::Int(info) = &in_msg.info {
             if let Some(expected_opcode) = &params.opcode {
-                let mut slice = in_msg.body;
-                let Ok(mut opcode) = slice.load_u32() else {
+                let opcode = tvm_ffi::message::original_message_body(
+                    in_msg.body,
+                    info.bounced && params.bounced == Some(true),
+                )
+                .and_then(|mut body| body.load_u32().ok());
+                let Some(opcode) = opcode else {
                     return false;
                 };
-                if info.bounced && params.bounced == Some(true) {
-                    let Ok(bounced_opcode) = slice.load_u32() else {
-                        return false;
-                    };
-                    opcode = bounced_opcode;
-                }
                 if *expected_opcode != opcode {
                     return false;
                 }
