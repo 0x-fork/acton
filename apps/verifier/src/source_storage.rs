@@ -304,19 +304,15 @@ impl GitSourceStorage {
 
                 if self.commit_enabled {
                     git(repo_path, &["add", "--", &bundle_path]).await?;
-
-                    let staged = git_has_staged_changes(repo_path, &bundle_path).await?;
-                    if staged {
-                        let message = commit_message(&request, &manifest_hash);
-                        git_with_author(
-                            repo_path,
-                            &["commit", "-m", &message, "--", &bundle_path],
-                            self,
-                            verified_at,
-                        )
-                        .await?;
-                        self.pending_push.store(true, Ordering::Release);
-                    }
+                    let message = commit_message(&request, &manifest_hash);
+                    git_with_author(
+                        repo_path,
+                        &["commit", "-m", &message, "--", &bundle_path],
+                        self,
+                        verified_at,
+                    )
+                    .await?;
+                    self.pending_push.store(true, Ordering::Release);
                 }
 
                 Ok::<(), SourceStorageError>(())
@@ -1017,25 +1013,6 @@ async fn git_output_untrimmed(
         command: git_command_string(args),
         source,
     })
-}
-
-async fn git_has_staged_changes(
-    repo_path: &Path,
-    bundle_path: &str,
-) -> Result<bool, SourceStorageError> {
-    let output = git_command(
-        repo_path,
-        &["diff", "--cached", "--quiet", "--", bundle_path],
-    )
-    .await?;
-    match output.status.code() {
-        Some(0) => Ok(false),
-        Some(1) => Ok(true),
-        _ => Err(git_error(
-            &["diff", "--cached", "--quiet", "--", bundle_path],
-            &output,
-        )),
-    }
 }
 
 async fn git_has_committed_files(

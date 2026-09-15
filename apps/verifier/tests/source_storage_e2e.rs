@@ -501,7 +501,10 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
     let config = Config::load_from_path(config_path)?;
     let storage = GitSourceStorage::from_config(&config);
 
-    assert!(storage.current_revision().await?.is_some());
+    let initial_revision = storage
+        .current_revision()
+        .await?
+        .expect("fixture should have an initial revision");
 
     let started_at = unix_timestamp()?;
     let bundle_path = format!(
@@ -544,6 +547,7 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
 
     assert_eq!(receipt.revision.len(), 40);
     assert!(receipt.created);
+    assert_ne!(receipt.revision, initial_revision);
 
     let stored_main = fixture.repo_path.join(&bundle_path).join("files/main.tolk");
     let stored_lib = fixture
