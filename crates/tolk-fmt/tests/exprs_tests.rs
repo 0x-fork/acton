@@ -213,7 +213,7 @@ fn test_dot_access_breaking() {
 }
 
 #[test]
-fn test_dot_access_for_struct_litral() {
+fn test_dot_access_for_struct_literal() {
     check_with_width(
         "fun test() { Foo { loooooooooong }.toCell() }",
         expect![[r"
@@ -223,6 +223,102 @@ fn test_dot_access_for_struct_litral() {
                     }.toCell();
                 }"]],
         20,
+    );
+}
+
+#[test]
+fn test_struct_literal_chain_fits_on_one_line() {
+    check(
+        "fun test() { Foo{}\n.foo\n.bar; }",
+        expect![[r"
+            fun test() {
+                Foo {}.foo.bar;
+            }"]],
+    );
+}
+
+#[test]
+fn test_struct_literal_chain_after_multiline_literal() {
+    check(
+        r"
+            fun test() {
+                Foo { first: 1, second: 2 }.foo.bar;
+                if (ready) {
+                    val result = Foo { first: 1, second: 2 }.foo().bar();
+                }
+            }
+        ",
+        expect![[r"
+            fun test() {
+                Foo {
+                    first: 1,
+                    second: 2,
+                }
+                .foo
+                .bar;
+                if (ready) {
+                    val result = Foo {
+                        first: 1,
+                        second: 2,
+                    }
+                    .foo()
+                    .bar();
+                }
+            }"]],
+    );
+}
+
+#[test]
+fn test_struct_literal_chain_breaks_by_width() {
+    check_with_width(
+        "fun test() { Foo {}.withFirstValue().withSecondValue(); }",
+        expect![[r"
+            fun test() {
+                Foo {}
+                .withFirstValue()
+                .withSecondValue();
+            }"]],
+        30,
+    );
+}
+
+#[test]
+fn test_struct_literal_chain_with_generics() {
+    check(
+        "fun test() { Foo<int> { first: 1, second: 2 }.convert<int>().toCell(); }",
+        expect![[r"
+            fun test() {
+                Foo<int> {
+                    first: 1,
+                    second: 2,
+                }
+                .convert<int>()
+                .toCell();
+            }"]],
+    );
+}
+
+#[test]
+fn test_struct_literal_chain_with_comments() {
+    check(
+        r"
+            fun test() {
+                Foo { first: 1, second: 2 }
+                    // First step
+                    .foo() // Keep the result
+                    .bar();
+            }
+        ",
+        expect![[r"
+            fun test() {
+                Foo {
+                    first: 1,
+                    second: 2,
+                }
+                // First step
+                .foo() // Keep the result
+                .bar();
+            }"]],
     );
 }
 

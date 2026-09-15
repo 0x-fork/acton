@@ -319,10 +319,10 @@ fn print_method_chain_expression<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<R
 
     let mut tail = Vec::with_capacity(chain.links.len() * 3);
     let mut previous_has_inline_line_comments = false;
-    for (index, link) in chain.links.into_iter().enumerate() {
+    for link in chain.links {
         let separator = if previous_has_inline_line_comments || link.has_leading_comments {
             RcDoc::hardline()
-        } else if index == 0 && (chain.base_is_object_lit || keep_single_link_attached) {
+        } else if keep_single_link_attached {
             RcDoc::nil()
         } else {
             RcDoc::line_()
@@ -334,7 +334,8 @@ fn print_method_chain_expression<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<R
         tail.push(link.doc);
     }
 
-    let tail_doc = if keep_single_link_attached {
+    // Struct literal chains align with the closing brace, which already marks the base's end.
+    let tail_doc = if keep_single_link_attached || chain.base_is_object_lit {
         RcDoc::concat(tail)
     } else {
         RcDoc::concat(tail).nest(4)
