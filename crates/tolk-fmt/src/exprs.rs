@@ -804,6 +804,16 @@ pub fn print_match_arm<'a>(ctx: &Context<'_>, arm: &MatchArm) -> Option<RcDoc<'a
         MatchArmBody::Block(b) => (stmts::print_block_statement(ctx, &b)?, true),
         MatchArmBody::Return(r) => (stmts::print_return_statement(ctx, &r)?, false),
         MatchArmBody::Throw(t) => (stmts::print_throw_statement(ctx, &t)?, false),
+        MatchArmBody::Statement(stmt) => (
+            stmts::print_statement(ctx, &stmt)?,
+            matches!(
+                stmt,
+                tolk_syntax::Stmt::If(_)
+                    | tolk_syntax::Stmt::While(_)
+                    | tolk_syntax::Stmt::Repeat(_)
+                    | tolk_syntax::Stmt::TryCatch(_)
+            ),
+        ),
         MatchArmBody::Expr(e) => (print_expression(ctx, &e)?, false),
     };
 

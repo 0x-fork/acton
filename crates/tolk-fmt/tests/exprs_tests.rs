@@ -2595,3 +2595,126 @@ fn test_match_in_expressions() {
                 }"]],
     );
 }
+
+#[test]
+fn test_triple_quoted_string_escapes() {
+    check(
+        r#"get fun f(): string { return """a\""""; }
+get fun g(): string { return """a\"""b"""; }
+get fun h(): string { return """a"\"b"""; }
+get fun i(): string { return """a""\"b"""; }"#,
+        expect![[r#"
+get fun f(): string {
+    return """a\"""";
+}
+
+get fun g(): string {
+    return """a\"""b""";
+}
+
+get fun h(): string {
+    return """a"\"b""";
+}
+
+get fun i(): string {
+    return """a""\"b""";
+}"#]],
+    );
+}
+
+#[test]
+fn test_match_assert_comma_form() {
+    check(
+        r"get fun f(x: int): int {
+match (x) {
+0 => assert(x == 0, 123),
+else => assert(x > 0, 123),
+}
+return x;
+}",
+        expect![[r"
+            get fun f(x: int): int {
+                match (x) {
+                    0 => assert(x == 0, 123),
+                    else => assert(x > 0, 123),
+                }
+                return x;
+            }"]],
+    );
+}
+
+#[test]
+fn test_match_statement_bodies() {
+    check(
+        r"get fun f(x: int): int {
+var result = 0;
+match (x) {
+1 => assert (x < 2) throw 123,
+2 => while (x > 0) { result += x; x -= 1; }
+3 => do { result += x; x -= 1; } while (x > 0)
+4 => if (x == 4) { result = 5; } else { throw 123; }
+5 => repeat (x) { result += 1; }
+6 => try { throw 1; } catch (code) { result = code; }
+else => return 0
+}
+return result;
+}",
+        expect![[r"
+get fun f(x: int): int {
+    var result = 0;
+    match (x) {
+        1 => assert (x < 2) throw 123,
+        2 => while (x > 0) {
+            result += x;
+            x -= 1;
+        }
+        3 => do {
+            result += x;
+            x -= 1;
+        } while (x > 0),
+        4 => if (x == 4) {
+            result = 5;
+        } else {
+            throw 123;
+        }
+        5 => repeat (x) {
+            result += 1;
+        }
+        6 => try {
+            throw 1;
+        } catch (code) {
+            result = code;
+        }
+        else => return 0,
+    }
+    return result;
+}"]],
+    );
+}
+
+#[test]
+fn test_match_loop_control_statements() {
+    check(
+        r"get fun f(x: int): int {
+while (x > 0) {
+x -= 1;
+match (x) {
+0 => break,
+else => continue,
+}
+}
+return x;
+}",
+        expect![[r"
+            get fun f(x: int): int {
+                while (x > 0) {
+                    x -= 1;
+                    match (x) {
+                        0 => break,
+                        else => continue,
+                    }
+                }
+                return x;
+            }"]],
+    );
+}

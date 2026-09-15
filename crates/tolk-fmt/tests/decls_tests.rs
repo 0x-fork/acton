@@ -1757,3 +1757,22 @@ fn test_constants_with_newlines() {
     );
 }
 // }
+
+#[test]
+fn test_enum_semicolon_separators() {
+    check(
+        r"enum E { A = 1; B = 2; C, D }
+get fun f(): int { return E.D as int; }",
+        expect![[r"
+enum E {
+    A = 1
+    B = 2
+    C
+    D
+}
+
+get fun f(): int {
+    return E.D as int;
+}"]],
+    );
+}

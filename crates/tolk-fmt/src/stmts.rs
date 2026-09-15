@@ -29,7 +29,8 @@ pub fn print_block_statement<'a>(ctx: &Context<'_>, block: &Block) -> Option<RcD
     )
 }
 
-fn print_statement<'a>(ctx: &Context<'_>, stmt: &Stmt) -> Option<RcDoc<'a>> {
+/// Prints block contents and direct match-arm bodies; the enclosing list owns comments.
+pub(crate) fn print_statement<'a>(ctx: &Context<'_>, stmt: &Stmt) -> Option<RcDoc<'a>> {
     match stmt {
         Stmt::Block(block) => print_block_statement(ctx, block),
         Stmt::If(if_stmt) => print_if_statement(ctx, if_stmt),
@@ -38,8 +39,14 @@ fn print_statement<'a>(ctx: &Context<'_>, stmt: &Stmt) -> Option<RcDoc<'a>> {
         Stmt::TryCatch(try_catch) => print_try_catch_statement(ctx, try_catch),
         Stmt::Return(return_stmt) => print_return_statement(ctx, return_stmt),
         Stmt::DoWhile(do_while) => print_do_while_statement(ctx, do_while),
-        Stmt::Break(_) => Some(RcDoc::text("break;")),
-        Stmt::Continue(_) => Some(RcDoc::text("continue;")),
+        Stmt::Break(node) => Some(RcDoc::text(format!(
+            "break{}",
+            statement_terminator(node.0)
+        ))),
+        Stmt::Continue(node) => Some(RcDoc::text(format!(
+            "continue{}",
+            statement_terminator(node.0)
+        ))),
         Stmt::Throw(throw_stmt) => print_throw_statement(ctx, throw_stmt),
         Stmt::Assert(assert_stmt) => print_assert_statement(ctx, assert_stmt),
         Stmt::Match(match_stmt) => print_match_statement(ctx, match_stmt),
@@ -54,6 +61,18 @@ fn print_statement<'a>(ctx: &Context<'_>, stmt: &Stmt) -> Option<RcDoc<'a>> {
             }
             common::print_node_text(ctx, &node.0)
         }
+    }
+}
+
+/// A match arm owns its comma; the same statement in a block needs a semicolon.
+fn statement_terminator(node: tree_sitter::Node<'_>) -> &'static str {
+    if node
+        .parent()
+        .is_some_and(|parent| parent.kind() == "match_arm")
+    {
+        ""
+    } else {
+        ";"
     }
 }
 
@@ -175,7 +194,8 @@ fn print_do_while_statement<'a>(ctx: &Context<'_>, do_while: &DoWhile) -> Option
             RcDoc::text("while ("),
             RcDoc::concat([RcDoc::line_(), condition_doc]).nest(4),
             RcDoc::line_(),
-            RcDoc::text(");"),
+            RcDoc::text(")"),
+            RcDoc::text(statement_terminator(do_while.0)),
         ])),
     ]))
 }
@@ -183,12 +203,7 @@ fn print_do_while_statement<'a>(ctx: &Context<'_>, do_while: &DoWhile) -> Option
 pub(crate) fn print_return_statement<'a>(ctx: &Context, return_stmt: &Return) -> Option<RcDoc<'a>> {
     let expr = return_stmt.expr();
 
-    // 10 => return 10,
-    let in_match_arm = return_stmt
-        .0
-        .parent()
-        .is_some_and(|p| p.kind() == "match_arm");
-    let end_semicolon = if in_match_arm { "" } else { ";" };
+    let end_semicolon = statement_terminator(return_stmt.0);
 
     if let Some(expr) = expr {
         let expr_doc = exprs::print_expression(ctx, &expr)?;
@@ -205,12 +220,7 @@ pub(crate) fn print_return_statement<'a>(ctx: &Context, return_stmt: &Return) ->
 pub(crate) fn print_throw_statement<'a>(ctx: &Context, throw_stmt: &Throw) -> Option<RcDoc<'a>> {
     let expr = throw_stmt.expr()?;
 
-    // 10 => throw 10,
-    let in_match_arm = throw_stmt
-        .0
-        .parent()
-        .is_some_and(|p| p.kind() == "match_arm");
-    let end_semicolon = if in_match_arm { "" } else { ";" };
+    let end_semicolon = statement_terminator(throw_stmt.0);
 
     let expr_doc = exprs::print_expression(ctx, &expr)?;
     Some(RcDoc::concat([
@@ -242,7 +252,7 @@ fn print_assert_statement<'a>(ctx: &Context<'_>, assert_stmt: &Assert) -> Option
             RcDoc::line_(),
             RcDoc::text(") throw "),
             exc_no_doc,
-            RcDoc::text(";"),
+            RcDoc::text(statement_terminator(assert_stmt.0)),
         ])))
     } else {
         Some(RcDoc::group(RcDoc::concat([
@@ -250,7 +260,8 @@ fn print_assert_statement<'a>(ctx: &Context<'_>, assert_stmt: &Assert) -> Option
             condition_doc,
             RcDoc::text(", "),
             exc_no_doc,
-            RcDoc::text(");"),
+            RcDoc::text(")"),
+            RcDoc::text(statement_terminator(assert_stmt.0)),
         ])))
     }
 }

@@ -197,3 +197,48 @@ fn test_nested_complex_types() {
 fn test_null_literal_type() {
     check("const x: null = null;", expect!["const x: null = null"]);
 }
+
+#[test]
+fn test_empty_tuple_types() {
+    check(
+        r"type Empty = []
+type Nested = [[], Cell<[]>?]
+get fun f(): Empty { return []; }",
+        expect![[r"
+type Empty = []
+
+type Nested = [[], Cell<[]>?]
+
+get fun f(): Empty {
+    return [];
+}"]],
+    );
+}
+
+#[test]
+fn test_nested_empty_tuple_type_and_literal() {
+    check(
+        "get fun f(): [[]] { return [[]]; }",
+        expect![[r"
+            get fun f(): [[]] {
+                return [[]];
+            }"]],
+    );
+}
+
+#[test]
+fn test_single_union_variant_in_parentheses() {
+    check(
+        r"type Single = (| int)
+type Optional = (| int)?
+get fun f(): Single { return 1; }",
+        expect![[r"
+type Single = (int)
+
+type Optional = (int)?
+
+get fun f(): Single {
+    return 1;
+}"]],
+    );
+}
