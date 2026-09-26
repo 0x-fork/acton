@@ -312,11 +312,24 @@ impl PaymentVerifier for OnchainPaymentVerifier {
     async fn recover(&self, published_transaction_hashes: &[String]) -> Result<(), PaymentError> {
         self.ready.store(false, Ordering::Release);
         let payments = self.load_history().await?;
-        self.ledger
+        let new_payments = self
+            .ledger
             .merge_recovered(&payments, published_transaction_hashes)?;
         self.ready.store(true, Ordering::Release);
+        for payment in &new_payments {
+            tracing::info!(
+                transaction_hash = %payment.transaction_hash,
+                code_hash = %payment.code_hash,
+                amount_nano = payment.amount_nano,
+                transaction_time = payment.transaction_time,
+                payment_address = %self.payment_address,
+                network = %self.network,
+                "new payment found in blockchain history"
+            );
+        }
         tracing::info!(
             payment_count = payments.len(),
+            new_payment_count = new_payments.len(),
             published_payment_count = published_transaction_hashes.len(),
             payment_address = %self.payment_address,
             network = %self.network,
@@ -525,19 +538,23 @@ impl PaymentLedger {
         }
     }
 
-    fn merge_recovered(
+    fn merge_recovered<'a>(
         &self,
-        payments: &[RecoveredPayment],
+        payments: &'a [RecoveredPayment],
         published_transaction_hashes: &[String],
-    ) -> Result<(), PaymentError> {
+    ) -> Result<Vec<&'a RecoveredPayment>, PaymentError> {
         let now = now_unix_seconds()?;
         let mut connection = self.connection()?;
         let transaction = connection.transaction()?;
+        let mut new_payments = Vec::new();
         transaction.execute(
             "update payment_transactions set state = 'retryable', updated_at = ?1 where state = 'processing'",
             [u64_to_i64("updated_at", now)?],
         )?;
         for payment in payments {
+            if existing_payment(&transaction, &payment.transaction_hash)?.is_none() {
+                new_payments.push(payment);
+            }
             transaction.execute(
                 r"
                 insert into payment_transactions (
@@ -573,7 +590,7 @@ impl PaymentLedger {
         }
         transaction.commit()?;
         drop(connection);
-        Ok(())
+        Ok(new_payments)
     }
 
     fn reserve(&self, payment: &RecoveredPayment) -> Result<PaymentClaim, PaymentError> {
