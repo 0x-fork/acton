@@ -1,0 +1,74 @@
+[
+  {
+    "body": {
+      "code": 400,
+      "error": "boc must contain valid base64",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 400,
+      "error": "invalid inbound external message",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 413,
+      "error": "boc exceeds 65535 bytes",
+      "ok": false
+    },
+    "status": 413
+  },
+  {
+    "body": {
+      "code": 400,
+      "error": "timeout_ms must be between 1000 and 120000",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 400,
+      "error": "timeout_ms must be between 1000 and 120000",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 422,
+      "error": "expected JSON with boc and optional timeout_ms",
+      "ok": false
+    },
+    "status": 422
+  },
+  {
+    "body": {
+      "code": 422,
+      "error": "expected JSON with boc and optional timeout_ms",
+      "ok": false
+    },
+    "status": 422
+  },
+  {
+    "body": {
+      "code": 422,
+      "error": "expected JSON with boc and optional timeout_ms",
+      "ok": false
+    },
+    "status": 422
+  },
+  {
+    "body": {
+      "code": 413,
+      "error": "expected JSON with boc and optional timeout_ms",
+      "ok": false
+    },
+    "status": 413
+  }
+]

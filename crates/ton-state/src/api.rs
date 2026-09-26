@@ -225,7 +225,7 @@ fn account_info(snapshot: AccountSnapshot) -> Result<wire::AddressInformation> {
     Ok(info)
 }
 
-fn block_id(id: BlockId) -> wire::TonBlockIdExt {
+pub(crate) fn block_id(id: BlockId) -> wire::TonBlockIdExt {
     wire::TonBlockIdExt {
         type_tag: Default::default(),
         workchain: i64::from(id.shard.workchain()),
@@ -290,8 +290,8 @@ async fn read<T: Serialize + Send + 'static>(
 
 #[derive(Debug, Clone)]
 pub(crate) struct ApiError {
-    status: StatusCode,
-    message: &'static str,
+    pub(crate) status: StatusCode,
+    pub(crate) message: &'static str,
 }
 
 impl ApiError {

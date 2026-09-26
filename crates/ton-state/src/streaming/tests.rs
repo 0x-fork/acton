@@ -33,7 +33,7 @@ fn storage() -> StoragePhase {
     }
 }
 
-fn transaction(index: u8) -> Result<Transaction> {
+pub(crate) fn transaction(index: u8) -> Result<Transaction> {
     let skipped = ComputePhase::Skipped(SkippedComputePhase {
         reason: ComputePhaseSkipReason::NoGas,
     });
@@ -186,7 +186,7 @@ fn transaction(index: u8) -> Result<Transaction> {
     Ok(tx)
 }
 
-fn block(
+pub(crate) fn block(
     shard: ShardIdent,
     seqno: u32,
     transactions: Vec<Transaction>,

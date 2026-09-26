@@ -1,0 +1,18 @@
+{
+  "aborted": true,
+  "block": {
+    "@type": "ton.blockIdExt",
+    "file_hash": "dPH8ioaYJunoG9uCI0Duekzh6obePOazhw+qmRg/qUU=",
+    "root_hash": "wwn2z/ewS/M30Jqcg8fUwQ4odM7Pn/uD44rfYG1Po6U=",
+    "seqno": 42,
+    "shard": "-9223372036854775808",
+    "workchain": -1
+  },
+  "checkpoint": 42,
+  "observation_slots": 64,
+  "original_transaction": true,
+  "responses_equal": true,
+  "status": 200,
+  "still_waiting_after_unrelated": true,
+  "submission_slots": 16
+}

@@ -32,8 +32,7 @@ use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::dict::Dict;
-use tycho_types::models::{Block, ExtInMsgInfo, Message, MsgInfo};
-use tycho_types::num::Tokens;
+use tycho_types::models::{Block, Message, MsgInfo};
 
 const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
 
@@ -3190,28 +3189,9 @@ pub(crate) fn convert_to_tx_struct(
 }
 
 pub(crate) fn compute_normalized_ext_in_hash(msg: &Message<'_>) -> anyhow::Result<Hash256> {
-    let MsgInfo::ExtIn(info) = &msg.info else {
-        anyhow::bail!("TEP-467 normalization only applies to external-in messages");
-    };
-
-    let mut body_builder = CellBuilder::new();
-    body_builder.store_slice(msg.body)?;
-    let body_cell = body_builder.build()?;
-
-    let normalized_info = ExtInMsgInfo {
-        src: None,
-        dst: info.dst.clone(),
-        import_fee: Tokens::ZERO,
-    };
-
-    let ctx = Cell::empty_context();
-    let mut builder = CellBuilder::new();
-    builder.store_small_uint(0b10, 2)?;
-    normalized_info.store_into(&mut builder, ctx)?;
-    builder.store_bit_zero()?;
-    builder.store_bit_one()?;
-    builder.store_reference(body_cell)?;
-    Ok(Hash256::from(builder.build()?.repr_hash()))
+    Ok(Hash256::from(
+        &ton_indexer_core::normalized_external_message_hash(msg)?,
+    ))
 }
 
 fn normalized_ext_in_hash_from_boc(boc: &[u8]) -> anyhow::Result<Option<Hash256>> {

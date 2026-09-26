@@ -39,6 +39,9 @@ All notable changes to this project will be documented in this file.
   `sendBoc` accepts external-message BoCs and broadcasts them directly through
   P2P, including FEC transport for larger messages. Submission does not confirm
   execution or inclusion in a block.
+  `sendBocAndWaitTransaction` submits an external message and waits for its
+  transaction in a committed block, with a bounded timeout, normalized message
+  matching, and the transaction and block coordinates in the response.
   `/docs` provides an interactive Scalar page for all supported HTTP methods,
   with a generated utoipa specification at `/openapi.json`.
   `getTransactions` reads account history from cached blocks through a persistent

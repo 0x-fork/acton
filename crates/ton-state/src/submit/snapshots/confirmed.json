@@ -1,0 +1,103 @@
+{
+  "broadcasts": 2,
+  "observation_slots": 64,
+  "original_hash_differs": true,
+  "partial_send_failure_still_returns_transaction": true,
+  "response": {
+    "body": {
+      "@extra": "",
+      "ok": true,
+      "result": {
+        "block_id": {
+          "@type": "ton.blockIdExt",
+          "file_hash": "I1kwOoO1EAh3rK9TFGcblpBmX6XWSYSwnjIMhwm8Q8E=",
+          "root_hash": "suO7Zz2vwGXpitW7l55apNgnDkZIH3wJ8NGcd4bXTu8=",
+          "seqno": 17,
+          "shard": "-9223372036854775808",
+          "workchain": 0
+        },
+        "mc_block_seqno": 42,
+        "normalized_message_hash": "BON9Jz61WPwkG9jcCQnJc6hG520TgZlvqfipOPZReRE=",
+        "transaction": {
+          "@type": "ext.transaction",
+          "account": "0:0202020202020202020202020202020202020202020202020202020202020202",
+          "address": {
+            "@type": "accountAddress",
+            "account_address": "EQACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAsoi"
+          },
+          "data": "te6ccgECDwEAAiIABLNwICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICACAAAAAAAAkEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAAgAAAAAAABZVPxAAAFRGBzgGBQQBAg8MRGIGcQEbxAMCAGXIlURUAAAAAAAEAAAAAAAEFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBRAigQAp0BUyA+ihn+AAAAA/////4AAAAlCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCYACCcgUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYADaAAAAAHCxwCAeANBwIB3QoIAQEgCQBl4AAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEABAAAAAAAAWyqfiAEAAAADAAQEgCwG1aAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBQAAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNEmWAtKAhYAQAAAAAAAFMqn4gBAAAAAwAwADaAAAAAHCWQBT4gABAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQQkAAAADAOAAiAAAAB",
+          "fee": "12356",
+          "in_msg": {
+            "@type": "ext.message",
+            "body_hash": "hkFnNw2630KAtNI711LT+AnBHVokJZFM0Jw5NIpQIV0=",
+            "created_lt": "0",
+            "destination": "0:0202020202020202020202020202020202020202020202020202020202020202",
+            "extra_currencies": [],
+            "fwd_fee": "0",
+            "hash": "iGX8MRL0t0z21OE5n4DW02MO/ASlcfr7h7uIhoU8aBI=",
+            "ihr_fee": "0",
+            "msg_data": {
+              "@type": "msg.dataRaw",
+              "body": "te6ccgEBAQEABgAACIAAAAE=",
+              "init_state": "te6ccgEBAgEACgABARQBAAiAAAAB"
+            },
+            "source": "",
+            "value": "0"
+          },
+          "other_fee": "12339",
+          "out_msgs": [
+            {
+              "@type": "ext.message",
+              "body_hash": "hkFnNw2630KAtNI711LT+AnBHVokJZFM0Jw5NIpQIV0=",
+              "created_lt": "9007199254741002",
+              "destination": "0:0303030303030303030303030303030303030303030303030303030303030303",
+              "extra_currencies": [
+                {
+                  "@type": "extraCurrency",
+                  "amount": "44",
+                  "id": 7
+                }
+              ],
+              "fwd_fee": "11",
+              "hash": "KmB976smAY7YaLaz7nm+a6X9yoDYlG9mjG/w7ozv/PQ=",
+              "ihr_fee": "0",
+              "msg_data": {
+                "@type": "msg.dataRaw",
+                "body": "te6ccgEBAQEABgAACIAAAAE=",
+                "init_state": ""
+              },
+              "source": "0:0202020202020202020202020202020202020202020202020202020202020202",
+              "value": "1234567890"
+            },
+            {
+              "@type": "ext.message",
+              "body_hash": "hkFnNw2630KAtNI711LT+AnBHVokJZFM0Jw5NIpQIV0=",
+              "created_lt": "9007199254741003",
+              "destination": "",
+              "extra_currencies": [],
+              "fwd_fee": "0",
+              "hash": "EY6k9IGM3R9NaRTjBxVLcqgWDG7siqr96zjAjVIQ2Bc=",
+              "ihr_fee": "0",
+              "msg_data": {
+                "@type": "msg.dataRaw",
+                "body": "te6ccgEBAQEABgAACIAAAAE=",
+                "init_state": ""
+              },
+              "source": "0:0202020202020202020202020202020202020202020202020202020202020202",
+              "value": "0"
+            }
+          ],
+          "storage_fee": "17",
+          "transaction_id": {
+            "@type": "internal.transactionId",
+            "hash": "F/WkCblf+uP8ZGgk/RBhKDIS5YMvYxHkvvsU5bxS6Uc=",
+            "lt": "9007199254741001"
+          },
+          "utime": 1700000000
+        }
+      }
+    },
+    "status": 200
+  },
+  "submission_slots": 16
+}

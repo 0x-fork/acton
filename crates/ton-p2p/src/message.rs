@@ -14,7 +14,7 @@ use tokio::{sync::Mutex, time::Instant};
 use tracing::info;
 use tycho_types::{
     boc::Boc,
-    cell::HashBytes,
+    cell::{Cell, HashBytes},
     models::{IntAddr, MsgInfo, OwnedMessage, StdAddr},
 };
 
@@ -28,6 +28,7 @@ pub struct ExternalMessage {
     boc: Vec<u8>,
     destination: StdAddr,
     hash: HashBytes,
+    root: Cell,
 }
 
 impl ExternalMessage {
@@ -69,6 +70,7 @@ impl ExternalMessage {
             hash: *root.repr_hash(),
             destination,
             boc,
+            root,
         })
     }
 
@@ -82,6 +84,13 @@ impl ExternalMessage {
     #[must_use]
     pub const fn hash(&self) -> HashBytes {
         self.hash
+    }
+
+    /// Original validated root for inspecting the message or computing a lookup
+    /// key. Broadcasting still uses the original bytes, preserving the signature.
+    #[must_use]
+    pub const fn root(&self) -> &Cell {
+        &self.root
     }
 }
 

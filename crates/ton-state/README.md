@@ -134,6 +134,46 @@ Invalid input returns an HTTP error in the v2 response format. HTTP 429 means
 the submission queue is full; HTTP 503 means P2P submission failed and the
 request can be retried. This route accepts POST JSON only.
 
+## Send a message and wait for its transaction
+
+Use `sendBocAndWaitTransaction` to submit a signed message and keep the HTTP
+request open until its transaction appears in a fully applied block batch:
+
+```sh
+base64 < message.boc | tr -d '\n' | jq -Rs '{boc: ., timeout_ms: 30000}' | \
+  curl -s http://127.0.0.1:8080/api/v2/sendBocAndWaitTransaction \
+    -H 'Content-Type: application/json' --data-binary @- | jq
+```
+
+The response has `ok: true` and a `result` containing:
+
+- `transaction`: the same v2 object as `getTransactions`, including its full BoC
+- `block_id`: the containing block's workchain, shard, sequence number, and hashes
+- `mc_block_seqno`: the masterchain checkpoint that committed the complete batch
+- `normalized_message_hash`: the base64 TEP-467 hash used to match the external message
+
+The observation starts before broadcast. The service returns the transaction that
+consumes the external message, including an aborted transaction. For a wallet
+message, this is the wallet's transaction. Subsequent transfers and other child
+transactions may execute later and are not awaited.
+
+`timeout_ms` defaults to 30,000 and accepts 1,000–120,000. It covers decoding,
+submission, observation, and response encoding after the request body is read.
+HTTP 504 with `error: "transaction_wait_timeout"` means the transaction was not
+returned within that budget. It does not prove rejection; execution may occur
+later, or the node may be behind the network. Errors include
+`normalized_message_hash` once the message has been decoded. HTTP 503 reports a
+submission failure or interrupted observation, also without ruling out execution.
+Disconnecting the client does not withdraw a message already sent to peers.
+
+Delivery is live only: a transaction committed before observation starts is not
+replayed. Retrying an already included message may time out. Concurrent requests
+for the same message can receive the same transaction; the method provides no
+additional replay protection. Each request uses the existing message admission
+checks. Up to 64 transaction waits are accepted; exceeding this limit returns
+HTTP 429 before broadcast. Waiting releases its submission slot after broadcast,
+so pending waits do not exhaust the separate `sendBoc` submission budget.
+
 ## Subscribe to finalized transactions
 
 Open a live SSE subscription on the same HTTP listener:

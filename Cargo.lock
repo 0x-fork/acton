@@ -6257,6 +6257,7 @@ dependencies = [
  "ton-fullnode-master",
  "ton-hardfork",
  "ton-indexer-contracts",
+ "ton-indexer-core",
  "ton-liteapi",
  "ton-networks",
  "toncenter",

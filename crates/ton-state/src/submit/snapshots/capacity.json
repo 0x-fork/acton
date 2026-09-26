@@ -1,0 +1,43 @@
+{
+  "broadcasts": 2,
+  "cancelled": true,
+  "closed": {
+    "body": {
+      "code": 503,
+      "error": "shutting_down",
+      "normalized_message_hash": "BON9Jz61WPwkG9jcCQnJc6hG520TgZlvqfipOPZReRE=",
+      "ok": false
+    },
+    "status": 503
+  },
+  "full_send": {
+    "body": {
+      "code": 429,
+      "error": "too many pending messages",
+      "ok": false
+    },
+    "status": 429
+  },
+  "full_wait": {
+    "body": {
+      "code": 429,
+      "error": "too many pending transaction waits",
+      "normalized_message_hash": "BON9Jz61WPwkG9jcCQnJc6hG520TgZlvqfipOPZReRE=",
+      "ok": false
+    },
+    "status": 429
+  },
+  "observation_slots_after_cancellation": 64,
+  "ordinary_send": {
+    "body": {
+      "@extra": "",
+      "ok": true,
+      "result": {
+        "@type": "ok"
+      }
+    },
+    "status": 200
+  },
+  "sent_while_full": 1,
+  "submission_slots": 16
+}

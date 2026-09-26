@@ -1,6 +1,7 @@
 //! Synchronize durable TON states and expose the applied checkpoint over HTTP.
 
 mod api;
+mod confirmation;
 mod docs;
 mod streaming;
 mod submit;
@@ -76,9 +77,10 @@ async fn main() -> Result<()> {
     let source = P2pBlockSource::new(client)?;
     let (checkpoints, state) = watch::channel(store.snapshot());
     let transactions = streaming::Transactions::default();
+    let confirmations = confirmation::Confirmations::default();
     let router = api::router(state.clone(), config.zero_state(), Arc::clone(&history))
         .merge(transactions.clone().router())
-        .merge(submit::router(sender))
+        .merge(submit::router(sender, confirmations.clone()))
         .merge(docs::router());
     let listener = tokio::net::TcpListener::bind(args.http)
         .await
@@ -96,13 +98,21 @@ async fn main() -> Result<()> {
     );
 
     let shutdown_transactions = transactions.clone();
-    let synchronization = sync::run(store, source, checkpoints, transactions.clone(), history);
+    let synchronization = sync::run(
+        store,
+        source,
+        checkpoints,
+        transactions.clone(),
+        confirmations.clone(),
+        history,
+    );
     drop(transactions);
     let result = tokio::select! {
         result = synchronization => result,
         result = axum::serve(listener, router).with_graceful_shutdown(async move {
             shutdown().await;
             shutdown_transactions.close();
+            confirmations.close();
         }) => {
             result.context("HTTP server failed")
         }

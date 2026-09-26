@@ -9,6 +9,7 @@ use ton_node_db::{BlockIndex, StateSnapshot, StateStore};
 use tracing::{info, warn};
 use tycho_types::models::BlockId;
 
+use crate::confirmation::Confirmations;
 use crate::streaming::Transactions;
 
 /// Keeps the store at complete masterchain/shard frontiers. Network failures are
@@ -18,6 +19,7 @@ pub(crate) async fn run(
     mut source: P2pBlockSource,
     checkpoints: watch::Sender<StateSnapshot>,
     transactions: Transactions,
+    confirmations: Confirmations,
     history: Arc<BlockIndex>,
 ) -> Result<()> {
     loop {
@@ -54,6 +56,7 @@ pub(crate) async fn run(
         let shard_blocks = shard_ids.len();
         let checkpoints = checkpoints.clone();
         let publisher = transactions.clone();
+        let confirmations = confirmations.clone();
         let history = Arc::clone(&history);
         let block_paths = std::iter::once(&master_id)
             .chain(&shard_ids)
@@ -82,6 +85,19 @@ pub(crate) async fn run(
             }
             checkpoints.send_replace(store.snapshot());
             let applied = Instant::now();
+
+            // HTTP observations and SSE have independent failure domains.
+            if let Err(error) = confirmations.publish(&batch) {
+                confirmations.fail();
+                warn!(
+                    operation = "transaction_confirmation",
+                    target = %master_id,
+                    duration_ms = started.elapsed().as_millis(),
+                    outcome = "failed",
+                    error = %format!("{error:#}"),
+                    "closed transaction waits after a publication failure",
+                );
+            }
 
             // Finalized events become visible only after the entire batch commits.
             // A streaming failure closes subscriptions without stopping state sync.

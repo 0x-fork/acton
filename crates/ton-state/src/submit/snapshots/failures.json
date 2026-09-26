@@ -1,0 +1,72 @@
+[
+  {
+    "mode": "send_failure",
+    "observation_slots": 64,
+    "response": {
+      "body": {
+        "code": 503,
+        "error": "P2P submission failed; execution may still occur",
+        "normalized_message_hash": "BON9Jz61WPwkG9jcCQnJc6hG520TgZlvqfipOPZReRE=",
+        "ok": false
+      },
+      "status": 503
+    },
+    "submission_slots": 16
+  },
+  {
+    "mode": "timeout_during_send",
+    "observation_slots": 64,
+    "response": {
+      "body": {
+        "code": 504,
+        "error": "transaction_wait_timeout",
+        "normalized_message_hash": "BON9Jz61WPwkG9jcCQnJc6hG520TgZlvqfipOPZReRE=",
+        "ok": false
+      },
+      "status": 504
+    },
+    "submission_slots": 16
+  },
+  {
+    "mode": "timeout_after_send",
+    "observation_slots": 64,
+    "response": {
+      "body": {
+        "code": 504,
+        "error": "transaction_wait_timeout",
+        "normalized_message_hash": "BON9Jz61WPwkG9jcCQnJc6hG520TgZlvqfipOPZReRE=",
+        "ok": false
+      },
+      "status": 504
+    },
+    "submission_slots": 16
+  },
+  {
+    "mode": "shutdown",
+    "observation_slots": 0,
+    "response": {
+      "body": {
+        "code": 503,
+        "error": "transaction_observation_unavailable",
+        "normalized_message_hash": "BON9Jz61WPwkG9jcCQnJc6hG520TgZlvqfipOPZReRE=",
+        "ok": false
+      },
+      "status": 503
+    },
+    "submission_slots": 16
+  },
+  {
+    "mode": "publication_gap",
+    "observation_slots": 64,
+    "response": {
+      "body": {
+        "code": 503,
+        "error": "transaction_observation_unavailable",
+        "normalized_message_hash": "BON9Jz61WPwkG9jcCQnJc6hG520TgZlvqfipOPZReRE=",
+        "ok": false
+      },
+      "status": 503
+    },
+    "submission_slots": 16
+  }
+]

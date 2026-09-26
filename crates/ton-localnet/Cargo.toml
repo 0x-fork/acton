@@ -44,6 +44,7 @@ tower_governor = { workspace = true }
 tracing = { workspace = true }
 rusqlite = { workspace = true }
 ton-indexer-contracts = { workspace = true }
+ton-indexer-core = { path = "../ton-indexer-core" }
 url = { workspace = true }
 rustc-hash = { workspace = true }
 thiserror = { workspace = true }

@@ -207,7 +207,8 @@ fn read_history(
     Ok(result)
 }
 
-fn convert(
+/// Maps a retained transaction to the shared v2 history and submission response.
+pub(crate) fn convert(
     address: &StdAddr,
     cell: &Lazy<Transaction>,
     tx: &Transaction,

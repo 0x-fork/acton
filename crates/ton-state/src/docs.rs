@@ -20,6 +20,7 @@ use crate::{api, streaming, submit};
         api::address_balance,
         api::transactions::get_transactions,
         submit::send_boc,
+        submit::send_boc_and_wait_transaction,
         streaming::subscribe,
     ),
 )]
