@@ -61,6 +61,10 @@ async fn reference_serves_only_supported_operations() {
             ["responses"]["200"]["content"].as_object().unwrap().keys().collect::<Vec<_>>(),
         "redirect": [home.status().as_str(), home.headers()["location"].to_str().unwrap()],
         "page": [page.status().as_str(), page.headers()["content-type"].to_str().unwrap()],
+        "wait_timeouts": [
+            document["components"]["schemas"]["SendBocAndWaitRequest"]["properties"]["timeout_ms"],
+            document["components"]["schemas"]["SendBocAndWaitTraceRequest"]["properties"]["timeout_ms"],
+        ],
     });
 
     expect![[r#"
@@ -72,6 +76,7 @@ async fn reference_serves_only_supported_operations() {
             "GET /api/v2/getMasterchainInfo",
             "GET /api/v2/getTransactions",
             "POST /api/v2/sendBoc",
+            "POST /api/v2/sendBocAndWaitTrace",
             "POST /api/v2/sendBocAndWaitTransaction"
           ],
           "page": [
@@ -90,6 +95,30 @@ async fn reference_serves_only_supported_operations() {
           "status": 200,
           "stream_content_types": [
             "text/event-stream"
+          ],
+          "wait_timeouts": [
+            {
+              "default": 30000,
+              "description": "Total processing budget after reading the request body; defaults to 30 seconds",
+              "format": "int64",
+              "maximum": 120000,
+              "minimum": 1000,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            {
+              "default": 120000,
+              "description": "Total trace budget after reading the body; defaults to two minutes",
+              "format": "int64",
+              "maximum": 600000,
+              "minimum": 1000,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
           ]
         }
     "#]]

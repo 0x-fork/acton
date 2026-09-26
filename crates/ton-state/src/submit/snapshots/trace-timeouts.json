@@ -1,0 +1,32 @@
+{
+  "default_timeout_response": {
+    "body": {
+      "code": 504,
+      "error": "trace_wait_timeout",
+      "normalized_message_hash": "BON9Jz61WPwkG9jcCQnJc6hG520TgZlvqfipOPZReRE=",
+      "ok": false
+    },
+    "status": 504
+  },
+  "maximum_timeout_status": 200,
+  "observation_slots": 64,
+  "pending_after_thirty_seconds": true,
+  "rejected_timeouts": [
+    {
+      "body": {
+        "code": 400,
+        "error": "timeout_ms must be between 1000 and 600000",
+        "ok": false
+      },
+      "status": 400
+    },
+    {
+      "body": {
+        "code": 400,
+        "error": "timeout_ms must be between 1000 and 600000",
+        "ok": false
+      },
+      "status": 400
+    }
+  ]
+}

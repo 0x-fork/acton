@@ -21,6 +21,7 @@ use crate::{api, streaming, submit};
         api::transactions::get_transactions,
         submit::send_boc,
         submit::send_boc_and_wait_transaction,
+        submit::send_boc_and_wait_trace,
         streaming::subscribe,
     ),
 )]

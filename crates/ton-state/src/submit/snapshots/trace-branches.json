@@ -1,0 +1,23 @@
+{
+  "observation_slots": 64,
+  "pending": [
+    true,
+    true,
+    true,
+    true
+  ],
+  "response": {
+    "body": {
+      "@extra": "",
+      "ok": true,
+      "result": {
+        "trace_hash": "2gsAb+zCO90ufl+ewStR1BmW/4GH99AuKElU2P/SeW4="
+      }
+    },
+    "status": 200
+  },
+  "root_transaction_hash": "2gsAb+zCO90ufl+ewStR1BmW/4GH99AuKElU2P/SeW4=",
+  "same_trace_for_both_waiters": true,
+  "submission_slots": 16,
+  "transaction_wait_status": 200
+}

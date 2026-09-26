@@ -1,0 +1,48 @@
+[
+  {
+    "mode": "timeout",
+    "observation_slots": 64,
+    "response": {
+      "body": {
+        "code": 504,
+        "error": "trace_wait_timeout",
+        "normalized_message_hash": "BON9Jz61WPwkG9jcCQnJc6hG520TgZlvqfipOPZReRE=",
+        "ok": false
+      },
+      "status": 504
+    }
+  },
+  {
+    "mode": "shutdown",
+    "observation_slots": 0,
+    "response": {
+      "body": {
+        "code": 503,
+        "error": "trace_observation_unavailable",
+        "normalized_message_hash": "BON9Jz61WPwkG9jcCQnJc6hG520TgZlvqfipOPZReRE=",
+        "ok": false
+      },
+      "status": 503
+    }
+  },
+  {
+    "mode": "publication_gap",
+    "observation_slots": 64,
+    "response": {
+      "body": {
+        "code": 503,
+        "error": "trace_observation_unavailable",
+        "normalized_message_hash": "BON9Jz61WPwkG9jcCQnJc6hG520TgZlvqfipOPZReRE=",
+        "ok": false
+      },
+      "status": 503
+    }
+  },
+  {
+    "mode": "cancel",
+    "observation_slots": 64,
+    "response": {
+      "cancelled": true
+    }
+  }
+]

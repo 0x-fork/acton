@@ -1,3 +1,5 @@
+mod trace;
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use axum::body::Body;
@@ -78,9 +80,11 @@ fn message() -> Cell {
 
 fn available_observations(confirmations: &Confirmations) -> usize {
     let mut observations = Vec::new();
-    while let Ok(observation) =
-        confirmations.register(StdAddr::new(0, HashBytes::ZERO), HashBytes::ZERO)
-    {
+    while let Ok(observation) = confirmations.register(
+        StdAddr::new(0, HashBytes::ZERO),
+        HashBytes::ZERO,
+        WaitFor::Transaction,
+    ) {
         observations.push(observation);
     }
     observations.len()
@@ -311,7 +315,13 @@ async fn cancellation_and_capacity_limits_do_not_block_send_boc() -> anyhow::Res
     let after_cancellation = available_observations(&confirmations);
 
     let observations = (0..64)
-        .map(|_| confirmations.register(StdAddr::new(0, HashBytes::ZERO), HashBytes::ZERO))
+        .map(|_| {
+            confirmations.register(
+                StdAddr::new(0, HashBytes::ZERO),
+                HashBytes::ZERO,
+                WaitFor::Transaction,
+            )
+        })
         .collect::<Result<Vec<_>, _>>()?;
     let full_wait = response(
         router

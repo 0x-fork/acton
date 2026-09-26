@@ -28,9 +28,9 @@ use tycho_types::{
 };
 
 use crate::api::ApiError;
-use crate::confirmation::Confirmations;
+use crate::confirmation::{Confirmation, Confirmations, WaitFor};
 
-// Both HTTP methods share one outbound transport and its admission budget.
+// All submission routes share one outbound transport and its admission budget.
 type Broadcast =
     Arc<dyn Fn(ExternalMessage) -> BoxFuture<'static, anyhow::Result<()>> + Send + Sync>;
 
@@ -63,6 +63,7 @@ impl Submission {
                 "/api/v2/sendBocAndWaitTransaction",
                 post(send_boc_and_wait_transaction),
             )
+            .route("/api/v2/sendBocAndWaitTrace", post(send_boc_and_wait_trace))
             .layer(DefaultBodyLimit::max(96 * 1024))
             .with_state(self)
     }
@@ -179,6 +180,16 @@ struct SendBocAndWaitRequest {
     timeout_ms: Option<u64>,
 }
 
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+struct SendBocAndWaitTraceRequest {
+    /// Signed inbound external message, encoded as a base64 `BoC`
+    boc: String,
+    /// Total trace budget after reading the body; defaults to two minutes
+    #[schema(minimum = 1000, maximum = 600_000, default = 120_000)]
+    timeout_ms: Option<u64>,
+}
+
 #[derive(Serialize, utoipa::ToSchema)]
 struct SendBocAndWaitResult {
     /// Original committed transaction in the same format as getTransactions
@@ -192,6 +203,19 @@ struct SendBocAndWaitResult {
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
+struct SendBocAndWaitTraceResult {
+    /// Root transaction's cell hash, in base64, matching TON Center's `trace_id`
+    trace_hash: String,
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+enum WaitResult {
+    Transaction(Box<SendBocAndWaitResult>),
+    Trace(SendBocAndWaitTraceResult),
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
 struct WaitErrorResponse {
     ok: bool,
     error: &'static str,
@@ -202,6 +226,7 @@ struct WaitErrorResponse {
 }
 
 struct WaitProgress {
+    operation: &'static str,
     started: Instant,
     destination: Option<StdAddr>,
     hash: Option<HashBytes>,
@@ -211,7 +236,7 @@ struct WaitProgress {
 impl Drop for WaitProgress {
     fn drop(&mut self) {
         info!(
-            operation = "send_boc_and_wait_transaction",
+            operation = self.operation,
             target = ?self.destination,
             message_hash = ?self.hash,
             duration_ms = self.started.elapsed().as_millis(),
@@ -247,15 +272,77 @@ impl Drop for WaitProgress {
         (status = 504, description = "Transaction not observed before the deadline; execution may still occur", body = WaitErrorResponse),
     ),
 )]
-#[expect(
-    clippy::significant_drop_tightening,
-    reason = "The observation slot remains reserved until response encoding finishes"
-)]
 async fn send_boc_and_wait_transaction(
     State(submission): State<Submission>,
     request: Result<Json<SendBocAndWaitRequest>, JsonRejection>,
 ) -> Response {
+    send_and_wait(submission, request, WaitFor::Transaction).await
+}
+
+/// Submit a message and wait for its complete trace
+///
+/// Waits for the root transaction and consumption of every emitted internal
+/// message, including bounces, in fully committed batches. External outputs are
+/// terminal. Completion does not imply successful execution of every contract
+///
+/// Observations are live only. The timeout covers the entire trace and does not
+/// withdraw messages already broadcast. Each wait retains at most 16,384 pending
+/// internal message hashes; exceeding this bound fails the observation
+#[utoipa::path(
+    post,
+    path = "/api/v2/sendBocAndWaitTrace",
+    operation_id = "sendBocAndWaitTrace",
+    request_body = SendBocAndWaitTraceRequest,
+    responses(
+        (status = 200, description = "Complete trace's root transaction hash, in base64", body = TonlibResponse<SendBocAndWaitTraceResult>),
+        (status = 400, description = "Invalid message or timeout", body = WaitErrorResponse),
+        (status = 413, description = "BoC exceeds 65,535 bytes or JSON exceeds 96 KiB", body = WaitErrorResponse),
+        (status = 415, description = "Expected application/json", body = WaitErrorResponse),
+        (status = 422, description = "Invalid request fields", body = WaitErrorResponse),
+        (status = 429, description = "Submission or observation capacity exhausted", body = WaitErrorResponse),
+        (status = 500, description = "Message decoding or response encoding failed", body = WaitErrorResponse),
+        (status = 503, description = "Submission or observation failed, or pending trace messages exceeded 16,384", body = WaitErrorResponse),
+        (status = 504, description = "Trace not completed before the deadline; execution may continue", body = WaitErrorResponse),
+    ),
+)]
+async fn send_boc_and_wait_trace(
+    State(submission): State<Submission>,
+    request: Result<Json<SendBocAndWaitTraceRequest>, JsonRejection>,
+) -> Response {
+    let request = request.map(|Json(request)| {
+        Json(SendBocAndWaitRequest {
+            boc: request.boc,
+            timeout_ms: request.timeout_ms,
+        })
+    });
+    send_and_wait(submission, request, WaitFor::Trace).await
+}
+
+/// Both wait routes share admission, registration-before-broadcast, cancellation,
+/// and one deadline so tracing cannot bypass the transaction submission budget.
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "The observation slot remains reserved until response encoding finishes"
+)]
+async fn send_and_wait(
+    submission: Submission,
+    request: Result<Json<SendBocAndWaitRequest>, JsonRejection>,
+    wait_for: WaitFor,
+) -> Response {
+    let (operation, timeout_error, unavailable_error) = match wait_for {
+        WaitFor::Transaction => (
+            "send_boc_and_wait_transaction",
+            "transaction_wait_timeout",
+            "transaction_observation_unavailable",
+        ),
+        WaitFor::Trace => (
+            "send_boc_and_wait_trace",
+            "trace_wait_timeout",
+            "trace_observation_unavailable",
+        ),
+    };
     let mut progress = WaitProgress {
+        operation,
         started: Instant::now(),
         destination: None,
         hash: None,
@@ -269,12 +356,21 @@ async fn send_boc_and_wait_transaction(
                 "expected JSON with boc and optional timeout_ms",
             )
         })?;
-        let timeout_ms = request.timeout_ms.unwrap_or(30_000);
-        if !(1_000..=120_000).contains(&timeout_ms) {
-            return Err(ApiError::new(
-                StatusCode::BAD_REQUEST,
+        let (default_timeout, max_timeout, range_error) = match wait_for {
+            WaitFor::Transaction => (
+                30_000,
+                120_000,
                 "timeout_ms must be between 1000 and 120000",
-            ));
+            ),
+            WaitFor::Trace => (
+                120_000,
+                600_000,
+                "timeout_ms must be between 1000 and 600000",
+            ),
+        };
+        let timeout_ms = request.timeout_ms.unwrap_or(default_timeout);
+        if !(1_000..=max_timeout).contains(&timeout_ms) {
+            return Err(ApiError::new(StatusCode::BAD_REQUEST, range_error));
         }
         let deadline = deadline_start + Duration::from_millis(timeout_ms);
         tokio::time::timeout_at(deadline, async {
@@ -309,11 +405,12 @@ async fn send_boc_and_wait_transaction(
             progress.destination = Some(destination.clone());
             progress.hash = Some(hash);
             let started = progress.started;
-            let mut observation = submission
-                .confirmations
-                .register(destination.clone(), hash)?;
+            let mut observation =
+                submission
+                    .confirmations
+                    .register(destination.clone(), hash, wait_for)?;
             info!(
-                operation = "send_boc_and_wait_transaction",
+                operation,
                 target = %destination,
                 message_hash = %hash,
                 duration_ms = progress.started.elapsed().as_millis(),
@@ -325,7 +422,7 @@ async fn send_boc_and_wait_transaction(
                 let _permit = permit;
                 (submission.broadcast)(message).await.map_err(|error| {
                     warn!(
-                        operation = "send_boc_and_wait_transaction",
+                        operation,
                         target = %destination,
                         message_hash = %hash,
                         duration_ms = started.elapsed().as_millis(),
@@ -354,19 +451,22 @@ async fn send_boc_and_wait_transaction(
                     }
                 }
             }
-            .map_err(|_| {
-                ApiError::new(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "transaction_observation_unavailable",
-                )
-            })?;
+            .map_err(|_| ApiError::new(StatusCode::SERVICE_UNAVAILABLE, unavailable_error))??;
 
             tokio::task::spawn_blocking(move || {
                 // Keep the observation slot while serializing its retained transaction.
                 let converted = (|| -> anyhow::Result<_> {
+                    let observed = match observed {
+                        Confirmation::Transaction(observed) => observed,
+                        Confirmation::Trace(hash) => {
+                            return Ok(WaitResult::Trace(SendBocAndWaitTraceResult {
+                                trace_hash: STANDARD.encode(hash),
+                            }));
+                        }
+                    };
                     let tx = observed.transaction.load()?;
                     let address = StdAddr::new(i8::try_from(observed.block.workchain)?, tx.account);
-                    Ok(SendBocAndWaitResult {
+                    Ok(WaitResult::Transaction(Box::new(SendBocAndWaitResult {
                         transaction: crate::api::transactions::convert(
                             &address,
                             &observed.transaction,
@@ -375,7 +475,7 @@ async fn send_boc_and_wait_transaction(
                         block_id: crate::api::block_id(observed.block.try_into()?),
                         mc_block_seqno: observed.mc_seqno,
                         normalized_message_hash: STANDARD.encode(hash),
-                    })
+                    })))
                 })();
                 let response = match converted {
                     Ok(result) => Ok(Json(TonlibResponse {
@@ -388,9 +488,8 @@ async fn send_boc_and_wait_transaction(
                     .into_response()),
                     Err(error) => {
                         warn!(
-                            operation = "send_boc_and_wait_transaction",
-                            target = %observed.block,
-                            transaction_hash = %observed.transaction.inner().repr_hash(),
+                            operation,
+                            target = %hash,
                             duration_ms = started.elapsed().as_millis(),
                             error = %format!("{error:#}"),
                             outcome = "encoding_failed",
@@ -414,7 +513,7 @@ async fn send_boc_and_wait_transaction(
             })?
         })
         .await
-        .map_err(|_| ApiError::new(StatusCode::GATEWAY_TIMEOUT, "transaction_wait_timeout"))?
+        .map_err(|_| ApiError::new(StatusCode::GATEWAY_TIMEOUT, timeout_error))?
     }
     .await;
 

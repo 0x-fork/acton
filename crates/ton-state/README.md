@@ -174,6 +174,37 @@ checks. Up to 64 transaction waits are accepted; exceeding this limit returns
 HTTP 429 before broadcast. Waiting releases its submission slot after broadcast,
 so pending waits do not exhaust the separate `sendBoc` submission budget.
 
+## Send a message and wait for its complete trace
+
+Use `sendBocAndWaitTrace` to wait for the root transaction and every internal
+message it produces, including messages from child transactions and bounces:
+
+```sh
+base64 < message.boc | tr -d '\n' | jq -Rs '{boc: ., timeout_ms: 120000}' | \
+  curl -s http://127.0.0.1:8080/api/v2/sendBocAndWaitTrace \
+    -H 'Content-Type: application/json' --data-binary @- | jq
+```
+
+The response contains only the trace identifier:
+
+```json
+{"ok":true,"result":{"trace_hash":"<base64 root transaction hash>"},"@extra":""}
+```
+
+`trace_hash` is the root transaction's cell hash, matching TON Center's `trace_id`.
+The trace completes when every emitted internal message has a receiving
+transaction in a committed block. External outgoing messages are terminal.
+Aborted transactions can produce bounces, which are awaited too. Completion
+does not mean that every contract executed successfully.
+
+`timeout_ms` defaults to 120,000 and accepts 1,000–600,000 (up to ten minutes).
+The live-only behavior and admission limits are shared with
+`sendBocAndWaitTransaction`. The deadline covers the entire trace and is not
+extended when more messages appear;
+HTTP 504 returns `error: "trace_wait_timeout"`. A timeout does not stop execution.
+HTTP 503 with `trace_pending_messages_limit_exceeded` means the trace exceeded
+16,384 pending internal messages. Both wait routes share the 64 observation slots.
+
 ## Subscribe to finalized transactions
 
 Open a live SSE subscription on the same HTTP listener:

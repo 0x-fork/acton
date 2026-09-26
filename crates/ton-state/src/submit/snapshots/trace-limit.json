@@ -1,0 +1,12 @@
+{
+  "observation_slots": 64,
+  "response": {
+    "body": {
+      "code": 503,
+      "error": "trace_pending_messages_limit_exceeded",
+      "normalized_message_hash": "BON9Jz61WPwkG9jcCQnJc6hG520TgZlvqfipOPZReRE=",
+      "ok": false
+    },
+    "status": 503
+  }
+}

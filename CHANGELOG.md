@@ -42,6 +42,9 @@ All notable changes to this project will be documented in this file.
   `sendBocAndWaitTransaction` submits an external message and waits for its
   transaction in a committed block, with a bounded timeout, normalized message
   matching, and the transaction and block coordinates in the response.
+  `sendBocAndWaitTrace` waits until every internal message in the submitted
+  message's trace is consumed and returns the root transaction hash, with a
+  two-minute default timeout and a configurable limit of up to ten minutes.
   `/docs` provides an interactive Scalar page for all supported HTTP methods,
   with a generated utoipa specification at `/openapi.json`.
   `getTransactions` reads account history from cached blocks through a persistent

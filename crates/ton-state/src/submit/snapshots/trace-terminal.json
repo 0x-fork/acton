@@ -1,0 +1,62 @@
+[
+  {
+    "expected_root_hash": "qR+b60gUyte6hnAxAedE1EAod1c/fQoM/ybZrvMZZZw=",
+    "mode": "root_only",
+    "observation_slots": 64,
+    "response": {
+      "body": {
+        "@extra": "",
+        "ok": true,
+        "result": {
+          "trace_hash": "qR+b60gUyte6hnAxAedE1EAod1c/fQoM/ybZrvMZZZw="
+        }
+      },
+      "status": 200
+    }
+  },
+  {
+    "expected_root_hash": "XTc96g+V0OcT47qOfqG+OnJWAQB0oLPCahABXj7Zfpg=",
+    "mode": "external_output",
+    "observation_slots": 64,
+    "response": {
+      "body": {
+        "@extra": "",
+        "ok": true,
+        "result": {
+          "trace_hash": "XTc96g+V0OcT47qOfqG+OnJWAQB0oLPCahABXj7Zfpg="
+        }
+      },
+      "status": 200
+    }
+  },
+  {
+    "expected_root_hash": "p2Q8iOOzj/GYsN8F+7w54naIN78PR5Lwbjp+CKQcQg0=",
+    "mode": "reversed_accounts",
+    "observation_slots": 64,
+    "response": {
+      "body": {
+        "@extra": "",
+        "ok": true,
+        "result": {
+          "trace_hash": "p2Q8iOOzj/GYsN8F+7w54naIN78PR5Lwbjp+CKQcQg0="
+        }
+      },
+      "status": 200
+    }
+  },
+  {
+    "expected_root_hash": "mYxQsctndRG1rEN1kKtdzB+tyVF4DBmzEZFUwb/hpgY=",
+    "mode": "masterchain_child",
+    "observation_slots": 64,
+    "response": {
+      "body": {
+        "@extra": "",
+        "ok": true,
+        "result": {
+          "trace_hash": "mYxQsctndRG1rEN1kKtdzB+tyVF4DBmzEZFUwb/hpgY="
+        }
+      },
+      "status": 200
+    }
+  }
+]
