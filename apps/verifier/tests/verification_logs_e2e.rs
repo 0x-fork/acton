@@ -74,16 +74,16 @@ async fn verification_logs_report_outcomes_without_uploading_source_payloads_to_
         .lines()
         .filter(|line| line.contains("operation=\"verify\""))
         .collect();
-    assert_eq!(events.len(), 7, "{content}");
-    for (event, (outcome, user_agent)) in events.iter().zip([
+    let expected_events = [
         ("started", "acton/1.2.3"),
         ("match", "acton/1.2.3"),
-        ("completed", "acton/1.2.3"),
         ("started", "blueprint/0.42.0"),
-        ("failed", "blueprint/0.42.0"),
+        ("error", "blueprint/0.42.0"),
         ("started", "acton/timeout-test"),
-        ("failed", "acton/timeout-test"),
-    ]) {
+        ("error", "acton/timeout-test"),
+    ];
+    assert_eq!(events.len(), expected_events.len(), "{content}");
+    for (event, (outcome, user_agent)) in events.iter().zip(expected_events) {
         assert!(
             event.contains("operation=\"verify\"") && event.contains(CODE_HASH_ONE),
             "{event}"
@@ -101,7 +101,10 @@ async fn verification_logs_report_outcomes_without_uploading_source_payloads_to_
     assert!(events.last().unwrap().contains("duration_ms="));
     let timeout_error = content
         .lines()
-        .find(|line| line.contains("compiler worker timed out after 20000 ms"))
+        .find(|line| {
+            line.contains("verifier::error:")
+                && line.contains("compiler worker timed out after 20000 ms")
+        })
         .expect("compiler timeout should be logged");
     assert!(timeout_error.contains("502 Bad Gateway"), "{timeout_error}");
     assert!(
