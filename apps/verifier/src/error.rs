@@ -55,6 +55,18 @@ impl ApiError {
         }
     }
 
+    const fn forbidden(message: String) -> Self {
+        Self {
+            status: StatusCode::FORBIDDEN,
+            message,
+            expose_message: true,
+            public_fallback: INTERNAL_ERROR_MESSAGE,
+            payment_retryable: false,
+            code_hash_matches: None,
+            code_hash: None,
+        }
+    }
+
     const fn hidden_bad_gateway(message: String) -> Self {
         Self {
             status: StatusCode::BAD_GATEWAY,
@@ -216,6 +228,7 @@ impl From<MultipartError> for ApiError {
 impl From<CompilerError> for ApiError {
     fn from(err: CompilerError) -> Self {
         match err {
+            CompilerError::Disabled { .. } => Self::forbidden(err.to_string()),
             CompilerError::CompileFailed(message) => Self::bad_request(message),
             err => Self::hidden_bad_gateway(err.to_string()),
         }

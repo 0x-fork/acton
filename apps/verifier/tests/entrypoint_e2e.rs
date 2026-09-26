@@ -100,18 +100,19 @@ fn generates_disabled_compilers_from_environment() {
 }
 
 #[test]
-fn invalid_disabled_compiler_environment_fails_policy_initialization() {
-    for value in [
-        "unknown",
-        "func@",
-        "tolk@^1.4.1",
-        "tolk@*",
-        ",tact",
-        "tact,",
-        "tact,,func",
-        "tact, ,func",
-        r#"tact"suffix"#,
-        r"func\suffix",
+fn disabled_compiler_environment_preserves_literal_rules_and_rejects_malformed_rules() {
+    for (value, valid) in [
+        ("unknown", true),
+        ("unknown@nightly", true),
+        ("func@", false),
+        ("tolk@^1.4.1", true),
+        ("tolk@*", true),
+        (",tact", false),
+        ("tact,", false),
+        ("tact,,func", false),
+        ("tact, ,func", false),
+        (r#"tact"suffix"#, true),
+        (r"func\suffix", true),
     ] {
         let temp_dir = tempfile::tempdir().expect("config directory");
         let output = run_entrypoint(&temp_dir, &[variable("VERIFIER_COMPILER_DISABLED", value)]);
@@ -122,9 +123,11 @@ fn invalid_disabled_compiler_environment_fails_policy_initialization() {
         let expected: Vec<_> = value.split(',').map(toml::Value::from).collect();
         assert_eq!(parsed["compiler"]["disabled"], toml::Value::Array(expected));
         let config = Config::load_from_path(&config_path).expect("raw compiler rules");
-        let error = CompilerPolicy::from_disabled(config.disabled_compilers())
-            .expect_err("invalid compiler rule");
-        assert!(!error.reason.is_empty());
+        assert_eq!(
+            CompilerPolicy::from_disabled(config.disabled_compilers()).is_ok(),
+            valid,
+            "{value}",
+        );
     }
 }
 

@@ -111,7 +111,8 @@ pub fn verify_cmd(
         return Ok(());
     }
 
-    let Some(payment_quote) = take_verifier_ticket(&code_hash_hex)? else {
+    let version = compiler_version.unwrap_or_else(|| "1.4.2".to_owned());
+    let Some(payment_quote) = take_verifier_ticket(&code_hash_hex, &version)? else {
         return Ok(());
     };
     let payment_tx_hash = payment_tx_hash
@@ -159,8 +160,6 @@ pub fn verify_cmd(
             bytes: file_content,
         });
     }
-
-    let version = compiler_version.unwrap_or_else(|| "1.4.2".to_owned());
 
     println!("  {} Using TON verifier", "→".blue().bold());
 
@@ -639,7 +638,10 @@ fn wait_for_existing_verification(code_hash: &str) -> anyhow::Result<bool> {
     )
 }
 
-fn take_verifier_ticket(code_hash: &str) -> anyhow::Result<Option<VerifierPaymentQuote>> {
+fn take_verifier_ticket(
+    code_hash: &str,
+    compiler_version: &str,
+) -> anyhow::Result<Option<VerifierPaymentQuote>> {
     println!("  {} Requesting verification ticket", "→".blue().bold());
     let backend = verifier_backend();
     let ticket_url = format!("{backend}/api/v1/take_ticket");
@@ -647,7 +649,11 @@ fn take_verifier_ticket(code_hash: &str) -> anyhow::Result<Option<VerifierPaymen
         build_verify_http_client().context("Failed to create HTTP client for verifier backend")?;
     let response = client
         .post(&ticket_url)
-        .json(&serde_json::json!({ "code_hash": code_hash }))
+        .json(&serde_json::json!({
+            "code_hash": code_hash,
+            "compiler": "tolk",
+            "compiler_version": compiler_version,
+        }))
         .send()
         .with_context(|| format!("Failed to request verification ticket from {ticket_url}"))?;
 

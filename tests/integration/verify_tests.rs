@@ -395,6 +395,10 @@ fn test_verify_verifier_sends_api_payload_and_reports_success() {
     assert_eq!(captured[1].path, "/api/v1/take_ticket");
     assert_eq!(captured[2].method, "POST");
     assert_eq!(captured[2].path, "/api/v1/verify");
+    let ticket: serde_json::Value =
+        serde_json::from_slice(&captured[1].body).expect("ticket request should be JSON");
+    assert_eq!(ticket["compiler"], "tolk");
+    assert_eq!(ticket["compiler_version"], "1.4.2");
     let ticket_body = String::from_utf8_lossy(&captured[1].body);
     assert!(
         ticket_body.contains(VERIFY_TEST_CODE_HASH),
@@ -563,6 +567,8 @@ fn test_verify_verifier_dry_run_formats_payment_without_sending_it() {
         .env("ACTON_VERIFY_BACKEND", &mock_url)
         .verify()
         .verify_contract("simple")
+        .arg("--compiler-version")
+        .arg("1.4.1")
         .arg("--dry-run")
         .run()
         .success();
@@ -577,6 +583,10 @@ fn test_verify_verifier_dry_run_formats_payment_without_sending_it() {
         .expect("captured verifier requests mutex poisoned");
     assert_eq!(captured.len(), 2, "expected status and ticket requests");
     assert_eq!(captured[1].path, "/api/v1/take_ticket");
+    let ticket: serde_json::Value =
+        serde_json::from_slice(&captured[1].body).expect("ticket request should be JSON");
+    assert_eq!(ticket["compiler"], "tolk");
+    assert_eq!(ticket["compiler_version"], "1.4.1");
 }
 
 #[allow(clippy::significant_drop_tightening)]

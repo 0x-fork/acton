@@ -211,7 +211,15 @@ async fn post_take_ticket(
     state: verifier::state::AppState,
     code_hash: &str,
 ) -> axum::response::Response {
-    post_take_ticket_with_body(state, &json!({"code_hash": code_hash})).await
+    post_take_ticket_with_body(
+        state,
+        &json!({
+            "code_hash": code_hash,
+            "compiler": "tolk",
+            "compiler_version": "1.4.1",
+        }),
+    )
+    .await
 }
 
 async fn post_take_ticket_with_body(
@@ -339,7 +347,7 @@ async fn take_ticket_accepts_compiler_metadata_without_changing_the_payment_quot
 }
 
 #[tokio::test]
-async fn take_ticket_treats_null_compiler_metadata_as_absent() {
+async fn take_ticket_requires_compiler_metadata_when_null_without_legacy_user_agent() {
     let response = post_take_ticket_with_body(
         app_state(&[], CODE_HASH_ONE),
         &json!({
@@ -350,10 +358,10 @@ async fn take_ticket_treats_null_compiler_metadata_as_absent() {
     )
     .await;
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     assert_eq!(
-        response_json::<Value>(response).await["status"],
-        "payment_required"
+        response_json::<Value>(response).await["error"],
+        "compiler and compiler_version are required"
     );
 }
 
@@ -728,11 +736,14 @@ async fn openapi_json_documents_verifier_api() {
     assert_eq!(service_status["operationId"], "service_status");
     assert_eq!(response_statuses(service_status), ["200"]);
     assert_eq!(verify["operationId"], "verify");
-    assert_eq!(response_statuses(take_ticket), ["200", "400", "502", "503"]);
+    assert_eq!(
+        response_statuses(take_ticket),
+        ["200", "400", "403", "502", "503"]
+    );
     assert_eq!(
         response_statuses(verify),
         [
-            "200", "400", "401", "402", "404", "409", "413", "502", "503"
+            "200", "400", "401", "402", "403", "404", "409", "413", "502", "503"
         ]
     );
     assert_eq!(response_statuses(abi), ["200", "400", "404", "502"]);

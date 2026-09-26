@@ -142,6 +142,20 @@ impl AppState {
         &self.compiler_policy
     }
 
+    pub(crate) fn ensure_compiler_allowed(
+        &self,
+        name: &str,
+        version: &str,
+    ) -> Result<(), CompilerError> {
+        if self.compiler_policy.is_disabled(name, version) {
+            return Err(CompilerError::Disabled {
+                language: name.trim().to_ascii_lowercase(),
+                version: version.to_owned(),
+            });
+        }
+        Ok(())
+    }
+
     pub(crate) async fn compile(
         &self,
         code_hash: &str,

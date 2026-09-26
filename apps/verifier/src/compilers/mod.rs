@@ -219,6 +219,8 @@ enum WorkerRequest<'a> {
 
 #[derive(Debug, Error)]
 pub enum CompilerError {
+    #[error("compiler_disabled: {language}@{version} is disabled by server configuration")]
+    Disabled { language: String, version: String },
     #[error("failed to serialize compiler input: {0}")]
     SerializeInput(serde_json::Error),
     #[error("compiler concurrency limiter is closed")]

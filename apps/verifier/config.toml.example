@@ -35,10 +35,12 @@ author_email = "ton-verifier@example.invalid"
 path = "verifier-index.sqlite3"
 
 [compiler]
-# Compiler names: func, tolk, tact (case-insensitive).
+# All compilers and versions are allowed unless matched by a rule below.
+# Compiler names are case-insensitive; versions are compared as literal strings.
 # A name matches all versions; name@version matches one exact version, including suffixes.
-# For example: ["tact", "func@0.4.4", "tolk@1.4.1"]. Ranges and wildcards are unsupported.
-# Rules are parsed only for now; HTTP verification does not enforce them yet.
+# For example: ["tact", "func@0.4.4", "tolk@1.4.1"]. No range or wildcard expansion.
+# Disabled compilers are rejected before payment and compilation.
+# Acton <=1.2.0 and Blueprint <=0.46.0 are exempt for backward compatibility.
 # Docker env: VERIFIER_COMPILER_DISABLED=tact,func@0.4.4 (used when generating config).
 disabled = []
 node_bin = "node"

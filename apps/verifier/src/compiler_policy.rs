@@ -14,7 +14,7 @@ impl CompilerPolicy {
     ///
     /// # Errors
     ///
-    /// Returns an error identifying the first unknown compiler or malformed version rule.
+    /// Returns an error identifying the first malformed `name` or `name@version` rule.
     pub fn from_disabled(entries: &[String]) -> Result<Self, CompilerPolicyError> {
         let disabled = entries
             .iter()
@@ -52,7 +52,7 @@ pub struct CompilerPolicyError {
 
 #[derive(Clone, Debug)]
 struct DisabledCompiler {
-    name: &'static str,
+    name: String,
     version: Option<String>,
 }
 
@@ -63,19 +63,15 @@ impl DisabledCompiler {
             .map_or((entry, None), |(name, version)| {
                 (name, Some(version.trim()))
             });
-        let name = match name.trim().to_ascii_lowercase().as_str() {
-            "func" => "func",
-            "tolk" => "tolk",
-            "tact" => "tact",
-            _ => return Err("expected compiler name func, tolk, or tact"),
-        };
-        if let Some(version) = version {
-            semver::Version::parse(version).map_err(|_| {
-                "expected an exact version such as 1.4.2; ranges and wildcards are not supported"
-            })?;
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("expected a non-empty compiler name");
+        }
+        if version.is_some_and(|version| version.is_empty() || version.contains('@')) {
+            return Err("expected name or name@version with a non-empty version");
         }
         Ok(Self {
-            name,
+            name: name.to_owned(),
             version: version.map(str::to_owned),
         })
     }

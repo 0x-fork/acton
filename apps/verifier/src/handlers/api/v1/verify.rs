@@ -16,6 +16,7 @@ use utoipa::ToSchema;
 
 use crate::{
     blockchain::{is_valid_hash, normalize_code_hash, normalize_hash},
+    client_compatibility::is_legacy_client,
     compilers::{
         CompileGeneratedSource, CompileOutput, CompileRequest, CompileSource, CompilerError,
     },
@@ -57,6 +58,7 @@ const API_KEY_HEADER: &str = "x-verifier-key";
         (status = 400, description = "Invalid verification request or compilation failure", body = crate::error::ErrorResponse),
         (status = 401, description = "A valid API key is required to set verified_at or skip payment", body = crate::error::ErrorResponse),
         (status = 402, description = "Payment is missing or invalid", body = crate::error::ErrorResponse),
+        (status = 403, description = "Compiler disabled by server configuration", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
         (status = 409, description = "Payment is already used or in progress, or the address exists on both TON networks", body = crate::error::ErrorResponse),
         (status = 413, description = "The request exceeds the configured upload limit", body = crate::error::ErrorResponse),
@@ -64,6 +66,7 @@ const API_KEY_HEADER: &str = "x-verifier-key";
         (status = 503, description = "Verifier is read-only or payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),
     params(
+        ("User-Agent" = Option<String>, Header, description = "Acton at or below 1.2.0 and Blueprint at or below 0.46.0 are exempt from compiler restrictions"),
         ("X-Verifier-Key" = Option<String>, Header, description = "API key used to authorize verified_at and verification without payment")
     ),
     tag = "verification"
@@ -193,6 +196,22 @@ async fn handle_multipart(
         return Err(ApiError::read_only().with_code_hash(&request_code_hash));
     }
 
+    let compile_input = if verified_bundle.is_none() {
+        let input = prepare_compile_input(&language, &compile_params, sources, files)
+            .map_err(|error| error.with_code_hash(&request_code_hash))?;
+        if !is_legacy_client(headers) {
+            state
+                .ensure_compiler_allowed(
+                    &input.configuration.language,
+                    &input.configuration.compiler_version,
+                )
+                .map_err(|error| ApiError::from(error).with_code_hash(&request_code_hash))?;
+        }
+        Some(input)
+    } else {
+        None
+    };
+
     let payment_claim = if has_valid_api_key {
         None
     } else {
@@ -223,8 +242,7 @@ async fn handle_multipart(
             verified_bundle,
             &language,
             compile_params,
-            sources,
-            files,
+            compile_input,
             verified_at,
             payment_tx_hash,
             &user_agent,
@@ -319,8 +337,7 @@ async fn verify_target(
     verified_bundle: Option<StoredSourceBundle>,
     language: &str,
     compile_params: Value,
-    sources: Option<Vec<SourceMetadata>>,
-    files: Vec<ReceivedFile>,
+    compile_input: Option<CompileInput>,
     verified_at: Option<u64>,
     payment_tx_hash: Option<String>,
     user_agent: &str,
@@ -348,7 +365,8 @@ async fn verify_target(
     let CompileInput {
         configuration,
         sources: mut retained_sources,
-    } = prepare_compile_input(language, &compile_params, sources, files)?;
+    } = compile_input
+        .ok_or_else(|| ApiError::internal("missing prepared compiler input".to_owned()))?;
     let compiled = run_compiler(
         state,
         &resolved_target.code_hash,

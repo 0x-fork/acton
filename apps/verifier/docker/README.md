@@ -74,9 +74,22 @@ Set `VERIFIER_COMPILER_DISABLED` to a comma-separated list of compiler rules:
 Docker Compose also forwards this variable from the shell or `.env` file. The
 entrypoint writes the list to `[compiler].disabled` when generating the TOML
 config. An unset or empty value produces an empty list. Whitespace around entries
-is ignored; empty entries, unknown compiler names, and invalid versions fail
-application initialization. Rules are parsed only for now; HTTP verification
-does not enforce them yet.
+is ignored; empty entries or malformed `name@version` rules fail application
+initialization. All compilers and versions are allowed unless a rule matches.
+Names are case-insensitive, and versions are compared as literal strings without
+format validation or range expansion. Disabled compilers return HTTP 403 before
+a payment quote is issued or a verification payment is claimed. Already verified
+bundles remain available.
+
+New verification tickets require `compiler` and `compiler_version`. Clients with
+`User-Agent: acton/<version>` at or below `1.2.0` or `User-Agent: blueprint/<version>`
+at or below `0.46.0` may omit both fields. For backward compatibility, these
+clients are exempt from `compiler.disabled` in both `/api/v1/take_ticket` and
+`/api/v1/verify`, even when
+compiler metadata is supplied. All other clients are checked against the deny
+list before a payment quote or verification payment claim.
+A missing or unrecognized User-Agent does not grant an exception. Verification
+still uses the existing language and compiler parameters needed for compilation.
 
 As with the other generated settings, an existing config file takes precedence.
 Use `VERIFIER_FORCE_GENERATE_CONFIG=1` to regenerate it from the environment.

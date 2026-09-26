@@ -21,8 +21,8 @@ fn absent_and_empty_disabled_lists_disable_nothing() {
         load_config("[compiler]\ndisabled = []").expect("empty disabled list"),
         Config::load_from_path("config.toml.example").expect("example config"),
     ];
-    for name in ["func", "tolk", "tact"] {
-        for version in ["0.4.4", "1.4.1", "99.0.0"] {
+    for name in ["func", "tolk", "tact", "unknown"] {
+        for version in ["0.4.4", "1.4.1", "99.0.0", "nightly"] {
             assert!(!CompilerPolicy::default().is_disabled(name, version));
             for config in &configs {
                 assert!(config.disabled_compilers().is_empty());
@@ -36,7 +36,7 @@ fn absent_and_empty_disabled_lists_disable_nothing() {
 
 #[test]
 fn compiler_names_match_all_versions_and_normalize_case_and_whitespace() {
-    for name in ["func", "tolk", "tact"] {
+    for name in ["func", "tolk", "tact", "unknown"] {
         let config = load_config(&format!(
             "[compiler]\ndisabled = [\" {} \"]",
             name.to_ascii_uppercase()
@@ -44,7 +44,7 @@ fn compiler_names_match_all_versions_and_normalize_case_and_whitespace() {
         .expect("compiler rule");
         let policy =
             CompilerPolicy::from_disabled(config.disabled_compilers()).expect("compiler policy");
-        for version in ["0.4.4", "1.4.1", "99.0.0", "0.4.6-wasmfix.0"] {
+        for version in ["0.4.4", "1.4.1", "99.0.0", "0.4.6-wasmfix.0", "nightly"] {
             assert!(policy.is_disabled(name, version));
             assert!(policy.is_disabled(&format!(" {} ", name.to_ascii_uppercase()), version));
             for other in ["func", "tolk", "tact", "unknown"] {
@@ -113,30 +113,40 @@ fn duplicates_and_overlapping_rules_do_not_depend_on_order() {
 }
 
 #[test]
+fn compiler_names_and_versions_are_literal_without_correctness_validation() {
+    for version in [
+        "latest",
+        "v1.4.1",
+        "1.4",
+        "01.4.1",
+        "1.4.1-",
+        "1.4.1+",
+        "*",
+        "1.4.*",
+        "^1.4.1",
+        "~1.4.1",
+        ">=1.4.1",
+        "1.4.1, <2.0.0",
+        "1.4.1 - 1.4.2",
+    ] {
+        let policy = CompilerPolicy::from_disabled(&[format!("unknown@{version}")])
+            .expect("literal compiler version");
+        assert!(policy.is_disabled("unknown", version));
+        assert!(!policy.is_disabled("unknown", "1.4.1"));
+        assert!(!policy.is_disabled("tolk", version));
+    }
+}
+
+#[test]
 fn malformed_rules_are_rejected_by_policy_and_application_initialization() {
     for entry in [
         "",
         " ",
-        "unknown",
-        "unknown@1.0.0",
         "@1.0.0",
         "tolk@",
         "tolk@ ",
         "tolk@@1.4.1",
         "tolk@1.4.1@1.4.2",
-        "tolk@latest",
-        "tolk@v1.4.1",
-        "tolk@1.4",
-        "tolk@01.4.1",
-        "tolk@1.4.1-",
-        "tolk@1.4.1+",
-        "tolk@*",
-        "tolk@1.4.*",
-        "tolk@^1.4.1",
-        "tolk@~1.4.1",
-        "tolk@>=1.4.1",
-        "tolk@1.4.1, <2.0.0",
-        "tolk@1.4.1 - 1.4.2",
     ] {
         let config = load_config(&format!("[compiler]\ndisabled = [\"func\", \"{entry}\"]"))
             .expect("config stores compiler rules as raw strings");
