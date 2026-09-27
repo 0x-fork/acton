@@ -41,7 +41,7 @@ pub(crate) fn router(
 ) -> Router {
     Router::new()
         .route("/api/masterchainInfo", get(masterchain_info))
-        .route("/api/address", get(address_information))
+        .route("/api/account", get(address_information))
         .route("/api/runGetMethod", post(get_method::run_get_method))
         .route("/api/transactions", get(transactions::get_transactions))
         .fallback(|| async { ApiError::new(StatusCode::NOT_FOUND, "unknown API method") })
@@ -87,8 +87,8 @@ async fn masterchain_info(State(api): State<Api>) -> Response {
 /// and code/data as base64 `BoCs`. The suspended field is currently always false
 #[utoipa::path(
     get,
-    path = "/api/address",
-    operation_id = "address",
+    path = "/api/account",
+    operation_id = "account",
     params(
         ("address" = String, Query, description = "Raw or user-friendly account address", example = "-1:3333333333333333333333333333333333333333333333333333333333333333"),
         ("seqno" = Option<u32>, Query, description = "Must equal the current applied checkpoint; omit for the latest applied state", maximum = 2147483647),
@@ -111,7 +111,7 @@ async fn address_information(
         return ApiError::new(StatusCode::BAD_REQUEST, "invalid account address").into_response();
     };
 
-    read(api, "address", move |store, _| {
+    read(api, "account", move |store, _| {
         if let Some(seqno) = query.seqno {
             let seqno = match seqno {
                 v2::Int32Input::Number(value) => Some(value),

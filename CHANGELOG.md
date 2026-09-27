@@ -26,11 +26,11 @@ All notable changes to this project will be documented in this file.
   redundant snapshot lookups. Immutable read snapshots retain a complete committed
   frontier while the writer applies subsequent blocks.
 - Add `ton-state` to synchronize a validator snapshot through P2P and serve
-  `/api/masterchainInfo` and `/api/address` from the last applied state with
+  `/api/masterchainInfo` and `/api/account` from the last applied state with
   TON Center v2 response formats, plus finalized transaction subscriptions at
   `/api/streaming/sse` with address filters and TON Center v3 fields.
   SSE subscriptions also support account state updates in the
-  `/api/address` format, once per changed account and committed checkpoint.
+  `/api/account` format, once per changed account and committed checkpoint.
   Each subscription receives code and data on its first account event and then
   only when those fields change; all other state fields remain complete.
   Subscriptions can set `include_code_data: false` to omit both BoCs entirely.

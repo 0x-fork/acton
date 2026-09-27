@@ -53,7 +53,7 @@ curl -s http://127.0.0.1:8080/api/masterchainInfo | jq
 Read an account. This example uses the standard elector address:
 
 ```sh
-curl -sG http://127.0.0.1:8080/api/address \
+curl -sG http://127.0.0.1:8080/api/account \
   --data-urlencode 'address=-1:3333333333333333333333333333333333333333333333333333333333333333' \
   | jq
 ```
@@ -61,12 +61,12 @@ curl -sG http://127.0.0.1:8080/api/address \
 Read the `balance` field in nanograms. One GRAM equals 1,000,000,000 nanograms:
 
 ```sh
-curl -sG http://127.0.0.1:8080/api/address \
+curl -sG http://127.0.0.1:8080/api/account \
   --data-urlencode 'address=-1:3333333333333333333333333333333333333333333333333333333333333333' \
   | jq -r '.result.balance'
 ```
 
-`/api/address` accepts raw and user-friendly addresses. An absent account has
+`/api/account` accepts raw and user-friendly addresses. An absent account has
 zero balance and `uninitialized` state. Account information includes code and
 data as base64 BoCs, the last transaction, and the masterchain checkpoint.
 `sync_utime` contains the account's shard-state time, as in TONLib.
@@ -317,7 +317,7 @@ curl -N http://127.0.0.1:8080/api/streaming/sse \
 
 Each update contains `type: "account_state"`, `finality: "finalized"`, the raw
 `address`, and `account_state` with the same fields as the `result` of
-`/api/address`: balance in nanograms, extra currencies, code/data BoCs,
+`/api/account`: balance in nanograms, extra currencies, code/data BoCs,
 last transaction ID, block ID, sync time, frozen hash, state, and suspended flag.
 The suspended flag is currently always false, as in the HTTP response.
 
@@ -350,7 +350,7 @@ For `types: ["transactions", "account_states"]`, transaction events precede the
 account state events for that batch.
 
 The `account_states` stream sends no initial account snapshot. To establish a starting state,
-open the subscription first, then call `/api/address` and reconcile
+open the subscription first, then call `/api/account` and reconcile
 queued events using `account_state.block_id.seqno`, the masterchain checkpoint.
 Maintain the stream's code/data baseline even for queued events older than that
 HTTP snapshot, and display the reconstructed state only once its checkpoint

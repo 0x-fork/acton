@@ -129,7 +129,7 @@
                 subscribed = true
                 // Register the live stream before reading the snapshot. Older queued
                 // events cannot overwrite a newer HTTP checkpoint.
-                const initial = await fetch(`/api/address?${new URLSearchParams({ address })}`, {
+                const initial = await fetch(`/api/account?${new URLSearchParams({ address })}`, {
                   signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
                   cache: 'no-store',
                 })

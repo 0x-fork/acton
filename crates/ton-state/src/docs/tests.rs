@@ -94,7 +94,7 @@ async fn reference_serves_only_supported_operations() {
     expect![[r#"
         {
           "methods": [
-            "GET /api/address",
+            "GET /api/account",
             "GET /api/masterchainInfo",
             "POST /api/runGetMethod",
             "POST /api/send",

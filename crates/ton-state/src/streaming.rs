@@ -576,7 +576,7 @@ impl Subscriber {
 /// is `{"status":"subscribed"}`. Later events contain `type=transaction`,
 /// `finality=finalized` and one `transaction` object with TON Center v3 fields,
 /// or `type=account_state`, `finality=finalized`, a raw `address` and an
-/// `account_state` object with the fields of `/api/address`. Code and
+/// `account_state` object with the fields of `/api/account`. Code and
 /// data are sent on the first event for each account, then only when changed.
 /// Missing code/data mean unchanged; empty strings mean cleared. Every other
 /// field is always present. Reconnecting resets these per-account baselines
