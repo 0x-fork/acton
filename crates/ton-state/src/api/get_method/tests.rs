@@ -178,11 +178,11 @@ impl Fixture {
 
     async fn raw(&self, body: &[u8]) -> Result<Value> {
         let app = axum::Router::new()
-            .route("/api/v2/runGetMethod", axum::routing::post(run_get_method))
+            .route("/api/runGetMethod", axum::routing::post(run_get_method))
             .with_state(self.api.clone());
         let response = app
             .oneshot(
-                Request::post("/api/v2/runGetMethod")
+                Request::post("/api/runGetMethod")
                     .header("content-type", "application/json")
                     .body(Body::from(body.to_vec()))?,
             )

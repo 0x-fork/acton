@@ -173,7 +173,7 @@
       }
 
       async function connect(request, session) {
-        const response = await fetch('/api/streaming/v2/sse', {
+        const response = await fetch('/api/streaming/sse', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
           body: JSON.stringify(request),

@@ -18,7 +18,6 @@ use crate::{api, streaming, submit};
     paths(
         api::masterchain_info,
         api::address_information,
-        api::address_balance,
         api::transactions::get_transactions,
         api::get_method::run_get_method,
         submit::send_boc,

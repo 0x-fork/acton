@@ -36,7 +36,7 @@ const MAX_LIBRARY_LOADS: usize = 8;
 /// never changed. Only the current checkpoint is available via seqno
 #[utoipa::path(
     post,
-    path = "/api/v2/runGetMethod",
+    path = "/api/runGetMethod",
     operation_id = "runGetMethod",
     request_body = RunGetMethodRequest,
     responses(

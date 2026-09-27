@@ -58,12 +58,12 @@ pub(crate) fn router(sender: MessageSender, confirmations: Confirmations) -> Rou
 impl Submission {
     fn router(self) -> Router {
         Router::new()
-            .route("/api/v2/sendBoc", post(send_boc))
+            .route("/api/send", post(send_boc))
             .route(
-                "/api/v2/sendBocAndWaitTransaction",
+                "/api/sendAndWaitTransaction",
                 post(send_boc_and_wait_transaction),
             )
-            .route("/api/v2/sendBocAndWaitTrace", post(send_boc_and_wait_trace))
+            .route("/api/sendAndWaitTrace", post(send_boc_and_wait_trace))
             .layer(DefaultBodyLimit::max(96 * 1024))
             .with_state(self)
     }
@@ -78,8 +78,8 @@ impl Submission {
 /// queued for broadcast, not accepted or included in a block
 #[utoipa::path(
     post,
-    path = "/api/v2/sendBoc",
-    operation_id = "sendBoc",
+    path = "/api/send",
+    operation_id = "send",
     request_body = SendBocRequest,
     responses(
         (status = 200, description = "P2P broadcast queued", body = TonlibResponse<ResultOk>),
@@ -192,7 +192,7 @@ struct SendBocAndWaitTraceRequest {
 
 #[derive(Serialize, utoipa::ToSchema)]
 struct SendBocAndWaitResult {
-    /// Original committed transaction in the same format as getTransactions
+    /// Original committed transaction in the same format as `/api/transactions`
     transaction: toncenter::v2::responses::Transaction,
     /// Full coordinates of the block containing this transaction
     block_id: toncenter::v2::responses::TonBlockIdExt,
@@ -257,8 +257,8 @@ impl Drop for WaitProgress {
 /// A timeout or disconnect does not withdraw a message already sent to peers
 #[utoipa::path(
     post,
-    path = "/api/v2/sendBocAndWaitTransaction",
-    operation_id = "sendBocAndWaitTransaction",
+    path = "/api/sendAndWaitTransaction",
+    operation_id = "sendAndWaitTransaction",
     request_body = SendBocAndWaitRequest,
     responses(
         (status = 200, description = "Transaction included in a committed block", body = TonlibResponse<SendBocAndWaitResult>),
@@ -290,8 +290,8 @@ async fn send_boc_and_wait_transaction(
 /// internal message hashes; exceeding this bound fails the observation
 #[utoipa::path(
     post,
-    path = "/api/v2/sendBocAndWaitTrace",
-    operation_id = "sendBocAndWaitTrace",
+    path = "/api/sendAndWaitTrace",
+    operation_id = "sendAndWaitTrace",
     request_body = SendBocAndWaitTraceRequest,
     responses(
         (status = 200, description = "Complete trace's root transaction hash, in base64", body = TonlibResponse<SendBocAndWaitTraceResult>),

@@ -47,26 +47,26 @@ On startup, the service indexes cached blocks that are missing from this index.
 Read the masterchain checkpoint:
 
 ```sh
-curl -s http://127.0.0.1:8080/api/v2/getMasterchainInfo | jq
+curl -s http://127.0.0.1:8080/api/masterchainInfo | jq
 ```
 
 Read an account. This example uses the standard elector address:
 
 ```sh
-curl -sG http://127.0.0.1:8080/api/v2/getAddressInformation \
+curl -sG http://127.0.0.1:8080/api/address \
   --data-urlencode 'address=-1:3333333333333333333333333333333333333333333333333333333333333333' \
   | jq
 ```
 
-Read its balance in nanograms. One GRAM equals 1,000,000,000 nanograms:
+Read the `balance` field in nanograms. One GRAM equals 1,000,000,000 nanograms:
 
 ```sh
-curl -sG http://127.0.0.1:8080/api/v2/getAddressBalance \
+curl -sG http://127.0.0.1:8080/api/address \
   --data-urlencode 'address=-1:3333333333333333333333333333333333333333333333333333333333333333' \
-  | jq
+  | jq -r '.result.balance'
 ```
 
-Account methods accept raw and user-friendly addresses. An absent account has
+`/api/address` accepts raw and user-friendly addresses. An absent account has
 zero balance and `uninitialized` state. Account information includes code and
 data as base64 BoCs, the last transaction, and the masterchain checkpoint.
 `sync_utime` contains the account's shard-state time, as in TONLib.
@@ -76,7 +76,7 @@ These GET routes use the [TON Center API v2](https://toncenter.com/api/v2/)
 response format. Success responses contain `ok: true` and `result`.
 Errors contain `ok: false`, `error`, and `code`.
 An optional `seqno` must equal the current applied checkpoint. Other heights
-return HTTP 409. These account routes do not support historical queries, POST,
+return HTTP 409. The account route does not support historical queries, POST,
 or JSON-RPC.
 
 The reported checkpoint can lag behind the network head. Network errors cause
@@ -87,7 +87,7 @@ download retries. An invalid state update or a storage error stops the service.
 Call the elector's `active_election_id` method:
 
 ```sh
-curl -s http://127.0.0.1:8080/api/v2/runGetMethod \
+curl -s http://127.0.0.1:8080/api/runGetMethod \
   -H 'Content-Type: application/json' \
   --data-binary '{"address":"-1:3333333333333333333333333333333333333333333333333333333333333333","method":"active_election_id","stack":[]}' \
   | jq
@@ -147,7 +147,7 @@ and TON Center's
 Read the elector's ten latest retained transactions:
 
 ```sh
-curl -sG http://127.0.0.1:8080/api/v2/getTransactions \
+curl -sG http://127.0.0.1:8080/api/transactions \
   --data-urlencode 'address=-1:3333333333333333333333333333333333333333333333333333333333333333' \
   --data-urlencode 'limit=10' | jq
 ```
@@ -175,7 +175,7 @@ Submit a signed inbound external message saved as `message.boc`:
 
 ```sh
 base64 < message.boc | tr -d '\n' | jq -Rs '{boc: .}' | \
-  curl -s http://127.0.0.1:8080/api/v2/sendBoc \
+  curl -s http://127.0.0.1:8080/api/send \
     -H 'Content-Type: application/json' --data-binary @-
 ```
 
@@ -196,18 +196,18 @@ request can be retried. This route accepts POST JSON only.
 
 ## Send a message and wait for its transaction
 
-Use `sendBocAndWaitTransaction` to submit a signed message and keep the HTTP
+Use `sendAndWaitTransaction` to submit a signed message and keep the HTTP
 request open until its transaction appears in a fully applied block batch:
 
 ```sh
 base64 < message.boc | tr -d '\n' | jq -Rs '{boc: ., timeout_ms: 30000}' | \
-  curl -s http://127.0.0.1:8080/api/v2/sendBocAndWaitTransaction \
+  curl -s http://127.0.0.1:8080/api/sendAndWaitTransaction \
     -H 'Content-Type: application/json' --data-binary @- | jq
 ```
 
 The response has `ok: true` and a `result` containing:
 
-- `transaction`: the same v2 object as `getTransactions`, including its full BoC
+- `transaction`: the same v2 object as `/api/transactions`, including its full BoC
 - `block_id`: the containing block's workchain, shard, sequence number, and hashes
 - `mc_block_seqno`: the masterchain checkpoint that committed the complete batch
 - `normalized_message_hash`: the base64 TEP-467 hash used to match the external message
@@ -232,16 +232,16 @@ for the same message can receive the same transaction; the method provides no
 additional replay protection. Each request uses the existing message admission
 checks. Up to 64 transaction waits are accepted; exceeding this limit returns
 HTTP 429 before broadcast. Waiting releases its submission slot after broadcast,
-so pending waits do not exhaust the separate `sendBoc` submission budget.
+so pending waits do not exhaust the separate `send` submission budget.
 
 ## Send a message and wait for its complete trace
 
-Use `sendBocAndWaitTrace` to wait for the root transaction and every internal
+Use `sendAndWaitTrace` to wait for the root transaction and every internal
 message it produces, including messages from child transactions and bounces:
 
 ```sh
 base64 < message.boc | tr -d '\n' | jq -Rs '{boc: ., timeout_ms: 120000}' | \
-  curl -s http://127.0.0.1:8080/api/v2/sendBocAndWaitTrace \
+  curl -s http://127.0.0.1:8080/api/sendAndWaitTrace \
     -H 'Content-Type: application/json' --data-binary @- | jq
 ```
 
@@ -259,7 +259,7 @@ does not mean that every contract executed successfully.
 
 `timeout_ms` defaults to 120,000 and accepts 1,000–600,000 (up to ten minutes).
 The live-only behavior and admission limits are shared with
-`sendBocAndWaitTransaction`. The deadline covers the entire trace and is not
+`sendAndWaitTransaction`. The deadline covers the entire trace and is not
 extended when more messages appear;
 HTTP 504 returns `error: "trace_wait_timeout"`. A timeout does not stop execution.
 HTTP 503 with `trace_pending_messages_limit_exceeded` means the trace exceeded
@@ -275,7 +275,7 @@ both fields from the displayed state. The choice is preserved in the page URL.
 Open a live SSE subscription on the same HTTP listener:
 
 ```sh
-curl -N http://127.0.0.1:8080/api/streaming/v2/sse \
+curl -N http://127.0.0.1:8080/api/streaming/sse \
   -H 'Content-Type: application/json' \
   -d '{"types":["transactions"],"addresses":["-1:3333333333333333333333333333333333333333333333333333333333333333"],"min_finality":"finalized"}'
 ```
@@ -310,14 +310,14 @@ without TON Center's trace grouping. See the reference
 To receive account state updates, select `account_states`:
 
 ```sh
-curl -N http://127.0.0.1:8080/api/streaming/v2/sse \
+curl -N http://127.0.0.1:8080/api/streaming/sse \
   -H 'Content-Type: application/json' \
   -d '{"types":["account_states"],"addresses":["-1:3333333333333333333333333333333333333333333333333333333333333333"]}'
 ```
 
 Each update contains `type: "account_state"`, `finality: "finalized"`, the raw
 `address`, and `account_state` with the same fields as the `result` of
-`getAddressInformation`: balance in nanograms, extra currencies, code/data BoCs,
+`/api/address`: balance in nanograms, extra currencies, code/data BoCs,
 last transaction ID, block ID, sync time, frozen hash, state, and suspended flag.
 The suspended flag is currently always false, as in the HTTP response.
 
@@ -350,7 +350,7 @@ For `types: ["transactions", "account_states"]`, transaction events precede the
 account state events for that batch.
 
 The `account_states` stream sends no initial account snapshot. To establish a starting state,
-open the subscription first, then call `getAddressInformation` and reconcile
+open the subscription first, then call `/api/address` and reconcile
 queued events using `account_state.block_id.seqno`, the masterchain checkpoint.
 Maintain the stream's code/data baseline even for queued events older than that
 HTTP snapshot, and display the reconstructed state only once its checkpoint
@@ -380,7 +380,7 @@ For a counter contract with a `seqno` storage field, use its generated ABI file:
 jq -n --slurpfile abi counter.abi.json \
   --arg address "$COUNTER_ADDRESS" \
   '{types:["storage_fields"], addresses:[$address], abi:$abi[0], fields:["seqno"]}' |
-  curl -N http://127.0.0.1:8080/api/streaming/v2/sse \
+  curl -N http://127.0.0.1:8080/api/streaming/sse \
     -H 'Content-Type: application/json' --data-binary @-
 ```
 

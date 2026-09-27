@@ -243,7 +243,7 @@ impl Subscriptions {
     /// it does not claim TON Center's trace-grouped streaming semantics.
     pub(crate) fn router(self) -> Router {
         Router::new()
-            .route("/api/streaming/v2/sse", post(subscribe))
+            .route("/api/streaming/sse", post(subscribe))
             .with_state(self)
     }
 
@@ -576,7 +576,7 @@ impl Subscriber {
 /// is `{"status":"subscribed"}`. Later events contain `type=transaction`,
 /// `finality=finalized` and one `transaction` object with TON Center v3 fields,
 /// or `type=account_state`, `finality=finalized`, a raw `address` and an
-/// `account_state` object with the fields of `getAddressInformation`. Code and
+/// `account_state` object with the fields of `/api/address`. Code and
 /// data are sent on the first event for each account, then only when changed.
 /// Missing code/data mean unchanged; empty strings mean cleared. Every other
 /// field is always present. Reconnecting resets these per-account baselines
@@ -603,7 +603,7 @@ impl Subscriber {
 /// event and are disconnected. Cancel the request to close the subscription
 #[utoipa::path(
     post,
-    path = "/api/streaming/v2/sse",
+    path = "/api/streaming/sse",
     operation_id = "subscribe",
     request_body = Subscription,
     responses(

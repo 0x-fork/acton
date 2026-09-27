@@ -51,7 +51,7 @@ fn service(confirmations: Confirmations, broadcast: Broadcast) -> Submission {
 }
 
 fn request(body: Value) -> Request<Body> {
-    Request::post("/api/v2/sendBocAndWaitTransaction")
+    Request::post("/api/sendAndWaitTransaction")
         .header("content-type", "application/json")
         .body(Body::from(body.to_string()))
         .unwrap()
@@ -335,7 +335,7 @@ async fn cancellation_and_capacity_limits_do_not_block_send_boc() -> anyhow::Res
         router
             .clone()
             .oneshot(
-                Request::post("/api/v2/sendBoc")
+                Request::post("/api/send")
                     .header("content-type", "application/json")
                     .body(Body::from(
                         json!({"boc": Boc::encode_base64(message())}).to_string(),
@@ -394,7 +394,7 @@ async fn wait_route_rejects_invalid_inputs_before_broadcast() -> anyhow::Result<
     ] {
         outcomes.push(response(app.clone().oneshot(request(body)).await?).await);
     }
-    let oversized = Request::post("/api/v2/sendBocAndWaitTransaction")
+    let oversized = Request::post("/api/sendAndWaitTransaction")
         .header("content-type", "application/json")
         .body(Body::from(" ".repeat(96 * 1024 + 1)))?;
     outcomes.push(response(app.oneshot(oversized).await?).await);

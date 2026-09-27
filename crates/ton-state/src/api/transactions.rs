@@ -30,8 +30,8 @@ use super::{Api, ApiError};
 /// page. Message bodies are returned as raw `BoCs` without comment decoding
 #[utoipa::path(
     get,
-    path = "/api/v2/getTransactions",
-    operation_id = "getTransactions",
+    path = "/api/transactions",
+    operation_id = "transactions",
     params(
         ("address" = String, Query, description = "Raw or user-friendly account address", example = "-1:3333333333333333333333333333333333333333333333333333333333333333"),
         ("limit" = Option<u32>, Query, minimum = 1, maximum = 100, description = "Maximum number of transactions; defaults to 10"),
@@ -59,7 +59,7 @@ pub(super) async fn get_transactions(
     };
     let index = api.history.clone();
 
-    super::read(api, "getTransactions", move |snapshot, _| {
+    super::read(api, "transactions", move |snapshot, _| {
         let account = snapshot.get_account(&query.address)?;
         let latest = account.account.map_or((0, HashBytes::ZERO), |account| {
             (account.last_trans_lt, account.last_trans_hash)

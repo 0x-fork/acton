@@ -40,14 +40,10 @@ pub(crate) fn router(
     history: Arc<BlockIndex>,
 ) -> Router {
     Router::new()
-        .route("/api/v2/getMasterchainInfo", get(masterchain_info))
-        .route("/api/v2/getAddressInformation", get(address_information))
-        .route("/api/v2/getAddressBalance", get(address_balance))
-        .route("/api/v2/runGetMethod", post(get_method::run_get_method))
-        .route(
-            "/api/v2/getTransactions",
-            get(transactions::get_transactions),
-        )
+        .route("/api/masterchainInfo", get(masterchain_info))
+        .route("/api/address", get(address_information))
+        .route("/api/runGetMethod", post(get_method::run_get_method))
+        .route("/api/transactions", get(transactions::get_transactions))
         .fallback(|| async { ApiError::new(StatusCode::NOT_FOUND, "unknown API method") })
         .with_state(Api {
             state,
@@ -64,15 +60,15 @@ pub(crate) fn router(
 /// Read the last fully applied masterchain checkpoint and network zerostate
 #[utoipa::path(
     get,
-    path = "/api/v2/getMasterchainInfo",
-    operation_id = "getMasterchainInfo",
+    path = "/api/masterchainInfo",
+    operation_id = "masterchainInfo",
     responses(
         (status = 200, description = "Applied checkpoint", body = v2::TonlibResponse<wire::MasterchainInfo>),
         (status = 500, description = "State read failed", body = v2::TonlibErrorResponse),
     ),
 )]
 async fn masterchain_info(State(api): State<Api>) -> Response {
-    read(api, "getMasterchainInfo", |store, zero_state| {
+    read(api, "masterchainInfo", |store, zero_state| {
         let state = store.masterchain_state()?;
 
         Ok(wire::MasterchainInfo {
@@ -91,8 +87,8 @@ async fn masterchain_info(State(api): State<Api>) -> Response {
 /// and code/data as base64 `BoCs`. The suspended field is currently always false
 #[utoipa::path(
     get,
-    path = "/api/v2/getAddressInformation",
-    operation_id = "getAddressInformation",
+    path = "/api/address",
+    operation_id = "address",
     params(
         ("address" = String, Query, description = "Raw or user-friendly account address", example = "-1:3333333333333333333333333333333333333333333333333333333333333333"),
         ("seqno" = Option<u32>, Query, description = "Must equal the current applied checkpoint; omit for the latest applied state", maximum = 2147483647),
@@ -108,42 +104,6 @@ async fn address_information(
     State(api): State<Api>,
     query: Result<Query<AddressInformationRequest>, QueryRejection>,
 ) -> Response {
-    account_request(api, query, "getAddressInformation", |info| info).await
-}
-
-/// Account balance
-///
-/// Read the native coin balance as a decimal string in nanograms
-///
-/// 1 GRAM = 1,000,000,000 nanograms
-#[utoipa::path(
-    get,
-    path = "/api/v2/getAddressBalance",
-    operation_id = "getAddressBalance",
-    params(
-        ("address" = String, Query, description = "Raw or user-friendly account address", example = "-1:3333333333333333333333333333333333333333333333333333333333333333"),
-        ("seqno" = Option<u32>, Query, description = "Must equal the current applied checkpoint; omit for the latest applied state", maximum = 2147483647),
-    ),
-    responses(
-        (status = 200, description = "Balance in nanograms", body = v2::TonlibResponse<String>),
-        (status = 400, description = "Invalid address or query", body = v2::TonlibErrorResponse),
-        (status = 409, description = "Requested checkpoint is unavailable", body = v2::TonlibErrorResponse),
-        (status = 500, description = "State read failed", body = v2::TonlibErrorResponse),
-    ),
-)]
-async fn address_balance(
-    State(api): State<Api>,
-    query: Result<Query<AddressInformationRequest>, QueryRejection>,
-) -> Response {
-    account_request(api, query, "getAddressBalance", |info| info.balance).await
-}
-
-async fn account_request<T: Serialize + Send + 'static>(
-    api: Api,
-    query: Result<Query<AddressInformationRequest>, QueryRejection>,
-    method: &'static str,
-    map: impl FnOnce(wire::AddressInformation) -> T + Send + 'static,
-) -> Response {
     let Ok(Query(query)) = query else {
         return ApiError::new(StatusCode::BAD_REQUEST, "invalid query parameters").into_response();
     };
@@ -151,7 +111,7 @@ async fn account_request<T: Serialize + Send + 'static>(
         return ApiError::new(StatusCode::BAD_REQUEST, "invalid account address").into_response();
     };
 
-    read(api, method, move |store, _| {
+    read(api, "address", move |store, _| {
         if let Some(seqno) = query.seqno {
             let seqno = match seqno {
                 v2::Int32Input::Number(value) => Some(value),
@@ -170,7 +130,7 @@ async fn account_request<T: Serialize + Send + 'static>(
         }
 
         let snapshot = store.get_account(&address)?;
-        Ok(map(account_info(snapshot)?))
+        account_info(snapshot)
     })
     .await
 }

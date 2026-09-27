@@ -254,7 +254,7 @@ async fn subscribe_to(hub: &Subscriptions, body: Value) -> Result<Response> {
         .clone()
         .router()
         .oneshot(
-            Request::post("/api/streaming/v2/sse")
+            Request::post("/api/streaming/sse")
                 .header("content-type", "application/json")
                 .body(Body::from(body.to_string()))?,
         )
@@ -383,7 +383,7 @@ async fn rejects_unsupported_subscriptions() -> Result<()> {
         .clone()
         .router()
         .oneshot(
-            Request::post("/api/streaming/v2/sse")
+            Request::post("/api/streaming/sse")
                 .header("content-type", "application/json")
                 .header("last-event-id", "42")
                 .body(Body::from(json!({"addresses": [address]}).to_string()))?,

@@ -26,11 +26,11 @@ All notable changes to this project will be documented in this file.
   redundant snapshot lookups. Immutable read snapshots retain a complete committed
   frontier while the writer applies subsequent blocks.
 - Add `ton-state` to synchronize a validator snapshot through P2P and serve
-  `getMasterchainInfo`, `getAddressInformation`, and `getAddressBalance` over
-  TON Center API v2 HTTP routes from the last applied state, plus finalized
-  transaction subscriptions over SSE with address filters and TON Center v3 fields.
+  `/api/masterchainInfo` and `/api/address` from the last applied state with
+  TON Center v2 response formats, plus finalized transaction subscriptions at
+  `/api/streaming/sse` with address filters and TON Center v3 fields.
   SSE subscriptions also support account state updates in the
-  `getAddressInformation` format, once per changed account and committed checkpoint.
+  `/api/address` format, once per changed account and committed checkpoint.
   Each subscription receives code and data on its first account event and then
   only when those fields change; all other state fields remain complete.
   Subscriptions can set `include_code_data: false` to omit both BoCs entirely.
@@ -48,20 +48,20 @@ All notable changes to this project will be documented in this file.
   reads across checkpoints. State updates reuse decoded blocks, and
   commit logs expose application, cell encoding, and durable write timings.
   Shard updates load independent Merkle branches in a bounded worker pool.
-  `sendBoc` accepts external-message BoCs and broadcasts them directly through
+  `/api/send` accepts external-message BoCs and broadcasts them directly through
   P2P, including FEC transport for larger messages. Submission does not confirm
   execution or inclusion in a block.
-  `sendBocAndWaitTransaction` submits an external message and waits for its
+  `/api/sendAndWaitTransaction` submits an external message and waits for its
   transaction in a committed block, with a bounded timeout, normalized message
   matching, and the transaction and block coordinates in the response.
-  `sendBocAndWaitTrace` waits until every internal message in the submitted
+  `/api/sendAndWaitTrace` waits until every internal message in the submitted
   message's trace is consumed and returns the root transaction hash, with a
   two-minute default timeout and a configurable limit of up to ten minutes.
   `/docs` provides an interactive Scalar page for all supported HTTP methods,
   with a generated utoipa specification at `/openapi.json`.
-  `getTransactions` reads account history from cached blocks through a persistent
+  `/api/transactions` reads account history from cached blocks through a persistent
   block logical-time index, with `address`, `limit`, and `lt`/`hash` pagination.
-  `runGetMethod` executes get methods locally with TON Center v2 requests and
+  `/api/runGetMethod` executes get methods locally with TON Center v2 requests and
   results, using account state, network configuration, previous blocks, and
   libraries from one committed checkpoint, with bounded gas and concurrency.
 

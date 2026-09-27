@@ -71,7 +71,7 @@ async fn reference_serves_only_supported_operations() {
         "status": status,
         "servers": document["servers"],
         "methods": methods,
-        "stream_content_types": document["paths"]["/api/streaming/v2/sse"]["post"]
+        "stream_content_types": document["paths"]["/api/streaming/sse"]["post"]
             ["responses"]["200"]["content"].as_object().unwrap().keys().collect::<Vec<_>>(),
         "stream_state_required": document["components"]["schemas"]["AccountStateEvent"]
             ["properties"]["account_state"]["required"],
@@ -94,15 +94,14 @@ async fn reference_serves_only_supported_operations() {
     expect![[r#"
         {
           "methods": [
-            "POST /api/streaming/v2/sse",
-            "GET /api/v2/getAddressBalance",
-            "GET /api/v2/getAddressInformation",
-            "GET /api/v2/getMasterchainInfo",
-            "GET /api/v2/getTransactions",
-            "POST /api/v2/runGetMethod",
-            "POST /api/v2/sendBoc",
-            "POST /api/v2/sendBocAndWaitTrace",
-            "POST /api/v2/sendBocAndWaitTransaction"
+            "GET /api/address",
+            "GET /api/masterchainInfo",
+            "POST /api/runGetMethod",
+            "POST /api/send",
+            "POST /api/sendAndWaitTrace",
+            "POST /api/sendAndWaitTransaction",
+            "POST /api/streaming/sse",
+            "GET /api/transactions"
           ],
           "page": [
             "200",

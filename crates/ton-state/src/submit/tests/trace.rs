@@ -4,7 +4,7 @@ use tycho_types::num::Uint15;
 use super::*;
 
 fn trace_request(boc: &str, timeout_ms: u64) -> Request<Body> {
-    Request::post("/api/v2/sendBocAndWaitTrace")
+    Request::post("/api/sendAndWaitTrace")
         .header("content-type", "application/json")
         .body(Body::from(
             json!({"boc": boc, "timeout_ms": timeout_ms}).to_string(),
@@ -259,7 +259,7 @@ async fn trace_timeout_defaults_to_two_minutes_and_accepts_up_to_ten_minutes() -
     )
     .router();
     let boc = Boc::encode_base64(message());
-    let default_request = Request::post("/api/v2/sendBocAndWaitTrace")
+    let default_request = Request::post("/api/sendAndWaitTrace")
         .header("content-type", "application/json")
         .body(Body::from(json!({"boc": boc}).to_string()))?;
     let mut task = tokio::spawn(app.clone().oneshot(default_request));
