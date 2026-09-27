@@ -1,6 +1,7 @@
 #[cfg(test)]
 pub(crate) mod tests;
 
+mod storage;
 mod transaction;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -20,12 +21,16 @@ use axum::{Json, Router};
 use futures::stream;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, watch};
+use tolk_source_map::abi::ContractABI;
 use ton_indexer_core::Batch;
-use ton_node_db::AccountSnapshot;
+use ton_node_db::{AccountSnapshot, StateSnapshot};
 use tracing::{debug, warn};
-use tycho_types::cell::HashBytes;
+use tycho_types::boc::Boc;
+use tycho_types::cell::{Cell, HashBytes};
 use tycho_types::models::{AccountState, StdAddr, StdAddrFormat};
+
+use self::storage::StorageWatch;
 
 const MAX_SUBSCRIBERS: usize = 64;
 const MAX_ADDRESSES: usize = 100;
@@ -36,14 +41,16 @@ const OPEN: u8 = 0;
 const LAGGED: u8 = 1;
 const FAILED: u8 = 2;
 const CLOSED: u8 = 3;
+const STORAGE_FAILED: u8 = 4;
 
 /// Live subscriptions to batches committed by the P2P state synchronizer.
-/// No cells or transaction history survive publication. Each connection owns a
-/// bounded queue; overflow terminates that subscription with an explicit gap.
+/// Only ABI schemas and field fingerprints survive storage publication. Each
+/// connection owns a bounded queue; overflow terminates it with an explicit gap.
 #[derive(Clone)]
 pub(crate) struct Subscriptions {
     subscribers: Arc<Mutex<Vec<Subscriber>>>,
     connections: Arc<Semaphore>,
+    state: Option<watch::Receiver<StateSnapshot>>,
 }
 
 struct Subscriber {
@@ -54,6 +61,7 @@ struct Subscriber {
     budget: Arc<Semaphore>,
     terminal: Arc<AtomicU8>,
     code_data: HashMap<String, CodeDataHashes>,
+    storage: Option<StorageWatch>,
 }
 
 /// Cell identities, not retained contract payloads. A baseline advances only
@@ -82,6 +90,7 @@ impl Default for Subscriptions {
         Self {
             subscribers: Arc::default(),
             connections: Arc::new(Semaphore::new(MAX_SUBSCRIBERS)),
+            state: None,
         }
     }
 }
@@ -109,6 +118,16 @@ struct Subscription {
     #[serde(default)]
     #[schema(default = true, example = false)]
     include_code_data: Option<bool>,
+    /// Tolk ABI with a storage type; required only for `storage_fields` subscriptions.
+    /// One ABI applies to all subscribed addresses, at most 16 for this event type
+    #[serde(default)]
+    #[schema(value_type = Option<Object>)]
+    abi: Option<ContractABI>,
+    /// Selected storage paths, for example seqno or settings.owner. Typed cells
+    /// are transparent. Required with `storage_fields`; 1–64 unique paths
+    #[serde(default)]
+    #[schema(min_items = 1, max_items = 64, example = json!(["seqno", "settings.owner"]))]
+    fields: Option<Vec<String>>,
 }
 
 #[derive(Clone, Copy, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
@@ -116,6 +135,7 @@ struct Subscription {
 enum SubscriptionType {
     Transactions,
     AccountStates,
+    StorageFields,
 }
 
 #[derive(Serialize)]
@@ -146,6 +166,26 @@ pub(crate) struct AccountStateEvent {
     account_state: serde_json::Map<String, serde_json::Value>,
 }
 
+/// A complete storage `BoC` gated by the selected ABI fields. Initial snapshots
+/// have no changed fields. An empty data string means the account has no storage.
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct StorageUpdateEvent<'a> {
+    #[serde(rename = "type")]
+    #[schema(example = "storage_update")]
+    kind: &'static str,
+    #[schema(example = "finalized")]
+    finality: &'static str,
+    address: &'a str,
+    /// Masterchain checkpoint of the complete committed state
+    mc_seqno: u32,
+    /// Full original storage `BoC` in base64, or an empty string when absent
+    data: String,
+    /// True only for the first snapshot of this account on this connection
+    initial: bool,
+    /// Changed subscribed paths, in request order; empty for an initial snapshot
+    changed_fields: Vec<String>,
+}
+
 // Keep the HTTP field types and nested schemas, changing only presence rules.
 fn account_state_schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
     let mut schema =
@@ -160,6 +200,45 @@ fn account_state_schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Sch
 }
 
 impl Subscriptions {
+    /// Initial storage snapshots are pinned while registration holds the same
+    /// lock as publication. State synchronization can continue independently.
+    pub(crate) fn new(state: watch::Receiver<StateSnapshot>) -> Self {
+        Self {
+            state: Some(state),
+            ..Self::default()
+        }
+    }
+
+    fn register(
+        &self,
+        mut subscriber: Subscriber,
+        mut read_account: impl FnMut(&StdAddr) -> Result<AccountSnapshot>,
+    ) -> Result<()> {
+        let mut subscribers = self.subscribers.lock().expect("subscription lock poisoned");
+        subscribers.retain(|subscriber| !subscriber.sender.is_closed());
+        ensure!(!self.connections.is_closed(), "shutting_down");
+        if subscriber.storage.is_some() {
+            let mut addresses = subscriber.addresses.iter().cloned().collect::<Vec<_>>();
+            addresses.sort();
+            for address in addresses {
+                let snapshot = read_account(&address.parse()?)?;
+                let data = account_data(&snapshot)?;
+                subscriber.send_storage(
+                    &address,
+                    snapshot.masterchain_block.seqno,
+                    data.as_ref(),
+                )?;
+                ensure!(
+                    subscriber.terminal.load(Ordering::Acquire) == OPEN,
+                    "initial storage snapshots exceed queue capacity"
+                );
+            }
+        }
+        subscribers.push(subscriber);
+        drop(subscribers);
+        Ok(())
+    }
+
     /// Serves live account and transaction events. The event envelope is local;
     /// it does not claim TON Center's trace-grouped streaming semantics.
     pub(crate) fn router(self) -> Router {
@@ -210,7 +289,8 @@ impl Subscriptions {
                     };
                     (
                         interested(SubscriptionType::Transactions),
-                        interested(SubscriptionType::AccountStates),
+                        interested(SubscriptionType::AccountStates)
+                            || interested(SubscriptionType::StorageFields),
                     )
                 };
                 if states {
@@ -254,7 +334,8 @@ impl Subscriptions {
                 .any(|subscriber| {
                     !subscriber.sender.is_closed()
                         && subscriber.addresses.contains(&address)
-                        && subscriber.types.contains(&SubscriptionType::AccountStates)
+                        && (subscriber.types.contains(&SubscriptionType::AccountStates)
+                            || subscriber.storage.is_some())
                 })
             {
                 continue;
@@ -266,6 +347,20 @@ impl Subscriptions {
                 snapshot.masterchain_block == batch.checkpoint().try_into()?,
                 "streaming account {address} belongs to a different checkpoint"
             );
+            let data = account_data(&snapshot)?;
+            self.send_storage(&address, snapshot.masterchain_block.seqno, data.as_ref());
+            let account_states = self
+                .subscribers
+                .lock()
+                .expect("subscription lock poisoned")
+                .iter()
+                .any(|subscriber| {
+                    subscriber.addresses.contains(&address)
+                        && subscriber.types.contains(&SubscriptionType::AccountStates)
+                });
+            if !account_states {
+                continue;
+            }
             let mut hashes = CodeDataHashes::default();
             if let Some(shard_account) = &snapshot.account
                 && let Some(account) = shard_account.load_account()?
@@ -296,6 +391,30 @@ impl Subscriptions {
             "published committed account events",
         );
         Ok(())
+    }
+
+    fn send_storage(&self, address: &str, seqno: u32, data: Option<&Cell>) {
+        let mut subscribers = self.subscribers.lock().expect("subscription lock poisoned");
+        for subscriber in &mut *subscribers {
+            if subscriber.sender.is_closed() || !subscriber.addresses.contains(address) {
+                continue;
+            }
+            let started = Instant::now();
+            if let Err(error) = subscriber.send_storage(address, seqno, data) {
+                warn!(operation = "storage_stream", target = address, mc_seqno = seqno,
+                    duration_ms = started.elapsed().as_millis(), outcome = "decode_failed",
+                    error = %format!("{error:#}"), "ending storage subscription");
+                let encoded = json!({"type": "error", "error": "storage_decode_failed",
+                    "address": address, "mc_seqno": seqno})
+                .to_string();
+                if subscriber.enqueue(encoded.into()) {
+                    subscriber.terminal.store(STORAGE_FAILED, Ordering::Release);
+                }
+            }
+        }
+        subscribers.retain(|subscriber| {
+            !subscriber.sender.is_closed() && subscriber.terminal.load(Ordering::Acquire) == OPEN
+        });
     }
 
     fn send_account_state(
@@ -402,6 +521,31 @@ impl Subscriptions {
 }
 
 impl Subscriber {
+    fn send_storage(&mut self, address: &str, seqno: u32, data: Option<&Cell>) -> Result<()> {
+        let Some(storage) = &mut self.storage else {
+            return Ok(());
+        };
+        let Some((initial, changed_fields)) = storage.update(address, seqno, data)? else {
+            return Ok(());
+        };
+        let event = StorageUpdateEvent {
+            kind: "storage_update",
+            finality: "finalized",
+            address,
+            mc_seqno: seqno,
+            data: data.map(Boc::encode_base64).unwrap_or_default(),
+            initial,
+            changed_fields,
+        };
+        let encoded = serde_json::to_string(&event)?;
+        ensure!(
+            encoded.len() <= MAX_EVENT_BYTES,
+            "stream event exceeds 1 MiB"
+        );
+        self.enqueue(encoded.into());
+        Ok(())
+    }
+
     fn enqueue(&self, encoded: Arc<str>) -> bool {
         let Ok(bytes) = self
             .budget
@@ -426,7 +570,7 @@ impl Subscriber {
     }
 }
 
-/// Finalized transactions and account states
+/// Finalized transactions, account states and storage fields
 ///
 /// Subscribe to finalized updates for 1–100 accounts. The first data event
 /// is `{"status":"subscribed"}`. Later events contain `type=transaction`,
@@ -437,11 +581,22 @@ impl Subscriber {
 /// Missing code/data mean unchanged; empty strings mean cleared. Every other
 /// field is always present. Reconnecting resets these per-account baselines
 /// Set `include_code_data: false` to omit both fields from every account event,
-/// including the first. The default is true; transaction events are unaffected
+/// including the first. The default is true; transaction and storage events
+/// are unaffected
 ///
-/// Select `transactions`, `account_states` or both in `types`. Account states are
-/// emitted once per changed account after the complete batch commits, following
-/// its transaction events. No initial state is sent; read it through the HTTP API
+/// Select `transactions`, `account_states`, `storage_fields` or a combination in `types`.
+/// Account states are emitted once per account after the complete batch commits, following
+/// its transaction events. Account state events have no initial snapshot
+///
+/// For `storage_fields`, provide a Tolk `abi` and 1–64 unique `fields` paths.
+/// At most 16 addresses can share one ABI. Each receives an initial
+/// `storage_update` with `initial: true` and empty `changed_fields`. Later events
+/// contain the complete base64 `data` `BoC`, `mc_seqno`, `initial: false`, and only
+/// changed subscribed paths. Empty data means absent storage. Nested structs and
+/// typed cells are supported; dictionary-key paths and recursive schemas are not.
+/// Changes that revert within one batch do not produce an event. ABI mismatch
+/// ends only that connection with `storage_decode_failed`. Custom serializers
+/// are unsupported. `include_code_data` does not affect storage events
 ///
 /// Keepalive comments arrive after 15 seconds without an event. Delivery is live
 /// only: no replay or Last-Event-ID support. Slow consumers receive an error
@@ -461,6 +616,35 @@ async fn subscribe(
     State(subscriptions): State<Subscriptions>,
     headers: HeaderMap,
     body: Result<Json<Subscription>, JsonRejection>,
+) -> Response {
+    let state = subscriptions.state.clone();
+    let mut snapshot = None;
+    open_subscription(subscriptions, headers, body, move |address| {
+        // This reader is first called under register's publication lock.
+        if snapshot.is_none() {
+            snapshot = Some(
+                state
+                    .as_ref()
+                    .context("state snapshots unavailable")?
+                    .borrow()
+                    .clone(),
+            );
+        }
+        snapshot
+            .as_ref()
+            .expect("snapshot pinned")
+            .get_account(address)
+    })
+    .await
+}
+
+/// Registration invokes the reader synchronously under the publication lock.
+/// It must pin one checkpoint on its first call and use it for every account.
+async fn open_subscription(
+    subscriptions: Subscriptions,
+    headers: HeaderMap,
+    body: Result<Json<Subscription>, JsonRejection>,
+    read_account: impl FnMut(&StdAddr) -> Result<AccountSnapshot> + Send + 'static,
 ) -> Response {
     let Ok(Json(body)) = body else {
         return reject(StatusCode::BAD_REQUEST, "invalid_subscription");
@@ -496,74 +680,128 @@ async fn subscribe(
         return reject(StatusCode::BAD_REQUEST, "invalid_address");
     };
 
+    let storage = if types.contains(&SubscriptionType::StorageFields) {
+        if addresses.len() > 16 {
+            return reject(
+                StatusCode::BAD_REQUEST,
+                "storage_fields_accepts_at_most_16_addresses",
+            );
+        }
+        let (Some(abi), Some(fields)) = (body.abi, body.fields) else {
+            return reject(
+                StatusCode::BAD_REQUEST,
+                "storage_fields_requires_abi_and_fields",
+            );
+        };
+        match StorageWatch::new(abi, fields) {
+            Ok(storage) => Some(storage),
+            Err(error) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({
+                        "error": "invalid_storage_subscription", "message": format!("{error:#}"),
+                    })),
+                )
+                    .into_response();
+            }
+        }
+    } else {
+        if body.abi.is_some() || body.fields.is_some() {
+            return reject(
+                StatusCode::BAD_REQUEST,
+                "abi_and_fields_require_storage_fields",
+            );
+        }
+        None
+    };
+
     let (sender, receiver) = mpsc::channel(QUEUE_EVENTS);
     let terminal = Arc::new(AtomicU8::new(OPEN));
     let Ok(slot) = subscriptions.connections.clone().try_acquire_owned() else {
         return reject(StatusCode::SERVICE_UNAVAILABLE, "too_many_subscribers");
     };
-    {
-        let mut subscribers = subscriptions
-            .subscribers
-            .lock()
-            .expect("subscription lock poisoned");
-        subscribers.retain(|subscriber| !subscriber.sender.is_closed());
-        if subscriptions.connections.is_closed() {
+    let subscriber = Subscriber {
+        addresses,
+        types,
+        include_code_data: body.include_code_data.unwrap_or(true),
+        sender,
+        budget: Arc::new(Semaphore::new(QUEUE_BYTES)),
+        terminal: Arc::clone(&terminal),
+        code_data: HashMap::new(),
+        storage,
+    };
+    let connections = Arc::clone(&subscriptions.connections);
+    let started = Instant::now();
+    let registered =
+        tokio::task::spawn_blocking(move || subscriptions.register(subscriber, read_account)).await;
+    match registered {
+        Ok(Ok(())) => {
+            debug!(
+                operation = "state_subscription",
+                target = "sse",
+                duration_ms = started.elapsed().as_millis(),
+                outcome = "subscribed",
+                "registered live subscription"
+            );
+        }
+        Ok(Err(_)) if connections.is_closed() => {
             return reject(StatusCode::SERVICE_UNAVAILABLE, "shutting_down");
         }
-        subscribers.push(Subscriber {
-            addresses,
-            types,
-            include_code_data: body.include_code_data.unwrap_or(true),
-            sender,
-            budget: Arc::new(Semaphore::new(QUEUE_BYTES)),
-            terminal: Arc::clone(&terminal),
-            code_data: HashMap::new(),
-        });
+        Ok(Err(error)) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "storage_initialization_failed", "message": format!("{error:#}"),
+                })),
+            )
+                .into_response();
+        }
+        Err(_) => return reject(StatusCode::INTERNAL_SERVER_ERROR, "subscription_failed"),
     }
+    response(Connection {
+        receiver,
+        terminal,
+        _slot: slot,
+        first: true,
+        done: false,
+    })
+}
 
-    let events = stream::unfold(
-        Connection {
-            receiver,
-            terminal,
-            _slot: slot,
-            first: true,
-            done: false,
-        },
-        |mut connection| async move {
-            if connection.done {
+fn response(connection: Connection) -> Response {
+    let events = stream::unfold(connection, |mut connection| async move {
+        if connection.done {
+            return None;
+        }
+        let event = if connection.first {
+            connection.first = false;
+            Event::default().data(r#"{"status":"subscribed"}"#)
+        } else {
+            let next = connection.receiver.recv().await;
+            let reason = connection.terminal.load(Ordering::Acquire);
+            if reason == CLOSED {
                 return None;
             }
-            let event = if connection.first {
-                connection.first = false;
-                Event::default().data(r#"{"status":"subscribed"}"#)
-            } else {
-                let next = connection.receiver.recv().await;
-                let reason = connection.terminal.load(Ordering::Acquire);
-                if reason == CLOSED {
-                    return None;
-                }
-                if reason == LAGGED || reason == FAILED {
-                    let error = if reason == LAGGED {
-                        "slow_consumer"
-                    } else {
-                        "stream_failed"
-                    };
-                    warn!(
-                        operation = "state_subscription",
-                        target = "sse",
-                        outcome = error,
-                        "ending subscription with a gap"
-                    );
-                    let event =
-                        Event::default().data(json!({"type": "error", "error": error}).to_string());
-                    connection.done = true;
-                    return Some((Ok::<_, Infallible>(event), connection));
-                }
-                Event::default().data(&*next?.json)
-            };
-            Some((Ok::<_, Infallible>(event), connection))
-        },
-    );
+            if reason == LAGGED || reason == FAILED {
+                let error = if reason == LAGGED {
+                    "slow_consumer"
+                } else {
+                    "stream_failed"
+                };
+                warn!(
+                    operation = "state_subscription",
+                    target = "sse",
+                    outcome = error,
+                    "ending subscription with a gap"
+                );
+                let event =
+                    Event::default().data(json!({"type": "error", "error": error}).to_string());
+                connection.done = true;
+                return Some((Ok::<_, Infallible>(event), connection));
+            }
+            Event::default().data(&*next?.json)
+        };
+        Some((Ok::<_, Infallible>(event), connection))
+    });
 
     (
         [("cache-control", "no-cache"), ("x-accel-buffering", "no")],
@@ -574,6 +812,16 @@ async fn subscribe(
         ),
     )
         .into_response()
+}
+
+fn account_data(snapshot: &AccountSnapshot) -> Result<Option<Cell>> {
+    if let Some(shard_account) = &snapshot.account
+        && let Some(account) = shard_account.load_account()?
+        && let AccountState::Active(state) = account.state
+    {
+        return Ok(state.data);
+    }
+    Ok(None)
 }
 
 fn reject(status: StatusCode, error: &'static str) -> Response {

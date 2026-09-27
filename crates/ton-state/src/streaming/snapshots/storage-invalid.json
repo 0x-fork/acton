@@ -1,0 +1,82 @@
+[
+  {
+    "body": {
+      "error": "invalid_storage_subscription",
+      "message": "expected 1 to 64 fields"
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "error": "invalid_storage_subscription",
+      "message": "unknown storage field"
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "error": "invalid_storage_subscription",
+      "message": "duplicate field path"
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "error": "invalid_storage_subscription",
+      "message": "empty field path component"
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "error": "invalid_storage_subscription",
+      "message": "field paths must traverse structs"
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "error": "storage_fields_requires_abi_and_fields"
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "error": "abi_and_fields_require_storage_fields"
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "error": "invalid_storage_subscription",
+      "message": "ABI has no storage type"
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "error": "invalid_storage_subscription",
+      "message": "custom storage serializers are unsupported"
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "error": "invalid_storage_subscription",
+      "message": "recursive storage schemas are unsupported"
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "error": "invalid_storage_subscription",
+      "message": "missing ABI type"
+    },
+    "status": 400
+  },
+  {
+    "active_subscribers": 0,
+    "available_slots": 64,
+    "malformed_data_status": 400
+  }
+]

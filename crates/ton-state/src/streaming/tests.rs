@@ -1,4 +1,5 @@
 mod accounts;
+mod storage;
 
 use anyhow::{Context, Result};
 use axum::body::Body;

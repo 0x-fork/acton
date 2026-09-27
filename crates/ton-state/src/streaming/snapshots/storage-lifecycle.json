@@ -1,0 +1,53 @@
+[
+  {
+    "address": "0:0202020202020202020202020202020202020202020202020202020202020202",
+    "changed_fields": [],
+    "data": "",
+    "finality": "finalized",
+    "initial": true,
+    "mc_seqno": 42,
+    "type": "storage_update"
+  },
+  {
+    "address": "0:0202020202020202020202020202020202020202020202020202020202020202",
+    "changed_fields": [
+      "seqno",
+      "settings.enabled",
+      "ledger",
+      "maybe.enabled"
+    ],
+    "data": "te6ccgEBAwEAGwACEQAAAAAAAAAAoAIBABKgAAAABwAAAAAAAUA=",
+    "finality": "finalized",
+    "initial": false,
+    "mc_seqno": 43,
+    "type": "storage_update"
+  },
+  {
+    "address": "0:0202020202020202020202020202020202020202020202020202020202020202",
+    "changed_fields": [
+      "seqno",
+      "settings.enabled",
+      "ledger",
+      "maybe.enabled"
+    ],
+    "data": "",
+    "finality": "finalized",
+    "initial": false,
+    "mc_seqno": 44,
+    "type": "storage_update"
+  },
+  {
+    "address": "0:0202020202020202020202020202020202020202020202020202020202020202",
+    "changed_fields": [
+      "seqno",
+      "settings.enabled",
+      "ledger",
+      "maybe.enabled"
+    ],
+    "data": "te6ccgEBAwEAGwACEQAAAAAAAAAAoAIBABKgAAAABwAAAAAAAUA=",
+    "finality": "finalized",
+    "initial": false,
+    "mc_seqno": 45,
+    "type": "storage_update"
+  }
+]

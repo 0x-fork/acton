@@ -1,0 +1,27 @@
+{
+  "address": "0:6e3eecb46e7a3003672e9032b0fff6155f4e02b14a57a6ba73337f428053d399",
+  "initial": {
+    "address": "0:6e3eecb46e7a3003672e9032b0fff6155f4e02b14a57a6ba73337f428053d399",
+    "changed_fields": [],
+    "data": "te6ccgEBAQEAKwAAUYAAABO///+I31AzTjEOSH6cYtaboLtJ2kigpT8XMXqq3ihGuziCLnsg",
+    "finality": "finalized",
+    "initial": true,
+    "mc_seqno": 95368297,
+    "type": "storage_update"
+  },
+  "no_extra_events": true,
+  "original_boc_preserved": true,
+  "seqno_after": 40,
+  "seqno_before": 39,
+  "update": {
+    "address": "0:6e3eecb46e7a3003672e9032b0fff6155f4e02b14a57a6ba73337f428053d399",
+    "changed_fields": [
+      "seqno"
+    ],
+    "data": "te6ccgEBAQEAKwAAUYAAABQ///+I31AzTjEOSH6cYtaboLtJ2kigpT8XMXqq3ihGuziCLnsg",
+    "finality": "finalized",
+    "initial": false,
+    "mc_seqno": 95368298,
+    "type": "storage_update"
+  }
+}

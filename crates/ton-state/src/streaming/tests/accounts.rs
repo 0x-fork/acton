@@ -3,7 +3,7 @@ use tycho_types::models::{Account, AccountState, OptionalAccount, ShardAccount};
 
 use super::*;
 
-fn snapshot(
+pub(super) fn snapshot(
     batch: &Batch,
     address: &StdAddr,
     state: Option<AccountState>,
@@ -48,7 +48,7 @@ fn snapshot(
     })
 }
 
-async fn event(body: &mut Body) -> Result<Value> {
+pub(super) async fn event(body: &mut Body) -> Result<Value> {
     let text = frame(body).await?;
     Ok(serde_json::from_str(
         text.trim()

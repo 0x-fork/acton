@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Storage updates</title>
+    <link rel="icon" href="data:," />
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: #fff;
+        color: #171717;
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      }
+      main { max-width: 1280px; margin: 0 auto; padding: 56px 48px; }
+      header { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
+      h1 { margin: 0; font-size: 20px; font-weight: 500; letter-spacing: -0.025em; }
+      a { color: #707070; font-size: 14px; text-underline-offset: 4px; }
+      label { display: block; font-size: 14px; margin-bottom: 10px; }
+      input, textarea {
+        display: block;
+        width: 100%;
+        padding: 12px 0;
+        border: 0;
+        border-bottom: 1px solid #ddd;
+        border-radius: 0;
+        background: #fff;
+        color: inherit;
+        font: 14px/1.6 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+      input:focus, textarea:focus { outline: none; border-color: #171717; }
+      input::placeholder, textarea::placeholder { color: #999; }
+      #address { padding: 8px 0 20px; font: inherit; font-size: clamp(24px, 3.5vw, 40px); letter-spacing: -0.035em; }
+      .configuration { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 40px; margin-top: 28px; }
+      textarea { height: 188px; resize: vertical; min-height: 100px; }
+      #fields { padding-top: 0; }
+      .hint { color: #707070; font-size: 13px; line-height: 1.6; margin: 10px 0 0; }
+      .actions { display: flex; align-items: center; gap: 24px; margin-top: 24px; }
+      button {
+        background: transparent;
+        color: inherit;
+        border: 0;
+        border-bottom: 1px solid currentColor;
+        border-radius: 0;
+        padding: 6px 0;
+        font: inherit;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button:disabled { color: #aaa; cursor: default; }
+      button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid #171717; outline-offset: 5px; }
+      #status { color: #707070; min-height: 22px; margin: 32px 0 24px; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+      #status[data-error="true"] { color: #171717; }
+      #empty { color: #999; font-size: 14px; margin: 0; }
+      details { border-top: 1px solid #e6e6e6; padding: 18px 0; }
+      details details { margin-top: 20px; padding-bottom: 0; border: 0; color: #707070; }
+      summary { cursor: pointer; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+      pre { margin: 20px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.75 "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+      @media (max-width: 700px) {
+        main { padding: 32px 20px; }
+        .configuration { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+        textarea { height: 160px; }
+        pre { font-size: 12px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Storage updates</h1>
+        <a id="account-link" href="/account">Account state</a>
+      </header>
+      <form id="form">
+        <input id="address" aria-label="Account address" placeholder="Account address"
+          autocomplete="off" autocapitalize="off" spellcheck="false" required />
+        <div class="configuration">
+          <div>
+            <label for="abi">Tolk ABI · JSON</label>
+            <textarea id="abi" placeholder='{"abi_schema_version": "1.0", …}'
+              autocomplete="off" autocapitalize="off" spellcheck="false" required></textarea>
+          </div>
+          <div>
+            <label for="fields">Fields</label>
+            <input id="fields" placeholder="seqno, settings.owner" autocomplete="off"
+              autocapitalize="off" spellcheck="false" aria-describedby="fields-hint" required />
+            <p class="hint" id="fields-hint">Separate paths with commas</p>
+            <div class="actions">
+              <button id="subscribe" type="submit">Subscribe</button>
+              <button id="stop" type="button" disabled>Stop</button>
+            </div>
+          </div>
+        </div>
+      </form>
+      <p id="status" role="status">Enter an address, ABI and fields to subscribe</p>
+      <p id="empty">Updates will appear here</p>
+      <section id="events" aria-label="Storage updates"></section>
+      <noscript>Enable JavaScript to receive storage updates</noscript>
+    </main>
+    <script type="module">
+      import {decodeStorage} from '/storage-decoder.js'
+
+      const form = document.querySelector('#form')
+      const addressInput = document.querySelector('#address')
+      const abiInput = document.querySelector('#abi')
+      const fieldsInput = document.querySelector('#fields')
+      const subscribeButton = document.querySelector('#subscribe')
+      const stopButton = document.querySelector('#stop')
+      const status = document.querySelector('#status')
+      const events = document.querySelector('#events')
+      const empty = document.querySelector('#empty')
+      const accountLink = document.querySelector('#account-link')
+      const savedKey = 'ton-state-storage-subscription'
+      let current
+      let retainedBytes = 0
+
+      function setStatus(text, error = false) {
+        status.textContent = text
+        status.dataset.error = String(error)
+      }
+
+      function stop(text) {
+        current?.abort()
+        current = undefined
+        subscribeButton.disabled = false
+        stopButton.disabled = true
+        if (text) setStatus(text)
+      }
+
+      function append(event, abi) {
+        const text = JSON.stringify(event, null, 2)
+        let storage
+        let failure
+        if (event.type === 'storage_update') {
+          try {
+            storage = decodeStorage(abi, event.data)
+          } catch (error) {
+            storage = 'Unable to decode storage with this ABI'
+            failure = Object.assign(new Error(`${storage}: ${error.message}`), { permanent: true })
+          }
+        }
+        const bytes = new TextEncoder().encode(text + (storage || '')).length
+        const row = document.createElement('details')
+        const summary = document.createElement('summary')
+        const output = document.createElement('pre')
+        const label = event.type === 'error' ? 'Subscription error'
+          : event.initial ? 'Initial snapshot' : event.changed_fields.join(', ')
+        summary.textContent = Number.isInteger(event.mc_seqno) ? `Block ${event.mc_seqno} · ${label}` : label
+        output.textContent = storage ?? text
+        row.append(summary, output)
+        if (storage !== undefined) {
+          const raw = document.createElement('details')
+          const rawLabel = document.createElement('summary')
+          const rawOutput = document.createElement('pre')
+          rawLabel.textContent = 'Event JSON and BoC'
+          rawOutput.textContent = text
+          raw.append(rawLabel, rawOutput)
+          row.append(raw)
+        }
+        row.dataset.bytes = String(bytes)
+        row.open = true
+        for (const previous of events.children) previous.open = false
+        events.prepend(row)
+        retainedBytes += bytes
+        while (events.children.length > 1 && (events.children.length > 20 || retainedBytes > 2 * 1024 * 1024)) {
+          const oldest = events.lastElementChild
+          retainedBytes -= Number(oldest.dataset.bytes)
+          oldest.remove()
+        }
+        empty.hidden = true
+        if (failure) throw failure
+      }
+
+      async function connect(request, session) {
+        const response = await fetch('/api/streaming/v2/sse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+          body: JSON.stringify(request),
+          signal: session.signal,
+        })
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}))
+          throw Object.assign(new Error(error.message || error.error || `Subscription failed (${response.status})`), {
+            permanent: response.status >= 400 && response.status < 500,
+          })
+        }
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        try {
+          while (!session.signal.aborted) {
+            const { value, done } = await reader.read()
+            if (done) throw new Error('Stream disconnected')
+            buffer += decoder.decode(value, { stream: true })
+            if (buffer.length > 2 * 1024 * 1024) throw new Error('Stream event is too large')
+            let boundary
+            while ((boundary = /\r?\n\r?\n/.exec(buffer))) {
+              const message = buffer.slice(0, boundary.index)
+              buffer = buffer.slice(boundary.index + boundary[0].length)
+              const data = message.split(/\r?\n/)
+                .filter(line => line.startsWith('data:'))
+                .map(line => line.slice(5).replace(/^ /, '')).join('\n')
+              if (!data || session.signal.aborted || current !== session) continue
+              const event = JSON.parse(data)
+              if (event.type === 'error') {
+                append(event, request.abi)
+                throw Object.assign(new Error(event.error), {
+                  permanent: event.error === 'storage_decode_failed',
+                })
+              }
+              if (event.status === 'subscribed') {
+                session.delay = 1000
+                setStatus('Connected · Waiting for initial storage')
+              } else if (event.type === 'storage_update') {
+                append(event, request.abi)
+                session.updates += Number(!event.initial)
+                const count = `${session.updates} ${session.updates === 1 ? 'update' : 'updates'}`
+                setStatus(`Live · ${count} · Block ${event.mc_seqno}`)
+              }
+            }
+          }
+        } finally {
+          await reader.cancel().catch(() => {})
+        }
+      }
+
+      async function watch(request, session) {
+        while (!session.signal.aborted) {
+          try {
+            await connect(request, session)
+          } catch (error) {
+            if (session.signal.aborted || current !== session) return
+            if (error.permanent) {
+              stop()
+              setStatus(error.message, true)
+              return
+            }
+            setStatus('Connection interrupted · Reconnecting with a fresh snapshot')
+          }
+          await new Promise(resolve => {
+            const done = () => {
+              clearTimeout(timer)
+              session.signal.removeEventListener('abort', done)
+              resolve()
+            }
+            const timer = setTimeout(done, session.delay)
+            session.signal.addEventListener('abort', done, { once: true })
+          })
+          session.delay = Math.min(session.delay * 2, 15000)
+        }
+      }
+
+      form.addEventListener('submit', event => {
+        event.preventDefault()
+        stop()
+        let abi
+        try {
+          abi = JSON.parse(abiInput.value)
+        } catch {
+          setStatus('ABI contains invalid JSON', true)
+          abiInput.focus()
+          return
+        }
+        if (!abi || typeof abi !== 'object' || Array.isArray(abi)) {
+          setStatus('ABI must be a JSON object', true)
+          abiInput.focus()
+          return
+        }
+        const address = addressInput.value.trim()
+        const fields = [...new Set(fieldsInput.value.split(/[,\s]+/).filter(Boolean))]
+        if (!address || !fields.length || fields.length > 64) {
+          setStatus('Enter an address and 1–64 fields', true)
+          return
+        }
+        const url = new URL(location.href)
+        url.searchParams.set('address', address)
+        history.replaceState(null, '', url)
+        accountLink.href = `/account?${new URLSearchParams({ address })}`
+        try {
+          sessionStorage.setItem(savedKey, JSON.stringify({ address, abi: abiInput.value, fields: fieldsInput.value }))
+        } catch {}
+        events.replaceChildren()
+        retainedBytes = 0
+        empty.hidden = false
+        current = new AbortController()
+        current.delay = 1000
+        current.updates = 0
+        subscribeButton.disabled = true
+        stopButton.disabled = false
+        setStatus('Connecting')
+        watch({ types: ['storage_fields'], addresses: [address], abi, fields }, current)
+      })
+      form.addEventListener('input', () => {
+        if (current) stop('Settings changed · Subscribe to apply')
+      })
+      stopButton.addEventListener('click', () => stop('Stopped'))
+      window.addEventListener('pagehide', () => stop())
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(savedKey) || '{}')
+        addressInput.value = saved.address || ''
+        abiInput.value = saved.abi || ''
+        fieldsInput.value = saved.fields || ''
+      } catch {}
+      const address = new URL(location.href).searchParams.get('address')
+      if (address) addressInput.value = address
+      if (addressInput.value) accountLink.href = `/account?${new URLSearchParams({ address: addressInput.value })}`
+    </script>
+  </body>
+</html>

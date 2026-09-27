@@ -1,0 +1,595 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "WalletV5r1",
+  "author": "TON Core",
+  "version": "5.1",
+  "description": "Wallet V5 R1 is a TON wallet for holding GRAM and sending transactions; compared with V4, it uses app extensions instead of plugins.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WalletSignedInternalV5r1"
+    },
+    {
+      "kind": "nullable",
+      "inner_ty_idx": 3
+    },
+    {
+      "kind": "bitsN",
+      "n": 512
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WalletExtensionActionV5r1"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "WalletV5r1IncomingExternalMessage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WalletSignedExternalV5r1"
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "WalletV5r1OutgoingMessage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "StonfiExcesses"
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "EnumRef",
+      "enum_name": "Errors"
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WalletV5r1Storage"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    },
+    {
+      "kind": "mapKV",
+      "key_ty_idx": 24,
+      "value_ty_idx": 5
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WalletV5r1AddExtensionAction"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WalletV5r1RemoveExtensionAction"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WalletV5r1SetSignatureAllowedAction"
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "WalletV5r1Storage",
+      "ty_idx": 23,
+      "fields": [
+        {
+          "name": "isSignatureAllowed",
+          "ty_idx": 5,
+          "description": "Whether public-key signature authentication is currently allowed."
+        },
+        {
+          "name": "seqno",
+          "ty_idx": 9,
+          "description": "Replay-protection sequence number."
+        },
+        {
+          "name": "subwalletId",
+          "ty_idx": 9,
+          "description": "Wallet id, equivalent to subwallet id in earlier wallet versions."
+        },
+        {
+          "name": "publicKey",
+          "ty_idx": 24,
+          "description": "Stored Ed25519 public key used to verify signed requests."
+        },
+        {
+          "name": "extensions",
+          "ty_idx": 25,
+          "description": "Extension address-hash dictionary; keys are 256-bit address hashes in the wallet workchain."
+        }
+      ],
+      "description": "Persistent Wallet V5 R1 state."
+    },
+    {
+      "kind": "struct",
+      "name": "WalletV5r1AddExtensionAction",
+      "ty_idx": 26,
+      "prefix": {
+        "prefix_num": 2,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "addr",
+          "ty_idx": 7,
+          "description": "Internal address of the extension to add."
+        }
+      ],
+      "description": "Extended action that installs an extension address."
+    },
+    {
+      "kind": "struct",
+      "name": "WalletV5r1RemoveExtensionAction",
+      "ty_idx": 27,
+      "prefix": {
+        "prefix_num": 3,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "addr",
+          "ty_idx": 7,
+          "description": "Internal address of the extension to remove."
+        }
+      ],
+      "description": "Extended action that removes an installed extension address."
+    },
+    {
+      "kind": "struct",
+      "name": "WalletV5r1SetSignatureAllowedAction",
+      "ty_idx": 28,
+      "prefix": {
+        "prefix_num": 4,
+        "prefix_len": 8
+      },
+      "fields": [
+        {
+          "name": "allowSignature",
+          "ty_idx": 5,
+          "description": "New signature-authentication mode."
+        }
+      ],
+      "description": "Extended action that toggles public-key signature authentication."
+    },
+    {
+      "kind": "struct",
+      "name": "WalletSignedInternalV5r1",
+      "ty_idx": 12,
+      "prefix": {
+        "prefix_num": 1936289396,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "walletId",
+          "ty_idx": 9,
+          "description": "Wallet id expected to match storage.subwalletId."
+        },
+        {
+          "name": "validUntil",
+          "ty_idx": 9,
+          "description": "Unix timestamp after which the request is expired."
+        },
+        {
+          "name": "seqno",
+          "ty_idx": 9,
+          "description": "Request sequence number expected to match storage.seqno."
+        },
+        {
+          "name": "outActions",
+          "ty_idx": 13,
+          "description": "Raw optional C5 out-action list cell."
+        },
+        {
+          "name": "extendedActions",
+          "ty_idx": 13,
+          "description": "Raw optional Wallet V5 extended-action list."
+        },
+        {
+          "name": "signature",
+          "ty_idx": 14,
+          "description": "Ed25519 signature over the signed payload."
+        }
+      ],
+      "description": "Internal signed request body, authenticated by Ed25519 signature."
+    },
+    {
+      "kind": "struct",
+      "name": "WalletExtensionActionV5r1",
+      "ty_idx": 15,
+      "prefix": {
+        "prefix_num": 1702392942,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "queryId",
+          "ty_idx": 11,
+          "description": "Caller-selected query id for extension-originated requests."
+        },
+        {
+          "name": "outActions",
+          "ty_idx": 13,
+          "description": "Raw optional C5 out-action list cell."
+        },
+        {
+          "name": "extendedActions",
+          "ty_idx": 13,
+          "description": "Raw optional Wallet V5 extended-action list."
+        }
+      ],
+      "description": "Internal extension request body, authenticated by the sender being installed."
+    },
+    {
+      "kind": "struct",
+      "name": "WalletSignedExternalV5r1",
+      "ty_idx": 17,
+      "prefix": {
+        "prefix_num": 1936287598,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "walletId",
+          "ty_idx": 9,
+          "description": "Wallet id expected to match storage.subwalletId."
+        },
+        {
+          "name": "validUntil",
+          "ty_idx": 9,
+          "description": "Unix timestamp after which the request is expired."
+        },
+        {
+          "name": "seqno",
+          "ty_idx": 9,
+          "description": "Request sequence number expected to match storage.seqno."
+        },
+        {
+          "name": "outActions",
+          "ty_idx": 13,
+          "description": "Raw optional C5 out-action list cell."
+        },
+        {
+          "name": "extendedActions",
+          "ty_idx": 13,
+          "description": "Raw optional Wallet V5 extended-action list."
+        },
+        {
+          "name": "signature",
+          "ty_idx": 14,
+          "description": "Ed25519 signature over the signed payload."
+        }
+      ],
+      "description": "External signed request body, authenticated by Ed25519 signature."
+    },
+    {
+      "kind": "alias",
+      "name": "WalletV5r1IncomingExternalMessage",
+      "ty_idx": 16,
+      "target_ty_idx": 17,
+      "description": "External-in message bodies accepted by Wallet V5 R1."
+    },
+    {
+      "kind": "struct",
+      "name": "StonfiExcesses",
+      "ty_idx": 19,
+      "prefix": {
+        "prefix_num": 1994117894,
+        "prefix_len": 32
+      },
+      "fields": [
+        {
+          "name": "payload",
+          "ty_idx": 20,
+          "description": "Protocol payload retained losslessly because its fields are not publicly specified."
+        }
+      ],
+      "description": "STON.fi excess notification carried in a wallet-created self-message."
+    },
+    {
+      "kind": "alias",
+      "name": "WalletV5r1OutgoingMessage",
+      "ty_idx": 18,
+      "target_ty_idx": 19,
+      "description": "Application message bodies observed in Wallet V5 R1 action lists."
+    },
+    {
+      "kind": "enum",
+      "name": "Errors",
+      "ty_idx": 21,
+      "encoded_as_ty_idx": 22,
+      "members": [
+        {
+          "name": "SignatureDisabled",
+          "value": "132",
+          "description": "Signature-authenticated requests are disabled."
+        },
+        {
+          "name": "InvalidSeqno",
+          "value": "133",
+          "description": "Request seqno does not match storage.seqno."
+        },
+        {
+          "name": "InvalidWalletId",
+          "value": "134",
+          "description": "Request wallet id does not match storage.subwalletId."
+        },
+        {
+          "name": "InvalidSignature",
+          "value": "135",
+          "description": "Ed25519 signature verification failed."
+        },
+        {
+          "name": "Expired",
+          "value": "136",
+          "description": "Request validUntil is not greater than the current block time."
+        },
+        {
+          "name": "ExternalSendMessageMustHaveIgnoreErrorsSendMode",
+          "value": "137",
+          "description": "External request contains a send action without IGNORE_ERRORS send mode."
+        },
+        {
+          "name": "InvalidMessageOperation",
+          "value": "138",
+          "description": "Message opcode is not accepted in the current entrypoint."
+        },
+        {
+          "name": "AddExtension",
+          "value": "139",
+          "description": "Add-extension action failed, usually because the extension already exists."
+        },
+        {
+          "name": "RemoveExtension",
+          "value": "140",
+          "description": "Remove-extension action failed, usually because the extension does not exist."
+        },
+        {
+          "name": "UnsupportedAction",
+          "value": "141",
+          "description": "Extended action opcode is unsupported."
+        },
+        {
+          "name": "DisableSignatureWhenExtensionsIsEmpty",
+          "value": "142",
+          "description": "Signature auth cannot be disabled while the extension dictionary is empty."
+        },
+        {
+          "name": "ThisSignatureModeAlreadySet",
+          "value": "143",
+          "description": "Requested signature-auth mode is already active."
+        },
+        {
+          "name": "RemoveLastExtensionWhenSignatureDisabled",
+          "value": "144",
+          "description": "The last extension cannot be removed while signature auth is disabled."
+        },
+        {
+          "name": "ExtensionWrongWorkchain",
+          "value": "145",
+          "description": "Extension address workchain differs from the wallet workchain."
+        },
+        {
+          "name": "OnlyExtensionCanChangeSignatureMode",
+          "value": "146",
+          "description": "Only an installed extension can change signature-auth mode."
+        },
+        {
+          "name": "InvalidC5",
+          "value": "147",
+          "description": "C5 out-action list validation failed."
+        }
+      ],
+      "description": "Wallet V5 R1 exit-code catalog from the source implementation."
+    }
+  ],
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    },
+    {
+      "body_ty_idx": 15
+    }
+  ],
+  "incoming_external": [
+    {
+      "body_ty_idx": 16
+    }
+  ],
+  "outgoing_messages": [
+    {
+      "body_ty_idx": 18
+    }
+  ],
+  "emitted_events": [],
+  "storage": {
+    "storage_ty_idx": 23
+  },
+  "get_methods": [
+    {
+      "tvm_method_id": 85143,
+      "name": "seqno",
+      "parameters": [],
+      "return_ty_idx": 1,
+      "description": "Return the current replay-protection sequence number."
+    },
+    {
+      "tvm_method_id": 78748,
+      "name": "get_public_key",
+      "parameters": [],
+      "return_ty_idx": 1,
+      "description": "Return the stored Ed25519 public key."
+    },
+    {
+      "tvm_method_id": 81467,
+      "name": "get_subwallet_id",
+      "parameters": [],
+      "return_ty_idx": 1,
+      "description": "Return the wallet id, equivalent to subwallet id."
+    },
+    {
+      "tvm_method_id": 117729,
+      "name": "get_extensions",
+      "parameters": [],
+      "return_ty_idx": 25,
+      "description": "Return the raw extension dictionary keyed by extension address hash."
+    },
+    {
+      "tvm_method_id": 88459,
+      "name": "is_signature_allowed",
+      "parameters": [],
+      "return_ty_idx": 5,
+      "description": "Return whether public-key signature authentication is currently allowed."
+    }
+  ],
+  "thrown_errors": [
+    {
+      "kind": "enum_member",
+      "name": "Errors.SignatureDisabled",
+      "description": "Signature-authenticated requests are disabled.",
+      "err_code": 132
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSeqno",
+      "description": "Request seqno does not match storage.seqno.",
+      "err_code": 133
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidWalletId",
+      "description": "Request wallet id does not match storage.subwalletId.",
+      "err_code": 134
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidSignature",
+      "description": "Ed25519 signature verification failed.",
+      "err_code": 135
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.Expired",
+      "description": "Request validUntil is not greater than the current block time.",
+      "err_code": 136
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ExternalSendMessageMustHaveIgnoreErrorsSendMode",
+      "description": "External request contains a send action without IGNORE_ERRORS send mode.",
+      "err_code": 137
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidMessageOperation",
+      "description": "Message opcode is not accepted in the current entrypoint.",
+      "err_code": 138
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.AddExtension",
+      "description": "Add-extension action failed, usually because the extension already exists.",
+      "err_code": 139
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.RemoveExtension",
+      "description": "Remove-extension action failed, usually because the extension does not exist.",
+      "err_code": 140
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.UnsupportedAction",
+      "description": "Extended action opcode is unsupported.",
+      "err_code": 141
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.DisableSignatureWhenExtensionsIsEmpty",
+      "description": "Signature auth cannot be disabled while the extension dictionary is empty.",
+      "err_code": 142
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ThisSignatureModeAlreadySet",
+      "description": "Requested signature-auth mode is already active.",
+      "err_code": 143
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.RemoveLastExtensionWhenSignatureDisabled",
+      "description": "The last extension cannot be removed while signature auth is disabled.",
+      "err_code": 144
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.ExtensionWrongWorkchain",
+      "description": "Extension address workchain differs from the wallet workchain.",
+      "err_code": 145
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.OnlyExtensionCanChangeSignatureMode",
+      "description": "Only an installed extension can change signature-auth mode.",
+      "err_code": 146
+    },
+    {
+      "kind": "enum_member",
+      "name": "Errors.InvalidC5",
+      "description": "C5 out-action list validation failed.",
+      "err_code": 147
+    }
+  ],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.2"
+}

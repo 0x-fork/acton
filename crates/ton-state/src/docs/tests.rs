@@ -49,6 +49,20 @@ async fn reference_serves_only_supported_operations() {
         .oneshot(Request::get("/").body(Body::empty()).unwrap())
         .await
         .unwrap();
+    let storage_page = app
+        .clone()
+        .oneshot(Request::get("/storage").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let decoder = app
+        .clone()
+        .oneshot(
+            Request::get("/storage-decoder.js")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
     let page = app
         .oneshot(Request::get("/docs").body(Body::empty()).unwrap())
         .await
@@ -61,9 +75,15 @@ async fn reference_serves_only_supported_operations() {
             ["responses"]["200"]["content"].as_object().unwrap().keys().collect::<Vec<_>>(),
         "stream_state_required": document["components"]["schemas"]["AccountStateEvent"]
             ["properties"]["account_state"]["required"],
+        "stream_storage_required": document["components"]["schemas"]["StorageUpdateEvent"]["required"],
+        "stream_types": document["components"]["schemas"]["SubscriptionType"],
+        "stream_fields": document["components"]["schemas"]["Subscription"]["properties"]["fields"],
+        "stream_abi": document["components"]["schemas"]["Subscription"]["properties"]["abi"],
         "stream_include_code_data": document["components"]["schemas"]["Subscription"]
             ["properties"]["include_code_data"],
         "redirect": [home.status().as_str(), home.headers()["location"].to_str().unwrap()],
+        "storage_page": [storage_page.status().as_str(), storage_page.headers()["content-type"].to_str().unwrap()],
+        "storage_decoder": [decoder.status().as_str(), decoder.headers()["content-type"].to_str().unwrap()],
         "page": [page.status().as_str(), page.headers()["content-type"].to_str().unwrap()],
         "wait_timeouts": [
             document["components"]["schemas"]["SendBocAndWaitRequest"]["properties"]["timeout_ms"],
@@ -97,9 +117,40 @@ async fn reference_serves_only_supported_operations() {
             }
           ],
           "status": 200,
+          "storage_decoder": [
+            "200",
+            "text/javascript; charset=utf-8"
+          ],
+          "storage_page": [
+            "200",
+            "text/html; charset=utf-8"
+          ],
+          "stream_abi": {
+            "description": "Tolk ABI with a storage type; required only for `storage_fields` subscriptions.\nOne ABI applies to all subscribed addresses, at most 16 for this event type",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "stream_content_types": [
             "text/event-stream"
           ],
+          "stream_fields": {
+            "description": "Selected storage paths, for example seqno or settings.owner. Typed cells\nare transparent. Required with `storage_fields`; 1–64 unique paths",
+            "example": [
+              "seqno",
+              "settings.owner"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "type": [
+              "array",
+              "null"
+            ]
+          },
           "stream_include_code_data": {
             "default": true,
             "description": "Include code/data in account state events; false omits both on every event.\nOmitted or null defaults to true. Transaction events are unaffected",
@@ -120,6 +171,23 @@ async fn reference_serves_only_supported_operations() {
             "state",
             "suspended"
           ],
+          "stream_storage_required": [
+            "type",
+            "finality",
+            "address",
+            "mc_seqno",
+            "data",
+            "initial",
+            "changed_fields"
+          ],
+          "stream_types": {
+            "enum": [
+              "transactions",
+              "account_states",
+              "storage_fields"
+            ],
+            "type": "string"
+          },
           "wait_timeouts": [
             {
               "default": 30000,

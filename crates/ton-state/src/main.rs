@@ -76,7 +76,7 @@ async fn main() -> Result<()> {
     let sender = client.message_sender();
     let source = P2pBlockSource::new(client)?;
     let (checkpoints, state) = watch::channel(store.snapshot());
-    let subscriptions = streaming::Subscriptions::default();
+    let subscriptions = streaming::Subscriptions::new(state.clone());
     let confirmations = confirmation::Confirmations::default();
     let router = api::router(state.clone(), config.zero_state(), Arc::clone(&history))
         .merge(subscriptions.clone().router())

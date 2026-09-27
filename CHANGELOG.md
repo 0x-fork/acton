@@ -34,6 +34,10 @@ All notable changes to this project will be documented in this file.
   Each subscription receives code and data on its first account event and then
   only when those fields change; all other state fields remain complete.
   Subscriptions can set `include_code_data: false` to omit both BoCs entirely.
+  Storage field subscriptions accept a Tolk ABI and selected field paths, send an
+  initial snapshot, and emit the full data BoC with the names of changed fields.
+  `/storage` subscribes from an address, JSON ABI, and field paths, and displays
+  a live event history with storage decoded on the client and complete data BoCs.
   `/account` displays a live account state from an address input and keeps it
   updated through SSE, reconnecting and refreshing the snapshot after a gap.
   Its code/data checkbox switches subscription mode and preserves the choice in the URL.

@@ -283,12 +283,51 @@ impl UnpackSchema for ContractABI {
     }
 }
 
+/// Decodes one ABI value from the slice, leaving any following fields unread.
+///
+/// Callers accepting untrusted schemas should validate their type graph and use
+/// [`unpack_from_slice_with_limits`] to bound collection expansion.
 pub fn unpack_from_slice<S: UnpackSchema + ?Sized>(
     data: &mut CellSlice<'_>,
     symbols: &S,
     ty_idx: TyIdx,
 ) -> anyhow::Result<UnpackedValue> {
-    unpack_type(data, symbols, ty_idx, None)
+    unpack_from_slice_with_limits(data, symbols, ty_idx, usize::MAX, usize::MAX)
+}
+
+/// Decodes one ABI value within caller-supplied expansion limits.
+///
+/// `max_values` counts struct fields and collection entries. `max_string_bytes`
+/// bounds bytes across decoded strings and object names. The value limit also terminates malformed
+/// arrays whose element consumes no bits or references.
+/// The caller must separately bound schema depth, identifiers, and cell input.
+pub fn unpack_from_slice_with_limits<S: UnpackSchema + ?Sized>(
+    data: &mut CellSlice<'_>,
+    symbols: &S,
+    ty_idx: TyIdx,
+    max_values: usize,
+    max_string_bytes: usize,
+) -> anyhow::Result<UnpackedValue> {
+    let mut budget = UnpackBudget {
+        values: max_values,
+        string_bytes: max_string_bytes,
+    };
+    unpack_type(data, symbols, ty_idx, None, &mut budget)
+}
+
+struct UnpackBudget {
+    values: usize,
+    string_bytes: usize,
+}
+
+impl UnpackBudget {
+    fn consume_string_bytes(&mut self, bytes: usize) -> anyhow::Result<()> {
+        self.string_bytes = self
+            .string_bytes
+            .checked_sub(bytes)
+            .context("ABI string byte limit exceeded")?;
+        Ok(())
+    }
 }
 
 fn unpack_type<S: UnpackSchema + ?Sized>(
@@ -296,7 +335,10 @@ fn unpack_type<S: UnpackSchema + ?Sized>(
     symbols: &S,
     ty_idx: TyIdx,
     u_label_ty_idx: Option<TyIdx>,
+    budget: &mut UnpackBudget,
 ) -> anyhow::Result<UnpackedValue> {
+    anyhow::ensure!(budget.values > 0, "ABI value limit exceeded");
+    budget.values -= 1;
     let ty = symbols
         .ty_by_idx(ty_idx)
         .ok_or_else(|| anyhow!("ABI ty_idx {ty_idx} was not found"))?;
@@ -309,8 +351,7 @@ fn unpack_type<S: UnpackSchema + ?Sized>(
         Ty::Callable => unsupported_type("callable"),
         Ty::String => {
             let cell = data.load_reference_cloned()?;
-            let string =
-                parse_snake_string(&cell).ok_or_else(|| anyhow!("expected snake string"))?;
+            let string = unpack_snake_string(cell, budget)?;
             Ok(UnpackedValue::String(string))
         }
         Ty::Coins => Ok(UnpackedValue::Number(data.load_var_bigint(4, false)?)),
@@ -345,42 +386,44 @@ fn unpack_type<S: UnpackSchema + ?Sized>(
             Ok(UnpackedValue::Number(data.load_var_bigint(len_bits, true)?))
         }
         Ty::BitsN { n } => Ok(UnpackedValue::Bits(load_bits(data, *n)?)),
-        Ty::ArrayOf { inner_ty_idx } => unpack_array(data, symbols, *inner_ty_idx),
+        Ty::ArrayOf { inner_ty_idx } => unpack_array(data, symbols, *inner_ty_idx, budget),
         Ty::Tensor { items_ty_idx } | Ty::ShapedTuple { items_ty_idx } => {
             let mut values = Vec::with_capacity(items_ty_idx.len());
             for &item_ty_idx in items_ty_idx {
-                values.push(unpack_type(data, symbols, item_ty_idx, None)?);
+                values.push(unpack_type(data, symbols, item_ty_idx, None, budget)?);
             }
             Ok(UnpackedValue::Array(values))
         }
         Ty::NullLiteral => Ok(UnpackedValue::Null),
         Ty::GenericT { name_t } => anyhow::bail!("unresolved generic type {name_t}"),
-        Ty::StructRef { struct_name, .. } => unpack_struct(data, symbols, ty_idx, struct_name),
-        Ty::EnumRef { enum_name } => unpack_enum(data, symbols, enum_name),
-        Ty::AliasRef { alias_name, .. } => unpack_alias(data, symbols, ty_idx, alias_name),
+        Ty::StructRef { struct_name, .. } => {
+            unpack_struct(data, symbols, ty_idx, struct_name, budget)
+        }
+        Ty::EnumRef { enum_name } => unpack_enum(data, symbols, enum_name, budget),
+        Ty::AliasRef { alias_name, .. } => unpack_alias(data, symbols, ty_idx, alias_name, budget),
         Ty::Remaining => Ok(UnpackedValue::RemainingBitsAndRefs(remaining_as_cell(
             data,
         )?)),
         Ty::CellOf { inner_ty_idx } => {
             let mut ref_slice = data.load_reference_as_slice()?;
-            let value = unpack_type(&mut ref_slice, symbols, *inner_ty_idx, None)?;
+            let value = unpack_type(&mut ref_slice, symbols, *inner_ty_idx, None, budget)?;
             Ok(UnpackedValue::Object {
                 name: "Cell".to_owned(),
                 fields: vec![("ref".to_owned(), value)],
             })
         }
-        Ty::LispListOf { inner_ty_idx } => unpack_lisp_list(data, symbols, *inner_ty_idx),
-        Ty::Union { variants, .. } => unpack_union(data, symbols, variants, u_label_ty_idx),
+        Ty::LispListOf { inner_ty_idx } => unpack_lisp_list(data, symbols, *inner_ty_idx, budget),
+        Ty::Union { variants, .. } => unpack_union(data, symbols, variants, u_label_ty_idx, budget),
         Ty::Nullable { inner_ty_idx, .. } => {
             if !data.load_bit()? {
                 return Ok(UnpackedValue::Null);
             }
-            unpack_type(data, symbols, *inner_ty_idx, None)
+            unpack_type(data, symbols, *inner_ty_idx, None, budget)
         }
         Ty::MapKV {
             key_ty_idx,
             value_ty_idx,
-        } => unpack_map(data, symbols, *key_ty_idx, *value_ty_idx),
+        } => unpack_map(data, symbols, *key_ty_idx, *value_ty_idx, budget),
         Ty::Unknown => unsupported_type("unknown"),
     }
 }
@@ -390,6 +433,7 @@ fn unpack_struct<S: UnpackSchema + ?Sized>(
     symbols: &S,
     ty_idx: TyIdx,
     struct_name: &str,
+    budget: &mut UnpackBudget,
 ) -> anyhow::Result<UnpackedValue> {
     let decl = symbols
         .struct_decl_info(struct_name)
@@ -403,9 +447,11 @@ fn unpack_struct<S: UnpackSchema + ?Sized>(
     let struct_fields = symbols
         .struct_fields_for(ty_idx)
         .ok_or_else(|| anyhow!("failed to resolve fields for {struct_name}"))?;
+    budget.consume_string_bytes(struct_name.len())?;
     let mut fields = Vec::with_capacity(struct_fields.len());
     for field in &struct_fields {
-        let value = unpack_type(data, symbols, field.ty_idx, field.u_label_ty_idx)
+        budget.consume_string_bytes(field.name.len())?;
+        let value = unpack_type(data, symbols, field.ty_idx, field.u_label_ty_idx, budget)
             .with_context(|| format!("failed to decode field {struct_name}.{}", field.name))?;
         fields.push((field.name.clone(), value));
     }
@@ -421,6 +467,7 @@ fn unpack_alias<S: UnpackSchema + ?Sized>(
     symbols: &S,
     ty_idx: TyIdx,
     alias_name: &str,
+    budget: &mut UnpackBudget,
 ) -> anyhow::Result<UnpackedValue> {
     let decl = symbols
         .alias_decl_info(alias_name)
@@ -434,13 +481,14 @@ fn unpack_alias<S: UnpackSchema + ?Sized>(
     let target = symbols
         .alias_target_for(ty_idx)
         .ok_or_else(|| anyhow!("failed to resolve target for alias {alias_name}"))?;
-    unpack_type(data, symbols, target.ty_idx, target.u_label_ty_idx)
+    unpack_type(data, symbols, target.ty_idx, target.u_label_ty_idx, budget)
 }
 
 fn unpack_enum<S: UnpackSchema + ?Sized>(
     data: &mut CellSlice<'_>,
     symbols: &S,
     enum_name: &str,
+    budget: &mut UnpackBudget,
 ) -> anyhow::Result<UnpackedValue> {
     let decl = symbols
         .enum_decl_info(enum_name)
@@ -448,7 +496,7 @@ fn unpack_enum<S: UnpackSchema + ?Sized>(
     ensure_standard_unpack_layout(enum_name, decl.custom_pack_unpack)?;
 
     let encoded_ty_idx = parse_enum_encoded_as(symbols, decl.encoded_as_ty_idx)?;
-    unpack_type(data, symbols, encoded_ty_idx, None)
+    unpack_type(data, symbols, encoded_ty_idx, None, budget)
 }
 
 fn unpack_union<S: UnpackSchema + ?Sized>(
@@ -456,6 +504,7 @@ fn unpack_union<S: UnpackSchema + ?Sized>(
     symbols: &S,
     variants: &[UnionVariant],
     u_label_ty_idx: Option<TyIdx>,
+    budget: &mut UnpackBudget,
 ) -> anyhow::Result<UnpackedValue> {
     let variants = resolve_union_variants(symbols, variants, u_label_ty_idx)?;
     for variant in variants {
@@ -470,11 +519,12 @@ fn unpack_union<S: UnpackSchema + ?Sized>(
             )?;
         }
 
-        let value = unpack_type(data, symbols, variant.variant_ty_idx, None)?;
+        let value = unpack_type(data, symbols, variant.variant_ty_idx, None, budget)?;
         if !variant.has_value_field {
             return Ok(value);
         }
 
+        budget.consume_string_bytes(variant.label.len())?;
         return Ok(UnpackedValue::Object {
             name: variant.label,
             fields: vec![("value".to_owned(), value)],
@@ -489,6 +539,7 @@ fn unpack_map<S: UnpackSchema + ?Sized>(
     symbols: &S,
     key_ty_idx: TyIdx,
     value_ty_idx: TyIdx,
+    budget: &mut UnpackBudget,
 ) -> anyhow::Result<UnpackedValue> {
     let key_bits = map_key_bit_len(symbols, key_ty_idx)?;
     let dict = Option::<Cell>::load_from(data)?;
@@ -496,9 +547,15 @@ fn unpack_map<S: UnpackSchema + ?Sized>(
     let mut entries = Vec::new();
     for entry in dict::RawIter::new(&dict, key_bits) {
         let (key_data, mut value_slice) = entry?;
-        let key = unpack_type(&mut key_data.as_data_slice(), symbols, key_ty_idx, None)
-            .context("failed to decode map key")?;
-        let value = unpack_type(&mut value_slice, symbols, value_ty_idx, None)
+        let key = unpack_type(
+            &mut key_data.as_data_slice(),
+            symbols,
+            key_ty_idx,
+            None,
+            budget,
+        )
+        .context("failed to decode map key")?;
+        let value = unpack_type(&mut value_slice, symbols, value_ty_idx, None, budget)
             .context("failed to decode map value")?;
         entries.push((key, value));
     }
@@ -510,6 +567,7 @@ fn unpack_array<S: UnpackSchema + ?Sized>(
     data: &mut CellSlice<'_>,
     symbols: &S,
     inner_ty_idx: TyIdx,
+    budget: &mut UnpackBudget,
 ) -> anyhow::Result<UnpackedValue> {
     let expected_len = usize::try_from(data.load_uint(8)?).context("array length exceeds usize")?;
     let mut head = Option::<Cell>::load_from(data)?;
@@ -519,7 +577,13 @@ fn unpack_array<S: UnpackSchema + ?Sized>(
         let mut chunk = cell.as_slice_allow_exotic();
         head = Option::<Cell>::load_from(&mut chunk)?;
         while chunk.size_bits() != 0 || chunk.size_refs() != 0 {
-            values.push(unpack_type(&mut chunk, symbols, inner_ty_idx, None)?);
+            values.push(unpack_type(
+                &mut chunk,
+                symbols,
+                inner_ty_idx,
+                None,
+                budget,
+            )?);
         }
     }
 
@@ -537,6 +601,7 @@ fn unpack_lisp_list<S: UnpackSchema + ?Sized>(
     data: &mut CellSlice<'_>,
     symbols: &S,
     inner_ty_idx: TyIdx,
+    budget: &mut UnpackBudget,
 ) -> anyhow::Result<UnpackedValue> {
     let mut head_cell = data.load_reference_cloned()?;
     let mut values = Vec::new();
@@ -547,7 +612,7 @@ fn unpack_lisp_list<S: UnpackSchema + ?Sized>(
             break;
         }
         let tail = head.load_reference_cloned()?;
-        let value = unpack_type(&mut head, symbols, inner_ty_idx, None)?;
+        let value = unpack_type(&mut head, symbols, inner_ty_idx, None, budget)?;
         ensure_fully_consumed(&head, "lisp_list item")?;
         values.insert(0, value);
         head_cell = tail;
@@ -666,34 +731,23 @@ fn parse_enum_encoded_as<S: UnpackSchema + ?Sized>(
     }
 }
 
-fn parse_snake_string(cell: &Cell) -> Option<String> {
-    String::from_utf8(parse_snake_bytes(cell)?).ok()
-}
-
-fn parse_snake_bytes(cell: &Cell) -> Option<Vec<u8>> {
-    let mut parser = cell.as_slice_allow_exotic();
-    parse_snake_bytes_slice(&mut parser)
-}
-
-fn parse_snake_bytes_slice(parser: &mut CellSlice<'_>) -> Option<Vec<u8>> {
+fn unpack_snake_string(mut cell: Cell, budget: &mut UnpackBudget) -> anyhow::Result<String> {
     let mut bytes = Vec::new();
-    let bits_to_load = parser.size_bits();
-    if !bits_to_load.is_multiple_of(8) {
-        return None;
+    loop {
+        let mut slice = cell.as_slice()?;
+        let bits = slice.size_bits();
+        anyhow::ensure!(bits.is_multiple_of(8), "expected snake string");
+        let len = usize::from(bits / 8);
+        budget.consume_string_bytes(len)?;
+        let offset = bytes.len();
+        bytes.resize(offset + len, 0);
+        slice.load_raw(&mut bytes[offset..], bits)?;
+        if slice.size_refs() == 0 {
+            break;
+        }
+        cell = slice.load_reference_cloned()?;
     }
-
-    let mut chunk = vec![0u8; bits_to_load.div_ceil(8) as usize];
-    parser.load_raw(&mut chunk, bits_to_load).ok()?;
-    bytes.extend_from_slice(&chunk);
-
-    if parser.size_refs() == 0 {
-        return Some(bytes);
-    }
-
-    let next_cell = parser.load_reference_cloned().ok()?;
-    let mut next_parser = next_cell.as_slice_allow_exotic();
-    bytes.extend(parse_snake_bytes_slice(&mut next_parser)?);
-    Some(bytes)
+    String::from_utf8(bytes).context("expected UTF-8 snake string")
 }
 
 fn map_key_bit_len<S: UnpackSchema + ?Sized>(symbols: &S, ty_idx: TyIdx) -> anyhow::Result<u16> {
@@ -916,6 +970,36 @@ mod tests {
             compiler_name: "tolk".to_owned(),
             compiler_version: "0".to_owned(),
         }
+    }
+
+    #[test]
+    fn decoding_limits_cover_shared_strings_and_nested_values() -> anyhow::Result<()> {
+        let mut abi = empty_abi();
+        abi.unique_types = vec![
+            Ty::String,
+            Ty::Tensor {
+                items_ty_idx: vec![0, 0],
+            },
+        ];
+        let mut text = CellBuilder::new();
+        text.store_raw(b"hello", 40)?;
+        let text = text.build()?;
+        let root = CellBuilder::build_from((&text, &text))?;
+        let mut rows = Vec::new();
+        for (values, bytes) in [(3, 10), (2, 10), (3, 9)] {
+            let result =
+                unpack_from_slice_with_limits(&mut root.as_slice()?, &abi, 1, values, bytes);
+            rows.push(match result {
+                Ok(value) => format!("{value:?}"),
+                Err(error) => format!("{error:#}"),
+            });
+        }
+        expect![[r#"
+            Array([String("hello"), String("hello")])
+            ABI value limit exceeded
+            ABI string byte limit exceeded"#]]
+        .assert_eq(&rows.join("\n"));
+        Ok(())
     }
 
     fn add_ty(abi: &mut ContractABI, ty: Ty) -> TyIdx {

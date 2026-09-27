@@ -289,13 +289,86 @@ not produce events just because the checkpoint or shard timestamp advances.
 For `types: ["transactions", "account_states"]`, transaction events precede the
 account state events for that batch.
 
-The stream sends no initial account snapshot. To establish a starting state,
+The `account_states` stream sends no initial account snapshot. To establish a starting state,
 open the subscription first, then call `getAddressInformation` and reconcile
 queued events using `account_state.block_id.seqno`, the masterchain checkpoint.
 Maintain the stream's code/data baseline even for queued events older than that
 HTTP snapshot, and display the reconstructed state only once its checkpoint
 reaches the displayed snapshot. This prevents older code/data from overwriting
 newer HTTP values while preserving changes needed by subsequent stream events.
+
+### Subscribe to storage fields
+
+Open `/storage` to enter an address, paste a Tolk ABI as JSON, and select field
+paths separated by commas. Subscribe to see storage decoded with the same ABI
+on the client. The full event JSON and BoC are available under each row.
+Stop ends the connection. Editing
+the form stops it too; subscribe again to apply the new settings. The page keeps
+up to 20 recent events within 2 MiB, always retaining the latest event. It restores
+the last submitted form in the same browser tab. A reconnect starts from a fresh snapshot.
+
+For Wallet V5 R1, use its ABI and select `seqno`, `isSignatureAllowed`, or
+`extensions`. A mainnet example is
+`UQBuPuy0bnowA2cukDKw__YVX04CsUpXprpzM39CgFPTmePf`; its captured state and compiler
+ABI are in `src/streaming/fixtures/wallet-v5r1-state.json` and
+`src/streaming/fixtures/wallet-v5r1.abi.json`.
+
+Select `storage_fields` and send the contract's Tolk ABI with the fields to watch.
+For a counter contract with a `seqno` storage field, use its generated ABI file:
+
+```sh
+jq -n --slurpfile abi counter.abi.json \
+  --arg address "$COUNTER_ADDRESS" \
+  '{types:["storage_fields"], addresses:[$address], abi:$abi[0], fields:["seqno"]}' |
+  curl -N http://127.0.0.1:8080/api/streaming/v2/sse \
+    -H 'Content-Type: application/json' --data-binary @-
+```
+
+After `{"status":"subscribed"}`, each account receives its current storage with
+`initial: true` and an empty `changed_fields` list. Later events contain the full,
+original base64 data BoC only when a selected field changes:
+
+```json
+{
+  "type": "storage_update",
+  "finality": "finalized",
+  "address": "0:0202020202020202020202020202020202020202020202020202020202020202",
+  "mc_seqno": 45,
+  "data": "te6ccgEBAQEABgAACAAAAAI=",
+  "initial": false,
+  "changed_fields": ["seqno"]
+}
+```
+
+Decode `data` on the client using the same ABI. The event always contains the
+complete storage, including fields outside the selection. `changed_fields`
+contains only changed subscribed paths, in request order. Changes to other
+fields produce no event. `include_code_data` has no effect on storage events.
+
+Paths can traverse structs, nullable structs, and typed cells, for example
+`settings.owner` for `settings: Cell<Settings>`. A dictionary can be watched as a
+whole; paths to individual keys are unsupported. Field comparisons use decoded
+ABI values; opaque cells use their representation hashes. An empty `data` string
+means absent storage, such as a deleted, uninitialized, or frozen account. Removal
+and restoration of storage mark every selected path as changed.
+
+Snapshots and updates use complete committed masterchain checkpoints. Updates
+that return a field to its previous value within one batch produce no event.
+Reconnecting sends a fresh snapshot. It does not replay intermediate changes.
+Storage subscriptions can be combined with transactions and account states;
+transaction events precede storage updates for each published batch.
+
+One ABI applies to all addresses in a subscription. This mode accepts up to
+16 addresses, 64 unique paths, and a 256 KiB ABI using schema version `1.0`.
+Schemas must be nonrecursive and use standard serialization. Schema traversal
+is limited to 32 levels and 4,096 visits. Storage decoding is limited to 16,384
+values, 1 MiB of decoded strings and object names, and a 700 KiB raw data BoC.
+
+Invalid schemas or initial data return HTTP 400 with an error and diagnostic
+message. If later data no longer matches the ABI, that connection receives
+`storage_decode_failed` with its address and checkpoint, then closes. Other
+subscriptions remain active. Use an ABI that matches the deployed contract;
+the service cannot verify the meaning of fields from the layout alone.
 
 Delivery is live only. Events published before subscription, during disconnection,
 or across process restarts are not replayed. `Last-Event-ID` returns HTTP 400.

@@ -1,0 +1,25 @@
+{
+  "coalesced": true,
+  "ended": true,
+  "error": {
+    "address": "0:0202020202020202020202020202020202020202020202020202020202020202",
+    "error": "storage_decode_failed",
+    "mc_seqno": 44,
+    "type": "error"
+  },
+  "initial_addresses": [
+    "0:0202020202020202020202020202020202020202020202020202020202020202",
+    "0:0303030303030303030303030303030303030303030303030303030303030303"
+  ],
+  "other_subscription": "account_state",
+  "transactions_before_error": [
+    "transaction",
+    "transaction"
+  ],
+  "types": [
+    "transaction",
+    "transaction",
+    "storage_update",
+    "account_state"
+  ]
+}

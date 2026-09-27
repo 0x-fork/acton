@@ -158,6 +158,10 @@ check-grammar-security:
     cd crates/tree-sitter-tlb && npm audit --audit-level=moderate
     cd crates/tree-sitter-tolk && npm audit --audit-level=moderate
 
+# Rebuild the checked-in decoder embedded in ton-state's standalone storage page.
+ton-state-web:
+    bun build crates/ton-state/web/storage-decoder.ts --target browser --minify --outfile crates/ton-state/src/storage-decoder.js
+
 check-ui-security:
   bun audit --audit-level=moderate
 
