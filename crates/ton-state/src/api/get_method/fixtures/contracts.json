@@ -1,0 +1,14 @@
+{
+  "identity": "te6ccgEBAQEAAwAAAjA=",
+  "context": "te6ccgEBAQEAFAAAJDD4I/gk+CX4Jvgn+Chw+DP4LQ==",
+  "out_of_gas": "te6ccgEBAQEABQAABjCQ6g==",
+  "throw": "te6ccgEBAQEABQAABjDyKg==",
+  "write_data": "te6ccgEBAQEADAAAFDCAY8jLH8ntVHc=",
+  "alternative_return": "te6ccgEBAQEABgAACDBx2zE=",
+  "nan": "te6ccgEBAQEABQAABjCD/w==",
+  "slice_offset": "te6ccgEBAQEABgAACDDTAjA=",
+  "continuation": "te6ccgEBAQEABQAABjCRcQ==",
+  "builder": "te6ccgEBAQEABAAABDDI",
+  "deep_result": "te6ccgEBAQEACgAAEDBwgEGSbwHk",
+  "shared_tuple_result": "te6ccgEBAQEACgAAEDBwepMgbwLk"
+}

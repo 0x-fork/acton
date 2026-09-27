@@ -1,0 +1,133 @@
+[
+  {
+    "exit_code": 9,
+    "gas_used": 160,
+    "lt": "899",
+    "mc_seqno": 100,
+    "ok": true,
+    "stack": [
+      [
+        "num",
+        "0x0"
+      ]
+    ],
+    "status": 200
+  },
+  {
+    "exit_code": 0,
+    "gas_used": 133,
+    "lt": "899",
+    "mc_seqno": 100,
+    "ok": true,
+    "stack": [],
+    "status": 200
+  },
+  {
+    "exit_code": -13,
+    "gas_used": 0,
+    "lt": "899",
+    "mc_seqno": 100,
+    "ok": true,
+    "stack": [
+      [
+        "num",
+        "0x5"
+      ],
+      [
+        "num",
+        "0x14c97"
+      ]
+    ],
+    "status": 200
+  },
+  {
+    "exit_code": -13,
+    "gas_used": 0,
+    "lt": "0",
+    "mc_seqno": 100,
+    "ok": true,
+    "stack": [
+      [
+        "num",
+        "0x5"
+      ],
+      [
+        "num",
+        "0x14c97"
+      ]
+    ],
+    "status": 200
+  },
+  {
+    "exit_code": -13,
+    "gas_used": 0,
+    "lt": "899",
+    "mc_seqno": 100,
+    "ok": true,
+    "stack": [
+      [
+        "num",
+        "0x5"
+      ],
+      [
+        "num",
+        "0x14c97"
+      ]
+    ],
+    "status": 200
+  },
+  {
+    "exit_code": -13,
+    "gas_used": 0,
+    "lt": "0",
+    "mc_seqno": 100,
+    "ok": true,
+    "stack": [
+      [
+        "num",
+        "0x5"
+      ],
+      [
+        "num",
+        "0x14c97"
+      ]
+    ],
+    "status": 200
+  },
+  {
+    "exit_code": -13,
+    "gas_used": 0,
+    "lt": "899",
+    "mc_seqno": 100,
+    "ok": true,
+    "stack": [
+      [
+        "num",
+        "0x5"
+      ],
+      [
+        "num",
+        "0x14c97"
+      ]
+    ],
+    "status": 200
+  },
+  {
+    "exit_code": -13,
+    "gas_used": 0,
+    "lt": "0",
+    "mc_seqno": 100,
+    "ok": true,
+    "stack": [
+      [
+        "num",
+        "0x5"
+      ],
+      [
+        "num",
+        "0x14c97"
+      ]
+    ],
+    "status": 200
+  }
+]

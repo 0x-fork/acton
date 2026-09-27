@@ -7,8 +7,8 @@ use sha2::{Digest, Sha256};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, Lazy, Load};
 use tycho_types::models::{
-    Block, BlockId, BlockInfo, PrevBlockRef, ShardAccount, ShardDescription, ShardIdent,
-    ShardStateSplit, ShardStateUnsplit, StdAddr,
+    Block, BlockId, BlockInfo, BlockchainConfig, PrevBlockRef, ShardAccount, ShardDescription,
+    ShardIdent, ShardStateSplit, ShardStateUnsplit, StdAddr,
 };
 
 use crate::lazy::Reader;
@@ -24,6 +24,19 @@ pub struct AccountSnapshot {
     pub gen_utime: u32,
     pub account: Option<ShardAccount>,
     pub reads: ReadStats,
+}
+
+/// Owned network configuration and block references for off-chain TVM execution.
+/// All fields belong to the same masterchain state; no lazy database cells escape.
+pub struct MasterchainContext {
+    /// Complete configuration dictionary, including the global TVM version.
+    pub config: BlockchainConfig,
+    /// Current block followed by up to fifteen predecessors, newest first.
+    pub last_mc_blocks: Vec<BlockId>,
+    /// Includes the current block when the state follows a key block.
+    pub last_key_block: BlockId,
+    /// Up to sixteen blocks at multiples of 100, newest first, for TVM 9+.
+    pub last_mc_blocks_100: Vec<BlockId>,
 }
 
 /// A retained shard state with cells fetched only when traversed.
@@ -94,6 +107,83 @@ impl StateView {
                 .context("missing masterchain state extra")?;
 
             Ok(StdAddr::new(-1, extra.config.get_elector_address()?))
+        })
+    }
+
+    /// Materializes configuration and the block windows used by `PREVBLOCKS*`.
+    /// Reads only the required paths in the previous-block dictionary. Missing
+    /// history is an error, rather than an invented execution context.
+    pub fn execution_context(&self) -> Result<MasterchainContext> {
+        self.reader.run(|| {
+            ensure!(
+                self.id.shard.is_masterchain(),
+                "execution context requires masterchain state"
+            );
+            let extra = self
+                .root
+                .parse::<ShardStateUnsplit>()?
+                .load_custom()?
+                .context("missing masterchain state extra")?;
+            let block_at = |seqno: u32| -> Result<BlockId> {
+                if seqno == self.id.seqno {
+                    return Ok(self.id);
+                }
+                let (_, entry) = extra
+                    .prev_blocks
+                    .get(seqno)?
+                    .with_context(|| format!("missing previous masterchain block {seqno}"))?;
+                Ok(entry.block_ref.as_block_id(ShardIdent::MASTERCHAIN))
+            };
+            let mut last_mc_blocks = Vec::new();
+            for offset in 0..16 {
+                let Some(seqno) = self.id.seqno.checked_sub(offset) else {
+                    break;
+                };
+                last_mc_blocks.push(block_at(seqno)?);
+            }
+            let last_key_block = if extra.after_key_block || self.id.seqno == 0 {
+                self.id
+            } else if let Some(block) = extra.last_key_block {
+                block.as_block_id(ShardIdent::MASTERCHAIN)
+            } else {
+                block_at(0)?
+            };
+            let mut last_mc_blocks_100 = Vec::new();
+            if extra.config.get_global_version()?.version >= 9 {
+                let start = self.id.seqno / 100 * 100;
+                for offset in 0..16 {
+                    let Some(seqno) = start.checked_sub(offset * 100) else {
+                        break;
+                    };
+                    last_mc_blocks_100.push(block_at(seqno)?);
+                }
+            }
+            let config = self
+                .materialize(&CellBuilder::build_from(extra.config)?)?
+                .parse()?;
+            Ok(MasterchainContext {
+                config,
+                last_mc_blocks,
+                last_key_block,
+                last_mc_blocks_100,
+            })
+        })
+    }
+
+    /// Resolves a published library at this checkpoint and returns owned cells.
+    /// An unpublished hash returns `None`; database failures remain errors.
+    pub fn get_library(&self, hash: &tycho_types::cell::HashBytes) -> Result<Option<Cell>> {
+        self.reader.run(|| {
+            ensure!(
+                self.id.shard.is_masterchain(),
+                "libraries require masterchain state"
+            );
+            let state = self.root.parse::<ShardStateUnsplit>()?;
+            let Some(library) = state.libraries.get(hash)? else {
+                return Ok(None);
+            };
+            ensure!(library.lib.repr_hash() == hash, "library hash mismatch");
+            Ok(Some(self.materialize(&library.lib)?))
         })
     }
 

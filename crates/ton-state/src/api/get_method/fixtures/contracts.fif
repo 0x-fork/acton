@@ -1,0 +1,15 @@
+"Asm.fif" include
+
+// Emit one base64 code BoC per line, in the order used by contracts.json
+<{ DROP }>c boc>B B>base64 type cr
+<{ DROP NOW BLOCKLT LTIME RANDSEED BALANCE MYADDR 0 PUSHINT CONFIGOPTPARAM 13 GETPARAM }>c boc>B B>base64 type cr
+<{ DROP <{ }> PUSHCONT AGAIN }>c boc>B B>base64 type cr
+<{ DROP 42 THROW }>c boc>B B>base64 type cr
+<{ DROP 99 PUSHINT NEWC 32 STU ENDC c4 POP 7 PUSHINT }>c boc>B B>base64 type cr
+<{ DROP 1 PUSHINT RETALT }>c boc>B B>base64 type cr
+<{ DROP PUSHNAN }>c boc>B B>base64 type cr
+<{ DROP 3 LDU DROP }>c boc>B B>base64 type cr
+<{ DROP <{ 1 PUSHINT }> PUSHCONT }>c boc>B B>base64 type cr
+<{ DROP NEWC }>c boc>B B>base64 type cr
+<{ DROP 0 PUSHINT 65 PUSHINT <{ 1 TUPLE }> PUSHCONT REPEAT }>c boc>B B>base64 type cr
+<{ DROP 0 PUSHINT 10 PUSHINT <{ DUP 2 TUPLE }> PUSHCONT REPEAT }>c boc>B B>base64 type cr

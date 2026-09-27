@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests;
 
+pub(crate) mod get_method;
 pub(crate) mod transactions;
 
 use std::sync::Arc;
@@ -11,11 +12,11 @@ use axum::extract::rejection::QueryRejection;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::Serialize;
-use tokio::sync::watch;
+use tokio::sync::{Semaphore, watch};
 use ton_node_db::{AccountSnapshot, BlockIndex, StateSnapshot};
 use toncenter::v2::requests::AddressInformationRequest;
 use toncenter::v2::{self as v2, responses as wire};
@@ -28,6 +29,7 @@ struct Api {
     state: watch::Receiver<StateSnapshot>,
     zero_state: BlockId,
     history: Arc<BlockIndex>,
+    get_method_slot: Arc<Semaphore>,
 }
 
 /// Each request pins a complete committed frontier before dispatching its read.
@@ -41,6 +43,7 @@ pub(crate) fn router(
         .route("/api/v2/getMasterchainInfo", get(masterchain_info))
         .route("/api/v2/getAddressInformation", get(address_information))
         .route("/api/v2/getAddressBalance", get(address_balance))
+        .route("/api/v2/runGetMethod", post(get_method::run_get_method))
         .route(
             "/api/v2/getTransactions",
             get(transactions::get_transactions),
@@ -50,6 +53,9 @@ pub(crate) fn router(
             state,
             zero_state,
             history,
+            // The native emulator changes process-global logging state. Keep
+            // executions serial and reject overload instead of queuing work.
+            get_method_slot: Arc::new(Semaphore::new(1)),
         })
 }
 

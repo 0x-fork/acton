@@ -1,0 +1,95 @@
+[
+  {
+    "matches_toncenter": true,
+    "method": "seqno",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 913,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "num",
+          "0x27"
+        ]
+      ],
+      "status": 200
+    }
+  },
+  {
+    "matches_toncenter": true,
+    "method": 85143,
+    "response": {
+      "exit_code": 0,
+      "gas_used": 913,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "num",
+          "0x27"
+        ]
+      ],
+      "status": 200
+    }
+  },
+  {
+    "matches_toncenter": true,
+    "method": "0x14c97",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 913,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "num",
+          "0x27"
+        ]
+      ],
+      "status": 200
+    }
+  },
+  {
+    "matches_toncenter": true,
+    "method": "get_extensions",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 721,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "list",
+          {
+            "@type": "tvm.list",
+            "elements": []
+          }
+        ]
+      ],
+      "status": 200
+    }
+  },
+  {
+    "matches_toncenter": true,
+    "method": "missing_method",
+    "response": {
+      "exit_code": 11,
+      "gas_used": 570,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "num",
+          "0x1c924"
+        ]
+      ],
+      "status": 200
+    }
+  }
+]

@@ -1,0 +1,277 @@
+[
+  {
+    "case": "integer_aliases",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 23,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "num",
+          "-0x1"
+        ],
+        [
+          "num",
+          "-0x2"
+        ],
+        [
+          "num",
+          "0x7b"
+        ],
+        [
+          "num",
+          "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        ],
+        [
+          "num",
+          "-0x10000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      ],
+      "status": 200
+    }
+  },
+  {
+    "case": "cell_and_slice",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 23,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "cell",
+          {
+            "bytes": "te6ccgEBAQEABAAABBI0",
+            "object": {
+              "data": {
+                "b64": "EjQ=",
+                "len": 16
+              },
+              "refs": [],
+              "special": false
+            }
+          }
+        ],
+        [
+          "cell",
+          {
+            "bytes": "te6ccgEBAQEABAAABBI0",
+            "object": {
+              "data": {
+                "b64": "EjQ=",
+                "len": 16
+              },
+              "refs": [],
+              "special": false
+            }
+          }
+        ],
+        [
+          "cell",
+          {
+            "bytes": "te6ccgEBAQEABAAABBI0",
+            "object": {
+              "data": {
+                "b64": "EjQ=",
+                "len": 16
+              },
+              "refs": [],
+              "special": false
+            }
+          }
+        ],
+        [
+          "cell",
+          {
+            "bytes": "te6ccgEBAQEABAAABBI0",
+            "object": {
+              "data": {
+                "b64": "EjQ=",
+                "len": 16
+              },
+              "refs": [],
+              "special": false
+            }
+          }
+        ]
+      ],
+      "status": 200
+    }
+  },
+  {
+    "case": "empty_tuple",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 23,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "tuple",
+          {
+            "@type": "tvm.tuple",
+            "elements": []
+          }
+        ]
+      ],
+      "status": 200
+    }
+  },
+  {
+    "case": "empty_list",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 23,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "list",
+          {
+            "@type": "tvm.list",
+            "elements": []
+          }
+        ]
+      ],
+      "status": 200
+    }
+  },
+  {
+    "case": "list",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 23,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "list",
+          {
+            "@type": "tvm.list",
+            "elements": [
+              {
+                "@type": "tvm.stackEntryNumber",
+                "number": {
+                  "@type": "tvm.numberDecimal",
+                  "number": "123"
+                }
+              },
+              {
+                "@type": "tvm.stackEntryNumber",
+                "number": {
+                  "@type": "tvm.numberDecimal",
+                  "number": "123"
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "status": 200
+    }
+  },
+  {
+    "case": "nested",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 23,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "tuple",
+          {
+            "@type": "tvm.tuple",
+            "elements": [
+              {
+                "@type": "tvm.stackEntryNumber",
+                "number": {
+                  "@type": "tvm.numberDecimal",
+                  "number": "123"
+                }
+              },
+              {
+                "@type": "tvm.stackEntryTuple",
+                "tuple": {
+                  "@type": "tvm.tuple",
+                  "elements": [
+                    {
+                      "@type": "tvm.stackEntryNumber",
+                      "number": {
+                        "@type": "tvm.numberDecimal",
+                        "number": "123"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "status": 200
+    }
+  },
+  {
+    "case": "int_overflow",
+    "response": {
+      "body": {
+        "code": 400,
+        "error": "invalid or oversized TVM input stack",
+        "ok": false
+      },
+      "status": 400
+    }
+  },
+  {
+    "case": "invalid_sign",
+    "response": {
+      "body": {
+        "code": 400,
+        "error": "invalid or oversized TVM input stack",
+        "ok": false
+      },
+      "status": 400
+    }
+  },
+  {
+    "case": "too_many_arguments",
+    "response": {
+      "body": {
+        "code": 400,
+        "error": "invalid or oversized TVM input stack",
+        "ok": false
+      },
+      "status": 400
+    }
+  },
+  {
+    "case": "deep_list",
+    "response": {
+      "body": {
+        "code": 400,
+        "error": "invalid or oversized TVM input stack",
+        "ok": false
+      },
+      "status": 400
+    }
+  },
+  {
+    "case": "oversized_boc",
+    "response": {
+      "body": {
+        "code": 400,
+        "error": "invalid or oversized TVM input stack",
+        "ok": false
+      },
+      "status": 400
+    }
+  }
+]

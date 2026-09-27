@@ -1,0 +1,189 @@
+[
+  {
+    "input": [
+      "address",
+      "invalid"
+    ],
+    "response": {
+      "body": {
+        "code": 400,
+        "error": "invalid account address",
+        "ok": false
+      },
+      "status": 400
+    }
+  },
+  {
+    "input": [
+      "seqno",
+      -1
+    ],
+    "response": {
+      "body": {
+        "code": 400,
+        "error": "invalid masterchain seqno",
+        "ok": false
+      },
+      "status": 400
+    }
+  },
+  {
+    "input": [
+      "seqno",
+      99
+    ],
+    "response": {
+      "body": {
+        "code": 409,
+        "error": "only the current applied masterchain seqno is available",
+        "ok": false
+      },
+      "status": 409
+    }
+  },
+  {
+    "input": [
+      "seqno",
+      100
+    ],
+    "response": {
+      "exit_code": 0,
+      "gas_used": 913,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "num",
+          "0x27"
+        ]
+      ],
+      "status": 200
+    }
+  },
+  {
+    "input": [
+      "method",
+      ""
+    ],
+    "response": {
+      "body": {
+        "code": 400,
+        "error": "invalid get-method name",
+        "ok": false
+      },
+      "status": 400
+    }
+  },
+  {
+    "input": [
+      "method",
+      "4294967296"
+    ],
+    "response": {
+      "body": {
+        "code": 400,
+        "error": "get-method ID does not fit int32",
+        "ok": false
+      },
+      "status": 400
+    }
+  },
+  {
+    "input": [
+      "stack",
+      [
+        [
+          "num",
+          "broken"
+        ]
+      ]
+    ],
+    "response": {
+      "body": {
+        "code": 400,
+        "error": "invalid or oversized TVM input stack",
+        "ok": false
+      },
+      "status": 400
+    }
+  },
+  {
+    "input": [
+      "stack",
+      [
+        [
+          "cell",
+          {
+            "bytes": "broken"
+          }
+        ]
+      ]
+    ],
+    "response": {
+      "body": {
+        "code": 400,
+        "error": "invalid or oversized TVM input stack",
+        "ok": false
+      },
+      "status": 400
+    }
+  },
+  {
+    "input": [
+      "stack",
+      [
+        [
+          "unsupported",
+          ""
+        ]
+      ]
+    ],
+    "response": {
+      "body": {
+        "code": 400,
+        "error": "invalid or oversized TVM input stack",
+        "ok": false
+      },
+      "status": 400
+    }
+  },
+  {
+    "input": [
+      "extra",
+      true
+    ],
+    "response": {
+      "body": {
+        "code": 400,
+        "error": "invalid runGetMethod JSON body",
+        "ok": false
+      },
+      "status": 400
+    }
+  },
+  {
+    "body": {
+      "code": 400,
+      "error": "invalid runGetMethod JSON body",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 413,
+      "error": "invalid runGetMethod JSON body",
+      "ok": false
+    },
+    "status": 413
+  },
+  {
+    "body": {
+      "code": 429,
+      "error": "get-method executor is busy",
+      "ok": false
+    },
+    "status": 429
+  }
+]

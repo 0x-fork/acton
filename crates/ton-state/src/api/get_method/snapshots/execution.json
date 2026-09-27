@@ -1,0 +1,1098 @@
+[
+  {
+    "contract": "identity",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 23,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [],
+      "status": 200
+    },
+    "state_unchanged": true
+  },
+  {
+    "contract": "context",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 1149,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "num",
+          "0x6553f17b"
+        ],
+        [
+          "num",
+          "0x0"
+        ],
+        [
+          "num",
+          "0x0"
+        ],
+        [
+          "num",
+          "0x0"
+        ],
+        [
+          "tuple",
+          {
+            "@type": "tvm.tuple",
+            "elements": [
+              {
+                "@type": "tvm.stackEntryNumber",
+                "number": {
+                  "@type": "tvm.numberDecimal",
+                  "number": "109388167086"
+                }
+              },
+              {
+                "@type": "tvm.stackEntryCell",
+                "cell": {
+                  "@type": "tvm.cell",
+                  "bytes": "te6ccgEBAQEACQAADaAAAAAqC9w="
+                }
+              }
+            ]
+          }
+        ],
+        [
+          "cell",
+          {
+            "bytes": "te6ccgEBAQEAJAAAQ4ANx92Wjc9GAGzl0gZWH/7Cq+nAVilK9NdOZm/oUAp6czA=",
+            "object": {
+              "data": {
+                "b64": "gA3H3ZaNz0YAbOXSBlYf/sKr6cBWKUr0105mb+hQCnpzMA==",
+                "len": 267
+              },
+              "refs": [],
+              "special": false
+            }
+          }
+        ],
+        [
+          "cell",
+          {
+            "bytes": "te6ccgEBAQEAIgAAQFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV",
+            "object": {
+              "data": {
+                "b64": "VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=",
+                "len": 256
+              },
+              "refs": [],
+              "special": false
+            }
+          }
+        ],
+        [
+          "tuple",
+          {
+            "@type": "tvm.tuple",
+            "elements": [
+              {
+                "@type": "tvm.stackEntryTuple",
+                "tuple": {
+                  "@type": "tvm.tuple",
+                  "elements": [
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "100"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "15732969138680839953518163206963319593089093676025123103277043672085499083733"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "83431775562633802296038816739628773382644848446289900899521141401062800446883"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "99"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "44954575821546287635033441238667070107740111693719277803554120850130979742563"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "98"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "44500489197086224123568456983731039096550817636206961866144483265786222371426"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "97"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "44046402572626160612103472728795008085361523578694645928734845681441465000289"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "96"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "43592315948166097100638488473858977074172229521182329991325208097096707629152"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "95"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "43138229323706033589173504218922946062982935463670014053915570512751950258015"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "94"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "42684142699245970077708519963986915051793641406157698116505932928407192886878"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "93"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "42230056074785906566243535709050884040604347348645382179096295344062435515741"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "92"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "41775969450325843054778551454114853029415053291133066241686657759717678144604"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "91"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "41321882825865779543313567199178822018225759233620750304277020175372920773467"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "90"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "40867796201405716031848582944242791007036465176108434366867382591028163402330"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "89"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "40413709576945652520383598689306759995847171118596118429457745006683406031193"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "88"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "39959622952485589008918614434370728984657877061083802492048107422338648660056"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "87"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "39505536328025525497453630179434697973468583003571486554638469837993891288919"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "86"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "39051449703565461985988645924498666962279288946059170617228832253649133917782"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "85"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "38597363079105398474523661669562635951089994888546854679819194669304376546645"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "@type": "tvm.stackEntryTuple",
+                "tuple": {
+                  "@type": "tvm.tuple",
+                  "elements": [
+                    {
+                      "@type": "tvm.stackEntryNumber",
+                      "number": {
+                        "@type": "tvm.numberDecimal",
+                        "number": "-1"
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryNumber",
+                      "number": {
+                        "@type": "tvm.numberDecimal",
+                        "number": "9223372036854775808"
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryNumber",
+                      "number": {
+                        "@type": "tvm.numberDecimal",
+                        "number": "90"
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryNumber",
+                      "number": {
+                        "@type": "tvm.numberDecimal",
+                        "number": "40867796201405716031848582944242791007036465176108434366867382591028163402330"
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryNumber",
+                      "number": {
+                        "@type": "tvm.numberDecimal",
+                        "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "@type": "tvm.stackEntryTuple",
+                "tuple": {
+                  "@type": "tvm.tuple",
+                  "elements": [
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "100"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "15732969138680839953518163206963319593089093676025123103277043672085499083733"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "83431775562633802296038816739628773382644848446289900899521141401062800446883"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "@type": "tvm.stackEntryTuple",
+                      "tuple": {
+                        "@type": "tvm.tuple",
+                        "elements": [
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "-1"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "9223372036854775808"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "0"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "0"
+                            }
+                          },
+                          {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                              "@type": "tvm.numberDecimal",
+                              "number": "454086624460063511464984254936031011189294057512315937409637584344757371137"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      ],
+      "status": 200
+    },
+    "state_unchanged": true
+  },
+  {
+    "contract": "out_of_gas",
+    "response": {
+      "exit_code": -14,
+      "gas_used": 1000004,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "num",
+          "0xf4244"
+        ]
+      ],
+      "status": 200
+    },
+    "state_unchanged": true
+  },
+  {
+    "contract": "throw",
+    "response": {
+      "exit_code": 42,
+      "gas_used": 94,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "num",
+          "0x0"
+        ]
+      ],
+      "status": 200
+    },
+    "state_unchanged": true
+  },
+  {
+    "contract": "write_data",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 655,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "num",
+          "0x7"
+        ]
+      ],
+      "status": 200
+    },
+    "state_unchanged": true
+  },
+  {
+    "contract": "alternative_return",
+    "response": {
+      "exit_code": 1,
+      "gas_used": 62,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "num",
+          "0x1"
+        ]
+      ],
+      "status": 200
+    },
+    "state_unchanged": true
+  },
+  {
+    "contract": "nan",
+    "response": {
+      "body": {
+        "code": 500,
+        "error": "state query failed; see service logs",
+        "ok": false
+      },
+      "status": 500
+    },
+    "state_unchanged": true
+  },
+  {
+    "contract": "slice_offset",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 67,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "num",
+          "0x0"
+        ]
+      ],
+      "status": 200
+    },
+    "state_unchanged": true
+  },
+  {
+    "contract": "continuation",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 41,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "unsupported",
+          ""
+        ]
+      ],
+      "status": 200
+    },
+    "state_unchanged": true
+  },
+  {
+    "contract": "builder",
+    "response": {
+      "exit_code": 0,
+      "gas_used": 41,
+      "lt": "899",
+      "mc_seqno": 100,
+      "ok": true,
+      "stack": [
+        [
+          "unsupported",
+          ""
+        ]
+      ],
+      "status": 200
+    },
+    "state_unchanged": true
+  },
+  {
+    "contract": "deep_result",
+    "response": {
+      "body": {
+        "code": 500,
+        "error": "state query failed; see service logs",
+        "ok": false
+      },
+      "status": 500
+    },
+    "state_unchanged": true
+  },
+  {
+    "contract": "shared_tuple_result",
+    "response": {
+      "body": {
+        "code": 500,
+        "error": "state query failed; see service logs",
+        "ok": false
+      },
+      "status": 500
+    },
+    "state_unchanged": true
+  }
+]

@@ -61,6 +61,9 @@ All notable changes to this project will be documented in this file.
   with a generated utoipa specification at `/openapi.json`.
   `getTransactions` reads account history from cached blocks through a persistent
   block logical-time index, with `address`, `limit`, and `lt`/`hash` pagination.
+  `runGetMethod` executes get methods locally with TON Center v2 requests and
+  results, using account state, network configuration, previous blocks, and
+  libraries from one committed checkpoint, with bounded gas and concurrency.
 
 ### Actonscan
 

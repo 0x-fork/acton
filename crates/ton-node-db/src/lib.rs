@@ -11,7 +11,7 @@ pub mod package;
 
 pub use history::{BlockIndex, BlockTransaction, TransactionReader};
 pub use lazy::ReadStats;
-pub use state::{AccountSnapshot, StateView};
+pub use state::{AccountSnapshot, MasterchainContext, StateView};
 pub use store::{StateSnapshot, StateStore};
 
 use std::collections::{BTreeMap, BTreeSet};

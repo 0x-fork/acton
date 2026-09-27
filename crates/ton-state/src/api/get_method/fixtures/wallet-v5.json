@@ -1,0 +1,62 @@
+{
+  "source": "https://toncenter.com/api/v2",
+  "captured_at": "2026-09-27",
+  "address": "0:6e3eecb46e7a3003672e9032b0fff6155f4e02b14a57a6ba73337f428053d399",
+  "account": {
+    "@type": "raw.fullAccountState",
+    "balance": "109388167086",
+    "extra_currencies": [],
+    "last_transaction_id": {
+      "@type": "internal.transactionId",
+      "lt": "86276239000033",
+      "hash": "aUuIvUG06NEO9NLeiQebU5CrqWRDNhg5D6HwQdzs2Ik="
+    },
+    "block_id": {
+      "@type": "ton.blockIdExt",
+      "workchain": -1,
+      "shard": "-9223372036854775808",
+      "seqno": 95373172,
+      "root_hash": "5pY7Vb2Fj86wODnUqyDwALdFQHbYRYNVd7hERzfSs8s=",
+      "file_hash": "OVD1fhy/oGweDHr2cTdZDvbFuplsh2Y/tpla9Z2k2GQ="
+    },
+    "code": "te6cckECFAEAAoEAART/APSkE/S88sgLAQIBIAIDAgFIBAUBAvIOAtzQINdJwSCRW49jINcLHyCCEGV4dG69IYIQc2ludL2wkl8D4IIQZXh0brqOtIAg1yEB0HTXIfpAMPpE+Cj6RDBYvZFb4O1E0IEBQdch9AWDB/QOb6ExkTDhgEDXIXB/2zzgMSDXSYECgLmRMOBw4hAPAgEgBgcCASAICQAZvl8PaiaECAoOuQ+gLAIBbgoLAgFIDA0AGa3OdqJoQCDrkOuF/8AAGa8d9qJoQBDrkOuFj8AAF7Ml+1E0HHXIdcLH4AARsmL7UTQ1woAgAR4g1wsfghBzaWduuvLgin8PAeaO8O2i7fshgwjXIgKDCNcjIIAg1yHTH9Mf0x/tRNDSANMfINMf0//XCgAK+QFAzPkQmiiUXwrbMeHywIffArNQB7Dy0IRRJbry4IVQNrry4Ib4I7vy0IgikvgA3gGkf8jKAMsfAc8Wye1UIJL4D95w2zzYEAP27aLt+wL0BCFukmwhjkwCIdc5MHCUIccAs44tAdcoIHYeQ2wg10nACPLgkyDXSsAC8uCTINcdBscSwgBSMLDy0InXTNc5MAGk6GwShAe78uCT10rAAPLgk+1V4tIAAcAAkVvg69csCBQgkXCWAdcsCBwS4lIQseMPINdKERITAJYB+kAB+kT4KPpEMFi68uCR7UTQgQFB1xj0BQSdf8jKAEAEgwf0U/Lgi44UA4MH9Fvy4Iwi1woAIW4Bs7Dy0JDiyFADzxYS9ADJ7VQAcjDXLAgkji0h8uCS0gDtRNDSAFETuvLQj1RQMJExnAGBAUDXIdcKAPLgjuLIygBYzxbJ7VST8sCN4gAQk1vbMeHXTNCon9ZI",
+    "data": "te6cckEBAQEAKwAAUYAAABO///+I31AzTjEOSH6cYtaboLtJ2kigpT8XMXqq3ihGuziCLnsgDGrVag==",
+    "frozen_hash": "",
+    "sync_utime": 1790499883,
+    "state": "active",
+    "suspended": false
+  },
+  "seqno": {
+    "gas_used": 913,
+    "exit_code": 0,
+    "stack": [
+      [
+        "num",
+        "0x27"
+      ]
+    ]
+  },
+  "get_extensions": {
+    "gas_used": 721,
+    "exit_code": 0,
+    "stack": [
+      [
+        "list",
+        {
+          "@type": "tvm.list",
+          "elements": []
+        }
+      ]
+    ]
+  },
+  "missing_method": {
+    "gas_used": 570,
+    "exit_code": 11,
+    "stack": [
+      [
+        "num",
+        "0x1c924"
+      ]
+    ]
+  }
+}

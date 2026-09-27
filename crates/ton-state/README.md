@@ -82,6 +82,66 @@ or JSON-RPC.
 The reported checkpoint can lag behind the network head. Network errors cause
 download retries. An invalid state update or a storage error stops the service.
 
+## Run a get method
+
+Call the elector's `active_election_id` method:
+
+```sh
+curl -s http://127.0.0.1:8080/api/v2/runGetMethod \
+  -H 'Content-Type: application/json' \
+  --data-binary '{"address":"-1:3333333333333333333333333333333333333333333333333333333333333333","method":"active_election_id","stack":[]}' \
+  | jq
+```
+
+`method` accepts a name, an int32 ID, or a decimal/hexadecimal ID string.
+Names use `crc16(name) | 0x10000`. The request uses TON Center v2 stack entries:
+
+- Integers: `["num", "123"]` or `["num", "-0x7b"]`. The aliases `int`, `integer`,
+  and `number` also work. Values must fit signed TVM int257.
+- Cells and slices: `["tvm.Cell", "<base64 BoC>"]` or
+  `["tvm.Slice", "<base64 BoC>"]`. The `cell` and `slice` tags take
+  `{ "bytes": "<base64 BoC>" }` instead.
+- Tuples and lists: `["tuple", { "@type": "tvm.tuple", "elements": [...] }]`
+  or `["list", { "@type": "tvm.list", "elements": [...] }]`.
+  Their elements use standard TONLib objects, such as
+  `{ "@type": "tvm.stackEntryNumber", "number": { "@type": "tvm.numberDecimal", "number": "123" } }`.
+
+The response contains `ok: true` and a `smc.runResult` with `gas_used`, `exit_code`,
+`stack`, `block_id`, and `last_transaction_id`. A VM failure still returns HTTP 200.
+Check `exit_code`: 0 and 1 mean success. An account without executable code returns
+-13 with the arguments and method ID on the stack. A missing library produces the
+VM's failure result. Infrastructure failures return `ok: false`.
+
+Output integers use hexadecimal strings. Top-level slices use the `cell` tag,
+as in TON Center. Cells include their base64 BoC and expanded `object`.
+Nested values retain TONLib tags. Null becomes an empty list, while an empty tuple
+stays a tuple. Builders and continuations become `unsupported` entries.
+NaN cannot be encoded as a legacy integer and returns an API error.
+
+Execution uses one committed checkpoint for the account, configuration, previous
+blocks, and published libraries. `NOW` reads the account's shard-state time.
+The balance includes extra currencies. Configuration controls the TVM version.
+The context follows TONLib: random seed, logical times, and due payment are zero.
+Direct `liteServer.runSmcMethod` uses different context values and a smaller gas limit.
+Execution never saves data or code changes and never submits messages.
+
+The gas limit is 1,000,000. Up to eight missing libraries can be loaded from the
+same checkpoint before execution is rejected. One execution runs at a time;
+concurrent requests return HTTP 429. Disconnecting does not release that slot
+until the VM finishes. Other HTTP methods and synchronization remain independent.
+
+Requests are limited to 2 MiB, 256 top-level arguments, 1,000 decoded values,
+64 levels of nesting, and 1 MiB of encoded cell arguments. Results have corresponding
+value, nesting, and byte limits, including expanded cell objects.
+`seqno` must equal the current checkpoint; other heights return HTTP 409.
+This route supports POST and does not expose state overrides or JSON-RPC.
+
+The compatibility references are TON's
+[`TonlibClient.cpp`](https://github.com/ton-blockchain/ton/blob/master/tonlib/tonlib/TonlibClient.cpp),
+[`SmartContract.cpp`](https://github.com/ton-blockchain/ton/blob/master/crypto/smc-envelope/SmartContract.cpp),
+and TON Center's
+[`runmethod.hpp`](https://github.com/toncenter/ton-http-api-cpp/blob/master/ton-http-api/src/converters/runmethod.hpp).
+
 ## Read account transactions
 
 Read the elector's ten latest retained transactions:

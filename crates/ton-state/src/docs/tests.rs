@@ -99,6 +99,7 @@ async fn reference_serves_only_supported_operations() {
             "GET /api/v2/getAddressInformation",
             "GET /api/v2/getMasterchainInfo",
             "GET /api/v2/getTransactions",
+            "POST /api/v2/runGetMethod",
             "POST /api/v2/sendBoc",
             "POST /api/v2/sendBocAndWaitTrace",
             "POST /api/v2/sendBocAndWaitTransaction"
