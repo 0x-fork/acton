@@ -76,10 +76,10 @@ async fn main() -> Result<()> {
     let sender = client.message_sender();
     let source = P2pBlockSource::new(client)?;
     let (checkpoints, state) = watch::channel(store.snapshot());
-    let transactions = streaming::Transactions::default();
+    let subscriptions = streaming::Subscriptions::default();
     let confirmations = confirmation::Confirmations::default();
     let router = api::router(state.clone(), config.zero_state(), Arc::clone(&history))
-        .merge(transactions.clone().router())
+        .merge(subscriptions.clone().router())
         .merge(submit::router(sender, confirmations.clone()))
         .merge(docs::router());
     let listener = tokio::net::TcpListener::bind(args.http)
@@ -97,21 +97,21 @@ async fn main() -> Result<()> {
         "serving the applied state and synchronizing through P2P",
     );
 
-    let shutdown_transactions = transactions.clone();
+    let shutdown_subscriptions = subscriptions.clone();
     let synchronization = sync::run(
         store,
         source,
         checkpoints,
-        transactions.clone(),
+        subscriptions.clone(),
         confirmations.clone(),
         history,
     );
-    drop(transactions);
+    drop(subscriptions);
     let result = tokio::select! {
         result = synchronization => result,
         result = axum::serve(listener, router).with_graceful_shutdown(async move {
             shutdown().await;
-            shutdown_transactions.close();
+            shutdown_subscriptions.close();
             confirmations.close();
         }) => {
             result.context("HTTP server failed")

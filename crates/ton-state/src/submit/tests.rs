@@ -422,7 +422,7 @@ async fn past_batches_are_not_replayed_and_sse_failure_does_not_interrupt_waitin
     let task = tokio::spawn(app.oneshot(request(json!({"boc": Boc::encode_base64(message())}))));
     tokio::time::timeout(Duration::from_secs(3), started.notified()).await?;
     let no_replay = !task.is_finished();
-    crate::streaming::Transactions::default().fail();
+    crate::streaming::Subscriptions::default().fail();
     tokio::task::yield_now().await;
     let unaffected_by_sse = !task.is_finished();
     confirmations.publish(&batch)?;

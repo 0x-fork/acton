@@ -1,0 +1,97 @@
+[
+  {
+    "account_state": {
+      "@type": "raw.fullAccountState",
+      "balance": "1234567890",
+      "block_id": {
+        "@type": "ton.blockIdExt",
+        "file_hash": "+H/n7YIXDXuOaI28sghfQthuD/p+cDpoXZ+dEiAz9Ss=",
+        "root_hash": "sAxepTZPJUZDNl5TPgYnFKc04ZM5NoTmMFrkiojofHM=",
+        "seqno": 42,
+        "shard": "-9223372036854775808",
+        "workchain": -1
+      },
+      "code": "",
+      "data": "",
+      "extra_currencies": [
+        {
+          "@type": "extraCurrency",
+          "amount": "44",
+          "id": 7
+        }
+      ],
+      "frozen_hash": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=",
+      "last_transaction_id": {
+        "@type": "internal.transactionId",
+        "hash": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=",
+        "lt": "899"
+      },
+      "state": "frozen",
+      "suspended": false,
+      "sync_utime": 1700000000
+    },
+    "address": "0:0202020202020202020202020202020202020202020202020202020202020202",
+    "finality": "finalized",
+    "type": "account_state"
+  },
+  {
+    "account_state": {
+      "@type": "raw.fullAccountState",
+      "balance": "1234567890",
+      "block_id": {
+        "@type": "ton.blockIdExt",
+        "file_hash": "+H/n7YIXDXuOaI28sghfQthuD/p+cDpoXZ+dEiAz9Ss=",
+        "root_hash": "sAxepTZPJUZDNl5TPgYnFKc04ZM5NoTmMFrkiojofHM=",
+        "seqno": 42,
+        "shard": "-9223372036854775808",
+        "workchain": -1
+      },
+      "extra_currencies": [
+        {
+          "@type": "extraCurrency",
+          "amount": "44",
+          "id": 7
+        }
+      ],
+      "frozen_hash": "",
+      "last_transaction_id": {
+        "@type": "internal.transactionId",
+        "hash": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=",
+        "lt": "899"
+      },
+      "state": "uninitialized",
+      "suspended": false,
+      "sync_utime": 1700000000
+    },
+    "address": "0:0202020202020202020202020202020202020202020202020202020202020202",
+    "finality": "finalized",
+    "type": "account_state"
+  },
+  {
+    "account_state": {
+      "@type": "raw.fullAccountState",
+      "balance": "0",
+      "block_id": {
+        "@type": "ton.blockIdExt",
+        "file_hash": "+H/n7YIXDXuOaI28sghfQthuD/p+cDpoXZ+dEiAz9Ss=",
+        "root_hash": "sAxepTZPJUZDNl5TPgYnFKc04ZM5NoTmMFrkiojofHM=",
+        "seqno": 42,
+        "shard": "-9223372036854775808",
+        "workchain": -1
+      },
+      "extra_currencies": [],
+      "frozen_hash": "",
+      "last_transaction_id": {
+        "@type": "internal.transactionId",
+        "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "lt": "0"
+      },
+      "state": "uninitialized",
+      "suspended": false,
+      "sync_utime": 1700000000
+    },
+    "address": "0:0202020202020202020202020202020202020202020202020202020202020202",
+    "finality": "finalized",
+    "type": "account_state"
+  }
+]

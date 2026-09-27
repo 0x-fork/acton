@@ -205,7 +205,12 @@ HTTP 504 returns `error: "trace_wait_timeout"`. A timeout does not stop executio
 HTTP 503 with `trace_pending_messages_limit_exceeded` means the trace exceeded
 16,384 pending internal messages. Both wait routes share the 64 observation slots.
 
-## Subscribe to finalized transactions
+## Subscribe to finalized transactions and account states
+
+Open `/account` in a browser, enter an address, and press Enter to view its live
+state. The page reconnects and reads a fresh snapshot after a disconnection.
+Select **Without code/data** to subscribe with `include_code_data: false` and hide
+both fields from the displayed state. The choice is preserved in the page URL.
 
 Open a live SSE subscription on the same HTTP listener:
 
@@ -222,7 +227,8 @@ object with TON Center v3 fields. The service sends `: keepalive` comments after
 
 Subscriptions accept 1–100 raw or user-friendly addresses. An address matches
 the transaction's account, not its message destinations. Repeated forms of the
-same address produce one event. `types` defaults to `["transactions"]` and
+same address produce one event. `types` accepts `"transactions"`,
+`"account_states"`, or both, and defaults to `["transactions"]`.
 `min_finality` defaults to `"finalized"`. Other event types, finality levels,
 and subscription fields return HTTP 400.
 
@@ -241,6 +247,56 @@ without TON Center's trace grouping. See the reference
 [SSE subscription](https://docs.ton.org/api/streaming/sse) and
 [notification schemas](https://docs.ton.org/api/streaming/reference).
 
+To receive account state updates, select `account_states`:
+
+```sh
+curl -N http://127.0.0.1:8080/api/streaming/v2/sse \
+  -H 'Content-Type: application/json' \
+  -d '{"types":["account_states"],"addresses":["-1:3333333333333333333333333333333333333333333333333333333333333333"]}'
+```
+
+Each update contains `type: "account_state"`, `finality: "finalized"`, the raw
+`address`, and `account_state` with the same fields as the `result` of
+`getAddressInformation`: balance in nanograms, extra currencies, code/data BoCs,
+last transaction ID, block ID, sync time, frozen hash, state, and suspended flag.
+The suspended flag is currently always false, as in the HTTP response.
+
+The first event for each account on a connection includes both `code` and `data`.
+Later events include each of those fields only when its cell changes. An absent
+field means unchanged; an empty string clears the field. All other fields are
+sent in full on every event, including `block_id` and `last_transaction_id`.
+Reconnecting starts a fresh baseline and sends both fields again on the next event.
+
+Set `include_code_data: false` to exclude both BoCs from every account state event,
+including the first event and any changes or clearing of those fields:
+
+```json
+{
+  "types": ["account_states"],
+  "addresses": ["-1:3333333333333333333333333333333333333333333333333333333333333333"],
+  "include_code_data": false
+}
+```
+
+All other fields remain complete. Omitted, `null`, or `true` keeps the default
+code/data behavior. The flag does not affect transaction events.
+
+An account with transactions in the committed batch produces one state event,
+even if it has several transactions or appears in several shard blocks. The event
+contains its state after the entire batch; deleted accounts use the same
+zero-balance uninitialized representation as the HTTP API. Unchanged accounts do
+not produce events just because the checkpoint or shard timestamp advances.
+For `types: ["transactions", "account_states"]`, transaction events precede the
+account state events for that batch.
+
+The stream sends no initial account snapshot. To establish a starting state,
+open the subscription first, then call `getAddressInformation` and reconcile
+queued events using `account_state.block_id.seqno`, the masterchain checkpoint.
+Maintain the stream's code/data baseline even for queued events older than that
+HTTP snapshot, and display the reconstructed state only once its checkpoint
+reaches the displayed snapshot. This prevents older code/data from overwriting
+newer HTTP values while preserving changes needed by subsequent stream events.
+
 Delivery is live only. Events published before subscription, during disconnection,
 or across process restarts are not replayed. `Last-Event-ID` returns HTTP 400.
 Clients must treat a disconnect as a possible gap and reconcile separately if
@@ -249,7 +305,7 @@ they need a complete history.
 At most 64 connections are accepted. Each has a queue limited to 32 events and
 2 MiB of serialized data. Queue overflow sends
 `{"type":"error","error":"slow_consumer"}` and ends that connection.
-An encoding failure or an event larger than 1 MiB ends current subscriptions
+A state-read or encoding failure, or an event larger than 1 MiB, ends current subscriptions
 with `{"type":"error","error":"stream_failed"}`. State synchronization
 continues. Reconnect creates a new live subscription and does not recover the gap.
 

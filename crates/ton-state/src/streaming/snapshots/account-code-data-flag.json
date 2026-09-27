@@ -1,0 +1,74 @@
+[
+  {
+    "code": null,
+    "data": null,
+    "include_code_data": false,
+    "small_fields_match_http": true,
+    "transaction_matches_other_subscriptions": true,
+    "transaction_type": "transaction"
+  },
+  {
+    "code": "te6ccgEBAQEABgAACAAAAAE=",
+    "data": "te6ccgEBAQEABgAACAAAAAs=",
+    "include_code_data": true,
+    "small_fields_match_http": true,
+    "transaction_matches_other_subscriptions": true,
+    "transaction_type": "transaction"
+  },
+  {
+    "code": "te6ccgEBAQEABgAACAAAAAE=",
+    "data": "te6ccgEBAQEABgAACAAAAAs=",
+    "include_code_data": null,
+    "small_fields_match_http": true,
+    "transaction_matches_other_subscriptions": true,
+    "transaction_type": "transaction"
+  },
+  {
+    "code": null,
+    "data": null,
+    "include_code_data": false,
+    "small_fields_match_http": true,
+    "transaction_matches_other_subscriptions": true,
+    "transaction_type": "transaction"
+  },
+  {
+    "code": "te6ccgEBAQEABgAACAAAAAI=",
+    "data": "te6ccgEBAQEABgAACAAAAAw=",
+    "include_code_data": true,
+    "small_fields_match_http": true,
+    "transaction_matches_other_subscriptions": true,
+    "transaction_type": "transaction"
+  },
+  {
+    "code": "te6ccgEBAQEABgAACAAAAAI=",
+    "data": "te6ccgEBAQEABgAACAAAAAw=",
+    "include_code_data": null,
+    "small_fields_match_http": true,
+    "transaction_matches_other_subscriptions": true,
+    "transaction_type": "transaction"
+  },
+  {
+    "code": null,
+    "data": null,
+    "include_code_data": false,
+    "small_fields_match_http": true,
+    "transaction_matches_other_subscriptions": true,
+    "transaction_type": "transaction"
+  },
+  {
+    "code": "",
+    "data": "",
+    "include_code_data": true,
+    "small_fields_match_http": true,
+    "transaction_matches_other_subscriptions": true,
+    "transaction_type": "transaction"
+  },
+  {
+    "code": "",
+    "data": "",
+    "include_code_data": null,
+    "small_fields_match_http": true,
+    "transaction_matches_other_subscriptions": true,
+    "transaction_type": "transaction"
+  }
+]

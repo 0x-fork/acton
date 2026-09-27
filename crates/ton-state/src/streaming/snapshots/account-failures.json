@@ -1,0 +1,18 @@
+[
+  {
+    "closed": true,
+    "error": "cannot read streaming account 0:0202020202020202020202020202020202020202020202020202020202020202: state unavailable",
+    "event": {
+      "error": "stream_failed",
+      "type": "error"
+    }
+  },
+  {
+    "closed": true,
+    "error": "streaming account 0:0202020202020202020202020202020202020202020202020202020202020202 belongs to a different checkpoint",
+    "event": {
+      "error": "stream_failed",
+      "type": "error"
+    }
+  }
+]

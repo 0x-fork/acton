@@ -29,6 +29,14 @@ All notable changes to this project will be documented in this file.
   `getMasterchainInfo`, `getAddressInformation`, and `getAddressBalance` over
   TON Center API v2 HTTP routes from the last applied state, plus finalized
   transaction subscriptions over SSE with address filters and TON Center v3 fields.
+  SSE subscriptions also support account state updates in the
+  `getAddressInformation` format, once per changed account and committed checkpoint.
+  Each subscription receives code and data on its first account event and then
+  only when those fields change; all other state fields remain complete.
+  Subscriptions can set `include_code_data: false` to omit both BoCs entirely.
+  `/account` displays a live account state from an address input and keeps it
+  updated through SSE, reconnecting and refreshing the snapshot after a gap.
+  Its code/data checkbox switches subscription mode and preserves the choice in the URL.
   Account responses report their shard-state time in `sync_utime`.
   HTTP requests pin one committed checkpoint without waiting for block application.
   P2P responses do not wait for periodic peer-rating writes; statistics are

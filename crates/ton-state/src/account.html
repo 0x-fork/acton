@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Account state</title>
+    <link rel="icon" href="data:," />
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        color: #171717;
+        background: #fff;
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      }
+      main { max-width: 1280px; margin: 0 auto; padding: 72px 48px; }
+      #address {
+        display: block;
+        width: 100%;
+        padding: 12px 0 24px;
+        border: 0;
+        border-bottom: 1px solid #ddd;
+        border-radius: 0;
+        outline: none;
+        background: #fff;
+        color: inherit;
+        font: inherit;
+        font-size: clamp(24px, 3.5vw, 44px);
+        letter-spacing: -0.035em;
+      }
+      #address::placeholder { color: #999; }
+      #address:focus { border-color: #171717; }
+      .controls {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px 24px;
+        margin: 18px 0 36px;
+        font-size: 14px;
+      }
+      #status { min-height: 20px; margin: 0; color: #707070; }
+      .option { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+      .option input { width: 14px; height: 14px; margin: 0; accent-color: #171717; }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font: 14px/1.75 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        tab-size: 2;
+      }
+      @media (max-width: 600px) {
+        main { padding: 32px 20px; }
+        pre { font-size: 12px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <form id="form">
+        <input id="address" aria-label="Account address" aria-describedby="status"
+          placeholder="Account address" autocomplete="off" autocapitalize="off"
+          spellcheck="false" enterkeyhint="go" required />
+      </form>
+      <div class="controls">
+        <p id="status" role="status">Enter an address and press Enter</p>
+        <label class="option"><input id="omit-code-data" type="checkbox" />Without code/data</label>
+      </div>
+      <pre id="state" aria-label="Account state" hidden></pre>
+      <noscript>Enable JavaScript to receive live account updates</noscript>
+    </main>
+    <script>
+      const input = document.querySelector('#address')
+      const omitCodeData = document.querySelector('#omit-code-data')
+      const status = document.querySelector('#status')
+      const output = document.querySelector('#state')
+      let current
+
+      function render(state, session) {
+        if (session.signal.aborted || state.block_id.seqno < session.seqno) return
+        session.seqno = state.block_id.seqno
+        const displayed = { ...state }
+        if (!session.includeCodeData) {
+          delete displayed.code
+          delete displayed.data
+        }
+        output.textContent = JSON.stringify(displayed, null, 2)
+        output.hidden = false
+        status.textContent = `Live · Updated ${new Date().toLocaleTimeString()}`
+      }
+
+      async function connect(address, session, signal) {
+        const response = await fetch('/api/streaming/v2/sse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            types: ['account_states'], addresses: [address], include_code_data: session.includeCodeData,
+          }),
+          signal,
+        })
+        if (!response.ok) {
+          throw Object.assign(new Error(`Subscription failed (${response.status})`), {
+            permanent: response.status === 400,
+          })
+        }
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let subscribed = false
+        let streamedState
+        try {
+          while (!signal.aborted) {
+            const { value, done } = await reader.read()
+            if (done) throw new Error('Stream disconnected')
+            buffer += decoder.decode(value, { stream: true })
+            let boundary
+            while ((boundary = /\r?\n\r?\n/.exec(buffer))) {
+              const message = buffer.slice(0, boundary.index)
+              buffer = buffer.slice(boundary.index + boundary[0].length)
+              const data = message.split(/\r?\n/)
+                .filter(line => line.startsWith('data:'))
+                .map(line => line.slice(5).replace(/^ /, '')).join('\n')
+              if (!data) continue
+              const event = JSON.parse(data)
+              if (event.type === 'error') throw new Error(event.error)
+              if (event.status === 'subscribed' && !subscribed) {
+                subscribed = true
+                // Register the live stream before reading the snapshot. Older queued
+                // events cannot overwrite a newer HTTP checkpoint.
+                const initial = await fetch(`/api/v2/getAddressInformation?${new URLSearchParams({ address })}`, {
+                  signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
+                  cache: 'no-store',
+                })
+                if (!initial.ok) throw new Error(`State unavailable (${initial.status})`)
+                const body = await initial.json()
+                if (!body.ok) throw new Error('State unavailable')
+                render(body.result, session)
+              } else if (event.type === 'account_state') {
+                const state = event.account_state
+                if (!session.includeCodeData) {
+                  render(state, session)
+                  continue
+                }
+                if (!streamedState && (typeof state.code !== 'string' || typeof state.data !== 'string')) {
+                  throw new Error('Missing initial account code or data')
+                }
+                // Keep the stream baseline even when its checkpoint is older than
+                // the HTTP snapshot. Only code/data may be absent from later events.
+                streamedState = {
+                  ...state,
+                  code: state.code ?? streamedState?.code,
+                  data: state.data ?? streamedState?.data,
+                }
+                render(streamedState, session)
+              }
+            }
+          }
+        } finally {
+          await reader.cancel().catch(() => {})
+        }
+      }
+
+      async function watch(address, session) {
+        let delay = 1000
+        while (!session.signal.aborted) {
+          const attempt = new AbortController()
+          try {
+            await connect(address, session, AbortSignal.any([session.signal, attempt.signal]))
+          } catch (error) {
+            if (session.signal.aborted) return
+            if (error.permanent) {
+              status.textContent = 'Enter a valid account address'
+              return
+            }
+            status.textContent = 'Connection interrupted · Reconnecting'
+          } finally {
+            attempt.abort()
+          }
+          // A fresh subscription and HTTP read reconcile any missed updates.
+          await new Promise(resolve => {
+            const done = () => {
+              clearTimeout(timer)
+              session.signal.removeEventListener('abort', done)
+              resolve()
+            }
+            const timer = setTimeout(done, delay)
+            session.signal.addEventListener('abort', done, { once: true })
+          })
+          delay = Math.min(delay * 2, 15000)
+        }
+      }
+
+      function startSubscription() {
+        current?.abort()
+        const address = input.value.trim()
+        output.textContent = ''
+        output.hidden = true
+        const url = new URL(location.href)
+        if (address) url.searchParams.set('address', address)
+        else url.searchParams.delete('address')
+        if (omitCodeData.checked) url.searchParams.set('include_code_data', 'false')
+        else url.searchParams.delete('include_code_data')
+        history.replaceState(null, '', url)
+        if (!address) {
+          status.textContent = 'Enter an address and press Enter'
+          return
+        }
+        current = new AbortController()
+        current.seqno = -1
+        current.includeCodeData = !omitCodeData.checked
+        status.textContent = 'Connecting'
+        watch(address, current)
+      }
+
+      document.querySelector('#form').addEventListener('submit', event => {
+        event.preventDefault()
+        startSubscription()
+      })
+      omitCodeData.addEventListener('change', startSubscription)
+
+      const params = new URL(location.href).searchParams
+      omitCodeData.checked = params.get('include_code_data') === 'false'
+      const address = params.get('address')
+      if (address) {
+        input.value = address
+        document.querySelector('#form').requestSubmit()
+      }
+    </script>
+  </body>
+</html>

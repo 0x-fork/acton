@@ -1,0 +1,93 @@
+{
+  "basechain_event": {
+    "account_state": {
+      "@type": "raw.fullAccountState",
+      "balance": "1234567890",
+      "block_id": {
+        "@type": "ton.blockIdExt",
+        "file_hash": "q9f1Tizq8bg4NTz/JFNY24r6z9J1igV9ZiJjdkXcQus=",
+        "root_hash": "ltNJftvZGvOl5Pm72GWjI6vGuLE55SsgYIjkeugJnLg=",
+        "seqno": 42,
+        "shard": "-9223372036854775808",
+        "workchain": -1
+      },
+      "code": "te6ccgEBAQEABgAACAAAAHs=",
+      "data": "te6ccgEBAQEABgAACAAAAcg=",
+      "extra_currencies": [
+        {
+          "@type": "extraCurrency",
+          "amount": "44",
+          "id": 7
+        }
+      ],
+      "frozen_hash": "",
+      "last_transaction_id": {
+        "@type": "internal.transactionId",
+        "hash": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=",
+        "lt": "899"
+      },
+      "state": "active",
+      "suspended": false,
+      "sync_utime": 1700000000
+    },
+    "address": "0:0202020202020202020202020202020202020202020202020202020202020202",
+    "finality": "finalized",
+    "type": "account_state"
+  },
+  "combined_types": [
+    "transaction",
+    "transaction",
+    "account_state"
+  ],
+  "idle_after_batch": [
+    true,
+    true,
+    true,
+    true
+  ],
+  "masterchain_event": {
+    "account_state": {
+      "@type": "raw.fullAccountState",
+      "balance": "1234567890",
+      "block_id": {
+        "@type": "ton.blockIdExt",
+        "file_hash": "q9f1Tizq8bg4NTz/JFNY24r6z9J1igV9ZiJjdkXcQus=",
+        "root_hash": "ltNJftvZGvOl5Pm72GWjI6vGuLE55SsgYIjkeugJnLg=",
+        "seqno": 42,
+        "shard": "-9223372036854775808",
+        "workchain": -1
+      },
+      "code": "te6ccgEBAQEABgAACAAAAHs=",
+      "data": "te6ccgEBAQEABgAACAAAAcg=",
+      "extra_currencies": [
+        {
+          "@type": "extraCurrency",
+          "amount": "44",
+          "id": 7
+        }
+      ],
+      "frozen_hash": "",
+      "last_transaction_id": {
+        "@type": "internal.transactionId",
+        "hash": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=",
+        "lt": "899"
+      },
+      "state": "active",
+      "suspended": false,
+      "sync_utime": 1700000000
+    },
+    "address": "-1:0202020202020202020202020202020202020202020202020202020202020202",
+    "finality": "finalized",
+    "type": "account_state"
+  },
+  "matches_http_result": true,
+  "reads": [
+    "-1:0202020202020202020202020202020202020202020202020202020202020202",
+    "0:0202020202020202020202020202020202020202020202020202020202020202"
+  ],
+  "same_event_for_combined_subscription": true,
+  "transaction_types": [
+    "transaction",
+    "transaction"
+  ]
+}

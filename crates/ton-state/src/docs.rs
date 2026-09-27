@@ -14,6 +14,7 @@ use crate::{api, streaming, submit};
 #[openapi(
     info(title = "TON State API", version = env!("CARGO_PKG_VERSION")),
     servers((url = "/")),
+    components(schemas(streaming::AccountStateEvent)),
     paths(
         api::masterchain_info,
         api::address_information,
@@ -41,5 +42,9 @@ pub(crate) fn router() -> Router {
     Router::new()
         .route("/", get(|| async { Redirect::temporary("/docs") }))
         .route("/docs", get(|| async { Html(include_str!("docs.html")) }))
+        .route(
+            "/account",
+            get(|| async { Html(include_str!("account.html")) }),
+        )
         .route("/openapi.json", get(move || async { Json(document) }))
 }

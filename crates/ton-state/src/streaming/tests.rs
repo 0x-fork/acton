@@ -1,3 +1,5 @@
+mod accounts;
+
 use anyhow::{Context, Result};
 use axum::body::Body;
 use axum::http::Request;
@@ -20,6 +22,10 @@ use tycho_types::models::{
 use tycho_types::num::{Tokens, VarUint24, VarUint56, VarUint248};
 
 use super::*;
+
+fn no_account_reads(_: &StdAddr) -> Result<AccountSnapshot> {
+    anyhow::bail!("transaction-only subscriptions must not read account state")
+}
 
 fn account(index: u8, workchain: i8) -> StdAddr {
     StdAddr::new(workchain, HashBytes([index; 32]))
@@ -242,7 +248,7 @@ fn batch() -> Result<Batch> {
     )?)
 }
 
-async fn subscribe_to(hub: &Transactions, body: Value) -> Result<Response> {
+async fn subscribe_to(hub: &Subscriptions, body: Value) -> Result<Response> {
     Ok(hub
         .clone()
         .router()
@@ -266,9 +272,9 @@ async fn frame(body: &mut Body) -> Result<String> {
 
 #[tokio::test]
 async fn finalized_batches_emit_single_transactions_and_filter_account_addresses() -> Result<()> {
-    let hub = Transactions::default();
+    let hub = Subscriptions::default();
     let batch = batch()?;
-    hub.publish(&batch)?;
+    hub.publish(&batch, no_account_reads)?;
     let friendly = account(2, 0).display_base64(true).to_string();
     let response = subscribe_to(
         &hub,
@@ -291,7 +297,7 @@ async fn finalized_batches_emit_single_transactions_and_filter_account_addresses
             .to_string(),
     );
 
-    hub.publish(&batch)?;
+    hub.publish(&batch, no_account_reads)?;
     let text = frame(&mut body).await?;
     let event: Value = serde_json::from_str(
         text.trim()
@@ -325,7 +331,7 @@ async fn finalized_batches_emit_single_transactions_and_filter_account_addresses
 
 #[tokio::test]
 async fn masterchain_and_aborted_transactions_preserve_their_own_block_coordinates() -> Result<()> {
-    let hub = Transactions::default();
+    let hub = Subscriptions::default();
     let mut body = subscribe_to(
         &hub,
         json!({
@@ -336,7 +342,7 @@ async fn masterchain_and_aborted_transactions_preserve_their_own_block_coordinat
     .await?
     .into_body();
     frame(&mut body).await?;
-    hub.publish(&batch()?)?;
+    hub.publish(&batch()?, no_account_reads)?;
     let mut events = Vec::new();
     for _ in 0..2 {
         let text = frame(&mut body).await?;
@@ -352,7 +358,7 @@ async fn masterchain_and_aborted_transactions_preserve_their_own_block_coordinat
 
 #[tokio::test]
 async fn rejects_unsupported_subscriptions() -> Result<()> {
-    let hub = Transactions::default();
+    let hub = Subscriptions::default();
     let address = account(2, 0).to_string();
     let mut rows = Vec::new();
     for body in [
@@ -360,8 +366,10 @@ async fn rejects_unsupported_subscriptions() -> Result<()> {
         json!({"addresses": ["bad"]}),
         json!({"addresses": vec![address.clone(); MAX_ADDRESSES + 1]}),
         json!({"addresses": [address], "types": ["actions"]}),
+        json!({"addresses": [address], "types": []}),
         json!({"addresses": [address], "min_finality": "confirmed"}),
         json!({"addresses": [address], "include_metadata": true}),
+        json!({"addresses": [address], "include_code_data": "false"}),
     ] {
         let response = subscribe_to(&hub, body).await?;
         rows.push(format!(
@@ -389,8 +397,10 @@ async fn rejects_unsupported_subscriptions() -> Result<()> {
         400 Bad Request {"error":"expected_1_to_100_addresses"}
         400 Bad Request {"error":"invalid_address"}
         400 Bad Request {"error":"expected_1_to_100_addresses"}
-        400 Bad Request {"error":"only_finalized_transactions_supported"}
-        400 Bad Request {"error":"only_finalized_transactions_supported"}
+        400 Bad Request {"error":"invalid_subscription"}
+        400 Bad Request {"error":"expected_nonempty_types"}
+        400 Bad Request {"error":"only_finalized_events_supported"}
+        400 Bad Request {"error":"invalid_subscription"}
         400 Bad Request {"error":"invalid_subscription"}
         400 Bad Request {"error":"replay_not_supported"}"#]]
     .assert_eq(&rows.join("\n"));
@@ -400,7 +410,7 @@ async fn rejects_unsupported_subscriptions() -> Result<()> {
 
 #[tokio::test]
 async fn overflow_closes_only_the_slow_subscriber() -> Result<()> {
-    let hub = Transactions::default();
+    let hub = Subscriptions::default();
     let request = json!({"addresses": [account(2, 0).to_string()]});
     let mut slow = subscribe_to(&hub, request.clone()).await?.into_body();
     let mut fast = subscribe_to(&hub, request).await?.into_body();
@@ -408,13 +418,13 @@ async fn overflow_closes_only_the_slow_subscriber() -> Result<()> {
     frame(&mut fast).await?;
     let batch = batch()?;
     for _ in 0..=QUEUE_EVENTS {
-        hub.publish(&batch)?;
+        hub.publish(&batch, no_account_reads)?;
         frame(&mut fast).await?;
     }
     expect![["data: {\"error\":\"slow_consumer\",\"type\":\"error\"}\n\n"]]
         .assert_eq(&frame(&mut slow).await?);
     expect![["true"]].assert_eq(&slow.frame().await.is_none().to_string());
-    hub.publish(&batch)?;
+    hub.publish(&batch, no_account_reads)?;
     frame(&mut fast).await?;
     drop(hub);
     Ok(())
@@ -422,7 +432,7 @@ async fn overflow_closes_only_the_slow_subscriber() -> Result<()> {
 
 #[tokio::test]
 async fn large_messages_hit_the_byte_budget_and_consumption_releases_it() -> Result<()> {
-    let hub = Transactions::default();
+    let hub = Subscriptions::default();
     let request = json!({"addresses": [account(3, 0).to_string()]});
     let mut slow = subscribe_to(&hub, request.clone()).await?.into_body();
     let mut fast = subscribe_to(&hub, request).await?.into_body();
@@ -456,7 +466,7 @@ async fn large_messages_hit_the_byte_budget_and_consumption_releases_it() -> Res
     // Fewer events than the count limit fill the byte budget. A reader that
     // drains its queue continues across several full byte budgets.
     for _ in 0..QUEUE_EVENTS - 1 {
-        hub.publish(&batch)?;
+        hub.publish(&batch, no_account_reads)?;
         frame(&mut fast).await?;
     }
     expect![["data: {\"error\":\"slow_consumer\",\"type\":\"error\"}\n\n"]]
@@ -468,7 +478,7 @@ async fn large_messages_hit_the_byte_budget_and_consumption_releases_it() -> Res
 
 #[tokio::test(start_paused = true)]
 async fn keepalive_failure_and_shutdown_end_idle_streams() -> Result<()> {
-    let hub = Transactions::default();
+    let hub = Subscriptions::default();
     let request = json!({"addresses": [account(2, 0).to_string()]});
     let mut body = subscribe_to(&hub, request.clone()).await?.into_body();
     frame(&mut body).await?;
@@ -488,7 +498,7 @@ async fn keepalive_failure_and_shutdown_end_idle_streams() -> Result<()> {
 
 #[tokio::test]
 async fn disconnected_clients_release_connection_slots() -> Result<()> {
-    let hub = Transactions::default();
+    let hub = Subscriptions::default();
     let request = json!({"addresses": [account(2, 0).to_string()]});
     let mut responses = Vec::new();
     for _ in 0..MAX_SUBSCRIBERS {

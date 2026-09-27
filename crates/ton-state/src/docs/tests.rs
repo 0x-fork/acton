@@ -59,6 +59,10 @@ async fn reference_serves_only_supported_operations() {
         "methods": methods,
         "stream_content_types": document["paths"]["/api/streaming/v2/sse"]["post"]
             ["responses"]["200"]["content"].as_object().unwrap().keys().collect::<Vec<_>>(),
+        "stream_state_required": document["components"]["schemas"]["AccountStateEvent"]
+            ["properties"]["account_state"]["required"],
+        "stream_include_code_data": document["components"]["schemas"]["Subscription"]
+            ["properties"]["include_code_data"],
         "redirect": [home.status().as_str(), home.headers()["location"].to_str().unwrap()],
         "page": [page.status().as_str(), page.headers()["content-type"].to_str().unwrap()],
         "wait_timeouts": [
@@ -95,6 +99,26 @@ async fn reference_serves_only_supported_operations() {
           "status": 200,
           "stream_content_types": [
             "text/event-stream"
+          ],
+          "stream_include_code_data": {
+            "default": true,
+            "description": "Include code/data in account state events; false omits both on every event.\nOmitted or null defaults to true. Transaction events are unaffected",
+            "example": false,
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "stream_state_required": [
+            "@type",
+            "balance",
+            "extra_currencies",
+            "last_transaction_id",
+            "block_id",
+            "frozen_hash",
+            "sync_utime",
+            "state",
+            "suspended"
           ],
           "wait_timeouts": [
             {

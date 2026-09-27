@@ -171,7 +171,7 @@ async fn account_request<T: Serialize + Send + 'static>(
 
 /// Maps the raw account without interpreting its contract code. Missing
 /// dictionary entries have the same zero-balance representation as `account_none`.
-fn account_info(snapshot: AccountSnapshot) -> Result<wire::AddressInformation> {
+pub(crate) fn account_info(snapshot: AccountSnapshot) -> Result<wire::AddressInformation> {
     let mut info = wire::AddressInformation {
         type_tag: Default::default(),
         balance: "0".into(),

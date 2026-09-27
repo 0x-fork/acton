@@ -10,7 +10,7 @@ use tracing::{info, warn};
 use tycho_types::models::BlockId;
 
 use crate::confirmation::Confirmations;
-use crate::streaming::Transactions;
+use crate::streaming::Subscriptions;
 
 /// Keeps the store at complete masterchain/shard frontiers. Network failures are
 /// retried; invalid state updates and storage failures stop the service.
@@ -18,7 +18,7 @@ pub(crate) async fn run(
     mut store: StateStore,
     mut source: P2pBlockSource,
     checkpoints: watch::Sender<StateSnapshot>,
-    transactions: Transactions,
+    subscriptions: Subscriptions,
     confirmations: Confirmations,
     history: Arc<BlockIndex>,
 ) -> Result<()> {
@@ -55,7 +55,7 @@ pub(crate) async fn run(
             .collect::<Result<Vec<BlockId>, _>>()?;
         let shard_blocks = shard_ids.len();
         let checkpoints = checkpoints.clone();
-        let publisher = transactions.clone();
+        let publisher = subscriptions.clone();
         let confirmations = confirmations.clone();
         let history = Arc::clone(&history);
         let block_paths = std::iter::once(&master_id)
@@ -83,7 +83,8 @@ pub(crate) async fn run(
             {
                 history.insert(block.id().try_into()?, block.root(), &path)?;
             }
-            checkpoints.send_replace(store.snapshot());
+            let snapshot = store.snapshot();
+            checkpoints.send_replace(snapshot.clone());
             let applied = Instant::now();
 
             // HTTP observations and SSE have independent failure domains.
@@ -101,15 +102,15 @@ pub(crate) async fn run(
 
             // Finalized events become visible only after the entire batch commits.
             // A streaming failure closes subscriptions without stopping state sync.
-            if let Err(error) = publisher.publish(&batch) {
+            if let Err(error) = publisher.publish(&batch, |address| snapshot.get_account(address)) {
                 publisher.fail();
                 warn!(
-                    operation = "transaction_stream",
+                    operation = "state_stream",
                     target = %master_id,
                     duration_ms = started.elapsed().as_millis(),
                     outcome = "failed",
                     error = %format!("{error:#}"),
-                    "closed subscriptions after a transaction encoding failure",
+                    "closed subscriptions after an event publication failure",
                 );
             }
             anyhow::Ok((store, applied.duration_since(applying), applied.elapsed()))
