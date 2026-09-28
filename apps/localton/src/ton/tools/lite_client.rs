@@ -10,12 +10,12 @@ use anyhow::{Context, Result, bail, ensure};
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use num_bigint::BigInt;
+use rston::models::config::ValidatorSet as ChainValidatorSet;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use ton::{block_tlb::TVMStackValue, ton_core::traits::tlb::TLB};
 use tonutils::tvm::Address;
 use tracing::{Instrument, debug, field, info_span};
-use rston::models::config::ValidatorSet as ChainValidatorSet;
 
 use crate::ton::lite::{AccountInfo, BlockRef, LocalLiteClient, TransactionRef};
 

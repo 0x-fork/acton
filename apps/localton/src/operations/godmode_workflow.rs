@@ -5,16 +5,16 @@ use crate::{
     storage,
     ton::lite::{BlockRef as ObservedBlock, LocalLiteClient},
 };
+use rston::{
+    boc::Boc,
+    merkle::MerkleProof,
+    models::{Block, BlockProof, PrevBlockRef},
+};
 use std::time::Duration;
 use tokio::time::sleep;
 use ton_hardfork::{
     HardforkBlock, build_hardfork,
     request::{AccountEdit, account_batch},
-};
-use rston::{
-    boc::Boc,
-    merkle::MerkleProof,
-    models::{Block, BlockProof, PrevBlockRef},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -544,8 +544,8 @@ mod tests {
 
     #[test]
     fn finishing_publishes_bootstrap_states_before_advancing_the_init_block() {
-        use ton_hardfork::{HardforkPrevBlock, HardforkSources, ShardSource};
         use rston::cell::{CellBuilder, CellFamily};
+        use ton_hardfork::{HardforkPrevBlock, HardforkSources, ShardSource};
 
         let (_dir, layout, plan) = fixture();
         install(&layout, &plan, endpoint()).unwrap();

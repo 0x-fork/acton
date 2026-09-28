@@ -44,7 +44,7 @@ Run the formatting and Clippy checks:
 
 ```sh
 cargo fmt --all -- --check
-cargo clippy --workspace --all-features -- -D warnings
+cargo clippy --workspace --all-targets --all-features -- -D warnings
 ```
 
 ## Miri

@@ -104,7 +104,7 @@ fn api_block_id(seqno: u32) -> Value {
 fn transaction_response(cell: &Cell, workchain: i8) -> anyhow::Result<Value> {
     let tx: Transaction = cell.parse()?;
     Ok(json!({
-        "@type": "raw.transaction",
+        "@type": "ext.transaction",
         "address": { "@type": "accountAddress", "account_address": StdAddr::new(workchain, tx.account).to_string() },
         "account": StdAddr::new(workchain, tx.account).to_string(),
         "utime": tx.now, "data": Boc::encode_base64(cell),

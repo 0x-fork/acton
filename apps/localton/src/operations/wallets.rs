@@ -10,6 +10,14 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use ed25519_dalek::SigningKey;
 use rand::{RngCore, rngs::OsRng};
+use rston::{
+    boc::{Boc, BocRepr},
+    cell::{Cell, CellBuilder, HashBytes},
+    models::{
+        CurrencyCollection, IntAddr, OwnedRelaxedMessage, RelaxedIntMsgInfo, RelaxedMsgInfo,
+        StateInit, StdAddr,
+    },
+};
 use serde::{Deserialize, Serialize};
 use ton::{
     ton_core::{cell::TonCell, traits::tlb::TLB, types::TonAddress},
@@ -19,14 +27,6 @@ use ton::{
     },
 };
 use tonutils::tvm::Address;
-use rston::{
-    boc::{Boc, BocRepr},
-    cell::{Cell, CellBuilder, HashBytes},
-    models::{
-        CurrencyCollection, IntAddr, OwnedRelaxedMessage, RelaxedIntMsgInfo, RelaxedMsgInfo,
-        StateInit, StdAddr,
-    },
-};
 use utoipa::ToSchema;
 
 use crate::{
@@ -1180,8 +1180,8 @@ fn unix_time_u32() -> Result<u32> {
 #[cfg(test)]
 mod tests {
     use ed25519_dalek::SigningKey;
-    use ton::{ton_core::traits::tlb::TLB, ton_wallet::WalletVersion as TonWalletVersion};
     use rston::boc::Boc;
+    use ton::{ton_core::traits::tlb::TLB, ton_wallet::WalletVersion as TonWalletVersion};
 
     use super::{MAX_GRAMS_NANO, format_nano_grams, parse_grams, ton_wallet};
 

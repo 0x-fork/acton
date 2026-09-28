@@ -66,13 +66,13 @@ describe("configuration TL-B catalog", () => {
     `)
   })
 
-  test("every displayed schema compiles independently with all dependencies", () => {
-    for (const id of Object.keys(catalog.parameters)) {
-      const source = getConfigParameterTlb(Number(id))
-      if (!source) throw new Error(`Missing TL-B for ConfigParam ${id}`)
+  test.each(
+    Object.keys(catalog.parameters),
+  )("ConfigParam %s compiles independently with all dependencies", id => {
+    const source = getConfigParameterTlb(Number(id))
+    if (!source) throw new Error(`Missing TL-B for ConfigParam ${id}`)
 
-      generateCode(`${source.declaration}\n\n${source.dependencies}`, "typescript")
-    }
+    generateCode(`${source.declaration}\n\n${source.dependencies}`, "typescript")
   })
 
   test("keeps root declarations first, exact tags and all recursive constructors", () => {

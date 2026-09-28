@@ -24,6 +24,7 @@ All notable changes to this project will be documented in this file.
   responses, field documentation, generated OpenAPI, and opt-in live contract tests.
 - Use the shared `toncenter` v2 and v3 types across Rust clients and simulator endpoints.
   Address information always includes the boolean `suspended` field.
+  Transaction replay uses the `ext.transaction` response format of `getTransactions`.
 - Remove unused dependencies from `ton-emulator` and `tvm-ffi`.
 - Add `ton-node-db` for reading validator database snapshots, querying account
   states lazily, and persisting masterchain and shard state updates in a separate

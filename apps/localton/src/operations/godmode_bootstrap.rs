@@ -6,9 +6,9 @@
 //! engine is stopped. ArchiveManager discovers these native files on restart.
 
 use super::*;
+use rston::boc::Boc;
 use sha2::{Digest, Sha256};
 use ton_hardfork::HardforkSources;
-use rston::boc::Boc;
 
 /// Stages every state needed by a fresh node, including an unchanged basechain.
 /// Only called after the live verification has authenticated the complete states.
