@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Dependencies
 
+- Remove Localton's `ton` dependency. Get-method stacks use `tvm-ffi` and `rston`,
+  and block monitoring uses `rston` block models.
 - Remove the direct `ton` dependency from the main Acton workspace. Debugger
   test helpers use `rston` cells and account state.
 - Replace yanked `chacha20` versions in Faucet and Localton with version `0.10.2`.

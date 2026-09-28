@@ -1,0 +1,18 @@
+{
+  "creator": "29e09f51adf3e5eaa55f587586e253ce8f45ab7b4086045843734723a3aca6fc",
+  "gen_utime": 1674507085,
+  "shards": [
+    {
+      "before_merge": false,
+      "before_split": false,
+      "file_hash": "44a41211534eba1ff5ab7516c916c7ead6c6e074d2ce5978499fb581b6814f80",
+      "gen_utime": 1674507082,
+      "root_hash": "ae84c16109d194e731a5adde775128a1dd9b083c88fba8356a184ab90d0ff664",
+      "seqno": 31806292,
+      "shard": "8000000000000000",
+      "want_merge": true,
+      "want_split": false,
+      "workchain": 0
+    }
+  ]
+}

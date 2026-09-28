@@ -1,0 +1,42 @@
+{
+  "creator": "4ca2d7f61cb11b19af432dce74ecbc7361a3742f1e4e15f3baf933fcf7984503",
+  "gen_utime": 1588856706,
+  "shards": [
+    {
+      "before_merge": false,
+      "before_split": true,
+      "file_hash": "555c8770ff821e183368134ea9e07890fd95b5f2f773ded5ef84509ec5a4fd6c",
+      "gen_utime": 1588856669,
+      "root_hash": "db0c5ac8109ec8472369d0f224b6854b94d0eaaf6d4b2e4af3a429bb7f9682c8",
+      "seqno": 85,
+      "shard": "4000000000000000",
+      "want_merge": true,
+      "want_split": false,
+      "workchain": 0
+    },
+    {
+      "before_merge": false,
+      "before_split": false,
+      "file_hash": "1651840665ce0015770b91ddcb4b5b28afbfcc88b2f1e0ab18948167f39571c8",
+      "gen_utime": 1588856704,
+      "root_hash": "a6647b9756c9debc7d3bcaeae926282f30c84d790a34c100dabfb18c9d1109e1",
+      "seqno": 86,
+      "shard": "a000000000000000",
+      "want_merge": false,
+      "want_split": false,
+      "workchain": 0
+    },
+    {
+      "before_merge": false,
+      "before_split": false,
+      "file_hash": "416c76b93eb4d95600c23ccde17aeb73228cfa416eac061983c0186019514a3c",
+      "gen_utime": 1588856703,
+      "root_hash": "9f37f76991b18091333afc4b56ba0ae2c549aa43e4dd60ed354769e0228c4fec",
+      "seqno": 86,
+      "shard": "e000000000000000",
+      "want_merge": false,
+      "want_split": false,
+      "workchain": 0
+    }
+  ]
+}

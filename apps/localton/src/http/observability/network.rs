@@ -8,8 +8,8 @@ use std::{
 
 use anyhow::{Context, Result};
 use regex::Regex;
+use rston::{boc::BocRepr, models::Block};
 use tokio::{sync::watch, time::MissedTickBehavior};
-use ton::{block_tlb::Block, ton_core::traits::tlb::TLB};
 use tracing::warn;
 
 use crate::{
@@ -335,67 +335,37 @@ impl NetworkReader {
                 }
             };
 
-            let shard_ids = block
-                .1
-                .extra
-                .mc_block_extra
-                .as_ref()
-                .map(|extra| extra.shard_ids())
-                .unwrap_or_default();
-            let shards = block
-                .1
-                .extra
-                .mc_block_extra
-                .as_ref()
-                .map(|extra| {
-                    extra
-                        .shard_hashes
-                        .iter()
-                        .flat_map(|(workchain, shards)| {
-                            shards.iter().map(|(prefix, shard)| ShardHead {
-                                workchain: *workchain,
-                                shard: format!("{:016x}", prefix.to_shard()),
-                                seqno: shard.seqno,
-                                root_hash: hex::encode(shard.root_hash.as_slice_sized()),
-                                file_hash: hex::encode(shard.file_hash.as_slice_sized()),
-                                gen_utime: shard.gen_utime,
-                                before_split: shard.before_split,
-                                before_merge: shard.before_merge,
-                                want_split: shard.want_split,
-                                want_merge: shard.want_merge,
-                            })
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
+            let shards = match block_shards(&block.1) {
+                Ok(shards) => shards,
+                Err(error) => {
+                    warn!(seqno, %error, "invalid masterchain shard descriptions skipped");
+                    continue;
+                }
+            };
 
             self.blocks.insert(block.0.id.clone(), block.0.clone());
-            latest = Some((id.clone(), block.0.gen_utime, shards));
 
-            for shard_id in shard_ids {
-                if shard_id.seqno == 0 {
+            for shard_head in &shards {
+                if shard_head.seqno == 0 {
                     continue;
                 }
 
-                let shard = format!("{:016x}", shard_id.shard_ident.shard);
-                let key = format!(
-                    "{}:{shard}:{}",
-                    shard_id.shard_ident.workchain, shard_id.seqno
-                );
+                let shard = &shard_head.shard;
+                let key = format!("{}:{shard}:{}", shard_head.workchain, shard_head.seqno);
                 if self.blocks.contains_key(&key) {
                     continue;
                 }
 
                 let (id, bytes) = match client
-                    .block(shard_id.shard_ident.workchain, &shard, shard_id.seqno)
+                    .block(shard_head.workchain, shard, shard_head.seqno)
                     .await
                 {
                     Ok(block) => block,
                     Err(error) => {
                         warn!(
-                            workchain = shard_id.shard_ident.workchain,
+                            workchain = shard_head.workchain,
                             shard,
-                            seqno = shard_id.seqno,
+                            seqno = shard_head.seqno,
                             %error,
                             "shard block observation skipped"
                         );
@@ -406,9 +376,9 @@ impl NetworkReader {
                     Ok(block) => block.0,
                     Err(error) => {
                         warn!(
-                            workchain = shard_id.shard_ident.workchain,
+                            workchain = shard_head.workchain,
                             shard,
-                            seqno = shard_id.seqno,
+                            seqno = shard_head.seqno,
                             %error,
                             "invalid shard block observation skipped"
                         );
@@ -418,6 +388,7 @@ impl NetworkReader {
                 self.blocks.insert(parsed.id.clone(), parsed);
             }
 
+            latest = Some((id.clone(), block.0.gen_utime, shards));
             self.last_scanned_seqno = Some(seqno);
         }
 
@@ -615,22 +586,113 @@ fn election_stage(
 
 /// Decodes one liteserver response and keeps only fields required for local aggregation.
 fn parse_block(id: &BlockRef, bytes: Vec<u8>) -> Result<(BlockObservation, Block)> {
-    let block = Block::from_boc(bytes).context("failed to decode TON block")?;
-    let info = &block.info;
+    let block: Block = BocRepr::decode(bytes).context("failed to decode TON block")?;
+    let info = block
+        .load_info()
+        .context("failed to decode TON block info")?;
+    let extra = block
+        .load_extra()
+        .context("failed to decode TON block extra")?;
     let observation = BlockObservation {
         id: format!("{}:{}:{}", id.workchain, id.shard, id.seqno),
         workchain: id.workchain,
         seqno: id.seqno,
         gen_utime: info.gen_utime,
-        creator: hex::encode(block.extra.created_by.as_slice_sized()),
+        creator: extra.created_by.to_string(),
     };
     Ok((observation, block))
+}
+
+/// Loads the shard tips advertised by a masterchain block, in shard order.
+fn block_shards(block: &Block) -> Result<Vec<ShardHead>> {
+    let extra = block
+        .load_extra()
+        .context("failed to decode TON block extra")?;
+    let Some(custom) = extra
+        .load_custom()
+        .context("failed to decode masterchain block extra")?
+    else {
+        return Ok(Vec::new());
+    };
+    custom
+        .shards
+        .iter()
+        .map(|entry| {
+            let (ident, shard) = entry.context("failed to decode shard description")?;
+            Ok(ShardHead {
+                workchain: ident.workchain(),
+                shard: format!("{:016x}", ident.prefix()),
+                seqno: shard.seqno,
+                root_hash: shard.root_hash.to_string(),
+                file_hash: shard.file_hash.to_string(),
+                gen_utime: shard.gen_utime,
+                before_split: shard.before_split,
+                before_merge: shard.before_merge,
+                want_split: shard.want_split,
+                want_merge: shard.want_merge,
+            })
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ton::tools::{lite_client::ValidatorSetMemberInfo, types::TonPublicKey};
+
+    #[test]
+    fn block_observations_preserve_creator_time_and_shard_heads() {
+        let fixtures: &[(&[u8], expect_test::ExpectFile)] = &[
+            (
+                include_bytes!(
+                    "../../../../../libs/rston/src/models/block/tests/mc_simple_block.boc"
+                ),
+                expect_test::expect_file!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/snapshots/masterchain_block.json"
+                )),
+            ),
+            (
+                include_bytes!(
+                    "../../../../../libs/rston/src/models/block/tests/mc_block_with_shards.boc"
+                ),
+                expect_test::expect_file!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/snapshots/split_shards_block.json"
+                )),
+            ),
+            (
+                include_bytes!(
+                    "../../../../../libs/rston/src/models/block/tests/empty_shard_block.boc"
+                ),
+                expect_test::expect_file!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/snapshots/shard_block.json"
+                )),
+            ),
+        ];
+        for (bytes, expected) in fixtures {
+            let block: Block = BocRepr::decode(bytes).unwrap();
+            let info = block.load_info().unwrap();
+            let id = BlockRef {
+                workchain: info.shard.workchain(),
+                shard: format!("{:016x}", info.shard.prefix()),
+                seqno: info.seqno,
+                root_hash: String::new(),
+                file_hash: String::new(),
+            };
+            let (observation, block) = parse_block(&id, bytes.to_vec()).unwrap();
+            let json = serde_json::json!({
+                "gen_utime": observation.gen_utime,
+                "creator": observation.creator,
+                "shards": block_shards(&block).unwrap(),
+            });
+            expected.assert_eq(&format!(
+                "{}\n",
+                serde_json::to_string_pretty(&json).unwrap()
+            ));
+        }
+    }
 
     #[tokio::test]
     async fn node_head_waits_for_runtime_readiness() {

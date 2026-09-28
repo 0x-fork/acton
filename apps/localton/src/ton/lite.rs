@@ -7,7 +7,6 @@ use std::{
 
 use anyhow::{Context, Result, anyhow, ensure};
 use crc::{CRC_16_XMODEM, Crc};
-use fastnum::I512;
 use num_bigint::BigInt;
 use rston::{
     boc::Boc,
@@ -17,7 +16,6 @@ use rston::{
     prelude::HashBytes,
 };
 use serde::{Deserialize, Serialize};
-use ton::{block_tlb::TVMStack, ton_core::traits::tlb::TLB};
 use ton_hardfork::{HardforkPrevBlock, HardforkSources, ShardSource};
 use tonutils::{
     liteclient::{
@@ -34,6 +32,10 @@ use tonutils::{
     tvm::Address,
 };
 use tracing::info;
+use tvm_ffi::{
+    serde::serialize_tuple,
+    stack::{Tuple, TupleItem},
+};
 
 use crate::ton::{global_config::GlobalConfig, tools::types::TonPublicKey};
 
@@ -357,12 +359,14 @@ impl LocalLiteClient {
     /// Inputs are integers because Localton's wallet and elector workflows only
     /// need integer stack arguments. Keeping the stack typed prevents them from
     /// constructing release-specific lite-client command strings.
+    /// Returns the serialized `VmStack` root so response adapters can preserve
+    /// opaque values without normalizing their wire representation.
     pub async fn run_method(
         &mut self,
         address: &str,
         method: &str,
         arguments: Vec<BigInt>,
-    ) -> Result<TVMStack> {
+    ) -> Result<Cell> {
         let account = Address::from_str(address)
             .with_context(|| format!("invalid TON address `{address}`"))?;
         let block = self
@@ -371,7 +375,7 @@ impl LocalLiteClient {
             .await
             .context("getMasterchainInfo failed before run method")?
             .last;
-        let mut stack = TVMStack::default();
+        let mut stack = Tuple::empty();
         let max_exclusive: BigInt = BigInt::from(1_u8) << 256_usize;
         let min_inclusive = -max_exclusive.clone();
         for argument in arguments {
@@ -379,7 +383,7 @@ impl LocalLiteClient {
                 argument >= min_inclusive && argument < max_exclusive,
                 "get method argument does not fit into a signed TVM int257"
             );
-            stack.push_int(I512::parse_str(&argument.to_string()));
+            stack.push(TupleItem::Int(argument));
         }
         let result = self
             .inner
@@ -388,9 +392,10 @@ impl LocalLiteClient {
                 block,
                 account,
                 ton_method_id(method),
-                stack
-                    .to_boc()
-                    .context("failed to serialize canonical TVM argument stack")?,
+                Boc::encode(
+                    serialize_tuple(&stack)
+                        .context("failed to serialize canonical TVM argument stack")?,
+                ),
             )
             .await
             .with_context(|| format!("run get method `{method}` failed for {address}"))?;
@@ -399,7 +404,7 @@ impl LocalLiteClient {
             "run get method `{method}` exited with code {}",
             result.exit_code
         );
-        TVMStack::from_boc(
+        Boc::decode(
             result
                 .result
                 .context("liteserver omitted the requested TVM result stack")?,

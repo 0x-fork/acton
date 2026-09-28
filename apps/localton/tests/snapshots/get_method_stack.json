@@ -1,0 +1,97 @@
+{
+  "stack": [
+    {
+      "decimal": "-115792089237316195423570985008687907853269984665640564039457584007913129639936",
+      "type": "int"
+    },
+    {
+      "decimal": "-9223372036854775809",
+      "type": "int"
+    },
+    {
+      "decimal": "-9223372036854775808",
+      "type": "int"
+    },
+    {
+      "decimal": "-1",
+      "type": "int"
+    },
+    {
+      "decimal": "0",
+      "type": "int"
+    },
+    {
+      "decimal": "9223372036854775807",
+      "type": "int"
+    },
+    {
+      "decimal": "9223372036854775808",
+      "type": "int"
+    },
+    {
+      "decimal": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+      "type": "int"
+    },
+    {
+      "type": "null"
+    },
+    {
+      "boc_base64": "te6ccgEBBAEAEAADA6vIAwIBAAIzAAIiAAIR",
+      "type": "cell"
+    },
+    {
+      "boc_base64": "te6ccgEBAgEABwABAl4BAAIi",
+      "type": "slice"
+    },
+    {
+      "type": "tuple",
+      "values": []
+    },
+    {
+      "type": "tuple",
+      "values": [
+        {
+          "decimal": "17",
+          "type": "int"
+        }
+      ]
+    },
+    {
+      "type": "tuple",
+      "values": [
+        {
+          "type": "null"
+        },
+        {
+          "decimal": "-3",
+          "type": "int"
+        },
+        {
+          "type": "tuple",
+          "values": [
+            {
+              "boc_base64": "te6ccgEBAgEABwABAl4BAAIi",
+              "type": "slice"
+            },
+            {
+              "bytes_hex": "b5ee9c7201010501001400010205010303abc8040302000233000222000211",
+              "type": "unsupported"
+            },
+            {
+              "bytes_hex": "b5ee9c7201010101000400000402ff",
+              "type": "unsupported"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "bytes_hex": "b5ee9c7201010101000400000402ff",
+      "type": "unsupported"
+    },
+    {
+      "bytes_hex": "b5ee9c7201010501001400010205010303abc8040302000233000222000211",
+      "type": "unsupported"
+    }
+  ]
+}

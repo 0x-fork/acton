@@ -8,14 +8,15 @@ use std::{fmt, future::Future, path::PathBuf, time::Instant};
 
 use anyhow::{Context, Result, bail, ensure};
 use async_trait::async_trait;
-use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use num_bigint::BigInt;
+use rston::boc::Boc as CellBoc;
+use rston::cell::{Cell, CellBuilder, CellSlice};
 use rston::models::config::ValidatorSet as ChainValidatorSet;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use ton::{block_tlb::TVMStackValue, ton_core::traits::tlb::TLB};
 use tonutils::tvm::Address;
 use tracing::{Instrument, debug, field, info_span};
+use tvm_ffi::{serde::parse_tuple_item, stack::TupleItem};
 
 use crate::ton::lite::{AccountInfo, BlockRef, LocalLiteClient, TransactionRef};
 
@@ -206,11 +207,11 @@ pub enum StackValue {
     Int { decimal: String },
     /// Cell serialized as a base64 BoC.
     Cell { boc_base64: String },
-    /// Slice serialized as its backing cell BoC.
+    /// Selected slice bits and references serialized as a cell BoC.
     Slice { boc_base64: String },
     /// Ordered tuple values.
     Tuple { values: Vec<StackValue> },
-    /// Future stack constructor preserved without guessing its schema.
+    /// NaN, builder or continuation serialized as a complete `VmStackValue` BoC.
     Unsupported { bytes_hex: String },
 }
 
@@ -622,10 +623,9 @@ impl LiteClient for NativeLiteClient {
                     request.method(),
                     request.arguments().to_vec(),
                 )
-                .await?
-                .iter()
-                .map(stack_value)
-                .collect::<Result<Vec<_>>>()?;
+                .await?;
+            let stack = parse_stack(&stack)
+                .context("liteserver returned an invalid canonical TVM result stack")?;
             Ok(RunMethodResult { stack })
         })
         .await
@@ -687,28 +687,67 @@ impl LiteClient for NativeLiteClient {
     }
 }
 
-/// Converts canonical TVM stack values into Localton's stable response model.
-fn stack_value(value: &TVMStackValue) -> Result<StackValue> {
-    Ok(match value {
-        TVMStackValue::Null(_) => StackValue::Null,
-        TVMStackValue::TinyInt(value) => StackValue::Int {
-            decimal: value.value.to_string(),
+/// Reads the stack spine in bottom-to-top order, keeping opaque values intact.
+fn parse_stack(cell: &Cell) -> Result<Vec<StackValue>> {
+    let mut slice = cell.as_slice()?;
+    let depth = slice.load_uint(24)?;
+    let mut values = Vec::new();
+    for _ in 0..depth {
+        let rest = slice.load_reference()?;
+        values.push(stack_value(slice)?);
+        slice = rest.as_slice()?;
+    }
+    values.reverse();
+    Ok(values)
+}
+
+/// Converts a complete `VmStackValue` into the stable response model.
+///
+/// Continuations stay opaque: `parse_tuple` reduces them to executable code and
+/// control data, which would lose their original constructor in `bytes_hex`.
+fn stack_value(mut slice: CellSlice<'_>) -> Result<StackValue> {
+    let tag = slice.get_u8(0)?;
+    if tag == 7 {
+        slice.skip_first(8, 0)?;
+        let length = slice.load_u16()?;
+        let mut values = Vec::new();
+        for remaining in (1..=length).rev() {
+            if remaining == 1 {
+                values.push(stack_value(slice.load_reference()?.as_slice()?)?);
+            } else {
+                let head = slice.load_reference()?;
+                let tail = slice.load_reference()?;
+                values.push(stack_value(tail.as_slice()?)?);
+                if remaining == 2 {
+                    values.push(stack_value(head.as_slice()?)?);
+                    break;
+                }
+                slice = head.as_slice()?;
+            }
+        }
+        values.reverse();
+        return Ok(StackValue::Tuple { values });
+    }
+
+    // NaN, builders and continuations have no typed JSON representation.
+    if matches!(tag, 5 | 6) || (tag == 2 && slice.get_u16(0)? == 0x02ff) {
+        return Ok(StackValue::Unsupported {
+            bytes_hex: hex::encode(CellBoc::encode(CellBuilder::build_from(slice)?)),
+        });
+    }
+
+    Ok(match parse_tuple_item(&mut slice)? {
+        TupleItem::Null => StackValue::Null,
+        TupleItem::Int(value) => StackValue::Int {
+            decimal: value.to_string(),
         },
-        TVMStackValue::Int(value) => StackValue::Int {
-            decimal: value.value.to_string(),
+        TupleItem::Cell(cell) => StackValue::Cell {
+            boc_base64: CellBoc::encode_base64(cell),
         },
-        TVMStackValue::Cell(cell) => StackValue::Cell {
-            boc_base64: BASE64.encode(cell.value.to_boc()?),
+        TupleItem::Slice(cell) => StackValue::Slice {
+            boc_base64: CellBoc::encode_base64(cell),
         },
-        TVMStackValue::CellSlice(slice) => StackValue::Slice {
-            boc_base64: BASE64.encode(slice.to_cell()?.to_boc()?),
-        },
-        TVMStackValue::Tuple(values) => StackValue::Tuple {
-            values: values.iter().map(stack_value).collect::<Result<Vec<_>>>()?,
-        },
-        _ => StackValue::Unsupported {
-            bytes_hex: hex::encode(value.to_boc()?),
-        },
+        _ => bail!("unsupported TVM stack constructor {tag}"),
     })
 }
 
@@ -857,6 +896,49 @@ mod tests {
     use expect_test::expect;
 
     use super::*;
+
+    #[test]
+    fn get_method_stack_preserves_values_and_slice_ranges() {
+        // Fixed VmStack with int64/int257 limits, null, a cell, a partial slice
+        // (bits 3..11, refs 1..2), tuples of lengths 0/1/3, NaN and a builder.
+        let cell = CellBoc::decode(include_bytes!(
+            "../../../tests/fixtures/get_method_stack.boc"
+        ))
+        .unwrap();
+        let result = RunMethodResult {
+            stack: parse_stack(&cell).unwrap(),
+        };
+        let json = serde_json::to_value(result).unwrap();
+        expect_test::expect_file!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/snapshots/get_method_stack.json"
+        ))
+        .assert_eq(&format!(
+            "{}\n",
+            serde_json::to_string_pretty(&json).unwrap()
+        ));
+    }
+
+    #[test]
+    fn get_method_continuations_preserve_their_original_constructor() {
+        // vmc_quit$1000 exit_code:42, both at stack level and inside a tuple.
+        let cell = CellBoc::decode(include_bytes!(
+            "../../../tests/fixtures/get_method_continuation.boc"
+        ))
+        .unwrap();
+        let result = RunMethodResult {
+            stack: parse_stack(&cell).unwrap(),
+        };
+        let json = serde_json::to_value(result).unwrap();
+        expect_test::expect_file!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/snapshots/get_method_continuation.json"
+        ))
+        .assert_eq(&format!(
+            "{}\n",
+            serde_json::to_string_pretty(&json).unwrap()
+        ));
+    }
 
     #[test]
     fn boc_debug_output_exposes_only_size() {

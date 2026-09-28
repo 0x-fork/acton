@@ -1,0 +1,21 @@
+{
+  "stack": [
+    {
+      "type": "tuple",
+      "values": [
+        {
+          "decimal": "9",
+          "type": "int"
+        },
+        {
+          "bytes_hex": "b5ee9c7201010101000800000b0680000002a8",
+          "type": "unsupported"
+        }
+      ]
+    },
+    {
+      "bytes_hex": "b5ee9c7201010101000800000b0680000002a8",
+      "type": "unsupported"
+    }
+  ]
+}
