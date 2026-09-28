@@ -66,7 +66,7 @@ pub(super) async fn run_get_method(
     let Ok((address, _)) = StdAddr::from_str_ext(&request.address, StdAddrFormat::any()) else {
         return ApiError::new(StatusCode::BAD_REQUEST, "invalid account address").into_response();
     };
-    let Ok(permit) = api.get_method_slot.clone().try_acquire_owned() else {
+    let Ok(permit) = api.execution_slot.clone().try_acquire_owned() else {
         return ApiError::new(StatusCode::TOO_MANY_REQUESTS, "get-method executor is busy")
             .into_response();
     };
@@ -239,7 +239,9 @@ fn execute(
     unreachable!("library retries return an error when exhausted")
 }
 
-fn previous_blocks(context: &MasterchainContext) -> Result<PrevBlocksInfo> {
+/// Preserves the checkpoint's newest-first block windows in the TVM c7 context.
+/// The hundred-block window is supplied only for network versions that support it.
+pub(super) fn previous_blocks(context: &MasterchainContext) -> Result<PrevBlocksInfo> {
     let convert = |id: &BlockId| PrevBlockId {
         workchain: id.shard.workchain(),
         shard: id.shard.prefix() as i64,

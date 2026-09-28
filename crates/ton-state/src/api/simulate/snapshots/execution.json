@@ -1,0 +1,83 @@
+[
+  {
+    "contract": "reject",
+    "response": {
+      "body": {
+        "error": "external message was not accepted",
+        "vm_exit_code": 42
+      },
+      "status": 422
+    }
+  },
+  {
+    "contract": "abort",
+    "response": {
+      "is_incomplete": false,
+      "mc_block_seqno": 100,
+      "status": 200,
+      "transactions": [
+        {
+          "aborted": true,
+          "account": "0:6e3eecb46e7a3003672e9032b0fff6155f4e02b14a57a6ba73337f428053d399",
+          "after": {
+            "account_status": "active",
+            "balance": "109388059217",
+            "code_hash": "1gABHp8epuRxjcX1NzDpd+C7XL4i7k3wdTNgxOLYup8=",
+            "data_hash": "6JSWRqDPaC+tnVKJ0I5DEe6y/LBhoicdqBBhUZalzbg=",
+            "extra_currencies": {
+              "42": "123"
+            },
+            "frozen_hash": null,
+            "hash": "XAr7hujjrGT+213NzrGq9JZrZjclJMij/QBFqFFkERI="
+          },
+          "before": {
+            "account_status": "active",
+            "balance": "109388167086",
+            "code_hash": "1gABHp8epuRxjcX1NzDpd+C7XL4i7k3wdTNgxOLYup8=",
+            "data_hash": "6JSWRqDPaC+tnVKJ0I5DEe6y/LBhoicdqBBhUZalzbg=",
+            "extra_currencies": {
+              "42": "123"
+            },
+            "frozen_hash": null,
+            "hash": "9rDA43Oze6JeWGbSGX1EXZKHnnAO12B9Q1Mmyah3qYY="
+          },
+          "bounce": null,
+          "children": 0,
+          "compute": {
+            "account_activated": false,
+            "exit_code": 42,
+            "gas_credit": "10000",
+            "gas_fees": "6801",
+            "gas_limit": "0",
+            "gas_used": "102",
+            "mode": 0,
+            "msg_state_used": false,
+            "skipped": false,
+            "success": false,
+            "vm_final_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+            "vm_init_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+            "vm_steps": 2
+          },
+          "lt": "1123457",
+          "now": 1700000124
+        }
+      ]
+    }
+  },
+  {
+    "contract": "relay",
+    "response": {
+      "is_incomplete": true,
+      "status": 200,
+      "transactions": 32
+    }
+  },
+  {
+    "contract": "fork",
+    "response": {
+      "is_incomplete": true,
+      "status": 200,
+      "transactions": 128
+    }
+  }
+]

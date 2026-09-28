@@ -1,5 +1,5 @@
-//! Maps block-contained data to TON Center v3 fields. Account balances and trace
-//! relations need additional state and remain absent; they are never inferred.
+//! Maps transaction cells to TON Center v3 fields. Callers supply account states
+//! and trace relations when they have them; the cell converter never infers them.
 
 use std::collections::HashMap;
 
@@ -21,6 +21,22 @@ use tycho_types::models::{
 pub(super) fn convert(
     block: BlockId,
     mc_seqno: u32,
+    lazy: &Lazy<Transaction>,
+    tx: &Transaction,
+) -> Result<wire::Transaction> {
+    let mut result = convert_cell(block.workchain, lazy, tx)?;
+    result.block_ref.shard = format!("{:016x}", block.shard);
+    result.block_ref.seqno = block.seqno;
+    result.mc_block_seqno = mc_seqno;
+    result.emulated = false;
+    result.finality = "finalized".into();
+    Ok(result)
+}
+
+/// Converts an uncommitted transaction. Zero shard/seqno are placeholders, not
+/// block inclusion evidence. The caller sets its simulation's masterchain anchor.
+pub(crate) fn convert_cell(
+    workchain: i32,
     lazy: &Lazy<Transaction>,
     tx: &Transaction,
 ) -> Result<wire::Transaction> {
@@ -75,18 +91,18 @@ pub(super) fn convert(
     }
 
     Ok(wire::Transaction {
-        account: format!("{}:{}", block.workchain, tx.account),
+        account: format!("{workchain}:{}", tx.account),
         hash: hash.clone(),
         lt: tx.lt.to_string(),
         block_ref: wire::BlockId {
-            workchain: block.workchain,
-            shard: format!("{:016x}", block.shard),
-            seqno: block.seqno,
+            workchain,
+            shard: "0000000000000000".into(),
+            seqno: 0,
         },
         now: tx.now,
-        mc_block_seqno: mc_seqno,
-        emulated: false,
-        finality: "finalized".into(),
+        mc_block_seqno: 0,
+        emulated: true,
+        finality: "pending".into(),
         prev_trans_hash: STANDARD.encode(tx.prev_trans_hash),
         prev_trans_lt: tx.prev_trans_lt.to_string(),
         orig_status: account_status(tx.orig_status).into(),
@@ -186,7 +202,9 @@ fn content(cell: &Cell) -> wire::MessageContent {
     }
 }
 
-fn currencies(values: &ExtraCurrencyCollection) -> Result<HashMap<String, String>> {
+/// Encodes identifiers and 248-bit amounts as decimal strings without losing
+/// precision in clients whose JSON numbers cannot represent the full range.
+pub(crate) fn currencies(values: &ExtraCurrencyCollection) -> Result<HashMap<String, String>> {
     values
         .as_dict()
         .iter()

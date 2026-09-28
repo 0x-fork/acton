@@ -1,0 +1,99 @@
+[
+  {
+    "ignore_chksig": false,
+    "response": {
+      "body": {
+        "error": "external message was not accepted",
+        "vm_exit_code": 135
+      },
+      "status": 422
+    },
+    "seqno": 39,
+    "updated_seqno": null,
+    "valid_until": 4294967295
+  },
+  {
+    "ignore_chksig": true,
+    "response": {
+      "is_incomplete": false,
+      "mc_block_seqno": 100,
+      "status": 200,
+      "transactions": [
+        {
+          "aborted": false,
+          "account": "0:6e3eecb46e7a3003672e9032b0fff6155f4e02b14a57a6ba73337f428053d399",
+          "after": {
+            "account_status": "active",
+            "balance": "109387853418",
+            "code_hash": "IINLe3KxEhR+Gy+0V7hOdNGjDwT3N9T2KmaOlVLSty8=",
+            "data_hash": "/r+un/GEQLkl/SzHpHx31TvvpucmuZi2VnP82s7JLz0=",
+            "extra_currencies": {
+              "42": "123"
+            },
+            "frozen_hash": null,
+            "hash": "jNG8+fpSkeGgE+8/paJQ4g836n6VZO+YDdRYcJnfuD4="
+          },
+          "before": {
+            "account_status": "active",
+            "balance": "109388167086",
+            "code_hash": "IINLe3KxEhR+Gy+0V7hOdNGjDwT3N9T2KmaOlVLSty8=",
+            "data_hash": "LNyosRCElN3r0GJdngQ4jKYZLJO+E4qX9kawe58nJ2k=",
+            "extra_currencies": {
+              "42": "123"
+            },
+            "frozen_hash": null,
+            "hash": "Q5CH12eMrazX8yt5DMU2J2RKU9Rc0BwUuCdATxRWXmA="
+          },
+          "bounce": null,
+          "children": 0,
+          "compute": {
+            "account_activated": false,
+            "exit_code": 0,
+            "gas_credit": "10000",
+            "gas_fees": "247001",
+            "gas_limit": "0",
+            "gas_used": "3705",
+            "mode": 0,
+            "msg_state_used": false,
+            "skipped": false,
+            "success": true,
+            "vm_final_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+            "vm_init_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+            "vm_steps": 97
+          },
+          "lt": "1123457",
+          "now": 1700000124
+        }
+      ]
+    },
+    "seqno": 39,
+    "updated_seqno": 40,
+    "valid_until": 4294967295
+  },
+  {
+    "ignore_chksig": true,
+    "response": {
+      "body": {
+        "error": "external message was not accepted",
+        "vm_exit_code": 136
+      },
+      "status": 422
+    },
+    "seqno": 39,
+    "updated_seqno": null,
+    "valid_until": 1
+  },
+  {
+    "ignore_chksig": true,
+    "response": {
+      "body": {
+        "error": "external message was not accepted",
+        "vm_exit_code": 133
+      },
+      "status": 422
+    },
+    "seqno": 40,
+    "updated_seqno": null,
+    "valid_until": 4294967295
+  }
+]

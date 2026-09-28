@@ -20,6 +20,7 @@ use crate::{api, streaming, submit};
         api::address_information,
         api::transactions::get_transactions,
         api::get_method::run_get_method,
+        api::simulate::simulate,
         submit::send_boc,
         submit::send_boc_and_wait_transaction,
         submit::send_boc_and_wait_trace,

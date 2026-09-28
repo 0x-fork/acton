@@ -1,3 +1,5 @@
+pub(crate) mod fixture;
+
 use anyhow::Result;
 use expect_test::expect;
 use ton_node_db::{AccountSnapshot, ReadStats};

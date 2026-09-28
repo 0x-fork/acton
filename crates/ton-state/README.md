@@ -142,6 +142,63 @@ The compatibility references are TON's
 and TON Center's
 [`runmethod.hpp`](https://github.com/toncenter/ton-http-api-cpp/blob/master/ton-http-api/src/converters/runmethod.hpp).
 
+## Simulate a message trace
+
+Simulate an inbound external message saved as `message.boc`:
+
+```sh
+base64 < message.boc | tr -d '\n' | jq -Rs '{boc: ., include_code_data: true}' | \
+  curl -s http://127.0.0.1:8080/api/simulate \
+    -H 'Content-Type: application/json' --data-binary @- | jq
+```
+
+The response follows the main fields of TON Center's `emulateTrace` API:
+`mc_block_seqno`, `trace`, `transactions`, `rand_seed`, and `is_incomplete`.
+It is returned directly, without an `ok`/`result` envelope.
+The tree links transactions by `tx_hash` and `in_msg_hash`; full transaction
+objects are in `transactions`, keyed by their base64 hashes.
+Transactions include fees, execution phases, messages, and account states before
+and after execution. Balances and fees are decimal strings in nanograms.
+
+`include_code_data` defaults to `false`. When enabled, `code_cells` and
+`data_cells` map base64 cell hashes to base64 BoCs. Look up each account state's
+`code_hash` or `data_hash` in these maps. Identical cells appear only once.
+`ignore_chksig: true` bypasses TVM signature checks for unsigned previews.
+Contract checks such as wallet seqno and expiration still apply.
+`mc_block_seqno`, when supplied, must equal the current applied checkpoint;
+other checkpoints return HTTP 409.
+
+Simulation uses `ton-emulator`, the same engine as Acton. Accounts, configuration,
+previous blocks and published libraries come from one committed checkpoint.
+Internal messages run in breadth-first order, including bounces. Each account
+sees earlier updates within the simulation. Node state stays unchanged and
+no message is broadcast. `NOW` is the checkpoint's masterchain time, the random
+seed is its state root hash, and logical time advances beyond the checkpoint.
+Repeated requests against the same checkpoint produce the same result.
+Future block times, ordering and random seeds can produce different results.
+
+Transactions have `emulated: true` and `finality: "pending"`.
+Their `block_ref` workchain is real, but shard and seqno are zero placeholders;
+the response does not claim inclusion in a block. `mc_block_seqno` identifies the
+simulation checkpoint. External output messages do not create child transactions.
+A TVM failure after acceptance returns a transaction with its failed phases.
+A message that produces no transaction returns HTTP 422 with `error` and,
+when available, `vm_exit_code`.
+
+Each simulation allows 128 transactions, 32 levels including the root, and ten
+seconds checked between native executions. On truncation, `is_incomplete` is
+`true`; unprocessed internal messages remain in their parents' `out_msgs`.
+A native call finishes under the network's gas limits before releasing the
+execution slot. The slot is shared with `runGetMethod`; concurrent executions
+return HTTP 429. Messages are limited to 65,535 decoded bytes, library loading
+to 64 cells, and responses to 16 MiB. Library/response limit failures return HTTP
+500; timeout before the first transaction returns HTTP 504.
+
+Action classification, address books and metadata are not available.
+The corresponding `with_actions`, `include_address_book`, and `include_metadata`
+flags must be false or omitted. Execution-phase `description.action` remains
+available; it is the VM action phase, not a classified business action.
+
 ## Read account transactions
 
 Read the elector's ten latest retained transactions:

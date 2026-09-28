@@ -100,6 +100,7 @@ async fn reference_serves_only_supported_operations() {
             "POST /api/send",
             "POST /api/sendAndWaitTrace",
             "POST /api/sendAndWaitTransaction",
+            "POST /api/simulate",
             "POST /api/streaming/sse",
             "GET /api/transactions"
           ],

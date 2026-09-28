@@ -2,7 +2,7 @@
 pub(crate) mod tests;
 
 mod storage;
-mod transaction;
+pub(crate) mod transaction;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::Infallible;

@@ -1,0 +1,114 @@
+[
+  {
+    "body": {
+      "code": 400,
+      "error": "invalid message base64",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 400,
+      "error": "invalid inbound external message",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 400,
+      "error": "invalid inbound external message",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 413,
+      "error": "message exceeds 65535 bytes",
+      "ok": false
+    },
+    "status": 413
+  },
+  {
+    "body": {
+      "code": 400,
+      "error": "actions, address book and metadata are not supported",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 400,
+      "error": "actions, address book and metadata are not supported",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 400,
+      "error": "actions, address book and metadata are not supported",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 400,
+      "error": "invalid simulate JSON body",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 409,
+      "error": "only the current applied masterchain seqno is available",
+      "ok": false
+    },
+    "status": 409
+  },
+  {
+    "body": {
+      "code": 400,
+      "error": "invalid simulate JSON body",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 400,
+      "error": "invalid simulate JSON body",
+      "ok": false
+    },
+    "status": 400
+  },
+  {
+    "body": {
+      "code": 413,
+      "error": "invalid simulate JSON body",
+      "ok": false
+    },
+    "status": 413
+  },
+  {
+    "body": {
+      "code": 429,
+      "error": "native executor is busy",
+      "ok": false
+    },
+    "status": 429
+  },
+  {
+    "body": {
+      "code": 429,
+      "error": "get-method executor is busy",
+      "ok": false
+    },
+    "status": 429
+  }
+]

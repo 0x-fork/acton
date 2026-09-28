@@ -6384,6 +6384,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tolk-source-map",
+ "ton-emulator",
  "ton-executor",
  "ton-indexer-core",
  "ton-indexer-p2p",

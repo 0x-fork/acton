@@ -1,0 +1,16 @@
+"Asm.fif" include
+
+// counter: accepts messages, increments c4, sends each message referenced by body
+<{ DROP ACCEPT c4 PUSH CTOS 32 LDU DROP INC NEWC 32 STU ENDC c4 POP DUP SREFS <{ LDREF SWAP 3 PUSHINT SENDRAWMSG }> PUSHCONT REPEAT DROP }>c boc>B B>base64 type cr
+
+// reject: fails before ACCEPT, so no external transaction can be produced
+<{ 42 THROW }>c boc>B B>base64 type cr
+
+// abort: fails after ACCEPT, producing an aborted transaction
+<{ ACCEPT 42 THROW }>c boc>B B>base64 type cr
+
+// relay: sends the body's first reference on external input, then relays to self
+<{ -1 EQINT IF:<{ ACCEPT LDREF DROP }>ELSE<{ DROP }> 3 PUSHINT SENDRAWMSG }>c boc>B B>base64 type cr
+
+// fork: duplicates each internal delivery to exercise the total transaction limit
+<{ -1 EQINT IF:<{ ACCEPT LDREF DROP }>ELSE<{ DROP DUP 3 PUSHINT SENDRAWMSG }> 3 PUSHINT SENDRAWMSG }>c boc>B B>base64 type cr

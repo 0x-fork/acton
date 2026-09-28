@@ -24,6 +24,7 @@ tokio.workspace = true
 tolk-source-map = { path = "../tolk-source-map" }
 toncenter = { workspace = true, features = ["openapi"] }
 ton-executor.workspace = true
+ton-emulator.workspace = true
 ton-indexer-core = { path = "../ton-indexer-core" }
 ton-indexer-p2p = { path = "../ton-indexer-p2p" }
 ton-node-db = { path = "../ton-node-db" }

@@ -1,0 +1,61 @@
+[
+  {
+    "body": {
+      "error": "external message was not accepted",
+      "vm_exit_code": 9
+    },
+    "status": 422
+  },
+  {
+    "is_incomplete": false,
+    "mc_block_seqno": 100,
+    "status": 200,
+    "transactions": [
+      {
+        "aborted": false,
+        "account": "0:6e3eecb46e7a3003672e9032b0fff6155f4e02b14a57a6ba73337f428053d399",
+        "after": {
+          "account_status": "active",
+          "balance": "109388037685",
+          "code_hash": "tD9bBiEq63H/Bs/HTaFKAVsJASFYgfR7v1baor3/mT0=",
+          "data_hash": "PwEUPeabjGFhdFzb5V/akf8A/umC3TFBy+1ES+2W4es=",
+          "extra_currencies": {
+            "42": "123"
+          },
+          "frozen_hash": null,
+          "hash": "TxM8UaVd/FjXUdLKUUoA3V5TvkgJv4AvsD2LUFJcRsk="
+        },
+        "before": {
+          "account_status": "active",
+          "balance": "109388167086",
+          "code_hash": "tD9bBiEq63H/Bs/HTaFKAVsJASFYgfR7v1baor3/mT0=",
+          "data_hash": "6JSWRqDPaC+tnVKJ0I5DEe6y/LBhoicdqBBhUZalzbg=",
+          "extra_currencies": {
+            "42": "123"
+          },
+          "frozen_hash": null,
+          "hash": "KX0FjVvZgdRpp1SM9AYoYNy38eaV1Z0/toTpbKMPXWY="
+        },
+        "bounce": null,
+        "children": 0,
+        "compute": {
+          "account_activated": false,
+          "exit_code": 0,
+          "gas_credit": "10000",
+          "gas_fees": "62734",
+          "gas_limit": "0",
+          "gas_used": "941",
+          "mode": 0,
+          "msg_state_used": false,
+          "skipped": false,
+          "success": true,
+          "vm_final_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "vm_init_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "vm_steps": 17
+        },
+        "lt": "1123457",
+        "now": 1700000124
+      }
+    ]
+  }
+]

@@ -85,6 +85,13 @@ impl StateView {
             .run(|| Ok(self.root.parse::<ShardStateUnsplit>()?.gen_utime))
     }
 
+    /// Logical time at the end of this state. Off-chain execution must start
+    /// after this frontier as well as after the account's previous transaction.
+    pub fn gen_lt(&self) -> Result<u64> {
+        self.reader
+            .run(|| Ok(self.root.parse::<ShardStateUnsplit>()?.gen_lt))
+    }
+
     /// Reports cumulative database reads for this view. Reusing loaded cell
     /// references does not increment the counters.
     #[must_use]

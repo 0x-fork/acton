@@ -2,6 +2,7 @@
 mod tests;
 
 pub(crate) mod get_method;
+pub(crate) mod simulate;
 pub(crate) mod transactions;
 
 use std::sync::Arc;
@@ -29,7 +30,7 @@ struct Api {
     state: watch::Receiver<StateSnapshot>,
     zero_state: BlockId,
     history: Arc<BlockIndex>,
-    get_method_slot: Arc<Semaphore>,
+    execution_slot: Arc<Semaphore>,
 }
 
 /// Each request pins a complete committed frontier before dispatching its read.
@@ -43,6 +44,7 @@ pub(crate) fn router(
         .route("/api/masterchainInfo", get(masterchain_info))
         .route("/api/account", get(address_information))
         .route("/api/runGetMethod", post(get_method::run_get_method))
+        .route("/api/simulate", post(simulate::simulate))
         .route("/api/transactions", get(transactions::get_transactions))
         .fallback(|| async { ApiError::new(StatusCode::NOT_FOUND, "unknown API method") })
         .with_state(Api {
@@ -51,7 +53,7 @@ pub(crate) fn router(
             history,
             // The native emulator changes process-global logging state. Keep
             // executions serial and reject overload instead of queuing work.
-            get_method_slot: Arc::new(Semaphore::new(1)),
+            execution_slot: Arc::new(Semaphore::new(1)),
         })
 }
 

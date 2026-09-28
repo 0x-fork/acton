@@ -43,6 +43,10 @@ All notable changes to this project will be documented in this file.
   Its code/data checkbox switches subscription mode and preserves the choice in the URL.
   Account responses report their shard-state time in `sync_utime`.
   HTTP requests pin one committed checkpoint without waiting for block application.
+  `/api/simulate` emulates an external message and its internal-message trace on
+  that checkpoint with TON Center v3 transaction fields, account states before
+  and after execution, and optional deduplicated code/data BoCs. Bounded traces
+  report incomplete results explicitly; simulation never broadcasts or commits state.
   P2P responses do not wait for periodic peer-rating writes; statistics are
   buffered and saved in the background. A bounded record cache accelerates state
   reads across checkpoints. State updates reuse decoded blocks, and
