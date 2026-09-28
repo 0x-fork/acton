@@ -91,11 +91,11 @@ jobs:
               --repo "${GITHUB_REPOSITORY}" \
               --base master \
               --head "${UPDATE_BRANCH}" \
-              --title "chore(ci): automate network config test updates" \
+              --title "chore(explorer): automate network config test updates" \
               --body-file "${body_file}"
           else
             gh pr edit "${pull_request}" \
               --repo "${GITHUB_REPOSITORY}" \
-              --title "chore(ci): automate network config test updates" \
+              --title "chore(explorer): automate network config test updates" \
               --body-file "${body_file}"
           fi
