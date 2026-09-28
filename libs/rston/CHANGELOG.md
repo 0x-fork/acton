@@ -24,6 +24,7 @@
 
 ### Changed
 
+- Require a `0x` or `0X` prefix for 66-character hex hashes.
 - Include all benchmark targets in Clippy checks.
 - Match TON capability names and masks.
 - Accept only TON block and validator constructors. Remove `Block::out_msg_queue_updates` and `ValidatorDescription::mc_seqno_since`.

@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::Utc;
+use rston::cell::HashBytes;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
-use ton::ton_core::cell::TonHash;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -793,8 +793,8 @@ fn prune_deployment_candidates(registry: &mut ContractRegistry, now: u64) -> boo
 fn normalize_code_hash(value: &str) -> String {
     let value = value.trim();
     value
-        .parse::<TonHash>()
-        .map_or_else(|_| value.to_ascii_lowercase(), |hash| hash.to_hex())
+        .parse::<HashBytes>()
+        .map_or_else(|_| value.to_ascii_lowercase(), |hash| hash.to_string())
 }
 
 fn compiler_abi_code_hashes(abi: &Value) -> Result<Vec<String>, ContractRegistryError> {

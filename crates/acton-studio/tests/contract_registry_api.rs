@@ -1,7 +1,6 @@
 use std::convert::Infallible;
 use std::fmt::Write as _;
 use std::fs;
-use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use acton_studio::{
@@ -16,8 +15,8 @@ use axum::response::IntoResponse;
 use axum::routing::{any, get};
 use axum::{Json, Router};
 use expect_test::expect;
+use rston::models::{StdAddr, StdAddrFormat};
 use serde_json::{Value, json};
-use ton::ton_core::types::TonAddress;
 use tower::ServiceExt;
 
 const ENVIRONMENT_ID: &str = "full-ton-1";
@@ -388,6 +387,142 @@ async fn proxy_and_registry_snapshot(
 }
 
 #[tokio::test]
+async fn address_names_share_a_key_across_raw_and_friendly_formats() {
+    let canonical = "0:bc83d444a72147f3ea1c734143f039c57233f18d5463936bbf1120859cc8665e";
+    let rpc = format!("/api/v1/environments/{ENVIRONMENT_ID}/rpc");
+
+    for address in [
+        canonical,
+        "0:BC83D444A72147F3EA1C734143F039C57233F18D5463936BBF1120859CC8665E",
+        "EQC8g9REpyFH8+occ0FD8DnFcjPxjVRjk2u/ESCFnMhmXo6z",
+        "EQC8g9REpyFH8-occ0FD8DnFcjPxjVRjk2u_ESCFnMhmXo6z",
+        "UQC8g9REpyFH8+occ0FD8DnFcjPxjVRjk2u/ESCFnMhmXtN2",
+        "UQC8g9REpyFH8-occ0FD8DnFcjPxjVRjk2u_ESCFnMhmXtN2",
+        "kQC8g9REpyFH8+occ0FD8DnFcjPxjVRjk2u/ESCFnMhmXjU5",
+        "kQC8g9REpyFH8-occ0FD8DnFcjPxjVRjk2u_ESCFnMhmXjU5",
+        "0QC8g9REpyFH8+occ0FD8DnFcjPxjVRjk2u/ESCFnMhmXmj8",
+        "0QC8g9REpyFH8-occ0FD8DnFcjPxjVRjk2u_ESCFnMhmXmj8",
+    ] {
+        let project = tempfile::tempdir().unwrap();
+        let app = router(
+            full_ton_environment("http://unused"),
+            ContractRegistryStore::for_project(project.path()),
+        );
+        let response = app
+            .clone()
+            .oneshot(
+                Request::post(format!("{rpc}/acton_setAddressName"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({"address": address, "name": "Counter"}).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        expect![[r#"
+            status: 200 OK
+            body:
+            {
+              "ok": true,
+              "result": null
+            }"#]]
+        .assert_eq(&response_snapshot(response).await);
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::get(format!("{rpc}/acton_getAddressName?address={canonical}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        expect![[r#"
+            status: 200 OK
+            body:
+            {
+              "ok": true,
+              "result": {
+                "0:bc83d444a72147f3ea1c734143f039c57233f18d5463936bbf1120859cc8665e": "Counter"
+              }
+            }"#]]
+        .assert_eq(&response_snapshot(response).await);
+    }
+}
+
+#[tokio::test]
+async fn verified_sources_share_a_key_across_hex_and_base64_hashes() {
+    let rpc = format!("/api/v1/environments/{ENVIRONMENT_ID}/rpc");
+    let hashes = [
+        DEPLOYMENT_CODE_HASH.to_owned(),
+        DEPLOYMENT_CODE_HASH.to_uppercase(),
+        format!("0x{DEPLOYMENT_CODE_HASH}"),
+        format!("0X{DEPLOYMENT_CODE_HASH}"),
+        "uZPGjFlkJfBdG8SS18A+KXmrZpkB7VpX415t1NYInSc=".to_owned(),
+    ];
+
+    for code_hash in &hashes {
+        let project = tempfile::tempdir().unwrap();
+        let app = router(
+            full_ton_environment("http://unused"),
+            ContractRegistryStore::for_project(project.path()),
+        );
+        let response = app
+            .clone()
+            .oneshot(
+                Request::post(format!("{rpc}/acton_registerVerifiedSources"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({"entries": [{
+                            "code_hash": code_hash,
+                            "source": {"bundle": {"source_bundle_hash": "counter-source"}},
+                        }]})
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        expect![[r#"
+            status: 200 OK
+            body:
+            {
+              "ok": true,
+              "result": null
+            }"#]]
+        .assert_eq(&response_snapshot(response).await);
+
+        for query_hash in &hashes {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::get(format!(
+                        "{rpc}/acton_getRegisteredVerifiedSource?code_hash={}",
+                        urlencoding::encode(query_hash),
+                    ))
+                    .body(Body::empty())
+                    .unwrap(),
+                )
+                .await
+                .unwrap();
+            expect![[r#"
+                status: 200 OK
+                body:
+                {
+                  "ok": true,
+                  "result": {
+                    "bundle": {
+                      "source_bundle_hash": "counter-source"
+                    }
+                  }
+                }"#]]
+            .assert_eq(&response_snapshot(response).await);
+        }
+    }
+}
+
+#[tokio::test]
 async fn full_ton_read_query_does_not_discover_contract() {
     let upstream = spawn_mock_environment_api().await;
     let project = tempfile::tempdir().expect("test project must be created");
@@ -542,9 +677,10 @@ fn stored_deployment_candidate(project: &tempfile::TempDir) -> Option<Value> {
         .and_then(Value::as_str)
         .expect("deployment candidate must have an address");
     assert_eq!(
-        TonAddress::from_str(display_address)
+        StdAddr::from_str_ext(display_address, StdAddrFormat::any())
             .expect("deployment candidate address must be valid")
-            .to_hex(),
+            .0
+            .to_string(),
         DEPLOYMENT_ADDRESS
     );
     candidate_object.insert(

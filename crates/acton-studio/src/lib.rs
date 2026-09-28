@@ -2,7 +2,6 @@ use std::collections::BTreeSet;
 use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::{Arc, Mutex as StdMutex};
 
 use axum::Router;
@@ -18,9 +17,9 @@ use base64::Engine;
 use futures::StreamExt;
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
+use rston::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr, StdAddrFormat};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
-use ton::ton_core::types::TonAddress;
 #[cfg(debug_assertions)]
 use tower_http::services::{ServeDir, ServeFile};
 
@@ -819,6 +818,19 @@ async fn resolve_full_ton_account_imports(
     resolve_account_imports(state, imported_accounts).await
 }
 
+// Studio renders imported and deployed accounts as bounceable testnet addresses.
+fn display_account_address(address: &StdAddr) -> String {
+    DisplayBase64StdAddr {
+        addr: address,
+        flags: Base64StdAddrFlags {
+            testnet: true,
+            bounceable: true,
+            base64_url: true,
+        },
+    }
+    .to_string()
+}
+
 fn normalize_account_imports(
     imported_accounts: &mut [FullTonAccountImport],
 ) -> Result<(), StudioApiError> {
@@ -838,20 +850,21 @@ fn normalize_account_imports(
             }));
         }
 
-        let address = TonAddress::from_str(account.address.trim()).map_err(|_| {
-            StudioApiError(EnvironmentRuntimeError::InvalidRequest {
-                code: "full_ton_import_address_invalid",
-                message: format!("Invalid TON address {}", account.address),
-            })
-        })?;
-        let canonical_address = address.to_hex();
+        let (address, _) = StdAddr::from_str_ext(account.address.trim(), StdAddrFormat::any())
+            .map_err(|_| {
+                StudioApiError(EnvironmentRuntimeError::InvalidRequest {
+                    code: "full_ton_import_address_invalid",
+                    message: format!("Invalid TON address {}", account.address),
+                })
+            })?;
+        let canonical_address = address.to_string();
         if !addresses.insert(canonical_address.clone()) {
             return Err(StudioApiError(EnvironmentRuntimeError::InvalidRequest {
                 code: "full_ton_import_address_duplicate",
                 message: format!("Account {canonical_address} was selected more than once"),
             }));
         }
-        account.address = address.to_base64(false, true, true);
+        account.address = display_account_address(&address);
     }
     Ok(())
 }
@@ -862,14 +875,15 @@ async fn resolve_account_imports(
 ) -> Result<(), StudioApiError> {
     normalize_account_imports(accounts)?;
     for account in accounts {
-        let canonical_address = TonAddress::from_str(&account.address)
+        let canonical_address = StdAddr::from_str_ext(&account.address, StdAddrFormat::any())
             .map_err(|error| {
                 StudioApiError(EnvironmentRuntimeError::InvalidRequest {
                     code: "full_ton_import_address_invalid",
                     message: error.to_string(),
                 })
             })?
-            .to_hex();
+            .0
+            .to_string();
         let source = state
             .environment_runtime
             .get(&account.source_environment_id)
@@ -2363,10 +2377,11 @@ async fn record_deployment_submission(
     let candidates = candidates
         .into_iter()
         .filter_map(|candidate| {
-            let address = TonAddress::from_str(&candidate.address).ok()?;
+            let (address, _) =
+                StdAddr::from_str_ext(&candidate.address, StdAddrFormat::any()).ok()?;
             Some(contract_registry::DeploymentCandidateRegistration {
-                canonical_address: address.to_hex(),
-                display_address: address.to_base64(false, true, true),
+                canonical_address: address.to_string(),
+                display_address: display_account_address(&address),
                 code_hash: candidate.code_hash,
             })
         })

@@ -87,7 +87,6 @@ uuid = { version = "1.18", features = ["serde", "v4"] }
 # remote crates
 rusqlite = { version = "0.31", features = ["bundled"] }
 # base TON libraries
-ton = "0.1.2"
 ton-connect-core = "0.0.3"
 
 num-bigint = "0.4.6"
@@ -260,7 +259,6 @@ ton-indexer-contracts = { workspace = true }
 
 # remote crates
 # base TON libraries
-ton = { workspace = true }
 rston = { workspace = true }
 
 num-bigint = { workspace = true }

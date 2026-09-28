@@ -17,6 +17,8 @@ use dap::types::StackFrame;
 use dap_client::DapClient;
 use owo_colors::OwoColorize;
 use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellFamily};
+use rston::models::{StateInit, StdAddr};
 use rustc_hash::FxHashMap;
 use std::collections::{BTreeMap, HashMap};
 use std::net::TcpListener;
@@ -26,10 +28,6 @@ use std::thread;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use tolk_compiler::abi::ContractABI;
 use tolk_compiler::{CompilerResult, SourceMap};
-use ton::block_tlb::StateInit;
-use ton::ton_core::cell::TonCell;
-use ton::ton_core::traits::tlb::TLB;
-use ton::ton_core::types::TonAddress;
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
 use ton_executor::get::step::StepGetExecutor;
@@ -236,7 +234,7 @@ pub(crate) fn run_script_file(
 
         match compiler.compile(script_path, true) {
             CompilerResult::Success(result) => {
-                let code_cell = TonCell::from_boc_base64(&result.code_boc64)?;
+                let code_cell = Boc::decode_base64(&result.code_boc64)?;
                 let source_map = Arc::new(result.source_map.unwrap_or_default());
                 let abi: Option<Arc<ContractABI>> = result.abi.map(Arc::new);
 
@@ -248,7 +246,7 @@ pub(crate) fn run_script_file(
         }
     };
 
-    let data_cell = TonCell::empty().clone();
+    let data_cell = Cell::empty_cell();
     let execution = execute_script(
         &code_cell,
         &data_cell,
@@ -272,8 +270,8 @@ pub(crate) fn run_script_file(
 
 #[allow(clippy::too_many_arguments)]
 fn execute_script(
-    code_cell: &TonCell,
-    data_cell: &TonCell,
+    code_cell: &Cell,
+    data_cell: &Cell,
     abi: Option<Arc<ContractABI>>,
     source_map: Arc<SourceMap>,
     debug_port: u16,
@@ -292,11 +290,11 @@ fn execute_script(
     let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
 
     let params = RunGetMethodArgs {
-        code: code_cell.to_boc_base64()?,
-        data: data_cell.to_boc_base64()?,
+        code: Boc::encode_base64(code_cell),
+        data: Boc::encode_base64(data_cell),
         verbosity,
         libs: String::new(),
-        address: dest_address.to_string(),
+        address: dest_address.display_base64_url(true).to_string(),
         unixtime: duration_since_epoch.as_secs().try_into()?,
         balance: "10".to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
@@ -324,10 +322,6 @@ fn execute_script(
     let mut assert_failure = None;
     let mut expected_exit_code = None;
 
-    // `code_cell` is a `TonCell` (from `ton::ton_core::cell`) but `Env.test_code` expects a
-    // `rston::cell::Cell`. The two cell libraries don't interop directly, so we round-trip
-    let test_code_cell = Boc::decode_base64(code_cell.to_boc_base64()?)?;
-
     let mut ctx = Context {
         env: Env {
             config: &config,
@@ -344,7 +338,7 @@ fn execute_script(
             fork_net: None,
             running_id: method_name.clone().into(),
             execution_mode,
-            test_code: Some(test_code_cell),
+            test_code: Some(code_cell.clone()),
         },
         io: IoContext {
             stdout_buffer: String::new(),
@@ -441,8 +435,12 @@ fn get_script_result(result: GetMethodResult) -> anyhow::Result<String> {
     }
 }
 
-fn contract_address(code: &TonCell) -> anyhow::Result<TonAddress> {
-    StateInit::new(code.clone(), TonCell::empty().clone())
-        .derive_address(0)
-        .map_err(Into::into)
+fn contract_address(code: &Cell) -> anyhow::Result<StdAddr> {
+    let state_init = StateInit {
+        code: Some(code.clone()),
+        data: Some(Cell::empty_cell()),
+        ..Default::default()
+    };
+    let state_init_cell = CellBuilder::build_from(state_init)?;
+    Ok(StdAddr::new(0, *state_init_cell.repr_hash()))
 }

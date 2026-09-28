@@ -947,7 +947,7 @@ impl FromStr for HashBytes {
                     return Err(ParseHashBytesError::InvalidHex(e));
                 }
             }
-            66 => {
+            66 if s.starts_with("0x") || s.starts_with("0X") => {
                 if let Err(e) = hex::decode_to_slice(&s[2..], &mut result.0) {
                     return Err(ParseHashBytesError::InvalidHex(e));
                 }
@@ -1922,6 +1922,31 @@ pub const MAX_REF_COUNT: usize = 4;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_hash_bytes() {
+        let expected = HashBytes([0xab; 32]);
+        for input in [
+            "ab".repeat(32),
+            "AB".repeat(32),
+            format!("0x{expected}"),
+            format!("0X{expected}"),
+        ] {
+            assert_eq!(input.parse::<HashBytes>().unwrap(), expected);
+        }
+
+        #[cfg(feature = "base64")]
+        assert_eq!(
+            "q6urq6urq6urq6urq6urq6urq6urq6urq6urq6urq6s="
+                .parse::<HashBytes>()
+                .unwrap(),
+            expected,
+        );
+
+        for input in [format!("xx{expected}"), format!("€{}", "a".repeat(63))] {
+            assert!(input.parse::<HashBytes>().is_err());
+        }
+    }
 
     #[test]
     fn correct_level() {

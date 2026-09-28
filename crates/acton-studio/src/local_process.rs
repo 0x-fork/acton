@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener as StdTcpListener};
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
-use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
@@ -26,11 +25,11 @@ use crate::environment_store::{
 };
 use crate::local_artifacts::{ProjectArtifactSynchronizer, ProjectFingerprint};
 use crate::localnet::{self, FullLocalnet};
+use rston::models::{StdAddr, StdAddrFormat};
 use tokio::net::TcpStream;
 use tokio::process::{Child, Command};
 use tokio::sync::{Mutex, Notify, RwLock};
 use tokio::time::{Instant, sleep, timeout};
-use ton::ton_core::types::TonAddress;
 use tracing::log;
 
 const FIRST_LOCALNET_PORT: u16 = 5411;
@@ -1033,15 +1032,14 @@ async fn register_imported_contracts(
         .iter()
         .enumerate()
         .map(|(index, account)| {
-            let address = TonAddress::from_str(&account.address).map_err(|_| {
-                EnvironmentRuntimeError::InvalidRequest {
+            let (address, _) = StdAddr::from_str_ext(&account.address, StdAddrFormat::any())
+                .map_err(|_| EnvironmentRuntimeError::InvalidRequest {
                     code: "full_ton_import_address_invalid",
                     message: format!("Invalid TON address {}", account.address),
-                }
-            })?;
+                })?;
             Ok(ContractRegistration {
-                canonical_address: address.to_hex(),
-                display_address: address.to_base64(false, true, true),
+                canonical_address: address.to_string(),
+                display_address: crate::display_account_address(&address),
                 name: account
                     .name
                     .as_deref()

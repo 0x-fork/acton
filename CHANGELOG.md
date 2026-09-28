@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Dependencies
 
+- Remove the direct `ton` dependency from the main Acton workspace. Debugger
+  test helpers use `rston` cells and account state.
 - Replace yanked `chacha20` versions in Faucet and Localton with version `0.10.2`.
 - Limit Faucet's direct SQLx dependency to its SQLite runtime features.
 - Reject RSA dependencies in Faucet builds while excluding the unused SQLx MySQL
@@ -13,6 +15,8 @@ All notable changes to this project will be documented in this file.
 
 ### Rust libraries
 
+- Use `rston` for address and hash handling in Studio and contract verification,
+  preserving raw/friendly inputs and address display flags.
 - Add `Boc::decode_any()` to `rston` for hex or base64 input and use it in wallet
   signing, disassembly, library publishing, and `envCell`.
 - Use `rston` for wallet addresses, deployment state, mnemonic keys, signing, and

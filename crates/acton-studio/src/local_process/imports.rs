@@ -8,14 +8,13 @@ use super::{
 };
 use crate::{AdminOperation, AdminRequest};
 use base64::Engine;
+use rston::models::{StdAddr, StdAddrFormat};
 use serde::{Deserialize, Serialize};
 use std::{
     path::{Path, PathBuf},
-    str::FromStr,
     sync::atomic::Ordering,
 };
 use tokio::{fs, io::AsyncWriteExt, time::Instant};
-use ton::ton_core::types::TonAddress;
 use tracing::log;
 use uuid::Uuid;
 
@@ -94,12 +93,11 @@ pub(super) async fn start(
             .accounts
             .iter()
             .map(|account| {
-                let address = TonAddress::from_str(&account.address).map_err(|error| {
-                    EnvironmentRuntimeError::InvalidRequest {
+                let (address, _) = StdAddr::from_str_ext(&account.address, StdAddrFormat::any())
+                    .map_err(|error| EnvironmentRuntimeError::InvalidRequest {
                         code: "full_ton_import_address_invalid",
                         message: error.to_string(),
-                    }
-                })?;
+                    })?;
                 let bytes = account
                     .shard_account_boc_hex
                     .as_deref()
@@ -109,7 +107,7 @@ pub(super) async fn start(
                         message: format!("Source state is missing for {}", account.address),
                     })?;
                 Ok(serde_json::json!({
-                    "address": address.to_hex(), "type": "replace",
+                    "address": address.to_string(), "type": "replace",
                     "boc": base64::engine::general_purpose::STANDARD.encode(bytes),
                 }))
             })

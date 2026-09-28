@@ -28,7 +28,7 @@ sha2 = { workspace = true }
 strip-ansi-escapes = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
-ton = { workspace = true }
+rston = { workspace = true }
 ton-api = { workspace = true }
 ton-localnet = { workspace = true }
 toncenter-keys = { workspace = true }

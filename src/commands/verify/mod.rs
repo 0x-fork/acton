@@ -12,17 +12,15 @@ use rston::boc::Boc;
 use rston::cell::{Cell, CellBuilder, CellSliceParts, HashBytes};
 use rston::models::{
     Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, MsgInfo, OwnedMessage,
-    StdAddr,
+    StdAddr, StdAddrFormat,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use ton::ton_core::types::TonAddress;
 use ton_api::{Network, TonApiClient};
 use toncenter::v3;
 use tvm_ffi::stack::Tuple;
@@ -51,7 +49,11 @@ pub fn verify_cmd(
         .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&config, &contract_key)))?;
     let contract_path = contract.absolute_source_path(configured_project_root());
     let contract_address = address
-        .map(|addr| TonAddress::from_str(&addr).with_context(|| error_fmt::invalid_address(&addr)))
+        .map(|addr| {
+            StdAddr::from_str_ext(&addr, StdAddrFormat::any())
+                .map(|(address, _)| address)
+                .with_context(|| error_fmt::invalid_address(&addr))
+        })
         .transpose()?;
     if tonconnect {
         tonconnect::ensure_supported_network(&Network::Testnet)?;
@@ -124,7 +126,7 @@ pub fn verify_cmd(
         println!(
             "  {} Contract address: {}",
             "→".blue().bold(),
-            format_ton_address(contract_address, true).dimmed()
+            format_std_address(contract_address, &Network::Testnet, false).dimmed()
         );
 
         validate_verifier_address_code_hash(&config, contract_address, code_hash)?;
@@ -184,14 +186,11 @@ pub fn verify_cmd(
     if payment_amount_nano <= BigInt::from(0) {
         anyhow::bail!("TON verifier returned a zero payment amount");
     }
-    let payment_address = TonAddress::from_str(&payment_quote.payment_address)
-        .context("Verifier returned an invalid payment address")?;
+    let (payment_address, _) =
+        StdAddr::from_str_ext(&payment_quote.payment_address, StdAddrFormat::any())
+            .context("Verifier returned an invalid payment address")?;
     let payment_amount = format_nanograms(&payment_amount_nano);
-    let payment_address_display = format_std_address(
-        &ton_address_to_std_addr(&payment_address),
-        &Network::Testnet,
-        true,
-    );
+    let payment_address_display = format_std_address(&payment_address, &Network::Testnet, true);
 
     println!("  {} Payment network: TON testnet", "→".blue().bold());
     println!(
@@ -732,7 +731,7 @@ fn ensure_ticket_payment_details(
         anyhow::bail!("Verifier ticket returned a payment comment for a different code hash");
     }
 
-    let payment_address = TonAddress::from_str(payment_address)
+    let (payment_address, _) = StdAddr::from_str_ext(payment_address, StdAddrFormat::any())
         .context("Verifier ticket returned an invalid payment address")?;
     if payment_address.workchain != 0 {
         anyhow::bail!(
@@ -747,16 +746,12 @@ fn send_verifier_payment(
     config: &ActonConfig,
     quote: &VerifierPaymentQuote,
     amount_nano: &BigInt,
-    payment_address: &TonAddress,
+    payment_address: &StdAddr,
     wallet_name: Option<String>,
     tonconnect: bool,
 ) -> anyhow::Result<String> {
     let network = Network::Testnet;
-    let payment_address_display = format_std_address(
-        &ton_address_to_std_addr(payment_address),
-        &Network::Testnet,
-        true,
-    );
+    let payment_address_display = format_std_address(payment_address, &Network::Testnet, true);
 
     let normalized_external_hash = if tonconnect {
         let storage_path = tonconnect::session_storage_path(configured_project_root(), &network)?;
@@ -822,7 +817,7 @@ fn send_verifier_payment(
 
 fn build_verifier_payment_message(
     sender: StdAddr,
-    payment_address: &TonAddress,
+    payment_address: &StdAddr,
     amount_nano: &BigInt,
     comment: &str,
 ) -> anyhow::Result<Cell> {
@@ -842,7 +837,7 @@ fn build_verifier_payment_message(
             bounce: true,
             bounced: false,
             src: IntAddr::Std(sender),
-            dst: IntAddr::Std(ton_address_to_std_addr(payment_address)),
+            dst: IntAddr::Std(payment_address.clone()),
             value: CurrencyCollection::new(amount_nano),
             extra_flags: Default::default(),
             fwd_fee: Default::default(),
@@ -976,10 +971,10 @@ fn parse_ton_comment_boc(body: &str) -> Option<String> {
 }
 
 fn ton_addresses_equal(left: &str, right: &str) -> bool {
-    TonAddress::from_str(left)
+    StdAddr::from_str_ext(left, StdAddrFormat::any())
         .ok()
-        .zip(TonAddress::from_str(right).ok())
-        .is_some_and(|(left, right)| left == right)
+        .zip(StdAddr::from_str_ext(right, StdAddrFormat::any()).ok())
+        .is_some_and(|((left, _), (right, _))| left == right)
 }
 
 fn build_verify_http_client() -> anyhow::Result<reqwest::blocking::Client> {
@@ -1180,10 +1175,6 @@ fn source_retry_delay(attempt: usize) -> Duration {
     Duration::from_secs(secs)
 }
 
-fn format_ton_address(address: &TonAddress, is_testnet: bool) -> String {
-    address.to_base64(!is_testnet, false, true)
-}
-
 fn format_std_address(address: &StdAddr, network: &Network, bounceable: bool) -> String {
     DisplayBase64StdAddr {
         addr: address,
@@ -1194,17 +1185,6 @@ fn format_std_address(address: &StdAddr, network: &Network, bounceable: bool) ->
         },
     }
     .to_string()
-}
-
-fn ton_address_to_std_addr(address: &TonAddress) -> StdAddr {
-    StdAddr {
-        anycast: None,
-        address: HashBytes(
-            <[u8; 32]>::try_from(address.hash.as_slice())
-                .expect("TonAddress hash must be exactly 32 bytes"),
-        ),
-        workchain: address.workchain as i8,
-    }
 }
 
 fn normalize_source_path_for_verifier(path: &Path, project_root: &Path) -> String {
@@ -1253,10 +1233,10 @@ fn show_verifier_link(backend: &str, code_hash: &str) {
 
 fn validate_verifier_address_code_hash(
     config: &ActonConfig,
-    contract_address: &TonAddress,
+    contract_address: &StdAddr,
     compiled_code_hash: &HashBytes,
 ) -> anyhow::Result<()> {
-    let address = format_ton_address(contract_address, true);
+    let address = format_std_address(contract_address, &Network::Testnet, false);
     println!(
         "  {} Checking deployed code hash for address",
         "→".blue().bold()
@@ -1362,13 +1342,14 @@ mod tests {
 
     #[test]
     fn payment_address_uses_bounceable_testnet_format() {
-        let address = TonAddress::from_str(
+        let (address, _) = StdAddr::from_str_ext(
             "0:3029b3eaeda86a5381d86100f2a8b761c38de45642edb6e4bb1cca2e6dd7ffed",
+            StdAddrFormat::any(),
         )
         .expect("raw payment address should parse");
 
         assert_eq!(
-            format_std_address(&ton_address_to_std_addr(&address), &Network::Testnet, true),
+            format_std_address(&address, &Network::Testnet, true),
             "kQAwKbPq7ahqU4HYYQDyqLdhw43kVkLttuS7HMoubdf_7eZe"
         );
     }
@@ -1413,11 +1394,10 @@ mod tests {
 
     #[test]
     fn verifier_payment_message_contains_the_exact_code_hash_comment() {
-        let sender = ton_address_to_std_addr(
-            &TonAddress::from_str(SENDER_ADDRESS).expect("sender address should parse"),
-        );
-        let destination =
-            TonAddress::from_str(PAYMENT_ADDRESS).expect("payment address should parse");
+        let (sender, _) = StdAddr::from_str_ext(SENDER_ADDRESS, StdAddrFormat::any())
+            .expect("sender address should parse");
+        let (destination, _) = StdAddr::from_str_ext(PAYMENT_ADDRESS, StdAddrFormat::any())
+            .expect("payment address should parse");
         let cell = build_verifier_payment_message(
             sender.clone(),
             &destination,
@@ -1434,10 +1414,7 @@ mod tests {
 
         assert!(info.bounce);
         assert_eq!(info.src, IntAddr::Std(sender));
-        assert_eq!(
-            info.dst,
-            IntAddr::Std(ton_address_to_std_addr(&destination))
-        );
+        assert_eq!(info.dst, IntAddr::Std(destination));
         assert_eq!(u128::from(info.value.tokens), 10_000_000);
 
         let mut body = CellSlice::apply(&message.body).expect("payment body should parse");
@@ -1456,6 +1433,32 @@ mod tests {
         let quote = payment_quote();
         let transaction = payment_transaction();
         assert!(is_expected_payment_transaction(&transaction, &quote));
+
+        let (address, _) = StdAddr::from_str_ext(PAYMENT_ADDRESS, StdAddrFormat::any())
+            .expect("payment address should parse");
+        for testnet in [false, true] {
+            for bounceable in [false, true] {
+                for base64_url in [false, true] {
+                    let friendly_address = DisplayBase64StdAddr {
+                        addr: &address,
+                        flags: Base64StdAddrFlags {
+                            testnet,
+                            bounceable,
+                            base64_url,
+                        },
+                    }
+                    .to_string();
+                    let mut friendly_transaction = transaction.clone();
+                    friendly_transaction.account = friendly_address.clone();
+                    friendly_transaction.in_msg.as_mut().unwrap().destination =
+                        Some(friendly_address);
+                    assert!(is_expected_payment_transaction(
+                        &friendly_transaction,
+                        &quote
+                    ));
+                }
+            }
+        }
 
         let mut overpayment = transaction.clone();
         overpayment

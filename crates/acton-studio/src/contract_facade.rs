@@ -7,11 +7,11 @@ use axum::body::to_bytes;
 use axum::extract::Request;
 use axum::http::{HeaderValue, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
+use rston::cell::HashBytes;
+use rston::models::{StdAddr, StdAddrFormat};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use ton::ton_core::cell::TonHash;
-use ton::ton_core::types::TonAddress;
 use toncenter::v2::{TonlibErrorResponse, TonlibResponse};
 use toncenter::v3::responses::{AccountStateFull, AccountStatesResponse};
 
@@ -559,22 +559,22 @@ fn account_transaction_lt(account: &AccountStateFull) -> u128 {
 }
 
 fn canonical_address(value: &str) -> Result<String, ContractFacadeError> {
-    TonAddress::from_str(value.trim())
-        .map(|address| address.to_hex())
+    StdAddr::from_str_ext(value.trim(), StdAddrFormat::any())
+        .map(|(address, _)| address.to_string())
         .map_err(|_| ContractFacadeError::InvalidRequest(format!("Invalid TON address {value}")))
 }
 
 fn display_address(canonical_address: &str) -> Result<String, ContractFacadeError> {
-    TonAddress::from_str(canonical_address)
-        .map(|address| address.to_base64(false, true, true))
+    StdAddr::from_str_ext(canonical_address, StdAddrFormat::any())
+        .map(|(address, _)| crate::display_account_address(&address))
         .map_err(|_| {
             ContractFacadeError::InvalidRequest(format!("Invalid TON address {canonical_address}"))
         })
 }
 
 fn normalize_hash(value: &str) -> Result<String, ContractFacadeError> {
-    TonHash::from_str(value.trim())
-        .map(|hash| hash.to_hex())
+    HashBytes::from_str(value.trim())
+        .map(|hash| hash.to_string())
         .map_err(|_| ContractFacadeError::InvalidRequest("Invalid TON hash".to_owned()))
 }
 

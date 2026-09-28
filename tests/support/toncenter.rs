@@ -10,18 +10,16 @@ use rston::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Lazy, Store};
 use rston::dict::{Dict, RawDict};
 use rston::models::{
     Account, AccountState, CurrencyCollection, IntAddr, IntMsgInfo, MsgInfo, OptionalAccount,
-    OwnedMessage, ShardAccount, StateInit, StdAddr,
+    OwnedMessage, ShardAccount, StateInit, StdAddr, StdAddrFormat,
 };
 use std::fmt::Write as _;
 use std::fs;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::TcpListener;
 use std::path::Path;
-use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use ton::ton_core::types::TonAddress;
 use ton_executor::DEFAULT_CONFIG_DICT;
 use ton_localnet::types::Addr;
 use toncenter::v2::responses;
@@ -1096,9 +1094,11 @@ pub(crate) fn toncenter_v2_verify_registry_address_response(
     registry_address: &str,
 ) -> ToncenterV2MockResponse {
     toncenter_v2_run_get_method_ok_response(
-        vec![TupleItem::Cell(to_cell(&ton_address_to_std_addr(
-            &TonAddress::from_str(registry_address).expect("registry address must parse"),
-        )))],
+        vec![TupleItem::Cell(to_cell(
+            &StdAddr::from_str_ext(registry_address, StdAddrFormat::any())
+                .expect("registry address must parse")
+                .0,
+        ))],
         0,
     )
 }
@@ -1234,17 +1234,6 @@ fn to_cell<T: Store + ?Sized>(obj: &T) -> Cell {
     obj.store_into(&mut builder, Cell::empty_context())
         .expect("failed to store object into cell");
     builder.build().expect("failed to build cell")
-}
-
-fn ton_address_to_std_addr(address: &TonAddress) -> StdAddr {
-    StdAddr {
-        anycast: None,
-        address: HashBytes(
-            <[u8; 32]>::try_from(address.hash.as_slice())
-                .expect("TonAddress hash must be exactly 32 bytes"),
-        ),
-        workchain: address.workchain as i8,
-    }
 }
 
 fn build_verifier_registry_entry_cell(verifier_id: &str, quorum: u8) -> Cell {
