@@ -182,7 +182,7 @@ fn read_storage(version: WalletVersion, cell: &Cell) -> Result<(HashBytes, Value
                 data.public_key,
                 json!({
                     "seqno": data.seqno, "wallet_id": data.wallet_id,
-                    "sign_allowed": data.sign_allowed, "extensions": extensions,
+                    "is_signature_allowed": data.is_signature_allowed, "extensions": extensions,
                 }),
             )
         }

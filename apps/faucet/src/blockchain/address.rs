@@ -2,8 +2,7 @@ use base64::{
     Engine,
     engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
 };
-use std::str::FromStr;
-use ton::ton_core::types::TonAddress;
+use rston::models::{StdAddr, StdAddrFormat};
 
 const BOUNCEABLE_TAG: u8 = 0x11;
 const NON_BOUNCEABLE_TAG: u8 = 0x51;
@@ -15,8 +14,9 @@ pub(crate) enum AddressValidationError {
     Mainnet,
 }
 
-pub(crate) fn parse_testnet_address(value: &str) -> Result<TonAddress, AddressValidationError> {
-    let address = TonAddress::from_str(value).map_err(|_| AddressValidationError::Invalid)?;
+pub(crate) fn parse_testnet_address(value: &str) -> Result<StdAddr, AddressValidationError> {
+    let (address, _) = StdAddr::from_str_ext(value, StdAddrFormat::any())
+        .map_err(|_| AddressValidationError::Invalid)?;
 
     // Raw addresses do not encode a network. Friendly addresses do, so require
     // their testnet-only flag to prevent accidental transfers to mainnet users.
@@ -46,7 +46,7 @@ pub(crate) fn parse_testnet_address(value: &str) -> Result<TonAddress, AddressVa
 #[cfg(test)]
 mod tests {
     use super::{AddressValidationError, parse_testnet_address};
-    use ton::ton_core::types::TonAddress;
+    use rston::models::StdAddr;
 
     #[test]
     fn accepts_testnet_zero_addresses() {
@@ -54,7 +54,7 @@ mod tests {
             "kQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHTW",
             "0QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACkT",
         ] {
-            assert_eq!(parse_testnet_address(address), Ok(TonAddress::ZERO));
+            assert_eq!(parse_testnet_address(address), Ok(StdAddr::default()));
         }
     }
 
@@ -73,9 +73,9 @@ mod tests {
 
     #[test]
     fn accepts_network_agnostic_raw_addresses() {
-        let address = TonAddress::ZERO.to_hex();
+        let address = StdAddr::default().to_string();
 
-        assert_eq!(parse_testnet_address(&address), Ok(TonAddress::ZERO));
+        assert_eq!(parse_testnet_address(&address), Ok(StdAddr::default()));
     }
 
     #[test]

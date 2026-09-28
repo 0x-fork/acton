@@ -602,7 +602,7 @@ pub struct WalletConfig {
     /// Wallet contract type
     pub kind: String,
     /// Workchain for the wallet address
-    pub workchain: Option<i32>,
+    pub workchain: Option<i8>,
     /// Mnemonic and key storage configuration
     pub keys: WalletKeys,
     #[serde(default)]

@@ -144,17 +144,15 @@ fn state_init_matches_destination(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rston::Wallet;
     use rston::cell::CellSliceParts;
     use rston::models::{
         CurrencyCollection, ExtInMsgInfo, MsgInfo, OwnedMessage, OwnedRelaxedMessage,
         RelaxedIntMsgInfo,
     };
     use rston::num::Tokens;
+    use rston::wallet::{Mnemonic, SendMsgFlags, WalletMessage, WalletVersion};
     use std::str::FromStr;
-    use ton::ton_core::cell::TonCell;
-    use ton::ton_core::traits::tlb::TLB;
-    use ton::ton_core::types::TonAddress;
-    use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
 
     const TEST_MNEMONIC: &str = "fancy carpet hello mandate penalty trial consider property top vicious exit rebuild tragic profit urban major total month holiday sudden rib gather media vicious";
 
@@ -207,7 +205,7 @@ mod tests {
                 code_hash,
             }]
         );
-        TonAddress::from_str(&candidates[0].address).expect("candidate address must be parseable");
+        StdAddr::from_str(&candidates[0].address).expect("candidate address must be parseable");
     }
 
     #[test]
@@ -249,19 +247,20 @@ mod tests {
             layout: None,
         })
         .expect("internal deployment message");
-        let internal =
-            TonCell::from_boc(Boc::encode(internal)).expect("convert internal message cell");
+        let wallet_message = WalletMessage {
+            mode: SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR,
+            msg: internal,
+        };
 
         let key_pair = Mnemonic::from_str(TEST_MNEMONIC, None)
             .expect("mnemonic")
             .to_key_pair()
             .expect("key pair");
-        let wallet = TonWallet::new(version, key_pair).expect("wallet");
+        let wallet = Wallet::new(version, key_pair).expect("wallet");
         let external = wallet
-            .create_ext_in_msg(vec![internal], 1, 2_000_000_000, false)
-            .expect("wallet external message")
-            .to_boc_base64()
-            .expect("wallet BoC");
+            .create_ext_in_msg(vec![wallet_message], 1, 2_000_000_000, false)
+            .expect("wallet external message");
+        let external = Boc::encode_base64(external);
 
         assert_eq!(
             extract_deployment_candidates(&external).expect("deployment extraction"),

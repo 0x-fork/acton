@@ -2,9 +2,8 @@ use crate::localnet::LocalnetAccountState;
 use crate::types::Hash256;
 use anyhow::Context;
 use rston::boc::Boc;
-use ton::ton_core::cell::{TonCell, TonHash};
-use ton::ton_core::traits::tlb::TLB;
-use ton::ton_wallet::WalletVersion;
+use rston::cell::HashBytes;
+use rston::wallet::{WalletVersion, get_version_by_code};
 
 const V2_WALLET_V5_BETA_CODE_HASH: &str = "89fKU0k97trCizgZhqhJQDy6w9LFhHea8IEGWvCsS5M=";
 
@@ -90,9 +89,8 @@ pub(crate) fn read_standard_wallet_state(
     account: &LocalnetAccountState,
 ) -> anyhow::Result<StandardWalletState> {
     let code_hash = account_code_hash(account)?;
-    let code_hash = TonHash::from_vec(code_hash.0.to_vec())?;
-    let version =
-        WalletVersion::get_version_by_code(code_hash).context("Account is not a known wallet")?;
+    let code_hash = HashBytes(code_hash.0);
+    let version = get_version_by_code(code_hash).context("Account is not a known wallet")?;
     read_standard_wallet_data(account, version)
 }
 
@@ -110,27 +108,24 @@ fn read_standard_wallet_data(
     version: WalletVersion,
 ) -> anyhow::Result<StandardWalletState> {
     let data = account.data.as_ref().context("Account state has no data")?;
-    let data = TonCell::from_boc(data.0.clone()).context("Failed to decode wallet data")?;
-    let mut parser = data.parser();
+    let data = Boc::decode(&data.0).context("Failed to decode wallet data")?;
     let parsed: anyhow::Result<_> = (|| {
+        // TON Center reads only this prefix, without requiring the public key or dictionaries.
+        let mut parser = data.as_slice()?;
         Ok(match version {
             WalletVersion::V1R1
             | WalletVersion::V1R2
             | WalletVersion::V1R3
             | WalletVersion::V2R1
-            | WalletVersion::V2R2 => (parser.read_num::<u32>(32)?, None, None),
+            | WalletVersion::V2R2 => (parser.load_u32()?, None, None),
             WalletVersion::V3R1
             | WalletVersion::V3R2
             | WalletVersion::V4R1
-            | WalletVersion::V4R2 => (
-                parser.read_num::<u32>(32)?,
-                Some(parser.read_num::<i32>(32)?),
-                None,
-            ),
+            | WalletVersion::V4R2 => (parser.load_u32()?, Some(parser.load_u32()? as i32), None),
             WalletVersion::V5R1 => {
-                let is_signature_allowed = parser.read_bit()?;
-                let seqno = parser.read_num::<u32>(32)?;
-                let wallet_id = parser.read_num::<i32>(32)?;
+                let is_signature_allowed = parser.load_bit()?;
+                let seqno = parser.load_u32()?;
+                let wallet_id = parser.load_u32()? as i32;
                 (seqno, Some(wallet_id), Some(is_signature_allowed))
             }
             _ => anyhow::bail!("Unsupported wallet type: {version:?}"),
@@ -192,8 +187,7 @@ fn classify_v2_wallet_code(account: &LocalnetAccountState) -> anyhow::Result<Opt
 }
 
 fn classify_v2_wallet_code_hash(code_hash: Hash256) -> anyhow::Result<Option<V2WalletCode>> {
-    let ton_hash = TonHash::from_vec(code_hash.0.to_vec())?;
-    if let Ok(version) = WalletVersion::get_version_by_code(ton_hash) {
+    if let Ok(version) = get_version_by_code(HashBytes(code_hash.0)) {
         return Ok(V2WalletVersion::try_from(version).ok().map(|v2_version| {
             V2WalletCode::Standard {
                 version,

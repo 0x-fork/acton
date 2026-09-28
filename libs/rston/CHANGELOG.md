@@ -4,6 +4,7 @@
 
 ### Added
 
+- `Boc::decode_any()` decodes a BoC supplied as hex or base64.
 - TON wallet code, initial data, address derivation, and signed external messages
   for V2, V3, V4, and V5R1. Each outgoing `WalletMessage` carries its cell and a
   `SendMsgFlags` bitmask. Requests over the wallet's message limit return
@@ -14,6 +15,10 @@
   defaults, signing requirements, parser behavior, and errors, with protocol sources.
   Signed V5R1 requests support empty transfer lists. Crate and wallet documentation
   include examples for address derivation, transfer signing, and storage decoding.
+  `Wallet::state_init()` exposes deployment state for account initialization.
+  The wallet type is also available as `rston::Wallet`.
+  `wallet::build_ext_in_body()` builds unsigned requests without a private key.
+  V5 storage exposes signature authorization as `is_signature_allowed`.
 - TON mnemonic validation, English word list, and Ed25519 key derivation, with
   typed `MnemonicError` results and automatic clearing of owned secret data on drop.
 

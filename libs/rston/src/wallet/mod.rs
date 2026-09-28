@@ -25,7 +25,8 @@
 //! The same key can have different addresses for different wallet versions or IDs.
 //!
 //! ```no_run
-//! use rston::wallet::{Wallet, WalletVersion};
+//! use rston::Wallet;
+//! use rston::wallet::WalletVersion;
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     let phrase = std::env::var("WALLET_MNEMONIC")?;
@@ -48,7 +49,8 @@
 //! use rston::boc::Boc;
 //! use rston::cell::CellBuilder;
 //! use rston::models::{CurrencyCollection, OwnedRelaxedMessage, RelaxedIntMsgInfo, RelaxedMsgInfo};
-//! use rston::wallet::{SendMsgFlags, Wallet, WalletMessage, WalletVersion};
+//! use rston::Wallet;
+//! use rston::wallet::{SendMsgFlags, WalletMessage, WalletVersion};
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     let phrase = std::env::var("WALLET_MNEMONIC")?;
@@ -90,7 +92,7 @@
 //!     let data = Boc::decode(std::fs::read("wallet-data.boc")?)?;
 //!     let storage = data.parse::<WalletV5Data>()?;
 //!     println!("Sequence number: {}", storage.seqno);
-//!     println!("Signature authentication: {}", storage.sign_allowed);
+//!     println!("Signature authentication: {}", storage.is_signature_allowed);
 //!     Ok(())
 //! }
 //! ```
@@ -293,40 +295,7 @@ impl Wallet {
         seqno: u32,
         int_msgs: Vec<WalletMessage>,
     ) -> Result<Cell, WalletError> {
-        use WalletVersion::*;
-
-        let body = match self.version {
-            V2R1 | V2R2 => WalletV2ExtMsgBody {
-                msg_seqno: seqno,
-                valid_until: expire_at,
-                msgs: int_msgs,
-            }
-            .to_cell(),
-            V3R1 | V3R2 => WalletV3ExtMsgBody {
-                subwallet_id: self.wallet_id,
-                valid_until: expire_at,
-                msg_seqno: seqno,
-                msgs: int_msgs,
-            }
-            .to_cell(),
-            V4R1 | V4R2 => WalletV4ExtMsgBody {
-                subwallet_id: self.wallet_id,
-                valid_until: expire_at,
-                msg_seqno: seqno,
-                opcode: 0,
-                msgs: int_msgs,
-            }
-            .to_cell(),
-            V5R1 => WalletV5ExtMsgBody {
-                wallet_id: self.wallet_id,
-                valid_until: expire_at,
-                msg_seqno: seqno,
-                msgs: int_msgs,
-            }
-            .to_cell(),
-            _ => return Err(WalletError::UnsupportedExternalMessage(self.version)),
-        };
-        Ok(body?)
+        build_ext_in_body(self.version, expire_at, seqno, self.wallet_id, int_msgs)
     }
 
     /// Signs the representation hash of an unsigned body and returns the signed body.
@@ -362,6 +331,23 @@ impl Wallet {
         Ok(builder.build()?)
     }
 
+    /// Returns the deployment state derived from this wallet's version, public key, and ID.
+    ///
+    /// Counters and dictionaries use their initial values. This does not fetch current account data.
+    /// The caller can use this state to initialize an account or attach it to a deployment message.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WalletError::UnsupportedInitialData`] for unsupported Highload revisions.
+    /// Cell construction errors are returned as [`WalletError::Cell`].
+    pub fn state_init(&self) -> Result<StateInit, WalletError> {
+        build_state_init(
+            self.version,
+            HashBytes(self.key_pair.public_key),
+            self.wallet_id,
+        )
+    }
+
     /// Wraps a signed body in an external inbound message.
     ///
     /// Uses this wallet's address as the destination and stores the body by reference.
@@ -395,14 +381,68 @@ impl Wallet {
             }),
         };
         if add_state_init {
-            msg.init = Some(build_state_init(
-                self.version,
-                HashBytes(self.key_pair.public_key),
-                self.wallet_id,
-            )?);
+            msg.init = Some(self.state_init()?);
         }
         Ok(CellBuilder::build_from(msg)?)
     }
+}
+
+/// Builds an unsigned external transfer body without a private key or wallet instance.
+///
+/// Use this for offline signing or emulation. The caller supplies the stored wallet ID,
+/// current sequence number, expiration timestamp, and complete outgoing messages with send modes.
+/// This does not query account state or validate whether the contract will accept the request.
+///
+/// V2, V3, and V4 accept up to four messages. V5R1 accepts up to 255.
+/// V4 supports transfer opcode zero. V5R1 supports external transfers without extended actions.
+/// V5 requires [`SendMsgFlags::IGNORE_ERROR`] on external transfers; this function does not add it.
+///
+/// # Errors
+///
+/// Returns [`WalletError::UnsupportedExternalMessage`] for V1 and Highload versions.
+/// Excessive message counts return [`crate::error::Error::TooManyMessages`] inside [`WalletError::Cell`].
+/// Other serialization errors also use [`WalletError::Cell`].
+pub fn build_ext_in_body(
+    version: WalletVersion,
+    expire_at: u32,
+    seqno: u32,
+    wallet_id: i32,
+    int_msgs: Vec<WalletMessage>,
+) -> Result<Cell, WalletError> {
+    use WalletVersion::*;
+
+    let body = match version {
+        V2R1 | V2R2 => WalletV2ExtMsgBody {
+            msg_seqno: seqno,
+            valid_until: expire_at,
+            msgs: int_msgs,
+        }
+        .to_cell(),
+        V3R1 | V3R2 => WalletV3ExtMsgBody {
+            subwallet_id: wallet_id,
+            valid_until: expire_at,
+            msg_seqno: seqno,
+            msgs: int_msgs,
+        }
+        .to_cell(),
+        V4R1 | V4R2 => WalletV4ExtMsgBody {
+            subwallet_id: wallet_id,
+            valid_until: expire_at,
+            msg_seqno: seqno,
+            opcode: 0,
+            msgs: int_msgs,
+        }
+        .to_cell(),
+        V5R1 => WalletV5ExtMsgBody {
+            wallet_id,
+            valid_until: expire_at,
+            msg_seqno: seqno,
+            msgs: int_msgs,
+        }
+        .to_cell(),
+        _ => return Err(WalletError::UnsupportedExternalMessage(version)),
+    };
+    Ok(body?)
 }
 
 /// Builds the deployment state shared by address derivation and deployment messages.

@@ -791,7 +791,7 @@ fn send_verifier_payment(
             "  {} Using testnet wallet: {} {}",
             "→".blue().bold(),
             wallet_name.cyan(),
-            format_ton_address(&wallet.wallet.address, true).dimmed()
+            format_std_address(&wallet.wallet.address, &Network::Testnet, false).dimmed()
         );
 
         let payment_amount = format_nanograms(amount_nano);

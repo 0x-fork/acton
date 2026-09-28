@@ -13,6 +13,10 @@ All notable changes to this project will be documented in this file.
 
 ### Rust libraries
 
+- Add `Boc::decode_any()` to `rston` for hex or base64 input and use it in wallet
+  signing, disassembly, library publishing, and `envCell`.
+- Use `rston` for wallet addresses, deployment state, mnemonic keys, signing, and
+  wallet message parsing in Acton, localnet, Localton, and Faucet.
 - Add the shared TON types library `rston` in `libs/rston`, with its own workspace,
   tests, benchmarks, and fuzz targets. Acton, its Rust crates, Localton, Actonscan,
   and Verifier use this local library.
@@ -85,6 +89,13 @@ All notable changes to this project will be documented in this file.
   and partial-window indicators.
 - Download P2P shard blocks from competing peers so an unresponsive peer does not
   hold up indexing until its request times out.
+
+### Wallets
+
+- Store wallet workchains as `i8` in `WalletConfig`, matching standard TON addresses.
+  Configuration values outside `-128..=127` are rejected during parsing.
+- Remove the redundant `input` encoding field from `acton wallet sign --json`.
+  The signed body remains hex encoded.
 
 ### Testing
 

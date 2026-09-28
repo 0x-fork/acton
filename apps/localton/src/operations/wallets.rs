@@ -3,29 +3,23 @@ use std::{
     fs,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
-    str::FromStr,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use ed25519_dalek::SigningKey;
 use rand::{RngCore, rngs::OsRng};
+use rston::Wallet;
+use rston::wallet::{KeyPair, SendMsgFlags, WalletMessage, WalletVersion as ContractWalletVersion};
 use rston::{
-    boc::{Boc, BocRepr},
-    cell::{Cell, CellBuilder, HashBytes},
+    boc::Boc,
+    cell::{Cell, CellBuilder},
     models::{
         CurrencyCollection, IntAddr, OwnedRelaxedMessage, RelaxedIntMsgInfo, RelaxedMsgInfo,
-        StateInit, StdAddr,
+        StateInit, StdAddr, StdAddrFormat,
     },
 };
 use serde::{Deserialize, Serialize};
-use ton::{
-    ton_core::{cell::TonCell, traits::tlb::TLB, types::TonAddress},
-    ton_wallet::{
-        KeyPair as TonKeyPair, TonWallet, WalletV4ExtMsgBody, WalletV5ExtMsgBody,
-        WalletVersion as TonWalletVersion,
-    },
-};
 use tonutils::tvm::Address;
 use utoipa::ToSchema;
 
@@ -476,15 +470,13 @@ async fn create_wallet(
             write_private_key(&base.with_extension("pk"), &seed)?;
             let valid_until = unix_time_u32()?.saturating_add(3600);
             let (stored, ton_version) = match version {
-                WalletVersion::V4r2 => (StoredWalletVersion::V4r2, TonWalletVersion::V4R2),
-                WalletVersion::V5r1 => (StoredWalletVersion::V5r1, TonWalletVersion::V5R1),
+                WalletVersion::V4r2 => (StoredWalletVersion::V4r2, ContractWalletVersion::V4R2),
+                WalletVersion::V5r1 => (StoredWalletVersion::V5r1, ContractWalletVersion::V5R1),
                 _ => unreachable!(),
             };
-            let wallet = ton_wallet(ton_version, &signing_key, workchain, wallet_id)?;
-            let address = wallet.address;
-            let deploy = wallet
-                .create_ext_in_msg(Vec::new(), 0, valid_until, true)?
-                .to_boc()?;
+            let wallet = signing_wallet(ton_version, &signing_key, workchain, wallet_id)?;
+            let address = wallet.address.clone();
+            let deploy = Boc::encode(wallet.create_ext_in_msg(Vec::new(), 0, valid_until, true)?);
             let address_file = base.with_extension("addr");
             write_address_file(&address_file, &address)?;
             let deploy_boc = base.with_file_name("wallet-query.boc");
@@ -772,9 +764,8 @@ async fn build_highload_transfer(
 fn build_native_transfer(source: &WalletRecord, transfer: &TransferBuild<'_>) -> Result<Vec<u8>> {
     let seed = read_private_key(&source.key_base.with_extension("pk"))?;
     let signing_key = SigningKey::from_bytes(&seed);
-    let destination = TonAddress::from_str(transfer.destination)
+    let (destination, _) = StdAddr::from_str_ext(transfer.destination, StdAddrFormat::any())
         .with_context(|| format!("invalid destination address `{}`", transfer.destination))?;
-    let destination = ton_address_to_std(&destination)?;
     let body = load_body(transfer.comment, transfer.body)?;
     let init = load_state_init(transfer.state_init)?;
     let message = OwnedRelaxedMessage {
@@ -788,39 +779,23 @@ fn build_native_transfer(source: &WalletRecord, transfer: &TransferBuild<'_>) ->
         body: body.into(),
         layout: None,
     };
-    let internal = TonCell::from_boc(BocRepr::encode(message)?)?;
+    let wallet_message = WalletMessage {
+        mode: SendMsgFlags::from_bits_retain(transfer.mode),
+        msg: CellBuilder::build_from(message)?,
+    };
     let valid_until = unix_time_u32()?.saturating_add(60);
     let version = match source.version {
-        StoredWalletVersion::V4r2 => TonWalletVersion::V4R2,
-        StoredWalletVersion::V5r1 => TonWalletVersion::V5R1,
+        StoredWalletVersion::V4r2 => ContractWalletVersion::V4R2,
+        StoredWalletVersion::V5r1 => ContractWalletVersion::V5R1,
         _ => bail!("wallet version does not use the native transfer path"),
     };
-    let wallet = ton_wallet(version, &signing_key, source.workchain, source.wallet_id)?;
-    let wallet_id = ton_wallet_id(source.wallet_id);
-    let signing_body = match version {
-        TonWalletVersion::V4R2 => WalletV4ExtMsgBody {
-            subwallet_id: wallet_id,
-            valid_until,
-            msg_seqno: transfer.seqno,
-            opcode: 0,
-            msgs_modes: vec![transfer.mode],
-            msgs: vec![internal],
-        }
-        .to_cell()?,
-        TonWalletVersion::V5R1 => WalletV5ExtMsgBody {
-            wallet_id,
-            valid_until,
-            msg_seqno: transfer.seqno,
-            msgs_modes: vec![transfer.mode],
-            msgs: vec![internal],
-        }
-        .to_cell()?,
-        _ => unreachable!(),
-    };
-    wallet
-        .create_ext_in_msg_from_body(wallet.sign_ext_in_body(&signing_body)?, transfer.seqno == 0)?
-        .to_boc()
-        .map_err(Into::into)
+    let wallet = signing_wallet(version, &signing_key, source.workchain, source.wallet_id)?;
+    Ok(Boc::encode(wallet.create_ext_in_msg(
+        vec![wallet_message],
+        transfer.seqno,
+        valid_until,
+        transfer.seqno == 0,
+    )?))
 }
 
 /// Rebuilds a signed deployment message without invoking external wallet scripts.
@@ -828,27 +803,27 @@ fn build_native_deploy(source: &WalletRecord) -> Result<Vec<u8>> {
     let seed = read_private_key(&source.key_base.with_extension("pk"))?;
     let signing_key = SigningKey::from_bytes(&seed);
     let version = match source.version {
-        StoredWalletVersion::V4r2 => TonWalletVersion::V4R2,
-        StoredWalletVersion::V5r1 => TonWalletVersion::V5R1,
+        StoredWalletVersion::V4r2 => ContractWalletVersion::V4R2,
+        StoredWalletVersion::V5r1 => ContractWalletVersion::V5R1,
         _ => bail!("wallet version does not use the native deployment path"),
     };
 
-    ton_wallet(version, &signing_key, source.workchain, source.wallet_id)?
-        .create_ext_in_msg(Vec::new(), 0, unix_time_u32()?.saturating_add(60), true)?
-        .to_boc()
-        .map_err(Into::into)
+    Ok(Boc::encode(
+        signing_wallet(version, &signing_key, source.workchain, source.wallet_id)?
+            .create_ext_in_msg(Vec::new(), 0, unix_time_u32()?.saturating_add(60), true)?,
+    ))
 }
 
-fn ton_wallet(
-    version: TonWalletVersion,
+fn signing_wallet(
+    version: ContractWalletVersion,
     signing_key: &SigningKey,
     workchain: i32,
     wallet_id: u32,
-) -> Result<TonWallet> {
-    i8::try_from(workchain).context("wallet workchain must fit in i8")?;
-    TonWallet::new_with_params(
+) -> Result<Wallet> {
+    let workchain = i8::try_from(workchain).context("wallet workchain must fit in i8")?;
+    Wallet::new_with_params(
         version,
-        TonKeyPair {
+        KeyPair {
             public_key: signing_key.verifying_key().to_bytes(),
             secret_key: signing_key.to_keypair_bytes(),
         },
@@ -860,13 +835,6 @@ fn ton_wallet(
 
 const fn ton_wallet_id(wallet_id: u32) -> i32 {
     i32::from_be_bytes(wallet_id.to_be_bytes())
-}
-
-fn ton_address_to_std(address: &TonAddress) -> Result<StdAddr> {
-    let workchain = i8::try_from(address.workchain).context("address workchain must fit in i8")?;
-    let hash = <[u8; 32]>::try_from(address.hash.as_slice())
-        .context("TON address hash must contain 32 bytes")?;
-    Ok(StdAddr::new(workchain, HashBytes(hash)))
 }
 
 fn load_body(comment: Option<&str>, body: Option<&Path>) -> Result<Cell> {
@@ -1067,10 +1035,10 @@ fn read_address_file(path: &Path) -> Result<Address> {
     Ok(Address::new(workchain, hash))
 }
 
-fn write_address_file(path: &Path, address: &TonAddress) -> Result<()> {
+fn write_address_file(path: &Path, address: &StdAddr) -> Result<()> {
     let mut bytes = Vec::with_capacity(36);
-    bytes.extend_from_slice(address.hash.as_slice());
-    bytes.extend_from_slice(&address.workchain.to_le_bytes());
+    bytes.extend_from_slice(address.address.as_slice());
+    bytes.extend_from_slice(&i32::from(address.workchain).to_le_bytes());
     fs::write(path, bytes)?;
     fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
     Ok(())
@@ -1181,21 +1149,21 @@ fn unix_time_u32() -> Result<u32> {
 mod tests {
     use ed25519_dalek::SigningKey;
     use rston::boc::Boc;
-    use ton::{ton_core::traits::tlb::TLB, ton_wallet::WalletVersion as TonWalletVersion};
+    use rston::wallet::WalletVersion as ContractWalletVersion;
 
-    use super::{MAX_GRAMS_NANO, format_nano_grams, parse_grams, ton_wallet};
+    use super::{MAX_GRAMS_NANO, format_nano_grams, parse_grams, signing_wallet};
 
     #[test]
     fn native_wallet_deploy_bocs_use_canonical_cell_order() {
         let signing_key = SigningKey::from_bytes(&[7; 32]);
 
-        for version in [TonWalletVersion::V4R2, TonWalletVersion::V5R1] {
-            let wallet = ton_wallet(version, &signing_key, 0, 698_983_191).unwrap();
-            let boc = wallet
-                .create_ext_in_msg(Vec::new(), 0, 2_000_000_000, true)
-                .unwrap()
-                .to_boc()
-                .unwrap();
+        for version in [ContractWalletVersion::V4R2, ContractWalletVersion::V5R1] {
+            let wallet = signing_wallet(version, &signing_key, 0, 698_983_191).unwrap();
+            let boc = Boc::encode(
+                wallet
+                    .create_ext_in_msg(Vec::new(), 0, 2_000_000_000, true)
+                    .unwrap(),
+            );
 
             Boc::decode(&boc).unwrap();
         }

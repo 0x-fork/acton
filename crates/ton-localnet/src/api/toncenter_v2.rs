@@ -1007,9 +1007,8 @@ mod tests {
     use crate::api::toncenter_wallet::read_v2_wallet_state;
     use crate::storage::{DnsRecordMeta, JettonMasterMeta, JettonWalletMeta, NftItemMeta};
     use rston::cell::{Cell, CellBuilder, CellFamily};
+    use rston::wallet::WalletVersion;
     use serde_json::json;
-    use ton::ton_core::traits::tlb::TLB;
-    use ton::ton_wallet::WalletVersion;
 
     const V5_BETA_CODE_BOC: &str =
         "te6cckEBAQEAIwAIQgLkzzsvTG1qYeoPK1RH0mZ4WyavNjfbLe7mvNGqgm80Eg3NjhE=";
@@ -1042,12 +1041,9 @@ mod tests {
     }
 
     fn set_wallet_code(account: &mut LocalnetAccountState, version: WalletVersion) {
-        let code = BocBytes::from(
-            WalletVersion::get_code(version)
-                .expect("wallet code must exist")
-                .to_boc()
-                .expect("wallet code must serialize"),
-        );
+        let code = BocBytes::from(Boc::encode(
+            rston::wallet::get_code(version).expect("wallet code must exist"),
+        ));
         account.code_hash = Some(code.hash().expect("wallet code must hash"));
         account.code = Some(code);
     }

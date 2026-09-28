@@ -155,6 +155,9 @@ pub mod util;
 #[cfg(feature = "wallet")]
 pub mod wallet;
 
+#[cfg(feature = "wallet")]
+pub use wallet::Wallet;
+
 #[cfg(feature = "models")]
 pub mod models;
 

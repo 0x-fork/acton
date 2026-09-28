@@ -203,6 +203,18 @@ impl Boc {
         decode_base64_impl(data.as_ref())
     }
 
+    /// Decodes a hex or base64 encoded BOC into a cell tree using an empty cell context.
+    ///
+    /// Use this when the input encoding is unknown. Hex is tried first, then base64.
+    /// Whitespace and encoding prefixes are not stripped. If both attempts fail,
+    /// returns the base64 decoding error.
+    #[cfg(any(feature = "base64", test))]
+    #[inline]
+    pub fn decode_any<T: AsRef<[u8]>>(data: T) -> Result<Cell, de::Error> {
+        let data = data.as_ref();
+        Self::decode_hex(data).or_else(|_| Self::decode_base64(data))
+    }
+
     /// Decodes a cell tree using an empty cell context.
     #[inline]
     pub fn decode<T>(data: T) -> Result<Cell, de::Error>

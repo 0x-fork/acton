@@ -43,6 +43,7 @@ use rston::models::{
     StoragePhase, StorageUsedShort, Transaction, TxInfo,
 };
 use rston::num::{Tokens, Uint15, VarUint24, VarUint56};
+use rston::wallet::{SendMsgFlags, WalletMessage};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -52,8 +53,6 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
 use tolk_syntax::ast::expressions::parse_tolk_int_literal;
-use ton::ton_core::cell::TonCell;
-use ton::ton_core::traits::tlb::TLB;
 use ton_api::{Network, TonApiClient};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use ton_emulator::world_state::{AccountsState, WorldState};
@@ -1503,27 +1502,28 @@ pub(crate) fn send_wallet_message(
 
     let (seqno, need_state_init) = wallet.seqno(&client)?;
     let expire_at = wallet_message_expire_at(network)?;
-    let message_ton = TonCell::from_boc(Boc::encode(message))?;
+    let wallet_message = WalletMessage {
+        mode: SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR,
+        msg: message.clone(),
+    };
     let external =
         wallet
             .wallet
-            .create_ext_in_msg(vec![message_ton], seqno, expire_at, need_state_init)?;
+            .create_ext_in_msg(vec![wallet_message], seqno, expire_at, need_state_init)?;
 
-    let boc = &external.to_boc_base64()?;
+    let boc = Boc::encode_base64(&external);
     let network_name = network.to_string();
     let context = SendBocContext::wallet(&wallet, &network_name, seqno, need_state_init);
     client
-        .send_boc(boc)
+        .send_boc(&boc)
         .map_err(|error| format_send_boc_error(error, context))?;
 
-    let external_in_cell =
-        Boc::decode_base64(boc).context("Failed to decode wallet external-in BoC")?;
-    let parsed_ext_in = external_in_cell
+    let parsed_ext_in = external
         .parse::<Message<'_>>()
         .context("Failed to parse wallet external-in message")?;
     let norm_hash = compute_normalized_ext_in_hash(&parsed_ext_in)?;
     drop(parsed_ext_in);
-    Ok((external_in_cell, norm_hash))
+    Ok((external, norm_hash))
 }
 
 pub(crate) fn send_tonconnect_message(

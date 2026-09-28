@@ -22,7 +22,7 @@ use crate::wallet::WalletMessage;
 
 /// Persistent V5R1 data, including signature controls and registered extensions.
 ///
-/// The serialized fields are `sign_allowed:bit`, `seqno:uint32`, `wallet_id:uint32`,
+/// The serialized fields are `is_signature_allowed:bit`, `seqno:uint32`, `wallet_id:uint32`,
 /// `public_key:bits256`, and `extensions:(HashmapE 256 int1)`.
 /// The Rust `i32` wallet ID preserves all 32 wire bits.
 /// The extensions dictionary is stored as a presence bit and an optional root reference.
@@ -35,7 +35,7 @@ pub struct WalletV5Data {
     ///
     /// If the extensions dictionary is empty, the contract also accepts valid owner signatures with this flag cleared.
     /// Registered extensions can change the flag through extended actions.
-    pub sign_allowed: bool,
+    pub is_signature_allowed: bool,
     /// Stored sequence number for replay protection. Initial data uses zero.
     pub seqno: u32,
     /// Wallet identifier encoded as 32 bits. It must match the request and stored state.
@@ -53,7 +53,7 @@ impl WalletV5Data {
     /// The caller supplies an ID for the intended network, workchain, and subwallet.
     pub fn new(wallet_id: i32, public_key: HashBytes) -> Self {
         Self {
-            sign_allowed: true,
+            is_signature_allowed: true,
             seqno: 0,
             wallet_id,
             public_key,

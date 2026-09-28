@@ -7,17 +7,16 @@ use hmac::{Hmac, Mac};
 use keyring::{Entry, Error as KeyringError};
 use rand::Rng;
 use ring::pbkdf2;
+use rston::Wallet as SigningWallet;
+use rston::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr, StdAddrFormat};
+use rston::wallet::{Mnemonic, WALLET_ID_DEFAULT, WORDLIST_EN_SET, WalletVersion};
 use sha2::Sha512;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::num::NonZeroU32;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use ton::ton_core::traits::tlb::TLB;
-use ton::ton_core::types::TonAddress;
-use ton::ton_wallet::{Mnemonic, TonWallet, WALLET_ID_DEFAULT, WORDLIST_EN_SET, WalletVersion};
 use ton_retrace::Network;
 
 const WALLET_MESSAGE_TTL_SECONDS: u64 = 600;
@@ -45,8 +44,16 @@ pub fn wallet_message_expire_at(network: &Network) -> anyhow::Result<u32> {
     Ok(expires_at.try_into().unwrap_or(u32::MAX))
 }
 
-fn format_ton_address(address: &TonAddress, testnet: bool, bounceable: bool) -> String {
-    address.to_base64(!testnet, bounceable, true)
+fn format_ton_address(address: &StdAddr, testnet: bool, bounceable: bool) -> String {
+    DisplayBase64StdAddr {
+        addr: address,
+        flags: Base64StdAddrFlags {
+            testnet,
+            bounceable,
+            base64_url: true,
+        },
+    }
+    .to_string()
 }
 
 fn test_keyring_file_path(id: &str) -> Option<PathBuf> {
@@ -287,7 +294,7 @@ pub fn open_wallets(
         let wallet_version = parse_wallet_version(&wallet.kind)?;
         let wallet_id = wallet_id_from_global_id(wallet_version, config.network_global_id(net));
 
-        let ton_wallet = TonWallet::new_with_params(
+        let ton_wallet = SigningWallet::new_with_params(
             wallet_version,
             mnemonic.to_key_pair()?,
             wallet.workchain.unwrap_or(0),
@@ -296,14 +303,15 @@ pub fn open_wallets(
 
         if let Some(expected) = &wallet.expected {
             let expected_address = match net {
-                Network::Mainnet => expected
-                    .address_mainnet
-                    .as_ref()
-                    .map(|a| TonAddress::from_str(&a.clone())),
-                Network::Testnet | Network::Localnet => expected
-                    .address_testnet
-                    .as_ref()
-                    .map(|a| TonAddress::from_str(&a.clone())),
+                Network::Mainnet => expected.address_mainnet.as_ref().map(|address| {
+                    StdAddr::from_str_ext(address, StdAddrFormat::any()).map(|(address, _)| address)
+                }),
+                Network::Testnet | Network::Localnet => {
+                    expected.address_testnet.as_ref().map(|address| {
+                        StdAddr::from_str_ext(address, StdAddrFormat::any())
+                            .map(|(address, _)| address)
+                    })
+                }
                 Network::Custom(_) => None,
             };
 
@@ -360,11 +368,10 @@ pub fn prepare_localnet_wallets(
     names: &[String],
 ) -> anyhow::Result<Vec<acton_localnet::StartupWallet>> {
     use rston::{
-        boc::{Boc, BocRepr},
+        boc::BocRepr,
         cell::{HashBytes, Lazy},
         models::{
             Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, ShardAccount,
-            StateInit,
         },
     };
 
@@ -388,23 +395,14 @@ pub fn prepare_localnet_wallets(
                 "Startup wallet '{name}' duplicates address {address}"
             );
 
-            let code = WalletVersion::get_code(wallet.wallet.version)?;
-            let data = WalletVersion::get_default_data(
-                wallet.wallet.version,
-                &wallet.wallet.key_pair,
-                wallet.wallet.wallet_id,
-            )?;
+            let state_init = wallet.wallet.state_init()?;
             let account = ShardAccount {
                 account: Lazy::new(&OptionalAccount(Some(Account {
                     address: IntAddr::Std(address),
                     storage_stat: Default::default(),
                     last_trans_lt: 0,
                     balance: CurrencyCollection::new(STARTUP_ACCOUNT_BALANCE_NANOGRAMS),
-                    state: AccountState::Active(StateInit {
-                        code: Some(Boc::decode(code.to_boc()?)?),
-                        data: Some(Boc::decode(data.to_boc()?)?),
-                        ..Default::default()
-                    }),
+                    state: AccountState::Active(state_init),
                 })))?,
                 last_trans_hash: HashBytes::ZERO,
                 last_trans_lt: 0,
@@ -556,7 +554,7 @@ const PBKDF_ITERATIONS_SEED: NonZeroU32 = match NonZeroU32::new(PBKDF_ITERATIONS
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ton::ton_wallet::{WALLET_V5R1_ID_DEFAULT, WALLET_V5R1_ID_DEFAULT_TESTNET};
+    use rston::wallet::{WALLET_V5R1_ID_DEFAULT, WALLET_V5R1_ID_DEFAULT_TESTNET};
 
     #[test]
     fn wallet_v5_derives_id_from_network_global_id() {

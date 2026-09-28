@@ -2,13 +2,13 @@ use apalis::prelude::Data;
 use faucet_valkey::{
     AmountWindowDecision, AntifraudModule, SentAmountWindowDecision, SuccessfulClaimWindowDecision,
 };
-use std::str::FromStr;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder};
+use rston::models::{
+    CurrencyCollection, IntMsgInfo, MsgInfo, OwnedMessage, StdAddr, StdAddrFormat,
+};
+use rston::wallet::{SendMsgFlags, WalletMessage};
 use std::time::Duration as StdDuration;
-use ton::block_tlb::{CommonMsgInfo, CommonMsgInfoInt, CurrencyCollection, Msg};
-use ton::ton_core::cell::TonCell;
-use ton::ton_core::traits::tlb::TLB;
-use ton::ton_core::types::TonAddress;
-use ton::ton_core::types::tlb_core::TLBCoins;
 use toncenter::ToncenterClient;
 use tracing::{error, info, warn};
 
@@ -469,7 +469,8 @@ async fn record_successful_claim_subject(
 }
 
 fn normalized_address_key(address: &str) -> anyhow::Result<String> {
-    Ok(TonAddress::from_str(address)?.to_hex())
+    let (address, _) = StdAddr::from_str_ext(address, StdAddrFormat::any())?;
+    Ok(address.to_string())
 }
 
 async fn wait_for_sent_amount_window(
@@ -557,9 +558,12 @@ async fn process_send_tokens(
     amount: u64,
     message: &str,
 ) -> anyhow::Result<()> {
-    let dest = TonAddress::from_str(dest)?;
+    let (dest, _) = StdAddr::from_str_ext(dest, StdAddrFormat::any())?;
 
-    let message_cell = build_message(wallet, amount, dest, message)?;
+    let wallet_message = WalletMessage {
+        mode: SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR,
+        msg: build_message(wallet, amount, dest, message)?,
+    };
 
     let seqno = client.get_wallet_seqno(&wallet.get_address()).await?;
 
@@ -568,11 +572,12 @@ async fn process_send_tokens(
         .as_secs()
         + 600) as u32;
 
-    let external = wallet
-        .wallet
-        .create_ext_in_msg(vec![message_cell], seqno, expire_at, false)?;
+    let external =
+        wallet
+            .wallet
+            .create_ext_in_msg(vec![wallet_message], seqno, expire_at, false)?;
 
-    client.send_boc(&external.to_boc_base64()?).await?;
+    client.send_boc(&Boc::encode_base64(external)).await?;
 
     Ok(())
 }
@@ -580,28 +585,36 @@ async fn process_send_tokens(
 fn build_message(
     wallet: &Wallet,
     amount: u64,
-    dest: TonAddress,
+    dest: StdAddr,
     message: &str,
-) -> anyhow::Result<TonCell> {
-    let message_info = CommonMsgInfoInt {
+) -> anyhow::Result<Cell> {
+    let message_info = IntMsgInfo {
         ihr_disabled: true,
         bounce: false,
         bounced: false,
-        src: wallet.wallet.address.to_msg_address(),
-        dst: dest.to_msg_address(),
-        value: CurrencyCollection::new(TLBCoins::from_num(&amount)?),
-        ihr_fee: TLBCoins::ZERO,
-        fwd_fee: TLBCoins::ZERO,
+        src: wallet.wallet.address.clone().into(),
+        dst: dest.into(),
+        value: CurrencyCollection::new(amount.into()),
+        extra_flags: Default::default(),
+        fwd_fee: Default::default(),
         created_at: 0,
         created_lt: 0,
     };
 
-    let mut message_body_builder = TonCell::builder();
-    message_body_builder.write_num(&0u32, 32)?;
-    message_body_builder.write_bits(message.as_bytes(), message.len() * 8)?;
+    let mut message_body_builder = CellBuilder::new();
+    message_body_builder.store_u32(0)?;
+    message_body_builder.store_raw(
+        message.as_bytes(),
+        u16::try_from(message.len().saturating_mul(8))?,
+    )?;
     let message_body = message_body_builder.build()?;
 
-    let message = Msg::new(CommonMsgInfo::Int(message_info), message_body);
+    let message = OwnedMessage {
+        info: MsgInfo::Int(message_info),
+        init: None,
+        body: message_body.into(),
+        layout: None,
+    };
 
-    Ok(message.to_cell()?)
+    Ok(CellBuilder::build_from(message)?)
 }

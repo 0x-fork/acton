@@ -26,7 +26,6 @@ log = { workspace = true }
 tvm-ffi = { workspace = true }
 
 [dev-dependencies]
-ton = { workspace = true }
 tungstenite = { workspace = true }
 tempfile = { workspace = true }
 

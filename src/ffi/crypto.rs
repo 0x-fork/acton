@@ -4,7 +4,7 @@ use ed25519_dalek::{Signer, SigningKey};
 use num_bigint::{BigInt, Sign};
 use rand::RngCore;
 use rston::cell::{Cell, CellBuilder};
-use ton::ton_wallet::Mnemonic;
+use rston::mnemonic::Mnemonic;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvm_ffi::stack::{Tuple, TupleItem};

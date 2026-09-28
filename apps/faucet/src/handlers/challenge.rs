@@ -99,7 +99,7 @@ pub(super) async fn create_challenge(
     headers: HeaderMap,
     Json(payload): Json<ChallengeRequest>,
 ) -> ChallengeResult {
-    let raw_address = parse_testnet_address(&payload.address).map(|address| address.to_hex());
+    let raw_address = parse_testnet_address(&payload.address).map(|address| address.to_string());
 
     info!(
         address = %payload.address,

@@ -22,7 +22,6 @@ use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
 use tolk_compiler::types_kernel::TyIdx;
 use tolk_source_map::SourceLocation;
-use ton::ton_wallet::TonWallet;
 use ton_api::{Network, TonApiClient};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use ton_emulator::world_state::WorldState;
@@ -955,25 +954,18 @@ impl MessageIterState {
 #[derive(Clone, Debug)]
 pub struct Wallet {
     pub name: String,
-    pub wallet: TonWallet,
+    pub wallet: rston::Wallet,
     pub seqno: Option<u32>,
 }
 
 impl Wallet {
     pub fn seqno(&self, client: &TonApiClient) -> anyhow::Result<(u32, bool)> {
-        client.get_wallet_seqno(&self.wallet.address.to_base64(true, true, true))
+        client.get_wallet_seqno(&self.wallet.address.display_base64_url(true).to_string())
     }
 
     #[must_use]
     pub fn address(&self) -> StdAddr {
-        StdAddr {
-            anycast: None,
-            address: HashBytes(
-                <[u8; 32]>::try_from(self.wallet.address.hash.as_slice())
-                    .expect("TonAddress hash must be exactly 32 bytes"),
-            ),
-            workchain: self.wallet.address.workchain as i8,
-        }
+        self.wallet.address.clone()
     }
 }
 

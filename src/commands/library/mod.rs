@@ -17,6 +17,7 @@ use rston::models::{
     Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, IntMsgInfo, MsgInfo,
     OwnedMessage, StateInit, StdAddr, StdAddrFormat,
 };
+use rston::wallet::{SendMsgFlags, WalletMessage};
 use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
@@ -27,8 +28,6 @@ use tasm_core::printer::FormatOptions;
 use tempfile::TempDir;
 use tolk_compiler::CompilerResult;
 use toml_edit::{DocumentMut, Item, Table, value};
-use ton::ton_core::cell::TonCell;
-use ton::ton_core::traits::tlb::TLB;
 use ton_api::{Network, TonApiClient};
 
 #[allow(clippy::too_many_arguments)]
@@ -50,13 +49,8 @@ pub fn publish_cmd(
     validate_tonconnect_options(tonconnect, wallet_name.as_deref(), &network)?;
 
     let library_code_cell = if let Some(code_str) = code_arg {
-        if let Ok(cell) = Boc::decode_base64(&code_str) {
-            cell
-        } else if let Ok(cell) = Boc::decode_hex(&code_str) {
-            cell
-        } else {
-            anyhow::bail!("Failed to decode BoC data as hex or base64");
-        }
+        Boc::decode_any(&code_str)
+            .map_err(|_| anyhow!("Failed to decode BoC data as hex or base64"))?
     } else {
         let contract_key = select_contract(contract_id.clone(), &config)?;
         let contract = config
@@ -467,15 +461,18 @@ impl LibrarySender {
                 let (seqno, need_state_init) = wallet.seqno(api_client)?;
                 let expire_at = wallet_message_expire_at(network)?;
 
-                let message_cell = TonCell::from_boc(Boc::encode(message.clone()))?;
+                let wallet_message = WalletMessage {
+                    mode: SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR,
+                    msg: message.clone(),
+                };
                 let external = wallet.wallet.create_ext_in_msg(
-                    vec![message_cell],
+                    vec![wallet_message],
                     seqno,
                     expire_at,
                     need_state_init,
                 )?;
 
-                let boc = external.to_boc_base64()?;
+                let boc = Boc::encode_base64(external);
                 let network_name = network.to_string();
                 let context = SendBocContext::wallet(wallet, &network_name, seqno, need_state_init);
                 api_client

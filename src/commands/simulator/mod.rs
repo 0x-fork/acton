@@ -7,18 +7,16 @@ use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::Context;
 use rand::RngCore;
-use rston::boc::BocRepr;
+use rston::boc::Boc;
 use rston::cell::{CellBuilder, CellSliceParts};
 use rston::models::{
     Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, IntMsgInfo, MsgInfo,
     OwnedMessage, StdAddr,
 };
+use rston::wallet::{SendMsgFlags, WalletMessage, WalletVersion};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use ton::ton_core::cell::TonCell;
-use ton::ton_core::traits::tlb::TLB;
-use ton::ton_wallet::WalletVersion;
 use ton_localnet::node::StateSource;
 use ton_localnet::remote::RemoteProvider;
 use ton_localnet::storage::AccountStatus;
@@ -325,12 +323,14 @@ fn build_wallet_deploy_message(wallet: &Wallet) -> anyhow::Result<String> {
         layout: None,
     };
 
-    let message_cell_boc = BocRepr::encode(message)?;
-    let message_cell = TonCell::from_boc(message_cell_boc)?;
+    let wallet_message = WalletMessage {
+        mode: SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR,
+        msg: CellBuilder::build_from(message)?,
+    };
     let external = wallet
         .wallet
-        .create_ext_in_msg(vec![message_cell], 0, expire_at, true)?;
-    Ok(external.to_boc_base64()?)
+        .create_ext_in_msg(vec![wallet_message], 0, expire_at, true)?;
+    Ok(Boc::encode_base64(external))
 }
 
 fn format_std_address(address: &StdAddr, network: &Network) -> String {

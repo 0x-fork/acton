@@ -6,6 +6,7 @@ use acton_studio::{
     WalletRuntimeError, WalletRuntimeFuture,
 };
 use ed25519_dalek::{Signer, SigningKey};
+use rston::models::{Base64StdAddrFlags, DisplayBase64StdAddr};
 use ton_retrace::Network;
 
 use crate::context::Wallet;
@@ -78,14 +79,22 @@ impl WalletRuntime for ProjectWalletRuntime {
             .values()
             .map(|wallet| StudioWallet {
                 name: wallet.name.clone(),
-                address: wallet.wallet.address.to_base64(false, false, true),
+                address: DisplayBase64StdAddr {
+                    addr: &wallet.wallet.address,
+                    flags: Base64StdAddrFlags {
+                        testnet: true,
+                        bounceable: false,
+                        base64_url: true,
+                    },
+                }
+                .to_string(),
                 public_key: format!("0x{}", hex::encode(wallet.wallet.key_pair.public_key)),
                 version: crate::commands::simulator::wallet_version_to_string(
                     wallet.wallet.version,
                 )
                 .to_owned(),
                 wallet_id: wallet.wallet.wallet_id,
-                workchain: wallet.wallet.address.workchain,
+                workchain: i32::from(wallet.wallet.address.workchain),
             })
             .collect();
         Box::pin(async move { Ok(wallets) })

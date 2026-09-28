@@ -6,12 +6,11 @@ use acton_config::config::ActonConfig;
 use acton_localnet::{CreateNetwork, catalog};
 use anyhow::Result;
 use expect_test::expect;
-use rston::boc::BocRepr;
+use rston::boc::{Boc, BocRepr};
 use rston::cell::CellBuilder;
 use rston::models::{AccountState, IntAddr, ShardAccount, Transaction, TxInfo};
+use rston::wallet::{SendMsgFlags, WalletMessage};
 use serde_json::json;
-use ton::ton_core::cell::TonCell;
-use ton::ton_core::traits::tlb::TLB;
 use ton_api::Network;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{EmulationResult, Executor, RunTransactionArgs};
@@ -55,10 +54,16 @@ fn full_localnet_startup_wallets_accept_signed_transfers() -> Result<()> {
         let wallet = &wallets[&prepared.name];
         let address = wallet.address();
         let internal = build_internal_message_boc(address.clone(), address.clone(), 1_000_000);
-        let message = wallet
-            .wallet
-            .create_ext_in_msg(vec![TonCell::from_boc(internal)?], 0, u32::MAX, false)?
-            .to_boc_base64()?;
+        let wallet_message = WalletMessage {
+            mode: SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR,
+            msg: Boc::decode(internal)?,
+        };
+        let message = Boc::encode_base64(wallet.wallet.create_ext_in_msg(
+            vec![wallet_message],
+            0,
+            u32::MAX,
+            false,
+        )?);
         let (result, _) = executor.run_transaction(
             &message,
             &RunTransactionArgs {

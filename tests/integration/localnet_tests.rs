@@ -19,6 +19,7 @@ use crate::support::toncenter::{
 use acton::wallets;
 use base64::Engine;
 use reqwest::blocking::Client;
+use rston::Wallet;
 use rston::boc::Boc;
 use rston::cell::{Cell, CellBuilder, CellFamily, Store};
 use rston::models::config::BlockchainConfigParams;
@@ -27,6 +28,7 @@ use rston::models::{
 };
 use rston::num::Tokens;
 use rston::prelude::HashBytes;
+use rston::wallet::{Mnemonic, SendMsgFlags, WalletMessage, WalletVersion};
 use serde_json::{Value, json};
 use std::fmt::Write as _;
 use std::fs;
@@ -34,10 +36,6 @@ use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use ton::ton_core::cell::TonCell;
-use ton::ton_core::traits::tlb::TLB;
-use ton::ton_core::types::TonAddress;
-use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
 use ton_api::Network;
 use ton_api::toncenter::emulate::v1::EmulateTraceResponse;
 use ton_localnet::types::{Addr, Hash256};
@@ -8128,20 +8126,23 @@ fn build_localnet_ext_in_boc() -> String {
     let version = WalletVersion::V4R2;
     let wallet_id = wallets::wallet_id(version, &Network::Localnet);
     let wallet =
-        TonWallet::new_with_params(version, key_pair, 0, wallet_id).expect("wallet must build");
+        Wallet::new_with_params(version, key_pair, 0, wallet_id).expect("wallet must build");
 
-    let wallet_addr = ton_address_to_std_addr(&wallet.address);
+    let wallet_addr = wallet.address.clone();
     let internal_boc = build_internal_message_boc(wallet_addr.clone(), wallet_addr, 50_000_000);
-    let internal_cell = TonCell::from_boc(internal_boc).expect("must decode internal TonCell");
+    let wallet_message = WalletMessage {
+        mode: SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR,
+        msg: Boc::decode(internal_boc).expect("must decode internal message"),
+    };
     let expire_at = (SystemTime::now() + Duration::from_secs(600))
         .duration_since(UNIX_EPOCH)
         .expect("current time must be after unix epoch")
         .as_secs() as u32;
-    wallet
-        .create_ext_in_msg(vec![internal_cell], 1, expire_at, false)
-        .expect("must build external-in message")
-        .to_boc_base64()
-        .expect("must encode external-in message boc")
+    Boc::encode_base64(
+        wallet
+            .create_ext_in_msg(vec![wallet_message], 1, expire_at, false)
+            .expect("must build external-in message"),
+    )
 }
 
 fn build_localnet_internal_boc() -> String {
@@ -8182,17 +8183,6 @@ fn compute_message_hashes_base64(boc_b64: &str) -> (String, String) {
         Hash256(*cell.repr_hash().as_array()).to_base64(),
         compute_normalized_ext_in_hash_for_test(&message).to_base64(),
     )
-}
-
-fn ton_address_to_std_addr(address: &TonAddress) -> StdAddr {
-    StdAddr {
-        anycast: None,
-        address: HashBytes(
-            <[u8; 32]>::try_from(address.hash.as_slice())
-                .expect("TonAddress hash must be exactly 32 bytes"),
-        ),
-        workchain: address.workchain as i8,
-    }
 }
 
 fn compute_normalized_ext_in_hash_for_test(msg: &Message<'_>) -> Hash256 {

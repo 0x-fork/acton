@@ -25,7 +25,6 @@
 /// Serde represents versions using their Rust variant names, such as `"V4R2"` and `"HLV2R2"`.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[non_exhaustive]
 pub enum WalletVersion {
     /// Original V1 code, with [`crate::wallet::WalletV1V2Data`] storage and no getters.
     V1R1,

@@ -88,11 +88,7 @@ extension!(env_cell in (Context) with (name: String) using env_cell_impl);
 fn env_cell_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
     match env::var(&name) {
         Ok(val) => {
-            let cell = if let Ok(b) = Boc::decode_base64(&val) {
-                Some(b)
-            } else {
-                Boc::decode_hex(&val).ok()
-            };
+            let cell = Boc::decode_any(&val).ok();
 
             if let Some(cell) = cell {
                 stack.push(TupleItem::Cell(cell));

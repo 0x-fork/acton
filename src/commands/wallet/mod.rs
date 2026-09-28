@@ -10,20 +10,20 @@ use clap::Subcommand;
 use inquire::{Confirm, Select, Text};
 use log::error;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use rston::Wallet;
+use rston::boc::Boc;
+use rston::cell::Cell;
+use rston::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr, StdAddrFormat};
+use rston::wallet::{Mnemonic, WalletVersion};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::io::{IsTerminal, Read, Write, stdin, stdout};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use toml_edit::{DocumentMut, Item, Table, value};
-use ton::ton_core::cell::TonCell;
-use ton::ton_core::traits::tlb::TLB;
-use ton::ton_core::types::TonAddress;
-use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
 use ton_api::{Network, TonApiClient};
 
 #[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq)]
@@ -51,12 +51,6 @@ pub enum WalletVersionArg {
 pub enum WalletAirdropNetworkArg {
     Testnet,
     Localnet,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum SignMessageFormat {
-    Hex,
-    Base64,
 }
 
 #[derive(serde::Deserialize)]
@@ -121,15 +115,6 @@ const AIRDROP_BALANCE_WAIT_INTERVAL: Duration = Duration::from_secs(2);
 const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED"; // integration tests only
 const WALLET_DEVICE_UID_HEADER: &str = "x-device-uid";
 const AIRDROP_TYPE_TON: u32 = 1;
-
-impl SignMessageFormat {
-    const fn as_str(self) -> &'static str {
-        match self {
-            SignMessageFormat::Hex => "hex",
-            SignMessageFormat::Base64 => "base64",
-        }
-    }
-}
 
 impl From<WalletVersionArg> for WalletVersion {
     fn from(arg: WalletVersionArg) -> Self {
@@ -969,22 +954,21 @@ fn sign_wallet_external_body(
         .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &name)))?;
 
     let body = read_sign_body(body)?;
-    let (external_body, input) = decode_sign_input(&body)?;
+    let external_body = decode_sign_input(&body)?;
 
     let mnemonic_str = wallets::load_mnemonic(&name, wallet)?;
     let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
     let key_pair = mnemonic.to_key_pair()?;
     let version = parse_wallet_version(&wallet.kind)?;
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
-    let ton_wallet =
-        TonWallet::new_with_params(version, key_pair, wallet.workchain.unwrap_or(0), wallet_id)?;
+
+    let workchain = wallet.workchain.unwrap_or(0);
+    let ton_wallet = Wallet::new_with_params(version, key_pair, workchain, wallet_id)?;
 
     let signed_body = ton_wallet
         .sign_ext_in_body(&external_body)
         .context("Failed to sign external body")?;
-    let signed_body_hex = signed_body
-        .to_boc_hex()
-        .context("Failed to encode signed body to hex BoC")?;
+    let signed_body_hex = Boc::encode_hex(signed_body);
 
     if json {
         println!(
@@ -992,7 +976,6 @@ fn sign_wallet_external_body(
             serde_json::to_string_pretty(&serde_json::json!({
                 "success": true,
                 "wallet": name,
-                "input": input.as_str(),
                 "output": "hex",
                 "signed_body": signed_body_hex,
             }))?
@@ -1025,31 +1008,25 @@ fn read_sign_body_from_reader(reader: &mut impl Read) -> anyhow::Result<String> 
     Ok(body)
 }
 
-fn decode_sign_input(body: &str) -> anyhow::Result<(TonCell, SignMessageFormat)> {
+fn decode_sign_input(body: &str) -> anyhow::Result<Cell> {
     let body = body.trim();
     if body.is_empty() {
         anyhow::bail!("Body cannot be empty");
     }
 
-    if is_hex_payload(body)
-        && let Ok(cell) = TonCell::from_boc_hex(body)
-    {
-        return Ok((cell, SignMessageFormat::Hex));
-    }
-
-    if let Ok(cell) = TonCell::from_boc_base64(body) {
-        return Ok((cell, SignMessageFormat::Base64));
-    }
-
-    anyhow::bail!("Body must be a valid BoC encoded as hex or base64")
+    Boc::decode_any(body).map_err(|_| anyhow!("Body must be a valid BoC encoded as hex or base64"))
 }
 
-fn is_hex_payload(value: &str) -> bool {
-    value.len().is_multiple_of(2) && value.as_bytes().iter().all(u8::is_ascii_hexdigit)
-}
-
-fn format_testnet_wallet_address(address: &TonAddress) -> String {
-    address.to_base64(false, true, true)
+fn format_testnet_wallet_address(address: &StdAddr) -> String {
+    DisplayBase64StdAddr {
+        addr: address,
+        flags: Base64StdAddrFlags {
+            testnet: true,
+            bounceable: true,
+            base64_url: true,
+        },
+    }
+    .to_string()
 }
 
 fn remove_wallet(name: Option<String>, yes: bool, json: bool) -> anyhow::Result<()> {
@@ -1231,7 +1208,8 @@ fn list_wallets(balance: bool, json: bool) -> anyhow::Result<()> {
                 for state in states {
                     if let Some(b) = state.balance
                         && let Ok(b_int) = b.parse::<i128>()
-                        && let Ok(address) = TonAddress::from_str(&state.address)
+                        && let Ok((address, _)) =
+                            StdAddr::from_str_ext(&state.address, StdAddrFormat::any())
                     {
                         balances.insert(format_testnet_wallet_address(&address), b_int);
                     }
@@ -1303,7 +1281,7 @@ fn get_wallet_address(
     if let Some(expected) = &wallet.expected
         && let Some(addr) = &expected.address_testnet
     {
-        let addr = TonAddress::from_str(addr)?;
+        let (addr, _) = StdAddr::from_str_ext(addr, StdAddrFormat::any())?;
         return Ok(format_testnet_wallet_address(&addr));
     }
 
@@ -1312,7 +1290,7 @@ fn get_wallet_address(
     let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
     let version = parse_wallet_version(&wallet.kind)?;
     let wallet_id = wallets::wallet_id(version, &network);
-    let ton_wallet = TonWallet::new_with_params(
+    let ton_wallet = Wallet::new_with_params(
         version,
         mnemonic.to_key_pair()?,
         wallet.workchain.unwrap_or(0),
@@ -1805,7 +1783,7 @@ fn new_wallet(
     let key_pair = mnemonic.to_key_pair()?;
 
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
-    let wallet = TonWallet::new_with_params(version, key_pair, 0, wallet_id)?;
+    let wallet = Wallet::new_with_params(version, key_pair, 0, wallet_id)?;
 
     let wallet_address = format_testnet_wallet_address(&wallet.address);
 
@@ -2027,7 +2005,7 @@ fn import_wallet(
     let version = get_or_prompt_version(version)?;
 
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
-    let wallet = TonWallet::new_with_params(version, key_pair, 0, wallet_id)?;
+    let wallet = Wallet::new_with_params(version, key_pair, 0, wallet_id)?;
 
     let wallet_address = format_testnet_wallet_address(&wallet.address);
 
@@ -2203,30 +2181,27 @@ mod wallet_name_tests {
 
     #[test]
     fn test_decode_sign_input_hex() {
-        let cell = TonCell::empty().clone();
-        let body_hex = cell.to_boc_hex().expect("must encode hex boc");
-        let (decoded, format) = decode_sign_input(&body_hex).expect("must decode hex");
+        let cell = Cell::default();
+        let body_hex = Boc::encode_hex(&cell);
+        let decoded = decode_sign_input(&body_hex).expect("must decode hex");
         assert_eq!(decoded, cell);
-        assert_eq!(format, SignMessageFormat::Hex);
     }
 
     #[test]
     fn test_decode_sign_input_base64() {
-        let cell = TonCell::empty().clone();
-        let body_b64 = cell.to_boc_base64().expect("must encode base64 boc");
-        let (decoded, format) = decode_sign_input(&body_b64).expect("must decode base64");
+        let cell = Cell::default();
+        let body_b64 = Boc::encode_base64(&cell);
+        let decoded = decode_sign_input(&body_b64).expect("must decode base64");
         assert_eq!(decoded, cell);
-        assert_eq!(format, SignMessageFormat::Base64);
     }
 
     #[test]
     fn test_decode_sign_input_trims_surrounding_whitespace() {
-        let cell = TonCell::empty().clone();
-        let body_b64 = cell.to_boc_base64().expect("must encode base64 boc");
+        let cell = Cell::default();
+        let body_b64 = Boc::encode_base64(&cell);
         let padded = format!(" \n{body_b64}\t");
-        let (decoded, format) = decode_sign_input(&padded).expect("must decode trimmed input");
+        let decoded = decode_sign_input(&padded).expect("must decode trimmed input");
         assert_eq!(decoded, cell);
-        assert_eq!(format, SignMessageFormat::Base64);
     }
 
     #[test]
@@ -2283,8 +2258,8 @@ mod wallet_name_tests {
         let key_pair = mnemonic.to_key_pair().expect("keypair from mnemonic");
         let version = WalletVersion::V5R1;
         let wallet_id = wallets::wallet_id(version, &Network::Testnet);
-        let expected_wallet = TonWallet::new_with_params(version, key_pair, 0, wallet_id)
-            .expect("wallet from mnemonic");
+        let expected_wallet =
+            Wallet::new_with_params(version, key_pair, 0, wallet_id).expect("wallet from mnemonic");
         let expected = format_testnet_wallet_address(&expected_wallet.address);
 
         assert_eq!(actual, expected);

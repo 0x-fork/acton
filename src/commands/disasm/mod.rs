@@ -61,9 +61,7 @@ pub fn disasm_cmd(
         // BoC file can be binary file or file with hex/base64 encoded data
         let binary_data =
             fs::read(&path).map_err(|err| anyhow!("Cannot access {}: {err}", path.yellow()))?;
-        if let Ok(cell) = Boc::decode_base64(binary_data.trim_ascii()) {
-            Boc::encode_hex(cell)
-        } else if let Ok(cell) = Boc::decode_hex(binary_data.trim_ascii()) {
+        if let Ok(cell) = Boc::decode_any(binary_data.trim_ascii()) {
             Boc::encode_hex(cell)
         } else {
             hex::encode(binary_data)
@@ -87,15 +85,8 @@ pub fn disasm_cmd(
         );
     };
 
-    let cell = if let Ok(cell) = Boc::decode_hex(&boc_data) {
-        cell
-    } else if let Ok(cell) = Boc::decode_base64(&boc_data) {
-        cell
-    } else {
-        return Err(anyhow::anyhow!(
-            "Failed to decode BoC data as hex or base64"
-        ));
-    };
+    let cell = Boc::decode_any(&boc_data)
+        .map_err(|_| anyhow!("Failed to decode BoC data as hex or base64"))?;
 
     let disassembler = Disassembler::new();
     let mut final_cell = cell;

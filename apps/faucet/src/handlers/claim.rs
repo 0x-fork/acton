@@ -90,7 +90,7 @@ pub(super) async fn create_claim(
     headers: HeaderMap,
     Json(payload): Json<CreateClaimRequest>,
 ) -> ClaimResult {
-    let raw_address = parse_testnet_address(&payload.address).map(|address| address.to_hex());
+    let raw_address = parse_testnet_address(&payload.address).map(|address| address.to_string());
 
     info!(
         address = %payload.address,

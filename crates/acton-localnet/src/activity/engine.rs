@@ -9,6 +9,8 @@ use anyhow::{Context, Result, bail, ensure};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use ed25519_dalek::SigningKey;
 use rand::Rng;
+use rston::Wallet;
+use rston::wallet::{KeyPair, SendMsgFlags, WalletMessage, WalletVersion};
 use rston::{
     boc::{Boc, BocRepr},
     cell::Cell,
@@ -18,15 +20,8 @@ use rston::{
     },
 };
 use serde_json::{Value, json};
-use std::{
-    str::FromStr,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 use tokio::sync::watch;
-use ton::{
-    ton_core::{cell::TonCell, traits::tlb::TLB},
-    ton_wallet::{KeyPair, TonWallet, WalletVersion},
-};
 
 use contracts::GRAM;
 
@@ -38,7 +33,7 @@ pub(crate) struct Engine {
 }
 
 struct Sender {
-    wallet: TonWallet,
+    wallet: Wallet,
     address: StdAddr,
     seqno: u32,
 }
@@ -287,7 +282,7 @@ impl Sender {
     fn new(version: ActivityWalletVersion) -> Result<Self> {
         let secret: [u8; 32] = rand::random();
         let key = SigningKey::from_bytes(&secret);
-        let wallet = TonWallet::new(
+        let wallet = Wallet::new(
             match version {
                 ActivityWalletVersion::V3r2 => WalletVersion::V3R2,
                 ActivityWalletVersion::V4r2 => WalletVersion::V4R2,
@@ -298,7 +293,7 @@ impl Sender {
                 secret_key: key.to_keypair_bytes(),
             },
         )?;
-        let address = StdAddr::from_str(&wallet.address.to_hex())?;
+        let address = wallet.address.clone();
         Ok(Self {
             wallet,
             address,
@@ -474,21 +469,22 @@ impl Engine {
                     body: transfer.body.clone().into(),
                     layout: None,
                 };
-                Ok(TonCell::from_boc(BocRepr::encode(message)?)?)
+                Ok(WalletMessage {
+                    mode: SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR,
+                    msg: rston::cell::CellBuilder::build_from(message)?,
+                })
             })
             .collect::<Result<Vec<_>>>()?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs() as u32;
-        let boc = sender
-            .wallet
-            .create_ext_in_msg(
-                messages,
-                sender.seqno,
-                now.saturating_add(90),
-                sender.seqno == 0,
-            )?
-            .to_boc()?;
+        let external = sender.wallet.create_ext_in_msg(
+            messages,
+            sender.seqno,
+            now.saturating_add(90),
+            sender.seqno == 0,
+        )?;
+        let boc = Boc::encode(external);
         let result = self
             .post(
                 &format!("{}/sendBocReturnHash", self.endpoints.api_v2),

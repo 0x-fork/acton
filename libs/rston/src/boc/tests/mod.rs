@@ -2,6 +2,25 @@ use super::*;
 use crate::util::decode_base64;
 
 #[test]
+fn decode_any_accepts_hex_and_base64() -> anyhow::Result<()> {
+    let child = CellBuilder::build_from(0xcafe_u16)?;
+    let mut builder = CellBuilder::new();
+    builder.store_u32(42)?;
+    builder.store_reference(child)?;
+    let cell = builder.build()?;
+
+    for encoded in [
+        Boc::encode_hex(&cell),
+        Boc::encode_hex(&cell).to_uppercase(),
+        Boc::encode_base64(&cell),
+    ] {
+        assert_eq!(Boc::decode_any(encoded)?, cell);
+    }
+
+    Ok(())
+}
+
+#[test]
 fn big_cell() -> anyhow::Result<()> {
     fn make_big_tree(depth: u8, count: &mut u32, target: u32) -> Cell {
         *count += 1;

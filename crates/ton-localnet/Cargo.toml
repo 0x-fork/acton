@@ -17,7 +17,6 @@ ton-executor = { workspace = true }
 ton-emulator = { workspace = true }
 ton-networks = { workspace = true }
 ton-api = { workspace = true }
-ton = { workspace = true }
 ton-liteapi = { workspace = true }
 acton-config = { workspace = true }
 rston = { workspace = true }

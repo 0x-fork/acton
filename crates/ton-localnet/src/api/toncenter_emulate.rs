@@ -3,15 +3,13 @@ use crate::localnet::LocalnetAccountState;
 use crate::types::{Addr, BocBytes};
 use anyhow::Context;
 use rston::boc::{Boc, BocRepr};
-use rston::cell::{Cell, CellSliceParts};
+use rston::cell::{Cell, CellBuilder, CellSliceParts};
 use rston::models::{
     CurrencyCollection, ExtInMsgInfo, IntAddr, IntMsgInfo, MessageLayout, MsgInfo, OwnedMessage,
     StateInit, StdAddr, StdAddrFormat,
 };
 use rston::num::Tokens;
-use ton::ton_core::cell::TonCell;
-use ton::ton_core::traits::tlb::TLB;
-use ton::ton_wallet::WalletVersion;
+use rston::wallet::{SendMsgFlags, WalletMessage, WalletVersion};
 use ton_api::toncenter::emulate::v1::{TonConnectEmulateRequest, TonConnectMessage};
 use toncenter::v3::EstimateFeeRequest;
 
@@ -76,14 +74,12 @@ pub(crate) fn compose_ton_connect_message(
     let messages = request
         .messages
         .iter()
-        .map(|message| build_internal_message(&from, message, now))
+        .map(|message| build_wallet_message(&from, message, now))
         .collect::<anyhow::Result<Vec<_>>>()?;
     let body =
-        WalletVersion::build_ext_in_body(version, valid_until, wallet.seqno, wallet_id, messages)
+        rston::wallet::build_ext_in_body(version, valid_until, wallet.seqno, wallet_id, messages)
             .context("Failed to build wallet external message body")?;
-    let signed_body = add_dummy_signature(version, body)?;
-    let body = Boc::decode(signed_body.to_boc()?)
-        .context("Failed to convert wallet body to local cell")?;
+    let body = add_dummy_signature(version, body)?;
 
     let message = OwnedMessage {
         info: MsgInfo::ExtIn(ExtInMsgInfo {
@@ -177,11 +173,11 @@ fn normalize_valid_until(value: u64) -> anyhow::Result<u32> {
     u32::try_from(seconds).context("valid_until does not fit uint32 seconds")
 }
 
-fn build_internal_message(
+fn build_wallet_message(
     from: &StdAddr,
     message: &TonConnectMessage,
     now: u32,
-) -> anyhow::Result<TonCell> {
+) -> anyhow::Result<WalletMessage> {
     let (destination, flags) = StdAddr::from_str_ext(&message.address, StdAddrFormat::any())
         .context("Invalid destination address format")?;
     let amount = message
@@ -214,7 +210,10 @@ fn build_internal_message(
             body_to_cell: message.payload.is_some(),
         }),
     };
-    TonCell::from_boc(BocRepr::encode(message)?).context("Failed to build internal message")
+    Ok(WalletMessage {
+        mode: SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR,
+        msg: CellBuilder::build_from(message).context("Failed to build internal message")?,
+    })
 }
 
 fn decode_optional_cell(value: Option<&str>) -> anyhow::Result<Option<Cell>> {
@@ -233,14 +232,14 @@ fn decode_cell(value: &str, field: &str) -> anyhow::Result<Cell> {
     Boc::decode(&boc.0).with_context(|| format!("failed to decode {field} BOC"))
 }
 
-fn add_dummy_signature(version: WalletVersion, body: TonCell) -> anyhow::Result<TonCell> {
-    let mut builder = TonCell::builder();
+fn add_dummy_signature(version: WalletVersion, body: Cell) -> anyhow::Result<Cell> {
+    let mut builder = CellBuilder::new();
     if version == WalletVersion::V5R1 {
-        builder.write_cell(&body)?;
-        builder.write_bits(DUMMY_SIGNATURE, DUMMY_SIGNATURE.len() * 8)?;
+        builder.store_slice(body.as_slice()?)?;
+        builder.store_raw(&DUMMY_SIGNATURE, 512)?;
     } else {
-        builder.write_bits(DUMMY_SIGNATURE, DUMMY_SIGNATURE.len() * 8)?;
-        builder.write_cell(&body)?;
+        builder.store_raw(&DUMMY_SIGNATURE, 512)?;
+        builder.store_slice(body.as_slice()?)?;
     }
     builder
         .build()
@@ -254,9 +253,9 @@ mod tests {
     use crate::storage::AccountStatus;
     use crate::types::{Addr, Hash256};
     use rston::cell::CellBuilder;
+    use rston::cell::HashBytes;
     use rston::models::Message;
-    use ton::ton_core::cell::TonHash;
-    use ton::ton_wallet::{
+    use rston::wallet::{
         WalletV1V2Data, WalletV3Data, WalletV3ExtMsgBody, WalletV4Data, WalletV4ExtMsgBody,
         WalletV5Data, WalletV5ExtMsgBody,
     };
@@ -282,14 +281,14 @@ mod tests {
             let (valid_until, messages, signature) = match version {
                 WalletVersion::V3R1 | WalletVersion::V3R2 => {
                     let (body, signature) =
-                        WalletV3ExtMsgBody::read_signed(&mut signed_body.parser())?;
+                        WalletV3ExtMsgBody::read_signed(&mut signed_body.as_slice()?)?;
                     assert_eq!(body.subwallet_id, WALLET_ID);
                     assert_eq!(body.msg_seqno, SEQNO);
                     (body.valid_until, body.msgs, signature)
                 }
                 WalletVersion::V4R1 | WalletVersion::V4R2 => {
                     let (body, signature) =
-                        WalletV4ExtMsgBody::read_signed(&mut signed_body.parser())?;
+                        WalletV4ExtMsgBody::read_signed(&mut signed_body.as_slice()?)?;
                     assert_eq!(body.subwallet_id, WALLET_ID);
                     assert_eq!(body.msg_seqno, SEQNO);
                     assert_eq!(body.opcode, 0);
@@ -297,7 +296,7 @@ mod tests {
                 }
                 WalletVersion::V5R1 => {
                     let (body, signature) =
-                        WalletV5ExtMsgBody::read_signed(&mut signed_body.parser())?;
+                        WalletV5ExtMsgBody::read_signed(&mut signed_body.as_slice()?)?;
                     assert_eq!(body.wallet_id, WALLET_ID);
                     assert_eq!(body.msg_seqno, SEQNO);
                     (body.valid_until, body.msgs, signature)
@@ -314,7 +313,11 @@ mod tests {
             assert_eq!(valid_until, expected_valid_until);
             assert_eq!(signature, DUMMY_SIGNATURE);
             assert_eq!(messages.len(), 1);
-            assert_internal_message(&messages[0])?;
+            assert_eq!(
+                messages[0].mode,
+                SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR
+            );
+            assert_internal_message(&messages[0].msg)?;
         }
         Ok(())
     }
@@ -417,34 +420,34 @@ mod tests {
     }
 
     fn wallet_account(version: WalletVersion) -> anyhow::Result<LocalnetAccountState> {
-        let public_key = TonHash::from_slice_sized(&[0x33; 32]);
+        let public_key = HashBytes([0x33; 32]);
         let data = match version {
-            WalletVersion::V2R2 => WalletV1V2Data::new(public_key).to_boc()?,
+            WalletVersion::V2R2 => WalletV1V2Data::new(public_key).to_cell()?,
             WalletVersion::V3R1 | WalletVersion::V3R2 => WalletV3Data {
                 seqno: SEQNO,
                 wallet_id: WALLET_ID,
                 public_key,
             }
-            .to_boc()?,
+            .to_cell()?,
             WalletVersion::V4R1 | WalletVersion::V4R2 => WalletV4Data {
                 seqno: SEQNO,
                 wallet_id: WALLET_ID,
                 public_key,
                 plugins: None,
             }
-            .to_boc()?,
+            .to_cell()?,
             WalletVersion::V5R1 => WalletV5Data {
-                sign_allowed: true,
+                is_signature_allowed: true,
                 seqno: SEQNO,
                 wallet_id: WALLET_ID,
                 public_key,
                 extensions: None,
             }
-            .to_boc()?,
+            .to_cell()?,
             _ => unreachable!(),
         };
-        let code = WalletVersion::get_code(version)?.clone();
-        let code_hash = Hash256(*code.cell_hash()?.as_slice_sized());
+        let code = rston::wallet::get_code(version)?.clone();
+        let code_hash = Hash256(code.repr_hash().0);
         Ok(LocalnetAccountState {
             address: Addr {
                 workchain: 0,
@@ -453,9 +456,9 @@ mod tests {
             account_state_hash: Hash256([0x44; 32]),
             balance: 1_000_000_000,
             extra_currencies: Vec::new(),
-            code: Some(BocBytes(code.to_boc()?)),
+            code: Some(BocBytes(Boc::encode(code))),
             code_hash: Some(code_hash),
-            data: Some(BocBytes(data)),
+            data: Some(BocBytes(Boc::encode(data))),
             data_hash: None,
             last_transaction_id: LocalnetTransactionId {
                 lt: 1,
@@ -468,7 +471,7 @@ mod tests {
         })
     }
 
-    fn extract_wallet_body(boc: &BocBytes) -> anyhow::Result<TonCell> {
+    fn extract_wallet_body(boc: &BocBytes) -> anyhow::Result<Cell> {
         let message_cell = Boc::decode(&boc.0)?;
         let message = message_cell.parse::<Message<'_>>()?;
         let MsgInfo::ExtIn(info) = message.info else {
@@ -478,12 +481,11 @@ mod tests {
 
         let mut builder = CellBuilder::new();
         builder.store_slice(message.body)?;
-        TonCell::from_boc(Boc::encode(builder.build()?)).map_err(Into::into)
+        builder.build().map_err(Into::into)
     }
 
-    fn assert_internal_message(message: &TonCell) -> anyhow::Result<()> {
-        let cell = Boc::decode(message.to_boc()?)?;
-        let message = cell.parse::<Message<'_>>()?;
+    fn assert_internal_message(message: &Cell) -> anyhow::Result<()> {
+        let message = message.parse::<Message<'_>>()?;
         let MsgInfo::Int(info) = message.info else {
             anyhow::bail!("expected internal message");
         };

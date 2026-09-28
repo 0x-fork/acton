@@ -125,7 +125,7 @@
   "w5r1-current": {
     "seqno": 39,
     "wallet_id": 2147483409,
-    "sign_allowed": true,
+    "is_signature_allowed": true,
     "extensions": {},
     "public_key": "bea0669c621c90fd38c5ad37417693b491414a7e2e62f555bc508d7671045cf6",
     "data_hash": "2cdca8b1108494ddebd0625d9e04388ca6192c93be138a97f646b07b9f272769"
@@ -133,7 +133,7 @@
   "w5r1-deployment": {
     "seqno": 0,
     "wallet_id": 2147483409,
-    "sign_allowed": true,
+    "is_signature_allowed": true,
     "extensions": {},
     "public_key": "bea0669c621c90fd38c5ad37417693b491414a7e2e62f555bc508d7671045cf6",
     "data_hash": "0fb43dddcc91203bf125817a3d1de8c206c7c3793add97c8ee52c3acb56a843c"
@@ -141,7 +141,7 @@
   "w5r1-five-extensions": {
     "seqno": 164,
     "wallet_id": 2147483409,
-    "sign_allowed": true,
+    "is_signature_allowed": true,
     "extensions": {
       "29de6f2e63a467c5c32c2d35c6d4be5e0f192a6464ae288686eeba6a0f5c2340": true,
       "7f6f01a69cf973c0dc6cd8971ffe0a64518c9fd1aba05c68b32a4043afe207ca": true,
@@ -155,7 +155,7 @@
   "w5r1-four-transfers-account": {
     "seqno": 415954,
     "wallet_id": 2147483409,
-    "sign_allowed": true,
+    "is_signature_allowed": true,
     "extensions": {},
     "public_key": "aca93a747118f257d4d09eab1719dde44bf0b642156ac4a0afde3aadb09dc300",
     "data_hash": "d7353c08e67fc3a36a88470f083599f7c6aee6856c1ba0e9590c2b45c52bd008"
@@ -163,7 +163,7 @@
   "w5r1-hundred-transfers-account": {
     "seqno": 6326,
     "wallet_id": 2147483409,
-    "sign_allowed": true,
+    "is_signature_allowed": true,
     "extensions": {},
     "public_key": "6303b64d7967ed6670c29ea1f58d2c054559ea246f0bf5d7f0f642ad1d677b15",
     "data_hash": "b69b29965a81f2833f234b2ba40e4930cac37ec35412d4d8afc74a1201a4fb41"
@@ -171,7 +171,7 @@
   "w5r1-mixed-modes-account": {
     "seqno": 1,
     "wallet_id": 2147483409,
-    "sign_allowed": true,
+    "is_signature_allowed": true,
     "extensions": {},
     "public_key": "dff2b6559b9c6d6bcec455e5d48810d1db67da9907b78f7488ba2cf2358c73e0",
     "data_hash": "3287cbbe91f2aa360914253ece9c58e8c329dc3225925b9d5031f5e0a41befb1"
@@ -179,7 +179,7 @@
   "w5r1-send-all-account": {
     "seqno": 6,
     "wallet_id": 2147483409,
-    "sign_allowed": true,
+    "is_signature_allowed": true,
     "extensions": {},
     "public_key": "ece93672211ec6d5fcdd5b784ff92f107c2bab459a8a78b95c77afb127fe05a2",
     "data_hash": "a3a4d4f93565cdf86cf2b7930fc4ac7cb0d6274d14d81a6fda31e3ccba8682d7"
@@ -187,7 +187,7 @@
   "w5r1-signatures-disabled": {
     "seqno": 9,
     "wallet_id": 2147483409,
-    "sign_allowed": false,
+    "is_signature_allowed": false,
     "extensions": {
       "97ecf01df52124906e4cbed02c1859bfda81a8cb7e9203f8e738236b4dcc011b": true
     },
