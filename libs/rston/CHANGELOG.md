@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- TON mnemonic validation, English word list, and Ed25519 key derivation, with
+  typed `MnemonicError` results and automatic clearing of owned secret data on drop.
+
 ### Changed
 
 - Match TON capability names and masks.

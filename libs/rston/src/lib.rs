@@ -135,6 +135,7 @@ pub mod cell;
 pub mod crc;
 pub mod dict;
 pub mod merkle;
+pub mod mnemonic;
 pub mod num;
 pub mod prelude;
 pub mod util;

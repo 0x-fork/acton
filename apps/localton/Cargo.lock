@@ -2533,9 +2533,12 @@ dependencies = [
  "base64",
  "bitflags",
  "crc32c",
+ "ed25519-dalek",
  "hex",
+ "hmac",
  "num-bigint",
  "num-traits",
+ "pbkdf2",
  "rston-proc",
  "scc",
  "serde",
@@ -2544,6 +2547,7 @@ dependencies = [
  "thiserror",
  "tl-proto",
  "tycho-crypto",
+ "zeroize",
 ]
 
 [[package]]

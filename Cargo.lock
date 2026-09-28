@@ -4449,9 +4449,12 @@ dependencies = [
  "bitflags 2.9.4",
  "crc32c",
  "dashmap 6.1.0",
+ "ed25519-dalek",
  "hex",
+ "hmac",
  "num-bigint",
  "num-traits",
+ "pbkdf2",
  "rayon",
  "rston-proc",
  "scc",
@@ -4461,6 +4464,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tl-proto 0.5.3",
  "tycho-crypto",
+ "zeroize",
 ]
 
 [[package]]

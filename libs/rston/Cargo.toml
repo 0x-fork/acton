@@ -6,7 +6,7 @@ repository = "https://github.com/ton-blockchain/acton"
 version = "0.3.5"
 edition = "2024"
 rust-version = "1.88"
-include = ["src/**/*.rs", "benches/**/*.rs", "LICENSE-*", "README.md", "CONTRIBUTING.md"]
+include = ["src/**/*.rs", "resources/mnemonics/*.txt", "benches/**/*.rs", "LICENSE-*", "README.md", "CONTRIBUTING.md"]
 license = "MIT OR Apache-2.0"
 
 [[bench]]
@@ -77,9 +77,12 @@ base64 = { version = "0.22", optional = true }
 bitflags = "2.3"
 crc32c = "0.6.8"
 dashmap = { version = "6.1.0", optional = true }
+ed25519-dalek = "2.2.0"
 hex = "0.4"
+hmac = "0.12"
 num-bigint = { version = "0.4", optional = true }
 num-traits = { version = "0.2", optional = true }
+pbkdf2 = { version = "0.12", features = ["simple"] }
 rand8 = { package = "rand", version = "0.8", optional = true }
 rand9 = { package = "rand", version = "0.9", optional = true }
 rayon = { version = "1.10", optional = true }
@@ -90,6 +93,7 @@ smallvec = { version = "1.9", features = ["union"] }
 thiserror = "2.0"
 tl-proto = { version = "0.5.3", optional = true }
 tycho-crypto = { version = "0.4", features = ["tl-proto"], optional = true }
+zeroize = "1"
 
 rston-proc = { version = "=0.3.0", path = "proc" }
 

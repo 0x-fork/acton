@@ -5,6 +5,8 @@ Use it to read blockchain data, construct messages, and serialize your own types
 
 It is a TON-focused fork of [tycho-types](https://github.com/broxus/tycho-types), developed in the [Acton repository](https://github.com/ton-blockchain/acton).
 
+The mnemonic implementation, related errors, and English word list come from [ton-rs](https://github.com/ston-fi/ton-rs/tree/8ee38e8a3c1c034dc78e3d2a6e71aae3d3848790), licensed under MIT or Apache-2.0.
+
 ## Installation
 
 `rston` requires Rust 1.88 or later.
@@ -62,6 +64,9 @@ Both macros are available through `rston::prelude` without a separate dependency
 
 The `models` module includes addresses, messages, accounts, transactions, blocks, shard states, and blockchain configuration.
 For custom cell formats, `CellBuilder` and `CellSlice` provide operations for individual fields.
+
+The `mnemonic` module validates 24-word TON mnemonics and derives Ed25519 key pairs.
+It exposes `Mnemonic`, `KeyPair`, and the English `WORDLIST_EN_SET`.
 
 ## Features
 

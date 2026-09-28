@@ -1,5 +1,33 @@
 //! Common error types.
 
+/// Errors reported by TON mnemonic validation and key derivation.
+#[derive(Debug, thiserror::Error)]
+pub enum MnemonicError {
+    /// The phrase does not contain the required 24 words.
+    #[error("expected 24 words mnemonic, got {0}")]
+    WordCount(usize),
+    /// A normalized word is absent from the English mnemonic word list.
+    #[error("unknown mnemonic word: {0}")]
+    UnknownWord(String),
+    /// The seed marker does not satisfy the password-protected mnemonic checks.
+    #[error("invalid seed marker for a password-protected mnemonic: {0}")]
+    InvalidPasswordSeed(u8),
+    /// The seed marker does not identify a passwordless mnemonic.
+    #[error("invalid seed marker for a passwordless mnemonic: {0}")]
+    InvalidPasswordlessSeed(u8),
+    /// Key derivation could not produce the required Ed25519 key bytes.
+    #[error("invalid Ed25519 secret key length: got {actual}, expected {expected}")]
+    InvalidSecretKeyLength {
+        /// Number of bytes available in the derived seed.
+        actual: usize,
+        /// Number of bytes required for the Ed25519 secret key.
+        expected: usize,
+    },
+    /// HMAC initialization rejected the supplied key length.
+    #[error("{0}")]
+    HmacInvalidLength(#[from] hmac::digest::crypto_common::InvalidLength),
+}
+
 /// Error type for cell related errors.
 #[derive(Debug, Clone, Eq, PartialEq, thiserror::Error)]
 pub enum Error {
