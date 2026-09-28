@@ -7,6 +7,12 @@ use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::Context;
 use rand::RngCore;
+use rston::boc::BocRepr;
+use rston::cell::{CellBuilder, CellSliceParts};
+use rston::models::{
+    Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, IntMsgInfo, MsgInfo,
+    OwnedMessage, StdAddr,
+};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -21,12 +27,6 @@ use ton_localnet::{
 };
 use ton_retrace::Network;
 use toncenter_keys::LOCALNET_API_KEY_ENV;
-use tycho_types::boc::BocRepr;
-use tycho_types::cell::{CellBuilder, CellSliceParts};
-use tycho_types::models::{
-    Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, IntMsgInfo, MsgInfo,
-    OwnedMessage, StdAddr,
-};
 
 const STARTUP_DEPLOY_TRANSFER_NANOGRAMS: u128 = 50_000_000; // 0.05 GRAM
 pub(crate) const LOCALNET_AUTH_TOKEN_ENV: &str = LOCALNET_API_KEY_ENV;
@@ -312,7 +312,7 @@ fn build_wallet_deploy_message(wallet: &Wallet) -> anyhow::Result<String> {
         src: IntAddr::Std(wallet_addr.clone()),
         dst: IntAddr::Std(wallet_addr),
         value: CurrencyCollection::new(STARTUP_DEPLOY_TRANSFER_NANOGRAMS),
-        ihr_fee: Default::default(),
+        extra_flags: Default::default(),
         fwd_fee: Default::default(),
         created_at: 0,
         created_lt: 0,

@@ -11,6 +11,12 @@ use acton_config::config::{
 use anyhow::{Context, anyhow};
 use chrono::{DateTime, Local};
 use inquire::{Select, Text};
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellImpl, CellSliceParts, HashBytes};
+use rston::models::{
+    Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, IntMsgInfo, MsgInfo,
+    OwnedMessage, StateInit, StdAddr, StdAddrFormat,
+};
 use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
@@ -24,12 +30,6 @@ use toml_edit::{DocumentMut, Item, Table, value};
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton_api::{Network, TonApiClient};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellImpl, CellSliceParts, HashBytes};
-use tycho_types::models::{
-    Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, IntMsgInfo, MsgInfo,
-    OwnedMessage, StateInit, StdAddr, StdAddrFormat,
-};
 
 #[allow(clippy::too_many_arguments)]
 pub fn publish_cmd(
@@ -206,7 +206,7 @@ pub fn publish_cmd(
         src: IntAddr::Std(sender.address()),
         dst: IntAddr::Std(publisher_address.clone()),
         value: CurrencyCollection::new(amount_to_send_nanogram),
-        ihr_fee: Default::default(),
+        extra_flags: Default::default(),
         fwd_fee: Default::default(),
         created_at: 0,
         created_lt: 0,
@@ -872,7 +872,7 @@ fn topup_library_entry(
         src: IntAddr::Std(sender.address()),
         dst: IntAddr::Std(dest_address),
         value: CurrencyCollection::new(amount_to_send_nanogram),
-        ihr_fee: Default::default(),
+        extra_flags: Default::default(),
         fwd_fee: Default::default(),
         created_at: 0,
         created_lt: 0,

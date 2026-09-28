@@ -31,6 +31,18 @@ use num_bigint::{BigInt, Sign};
 use num_traits::{Num, ToPrimitive};
 use path_absolutize::Absolutize;
 use rand::RngCore;
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Load, Store};
+use rston::dict::Dict;
+use rston::models::{
+    AccountState, AccountStatus, AccountStatusChange, ActionPhase, ComputePhase,
+    ComputePhaseSkipReason, CurrencyCollection, ExtInMsgInfo, ExtOutMsgInfo,
+    ExtraCurrencyCollection, HashUpdate, IntAddr, IntMsgInfo, LibDescr, Message, MessageExtraFlags,
+    MsgInfo, OptionalAccount, OrdinaryTxInfo, OutAction, OutActionsRevIter, RelaxedMessage,
+    RelaxedMsgInfo, ShardAccount, SkippedComputePhase, StateInit, StdAddr, StdAddrFormat,
+    StoragePhase, StorageUsedShort, Transaction, TxInfo,
+};
+use rston::num::{Tokens, Uint15, VarUint24, VarUint56};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -54,18 +66,6 @@ use ton_executor::{MissingLibrariesContext, missing_library_callback};
 use toncenter::v3;
 use tvm_ffi::serde::serialize_tuple;
 use tvm_ffi::stack::{ContData, Tuple, TupleItem};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Load, Store};
-use tycho_types::dict::Dict;
-use tycho_types::models::{
-    AccountState, AccountStatus, AccountStatusChange, ActionPhase, ComputePhase,
-    ComputePhaseSkipReason, CurrencyCollection, ExtInMsgInfo, ExtOutMsgInfo,
-    ExtraCurrencyCollection, HashUpdate, IntAddr, IntMsgInfo, LibDescr, Message, MsgInfo,
-    OptionalAccount, OrdinaryTxInfo, OutAction, OutActionsRevIter, RelaxedMessage, RelaxedMsgInfo,
-    ShardAccount, SkippedComputePhase, StateInit, StdAddr, StdAddrFormat, StoragePhase,
-    StorageUsedShort, Transaction, TxInfo,
-};
-use tycho_types::num::{Tokens, Uint15, VarUint24, VarUint56};
 
 const ZERO_RANDOM_SEED_HEX: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
@@ -3835,12 +3835,55 @@ mod tests {
     use super::*;
     use crate::context::{TREASURY_CODE_BOC64, is_treasury_code};
     use anyhow::anyhow;
+    use rston::models::OwnedMessage;
     use rustc_hash::FxHashSet;
     use std::sync::Arc;
-    use tycho_types::models::OwnedMessage;
 
     fn test_hash(byte: u8) -> HashBytes {
         HashBytes([byte; 32])
+    }
+
+    #[test]
+    fn v3_message_reconstruction_preserves_extra_flags_and_hash() -> anyhow::Result<()> {
+        let src = StdAddr::new(0, test_hash(1));
+        let dst = StdAddr::new(0, test_hash(2));
+        let body = CellBuilder::build_from(0x1234_5678_u32)?;
+
+        for flags in [None, Some(0), Some(1), Some(3)] {
+            let message = OwnedMessage {
+                info: MsgInfo::Int(IntMsgInfo {
+                    src: src.clone().into(),
+                    dst: dst.clone().into(),
+                    value: CurrencyCollection::new(1_000_000_000),
+                    extra_flags: MessageExtraFlags::from_bits(flags.unwrap_or(0)).unwrap(),
+                    fwd_fee: Tokens::new(13),
+                    created_lt: 42,
+                    created_at: 1_700_000_000,
+                    ..Default::default()
+                }),
+                init: None,
+                body: body.clone().into(),
+                layout: None,
+            };
+            let original = CellBuilder::build_from(&message)?;
+            let summary = serde_json::from_value(serde_json::json!({
+                "hash": original.repr_hash().to_string(),
+                "source": src.to_string(),
+                "destination": dst.to_string(),
+                "value": "1000000000",
+                "extra_flags": flags.map(|bits| bits.to_string()),
+                "fwd_fee": "13",
+                "ihr_fee": "0",
+                "created_lt": "42",
+                "created_at": "1700000000",
+                "message_content": { "body": Boc::encode_base64(&body) },
+            }))?;
+
+            let reconstructed = build_message_cell_from_v3(&summary)?;
+            assert_eq!(reconstructed.repr_hash(), original.repr_hash());
+            assert_eq!(reconstructed.parse::<OwnedMessage>()?.info, message.info);
+        }
+        Ok(())
     }
 
     #[test]
@@ -4691,7 +4734,14 @@ fn infer_msg_info_from_v3(m: &v3::Message) -> anyhow::Result<MsgInfo> {
                     tokens: parse_tokens_opt(m.value.as_deref()),
                     other: ExtraCurrencyCollection::new(),
                 },
-                ihr_fee: parse_tokens_opt(m.ihr_fee.as_deref()),
+                extra_flags: MessageExtraFlags::from_bits(
+                    m.extra_flags
+                        .as_deref()
+                        .unwrap_or("0")
+                        .parse()
+                        .context("Invalid message extra_flags")?,
+                )
+                .context("Unsupported message extra_flags")?,
                 fwd_fee: parse_tokens_opt(m.fwd_fee.as_deref()),
                 created_lt: m
                     .created_lt
@@ -4736,7 +4786,7 @@ fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> TxInfo {
         Some(cp) if cp.skipped == Some(true) => ComputePhase::Skipped(SkippedComputePhase {
             reason: parse_compute_phase_skip_reason(cp.reason.as_deref()),
         }),
-        Some(cp) => ComputePhase::Executed(tycho_types::models::ExecutedComputePhase {
+        Some(cp) => ComputePhase::Executed(rston::models::ExecutedComputePhase {
             success: cp.success.unwrap_or(false),
             msg_state_used: cp.msg_state_used.unwrap_or(false),
             account_activated: cp.account_activated.unwrap_or(false),
@@ -4846,7 +4896,7 @@ fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> TxInfo {
     let credit_phase = desc
         .credit_ph
         .as_ref()
-        .map(|cp| tycho_types::models::CreditPhase {
+        .map(|cp| rston::models::CreditPhase {
             due_fees_collected: cp
                 .due_fees_collected
                 .as_deref()

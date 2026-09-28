@@ -5,16 +5,16 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use base64::{Engine, engine::general_purpose::STANDARD};
-use serde_json::{Value, json};
-use ton_indexer_core::BlockId;
-use toncenter::v3::{StringOrNumber, responses as wire};
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, HashBytes, Lazy};
-use tycho_types::models::{
+use rston::boc::Boc;
+use rston::cell::{Cell, CellBuilder, HashBytes, Lazy};
+use rston::models::{
     AccountStatus, AccountStatusChange, ActionPhase, BouncePhase, ComputePhase,
     ComputePhaseSkipReason, ExtraCurrencyCollection, Message, MsgInfo, StoragePhase, TickTock,
     Transaction, TxInfo,
 };
+use serde_json::{Value, json};
+use ton_indexer_core::BlockId;
+use toncenter::v3::{StringOrNumber, responses as wire};
 
 /// Converts one finalized transaction without fetching account state or following
 /// messages. `block` is its actual shard block; `mc_seqno` is the committing anchor.
@@ -172,7 +172,8 @@ fn message(cell: &Cell, tx_hash: &str, incoming: bool) -> Result<wire::Message> 
             result.value = Some(info.value.tokens.to_string());
             result.value_extra_currencies = Some(currencies(&info.value.other)?);
             result.fwd_fee = Some(info.fwd_fee.to_string());
-            result.ihr_fee = Some(info.ihr_fee.to_string());
+            result.ihr_fee = Some("0".into());
+            result.extra_flags = Some(info.extra_flags.bits().to_string());
             result.created_lt = Some(info.created_lt.to_string());
             result.created_at = Some(info.created_at.to_string());
             result.ihr_disabled = Some(info.ihr_disabled);

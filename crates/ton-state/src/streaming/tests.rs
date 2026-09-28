@@ -6,13 +6,11 @@ use axum::body::Body;
 use axum::http::Request;
 use expect_test::{expect, expect_file};
 use http_body_util::BodyExt;
-use serde_json::Value;
-use tower::ServiceExt;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{CellBuilder, HashBytes, Lazy};
-use tycho_types::dict::AugDict;
-use tycho_types::merkle::MerkleUpdate;
-use tycho_types::models::{
+use rston::boc::Boc;
+use rston::cell::{CellBuilder, HashBytes, Lazy};
+use rston::dict::AugDict;
+use rston::merkle::MerkleUpdate;
+use rston::models::{
     AccountBlock, AccountBlocks, AccountStatus, AccountStatusChange, ActionPhase, Block,
     BlockExtra, BlockInfo, BouncePhase, ComputePhase, ComputePhaseSkipReason, CreditPhase,
     CurrencyCollection, ExecutedComputePhase, ExtInMsgInfo, ExtOutMsgInfo, HashUpdate, IntMsgInfo,
@@ -20,7 +18,9 @@ use tycho_types::models::{
     StateInit, StdAddr, StoragePhase, StorageUsedShort, TickTock, TickTockTxInfo, Transaction,
     TxInfo, ValueFlow,
 };
-use tycho_types::num::{Tokens, VarUint24, VarUint56, VarUint248};
+use rston::num::{Tokens, VarUint24, VarUint56, VarUint248};
+use serde_json::Value;
+use tower::ServiceExt;
 
 use super::*;
 
@@ -142,11 +142,11 @@ pub(crate) fn transaction(index: u8) -> Result<Transaction> {
                 layout: None,
             };
             tx.out_msgs.set(
-                tycho_types::num::Uint15::new(position as u16),
+                rston::num::Uint15::new(position as u16),
                 CellBuilder::build_from(&message)?,
             )?;
         }
-        tx.out_msg_count = tycho_types::num::Uint15::new(2);
+        tx.out_msg_count = rston::num::Uint15::new(2);
         tx.info = Lazy::new(&TxInfo::Ordinary(OrdinaryTxInfo {
             credit_first: true,
             storage_phase: Some(storage()),
@@ -218,7 +218,6 @@ pub(crate) fn block(
         })?,
         value_flow: Lazy::new(&ValueFlow::default())?,
         state_update: Lazy::new(&MerkleUpdate::default())?,
-        out_msg_queue_updates: None,
         extra: Lazy::new(&BlockExtra {
             account_blocks: Lazy::new(&accounts)?,
             ..Default::default()
@@ -269,6 +268,41 @@ async fn frame(body: &mut Body) -> Result<String> {
         .into_data()
         .map_err(|_| anyhow::anyhow!("unexpected trailers"))?;
     Ok(String::from_utf8(bytes.to_vec())?)
+}
+
+#[test]
+fn transaction_messages_preserve_extra_flags_and_forwarding_fees() -> Result<()> {
+    let mut tx = transaction(2)?;
+    let key = rston::num::Uint15::new(0);
+    let mut message = tx.out_msgs.get(key)?.unwrap().parse::<OwnedMessage>()?;
+    let MsgInfo::Int(info) = &mut message.info else {
+        anyhow::bail!("expected an internal message");
+    };
+    info.extra_flags = rston::models::MessageExtraFlags::all();
+    tx.out_msgs.set(key, CellBuilder::build_from(message)?)?;
+
+    let converted = transaction::convert_cell(0, &Lazy::new(&tx)?, &tx)?;
+    let incoming = converted.in_msg.unwrap();
+    let internal = &converted.out_msgs[0];
+    let external = &converted.out_msgs[1];
+    expect![[r#"
+        external-in: None/None/None
+        internal: Some("3")/Some("0")/Some("11")
+        external-out: None/None/None
+    "#]]
+    .assert_eq(&format!(
+        "external-in: {:?}/{:?}/{:?}\ninternal: {:?}/{:?}/{:?}\nexternal-out: {:?}/{:?}/{:?}\n",
+        incoming.extra_flags,
+        incoming.ihr_fee,
+        incoming.fwd_fee,
+        internal.extra_flags,
+        internal.ihr_fee,
+        internal.fwd_fee,
+        external.extra_flags,
+        external.ihr_fee,
+        external.fwd_fee,
+    ));
+    Ok(())
 }
 
 #[tokio::test]

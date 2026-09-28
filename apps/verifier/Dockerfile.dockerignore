@@ -3,6 +3,11 @@
 !package.json
 !bun.lock
 
+!libs/
+libs/*
+!libs/rston/
+libs/rston/target/
+
 !apps/
 apps/*
 !apps/verifier/

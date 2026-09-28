@@ -1,19 +1,19 @@
 use std::path::Path;
 
 use expect_test::expect;
-use tycho_types::dict::AugDict;
-use tycho_types::merkle::MerkleUpdate;
-use tycho_types::models::{
+use rston::dict::AugDict;
+use rston::merkle::MerkleUpdate;
+use rston::models::{
     AccountBlock, AccountBlocks, AccountStatus, AccountStatusChange, Block, BlockExtra, BlockId,
     BlockInfo, ComputePhase, ComputePhaseSkipReason, CurrencyCollection, HashUpdate, IntMsgInfo,
     OrdinaryTxInfo, OwnedMessage, ShardIdent, SkippedComputePhase, StoragePhase, ValueFlow,
 };
-use tycho_types::num::{Tokens, Uint15};
+use rston::num::{Tokens, Uint15};
 
 use super::*;
 
 fn transaction(lt: u64, previous: Option<&Lazy<Transaction>>) -> Result<Lazy<Transaction>> {
-    let mut out_msgs = tycho_types::dict::Dict::new();
+    let mut out_msgs = rston::dict::Dict::new();
     out_msgs.set(
         Uint15::new(0),
         CellBuilder::build_from(OwnedMessage {
@@ -22,7 +22,7 @@ fn transaction(lt: u64, previous: Option<&Lazy<Transaction>>) -> Result<Lazy<Tra
                 dst: StdAddr::new(0, HashBytes([8; 32])).into(),
                 value: CurrencyCollection::new(1_000_000_000),
                 fwd_fee: Tokens::new(13),
-                ihr_fee: Tokens::new(7),
+                extra_flags: rston::models::MessageExtraFlags::all(),
                 created_lt: lt + 1,
                 ..Default::default()
             }),
@@ -103,7 +103,6 @@ fn block(
         })?,
         value_flow: Lazy::new(&ValueFlow::default())?,
         state_update: Lazy::new(&MerkleUpdate::default())?,
-        out_msg_queue_updates: None,
         extra: Lazy::new(&BlockExtra {
             account_blocks: Lazy::new(&accounts)?,
             ..Default::default()
@@ -176,6 +175,15 @@ fn history_survives_restart_and_pages_across_shard_splits_and_merges() -> Result
         Boc::decode_base64(&tx.data)
             .is_ok_and(|cell| STANDARD.encode(cell.repr_hash()) == tx.transaction_id.hash)
     });
+    let decoded = Boc::decode_base64(&all[0].data)?.parse::<Transaction>()?;
+    let outgoing = decoded
+        .out_msgs
+        .get(Uint15::new(0))?
+        .unwrap()
+        .parse::<OwnedMessage>()?;
+    let MsgInfo::Int(outgoing) = outgoing.info else {
+        anyhow::bail!("expected an internal message");
+    };
 
     let partial = BlockIndex::open(&directory.path().join("partial"))?;
     partial.insert(child.0, &child.1, &blocks.join("child.boc"))?;
@@ -193,18 +201,23 @@ fn history_survives_restart_and_pages_across_shard_splits_and_merges() -> Result
         inclusive cursor: 24,21,10
         full chain: 31,24,21,10
         full BoCs match hashes: true
-        fees: 143/17/126
+        fees: 136/17/119
+        outgoing fees: 13/0
+        outgoing BoC flags: 3
         partial history: 31,24,21
         missing: 404, wrong hash: 400, uncommitted: 409, other workchain: 404
         empty account: 0
     "]].assert_eq(&format!(
-        "first page: {}\ninclusive cursor: {}\nfull chain: {}\nfull BoCs match hashes: {roundtrip}\nfees: {}/{}/{}\npartial history: {}\nmissing: {}, wrong hash: {}, uncommitted: {}, other workchain: {}\nempty account: {}\n",
+        "first page: {}\ninclusive cursor: {}\nfull chain: {}\nfull BoCs match hashes: {roundtrip}\nfees: {}/{}/{}\noutgoing fees: {}/{}\noutgoing BoC flags: {}\npartial history: {}\nmissing: {}, wrong hash: {}, uncommitted: {}, other workchain: {}\nempty account: {}\n",
         lt(&page),
         lt(&continued),
         lt(&all),
         all[0].fee,
         all[0].storage_fee,
         all[0].other_fee,
+        all[0].out_msgs[0].fwd_fee,
+        all[0].out_msgs[0].ihr_fee,
+        outgoing.extra_flags.bits(),
         lt(&partial_page),
         missing.downcast_ref::<ApiError>().unwrap().status.as_u16(),
         wrong_hash.downcast_ref::<ApiError>().unwrap().status.as_u16(),
