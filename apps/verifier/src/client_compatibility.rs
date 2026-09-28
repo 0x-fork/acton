@@ -5,7 +5,7 @@ const ACTON_LEGACY_MAX_VERSION: Version = Version::new(1, 2, 0);
 const BLUEPRINT_LEGACY_MAX_VERSION: Version = Version::new(0, 46, 0);
 
 /// Clients that predate compiler admission checks keep the previous API behavior.
-pub(crate) fn is_legacy_client(headers: &HeaderMap) -> bool {
+pub fn is_legacy_client(headers: &HeaderMap) -> bool {
     let mut user_agents = headers.get_all(USER_AGENT).iter();
     let Some(user_agent) = user_agents.next().and_then(|value| value.to_str().ok()) else {
         return false;
