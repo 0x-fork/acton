@@ -31,6 +31,7 @@ mod mock_compiler;
 mod mock_source_storage;
 
 const MULTIPART_BOUNDARY: &str = "verifier-test-boundary";
+pub const TEST_USER_AGENT: &str = "verifier-tests/1.0";
 type RecordedCompilerRequests = Arc<Mutex<Vec<CompileRequest>>>;
 type RecordedSourceStorageRequests =
     Arc<Mutex<Vec<mock_source_storage::RecordedSourceStorageRequest>>>;
@@ -600,7 +601,7 @@ pub fn payment_transaction(transaction_hash: &str, code_hash: &str) -> PaymentTr
 }
 
 pub async fn post_verify(state: AppState, parts: Vec<MultipartPart>) -> Response {
-    post_verify_request(state, parts, None, None, true).await
+    post_verify_request(state, parts, None, TEST_USER_AGENT, true).await
 }
 
 pub async fn post_verify_with_user_agent(
@@ -608,11 +609,11 @@ pub async fn post_verify_with_user_agent(
     parts: Vec<MultipartPart>,
     user_agent: &str,
 ) -> Response {
-    post_verify_request(state, parts, None, Some(user_agent), true).await
+    post_verify_request(state, parts, None, user_agent, true).await
 }
 
 pub async fn post_verify_without_payment(state: AppState, parts: Vec<MultipartPart>) -> Response {
-    post_verify_request(state, parts, None, None, false).await
+    post_verify_request(state, parts, None, TEST_USER_AGENT, false).await
 }
 
 pub async fn post_verify_with_api_key(
@@ -620,14 +621,14 @@ pub async fn post_verify_with_api_key(
     parts: Vec<MultipartPart>,
     api_key: &str,
 ) -> Response {
-    post_verify_request(state, parts, Some(api_key), None, false).await
+    post_verify_request(state, parts, Some(api_key), TEST_USER_AGENT, false).await
 }
 
 async fn post_verify_request(
     state: AppState,
     mut parts: Vec<MultipartPart>,
     api_key: Option<&str>,
-    user_agent: Option<&str>,
+    user_agent: &str,
     include_payment: bool,
 ) -> Response {
     if include_payment {
@@ -637,15 +638,13 @@ async fn post_verify_request(
     let mut request = Request::builder()
         .method(Method::POST)
         .uri("/api/v1/verify")
+        .header(axum::http::header::USER_AGENT, user_agent)
         .header(
             CONTENT_TYPE,
             format!("multipart/form-data; boundary={MULTIPART_BOUNDARY}"),
         );
     if let Some(api_key) = api_key {
         request = request.header("X-Verifier-Key", api_key);
-    }
-    if let Some(user_agent) = user_agent {
-        request = request.header(axum::http::header::USER_AGENT, user_agent);
     }
     let request = request
         .body(Body::from(body))

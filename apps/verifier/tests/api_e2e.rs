@@ -17,7 +17,7 @@ use verifier::payment::{
 use verifier::source_storage::SourceMapData;
 
 use support::{
-    PAYMENT_ADDRESS, PAYMENT_TX_HASH, StaticPaymentBlockchainClient, app_state,
+    PAYMENT_ADDRESS, PAYMENT_TX_HASH, StaticPaymentBlockchainClient, TEST_USER_AGENT, app_state,
     app_state_with_api_key, blocking_verification_app_state, fail_once_source_storage_app_state,
     failing_compiler_app_state, failing_compiler_app_state_with_payment_outcomes,
     failing_source_storage_app_state, failing_source_storage_app_state_with_payment_outcomes,
@@ -207,6 +207,56 @@ async fn verify_enforces_configured_request_size_limit() {
     assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
 }
 
+#[tokio::test]
+async fn verification_requests_require_user_agent_before_body_processing() {
+    for path in ["/api/v1/take_ticket", "/api/v1/verify"] {
+        for user_agent in [
+            None,
+            Some(b"".as_slice()),
+            Some(b" \t ".as_slice()),
+            Some(b"\xff".as_slice()),
+        ] {
+            let (state, compiler_requests) = recording_app_state(&[], CODE_HASH_ONE);
+            let mut request = Request::builder()
+                .method(Method::POST)
+                .uri(path)
+                .header("X-Verifier-Key", API_KEY);
+            if let Some(user_agent) = user_agent {
+                request = request.header(header::USER_AGENT, user_agent);
+            }
+            let response = app::router_with_state(state.with_api_key(Some(API_KEY)))
+                .oneshot(request.body(Body::empty()).expect("verification request"))
+                .await
+                .expect("verification response");
+
+            assert_eq!(
+                response.status(),
+                StatusCode::BAD_REQUEST,
+                "{path}: {user_agent:?}"
+            );
+            assert_eq!(
+                response_json::<Value>(response).await["error"],
+                "a non-empty User-Agent header is required",
+                "{path}: {user_agent:?}",
+            );
+            assert!(
+                compiler_requests
+                    .lock()
+                    .expect("compiler requests")
+                    .is_empty()
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn verification_user_agent_check_preserves_method_not_allowed() {
+    for path in ["/api/v1/take_ticket", "/api/v1/verify"] {
+        let response = get(app_state(&[], CODE_HASH_ONE), path).await;
+        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED, "{path}");
+    }
+}
+
 async fn post_take_ticket(
     state: verifier::state::AppState,
     code_hash: &str,
@@ -229,6 +279,7 @@ async fn post_take_ticket_with_body(
     let request = Request::builder()
         .method(Method::POST)
         .uri("/api/v1/take_ticket")
+        .header(header::USER_AGENT, TEST_USER_AGENT)
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(body.to_string()))
         .expect("POST /api/v1/take_ticket request should be valid");
@@ -736,6 +787,16 @@ async fn openapi_json_documents_verifier_api() {
     assert_eq!(service_status["operationId"], "service_status");
     assert_eq!(response_statuses(service_status), ["200"]);
     assert_eq!(verify["operationId"], "verify");
+    for operation in [take_ticket, verify] {
+        let user_agent = operation["parameters"]
+            .as_array()
+            .expect("operation parameters")
+            .iter()
+            .find(|parameter| parameter["name"] == "User-Agent")
+            .expect("User-Agent parameter");
+        assert_eq!(user_agent["in"], "header");
+        assert_eq!(user_agent["required"], true);
+    }
     assert_eq!(
         response_statuses(take_ticket),
         ["200", "400", "403", "502", "503"]

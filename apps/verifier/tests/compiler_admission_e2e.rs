@@ -33,8 +33,6 @@ const LEGACY_USER_AGENTS: &[&str] = &[
     "blueprint/0.46.0 node/24.0.0",
 ];
 const NON_LEGACY_USER_AGENTS: &[Option<&str>] = &[
-    None,
-    Some(""),
     Some("acton/1.2.1-rc.1"),
     Some("acton/1.2.1"),
     Some("acton/1.10.0"),

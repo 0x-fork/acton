@@ -55,7 +55,7 @@ const API_KEY_HEADER: &str = "x-verifier-key";
     ),
     responses(
         (status = 200, description = "Verification completed", body = VerifyResponse),
-        (status = 400, description = "Invalid verification request or compilation failure", body = crate::error::ErrorResponse),
+        (status = 400, description = "Invalid verification request, missing or invalid User-Agent, or compilation failure", body = crate::error::ErrorResponse),
         (status = 401, description = "A valid API key is required to set verified_at or skip payment", body = crate::error::ErrorResponse),
         (status = 402, description = "Payment is missing or invalid", body = crate::error::ErrorResponse),
         (status = 403, description = "Compiler disabled by server configuration", body = crate::error::ErrorResponse),
@@ -66,7 +66,7 @@ const API_KEY_HEADER: &str = "x-verifier-key";
         (status = 503, description = "Verifier is read-only or payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),
     params(
-        ("User-Agent" = Option<String>, Header, description = "Acton at or below 1.2.0 and Blueprint at or below 0.46.0 are exempt from compiler restrictions"),
+        ("User-Agent" = String, Header, description = "Required non-empty client identifier. Acton at or below 1.2.0 and Blueprint at or below 0.46.0 are exempt from compiler restrictions"),
         ("X-Verifier-Key" = Option<String>, Header, description = "API key used to authorize verified_at and verification without payment")
     ),
     tag = "verification"

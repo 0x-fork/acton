@@ -398,6 +398,11 @@ GET /api/v1/statistics
 GET /api/v1/statistics/history
 ```
 
+`POST /api/v1/take_ticket` and `POST /api/v1/verify` require a non-empty
+`User-Agent` header. Middleware returns `400` with a JSON error before processing
+the request body if the header is missing, blank, or contains non-text bytes.
+This requirement also applies to requests authenticated with `X-Verifier-Key`.
+
 Status responses include:
 
 - `code_hash`

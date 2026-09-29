@@ -14,5 +14,6 @@ pub mod state;
 pub mod bundle_validation;
 mod error;
 mod handlers;
+mod middlewares;
 mod source_bundle;
 mod verification;

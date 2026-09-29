@@ -1,10 +1,10 @@
 use axum::{
-    Json, Router,
+    Json, Router, middleware,
     routing::{get, post},
 };
 use utoipa::OpenApi;
 
-use crate::{error::ErrorResponse, state::AppState};
+use crate::{error::ErrorResponse, middlewares::request_headers, state::AppState};
 
 mod status;
 mod take_ticket;
@@ -13,6 +13,7 @@ mod verification;
 mod verify;
 
 pub fn router() -> Router<AppState> {
+    let require_user_agent = middleware::from_fn(request_headers::require_user_agent);
     Router::new()
         .route("/openapi.json", get(openapi_handler))
         .route("/status", get(status::handler))
@@ -29,8 +30,14 @@ pub fn router() -> Router<AppState> {
             "/abi",
             get(verification::abi_handler).head(verification::abi_head_handler),
         )
-        .route("/take_ticket", post(take_ticket::handler))
-        .route("/verify", post(verify::handler))
+        .route(
+            "/take_ticket",
+            post(take_ticket::handler).route_layer(require_user_agent.clone()),
+        )
+        .route(
+            "/verify",
+            post(verify::handler).route_layer(require_user_agent),
+        )
         .route("/verification/status", get(verification::status_handler))
         .route("/verification/source", get(verification::source_handler))
 }

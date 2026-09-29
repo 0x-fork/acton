@@ -16,13 +16,13 @@ use super::validation;
     request_body = TakeTicketRequest,
     responses(
         (status = 200, description = "Verification status or payment quote", body = TakeTicketResponse),
-        (status = 400, description = "Invalid code hash or missing compiler metadata", body = crate::error::ErrorResponse),
+        (status = 400, description = "Invalid code hash, missing compiler metadata, or missing or invalid User-Agent", body = crate::error::ErrorResponse),
         (status = 403, description = "Compiler disabled by server configuration", body = crate::error::ErrorResponse),
         (status = 502, description = "Verification registry failure", body = crate::error::ErrorResponse),
         (status = 503, description = "Verifier is read-only or payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),
     params(
-        ("User-Agent" = Option<String>, Header, description = "Acton at or below 1.2.0 and Blueprint at or below 0.46.0 may omit compiler metadata and are exempt from compiler restrictions")
+        ("User-Agent" = String, Header, description = "Required non-empty client identifier. Acton at or below 1.2.0 and Blueprint at or below 0.46.0 may omit compiler metadata and are exempt from compiler restrictions")
     ),
     tag = "verification"
 )]
