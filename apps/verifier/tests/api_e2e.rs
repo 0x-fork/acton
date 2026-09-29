@@ -84,7 +84,7 @@ async fn legacy_source_endpoint_returns_blueprint_upgrade_error() {
     );
     assert_eq!(
         response_json::<String>(response).await,
-        "This verifier is no longer supported. Update @ton/blueprint to version 0.46.0 or newer",
+        "This verifier is no longer supported. Update @ton/blueprint to version 0.47.1 or newer",
     );
 }
 

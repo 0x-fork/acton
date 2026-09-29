@@ -5,7 +5,7 @@ use axum::{
 };
 
 const UNSUPPORTED_BLUEPRINT_ERROR: &str =
-    "This verifier is no longer supported. Update @ton/blueprint to version 0.46.0 or newer";
+    "This verifier is no longer supported. Update @ton/blueprint to version 0.47.1 or newer";
 const UNSUPPORTED_ACTON_ERROR: &str =
     "This version of acton verify is no longer supported. Update Acton to version 1.2.0 or newer";
 
