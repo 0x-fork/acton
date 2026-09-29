@@ -12,7 +12,7 @@ const TELEGRAM_WALLET_CONTRACT_REPOSITORY_URL =
 const TELEGRAM_WALLET_CONTRACT_BYTECODE_REVISIONS: ReadonlyMap<string, string> = new Map([
   // Rev00_Initial bytecode proposed for config[-123]:
   // https://github.com/ton-blockchain/tg-wallet-contract/blob/rev00/contracts/WalletTg/revisions.tolk
-  ["6f177fd863213d7bd3b24a694b0b7efb7425721ed1d21490d052ae93276c4406", "00"],
+  ["e30911420bef1191c09dce58b9df2b4ca4c2d9c383cc3b6a91170349ffa70e2c", "00"],
 ])
 
 export function parseTelegramWalletContractBytecode(cell: Cell): TelegramWalletContractBytecode {
