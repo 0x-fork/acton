@@ -11,7 +11,7 @@ on:
       - "Cargo.lock"
       - "**/Cargo.toml"
       - "**/Cargo.lock"
-      - "deny.toml"
+      - ".cargo/deny.toml"
       - "!apps/**"
   push:
     branches:
@@ -22,7 +22,7 @@ on:
       - "Cargo.lock"
       - "**/Cargo.toml"
       - "**/Cargo.lock"
-      - "deny.toml"
+      - ".cargo/deny.toml"
       - "!apps/**"
   workflow_dispatch:
 

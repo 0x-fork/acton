@@ -61,6 +61,7 @@ All notable changes to this project will be documented in this file.
 
 ### Dependencies
 
+- Allow the CC0-1.0 dependencies used by BIP39 wallet support in dependency checks.
 - Remove Localton's `ton` dependency. Get-method stacks use `tvm-ffi` and `rston`,
   and block monitoring uses `rston` block models.
 - Remove the direct `ton` dependency from the main Acton workspace. Debugger
