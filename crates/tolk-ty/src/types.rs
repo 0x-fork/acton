@@ -72,9 +72,6 @@ pub enum TyData {
     Bits {
         size: usize,
     },
-    Bytes {
-        size: usize,
-    },
     UntypedTuple, // tuple in C++
     Null,
     Void,

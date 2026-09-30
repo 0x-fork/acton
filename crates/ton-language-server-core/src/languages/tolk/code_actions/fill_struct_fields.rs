@@ -153,9 +153,7 @@ fn type_default(context: &TolkCodeActionContext<'_>, ty: TyId) -> String {
         TyData::Bool { .. } => "false".to_owned(),
         TyData::Int(IntTy::Coins) => "ton(\"0.1\")".to_owned(),
         TyData::Int(_) => "0".to_owned(),
-        TyData::Bits { .. } | TyData::Bytes { .. } | TyData::Slice => {
-            "createEmptySlice()".to_owned()
-        }
+        TyData::Bits { .. } | TyData::Slice => "createEmptySlice()".to_owned(),
         TyData::Address(_) => "address(\"\")".to_owned(),
         TyData::Builder => "beginCell()".to_owned(),
         TyData::Cell => "createEmptyCell()".to_owned(),

@@ -821,13 +821,6 @@ impl<'a> TypeDb<'a> {
                     None
                 }
             }
-            _ if name.starts_with("bytes") && name.len() > 5 => {
-                if let Ok(size) = name[5..].parse::<usize>() {
-                    Some(self.intrn.bytes(size))
-                } else {
-                    None
-                }
-            }
             _ => None,
         }
     }

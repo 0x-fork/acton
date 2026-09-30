@@ -68,6 +68,20 @@ fn resolves_function_in_same_file() {
 }
 
 #[test]
+fn resolves_user_defined_bytes_alias() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            type bytes32 = bits256;
+            fun main(value: <caret>bytes32) {}
+        ",
+        |_| {},
+        expect![[r"
+            1:16 -> file:///fixture/main.tolk 0:5 resolved"]],
+    );
+}
+
+#[test]
 fn resolves_stdlib_method_on_string_literal() {
     case_tolk_definition(
         "file:///fixture/main.tolk",

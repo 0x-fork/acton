@@ -22,6 +22,8 @@ All notable changes to this project will be documented in this file.
 
 ### IDE
 
+- Match Tolk 1.5 by using `bitsN` for fixed-size bit strings and resolving
+  explicitly declared `bytesN` aliases as user-defined types.
 - Complete `break` and `continue` inside loop bodies, respecting function and
   `try`/`catch` boundaries in Tolk 1.5.
 - Offer `@pure` only for `asm` and `builtin` functions and describe its scope in hover.

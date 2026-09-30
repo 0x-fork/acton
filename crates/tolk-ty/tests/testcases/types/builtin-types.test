@@ -58,19 +58,25 @@ ok
 ========================================================================
 bitsN type with N=32
 ========================================================================
-fun main() {
-    val a = "" as bits32;
+fun main(value: slice) {
+    val a = value as bits32;
 //!     ^ bits32
 }
 ------------------------------------------------------------------------
 ok
 
 ========================================================================
-bytesN type with N=4
+User-defined bytes4 alias and its method
 ========================================================================
-fun main() {
-    val a = "" as bytes4;
+type bytes4 = bits32;
+
+fun bytes4.isValid(self): bool { return true; }
+
+fun main(value: slice) {
+    val a = value as bytes4;
 //!     ^ bytes4
+    val valid = a.isValid();
+//!     ^ bool
 }
 ------------------------------------------------------------------------
 ok

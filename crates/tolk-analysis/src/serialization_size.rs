@@ -250,7 +250,6 @@ impl Estimator<'_> {
             TyData::Address(AddressKind::Internal) => SerializationSize::exact(267),
             TyData::Address(AddressKind::Any) => SerializationSize::range(2, 522, 0, 0),
             TyData::MapKV { .. } => SerializationSize::range(1, 1, 0, 1),
-            TyData::Bytes { size } => SerializationSize::exact((size * 8) as u32),
             TyData::Void => SerializationSize::exact(0),
             TyData::Int(IntTy::Int)
             | TyData::UntypedTuple

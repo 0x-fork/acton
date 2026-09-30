@@ -157,11 +157,6 @@ impl TypeInterner {
         self.intern(TyData::Bits { size })
     }
 
-    /// Creates a byte string type of given size.
-    pub fn bytes(&mut self, size: usize) -> TyId {
-        self.intern(TyData::Bytes { size })
-    }
-
     /// Creates a tuple type.
     pub fn tuple(&mut self, elements: Vec<TyId>) -> TyId {
         self.intern(TyData::Tuple(elements))
@@ -519,8 +514,7 @@ impl TypeInterner {
             | (TyData::Unknown, TyData::Unknown)
             | (TyData::UntypedTuple, TyData::UntypedTuple) => true,
             (TyData::Address(ka), TyData::Address(kb)) => ka == kb,
-            (TyData::Bits { size: sa }, TyData::Bits { size: sb })
-            | (TyData::Bytes { size: sa }, TyData::Bytes { size: sb }) => sa == sb,
+            (TyData::Bits { size: sa }, TyData::Bits { size: sb }) => sa == sb,
             (TyData::Builtin { name: na }, TyData::Builtin { name: nb }) => na == nb,
             (
                 TyData::Struct {
@@ -819,8 +813,7 @@ impl TypeInterner {
                 self.equals(lhs, rhs)
             }
             (TyData::Enum { def: dl, .. }, TyData::Enum { def: dr, .. }) => dl == dr,
-            (TyData::Bits { size: sl }, TyData::Bits { size: sr })
-            | (TyData::Bytes { size: sl }, TyData::Bytes { size: sr }) => sl == sr,
+            (TyData::Bits { size: sl }, TyData::Bits { size: sr }) => sl == sr,
             _ => false,
         }
     }
@@ -909,11 +902,11 @@ impl TypeInterner {
                     unsigned: false, ..
                 }),
             )
-            // `slice` to `bytes32` / `slice` to `bits8`
+            // `slice` to `bits8`
             // `slice` to `address`
             // `any_address` as `address` and any other casts are ok
             // all enums are integers, they can be `as` cast to each other
-            | (TyData::Slice, TyData::Bits { .. } | TyData::Bytes { .. } | TyData::Address(_))
+            | (TyData::Slice, TyData::Bits { .. } | TyData::Address(_))
             | (TyData::Address(_), TyData::Slice | TyData::Bits { .. } | TyData::Address(_))
             | (TyData::Enum { .. }, TyData::Enum { .. })
             // `[int, int]` as `tuple`

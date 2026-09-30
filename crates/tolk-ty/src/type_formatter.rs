@@ -42,7 +42,6 @@ impl<'a> TypeFormatter<'a> {
             TyData::Never => "never".to_string(),
             TyData::UntypedTuple => "tuple".to_string(),
             TyData::Bits { size } => format!("bits{size}"),
-            TyData::Bytes { size } => format!("bytes{size}"),
             TyData::Builtin { name } | TyData::Enum { name, .. } => name.to_string(),
             TyData::Tuple(elements) => {
                 let parts = elements.iter().map(|t| self.format(*t)).collect::<Vec<_>>();

@@ -3,6 +3,11 @@
 The `fixtures/` directory is a vendored copy of `tolk-tester/tests` from
 `ton-blockchain/ton` commit `83fe78b06c9e66e1069e5f58bb2c2e78018dd13c`.
 
+For Tolk 1.5, the local fixtures use `bitsN` instead of the removed `bytesN` types.
+When restoring the corpus, replace `bytesN` with `bits(N * 8)` in type references and
+expected types. Use `bits1023` for the former `bytes128` boundary case, as in upstream
+commit `9334027d63528da1a78b2efbe898bc586d4e6cec`.
+
 The fixtures are intentionally not synchronized automatically. Update them as a reviewed change,
 then run the `tolk_compiler_corpus` test and account for every new semantic difference explicitly.
 

@@ -1572,20 +1572,20 @@ fn size_of_10_size_of_int32_and_bits32() {
 }
 
 #[test]
-fn size_of_11_size_of_int32_and_bytes32() {
-    // Checks Size of: int32 and bytes32; ported from size-of.test.
+fn size_of_11_size_of_int32_and_bits256() {
+    // Checks Size of: int32 and bits256; ported from size-of.test.
     case_tolk_hover(
         r"
-            struct <caret>Foo { // 32 + 32 * 8
+            struct <caret>Foo { // 32 + 256
                 a: int32
-                b: bytes32
+                b: bits256
             }
         ",
         expect![[r"
             ```tolk
             struct Foo {
                 a: int32
-                b: bytes32
+                b: bits256
             }
             ```
             **Size:** 288 bits.

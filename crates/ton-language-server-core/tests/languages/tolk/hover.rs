@@ -667,7 +667,7 @@ fn shows_serialization_sizes_for_supported_type_shapes() {
 
             struct <caret>Binary {
                 bits: bits32
-                bytes: bytes32
+                bytes: bits256
             }
 
             type <caret>Either = uint32 | int64;
@@ -719,7 +719,7 @@ fn shows_serialization_sizes_for_supported_type_shapes() {
             ```tolk
             struct Binary {
                 bits: bits32
-                bytes: bytes32
+                bytes: bits256
             }
             ```
             **Size:** 288 bits.
@@ -733,6 +733,28 @@ fn shows_serialization_sizes_for_supported_type_shapes() {
             **Size:** 33..65 bits, 0 refs.
 
             ---"#]],
+    );
+}
+
+#[test]
+fn shows_serialization_size_for_user_defined_bytes_alias() {
+    case_tolk_hover(
+        r"
+            type bytes32 = bits256;
+
+            struct <caret>Digest {
+                value: bytes32
+            }
+        ",
+        expect![[r"
+            ```tolk
+            struct Digest {
+                value: bytes32
+            }
+            ```
+            **Size:** 256 bits.
+
+            ---"]],
     );
 }
 

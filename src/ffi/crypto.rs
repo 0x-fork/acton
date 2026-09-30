@@ -59,8 +59,7 @@ fn mnemonic_to_key_pair_impl(
     let mnemonic = Mnemonic::new(words, None)?;
     let key_pair = mnemonic.to_key_pair()?;
 
-    // Return KeyPair { privateKey: bytes32, publicKey: bytes32 }
-    // privateKey is the 32-byte seed (first 32 bytes of the 64-byte nacl secret key)
+    // Return KeyPair { privateKey: int, publicKey: int }
     // privateKey is the 32-byte seed (first 32 bytes of the 64-byte nacl secret key)
     let private_key = BigInt::from_bytes_be(Sign::Plus, &key_pair.secret_key[..32]);
     let public_key = BigInt::from_bytes_be(Sign::Plus, &key_pair.public_key);

@@ -140,6 +140,7 @@ fn fills_alias_nullable_and_defaulted_fields() {
 fn fills_defaults_for_all_supported_type_shapes() {
     CodeActionTest::new(
         "
+            type bytes32 = bits256;
             struct Other {}
             struct (0x100) Message {}
             enum Color { Red, Blue }
@@ -149,7 +150,7 @@ fn fills_defaults_for_all_supported_type_shapes() {
                 coinsValue: coins
                 int32Value: int32
                 bitsValue: bits32
-                bytesValue: bytes1000
+                bytesValue: bytes32
                 flag: bool
                 destination: address
                 output: builder
@@ -169,6 +170,7 @@ fn fills_defaults_for_all_supported_type_shapes() {
     .check_applied(
         "Fill all fields...",
         expect![[r#"
+            type bytes32 = bits256;
             struct Other {}
             struct (0x100) Message {}
             enum Color { Red, Blue }
@@ -178,7 +180,7 @@ fn fills_defaults_for_all_supported_type_shapes() {
                 coinsValue: coins
                 int32Value: int32
                 bitsValue: bits32
-                bytesValue: bytes1000
+                bytesValue: bytes32
                 flag: bool
                 destination: address
                 output: builder
