@@ -1,0 +1,8 @@
+[wallets.telegram]
+kind = "tg-wallet"
+workchain = 0
+mnemonic-scheme = "rotation"
+keys = { [MNEMONIC] }
+
+[wallets.telegram.expected]
+[WALLET_ADDRESS_TESTNET]

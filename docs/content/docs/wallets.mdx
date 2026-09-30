@@ -49,9 +49,19 @@ acton wallet import --name deployer --local "word1 word2 ... word24"
 
 <AvailabilityBadge since="trunk" />
 
-You can also import a 12-word BIP39 phrase. Its keys use SLIP-0010 Ed25519
-derivation at `m/44'/607'/0'` (the first TON account).
-Wallets that use another derivation path are not supported.
+Select the scheme used by the wallet that created the phrase with
+`--mnemonic-scheme`. The default is `ton`:
+
+| Scheme | Words | Key derivation |
+| --- | --- | --- |
+| `ton` | 24 | TON seed derivation |
+| `bip39` | 12 or 24 | SLIP-0010 Ed25519 at `m/44'/607'/0'` |
+| `rotation` | 12 or 24 | Two independent BIP39 halves for TG Wallet |
+
+For BIP39, import with `acton wallet import --mnemonic-scheme bip39`.
+Other derivation paths are not supported. Acton saves the selected scheme in
+`wallets.toml` as `mnemonic-scheme`; an omitted field means `ton`.
+The same words can produce different keys under different schemes.
 
 For interactive import, omit the mnemonic:
 
@@ -60,6 +70,34 @@ acton wallet import
 ```
 
 `acton wallet import` follows the same storage rules as `acton wallet new`: local or global placement, interactive prompts when flags are omitted, and secure storage when available.
+
+## Import TG Wallet
+
+<AvailabilityBadge since="trunk" />
+
+Import a TG Wallet rev00 rotation phrase interactively:
+
+```bash
+acton wallet import --name telegram --version tg-wallet --mnemonic-scheme rotation --local
+```
+
+Before the first key rotation, enter 12 words. After rotation, enter all 24:
+the first half fixes the address, and the second half signs requests.
+Each half has its own BIP39 checksum. Acton keeps the original address when
+the signing half changes; it does not perform key rotation.
+
+To configure an external mnemonic source:
+
+```toml title="wallets.toml"
+[wallets.telegram]
+kind = "tg-wallet"
+mnemonic-scheme = "rotation"
+keys = { mnemonic-env = "TELEGRAM_MNEMONIC" }
+```
+
+TG Wallet execution requires its implementation in blockchain config parameter
+`-123`. The embedded trampoline determines the account address. An explicit
+[`wallet-id`](#use-the-same-wallet-id-on-every-network) overrides the network default.
 
 ## Inspect configured wallets
 

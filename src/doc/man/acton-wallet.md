@@ -107,9 +107,11 @@ characters are removed.
 
 Import an existing mnemonic-based wallet.
 
-Accepts 12-word BIP39 phrases and 24-word TON phrases. BIP39 keys use
-SLIP-0010 Ed25519 derivation at `m/44'/607'/0'` (the first TON account).
-Support for 12-word phrases is available since trunk.
+The mnemonic scheme defaults to `ton` (24 words). Select `bip39` for a 12- or
+24-word BIP39 phrase, or `rotation` for TG Wallet's anchor and signing halves.
+BIP39 keys use SLIP-0010 Ed25519 at `m/44'/607'/0'`.
+
+Available since trunk.
 
 #### Synopsis
 
@@ -123,6 +125,18 @@ Support for 12-word phrases is available since trunk.
 Mnemonic words for the wallet.
 
 If omitted, Acton prompts interactively.
+{{/option}}
+
+{{#option "`--mnemonic-scheme` _ton|bip39|rotation_" }}
+Select mnemonic validation and key derivation. Acton prompts when this flag is
+omitted in an interactive terminal; otherwise it uses `ton`.
+The choice is saved as `mnemonic-scheme` in the wallet entry.
+
+For `rotation`, use `--version tg-wallet`. Enter 12 words before the first
+rotation or 24 words afterward: the anchor half followed by the signing half.
+Each half is validated independently. The anchor fixes the account address.
+
+Available since trunk.
 {{/option}}
 
 {{#option "`--name` _name_" }}

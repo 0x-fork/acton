@@ -44,6 +44,8 @@ pub enum WalletVersionArg {
     HighloadV2,
     HighloadV2R1,
     HighloadV2R2,
+    #[value(name = "tg-wallet")]
+    TgWallet,
 }
 
 #[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq)]
@@ -129,6 +131,7 @@ impl From<WalletVersionArg> for WalletVersion {
             WalletVersionArg::V4R1 => WalletVersion::V4R1,
             WalletVersionArg::V4R2 => WalletVersion::V4R2,
             WalletVersionArg::V5R1 => WalletVersion::V5R1,
+            WalletVersionArg::TgWallet => WalletVersion::TgWallet,
             WalletVersionArg::HighloadV1R1 => WalletVersion::HLV1R1,
             WalletVersionArg::HighloadV1R2 => WalletVersion::HLV1R2,
             WalletVersionArg::HighloadV2 => WalletVersion::HLV2,
@@ -180,6 +183,12 @@ pub enum WalletCommand {
         name: Option<String>,
         #[arg(help = "Mnemonic words of the wallet")]
         mnemonics: Vec<String>,
+        #[arg(
+            long,
+            value_enum,
+            help = "Mnemonic scheme (prompts interactively, defaults to ton)"
+        )]
+        mnemonic_scheme: Option<config::MnemonicScheme>,
         #[arg(long, help = "Version of the wallet (prompts if not provided)")]
         version: Option<WalletVersionArg>,
         #[arg(long, help = "Save wallet to global.wallets.toml")]
@@ -280,12 +289,22 @@ pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
         WalletCommand::Import {
             name,
             mnemonics,
+            mnemonic_scheme,
             version,
             global,
             local,
             secure,
             json,
-        } => import_wallet(name, mnemonics, version, global, local, secure, json),
+        } => import_wallet(
+            name,
+            mnemonics,
+            mnemonic_scheme,
+            version,
+            global,
+            local,
+            secure,
+            json,
+        ),
         WalletCommand::List { balance, json } => list_wallets(balance, json),
         WalletCommand::ExportMnemonic { name } => export_mnemonic(name),
         WalletCommand::Sign { name, body, json } => sign_wallet_external_body(name, body, json),
@@ -957,8 +976,7 @@ fn sign_wallet_external_body(
     let external_body = decode_sign_input(&body)?;
 
     let mnemonic_str = wallets::load_mnemonic(&name, wallet)?;
-    let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
-    let key_pair = mnemonic.to_key_pair()?;
+    let mnemonic = wallets::parse_mnemonic(&mnemonic_str, wallet.mnemonic_scheme)?;
     let version = parse_wallet_version(&wallet.kind)?;
     let wallet_id = wallet.wallet_id.map_or_else(
         || wallets::wallet_id(version, &Network::Testnet),
@@ -966,7 +984,7 @@ fn sign_wallet_external_body(
     );
 
     let workchain = wallet.workchain.unwrap_or(0);
-    let ton_wallet = Wallet::new_with_params(version, key_pair, workchain, wallet_id)?;
+    let ton_wallet = Wallet::new_with_mnemonic(version, &mnemonic, workchain, wallet_id)?;
 
     let signed_body = ton_wallet
         .sign_ext_in_body(&external_body)
@@ -1282,6 +1300,7 @@ fn get_wallet_address(
     network: Network,
 ) -> anyhow::Result<String> {
     if wallet.wallet_id.is_none()
+        && wallet.mnemonic_scheme == config::MnemonicScheme::Ton
         && let Some(expected) = &wallet.expected
         && let Some(addr) = &expected.address_testnet
     {
@@ -1291,17 +1310,13 @@ fn get_wallet_address(
 
     let mnemonic_str = wallets::load_mnemonic(wallet_name, wallet)?;
 
-    let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
+    let mnemonic = wallets::parse_mnemonic(&mnemonic_str, wallet.mnemonic_scheme)?;
     let version = parse_wallet_version(&wallet.kind)?;
     let wallet_id = wallet
         .wallet_id
         .map_or_else(|| wallets::wallet_id(version, &network), |id| id as i32);
-    let ton_wallet = Wallet::new_with_params(
-        version,
-        mnemonic.to_key_pair()?,
-        wallet.workchain.unwrap_or(0),
-        wallet_id,
-    )?;
+    let ton_wallet =
+        Wallet::new_with_mnemonic(version, &mnemonic, wallet.workchain.unwrap_or(0), wallet_id)?;
     Ok(format_testnet_wallet_address(&ton_wallet.address))
 }
 
@@ -1349,6 +1364,7 @@ fn wallet_version_to_string(v: WalletVersion) -> String {
         WalletVersion::V4R1 => "v4r1",
         WalletVersion::V4R2 => "v4r2",
         WalletVersion::V5R1 => "v5r1",
+        WalletVersion::TgWallet => "tg-wallet",
         WalletVersion::HLV1R1 => "highloadv1r1",
         WalletVersion::HLV1R2 => "highloadv1r2",
         WalletVersion::HLV2 => "highloadv2",
@@ -1672,6 +1688,7 @@ fn get_or_prompt_version(version: Option<WalletVersionArg>) -> anyhow::Result<Wa
             WalletVersion::HLV2,
             WalletVersion::HLV1R2,
             WalletVersion::HLV1R1,
+            WalletVersion::TgWallet,
         ];
 
         let versions_str: Vec<String> = versions
@@ -1685,10 +1702,12 @@ fn get_or_prompt_version(version: Option<WalletVersionArg>) -> anyhow::Result<Wa
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn save_wallet_to_config(
     config_path: &Path,
     name: &str,
     version: WalletVersion,
+    mnemonic_scheme: config::MnemonicScheme,
     mnemonic_str: Option<String>,
     mnemonic_keyring: Option<String>,
     wallet_address: &str,
@@ -1722,6 +1741,9 @@ fn save_wallet_to_config(
 
     wallet["kind"] = value(wallet_version_to_string(version));
     wallet["workchain"] = value(0i64);
+    if mnemonic_scheme != config::MnemonicScheme::Ton {
+        wallet["mnemonic-scheme"] = value(mnemonic_scheme.as_str());
+    }
 
     let mut keys = toml_edit::InlineTable::new();
     if let Some(m) = mnemonic_str {
@@ -1807,6 +1829,7 @@ fn new_wallet(
         &config_path,
         &name,
         version,
+        config::MnemonicScheme::Ton,
         mnemonic_str_opt,
         mnemonic_keyring_opt,
         &wallet_address,
@@ -1985,9 +2008,11 @@ fn existing_keyring_id(config_path: &Path) -> anyhow::Result<Option<String>> {
     }))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn import_wallet(
     name: Option<String>,
     mnemonics: Vec<String>,
+    mnemonic_scheme: Option<config::MnemonicScheme>,
     version: Option<WalletVersionArg>,
     global_flag: bool,
     local_flag: bool,
@@ -1998,20 +2023,40 @@ fn import_wallet(
     let is_global = get_is_global(global_flag, local_flag)?;
     let config_path = get_config_path(&name, is_global)?;
 
+    let mnemonic_scheme = match mnemonic_scheme {
+        Some(scheme) => scheme,
+        None if stdin().is_terminal() && stdout().is_terminal() => Select::new(
+            "Mnemonic scheme:",
+            vec![
+                config::MnemonicScheme::Ton,
+                config::MnemonicScheme::Bip39,
+                config::MnemonicScheme::Rotation,
+            ],
+        )
+        .with_starting_cursor(0)
+        .prompt()?,
+        None => config::MnemonicScheme::Ton,
+    };
+
     let mnemonic_str = if mnemonics.is_empty() {
-        Text::new("Enter mnemonic (12 or 24 words):").prompt()?
+        let prompt = match mnemonic_scheme {
+            config::MnemonicScheme::Ton => "Enter mnemonic (24 words):",
+            config::MnemonicScheme::Bip39 | config::MnemonicScheme::Rotation => {
+                "Enter mnemonic (12 or 24 words):"
+            }
+        };
+        Text::new(prompt).prompt()?
     } else {
         mnemonics.join(" ")
     };
 
-    let mnemonic =
-        Mnemonic::from_str(mnemonic_str.trim(), None).context("Invalid mnemonic phrase")?;
-    let key_pair = mnemonic.to_key_pair()?;
+    let mnemonic = wallets::parse_mnemonic(mnemonic_str.trim(), mnemonic_scheme)
+        .context("Invalid mnemonic phrase")?;
 
     let version = get_or_prompt_version(version)?;
 
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
-    let wallet = Wallet::new_with_params(version, key_pair, 0, wallet_id)?;
+    let wallet = Wallet::new_with_mnemonic(version, &mnemonic, 0, wallet_id)?;
 
     let wallet_address = format_testnet_wallet_address(&wallet.address);
 
@@ -2029,6 +2074,7 @@ fn import_wallet(
         &config_path,
         &name,
         version,
+        mnemonic_scheme,
         mnemonic_str_opt,
         mnemonic_keyring_opt,
         &wallet_address,
@@ -2146,6 +2192,7 @@ fn parse_wallet_version(kind: &str) -> anyhow::Result<WalletVersion> {
         "v4r1" => Ok(WalletVersion::V4R1),
         "v4r2" => Ok(WalletVersion::V4R2),
         "v5r1" => Ok(WalletVersion::V5R1),
+        "tg-wallet" => Ok(WalletVersion::TgWallet),
         "highloadv1r1" => Ok(WalletVersion::HLV1R1),
         "highloadv1r2" => Ok(WalletVersion::HLV1R2),
         "highloadv2" => Ok(WalletVersion::HLV2),
@@ -2245,6 +2292,7 @@ mod wallet_name_tests {
             kind: "v5r1".to_string(),
             workchain: Some(0),
             wallet_id: None,
+            mnemonic_scheme: config::MnemonicScheme::Ton,
             keys: config::WalletKeys {
                 mnemonic_env: None,
                 mnemonic_file: None,

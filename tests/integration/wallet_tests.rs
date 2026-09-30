@@ -40,11 +40,15 @@ struct CapturedToncenterRequest {
 }
 
 fn wallet_sign_fixture() -> (String, String, String) {
-    wallet_sign_fixture_for_mnemonic(TEST_MNEMONIC)
+    wallet_sign_fixture_for_mnemonic(TEST_MNEMONIC, rston::mnemonic::MnemonicScheme::Ton)
 }
 
-fn wallet_sign_fixture_for_mnemonic(mnemonic_str: &str) -> (String, String, String) {
-    let mnemonic = Mnemonic::from_str(mnemonic_str, None).expect("invalid test mnemonic");
+fn wallet_sign_fixture_for_mnemonic(
+    mnemonic_str: &str,
+    scheme: rston::mnemonic::MnemonicScheme,
+) -> (String, String, String) {
+    let mnemonic =
+        Mnemonic::from_str_with_scheme(mnemonic_str, None, scheme).expect("invalid test mnemonic");
     let key_pair = mnemonic.to_key_pair().expect("mnemonic to keypair failed");
     let version = WalletVersion::V5R1;
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
@@ -459,7 +463,7 @@ fn test_wallet_new_unknown_kind() {
         .run()
         .failure();
 
-    output.assert_contains("[possible values: v1r1, v1r2, v1r3, v2r1, v2r2, v3r1, v3r2, v4r1, v4r2, v5r1, highloadv1r1, highloadv1r2, highloadv2, highloadv2r1, highloadv2r2]");
+    output.assert_contains("[possible values: v1r1, v1r2, v1r3, v2r1, v2r2, v3r1, v3r2, v4r1, v4r2, v5r1, highloadv1r1, highloadv1r2, highloadv2, highloadv2r1, highloadv2r2, tg-wallet]");
 }
 
 #[test]
@@ -821,7 +825,10 @@ fn test_wallet_import_all_fields_interactive() {
     session.expect("Save wallet to:");
     session.send_line("", "failed to select default local wallet config");
 
-    session.expect("Enter mnemonic (12 or 24 words):");
+    session.expect("Mnemonic scheme:");
+    session.send_line("", "failed to select the default TON scheme");
+
+    session.expect("Enter mnemonic (24 words):");
     session.send_line(TEST_MNEMONIC, "failed to send mnemonic");
 
     session.expect("Wallet type:");
@@ -859,7 +866,10 @@ fn test_wallet_import_invalid_mnemonic() {
 #[test]
 fn test_wallet_import_bip39_and_sign() {
     let project = ProjectBuilder::new("wallet-import-bip39").build();
-    let (_, body_base64, _) = wallet_sign_fixture_for_mnemonic(BIP39_TEST_MNEMONIC);
+    let (_, body_base64, _) = wallet_sign_fixture_for_mnemonic(
+        BIP39_TEST_MNEMONIC,
+        rston::mnemonic::MnemonicScheme::Bip39,
+    );
 
     let output = project
         .acton()
@@ -868,6 +878,8 @@ fn test_wallet_import_bip39_and_sign() {
         .arg("bip39-wallet")
         .arg("--version")
         .arg("v5r1")
+        .arg("--mnemonic-scheme")
+        .arg("bip39")
         .arg("--local")
         .arg("--json")
         .arg(BIP39_TEST_MNEMONIC)
@@ -921,7 +933,7 @@ global-id = 42
             .map(|id| format!("wallet-id = {id}\n"))
             .unwrap_or_default();
         let file: WalletsFile = toml::from_str(&format!(
-            "[wallets.deployer]\nkind = \"v5r1\"\n{id_field}keys = {{ mnemonic = \"{BIP39_TEST_MNEMONIC}\" }}\n"
+            "[wallets.deployer]\nkind = \"v5r1\"\nmnemonic-scheme = \"bip39\"\n{id_field}keys = {{ mnemonic = \"{BIP39_TEST_MNEMONIC}\" }}\n"
         ))?;
         config.wallets = file.wallets;
 
@@ -954,6 +966,216 @@ global-id = 42
 }
 
 #[test]
+fn test_wallet_import_explicit_schemes_preserves_address_and_signing_key() -> anyhow::Result<()> {
+    use acton_config::config::{ActonConfig, WalletsFile};
+    use ed25519_dalek::{Signature, VerifyingKey};
+    use rston::cell::CellBuilder;
+    use rston::wallet::{SendMsgFlags, TgWalletExtMsgBody, WalletMessage, WalletV5ExtMsgBody};
+
+    let bip39_24 = format!("{}art", "abandon ".repeat(23));
+    let rotation_24 =
+        format!("{BIP39_TEST_MNEMONIC} zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong");
+    let mut results = Vec::new();
+    for (scheme, kind, phrase) in [
+        ("bip39", "v5r1", bip39_24.as_str()),
+        ("ton", "tg-wallet", TEST_MNEMONIC),
+        ("rotation", "tg-wallet", BIP39_TEST_MNEMONIC),
+        ("rotation", "tg-wallet", rotation_24.as_str()),
+    ] {
+        let project = ProjectBuilder::new("wallet-import-scheme").build();
+        let imported = project
+            .acton()
+            .wallet_import()
+            .arg("--name")
+            .arg("deployer")
+            .arg("--version")
+            .arg(kind)
+            .arg("--mnemonic-scheme")
+            .arg(scheme)
+            .arg("--local")
+            .arg("--json")
+            .arg(phrase)
+            .run()
+            .success();
+        let imported: Value = serde_json::from_str(&imported.get_stdout())?;
+        let file: WalletsFile =
+            toml::from_str(&fs::read_to_string(project.path().join("wallets.toml"))?)?;
+        let stored_scheme = file.wallets.as_ref().unwrap().wallets["deployer"].mnemonic_scheme;
+        let mut config: ActonConfig = toml::from_str(
+            "[package]\nname = 'wallet-schemes'\ndescription = 'Wallet mnemonic schemes'\nversion = '0.1.0'\n",
+        )?;
+        config.wallets = file.wallets;
+        let opened = wallets::open_wallets(&config, Some(&Network::Testnet), true)?;
+        let wallet = &opened["deployer"].wallet;
+        let body = wallet.create_ext_in_body(
+            1_900_000_000,
+            7,
+            vec![WalletMessage {
+                mode: SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR,
+                msg: CellBuilder::build_from(0xabu8)?,
+            }],
+        )?;
+        let signed = project
+            .acton()
+            .wallet_sign()
+            .arg("deployer")
+            .arg("--body")
+            .arg(&Boc::encode_base64(&body))
+            .arg("--json")
+            .run()
+            .success();
+        let signed: Value = serde_json::from_str(&signed.get_stdout())?;
+        let signed = Boc::decode_hex(signed["signed_body"].as_str().unwrap())?;
+        let signature = if wallet.version == WalletVersion::TgWallet {
+            TgWalletExtMsgBody::read_signed(&mut signed.as_slice()?)?.1
+        } else {
+            WalletV5ExtMsgBody::read_signed(&mut signed.as_slice()?)?.1
+        };
+        let signature_valid = VerifyingKey::from_bytes(&wallet.key_pair.public_key)?
+            .verify_strict(
+                body.repr_hash().as_ref(),
+                &Signature::from_slice(&signature)?,
+            )
+            .is_ok();
+        results.push(serde_json::json!({
+            "scheme": stored_scheme,
+            "kind": kind,
+            "words": phrase.split_whitespace().count(),
+            "imported_address": imported["address"],
+            "raw_address": wallet.address.to_string(),
+            "signing_public_key": hex::encode(wallet.key_pair.public_key),
+            "anchor_public_key": wallet.anchor_public_key.map(|key| key.to_string()),
+            "signature_valid": signature_valid,
+            "deployment_hash": CellBuilder::build_from(wallet.state_init()?)?.repr_hash().to_string(),
+        }));
+    }
+    expect_test::expect_file!["snapshots/wallet/mnemonic_schemes.json"]
+        .assert_eq(&serde_json::to_string_pretty(&results)?);
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn test_wallet_import_rotation_interactively() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("wallet-import-rotation-interactive").build();
+    let mut session = project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("telegram")
+        .arg("--local")
+        .arg("--version")
+        .arg("tg-wallet")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+    session.expect("Mnemonic scheme:");
+    session.send_line("\x1b[B\x1b[B", "failed to select the rotation scheme");
+    session.expect("Enter mnemonic (12 or 24 words):");
+    session.send_line(BIP39_TEST_MNEMONIC, "failed to enter the rotation phrase");
+    session.expect("Wallet successfully created and added to");
+    session.expect(Eof);
+    session.assert_file_snapshot_matches(
+        "wallets.toml",
+        "integration/snapshots/wallet/test_wallet_import_rotation_interactively.wallets.toml.txt",
+    );
+}
+
+#[test]
+fn test_tg_wallet_executes_single_and_bulk_transfers() -> anyhow::Result<()> {
+    use rston::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy};
+    use rston::models::{
+        Account, AccountState, ComputePhase, CurrencyCollection, OptionalAccount,
+        OwnedRelaxedMessage, RelaxedIntMsgInfo, RelaxedMsgInfo, ShardAccount, StdAddr, StorageInfo,
+        TxInfo,
+    };
+    use rston::wallet::{MnemonicScheme, SendMsgFlags, WalletMessage};
+    use ton_emulator::emulator::SendMessageResult;
+    use ton_emulator::{AccountsState, Emulator, LocalAccountsState, WorldState};
+    use ton_executor::ExecutorVerbosity;
+
+    let mnemonic =
+        Mnemonic::from_str_with_scheme(BIP39_TEST_MNEMONIC, None, MnemonicScheme::Rotation)?;
+    let wallet = Wallet::new_with_mnemonic(
+        WalletVersion::TgWallet,
+        &mnemonic,
+        0,
+        wallets::wallet_id(WalletVersion::TgWallet, &Network::Testnet),
+    )?;
+    let mut state = WorldState::new(AccountsState::Local(LocalAccountsState::new()), None)?;
+    state.set_now(1_800_000_000);
+    let account = ShardAccount {
+        account: Lazy::new(&OptionalAccount(Some(Account {
+            address: wallet.address.clone().into(),
+            balance: CurrencyCollection::new(100_000_000_000),
+            last_trans_lt: 0,
+            storage_stat: StorageInfo::default(),
+            state: AccountState::Uninit,
+        })))?,
+        last_trans_hash: HashBytes::ZERO,
+        last_trans_lt: 0,
+    };
+    state.update_account(&wallet.address, &account);
+    // Wallet Engine rev00 fixture at 20adadc9401519819ace972f5c246adca582d04d.
+    // The trampoline reads the implementation from config -123 during execution.
+    let mut config = (*state.get_config()).clone();
+    config.set(
+        (-123i32) as u32,
+        Boc::decode_base64(include_str!("../fixtures/wallet_tg_rev00.code").trim())?,
+    )?;
+    state.set_config(config);
+    let emulator = Emulator::new(ExecutorVerbosity::Short, Some(&state.get_config_b64()))?;
+    let message = CellBuilder::build_from(OwnedRelaxedMessage {
+        info: RelaxedMsgInfo::Int(RelaxedIntMsgInfo {
+            bounce: false,
+            dst: StdAddr::new(0, HashBytes([0x42; 32])).into(),
+            value: CurrencyCollection::new(1_000_000),
+            ..Default::default()
+        }),
+        init: None,
+        body: Cell::empty_cell().into(),
+        layout: None,
+    })?;
+    let mut results = Vec::new();
+    for (seqno, count) in [1, 8, 255].into_iter().enumerate() {
+        let body = wallet.create_ext_in_body(
+            1_800_000_600,
+            seqno as u32,
+            vec![
+                WalletMessage {
+                    mode: SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR,
+                    msg: message.clone(),
+                };
+                count
+            ],
+        )?;
+        let signed = wallet.sign_ext_in_body(&body)?;
+        let external = wallet.create_ext_in_msg_from_body(signed, seqno == 0)?;
+        let result = emulator.send_transaction(&mut state, external, &Default::default(), None)?;
+        let SendMessageResult::Success(result) = result else {
+            anyhow::bail!("TG Wallet emulation failed: {result:?}");
+        };
+        let TxInfo::Ordinary(info) = result.transaction.info.load()? else {
+            anyhow::bail!("expected an ordinary wallet transaction");
+        };
+        let ComputePhase::Executed(compute) = info.compute_phase else {
+            anyhow::bail!("wallet compute phase was skipped");
+        };
+        results.push(serde_json::json!({
+            "messages": count,
+            "exit_code": compute.exit_code,
+            "aborted": info.aborted,
+            "outgoing_messages": result.transaction.out_msg_count,
+            "action_success": info.action_phase.map(|phase| phase.success),
+        }));
+    }
+    expect_test::expect_file!["snapshots/wallet/tg_wallet_transfers.json"]
+        .assert_eq(&serde_json::to_string_pretty(&results)?);
+    Ok(())
+}
+
+#[test]
 fn test_wallet_list_uses_explicit_id_with_cached_expected_address() {
     let project = ProjectBuilder::new("wallet-list-explicit-id").build();
     fs::write(
@@ -962,6 +1184,7 @@ fn test_wallet_list_uses_explicit_id_with_cached_expected_address() {
             r#"[wallets.deployer]
 kind = "v5r1"
 wallet-id = 0
+mnemonic-scheme = "bip39"
 keys = {{ mnemonic = "{BIP39_TEST_MNEMONIC}" }}
 
 [wallets.deployer.expected]
@@ -2172,7 +2395,10 @@ fn test_wallet_import_secure_true_uses_keyring_when_supported() {
 fn test_wallet_secure_wallets_share_keyring_bundle_per_scope() {
     let project = ProjectBuilder::new("wallet-shared-keyring-bundle").build();
     let keyring_dir = tempfile::TempDir::new().expect("failed to create keyring temp dir");
-    let (body_hex, _, signed_hex_expected) = wallet_sign_fixture_for_mnemonic(SECOND_TEST_MNEMONIC);
+    let (body_hex, _, signed_hex_expected) = wallet_sign_fixture_for_mnemonic(
+        SECOND_TEST_MNEMONIC,
+        rston::mnemonic::MnemonicScheme::Ton,
+    );
 
     for (name, mnemonic) in [
         ("alpha-wallet", TEST_MNEMONIC),

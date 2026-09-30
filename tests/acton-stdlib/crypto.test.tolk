@@ -25,6 +25,27 @@ get fun `test mnemonic to key pair and sign`() {
     expect(valid).toBeTrue();
 }
 
+get fun `test bip39 mnemonic to key pair`() {
+    val words: Mnemonic = [
+        "abandon",
+        "abandon",
+        "abandon",
+        "abandon",
+        "abandon",
+        "abandon",
+        "abandon",
+        "abandon",
+        "abandon",
+        "abandon",
+        "abandon",
+        "about",
+    ];
+    val kp = words.toKeyPair();
+    expect(
+        kp.publicKey,
+    ).toEqual(0x7952e94118f34607c75e23258dd9220d66ccac5a3ee074125c25068e8107bfbf);
+}
+
 get fun `test fast random bytes`() {
     // Same seed produce same output
     testing.setRandomSeed(42);

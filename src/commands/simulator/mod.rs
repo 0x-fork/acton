@@ -291,6 +291,7 @@ pub(crate) const fn wallet_version_to_string(version: WalletVersion) -> &'static
         WalletVersion::V4R1 => "v4r1",
         WalletVersion::V4R2 => "v4r2",
         WalletVersion::V5R1 => "v5r1",
+        WalletVersion::TgWallet => "tg-wallet",
         WalletVersion::HLV1R1 => "highloadv1r1",
         WalletVersion::HLV1R2 => "highloadv1r2",
         WalletVersion::HLV2 => "highloadv2",

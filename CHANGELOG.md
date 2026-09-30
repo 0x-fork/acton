@@ -74,7 +74,7 @@ All notable changes to this project will be documented in this file.
 
 ### Rust libraries
 
-- Import 12-word BIP39 wallet mnemonics through `rston`, using SLIP-0010 Ed25519
+- Import 12- or 24-word BIP39 wallet mnemonics through `rston`, using SLIP-0010 Ed25519
   derivation at `m/44'/607'/0'`. Existing 24-word TON mnemonics keep their derivation.
 - Use `rston` for address and hash handling in Studio and contract verification,
   preserving raw/friendly inputs and address display flags.
@@ -157,6 +157,10 @@ All notable changes to this project will be documented in this file.
 
 ### Wallets
 
+- Support TG Wallet rev00 and explicit mnemonic schemes: `ton` (default),
+  `bip39` for 12 or 24 words, and `rotation` for separate anchor and signing keys.
+  Configure `mnemonic-scheme` in `wallets.toml`, pass `--mnemonic-scheme` when
+  importing, or select the scheme interactively.
 - Support an optional `wallet-id` in wallet configuration. An explicit ID is
   used on every network; omitting it keeps the version- and network-specific default.
 - Store wallet workchains as `i8` in `WalletConfig`, matching standard TON addresses.

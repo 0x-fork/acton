@@ -1,0 +1,23 @@
+[
+  {
+    "aborted": false,
+    "action_success": true,
+    "exit_code": 0,
+    "messages": 1,
+    "outgoing_messages": 1
+  },
+  {
+    "aborted": false,
+    "action_success": true,
+    "exit_code": 0,
+    "messages": 8,
+    "outgoing_messages": 8
+  },
+  {
+    "aborted": false,
+    "action_success": true,
+    "exit_code": 0,
+    "messages": 255,
+    "outgoing_messages": 255
+  }
+]

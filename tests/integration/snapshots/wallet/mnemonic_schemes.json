@@ -1,0 +1,46 @@
+[
+  {
+    "anchor_public_key": null,
+    "deployment_hash": "cc4809912dc48c5972f1441b9dd277e23f439162528e7cd65edac642d074a74c",
+    "imported_address": "kQDMSAmRLcSMWXLxRBud0nfiP0ORYlKOfNZe2sZC0HSnTODr",
+    "kind": "v5r1",
+    "raw_address": "0:cc4809912dc48c5972f1441b9dd277e23f439162528e7cd65edac642d074a74c",
+    "scheme": "bip39",
+    "signature_valid": true,
+    "signing_public_key": "c6d2c947e552974c9f739fd7a02652519b8eef8cb9eef7867ac2e8f85777f244",
+    "words": 24
+  },
+  {
+    "anchor_public_key": null,
+    "deployment_hash": "6fafbdd84ee6e7758d247a4cbafba4dc4c5d13b6cfca7d682921bbc996c7af59",
+    "imported_address": "kQBvr73YTubndY0keky6-6TcTF0Tts_KfWgpIbvJlsevWQki",
+    "kind": "tg-wallet",
+    "raw_address": "0:6fafbdd84ee6e7758d247a4cbafba4dc4c5d13b6cfca7d682921bbc996c7af59",
+    "scheme": "ton",
+    "signature_valid": true,
+    "signing_public_key": "a8a087084058fd0609989a3a3f0e8f34c441abb96f5deca95dd710ddd1353625",
+    "words": 24
+  },
+  {
+    "anchor_public_key": "7952e94118f34607c75e23258dd9220d66ccac5a3ee074125c25068e8107bfbf",
+    "deployment_hash": "b8d4e224ad236b774861463a952b3526fb596e0408af003538db7c683b17a54a",
+    "imported_address": "kQC41OIkrSNrd0hhRjqVKzUm-1luBAivADU423xoOxelSiky",
+    "kind": "tg-wallet",
+    "raw_address": "0:b8d4e224ad236b774861463a952b3526fb596e0408af003538db7c683b17a54a",
+    "scheme": "rotation",
+    "signature_valid": true,
+    "signing_public_key": "7952e94118f34607c75e23258dd9220d66ccac5a3ee074125c25068e8107bfbf",
+    "words": 12
+  },
+  {
+    "anchor_public_key": "7952e94118f34607c75e23258dd9220d66ccac5a3ee074125c25068e8107bfbf",
+    "deployment_hash": "b8d4e224ad236b774861463a952b3526fb596e0408af003538db7c683b17a54a",
+    "imported_address": "kQC41OIkrSNrd0hhRjqVKzUm-1luBAivADU423xoOxelSiky",
+    "kind": "tg-wallet",
+    "raw_address": "0:b8d4e224ad236b774861463a952b3526fb596e0408af003538db7c683b17a54a",
+    "scheme": "rotation",
+    "signature_valid": true,
+    "signing_public_key": "5d6320a0546c2df0908f0477e1ade79226faf854d041548f846b58872de5213e",
+    "words": 24
+  }
+]

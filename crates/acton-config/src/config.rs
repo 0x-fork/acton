@@ -596,6 +596,41 @@ pub struct WalletExpectedAddresses {
     pub address_testnet: Option<String>,
 }
 
+/// Recovery-phrase validation and key derivation used by a configured wallet.
+///
+/// Word count alone does not identify a scheme. Missing configuration uses TON.
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, clap::ValueEnum,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum MnemonicScheme {
+    /// A 24-word TON mnemonic with TON-specific seed derivation.
+    #[default]
+    Ton,
+    /// One 12- or 24-word BIP39 mnemonic at `m/44'/607'/0'`.
+    Bip39,
+    /// TG Wallet's 12-word anchor and optional separate 12-word signing half.
+    Rotation,
+}
+
+impl MnemonicScheme {
+    /// Stable spelling shared by wallet configuration and CLI arguments.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Ton => "ton",
+            Self::Bip39 => "bip39",
+            Self::Rotation => "rotation",
+        }
+    }
+}
+
+impl std::fmt::Display for MnemonicScheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Wallet configuration entry
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WalletConfig {
@@ -608,6 +643,9 @@ pub struct WalletConfig {
     /// For V5 this replaces the final wallet ID, not just its subwallet-number bits.
     #[serde(rename = "wallet-id", skip_serializing_if = "Option::is_none")]
     pub wallet_id: Option<u32>,
+    /// Recovery-phrase scheme. Defaults to TON independently of phrase length.
+    #[serde(default, rename = "mnemonic-scheme")]
+    pub mnemonic_scheme: MnemonicScheme,
     /// Mnemonic and key storage configuration
     pub keys: WalletKeys,
     #[serde(default)]
@@ -2125,11 +2163,13 @@ address-testnet = "EQD_testnet_address_here"
 [wallets.user]
 kind = "v5R1"
 workchain = -1
+mnemonic-scheme = "bip39"
 keys = { mnemonic-file = "user-keys.txt" }
 
 [wallets.direct]
-kind = "v4R2"
+kind = "tg-wallet"
 wallet-id = 4294967295
+mnemonic-scheme = "rotation"
 keys = { mnemonic = "word1 word2 word3" }
 "#;
 
@@ -2141,6 +2181,7 @@ keys = { mnemonic = "word1 word2 word3" }
         assert_eq!(deployer.kind, "v4R2");
         assert_eq!(deployer.workchain, Some(0));
         assert_eq!(deployer.wallet_id, Some(0));
+        assert_eq!(deployer.mnemonic_scheme, MnemonicScheme::Ton);
         assert_eq!(
             deployer.keys.mnemonic_env,
             Some("DEPLOYER_MNEMONIC".to_string())
@@ -2162,13 +2203,15 @@ keys = { mnemonic = "word1 word2 word3" }
         assert_eq!(user.kind, "v5R1");
         assert_eq!(user.workchain, Some(-1));
         assert_eq!(user.wallet_id, None);
+        assert_eq!(user.mnemonic_scheme, MnemonicScheme::Bip39);
         assert_eq!(user.keys.mnemonic_file, Some("user-keys.txt".to_string()));
         assert_eq!(user.keys.mnemonic_env, None);
         assert!(user.expected.is_none());
 
         let direct = wallets.get("direct").unwrap();
-        assert_eq!(direct.kind, "v4R2");
+        assert_eq!(direct.kind, "tg-wallet");
         assert_eq!(direct.wallet_id, Some(u32::MAX));
+        assert_eq!(direct.mnemonic_scheme, MnemonicScheme::Rotation);
         assert_eq!(direct.keys.mnemonic, Some("word1 word2 word3".to_string()));
 
         Ok(())

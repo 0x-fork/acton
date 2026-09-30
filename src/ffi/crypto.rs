@@ -4,7 +4,7 @@ use ed25519_dalek::{Signer, SigningKey};
 use num_bigint::{BigInt, Sign};
 use rand::RngCore;
 use rston::cell::{Cell, CellBuilder};
-use rston::mnemonic::Mnemonic;
+use rston::mnemonic::{Mnemonic, MnemonicScheme};
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvm_ffi::stack::{Tuple, TupleItem};
@@ -54,9 +54,15 @@ fn mnemonic_to_key_pair_impl(
     stack: &mut Tuple,
     words: Vec<String>,
 ) -> anyhow::Result<()> {
+    // The Tolk helper accepts 12-word BIP39 or 24-word TON phrases.
+    let scheme = if words.len() == 12 {
+        MnemonicScheme::Bip39
+    } else {
+        MnemonicScheme::Ton
+    };
     let words = words.iter().map(String::as_str).collect();
 
-    let mnemonic = Mnemonic::new(words, None)?;
+    let mnemonic = Mnemonic::new_with_scheme(words, None, scheme)?;
     let key_pair = mnemonic.to_key_pair()?;
 
     // Return KeyPair { privateKey: int, publicKey: int }

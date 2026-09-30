@@ -115,9 +115,11 @@ characters are removed.
 .SS "acton wallet import"
 Import an existing mnemonic\-based wallet.
 .sp
-Accepts 12\-word BIP39 phrases and 24\-word TON phrases. BIP39 keys use
-SLIP\-0010 Ed25519 derivation at \fBm/44'/607'/0'\fR (the first TON account).
-Support for 12\-word phrases is available since trunk.
+The mnemonic scheme defaults to \fBton\fR (24 words). Select \fBbip39\fR for a 12\- or
+24\-word BIP39 phrase, or \fBrotation\fR for TG Wallet\[cq]s anchor and signing halves.
+BIP39 keys use SLIP\-0010 Ed25519 at \fBm/44'/607'/0'\fR\&.
+.sp
+Available since trunk.
 .SS "Synopsis"
 \fBacton wallet import\fR [\fIoptions\fR] [\fImnemonics\fR\[u2026]]
 .SS "Options"
@@ -127,6 +129,19 @@ Support for 12\-word phrases is available since trunk.
 Mnemonic words for the wallet.
 .sp
 If omitted, Acton prompts interactively.
+.RE
+.sp
+\fB\-\-mnemonic\-scheme\fR \fIton|bip39|rotation\fR
+.RS 4
+Select mnemonic validation and key derivation. Acton prompts when this flag is
+omitted in an interactive terminal; otherwise it uses \fBton\fR\&.
+The choice is saved as \fBmnemonic\-scheme\fR in the wallet entry.
+.sp
+For \fBrotation\fR, use \fB\-\-version tg\-wallet\fR\&. Enter 12 words before the first
+rotation or 24 words afterward: the anchor half followed by the signing half.
+Each half is validated independently. The anchor fixes the account address.
+.sp
+Available since trunk.
 .RE
 .sp
 \fB\-\-name\fR \fIname\fR

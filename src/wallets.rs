@@ -267,6 +267,17 @@ pub fn load_mnemonic(wallet_name: &str, wallet: &config::WalletConfig) -> anyhow
     }
 }
 
+/// Parses a phrase with the configured scheme, without guessing from word count.
+/// The returned mnemonic owns and clears its copy of secret material on drop.
+pub fn parse_mnemonic(phrase: &str, scheme: config::MnemonicScheme) -> anyhow::Result<Mnemonic> {
+    let scheme = match scheme {
+        config::MnemonicScheme::Ton => rston::mnemonic::MnemonicScheme::Ton,
+        config::MnemonicScheme::Bip39 => rston::mnemonic::MnemonicScheme::Bip39,
+        config::MnemonicScheme::Rotation => rston::mnemonic::MnemonicScheme::Rotation,
+    };
+    Ok(Mnemonic::from_str_with_scheme(phrase, None, scheme)?)
+}
+
 pub fn open_wallets(
     config: &ActonConfig,
     net: Option<&Network>,
@@ -289,7 +300,7 @@ pub fn open_wallets(
         let mnemonic_str = load_mnemonic(&name, &wallet)
             .with_context(|| format!("No mnemonic found for '{name}' wallet"))?;
 
-        let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
+        let mnemonic = parse_mnemonic(&mnemonic_str, wallet.mnemonic_scheme)?;
 
         let wallet_version = parse_wallet_version(&wallet.kind)?;
         let wallet_id = wallet.wallet_id.map_or_else(
@@ -297,9 +308,9 @@ pub fn open_wallets(
             |id| id as i32,
         );
 
-        let ton_wallet = SigningWallet::new_with_params(
+        let ton_wallet = SigningWallet::new_with_mnemonic(
             wallet_version,
-            mnemonic.to_key_pair()?,
+            &mnemonic,
             wallet.workchain.unwrap_or(0),
             wallet_id,
         )?;
@@ -483,6 +494,7 @@ pub const fn wallet_id(wallet: WalletVersion, network: &Network) -> i32 {
 pub const fn wallet_id_from_global_id(wallet: WalletVersion, network_global_id: i32) -> i32 {
     match wallet {
         WalletVersion::V5R1 => network_global_id ^ i32::MIN,
+        WalletVersion::TgWallet => network_global_id ^ 0x80008000u32 as i32,
         _ => WALLET_ID_DEFAULT,
     }
 }
@@ -499,6 +511,7 @@ fn parse_wallet_version(kind: &str) -> anyhow::Result<WalletVersion> {
         "v4r1" => Ok(WalletVersion::V4R1),
         "v4r2" => Ok(WalletVersion::V4R2),
         "v5r1" => Ok(WalletVersion::V5R1),
+        "tg-wallet" => Ok(WalletVersion::TgWallet),
         "highloadv1r1" => Ok(WalletVersion::HLV1R1),
         "highloadv1r2" => Ok(WalletVersion::HLV1R2),
         "highloadv2" => Ok(WalletVersion::HLV2),

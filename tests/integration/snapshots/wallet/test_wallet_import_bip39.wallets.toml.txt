@@ -1,6 +1,7 @@
 [wallets.bip39-wallet]
 kind = "v5r1"
 workchain = 0
+mnemonic-scheme = "bip39"
 keys = { [MNEMONIC] }
 
 [wallets.bip39-wallet.expected]
