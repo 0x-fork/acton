@@ -205,14 +205,14 @@ impl ReferenceCompletionProvider {
                 .type_of_node(qualifier)
                 .or_else(|| context.snapshot.type_db_cache.top_level_type(symbol.id))
             {
-                Self::collect_methods(context, receiver_ty, false, collector);
+                Self::collect_methods(context, receiver_ty, None, false, collector);
             }
             return Some(());
         }
 
         let receiver_ty = context.type_of_node(qualifier)?;
         if matches!(qualifier, Expr::ObjectLit(_)) {
-            Self::collect_methods(context, receiver_ty, true, collector);
+            Self::collect_methods(context, receiver_ty, Some(qualifier), true, collector);
             return Some(());
         }
 
@@ -225,7 +225,7 @@ impl ReferenceCompletionProvider {
             }
             _ => {}
         }
-        Self::collect_methods(context, receiver_ty, true, collector);
+        Self::collect_methods(context, receiver_ty, Some(qualifier), true, collector);
         Some(())
     }
 
@@ -259,6 +259,7 @@ impl ReferenceCompletionProvider {
     fn collect_methods(
         context: &TolkCompletionProviderContext<'_>,
         receiver_ty: TyId,
+        qualifier: Option<Expr<'_>>,
         instance: bool,
         collector: &mut CompletionCollector,
     ) {
@@ -280,7 +281,13 @@ impl ReferenceCompletionProvider {
             .finish("tolk.completion.methods.query_db", query_db_started_at);
 
         let resolve_started_at = context.profiler.start();
-        let method_ids = method_ids_for_completion(receiver_ty, instance, &mut type_db);
+        let declared_receiver = qualifier.and_then(|expr| {
+            context
+                .snapshot
+                .declared_receiver_type(context.file_id, expr, &mut type_db)
+        });
+        let method_ids =
+            method_ids_for_completion(receiver_ty, declared_receiver, instance, &mut type_db);
         context
             .profiler
             .finish("tolk.completion.methods.resolve", resolve_started_at);

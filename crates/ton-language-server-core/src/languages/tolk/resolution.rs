@@ -173,6 +173,19 @@ impl TolkResolveSnapshot {
         inference.type_of(span)
     }
 
+    pub(super) fn declared_receiver_type(
+        &self,
+        file_id: FileId,
+        expr: tolk_syntax::Expr<'_>,
+        type_db: &mut tolk_ty::TypeDb<'_>,
+    ) -> Option<TyId> {
+        let file = self.file_db.get_by_id(file_id)?;
+        let symbol = file.find_symbol_at(expr.syntax().start_byte())?;
+        self.body_types(file_id)?
+            .get(&symbol.id)?
+            .declared_type_before_smart_cast(expr, file_id, type_db)
+    }
+
     pub(super) fn type_of_resolved(&self, resolved: &Resolved) -> Option<TyId> {
         match resolved {
             Resolved::Global(symbol_id) => self.type_db_cache.top_level_type(*symbol_id),

@@ -130,6 +130,8 @@ pub(crate) fn calculate_shape_score(id: TyId, interner: &TypeInterner) -> ShapeS
 pub struct MethodCallCandidate {
     pub original_receiver: TyId,
     pub instantiated_receiver: TyId,
+    /// Alias distance to the receiver; implicit coercions sort after subtype matches.
+    pub receiver_distance: usize,
     pub method_id: SymbolId,
     pub substitutions: FxHashMap<TyId, TyId>,
 }
@@ -157,6 +159,23 @@ pub(crate) fn is_more_specific_generic(type_a: TyId, type_b: TyId, type_db: &mut
     // exists θ: θ(B)=A && not exists φ: φ(A)=B
     can_substitute_to_reach_actual(type_b, type_a, type_db)
         && !can_substitute_to_reach_actual(type_a, type_b, type_db)
+}
+
+/// Accepts directional alias conversions first and other implicit coercions last.
+fn receiver_distance(receiver: TyId, provided: TyId, interner: &TypeInterner) -> Option<usize> {
+    if receiver == provided {
+        return Some(0);
+    }
+    if let Some(distance) = interner.subtype_distance(provided, receiver) {
+        return Some(distance);
+    }
+    if !interner.equals(receiver, provided)
+        && interner.can_rhs_be_assigned(receiver, provided)
+        && !matches!(interner.data(receiver), TyData::TypeAlias { .. })
+    {
+        return Some(1_000_000);
+    }
+    None
 }
 
 /// the main "overload resolution" entrypoint: given `obj.method()`, find best applicable methods;
@@ -206,20 +225,24 @@ fn resolve_methods(
             let mut deducer = GenericSubstitutionsDeducing::new();
             let replaced = deducer.auto_deduce_from_argument(receiver, provided_receiver, intn);
 
-            if intn.can_rhs_be_assigned(replaced, provided_receiver) {
+            if let Some(receiver_distance) = receiver_distance(replaced, provided_receiver, intn)
+                && (!intn.has_generics(replaced) || intn.has_generics(provided_receiver))
+            {
                 viable.push(MethodCallCandidate {
                     original_receiver: receiver,
                     instantiated_receiver: replaced,
+                    receiver_distance,
                     method_id: symbol.id,
                     substitutions: deducer.substitutions.mapping,
                 });
             }
-        } else if intn.can_rhs_be_assigned(receiver, provided_receiver)
+        } else if let Some(receiver_distance) = receiver_distance(receiver, provided_receiver, intn)
             && provided_receiver != intn.ty_never
         {
             viable.push(MethodCallCandidate {
                 original_receiver: receiver,
                 instantiated_receiver: receiver,
+                receiver_distance,
                 method_id: symbol.id,
                 substitutions: FxHashMap::default(),
             });
@@ -232,32 +255,18 @@ fn resolve_methods(
         return viable;
     }
 
-    // 1) exact match candidates with equal_to()
-    //    (for instance, an alias equals to its underlying type, as well as `T1|T2` equals to `T2|T1`)
-    let mut exact = Vec::new();
-    let mut generic_count = 0;
-    for candidate in &viable {
-        generic_count += usize::from(candidate.is_generic(type_db.intrn));
-        if type_db
-            .intrn
-            .equals(candidate.instantiated_receiver, provided_receiver)
-        {
-            exact.push(MethodCallCandidate {
-                original_receiver: candidate.original_receiver,
-                instantiated_receiver: candidate.instantiated_receiver,
-                method_id: candidate.method_id,
-                substitutions: candidate.substitutions.clone(),
-            });
-        }
-    }
-    if exact.len() == 1 {
-        return exact;
-    }
-    if !exact.is_empty() {
-        viable = exact;
-    }
-
-    if generic_count == 0 {
+    // Nearest receivers win before generic specificity or shape breaks a tie.
+    let best_distance = viable
+        .iter()
+        .map(|candidate| candidate.receiver_distance)
+        .min()
+        .expect("multiple viable methods remain");
+    viable.retain(|candidate| candidate.receiver_distance == best_distance);
+    if viable.len() == 1
+        || !viable
+            .iter()
+            .any(|candidate| candidate.is_generic(type_db.intrn))
+    {
         return viable;
     }
 
@@ -329,10 +338,13 @@ fn find_only_generic_dominator(
     dominator
 }
 
-/// Returns the best applicable method declaration for every method name available on a receiver.
+/// Returns the best applicable method declarations for every name on a receiver.
+/// If a name has no candidates on the inferred type, retries its declared type
+/// before smart casts, as for a method call.
 #[must_use]
 pub fn method_ids_for_completion(
     provided_receiver: TyId,
+    declared_receiver: Option<TyId>,
     instance: bool,
     type_db: &mut TypeDb<'_>,
 ) -> Vec<SymbolId> {
@@ -357,11 +369,14 @@ pub fn method_ids_for_completion(
             continue;
         }
 
-        result.extend(
-            resolve_methods(provided_receiver, name, Some(instance), type_db)
-                .into_iter()
-                .map(|candidate| candidate.method_id),
-        );
+        let mut candidates = resolve_methods(provided_receiver, name, Some(instance), type_db);
+        if candidates.is_empty()
+            && let Some(declared_receiver) = declared_receiver
+            && declared_receiver != provided_receiver
+        {
+            candidates = resolve_methods(declared_receiver, name, Some(instance), type_db);
+        }
+        result.extend(candidates.into_iter().map(|candidate| candidate.method_id));
     }
 
     result.sort_unstable();

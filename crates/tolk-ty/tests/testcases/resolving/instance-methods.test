@@ -239,7 +239,7 @@ fun main(a: Foo<slice>, b: Foo<int>, c: int, d: IntFoo): void {
 19:6 -> 6:11 resolved
 20:6 -> 10:13 resolved
 21:6 -> 14:6 resolved
-22:6 -> 10:13 resolved
+22:6 -> 14:6 resolved
 
 ========================================================================
 Generic struct method resolving
@@ -308,7 +308,7 @@ fun main(a: dict, b: cell?): void {
 }
 ------------------------------------------------------------------------
 5:6 -> 0:9 resolved
-6:6 -> 0:9 resolved
+6:6 unresolved
 
 ========================================================================
 Instance method for type with same function name

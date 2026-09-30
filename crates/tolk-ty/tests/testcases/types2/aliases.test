@@ -1,0 +1,148 @@
+========================================================================
+Tolk 1.5 alias distance and declared receiver fallback
+========================================================================
+type Id = int;
+type Owner = int;
+type DeepId = Id;
+type DeeperId = DeepId;
+
+fun int.nearest(self): int1 { return 0; }
+fun Id.nearest(self): int2 { return 0; }
+fun DeepId.nearest(self): int3 { return 0; }
+fun int.preferGeneric(self): int4 { return 0; }
+fun T.preferGeneric(self): int5 { return 0; }
+
+fun checkAliases(value: DeeperId, owner: Owner) {
+    val id: Id = owner;
+    val copy: Owner = id;
+    val observed1 = id;
+//!     ^ Id
+    val observed2 = copy;
+//!     ^ Owner
+    val observed3 = value.nearest();
+//!     ^ int3
+    val observed4 = value.preferGeneric();
+//!     ^ int5
+    val observed5 = (0 as int8).nearest();
+//!     ^ int1
+}
+
+struct Box<T> { value: T }
+fun Box<int>.boxKind(self): int1 { return 0; }
+fun Box<Id>.boxKind(self): int2 { return 0; }
+fun Box<T>.boxKind(self): int3 { return 0; }
+fun checkContainers(value: Box<DeepId>) {
+    val widened: Box<int> = value;
+    val observed6 = widened;
+//!     ^ Box<int>
+    val observed7 = widened.boxKind();
+//!     ^ int1
+    val observed8 = value.boxKind();
+//!     ^ int3
+}
+
+fun array<int>.arrayKind(self): int1 { return 0; }
+fun array<Id>.arrayKind(self): int2 { return 0; }
+fun checkArray(value: array<DeepId>) {
+    val observed9 = value.arrayKind();
+//!     ^ int2
+}
+
+fun (int, int).tensorKind(self): int1 { return 0; }
+fun (Id, int).tensorKind(self): int2 { return 0; }
+fun [int, int].tupleKind(self): int1 { return 0; }
+fun [Id, int].tupleKind(self): int2 { return 0; }
+fun checkShapes(tensor: (DeepId, int), tuple: [DeepId, int]) {
+    val observed10 = tensor.tensorKind();
+//!     ^ int2
+    val observed11 = tuple.tupleKind();
+//!     ^ int2
+}
+
+fun (int | slice).unionKind(self): int1 { return 0; }
+fun (Id | slice).unionKind(self): int2 { return 0; }
+fun checkUnion(value: slice | DeepId) {
+    val observed12 = value.unionKind();
+//!     ^ int2
+    if (value is Id) {
+        val observed13 = value;
+//!         ^ Id
+    }
+    match (value) {
+        int => {
+            val observed14 = value;
+//!             ^ int
+        }
+        slice => {}
+    }
+}
+
+type Tagged<T> = cell;
+type OtherTag<T> = cell;
+fun Tagged<T>.tagKind(self): int1 { return 0; }
+fun OtherTag<T>.tagKind(self): int2 { return 0; }
+fun Tagged<Id>.tagDistance(self): int3 { return 0; }
+fun Tagged<int>.tagDistance(self): int4 { return 0; }
+fun checkTags(value: Tagged<DeepId>, other: OtherTag<int>) {
+    val assigned: OtherTag<int> = value;
+    val observed15 = assigned;
+//!     ^ OtherTag<int>
+    val observed16 = value.tagKind();
+//!     ^ int1
+    val observed17 = other.tagKind();
+//!     ^ int2
+    val observed18 = value.tagDistance();
+//!     ^ int3
+}
+
+type Balance = cell?;
+type Assets = cell?;
+fun Balance.validate(self): int1 { return 0; }
+fun Assets.validate(self): int2 { return 0; }
+struct Holder<T> { padding: int; data: T }
+fun checkDeclaredReceiver(value: Balance, holder: Holder<Balance>, tuple: (int, Balance)) {
+    if (value == null || holder.data == null || tuple.1 == null) { return; }
+    val observed19 = value;
+//!     ^ cell
+    val observed20 = value.validate();
+//!     ^ int1
+    val observed21 = holder.data.validate();
+//!     ^ int1
+    val observed22 = tuple.1.validate();
+//!     ^ int1
+}
+
+fun (int -> int).callbackKind(self): int1 { return 0; }
+fun (Id -> int).callbackKind(self): int2 { return 0; }
+type Key = uint32;
+type DeepKey = Key;
+fun map<uint32, uint32>.mapKind(self): int1 { return 0; }
+fun map<Key, uint32>.mapKind(self): int2 { return 0; }
+fun checkCallableAndMap(callback: DeepId -> int, table: map<DeepKey, uint32>) {
+    val observed101 = callback.callbackKind();
+//!     ^ int2
+    val observed102 = table.mapKind();
+//!     ^ int2
+}
+
+fun cell.retain(self): self { return self; }
+fun cell.retainAs<T>(self): self { return self; }
+fun cell.preferNarrowed(self): int3 { return 0; }
+fun Balance.preferNarrowed(self): int4 { return 0; }
+fun checkMethodChain(value: Balance) {
+    if (value == null) { return; }
+    val observed103 = value.retain().validate();
+//!     ^ int1
+    val observed104 = value.preferNarrowed();
+//!     ^ int3
+}
+
+fun checkExplicitGenericChain(value: Balance) {
+    if (value == null) { return; }
+    val parsed = value.retainAs<int>().validate();
+//!     ^ int1
+}
+
+fun main() {}
+------------------------------------------------------------------------
+ok

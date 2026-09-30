@@ -359,3 +359,17 @@ fn event_count(summary: &ProfileSummary, name: &'static str) -> usize {
         .filter(|event| event.name == name)
         .count()
 }
+
+#[test]
+fn shows_signature_with_nearest_alias_receiver() {
+    case_signature_help(
+        r"type Id = int;
+type DeepId = Id;
+fun int.pick(self, base: int): int1 { return 0; }
+fun Id.pick(self, alias: int): int2 { return 0; }
+fun main(value: DeepId) { value.pick(<caret>0); }",
+        expect![[r#"
+            alias: int
+            fun Id.pick(alias: int)"#]],
+    );
+}

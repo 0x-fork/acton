@@ -755,3 +755,17 @@ fn render_definition(caret_position: Position, locations: &[Location]) -> String
 fn format_position(position: Position) -> String {
     format!("{}:{}", position.line, position.character)
 }
+
+#[test]
+fn resolves_method_with_nearest_alias_receiver() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"type Id = int;
+type DeepId = Id;
+fun int.pick(self, base: int): int1 { return 0; }
+fun Id.pick(self, alias: int): int2 { return 0; }
+fun main(value: DeepId) { value.<caret>pick(0); }",
+        |_| {},
+        expect!["4:32 -> file:///fixture/main.tolk 3:7 resolved"],
+    );
+}

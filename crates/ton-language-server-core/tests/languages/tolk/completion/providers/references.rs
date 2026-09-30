@@ -2558,3 +2558,47 @@ fn applies_multifile_reference_completions_and_auto_imports() {
             expect!["fun main() { someGlobalFunction()<caret>; }"],
         );
 }
+
+#[test]
+fn completes_alias_methods_after_smart_casts() {
+    for (receiver, expected) in [
+        (
+            "value",
+            expect![[r#"
+            label     kind    detail        edit       text
+            validate  Method  (self): int1  6:23-6:27  validate();$0"#]],
+        ),
+        (
+            "holder.data",
+            expect![[r#"
+            label     kind    detail        edit       text
+            validate  Method  (self): int1  6:29-6:33  validate();$0"#]],
+        ),
+        (
+            "tuple.1",
+            expect![[r#"
+            label     kind    detail        edit       text
+            validate  Method  (self): int1  6:25-6:29  validate();$0"#]],
+        ),
+        (
+            "value.retain()",
+            expect![[r#"
+            label     kind    detail        edit       text
+            validate  Method  (self): int1  6:32-6:36  validate();$0"#]],
+        ),
+    ] {
+        CompletionTest::new(&format!(
+            "type Balance = cell?;
+             struct Holder<T> {{ padding: int; data: T }}
+             fun Balance.validate(self): int1 {{ return 0; }}
+             fun cell.retain(self): self {{ return self; }}
+             fun main(value: Balance, holder: Holder<Balance>, tuple: (int, Balance)) {{
+                 if (value == null || holder.data == null || tuple.1 == null) {{ return; }}
+                 {receiver}.vali<caret>
+             }}"
+        ))
+        .labels(&["validate"])
+        .trigger_character(".")
+        .check(expected);
+    }
+}

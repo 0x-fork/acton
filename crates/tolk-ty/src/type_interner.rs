@@ -429,70 +429,6 @@ impl TypeInterner {
         current
     }
 
-    /// having `type UserId = int` and `type OwnerId = int` (when their underlying types are equal),
-    /// make `UserId` and `OwnerId` NOT equal and NOT assignable (although they'll have the same `type_id`);
-    /// it allows overloading methods for these types independently, e.g.
-    /// > type BalanceList = dict
-    /// > type AssetList = dict
-    /// > fun BalanceList.validate(self)
-    /// > fun AssetList.validate(self)
-    fn are_two_equal_type_aliases_different(&self, a_id: TyId, b_id: TyId) -> bool {
-        let (a_def, a_inner, a_args) = match self.data(a_id) {
-            TyData::TypeAlias {
-                def,
-                inner_ty,
-                args,
-                ..
-            } => (*def, *inner_ty, args.as_ref()),
-            _ => return true,
-        };
-        let (b_def, b_inner, b_args) = match self.data(b_id) {
-            TyData::TypeAlias {
-                def,
-                inner_ty,
-                args,
-                ..
-            } => (*def, *inner_ty, args.as_ref()),
-            _ => return true,
-        };
-
-        if a_def == b_def {
-            return match (a_args, b_args) {
-                (Some(aa), Some(bb)) => {
-                    if aa.len() != bb.len() {
-                        return true;
-                    }
-                    !aa.iter()
-                        .zip(bb.iter())
-                        .all(|(&at, &bt)| self.equals(at, bt))
-                }
-                (None, None) => false,
-                _ => true,
-            };
-        }
-
-        if let Some(a_args) = a_args
-            && let Some(b_args) = b_args
-        {
-            if a_args.len() != b_args.len() {
-                return true;
-            }
-            return a_def != b_def
-                || !a_args
-                    .iter()
-                    .zip(b_args.iter())
-                    .all(|(&at, &bt)| self.equals(at, bt));
-        }
-
-        // handle `type MInt2 = MInt1`, as well as `type BalanceList = dict`, then they are equal
-        let one_aliases_another = match (self.data(a_inner), self.data(b_inner)) {
-            (TyData::TypeAlias { def: def1, .. }, _) if *def1 == b_def => true,
-            (_, TyData::TypeAlias { def: def2, .. }) if *def2 == a_def => true,
-            _ => false,
-        };
-        !one_aliases_another
-    }
-
     /// Checks if a type contains any generic parameters.
     #[must_use]
     pub fn has_generics(&self, id: TyId) -> bool {
@@ -523,10 +459,8 @@ impl TypeInterner {
         }
     }
 
-    /// comparing types for equality (when implementation differs from a default "compare ids");
-    /// two types are EQUAL is a much more strict property than "assignable";
-    /// a union type can hold only non-equal types; for instance, having `type MyInt = int`, a union `int | MyInt` == `int`;
-    /// searching for a compatible method for a receiver is also based on `equal_to()` as first priority
+    /// Compares runtime types, erasing aliases recursively inside containers.
+    /// Method receivers use [`Self::subtype_distance`] to preserve alias direction and identity.
     #[must_use]
     pub fn equals(&self, a: TyId, b: TyId) -> bool {
         if a == b {
@@ -536,29 +470,8 @@ impl TypeInterner {
         let da = self.data(a);
         let db = self.data(b);
 
-        // given `type UserId = int` and `type OwnerId = int`, treat them as NOT equal (they are also not assignable);
-        // (but nevertheless, they will have the same type_id, and `UserId | OwnerId` is not a valid union)
-        if matches!(da, TyData::TypeAlias { .. }) {
-            if matches!(db, TyData::TypeAlias { .. })
-                && let (
-                    TyData::TypeAlias {
-                        def: a_def,
-                        inner_ty: ia,
-                        ..
-                    },
-                    TyData::TypeAlias {
-                        def: b_def,
-                        inner_ty: ib,
-                        ..
-                    },
-                ) = (da, db)
-                && (*a_def == *b_def || self.equals(*ia, *ib))
-            {
-                return !self.are_two_equal_type_aliases_different(a, b);
-            }
-            if let TyData::TypeAlias { inner_ty: ia, .. } = da {
-                return self.equals(*ia, b);
-            }
+        if let TyData::TypeAlias { inner_ty, .. } = da {
+            return self.equals(*inner_ty, b);
         }
 
         if let TyData::TypeAlias { inner_ty: ib, .. } = db {
@@ -685,6 +598,89 @@ impl TypeInterner {
         }
     }
 
+    /// Counts alias-unwrapping steps from a provided type to a method receiver.
+    /// Returns `None` for different runtime types or a reverse alias conversion.
+    /// Container children contribute their distances; union variants match by runtime type.
+    #[must_use]
+    pub fn subtype_distance(&self, provided: TyId, receiver: TyId) -> Option<usize> {
+        if !self.equals(provided, receiver) {
+            return None;
+        }
+
+        if let TyData::TypeAlias {
+            def,
+            inner_ty,
+            args,
+            ..
+        } = self.data(provided)
+        {
+            if let TyData::TypeAlias {
+                def: receiver_def,
+                args: receiver_args,
+                ..
+            } = self.data(receiver)
+            {
+                if def == receiver_def && args == receiver_args {
+                    return Some(0);
+                }
+                if def == receiver_def
+                    && let (Some(args), Some(receiver_args)) = (args, receiver_args)
+                {
+                    return args.iter().zip(receiver_args).try_fold(
+                        0,
+                        |sum, (&arg, &receiver_arg)| {
+                            Some(sum + self.subtype_distance(arg, receiver_arg)?)
+                        },
+                    );
+                }
+            }
+            return Some(self.subtype_distance(*inner_ty, receiver)? + 1);
+        }
+        if matches!(self.data(receiver), TyData::TypeAlias { .. }) {
+            return None;
+        }
+
+        if let (TyData::Union(provided_variants), TyData::Union(receiver_variants)) =
+            (self.data(provided), self.data(receiver))
+        {
+            return receiver_variants
+                .iter()
+                .try_fold(0, |sum, &receiver_variant| {
+                    let provided_variant = provided_variants
+                        .iter()
+                        .find(|&&variant| self.equals(variant, receiver_variant))?;
+                    Some(sum + self.subtype_distance(*provided_variant, receiver_variant)?)
+                });
+        }
+
+        let provided_children = self.subtype_children(provided);
+        let receiver_children = self.subtype_children(receiver);
+        provided_children.iter().zip(&receiver_children).try_fold(
+            0,
+            |sum, (&child, &receiver_child)| {
+                Some(sum + self.subtype_distance(child, receiver_child)?)
+            },
+        )
+    }
+
+    fn subtype_children(&self, ty: TyId) -> Vec<TyId> {
+        match self.data(ty) {
+            TyData::Array(item) => vec![*item],
+            TyData::Tensor(items) | TyData::Tuple(items) => items.clone(),
+            TyData::MapKV { key, value } => vec![*key, *value],
+            TyData::GenericTypeWithTs { types, .. } => types.clone(),
+            TyData::Func { params, return_ty } => {
+                let mut children = params.clone();
+                children.push(*return_ty);
+                children
+            }
+            TyData::Struct {
+                args: Some(args), ..
+            } => args.clone(),
+            _ => Vec::new(),
+        }
+    }
+
     /// on `var lhs: <lhs_type> = rhs`, having inferred `rhs_type`, check that it can be assigned without any casts
     /// the same goes for passing arguments, returning values, etc. — where the "receiver" (lhs) checks "applier" (rhs)
     /// note, that `int8 | int16` is not assignable to `int` (even though both are assignable),
@@ -708,21 +704,8 @@ impl TypeInterner {
             return true;
         }
 
-        if matches!(dl, TyData::TypeAlias { .. }) {
-            // having `type UserId = int` and `type OwnerId = int`, make them NOT assignable without `as`
-            // (although they both have the same type_id)
-            if matches!(dr, TyData::TypeAlias { .. })
-                && let (
-                    TyData::TypeAlias { inner_ty: il, .. },
-                    TyData::TypeAlias { inner_ty: ir, .. },
-                ) = (dl, dr)
-                && self.equals(*il, *ir)
-            {
-                return !self.are_two_equal_type_aliases_different(lhs, rhs);
-            }
-            if let TyData::TypeAlias { inner_ty: il, .. } = dl {
-                return self.can_rhs_be_assigned(*il, rhs);
-            }
+        if let TyData::TypeAlias { inner_ty, .. } = dl {
+            return self.can_rhs_be_assigned(*inner_ty, rhs);
         }
 
         if let TyData::TypeAlias { inner_ty: ir, .. } = dr {
@@ -1399,7 +1382,7 @@ mod tests {
     }
 
     #[test]
-    fn test_alias_nominal_equality() {
+    fn test_alias_runtime_equality() {
         let mut interner = TypeInterner::new();
 
         let t_int = interner.ty_int;
@@ -1415,15 +1398,16 @@ mod tests {
         let t_a = interner.type_alias(def_a, "A".into(), t_int);
         let t_b = interner.type_alias(def_b, "B".into(), t_int);
 
-        // A and B both alias int, but they are nominally different
-        assert!(!interner.equals(t_a, t_b));
+        // Alias names do not change the runtime type or ordinary assignment.
+        assert!(interner.equals(t_a, t_b));
         assert!(interner.equals(t_a, t_int));
         assert!(interner.equals(t_b, t_int));
 
         // A is assignable from int (because its underlying is int)
         assert!(interner.can_rhs_be_assigned(t_a, t_int));
-        // B is NOT assignable from A without as (because they are different nominal aliases)
-        assert!(!interner.can_rhs_be_assigned(t_a, t_b));
+        assert!(interner.can_rhs_be_assigned(t_a, t_b));
+        assert_eq!(interner.subtype_distance(t_a, t_int), Some(1));
+        assert_eq!(interner.subtype_distance(t_a, t_b), None);
     }
 
     #[test]
@@ -1496,7 +1480,7 @@ mod tests {
     }
 
     #[test]
-    fn generic_aliases_with_different_bases_are_nominal() {
+    fn generic_aliases_share_runtime_types_but_keep_receiver_identity() {
         let mut interner = TypeInterner::new();
 
         let def_w1 = SymbolId {
@@ -1516,9 +1500,11 @@ mod tests {
         let t_w2_int =
             interner.type_alias_instantiation(def_w2, "Wrapper2".into(), t_int, vec![t_int]);
 
-        assert!(!interner.equals(t_w1_int, t_w2_int));
-        assert!(!interner.can_rhs_be_assigned(t_w1_int, t_w2_int));
-        assert!(!interner.can_rhs_be_assigned(t_w2_int, t_w1_int));
+        assert!(interner.equals(t_w1_int, t_w2_int));
+        assert!(interner.can_rhs_be_assigned(t_w1_int, t_w2_int));
+        assert!(interner.can_rhs_be_assigned(t_w2_int, t_w1_int));
+        assert_eq!(interner.subtype_distance(t_w1_int, t_int), Some(1));
+        assert_eq!(interner.subtype_distance(t_w1_int, t_w2_int), None);
     }
 
     #[test]

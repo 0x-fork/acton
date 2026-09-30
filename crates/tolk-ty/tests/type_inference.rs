@@ -376,3 +376,8 @@ fn test_types2_try_catch() {
 fn test_types2_vars() {
     run_tests_from_file(&get_test_path2("vars.test"));
 }
+
+#[test]
+fn test_types2_aliases() {
+    run_tests_from_file(&get_test_path2("aliases.test"));
+}

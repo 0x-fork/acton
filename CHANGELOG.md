@@ -25,6 +25,8 @@ All notable changes to this project will be documented in this file.
 
 ### IDE
 
+- Match Tolk 1.5 alias equality and method selection, including alias chains,
+  generic receivers, and methods on declared types after smart casts.
 - Match Tolk 1.5 smart casts after branch merges, including alias restoration,
   tensor unions, and the types of both ternary branches.
 - Track `break` and `continue` paths when inferring loop types, including

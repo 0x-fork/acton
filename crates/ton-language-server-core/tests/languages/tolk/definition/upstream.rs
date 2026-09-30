@@ -983,9 +983,9 @@ fun main(a: Foo<slice>, b: Foo<int>, c: int, d: IntFoo): void {
 }"#,
         |_| {},
         expect![[r#"23:6 -> file:///fixture/main.tolk 10:11 resolved
-24:6 unresolved
+24:6 -> file:///fixture/main.tolk 14:13 resolved
 25:6 -> file:///fixture/main.tolk 18:6 resolved
-26:6 unresolved"#]],
+26:6 -> file:///fixture/main.tolk 6:11 resolved"#]],
     );
 }
 
@@ -1063,7 +1063,7 @@ fun main(a: dict, b: cell?): void {
 }"#,
         |_| {},
         expect![[r#"5:6 -> file:///fixture/main.tolk 0:9 resolved
-6:6 -> file:///fixture/main.tolk 0:9 resolved"#]],
+6:6 unresolved"#]],
     );
 }
 

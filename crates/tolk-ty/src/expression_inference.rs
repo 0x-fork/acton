@@ -1072,71 +1072,10 @@ impl<'t> TypeInferenceWalker<'_, '_> {
         lhs_declared_type
     }
 
-    //+ CHECKED
-    /// given `lhs = rhs`, calculate "original" type of `lhs`
-    /// example: `var x: int? = ...; if (x != null) { x (here) = null; }`
-    /// "(here)" x is `int` (smart cast), but originally declared as `int?`
-    /// example: `if (x is (int,int)?) { x!.0 = rhs }`, here `x!.0` is `int`
     fn calc_declared_type_before_smart_cast(&mut self, expr: Expr<'t>) -> TyId {
-        match expr {
-            Expr::Ident(ident) => {
-                let span = ident.span();
-                if let Some(usage) = self.ctx.get_resolved(span)
-                    && let Resolved::Local(local) = usage.resolved
-                {
-                    let decl_span = Span::from_def_id(local, usage.span.len() as u32);
-                    return self
-                        .ctx
-                        .expression_types
-                        .get(&decl_span)
-                        .copied()
-                        .unwrap_or_else(|| self.intrn().ty_undefined);
-                }
-            }
-            Expr::DotAccess(dot) => {
-                let Some(obj) = dot.obj() else {
-                    return self.ctx.get_node_type_or_unknown(&expr);
-                };
-
-                let obj_ty = self.ctx.get_node_type_or_unknown(&obj.syntax());
-                let obj_ty = self.intrn().unwrap_alias(obj_ty);
-
-                let Some(field) = dot.field() else {
-                    return self.intrn().ty_undefined;
-                };
-
-                match field {
-                    DotAccessField::Ident(ident) => {
-                        if let Some(usage) = self.ctx.get_resolved_node(&ident.0)
-                            && let Resolved::Global(sym_id) = usage.resolved
-                            && let Some(ty) = self.ctx.get_top_level_type(sym_id)
-                        {
-                            return ty;
-                        }
-                    }
-                    DotAccessField::NumericIndex(idx) => {
-                        let index_str = self.text_of(&idx);
-                        if let Ok(index_at) = index_str.parse::<usize>() {
-                            match self.intrn().data(obj_ty) {
-                                TyData::Tensor(items) | TyData::Tuple(items) => {
-                                    if let Some(ty) = items.get(index_at) {
-                                        return *ty;
-                                    }
-                                }
-                                _ => {
-                                    if let Some(item_ty) = self.array_element_type(obj_ty) {
-                                        return item_ty;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-
-        self.ctx.get_node_type_or_unknown(&expr)
+        self.ctx
+            .declared_type_before_smart_cast(expr)
+            .unwrap_or(self.ctx.type_db.intrn.ty_undefined)
     }
 
     /// from `expr!` get `expr`
@@ -1755,11 +1694,16 @@ impl<'t> TypeInferenceWalker<'_, '_> {
 
         // check for method (`t.size` / `user.getId`); even `i.0()` can be here if `fun int.0(self)` exists
         // for `T.copy` / `Container<T>.create`, substitution for T is also returned
-        if fun_ref.is_none()
-            && let Ok(Some(candidate)) = self.choose_only_method_to_call(&field_name, obj_type)
-        {
-            fun_ref = Some(candidate.method_id);
-            substituted_ts.mapping = candidate.substitutions;
+        if fun_ref.is_none() {
+            let mut candidate = self.choose_only_method_to_call(&field_name, obj_type);
+            if matches!(candidate, Ok(None)) {
+                let declared_type = self.calc_declared_type_before_smart_cast(obj);
+                candidate = self.choose_only_method_to_call(&field_name, declared_type);
+            }
+            if let Ok(Some(candidate)) = candidate {
+                fun_ref = Some(candidate.method_id);
+                substituted_ts.mapping = candidate.substitutions;
+            }
         }
 
         if let Some(out_f) = out_f_called {

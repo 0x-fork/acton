@@ -12,7 +12,7 @@ use std::hash::{Hash, Hasher};
 use tolk_resolver::file_index::{AstNodeSpanExt, FileId, Span};
 use tolk_resolver::resolve_index::{LocalDefId, NameUse};
 use tolk_resolver::{Resolved, SymbolId};
-use tolk_syntax::AstNode;
+use tolk_syntax::{AstNode, DotAccessField, Expr, TopLevel};
 
 #[derive(Debug)]
 pub(crate) struct ExprFlow {
@@ -365,6 +365,94 @@ fn get_child_type(parent: TyId, index: usize, type_db: &mut TypeDb) -> Option<Ty
     Some(field_type)
 }
 
+/// Recovers the declaration behind a narrowed receiver, including instantiated fields
+/// and method chains that return `self`. Inference and completion share this lookup.
+fn declared_type_before_smart_cast(
+    expr: Expr<'_>,
+    file_id: FileId,
+    expression_types: &FxHashMap<Span, TyId>,
+    resolved_refs: &[NameUse],
+    type_db: &mut TypeDb<'_>,
+) -> Option<TyId> {
+    let resolve = |span: Span| {
+        resolved_refs
+            .iter()
+            .rev()
+            .find(|usage| usage.span == span)
+            .or_else(|| type_db.project_index.find_use(file_id, span.start()))
+            .map(|usage| &usage.resolved)
+    };
+    match expr {
+        Expr::Ident(ident) => {
+            if let Some(Resolved::Local(local)) = resolve(ident.span())
+                && let Some(local) = type_db
+                    .project_index
+                    .get_resolved_uses(local.file_id)
+                    .and_then(|index| index.find_local(*local))
+            {
+                return expression_types.get(&local.def_span).copied();
+            }
+        }
+        Expr::Call(call) => {
+            let callee = match call.callee()? {
+                Expr::Instantiation(instantiation) => instantiation.expr()?,
+                callee => callee,
+            };
+            if let Expr::DotAccess(dot) = callee
+                && let Some(DotAccessField::Ident(field)) = dot.field()
+                && let Some(Resolved::Global(method_id)) = resolve(field.span())
+                && let Some(file) = type_db.file_db.get_by_id(method_id.file_id)
+                && let Some(TopLevel::Method(method)) = file.find_syntax_declaration(*method_id)
+                && method.is_instance(file.source().source.as_ref())
+                && let Some(return_type) = method.return_type()
+                && file.text_at(return_type.span()) == "self"
+                && let Some(obj) = dot.obj()
+            {
+                return declared_type_before_smart_cast(
+                    obj,
+                    file_id,
+                    expression_types,
+                    resolved_refs,
+                    type_db,
+                );
+            }
+        }
+        Expr::DotAccess(dot) => {
+            let obj_ty = *expression_types.get(&dot.obj()?.span())?;
+            let obj_ty = type_db.intrn.unwrap_alias(obj_ty);
+            match dot.field()? {
+                DotAccessField::Ident(ident) => {
+                    let name = type_db.file_db.text_of(file_id, &ident)?;
+                    if let Some(def) = type_db.find_struct(obj_ty)
+                        && let Some(field) = type_db.find_struct_field(def, name.trim_matches('`'))
+                    {
+                        return get_child_type(obj_ty, field.field_idx, type_db);
+                    }
+                }
+                DotAccessField::NumericIndex(index) => {
+                    let index = type_db
+                        .file_db
+                        .text_of(file_id, &index)?
+                        .parse::<usize>()
+                        .ok()?;
+                    return get_child_type(obj_ty, index, type_db);
+                }
+            }
+        }
+        Expr::Paren(paren) => {
+            return declared_type_before_smart_cast(
+                paren.inner()?,
+                file_id,
+                expression_types,
+                resolved_refs,
+                type_db,
+            );
+        }
+        _ => {}
+    }
+    expression_types.get(&expr.span()).copied()
+}
+
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub struct MethodKey(pub TyId, pub SmolStr);
 
@@ -404,6 +492,16 @@ impl<'db, 'a> InferenceContext<'db, 'a> {
             call_stack,
             computed_methods: FxHashMap::default(),
         }
+    }
+
+    pub(crate) fn declared_type_before_smart_cast(&mut self, expr: Expr<'_>) -> Option<TyId> {
+        declared_type_before_smart_cast(
+            expr,
+            self.file_id,
+            &self.expression_types,
+            &self.resolved_refs,
+            self.type_db,
+        )
     }
 
     pub fn set_resolved(&mut self, use_: NameUse) {
@@ -528,6 +626,24 @@ impl InferenceResult {
     #[must_use]
     pub fn type_of(&self, span: Span) -> Option<TyId> {
         self.expression_types.get(&span).copied()
+    }
+
+    /// Retrieves the declared receiver type after smart casts for method lookup.
+    /// `expr` must belong to this inference result and `file_id`; `type_db` must
+    /// use the same interner as this result.
+    pub fn declared_type_before_smart_cast(
+        &self,
+        expr: Expr<'_>,
+        file_id: FileId,
+        type_db: &mut TypeDb<'_>,
+    ) -> Option<TyId> {
+        declared_type_before_smart_cast(
+            expr,
+            file_id,
+            &self.expression_types,
+            &self.resolved_refs,
+            type_db,
+        )
     }
 
     /// Relocates all source positions after an unchanged declaration moves in its file.

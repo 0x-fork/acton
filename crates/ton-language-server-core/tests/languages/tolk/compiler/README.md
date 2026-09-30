@@ -12,6 +12,13 @@ The smart-cast and cell-builder fixtures also include the Tolk 1.5 changes for
 ternary expressions: their result type includes both branches, even for a constant
 condition. The older warning fixture expects the nullable result for the same reason.
 
+The alias fixtures also use the Tolk 1.5 receiver rules from upstream. When restoring
+the corpus, apply the corresponding changes in `dicts-demo`, `generics-2`,
+`indexed-access`, `inline-tests`, `lazy-algo-tests`, `methods-tests`, `mutate-methods`,
+`overloads-tests`, `self-keyword`, `smart-cast-tests`, and `type-aliases-tests`.
+Alias methods require a compatible declared receiver; overload expectations select
+the nearest alias. Keep unrelated additions to the upstream corpus separate.
+
 The fixtures are intentionally not synchronized automatically. Update them as a reviewed change,
 then run the `tolk_compiler_corpus` test and account for every new semantic difference explicitly.
 

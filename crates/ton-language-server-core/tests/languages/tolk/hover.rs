@@ -1439,3 +1439,18 @@ fn event_count(summary: &ProfileSummary, name: &'static str) -> usize {
         .filter(|event| event.name == name)
         .count()
 }
+
+#[test]
+fn shows_method_with_nearest_alias_receiver() {
+    case_tolk_hover(
+        r"type Id = int;
+type DeepId = Id;
+fun int.pick(self, base: int): int1 { return 0; }
+fun Id.pick(self, alias: int): int2 { return 0; }
+fun main(value: DeepId) { value.<caret>pick(0); }",
+        expect![[r#"
+            ```tolk
+            fun Id.pick(self, alias: int): int2
+            ```"#]],
+    );
+}
