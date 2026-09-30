@@ -1,5 +1,5 @@
 import {useEffect, useState} from "react"
-import type {FC, ImgHTMLAttributes} from "react"
+import type {FC, ImgHTMLAttributes, ReactNode} from "react"
 
 import {NFT_PLACEHOLDER_IMAGE, deduplicateImageSources} from "./imageFallbacks"
 
@@ -8,6 +8,8 @@ interface NftImageProps
   readonly sources: readonly string[]
   readonly blurred?: boolean
   readonly blurredClassName: string
+  /** Rendered beside a loaded, blurred image; placeholders never offer image consent. */
+  readonly revealControl?: ReactNode
 }
 
 interface ResolvedNftImage {
@@ -20,6 +22,7 @@ export const NftImage: FC<NftImageProps> = ({
   sources,
   blurred = false,
   blurredClassName,
+  revealControl,
   className = "",
   alt = "",
   ...imageProps
@@ -51,17 +54,20 @@ export const NftImage: FC<NftImageProps> = ({
   }, [sourcesKey])
 
   return (
-    <img
-      {...imageProps}
-      src={loadedSource ?? NFT_PLACEHOLDER_IMAGE}
-      alt={alt}
-      className={`${className}${loadedSource && blurred ? ` ${blurredClassName}` : ""}`}
-      onError={event => {
-        if (event.currentTarget.getAttribute("src") === NFT_PLACEHOLDER_IMAGE) return
+    <>
+      <img
+        {...imageProps}
+        src={loadedSource ?? NFT_PLACEHOLDER_IMAGE}
+        alt={alt}
+        className={`${className}${loadedSource && blurred ? ` ${blurredClassName}` : ""}`}
+        onError={event => {
+          if (event.currentTarget.getAttribute("src") === NFT_PLACEHOLDER_IMAGE) return
 
-        event.currentTarget.src = NFT_PLACEHOLDER_IMAGE
-        setImage(undefined)
-      }}
-    />
+          event.currentTarget.src = NFT_PLACEHOLDER_IMAGE
+          setImage(undefined)
+        }}
+      />
+      {loadedSource && blurred && revealControl}
+    </>
   )
 }

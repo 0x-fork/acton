@@ -1245,3 +1245,7 @@ th.valueContainer {
     border-top: 0;
   }
 }
+.blurredNftImage {
+  filter: blur(6px);
+  transform: scale(1.35);
+}

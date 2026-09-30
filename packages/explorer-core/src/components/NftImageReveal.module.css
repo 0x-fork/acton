@@ -1,0 +1,50 @@
+.trigger {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 50%;
+  background: rgb(20 23 30 / 78%);
+  color: white;
+  cursor: pointer;
+}
+
+.trigger:hover {
+  background: rgb(20 23 30 / 94%);
+}
+
+.trigger:focus-visible,
+.options button:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: min(320px, calc(100vw - 64px));
+}
+
+.options button {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--acton-radius-control-xs);
+  background: transparent;
+  color: var(--acton-color-text);
+  font: inherit;
+  font-size: var(--acton-font-size-sm);
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.options button:hover {
+  background: var(--acton-color-surface-active);
+}

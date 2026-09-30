@@ -1,4 +1,4 @@
-import type {FC} from "react"
+import type {FC, ReactNode} from "react"
 
 import {AccountAddressDetailRow, AccountDetailRows, AccountTextDetailRow} from "./AccountDetailRows"
 import {NftImage} from "./NftImage"
@@ -10,6 +10,8 @@ interface NftOverviewBaseProps {
   readonly description?: string
   readonly imageSources: readonly string[]
   readonly isScam: boolean
+  readonly blurred?: boolean
+  readonly revealControl?: ReactNode
   readonly onAddressClick: (address: string) => void
 }
 
@@ -80,7 +82,8 @@ export const NftOverview: FC<NftOverviewProps> = props => (
           alt={props.name}
           className={styles.image}
           blurredClassName={styles.blurredImage}
-          blurred={props.isScam}
+          blurred={props.blurred ?? props.isScam}
+          revealControl={props.revealControl}
         />
         {props.isScam && <span className={styles.scamLabel}>SCAM</span>}
       </div>

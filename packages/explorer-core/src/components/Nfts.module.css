@@ -114,6 +114,7 @@
 }
 
 .nftItem {
+  position: relative;
   min-width: 0;
   overflow: hidden;
   border: 0;
@@ -126,16 +127,41 @@
   text-align: left;
 }
 
-.nftItem:hover .nftImage {
+.nftItem:hover .nftImage:not(.blurredImage) {
   transform: scale(1.04);
 }
 
-.nftItem:focus-visible {
+.nftOpenButton {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nftOpenButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
+.nftOpenButton::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  border-radius: inherit;
+}
+
+.nftOpenButton:focus-visible::after {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: -2px;
 }
 
 .imageFrame {
+  display: block;
   position: relative;
   width: 100%;
   aspect-ratio: 1;
@@ -156,7 +182,8 @@
 }
 
 .blurredImage {
-  filter: blur(12px);
+  filter: blur(10px);
+  transform: scale(1.2);
 }
 
 .scamLabel {
@@ -177,6 +204,7 @@
 }
 
 .nftInfo {
+  align-self: stretch;
   min-width: 0;
   display: flex;
   flex-direction: column;

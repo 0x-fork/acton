@@ -279,6 +279,10 @@ keys.
 
 #### Accounts and networks
 
+- Blur NFT images outside recognized ecosystem collections by default. Reveal
+  one image temporarily, remember an NFT, or allow its whole collection in the
+  browser. NFT pages, history thumbnails, and account previews share these
+  preferences. Account previews show ecosystem NFTs first.
 - Inspect accounts, token and NFT holdings, staking pools, multisigs, vesting
   contracts, and lockers. Search accepts addresses, names, tokens, and pasted
   explorer links.

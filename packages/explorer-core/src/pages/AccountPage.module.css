@@ -164,11 +164,20 @@
 }
 
 .metadataNftImage {
+  display: block;
+  border-radius: var(--acton-radius-panel);
+}
+
+.metadataNftMedia {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
   border-radius: var(--acton-radius-panel);
 }
 
 .blurredImage {
-  filter: blur(12px);
+  filter: blur(10px);
+  transform: scale(1.2);
 }
 
 .metadataSummary {

@@ -618,6 +618,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                       <button
                         type="button"
                         className={styles.collectiblesLink}
+                        aria-label="Open all collectibles"
                         onClick={onCollectiblesClick}
                         disabled={!canOpenCollectibles}
                       >
@@ -625,7 +626,11 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                           <span className={styles.collectibleThumbs}>
                             {visibleCollectibles.map((item, index) =>
                               item.image ? (
-                                <span key={item.address} className={styles.collectibleThumb}>
+                                <span
+                                  key={item.address}
+                                  className={styles.collectibleThumb}
+                                  data-nft-preview={item.address}
+                                >
                                   <NftImage
                                     sources={item.imageSources ?? [item.image]}
                                     alt={item.name || "NFT"}

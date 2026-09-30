@@ -8,6 +8,8 @@ These addresses are not fixtures and their balances or recent history can change
 
 | Address | What to verify | Last checked |
 | --- | --- | --- |
+| [`EQA0i8-CdGnF_DhUHHf92R1ONH6sIA9vLZ_WLcCIhfBBXwtG`](https://actonscan.com/address/EQA0i8-CdGnF_DhUHHf92R1ONH6sIA9vLZ_WLcCIhfBBXwtG?network=mainnet#nfts) | Promotional NFTs and several Rich Cats collections: blurred artwork, collection names in reveal controls, shared consent for collection items, and no eye button on the GO TON ticket image fallback | 2026-09-30 |
+| [`EQBprCMX83F75A67vjsW5jDJo4CWGDabxSBcCVdLsJ5i4fBc`](https://actonscan.com/address/EQBprCMX83F75A67vjsW5jDJo4CWGDabxSBcCVdLsJ5i4fBc?network=mainnet) | Standalone promotional NFT: image consent is shared between the overview, metadata, owner holdings, and NFT thumbnails in history; no collection reveal option | 2026-09-30 |
 | [`Ef-Ob4ib3dI6SyugRcZHLwLEyhsTz0Uhi9RW-AszqL1xR4D4`](https://actonscan.com/address/Ef-Ob4ib3dI6SyugRcZHLwLEyhsTz0Uhi9RW-AszqL1xR4D4?network=mainnet) | Nominator Pool overview with active validator, stake and income split, minimum stakes, and a Nominators tab with active and pending amounts | 2026-09-09 |
 | [`Ef8eWpCZ7U0WWxCFEnXsae_3GTPnAWyolMp6KkWAWetQcjZj`](https://actonscan.com/address/Ef8eWpCZ7U0WWxCFEnXsae_3GTPnAWyolMp6KkWAWetQcjZj?network=mainnet) | Single Nominator v1.0 overview with version and clickable Owner and Validator addresses returned by `get_roles` | 2026-09-09 |
 | [`EQA9S5qRZTa0GcH5VZqDJ_KxtfVvGzYgZtdon7Rhg82zLi-N`](https://actonscan.com/address/EQA9S5qRZTa0GcH5VZqDJ_KxtfVvGzYgZtdon7Rhg82zLi-N?network=mainnet) | Fragment username NFT: Username and both Telegram aliases are shown as external links in the account summary | 2026-09-09 |

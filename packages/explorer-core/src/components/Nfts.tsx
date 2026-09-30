@@ -4,8 +4,11 @@ import type {FC} from "react"
 
 import type {NftItem} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
+import {useNftImageVisibility} from "../hooks/useNftImageVisibility"
+import {nftCollectionKey} from "../nfts/ecosystemCollections"
 
 import {NftImage} from "./NftImage"
+import {NftImageReveal} from "./NftImageReveal"
 import {NFT_CARD_IMAGE_SOURCE_KEYS, getNftImageSources} from "./imageFallbacks"
 import styles from "./Nfts.module.css"
 
@@ -16,15 +19,19 @@ interface NftsProps {
   readonly onAddressClick?: (addr: string, event?: ExplorerNavigationClickEvent) => void
 }
 
-const getContentString = (content: Record<string, unknown>, key: string): string | undefined => {
-  const value = content[key]
+const getContentString = (
+  content: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined => {
+  const value = content?.[key]
   return typeof value === "string" && value.length > 0 ? value : undefined
 }
 
 function getCollectionName(item: NftItem): string | undefined {
   return (
     getContentString(item.content, "collection_name") ||
-    getContentString(item.content, "collection")
+    getContentString(item.content, "collection") ||
+    getContentString(item.collection?.collection_content, "name")
   )
 }
 
@@ -49,6 +56,7 @@ export const Nfts: FC<NftsProps> = ({
 }) => {
   const [query, setQuery] = useState("")
   const [showWithoutMetadata, setShowWithoutMetadata] = useState(false)
+  const {isVisible, reveal} = useNftImageVisibility()
   const normalizedQuery = query.trim().toLowerCase()
   const {withMetadata, withoutMetadata} = useMemo(() => {
     const withMetadata: NftItem[] = []
@@ -130,41 +138,45 @@ export const Nfts: FC<NftsProps> = ({
               ? []
               : getNftImageSources(item.content, NFT_CARD_IMAGE_SOURCE_KEYS)
           const isScam = item.is_scam === true
+          const hidden = !isVisible(item)
 
           return (
-            <div
-              key={item.address}
-              className={styles.nftItem}
-              onClick={event => onAddressClick?.(item.address, event)}
-              onKeyDown={event => {
-                if (event.key === "Enter" || event.key === " ") {
-                  onAddressClick?.(item.address)
-                }
-              }}
-              role="button"
-              tabIndex={0}
-            >
+            <div key={item.address} className={styles.nftItem} data-nft-address={item.address}>
               <div className={styles.imageFrame}>
                 <NftImage
                   sources={imageSources}
                   alt={name}
                   className={styles.nftImage}
                   blurredClassName={styles.blurredImage}
-                  blurred={isScam}
+                  blurred={hidden}
+                  revealControl={
+                    <NftImageReveal
+                      name={name}
+                      hasCollection={nftCollectionKey(item) !== undefined}
+                      collectionName={collectionName}
+                      onReveal={scope => reveal(item, scope)}
+                    />
+                  }
                 />
                 {isScam && <span className={styles.scamLabel}>SCAM</span>}
               </div>
-              <div className={styles.nftInfo}>
-                <div className={styles.collectionName} title={collectionName}>
-                  {collectionName ||
-                    (item.collection_address || item.collection?.address
-                      ? "Unknown collection"
-                      : "No collection")}
-                </div>
-                <div className={styles.nftName} title={name}>
-                  {name}
-                </div>
-              </div>
+              <button
+                type="button"
+                className={styles.nftOpenButton}
+                onClick={event => onAddressClick?.(item.address, event)}
+              >
+                <span className={styles.nftInfo}>
+                  <span className={styles.collectionName} title={collectionName}>
+                    {collectionName ||
+                      (item.collection_address || item.collection?.address
+                        ? "Unknown collection"
+                        : "No collection")}
+                  </span>
+                  <span className={styles.nftName} title={name}>
+                    {name}
+                  </span>
+                </span>
+              </button>
             </div>
           )
         })}

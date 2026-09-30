@@ -48,7 +48,10 @@ import {
   type MultisigDetailsState,
 } from "../components/multisig-details"
 import {NftImage} from "../components/NftImage"
+import {NftImageReveal} from "../components/NftImageReveal"
 import {NftOverview} from "../components/NftOverview"
+import {useNftImageVisibility} from "../hooks/useNftImageVisibility"
+import {isEcosystemNft, nftCollectionKey} from "../nfts/ecosystemCollections"
 import {SuspendedAccountOverview} from "../components/SuspendedAccountOverview"
 import {VestingOverview} from "../components/VestingOverview"
 import {WalletV5PluginsTab} from "../components/WalletV5PluginsTab"
@@ -229,6 +232,11 @@ export const AccountPage: FC<AccountPageProps> = ({
   const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
   const {addressFormat, network} = useNetworkInfo()
+  const {
+    isVisible: isNftImageVisible,
+    reveal: revealNftImage,
+    ecosystemNetwork,
+  } = useNftImageVisibility()
   const metadataRegistry = useMetadataRegistry()
   const {updateDomains} = useAddressBook()
   const [accountState, setAccountState] = useState<AddressInformation | undefined>()
@@ -1848,7 +1856,23 @@ export const AccountPage: FC<AccountPageProps> = ({
       )
     : undefined
   const nftItemOwnerAddress = currentNftItem?.owner_address
-  const nftItemCollectionAddress = currentNftItem?.collection_address
+  const nftItemCollectionAddress = currentNftItem ? nftCollectionKey(currentNftItem) : undefined
+  const nftItemImageHidden = currentNftItem
+    ? !isNftImageVisible({...currentNftItem, is_scam: nftItemIsScam, is_nsfw: nftItemIsNsfw})
+    : false
+  const nftItemRevealControl = currentNftItem && (
+    <NftImageReveal
+      key={currentNftItem.address}
+      name={nftItemName ?? `NFT #${currentNftItem.index}`}
+      hasCollection={nftItemCollectionAddress !== undefined}
+      collectionName={
+        contentString(currentNftItem.content, "collection_name") ||
+        contentString(currentNftItem.content, "collection") ||
+        contentString(currentNftItem.collection?.collection_content, "name")
+      }
+      onReveal={scope => revealNftImage(currentNftItem, scope)}
+    />
+  )
   const fragmentIdentity = getFragmentNftIdentity(
     compilerAbi?.contract_name,
     nftItemName,
@@ -1876,20 +1900,27 @@ export const AccountPage: FC<AccountPageProps> = ({
   ]
   const nftCollectionIsNsfw = nftCollectionTokenInfo?.is_nsfw === true
   const nftCollectionIsScam = nftCollectionTokenInfo?.is_scam === true
-  const collectiblePreviews = nftItems.slice(0, 8).map(item => {
-    const imageSources =
-      item.is_nsfw === true ? [] : getNftImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
-    return {
-      address: item.address,
-      image: imageSources[0] ?? NFT_PLACEHOLDER_IMAGE,
-      imageSources,
-      blurred: item.is_scam === true,
-      name:
-        contentString(item.content, "name") ||
-        contentString(item.content, "collection_name") ||
-        `NFT #${item.index}`,
-    }
-  })
+  const collectiblePreviews = nftItems
+    .toSorted(
+      (left, right) =>
+        Number(isEcosystemNft(right, ecosystemNetwork)) -
+        Number(isEcosystemNft(left, ecosystemNetwork)),
+    )
+    .slice(0, 8)
+    .map(item => {
+      const imageSources =
+        item.is_nsfw === true ? [] : getNftImageSources(item.content, NFT_IMAGE_SOURCE_KEYS)
+      return {
+        address: item.address,
+        image: imageSources[0] ?? NFT_PLACEHOLDER_IMAGE,
+        imageSources,
+        blurred: !isNftImageVisible(item),
+        name:
+          contentString(item.content, "name") ||
+          contentString(item.content, "collection_name") ||
+          `NFT #${item.index}`,
+      }
+    })
   const accountLoadIssue = useMemo(
     () =>
       accountError
@@ -2306,6 +2337,8 @@ export const AccountPage: FC<AccountPageProps> = ({
                       description={nftItemDescription}
                       imageSources={nftItemImageSources}
                       isScam={nftItemIsScam}
+                      blurred={nftItemImageHidden}
+                      revealControl={nftItemRevealControl}
                       ownerAddress={nftItemOwnerAddress}
                       collectionAddress={nftItemCollectionAddress}
                       index={currentNftItem.index}
@@ -2406,13 +2439,16 @@ export const AccountPage: FC<AccountPageProps> = ({
               <div className={styles.metadataOverview}>
                 {activeMetadataImage &&
                   (currentNftItem ? (
-                    <NftImage
-                      sources={activeMetadataImageSources}
-                      alt=""
-                      className={`${styles.metadataTokenImage} ${styles.metadataNftImage}`}
-                      blurredClassName={styles.blurredImage}
-                      blurred={nftItemIsScam}
-                    />
+                    <div className={styles.metadataNftMedia}>
+                      <NftImage
+                        sources={activeMetadataImageSources}
+                        alt=""
+                        className={`${styles.metadataTokenImage} ${styles.metadataNftImage}`}
+                        blurredClassName={styles.blurredImage}
+                        blurred={nftItemImageHidden}
+                        revealControl={nftItemRevealControl}
+                      />
+                    </div>
                   ) : (
                     <img
                       src={activeMetadataImage}

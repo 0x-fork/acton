@@ -788,6 +788,7 @@ state while metadata lookup and navigation remain caller-owned.
 
 - Pass the already-resolved label and image URL; keep NFT metadata APIs outside
   `@acton/ui`.
+- Use the `image` slot when the caller controls loading, fallbacks, or image visibility.
 - Use `onImageError` when the caller owns a fallback image chain.
 - Use `onClick` for navigation instead of wrapping the chip in a link or button.
 - Do not add underlines or replace the positive asset color on hover.

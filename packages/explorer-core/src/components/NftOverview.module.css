@@ -126,7 +126,8 @@
 }
 
 .blurredImage {
-  filter: blur(12px);
+  filter: blur(10px);
+  transform: scale(1.2);
 }
 
 @media (max-width: 620px) {

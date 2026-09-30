@@ -115,13 +115,11 @@ import {
   type MessageNamesByAddress,
 } from "../hooks/useMessageNamesByAddress"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
+import {useNftImageVisibility} from "../hooks/useNftImageVisibility"
 
 import {ExplorerAddressChip} from "./ExplorerAddressChip"
-import {
-  getNftImageSources,
-  NFT_PLACEHOLDER_IMAGE,
-  replaceBrokenImageWithFallback,
-} from "./imageFallbacks"
+import {getNftImageSources} from "./imageFallbacks"
+import {NftImage} from "./NftImage"
 import {Nfts, NftsSkeleton} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
@@ -269,6 +267,8 @@ interface HistoryNftValueLine {
   readonly fullLabel: string
   readonly tone: "positive"
   readonly address?: string
+  readonly collectionAddress?: string
+  readonly isScam?: boolean
   readonly imageSources: readonly string[]
 }
 
@@ -1737,15 +1737,28 @@ function HistoryTextValue({
   readonly className: string
   readonly onAddressClick?: (address: string, event?: MouseEvent<HTMLElement>) => void
 }): JSX.Element {
+  const {isVisible} = useNftImageVisibility()
+
   if (line.kind === "nft") {
     const address = line.address
     return (
       <NftChip
         className={className}
         label={line.label}
-        imageSrc={line.imageSources[0]}
-        onImageError={event =>
-          replaceBrokenImageWithFallback(event, line.imageSources, NFT_PLACEHOLDER_IMAGE)
+        image={
+          line.imageSources.length > 0 && (
+            <NftImage
+              sources={line.imageSources}
+              blurred={
+                !isVisible({
+                  address,
+                  collection_address: line.collectionAddress,
+                  is_scam: line.isScam,
+                })
+              }
+              blurredClassName={styles.blurredNftImage}
+            />
+          )
         }
         ariaLabel={address && onAddressClick ? `Open ${line.fullLabel}` : undefined}
         title={address && onAddressClick ? `Open ${line.fullLabel}` : line.fullLabel}
@@ -2764,7 +2777,15 @@ function getHistoryActionDisplay(
         action.details.source,
         action.details.asset,
         context.ownerAddress,
-        () => valueLines(actionNftValueLine(action.details.asset, null, context.metadata)),
+        () =>
+          valueLines(
+            actionNftValueLine(
+              action.details.asset,
+              null,
+              context.metadata,
+              action.details.nft_collection,
+            ),
+          ),
         "DNS",
       )
     case "delete_dns":
@@ -2772,7 +2793,15 @@ function getHistoryActionDisplay(
         action.details.source,
         action.details.asset,
         context.ownerAddress,
-        () => valueLines(actionNftValueLine(action.details.asset, null, context.metadata)),
+        () =>
+          valueLines(
+            actionNftValueLine(
+              action.details.asset,
+              null,
+              context.metadata,
+              action.details.nft_collection,
+            ),
+          ),
         "DNS",
       )
     case "renew_dns":
@@ -2780,7 +2809,15 @@ function getHistoryActionDisplay(
         action.details.source,
         action.details.asset,
         context.ownerAddress,
-        () => valueLines(actionNftValueLine(action.details.asset, null, context.metadata)),
+        () =>
+          valueLines(
+            actionNftValueLine(
+              action.details.asset,
+              null,
+              context.metadata,
+              action.details.nft_collection,
+            ),
+          ),
         "DNS",
       )
     case "dns_purchase":
@@ -2796,6 +2833,7 @@ function getHistoryActionDisplay(
             action.details.nft_item,
             action.details.nft_item_index,
             context.metadata,
+            action.details.nft_collection,
           ),
         ),
       )
@@ -2894,6 +2932,7 @@ function getHistoryActionDisplay(
             action.details.nft_item,
             action.details.nft_item_index,
             context.metadata,
+            action.details.nft_collection,
           ),
         ),
       )
@@ -2911,6 +2950,7 @@ function getHistoryActionDisplay(
                   action.details.nft_item,
                   action.details.nft_item_index,
                   context.metadata,
+                  action.details.nft_collection,
                 ),
               )
             : valueLines(
@@ -2918,6 +2958,7 @@ function getHistoryActionDisplay(
                   action.details.nft_item,
                   action.details.nft_item_index,
                   context.metadata,
+                  action.details.nft_collection,
                 ),
               ),
         "Account",
@@ -2944,6 +2985,7 @@ function getHistoryActionDisplay(
             action.details.nft_item,
             action.details.nft_item_index,
             context.metadata,
+            action.details.nft_collection,
           ),
         ),
       )
@@ -2953,7 +2995,14 @@ function getHistoryActionDisplay(
         "sale",
         false,
         "Sale",
-        valueLines(actionNftValueLine(action.details.nft_item, null, context.metadata)),
+        valueLines(
+          actionNftValueLine(
+            action.details.nft_item,
+            null,
+            context.metadata,
+            action.details.nft_collection,
+          ),
+        ),
       )
     case "nft_cancel_auction":
     case "teleitem_cancel_auction":
@@ -2963,7 +3012,14 @@ function getHistoryActionDisplay(
         "auction",
         false,
         "Auction",
-        valueLines(actionNftValueLine(action.details.nft_item, null, context.metadata)),
+        valueLines(
+          actionNftValueLine(
+            action.details.nft_item,
+            null,
+            context.metadata,
+            action.details.nft_collection,
+          ),
+        ),
       )
     case "nft_update_sale":
       return addressAction(
@@ -2984,6 +3040,7 @@ function getHistoryActionDisplay(
             action.details.nft_item,
             action.details.nft_item_index,
             context.metadata,
+            action.details.nft_collection,
           ),
         ),
       )
@@ -3715,6 +3772,7 @@ function actionNftValueLine(
   itemAddress: string | null | undefined,
   itemIndex: string | null | undefined,
   metadata: V3Metadata,
+  collectionAddress: string | null | undefined,
 ): HistoryNftValueLine | undefined {
   const tokenInfo = itemAddress
     ? getMetadataTokenInfo(metadata, itemAddress, "nft_items")
@@ -3733,6 +3791,8 @@ function actionNftValueLine(
     fullLabel: fullLabel ?? "NFT",
     tone: "positive",
     ...(itemAddress ? {address: itemAddress} : {}),
+    ...(collectionAddress ? {collectionAddress} : {}),
+    ...(tokenInfo?.is_scam === true ? {isScam: true} : {}),
     imageSources,
   }
 }
@@ -3743,9 +3803,10 @@ function tonToNftValueLine(
   itemAddress: string | null,
   itemIndex: string | null,
   metadata: V3Metadata,
+  collectionAddress: string | null | undefined,
 ): HistoryValueLine | undefined {
   const ton = tonValueLine(amount, amountTone)
-  const nft = actionNftValueLine(itemAddress, itemIndex, metadata)
+  const nft = actionNftValueLine(itemAddress, itemIndex, metadata, collectionAddress)
 
   if (ton && nft) {
     return {
