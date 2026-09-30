@@ -508,7 +508,7 @@ Defines network settings used by `--net` and `--fork-net`.
 
 <AvailabilityBadge since="Acton 1.2" />
 
-Wallet V5 derives its wallet ID from the network's TON `global-id`. Custom networks default to `-3`, matching testnet and localnet; set `global-id = -239` for a custom endpoint that is an alias or proxy for mainnet. Localnet always keeps `-3`, even when `[localnet].fork-net = "mainnet"`: the fork only provides remote state and does not turn the local chain into mainnet.
+Without an explicit [`wallet-id`](/docs/wallets#use-the-same-wallet-id-on-every-network), Wallet V5 derives its wallet ID from the network's TON `global-id`. Custom networks default to `-3`, matching testnet and localnet; set `global-id = -239` for a custom endpoint that is an alias or proxy for mainnet. Localnet always keeps `-3`, even when `[localnet].fork-net = "mainnet"`: the fork only provides remote state and does not turn the local chain into mainnet.
 
 | Field      | Type     | Required                                | Description                                                                                                                                                                                                                                                                                     |
 |:-----------|:---------|:----------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

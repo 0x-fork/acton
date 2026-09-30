@@ -689,6 +689,24 @@ To show a mnemonic, run `acton wallet export-mnemonic <name>` from the project
 directory. The command requires an interactive terminal and asks you to confirm
 the wallet name.
 
+## Wallet ID
+
+<AvailabilityBadge since="trunk" />
+
+Set `wallet-id` in a wallet entry to use the same full 32-bit ID on all networks:
+
+```toml
+[wallets.deployer]
+kind = "v5r1"
+wallet-id = 0
+keys = { mnemonic-env = "DEPLOYER_MNEMONIC" }
+```
+
+The allowed range is `0` to `4294967295`. For V5, an explicit ID is used directly,
+without combining it with the network's `global-id`. Omit the field to keep the
+default for the wallet version and network. Update or remove stale `expected`
+addresses after changing the ID.
+
 ## Security
 
 - secure keyring storage is recommended when available

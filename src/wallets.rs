@@ -292,7 +292,10 @@ pub fn open_wallets(
         let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
 
         let wallet_version = parse_wallet_version(&wallet.kind)?;
-        let wallet_id = wallet_id_from_global_id(wallet_version, config.network_global_id(net));
+        let wallet_id = wallet.wallet_id.map_or_else(
+            || wallet_id_from_global_id(wallet_version, config.network_global_id(net)),
+            |id| id as i32,
+        );
 
         let ton_wallet = SigningWallet::new_with_params(
             wallet_version,
@@ -326,7 +329,7 @@ pub fn open_wallets(
                                 false,
                             );
                             anyhow::bail!(
-                                "Wallet address mismatch for '{name}' on '{net}':\n  Expected: {expected_addr}\n  Derived:  {derived_address}\n\nPossible causes:\n  - Wrong mnemonic/private key\n  - Incorrect 'kind' or 'workchain'\n  - Keys rotated but expected.address-{net} not updated",
+                                "Wallet address mismatch for '{name}' on '{net}':\n  Expected: {expected_addr}\n  Derived:  {derived_address}\n\nPossible causes:\n  - Wrong mnemonic/private key\n  - Incorrect 'kind', 'workchain', or 'wallet-id'\n  - Keys rotated but expected.address-{net} not updated",
                             );
                         }
                     }

@@ -899,6 +899,98 @@ fn test_wallet_import_bip39_and_sign() {
 }
 
 #[test]
+fn test_wallet_id_is_used_on_every_network() -> anyhow::Result<()> {
+    use acton_config::config::{ActonConfig, WalletsFile};
+    use rston::wallet::{WalletV5Data, WalletV5ExtMsgBody};
+
+    let mut config: ActonConfig = toml::from_str(
+        r#"
+[package]
+name = "wallet-id"
+description = "Wallet ID configuration"
+version = "0.1.0"
+
+[networks.development]
+global-id = 42
+"#,
+    )?;
+    let mut results = Vec::new();
+
+    for configured_id in [None, Some(0), Some(u32::MAX)] {
+        let id_field = configured_id
+            .map(|id| format!("wallet-id = {id}\n"))
+            .unwrap_or_default();
+        let file: WalletsFile = toml::from_str(&format!(
+            "[wallets.deployer]\nkind = \"v5r1\"\n{id_field}keys = {{ mnemonic = \"{BIP39_TEST_MNEMONIC}\" }}\n"
+        ))?;
+        config.wallets = file.wallets;
+
+        for network in [
+            Network::Mainnet,
+            Network::Testnet,
+            Network::Localnet,
+            Network::Custom("development".into()),
+        ] {
+            let opened = wallets::open_wallets(&config, Some(&network), true)?;
+            let wallet = &opened["deployer"].wallet;
+            let storage: WalletV5Data = wallet.state_init()?.data.unwrap().parse()?;
+            let body = wallet.create_ext_in_body(1_700_000_000, 7, Vec::new())?;
+            let signed = wallet.sign_ext_in_body(&body)?;
+            let (request, _) = WalletV5ExtMsgBody::read_signed(&mut signed.as_slice()?)?;
+
+            results.push(serde_json::json!({
+                "configured_id": configured_id,
+                "network": network.to_string(),
+                "address": wallet.address.to_string(),
+                "storage_id": storage.wallet_id as u32,
+                "request_id": request.wallet_id as u32,
+            }));
+        }
+    }
+
+    expect_test::expect_file!["snapshots/wallet/wallet_id_networks.json"]
+        .assert_eq(&serde_json::to_string_pretty(&results)?);
+    Ok(())
+}
+
+#[test]
+fn test_wallet_list_uses_explicit_id_with_cached_expected_address() {
+    let project = ProjectBuilder::new("wallet-list-explicit-id").build();
+    fs::write(
+        project.path().join("wallets.toml"),
+        format!(
+            r#"[wallets.deployer]
+kind = "v5r1"
+wallet-id = 0
+keys = {{ mnemonic = "{BIP39_TEST_MNEMONIC}" }}
+
+[wallets.deployer.expected]
+address-testnet = "kQCf9EYCGEnzNflKo0BRm4IM0g2i094C_uqgJBSBmHZMUDL-"
+"#,
+        ),
+    )
+    .unwrap();
+
+    let output = project.acton().wallet_list().arg("--json").run().success();
+    let wallets: Value = serde_json::from_str(&output.get_stdout()).unwrap();
+    expect_test::expect![[r#"
+        Object {
+            "success": Bool(true),
+            "wallets": Array [
+                Object {
+                    "address": String("kQCQeJabR5hI_pHH2pfZKrQE7b9fMLdfI2p2qE7c6SZM2Qcl"),
+                    "balance": Null,
+                    "is_global": Bool(false),
+                    "kind": String("v5r1"),
+                    "name": String("deployer"),
+                },
+            ],
+        }
+    "#]]
+    .assert_debug_eq(&wallets);
+}
+
+#[test]
 fn test_wallet_import_already_exists() {
     let project = ProjectBuilder::new("wallet-import-exists").build();
     let mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";

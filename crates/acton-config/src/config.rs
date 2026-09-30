@@ -603,6 +603,11 @@ pub struct WalletConfig {
     pub kind: String,
     /// Workchain for the wallet address
     pub workchain: Option<i8>,
+    /// Full 32-bit wallet ID used in storage and outgoing requests on every network.
+    /// When omitted, Acton selects the default for the wallet version and network.
+    /// For V5 this replaces the final wallet ID, not just its subwallet-number bits.
+    #[serde(rename = "wallet-id", skip_serializing_if = "Option::is_none")]
+    pub wallet_id: Option<u32>,
     /// Mnemonic and key storage configuration
     pub keys: WalletKeys,
     #[serde(default)]
@@ -2110,6 +2115,7 @@ seed = 42
 [wallets.deployer]
 kind = "v4R2"
 workchain = 0
+wallet-id = 0
 keys = { mnemonic-env = "DEPLOYER_MNEMONIC" }
 
 [wallets.deployer.expected]
@@ -2123,6 +2129,7 @@ keys = { mnemonic-file = "user-keys.txt" }
 
 [wallets.direct]
 kind = "v4R2"
+wallet-id = 4294967295
 keys = { mnemonic = "word1 word2 word3" }
 "#;
 
@@ -2133,6 +2140,7 @@ keys = { mnemonic = "word1 word2 word3" }
         let deployer = wallets.get("deployer").unwrap();
         assert_eq!(deployer.kind, "v4R2");
         assert_eq!(deployer.workchain, Some(0));
+        assert_eq!(deployer.wallet_id, Some(0));
         assert_eq!(
             deployer.keys.mnemonic_env,
             Some("DEPLOYER_MNEMONIC".to_string())
@@ -2153,12 +2161,14 @@ keys = { mnemonic = "word1 word2 word3" }
         let user = wallets.get("user").unwrap();
         assert_eq!(user.kind, "v5R1");
         assert_eq!(user.workchain, Some(-1));
+        assert_eq!(user.wallet_id, None);
         assert_eq!(user.keys.mnemonic_file, Some("user-keys.txt".to_string()));
         assert_eq!(user.keys.mnemonic_env, None);
         assert!(user.expected.is_none());
 
         let direct = wallets.get("direct").unwrap();
         assert_eq!(direct.kind, "v4R2");
+        assert_eq!(direct.wallet_id, Some(u32::MAX));
         assert_eq!(direct.keys.mnemonic, Some("word1 word2 word3".to_string()));
 
         Ok(())

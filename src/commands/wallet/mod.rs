@@ -960,7 +960,10 @@ fn sign_wallet_external_body(
     let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
     let key_pair = mnemonic.to_key_pair()?;
     let version = parse_wallet_version(&wallet.kind)?;
-    let wallet_id = wallets::wallet_id(version, &Network::Testnet);
+    let wallet_id = wallet.wallet_id.map_or_else(
+        || wallets::wallet_id(version, &Network::Testnet),
+        |id| id as i32,
+    );
 
     let workchain = wallet.workchain.unwrap_or(0);
     let ton_wallet = Wallet::new_with_params(version, key_pair, workchain, wallet_id)?;
@@ -1278,7 +1281,8 @@ fn get_wallet_address(
     wallet: &config::WalletConfig,
     network: Network,
 ) -> anyhow::Result<String> {
-    if let Some(expected) = &wallet.expected
+    if wallet.wallet_id.is_none()
+        && let Some(expected) = &wallet.expected
         && let Some(addr) = &expected.address_testnet
     {
         let (addr, _) = StdAddr::from_str_ext(addr, StdAddrFormat::any())?;
@@ -1289,7 +1293,9 @@ fn get_wallet_address(
 
     let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
     let version = parse_wallet_version(&wallet.kind)?;
-    let wallet_id = wallets::wallet_id(version, &network);
+    let wallet_id = wallet
+        .wallet_id
+        .map_or_else(|| wallets::wallet_id(version, &network), |id| id as i32);
     let ton_wallet = Wallet::new_with_params(
         version,
         mnemonic.to_key_pair()?,
@@ -2238,6 +2244,7 @@ mod wallet_name_tests {
         let wallet = config::WalletConfig {
             kind: "v5r1".to_string(),
             workchain: Some(0),
+            wallet_id: None,
             keys: config::WalletKeys {
                 mnemonic_env: None,
                 mnemonic_file: None,

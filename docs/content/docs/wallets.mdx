@@ -224,6 +224,29 @@ kind = "v5r1"
 keys = { mnemonic = "word1 word2 ... word24" }
 ```
 
+## Use the same wallet ID on every network
+
+<AvailabilityBadge since="trunk" />
+
+Set `wallet-id` to use an explicit ID for address derivation and wallet requests:
+
+```toml title="wallets.toml"
+[wallets.deployer]
+kind = "v5r1"
+workchain = 0
+wallet-id = 0
+keys = { mnemonic-env = "DEPLOYER_MNEMONIC" }
+```
+
+The ID accepts integers from `0` to `4294967295`. It is used directly on mainnet,
+testnet, localnet, and custom networks. For V5, this is the full wallet ID;
+Acton does not combine it with the network's `global-id`.
+The same key, wallet version, and workchain produce the same raw address on all
+networks. Friendly addresses can differ by their testnet flag.
+
+Omit `wallet-id` to keep the default for the wallet version and network.
+After changing it, update or remove any `expected` addresses that refer to the old ID.
+
 ## Add address safety checks
 
 Expected addresses help catch wallet misconfiguration before real-network operations:
@@ -242,7 +265,7 @@ address-testnet = "0QD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8ZLd"
 
 <AvailabilityBadge since="Acton 1.2" />
 
-Wallet V5 derives its address from the network's `global-id`. Custom networks default to `-3`, matching testnet and localnet. For a custom endpoint that uses mainnet wallet addresses, set `global-id = -239` in its [network configuration](/docs/acton-toml#networks).
+Without an explicit `wallet-id`, Wallet V5 derives its address from the network's `global-id`. Custom networks default to `-3`, matching testnet and localnet. For a custom endpoint that uses mainnet wallet addresses, set `global-id = -239` in its [network configuration](/docs/acton-toml#networks).
 
 ## Keep wallet data out of version control
 

@@ -156,6 +156,8 @@ All notable changes to this project will be documented in this file.
 
 ### Wallets
 
+- Support an optional `wallet-id` in wallet configuration. An explicit ID is
+  used on every network; omitting it keeps the version- and network-specific default.
 - Store wallet workchains as `i8` in `WalletConfig`, matching standard TON addresses.
   Configuration values outside `-128..=127` are rejected during parsing.
 - Remove the redundant `input` encoding field from `acton wallet sign --json`.

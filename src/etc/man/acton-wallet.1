@@ -432,6 +432,24 @@ logins in \fBPasswords\fR\&.
 To show a mnemonic, run \fBacton wallet export\-mnemonic <name>\fR from the project
 directory. The command requires an interactive terminal and asks you to confirm
 the wallet name.
+.SH "WALLET ID"
+Available since trunk.
+.sp
+Set \fBwallet\-id\fR in a wallet entry to use the same full 32\-bit ID on all networks:
+.sp
+.RS 4
+.nf
+[wallets.deployer]
+kind = "v5r1"
+wallet\-id = 0
+keys = { mnemonic\-env = "DEPLOYER_MNEMONIC" }
+.fi
+.RE
+.sp
+The allowed range is \fB0\fR to \fB4294967295\fR\&. For V5, an explicit ID is used directly,
+without combining it with the network\[cq]s \fBglobal\-id\fR\&. Omit the field to keep the
+default for the wallet version and network. Update or remove stale \fBexpected\fR
+addresses after changing the ID.
 .SH "SECURITY"
 .sp
 .RS 4
