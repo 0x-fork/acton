@@ -18,8 +18,12 @@ import { SourceCodeLink } from '@/components/SourceCodeLink';
 ### What it does
 Checks for calls to `@pure` functions where the result is not used.
 
-### Why is this bad?
-`@pure` functions have no side effects, so calling them without using the result is a no-op and likely a bug.
+### Why check this?
+An unused result may indicate a missing assignment or check.
+However, `@pure` does not mean that the call cannot throw an exception.
+The call may validate input even when its result is ignored.
+For example, `s.preloadUint(32);` throws if the slice has fewer than 32 bits.
+Use the return value, or write `val _ = s.preloadUint(32);` to discard it explicitly.
 
 ### Example
 ```tolk twoslash
@@ -29,4 +33,4 @@ fun main() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/pure_function_call_unused.rs#L24" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/pure_function_call_unused.rs#L28" />

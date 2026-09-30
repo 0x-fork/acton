@@ -28,6 +28,11 @@ All notable changes to this project will be documented in this file.
   `try`/`catch` boundaries in Tolk 1.5.
 - Offer `@pure` only for `asm` and `builtin` functions and describe its scope in hover.
 
+### Linting
+
+- Clarify E006 (`pure-function-call-unused`): an unused result may be intentional
+  because a `@pure` call can validate input and throw an exception.
+
 ### Dependencies
 
 - Remove Localton's `ton` dependency. Get-method stacks use `tvm-ffi` and `rston`,

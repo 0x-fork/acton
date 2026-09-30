@@ -4,7 +4,7 @@ warning[E006]: result of pure function is not used
 3 |                 createEmptyCell();
   |                 ^^^^^^^^^^^^^^^^^ result of pure function `createEmptyCell` is not used
   |
-  = functions marked with `@pure` have no side effects. Calling them without using the result does nothing and may indicate a bug
+  = use the return value, or discard it explicitly with `val _ = ...`
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.

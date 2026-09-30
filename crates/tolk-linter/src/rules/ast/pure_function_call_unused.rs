@@ -11,8 +11,12 @@ use tolk_ty::InferenceResult;
 /// ### What it does
 /// Checks for calls to `@pure` functions where the result is not used.
 ///
-/// ### Why is this bad?
-/// `@pure` functions have no side effects, so calling them without using the result is a no-op and likely a bug.
+/// ### Why check this?
+/// An unused result may indicate a missing assignment or check.
+/// However, `@pure` does not mean that the call cannot throw an exception.
+/// The call may validate input even when its result is ignored.
+/// For example, `s.preloadUint(32);` throws if the slice has fewer than 32 bits.
+/// Use the return value, or write `val _ = s.preloadUint(32);` to discard it explicitly.
 ///
 /// ### Example
 /// ```tolk twoslash
@@ -87,6 +91,6 @@ fn fire_diagnostic(checker: &mut Checker, file_id: FileId, call: &Call, symbol: 
             is_primary: true,
             tags: vec![],
         }])
-        .with_help("functions marked with `@pure` have no side effects. Calling them without using the result does nothing and may indicate a bug");
+        .with_help("use the return value, or discard it explicitly with `val _ = ...`");
     checker.emit_diagnostic(diagnostic);
 }
