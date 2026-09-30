@@ -4,6 +4,10 @@
 
 ### Added
 
+- TG Wallet rev00 code, deployment data, and transfer bodies, with separate
+  address and signing keys for rotation mnemonics.
+- Explicit `MnemonicScheme` selection for TON, 12/24-word BIP39, and rotation
+  phrases. Rotation phrases derive their anchor and signing keys independently.
 - `Boc::decode_any()` decodes a BoC supplied as hex or base64.
 - TON wallet code, initial data, address derivation, and signed external messages
   for V2, V3, V4, and V5R1. Each outgoing `WalletMessage` carries its cell and a
@@ -21,7 +25,7 @@
   V5 storage exposes signature authorization as `is_signature_allowed`.
 - TON mnemonic validation, English word list, and Ed25519 key derivation, with
   typed `MnemonicError` results and automatic clearing of owned secret data on drop.
-  Import also accepts 12-word BIP39 mnemonics, using SLIP-0010 Ed25519 derivation
+  Explicit BIP39 import accepts 12 or 24 words, using SLIP-0010 Ed25519 derivation
   at `m/44'/607'/0'`.
 
 ### Changed

@@ -65,13 +65,18 @@ Both macros are available through `rston::prelude` without a separate dependency
 The `models` module includes addresses, messages, accounts, transactions, blocks, shard states, and blockchain configuration.
 For custom cell formats, `CellBuilder` and `CellSlice` provide operations for individual fields.
 
-The `mnemonic` module validates 24-word TON mnemonics and 12-word BIP39 mnemonics,
-then derives Ed25519 key pairs. BIP39 phrases use SLIP-0010 at `m/44'/607'/0'`.
-It exposes `Mnemonic`, `KeyPair`, and the English `WORDLIST_EN_SET`.
+The `mnemonic` module validates 24-word TON mnemonics and 12- or 24-word BIP39 mnemonics,
+then derives Ed25519 key pairs. Select `MnemonicScheme::Bip39` explicitly for BIP39;
+constructors without a scheme use TON. BIP39 phrases use SLIP-0010 at `m/44'/607'/0'`.
+`MnemonicScheme::Rotation` supports TG Wallet phrases with an address anchor and a
+current signing key. It accepts 12 words before rotation or two independent 12-word
+phrases after rotation. Use `Wallet::new_with_mnemonic` to preserve the anchor address.
+The module also exposes `KeyPair` and the English `WORDLIST_EN_SET`.
 
 The `wallet` module derives wallet addresses and prepares signed external messages
 using `rston` cells. It exposes `Wallet`, `WalletVersion`, wallet data types,
-and contract code. Message signing supports V2, V3, V4, and V5R1.
+and contract code. Message signing supports V2, V3, V4, V5R1, and TG Wallet rev00.
+TG Wallet requires its runtime implementation in network configuration parameter -123.
 Pass outgoing messages as `Vec<WalletMessage>`. Each entry contains the complete
 message cell in `msg` and a `SendMsgFlags` bitmask in `mode`.
 Combine flags with `|`, such as `SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR`.

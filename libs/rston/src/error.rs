@@ -31,15 +31,26 @@ pub enum WalletError {
     /// The public key does not match the signing key derived from the secret-key bytes.
     #[error("public key does not match the signing key")]
     PublicKeyMismatch,
+    /// Rotation phrases require a contract with separate anchor and signing keys.
+    #[error("rotation mnemonics require TG Wallet, got {0:?}")]
+    RotationRequiresTgWallet(WalletVersion),
 }
 
 /// Errors reported by wallet mnemonic validation and key derivation.
 #[derive(Debug, thiserror::Error)]
 pub enum MnemonicError {
-    /// The phrase contains neither 12 BIP39 words nor 24 TON words.
-    #[error("expected 12 or 24 mnemonic words, got {0}")]
-    WordCount(usize),
-    /// The 12-word phrase fails BIP39 validation, including its checksum.
+    /// The word count does not match the selected mnemonic scheme.
+    #[error("expected {expected} mnemonic words, got {actual}")]
+    WordCount {
+        /// Allowed word counts for the selected scheme.
+        expected: &'static str,
+        /// Number of supplied words.
+        actual: usize,
+    },
+    /// Rotation phrases always use passphraseless BIP39 derivation.
+    #[error("rotation mnemonics do not use a password")]
+    RotationPassword,
+    /// The phrase or one rotation half fails BIP39 validation.
     #[error("invalid BIP39 mnemonic: {0}")]
     InvalidBip39(#[from] bip39::Error),
     /// A normalized word is absent from the English mnemonic word list.
@@ -85,6 +96,9 @@ pub enum Error {
     /// Data does not satisfy some constraints.
     #[error("invalid data")]
     InvalidData,
+    /// A wallet transfer format requires at least one outgoing message.
+    #[error("wallet request must contain at least one message")]
+    EmptyWalletMessages,
     /// A wallet request exceeds the message limit of its contract version.
     #[error("too many messages: got {actual}, maximum is {max}")]
     TooManyMessages {

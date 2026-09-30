@@ -1,4 +1,4 @@
-//! TON and BIP39 mnemonic validation and Ed25519 wallet key derivation.
+//! TON, BIP39, and rotation mnemonic validation and Ed25519 key derivation.
 
 use crate::error::MnemonicError;
 use ed25519_dalek::{KEYPAIR_LENGTH, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SecretKey, SigningKey};
@@ -23,7 +23,8 @@ pub static WORDLIST_EN_SET: LazyLock<HashSet<&'static str>> =
 
 /// An owned wallet mnemonic whose words and optional password are zeroized on drop.
 ///
-/// Imports 24-word TON phrases or 12-word BIP39 phrases. BIP39 wallet keys use
+/// The caller selects the scheme explicitly; constructors without a scheme use TON.
+/// BIP39 phrases contain 12 or 24 words. BIP39 wallet keys use
 /// SLIP-0010 Ed25519 derivation at `m/44'/607'/0'`, as described in the
 /// [TON wallet guidelines](https://github.com/ton-blockchain/TEPs/blob/master/text/0003-wallets.md).
 ///
@@ -34,9 +35,31 @@ pub struct Mnemonic {
     password: Zeroizing<Option<String>>,
 }
 
+/// Selects validation and key derivation independently of the number of words.
+///
+/// A phrase can be valid under several schemes and produce different keys.
+/// Select the scheme used by the wallet that created the phrase.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
+pub enum MnemonicScheme {
+    /// A 24-word TON phrase with TON seed validation and derivation.
+    #[default]
+    Ton,
+    /// One 12- or 24-word BIP39 phrase, derived at `m/44'/607'/0'`.
+    Bip39,
+    /// TG Wallet's two independent 12-word BIP39 halves: anchor, then signing.
+    /// A single 12-word half supplies both keys before the first rotation.
+    Rotation,
+}
+
 enum MnemonicWords {
     Ton(Zeroizing<Vec<String>>),
     Bip39(bip39::Mnemonic),
+    Rotation {
+        anchor: bip39::Mnemonic,
+        signing: bip39::Mnemonic,
+    },
 }
 
 /// An Ed25519 key pair whose secret key bytes are zeroized on drop.
@@ -67,24 +90,49 @@ impl fmt::Debug for KeyPair {
 }
 
 impl Mnemonic {
-    /// Imports 24 English words as a TON mnemonic or 12 as a BIP39 mnemonic.
+    /// Imports a 24-word TON mnemonic.
+    ///
+    /// Use [`Self::new_with_scheme`] for BIP39 or rotation phrases.
     ///
     /// Trims each word and converts it to lowercase before validation.
     ///
     /// `password` is the mnemonic password used for key derivation.
     /// `None` and an empty string both mean no password. Nonempty passwords
-    /// retain their whitespace and case. BIP39 passphrases are normalized to
-    /// Unicode NFKD during key derivation and do not affect checksum validation.
+    /// retain their whitespace and case.
     ///
     /// # Errors
     ///
     /// Returns [`MnemonicError`] for an incorrect word count, an unknown word,
-    /// or a phrase that fails TON seed validation or the BIP39 checksum.
+    /// or a phrase that fails TON seed validation.
     pub fn new(words: Vec<&str>, password: Option<String>) -> Result<Mnemonic, MnemonicError> {
-        let password = Zeroizing::new(password);
+        Self::new_with_scheme(words, password, MnemonicScheme::Ton)
+    }
 
-        if !matches!(words.len(), 12 | 24) {
-            return Err(MnemonicError::WordCount(words.len()));
+    /// Imports words using the selected scheme, without auto-detection.
+    ///
+    /// TON accepts 24 words; BIP39 and rotation accept 12 or 24.
+    /// Each rotation half has its own checksum and uses an empty passphrase.
+    /// BIP39 passwords use Unicode NFKD normalization. Word normalization and
+    /// ownership follow [`Self::new`].
+    pub fn new_with_scheme(
+        words: Vec<&str>,
+        password: Option<String>,
+        scheme: MnemonicScheme,
+    ) -> Result<Self, MnemonicError> {
+        let password = Zeroizing::new(password);
+        let valid_count = match scheme {
+            MnemonicScheme::Ton => words.len() == 24,
+            MnemonicScheme::Bip39 | MnemonicScheme::Rotation => matches!(words.len(), 12 | 24),
+        };
+        if !valid_count {
+            return Err(MnemonicError::WordCount {
+                expected: if scheme == MnemonicScheme::Ton {
+                    "24"
+                } else {
+                    "12 or 24"
+                },
+                actual: words.len(),
+            });
         }
 
         let normalized_words = Zeroizing::new(
@@ -101,13 +149,36 @@ impl Mnemonic {
             return Err(MnemonicError::UnknownWord(word.clone()));
         }
 
-        if normalized_words.len() == 12 {
-            let phrase = Zeroizing::new(normalized_words.join(" "));
-            let words = bip39::Mnemonic::parse_in_normalized(bip39::Language::English, &phrase)?;
-            return Ok(Mnemonic {
-                words: MnemonicWords::Bip39(words),
-                password,
-            });
+        let parse_bip39 = |words: &[String]| {
+            let phrase = Zeroizing::new(words.join(" "));
+            bip39::Mnemonic::parse_in_normalized(bip39::Language::English, &phrase)
+        };
+        match scheme {
+            MnemonicScheme::Bip39 => {
+                return Ok(Self {
+                    words: MnemonicWords::Bip39(parse_bip39(&normalized_words)?),
+                    password,
+                });
+            }
+            MnemonicScheme::Rotation => {
+                if password
+                    .as_deref()
+                    .is_some_and(|password| !password.is_empty())
+                {
+                    return Err(MnemonicError::RotationPassword);
+                }
+                let anchor = parse_bip39(&normalized_words[..12])?;
+                let signing = if normalized_words.len() == 12 {
+                    anchor.clone()
+                } else {
+                    parse_bip39(&normalized_words[12..])?
+                };
+                return Ok(Self {
+                    words: MnemonicWords::Rotation { anchor, signing },
+                    password,
+                });
+            }
+            MnemonicScheme::Ton => {}
         }
 
         match &*password {
@@ -149,24 +220,59 @@ impl Mnemonic {
         })
     }
 
-    /// Imports a 12-word BIP39 or 24-word TON mnemonic from a space-separated phrase.
+    /// Imports a 24-word TON mnemonic from a space-separated phrase.
     ///
     /// Accepts repeated spaces and whitespace around each word.
     /// Tabs and line breaks do not separate words.
     /// Uses [`Self::new`] for word normalization, password handling, and validation.
     pub fn from_str(s: &str, password: Option<String>) -> Result<Mnemonic, MnemonicError> {
+        Self::from_str_with_scheme(s, password, MnemonicScheme::Ton)
+    }
+
+    /// Imports a space-separated phrase using an explicit scheme.
+    ///
+    /// Splitting follows [`Self::from_str`]; validation and password rules follow
+    /// [`Self::new_with_scheme`]. The input remains owned by the caller.
+    pub fn from_str_with_scheme(
+        s: &str,
+        password: Option<String>,
+        scheme: MnemonicScheme,
+    ) -> Result<Self, MnemonicError> {
         let words: Vec<&str> = s
             .split(' ')
             .map(|w| w.trim())
             .filter(|w| !w.is_empty())
             .collect();
-        Mnemonic::new(words, password)
+        Self::new_with_scheme(words, password, scheme)
     }
 
-    /// Derives the Ed25519 wallet key pair for this phrase's scheme.
+    /// Returns the scheme selected at import; it is never inferred from the words.
+    pub fn scheme(&self) -> MnemonicScheme {
+        match self.words {
+            MnemonicWords::Ton(_) => MnemonicScheme::Ton,
+            MnemonicWords::Bip39(_) => MnemonicScheme::Bip39,
+            MnemonicWords::Rotation { .. } => MnemonicScheme::Rotation,
+        }
+    }
+
+    /// Derives the address anchor for a rotation phrase, or the ordinary key otherwise.
+    ///
+    /// TG Wallet's deployment state uses this public key even after rotation.
+    /// The returned secret is owned by the caller and zeroized on drop.
+    pub fn to_anchor_key_pair(&self) -> Result<KeyPair, MnemonicError> {
+        match &self.words {
+            MnemonicWords::Rotation { anchor, .. } => {
+                key_pair_from_seed(&bip39_wallet_seed(anchor, "")?)
+            }
+            _ => self.to_key_pair(),
+        }
+    }
+
+    /// Derives the current signing key pair for this phrase's scheme.
     ///
     /// TON phrases use the TON default seed parameters. BIP39 phrases use
     /// SLIP-0010 at `m/44'/607'/0'` (the first TON account).
+    /// Rotation uses the signing half; [`Self::to_anchor_key_pair`] derives its address key.
     /// The returned pair owns its secret bytes and clears them on drop.
     pub fn to_key_pair(&self) -> Result<KeyPair, MnemonicError> {
         let seed = match &self.words {
@@ -177,22 +283,26 @@ impl Mnemonic {
             MnemonicWords::Bip39(words) => {
                 bip39_wallet_seed(words, self.password.as_deref().unwrap_or_default())?
             }
+            MnemonicWords::Rotation { signing, .. } => bip39_wallet_seed(signing, "")?,
         };
-
-        let secret_key_bytes: &SecretKey = seed
-            .get(..SECRET_KEY_LENGTH)
-            .and_then(|bytes| bytes.try_into().ok())
-            .ok_or_else(|| MnemonicError::InvalidSecretKeyLength {
-                actual: seed.len(),
-                expected: SECRET_KEY_LENGTH,
-            })?;
-
-        let signing_key = SigningKey::from_bytes(secret_key_bytes);
-        Ok(KeyPair {
-            public_key: signing_key.verifying_key().to_bytes(),
-            secret_key: signing_key.to_keypair_bytes(),
-        })
+        key_pair_from_seed(&seed)
     }
+}
+
+fn key_pair_from_seed(seed: &[u8]) -> Result<KeyPair, MnemonicError> {
+    let secret_key_bytes: &SecretKey = seed
+        .get(..SECRET_KEY_LENGTH)
+        .and_then(|bytes| bytes.try_into().ok())
+        .ok_or(MnemonicError::InvalidSecretKeyLength {
+            actual: seed.len(),
+            expected: SECRET_KEY_LENGTH,
+        })?;
+
+    let signing_key = SigningKey::from_bytes(secret_key_bytes);
+    Ok(KeyPair {
+        public_key: signing_key.verifying_key().to_bytes(),
+        secret_key: signing_key.to_keypair_bytes(),
+    })
 }
 
 /// Derives the first TON account using hardened SLIP-0010 Ed25519 children.
@@ -335,7 +445,11 @@ mod tests {
         ];
 
         for (phrase, password, expected) in cases {
-            let mnemonic = Mnemonic::from_str(phrase, password.map(str::to_owned))?;
+            let mnemonic = Mnemonic::from_str_with_scheme(
+                phrase,
+                password.map(str::to_owned),
+                MnemonicScheme::Bip39,
+            )?;
             let key_pair = mnemonic.to_key_pair()?;
             assert_eq!(hex::encode(key_pair.secret_key), expected);
             assert_eq!(key_pair.public_key, key_pair.secret_key[32..]);
@@ -347,12 +461,20 @@ mod tests {
     #[test]
     fn bip39_normalizes_words_and_passphrase() -> anyhow::Result<()> {
         let phrase = "  ABANDON abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon  ABOUT ";
-        let without_password = Mnemonic::from_str(phrase, None)?.to_key_pair()?;
-        let empty_password = Mnemonic::from_str(phrase, Some(String::new()))?.to_key_pair()?;
+        let without_password =
+            Mnemonic::from_str_with_scheme(phrase, None, MnemonicScheme::Bip39)?.to_key_pair()?;
+        let empty_password =
+            Mnemonic::from_str_with_scheme(phrase, Some(String::new()), MnemonicScheme::Bip39)?
+                .to_key_pair()?;
         assert_eq!(without_password, empty_password);
 
         for password in ["caf\u{e9}", "cafe\u{301}"] {
-            let key_pair = Mnemonic::from_str(phrase, Some(password.to_owned()))?.to_key_pair()?;
+            let key_pair = Mnemonic::from_str_with_scheme(
+                phrase,
+                Some(password.to_owned()),
+                MnemonicScheme::Bip39,
+            )?
+            .to_key_pair()?;
             assert_eq!(
                 hex::encode(key_pair.public_key),
                 "001a3e145602093c24330c1515319b9cf68ed74a3412310008fd6407fc025f0c",
@@ -364,10 +486,50 @@ mod tests {
 
     #[test]
     fn bip39_validates_checksum() {
-        let result = Mnemonic::new(vec!["abandon"; 12], None);
+        let result = Mnemonic::new_with_scheme(vec!["abandon"; 12], None, MnemonicScheme::Bip39);
         assert!(matches!(
             result,
             Err(MnemonicError::InvalidBip39(bip39::Error::InvalidChecksum)),
         ));
+    }
+
+    #[test]
+    fn bip39_24_words_match_reference() -> anyhow::Result<()> {
+        // BIP39's zero-entropy 24-word vector, independently derived by @ton/crypto.
+        let phrase = format!("{}art", "abandon ".repeat(23));
+        let mnemonic = Mnemonic::from_str_with_scheme(&phrase, None, MnemonicScheme::Bip39)?;
+        assert_eq!(
+            hex::encode(mnemonic.to_key_pair()?.public_key),
+            "c6d2c947e552974c9f739fd7a02652519b8eef8cb9eef7867ac2e8f85777f244",
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn rotation_keys_match_wallet_engine() -> anyhow::Result<()> {
+        let anchor = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let signing = "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong";
+        let before = Mnemonic::from_str_with_scheme(anchor, None, MnemonicScheme::Rotation)?;
+        let after = Mnemonic::from_str_with_scheme(
+            &format!("{anchor} {signing}"),
+            None,
+            MnemonicScheme::Rotation,
+        )?;
+        assert_eq!(before.to_key_pair()?, before.to_anchor_key_pair()?);
+        assert_eq!(before.to_anchor_key_pair()?, after.to_anchor_key_pair()?);
+        assert_eq!(
+            hex::encode(after.to_anchor_key_pair()?.public_key),
+            "7952e94118f34607c75e23258dd9220d66ccac5a3ee074125c25068e8107bfbf",
+        );
+        assert_eq!(
+            hex::encode(after.to_key_pair()?.public_key),
+            "5d6320a0546c2df0908f0477e1ade79226faf854d041548f846b58872de5213e",
+        );
+        let invalid = format!("{anchor} {}", "abandon ".repeat(12));
+        assert!(matches!(
+            Mnemonic::from_str_with_scheme(&invalid, None, MnemonicScheme::Rotation),
+            Err(MnemonicError::InvalidBip39(bip39::Error::InvalidChecksum)),
+        ));
+        Ok(())
     }
 }

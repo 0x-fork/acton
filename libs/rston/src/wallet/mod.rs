@@ -6,6 +6,8 @@
 //! For deployment, the caller can include the initial state in the external message.
 //!
 //! V2, V3, and V4 bodies support up to four messages. V5R1 supports up to 255.
+//! TG Wallet rev00 supports one to 255 and uses separate anchor and signing keys
+//! when imported with [`MnemonicScheme::Rotation`].
 //! [`WalletMessage`] pairs each message cell with its [`SendMsgFlags`].
 //! Version-specific types expose `to_cell()` for storage or unsigned request bodies.
 //! Their `read_signed()` methods extract signatures but do not verify them.
@@ -21,7 +23,7 @@
 //!
 //! # Derive a wallet address
 //!
-//! Read a 24-word TON or 12-word BIP39 mnemonic from `WALLET_MNEMONIC`
+//! Read a 24-word TON mnemonic from `WALLET_MNEMONIC`
 //! and derive its V5R1 mainnet address.
 //! The same key can have different addresses for different wallet versions or IDs.
 //!
@@ -144,6 +146,16 @@ pub const WALLET_V5R1_ID_DEFAULT: i32 = 0x7FFFFF11;
 /// See the [SDK encoding and default values](https://github.com/ton-org/ton/blob/master/src/wallets/v5r1/WalletV5R1WalletId.ts).
 pub const WALLET_V5R1_ID_DEFAULT_TESTNET: i32 = 0x7FFFFFFD;
 
+/// TG Wallet rev00 mainnet ID for workchain and subwallet zero.
+///
+/// Uses `global_id XOR 0x80008000`, matching Wallet Engine's TG Wallet context.
+/// See its [wallet ID constants](https://github.com/i582/wallet-engine/blob/master/vendor/ton/src/ton_wallet/wallet_constants.rs).
+pub const TG_WALLET_ID_DEFAULT: i32 = 0x7FFF7F11;
+
+/// TG Wallet rev00 testnet ID for the same context as [`TG_WALLET_ID_DEFAULT`].
+/// Testnet and localnet use global ID `-3`.
+pub const TG_WALLET_ID_DEFAULT_TESTNET: i32 = 0x7FFF7FFD;
+
 /// An outgoing message and its send mode in a wallet request.
 ///
 /// The caller supplies the complete message cell and selects its send mode.
@@ -178,12 +190,15 @@ pub struct Wallet {
     pub address: StdAddr,
     /// Identifier stored in the initial data for versions that support subwallets.
     pub wallet_id: i32,
+    /// Original TG Wallet key used for deployment state after a signing-key rotation.
+    /// Other wallet versions and unrotated single-key constructors leave this absent.
+    pub anchor_public_key: Option<HashBytes>,
 }
 
 impl Wallet {
     /// Derives a wallet address in workchain zero with the default wallet ID.
     ///
-    /// V5R1 uses [`WALLET_V5R1_ID_DEFAULT`] for mainnet.
+    /// V5R1 uses [`WALLET_V5R1_ID_DEFAULT`] and TG Wallet uses [`TG_WALLET_ID_DEFAULT`] for mainnet.
     /// Other versions use [`WALLET_ID_DEFAULT`] where their data layout includes an ID.
     /// For testnet or a custom subwallet, use [`Self::new_with_params`].
     /// Key-pair consistency is checked during signing, not address derivation.
@@ -195,13 +210,14 @@ impl Wallet {
     pub fn new(version: WalletVersion, key_pair: KeyPair) -> Result<Self, WalletError> {
         let wallet_id = match version {
             WalletVersion::V5R1 => WALLET_V5R1_ID_DEFAULT,
+            WalletVersion::TgWallet => TG_WALLET_ID_DEFAULT,
             _ => WALLET_ID_DEFAULT,
         };
         Self::new_with_params(version, key_pair, 0, wallet_id)
     }
 
-    /// Imports a 24-word TON or 12-word BIP39 mnemonic and derives a wallet
-    /// with the default parameters. BIP39 phrases use `m/44'/607'/0'`.
+    /// Imports a 24-word TON mnemonic and derives a wallet with default parameters.
+    /// Use [`Self::new_with_mnemonic`] for an explicitly selected BIP39 or rotation scheme.
     ///
     /// `seed` contains a space-separated phrase, not raw seed bytes.
     /// `pass` is the optional mnemonic password. Parsing follows [`Mnemonic::from_str`].
@@ -249,7 +265,34 @@ impl Wallet {
             version,
             address,
             wallet_id,
+            anchor_public_key: None,
         })
+    }
+
+    /// Derives a wallet from an explicitly selected mnemonic scheme.
+    ///
+    /// Rotation phrases require [`WalletVersion::TgWallet`]. Their anchor key
+    /// fixes the address and deployment state, while the current signing key
+    /// signs outgoing requests. This method does not verify on-chain rotation
+    /// state; the caller must import the current signing half.
+    pub fn new_with_mnemonic(
+        version: WalletVersion,
+        mnemonic: &Mnemonic,
+        workchain: i8,
+        wallet_id: i32,
+    ) -> Result<Self, WalletError> {
+        let rotation = mnemonic.scheme() == MnemonicScheme::Rotation;
+        if rotation && version != WalletVersion::TgWallet {
+            return Err(WalletError::RotationRequiresTgWallet(version));
+        }
+
+        let anchor = mnemonic.to_anchor_key_pair()?;
+        let mut wallet = Self::new_with_params(version, anchor, workchain, wallet_id)?;
+        if rotation {
+            wallet.anchor_public_key = Some(HashBytes(wallet.key_pair.public_key));
+            wallet.key_pair = mnemonic.to_key_pair()?;
+        }
+        Ok(wallet)
     }
 
     /// Creates and signs an external inbound message with the supplied send modes.
@@ -281,7 +324,7 @@ impl Wallet {
     ///
     /// Uses this wallet's version and ID, preserving message order and send modes.
     /// `seqno` must match the account state. `expire_at` is the expiration timestamp in Unix seconds.
-    /// V2–V4 accept zero to four messages. V5R1 accepts zero to 255.
+    /// V2–V4 accept zero to four messages. V5R1 accepts zero to 255; TG Wallet accepts one to 255.
     /// V4 uses transfer opcode zero. V5R1 includes no extended actions.
     /// The caller supplies complete outgoing messages and V5R1's required [`SendMsgFlags::IGNORE_ERROR`] flag.
     /// This method checks the message count, but does not validate message contents or consult account state.
@@ -335,7 +378,8 @@ impl Wallet {
 
     /// Returns the deployment state derived from this wallet's version, public key, and ID.
     ///
-    /// Counters and dictionaries use their initial values. This does not fetch current account data.
+    /// Counters and dictionaries use their initial values. TG Wallet retains its anchor key
+    /// after rotation. This does not fetch current account data.
     /// The caller can use this state to initialize an account or attach it to a deployment message.
     ///
     /// # Errors
@@ -345,7 +389,8 @@ impl Wallet {
     pub fn state_init(&self) -> Result<StateInit, WalletError> {
         build_state_init(
             self.version,
-            HashBytes(self.key_pair.public_key),
+            self.anchor_public_key
+                .unwrap_or(HashBytes(self.key_pair.public_key)),
             self.wallet_id,
         )
     }
@@ -396,6 +441,7 @@ impl Wallet {
 /// This does not query account state or validate whether the contract will accept the request.
 ///
 /// V2, V3, and V4 accept up to four messages. V5R1 accepts up to 255.
+/// TG Wallet requires one to 255 messages and uses single/bulk transfer opcodes.
 /// V4 supports transfer opcode zero. V5R1 supports external transfers without extended actions.
 /// V5 requires [`SendMsgFlags::IGNORE_ERROR`] on external transfers; this function does not add it.
 ///
@@ -442,6 +488,13 @@ pub fn build_ext_in_body(
             msgs: int_msgs,
         }
         .to_cell(),
+        TgWallet => TgWalletExtMsgBody {
+            wallet_id,
+            valid_until: expire_at,
+            msg_seqno: seqno,
+            msgs: int_msgs,
+        }
+        .to_cell(),
         _ => return Err(WalletError::UnsupportedExternalMessage(version)),
     };
     Ok(body?)
@@ -462,6 +515,7 @@ fn build_state_init(
         V3R1 | V3R2 => WalletV3Data::new(wallet_id, public_key).to_cell(),
         V4R1 | V4R2 => WalletV4Data::new(wallet_id, public_key).to_cell(),
         V5R1 => WalletV5Data::new(wallet_id, public_key).to_cell(),
+        TgWallet => TgWalletData::new(wallet_id, public_key).to_cell(),
         HLV2R2 => WalletHLV2R2Data::new(wallet_id, public_key).to_cell(),
         HLV1R1 | HLV1R2 | HLV2 | HLV2R1 => {
             return Err(WalletError::UnsupportedInitialData(version));
@@ -561,11 +615,12 @@ mod tests {
             )?
             .0,
             wallet_id: 42,
+            anchor_public_key: None,
         };
 
         let debug_output = format!("{wallet:?}");
         let expected_output = format!(
-            "Wallet {{ version: V4R2, key_pair: KeyPair {{ public_key: {:?}, secret_key: \"***REDACTED***\" }}, address: {:?}, wallet_id: 42 }}",
+            "Wallet {{ version: V4R2, key_pair: KeyPair {{ public_key: {:?}, secret_key: \"***REDACTED***\" }}, address: {:?}, wallet_id: 42, anchor_public_key: None }}",
             public_key, wallet.address
         );
         assert_eq!(debug_output, expected_output);

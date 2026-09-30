@@ -17,11 +17,14 @@ use crate::wallet::WalletVersion;
 
 macro_rules! load_code {
     ($filename:literal) => {
-        Boc::decode_base64(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/resources/ton_wallet_code/",
-            $filename
-        )))
+        Boc::decode_base64(
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/resources/ton_wallet_code/",
+                $filename
+            ))
+            .trim(),
+        )
         .unwrap()
     };
 }
@@ -45,6 +48,7 @@ pub static TON_WALLET_CODE_BY_VERSION: LazyLock<HashMap<WalletVersion, Cell>> =
             (V4R1, load_code!("wallet_v4r1.code")),
             (V4R2, load_code!("wallet_v4r2.code")),
             (V5R1, load_code!("wallet_v5.code")),
+            (TgWallet, load_code!("tg_wallet.code")),
             (HLV1R1, load_code!("highload_v1r1.code")),
             (HLV1R2, load_code!("highload_v1r2.code")),
             (HLV2, load_code!("highload_v2.code")),

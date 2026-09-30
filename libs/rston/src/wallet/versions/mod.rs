@@ -12,12 +12,14 @@
 
 mod highload_v2;
 mod message_utils;
+mod tg;
 mod v1_v2;
 mod v3;
 mod v4;
 mod v5;
 
 pub use highload_v2::*;
+pub use tg::*;
 pub use v1_v2::*;
 pub use v3::*;
 pub use v4::*;

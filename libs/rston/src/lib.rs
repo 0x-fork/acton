@@ -83,7 +83,7 @@
 //! ## Wallets
 //!
 //! The [`wallet`] module derives wallet addresses, reads contract storage, and builds
-//! signed external messages for V2, V3, V4, and V5R1 wallets.
+//! signed external messages for V2, V3, V4, V5R1, and TG Wallet rev00 wallets.
 //! [`wallet::WalletMessage`] pairs an outgoing message with its send-mode flags.
 //! The module also provides embedded contract code and code-hash lookup by revision.
 //! See the [wallet examples](wallet#derive-a-wallet-address) for address derivation,
@@ -91,7 +91,8 @@
 //!
 //! Wallet support requires the `wallet` feature, which is enabled by default.
 //! The caller fetches account state, supplies the sequence number, and sends the resulting BoC.
-//! The [`mnemonic`] module validates TON mnemonic phrases and derives Ed25519 keys.
+//! The [`mnemonic`] module derives Ed25519 keys from TON, BIP39, and TG Wallet rotation phrases.
+//! Constructors use TON by default; select other schemes with [`mnemonic::MnemonicScheme`].
 //!
 //! ## Supported Rust Versions
 //!
