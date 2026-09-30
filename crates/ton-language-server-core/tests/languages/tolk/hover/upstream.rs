@@ -25,7 +25,16 @@ fn annotations_01_annotations_documentation() {
         "#,
         expect![[r#"
             Symbol with this annotation is deprecated and should not be used in new code. First string argument is a reason for deprecation as a string literal.
-            Function with this annotation will be automatically inlined during compilation
+            Requests in-place inlining: the compiler inserts the function body at each direct call site. If this is not possible, compilation fails.
+
+            Tolk 1.5 supports early `return` in `if` and `match` statements. Each such statement must leave at most one path to the following code. A fully terminating `if` or `match` that contains `return` must be the last statement in its block.
+
+            Inlining is not supported for:
+
+            - Recursive functions or functions used as values
+            - Contract entrypoints, getters, or functions with `@method_id`
+            - Functions without a Tolk body, such as `asm` functions
+            - `return` inside loops, `try/catch`, standalone blocks, or expressions
             Function with this annotation will be automatically inlined by reference during compilation
             Function with this annotation will not be inlined even if compiler can inline it
             Defines the policy for handling bounced messages. Right now, only `"manual"` value is supported.

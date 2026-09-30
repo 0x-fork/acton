@@ -1,7 +1,16 @@
 pub(super) fn annotation(name: &str) -> Option<&'static str> {
     let description = match name {
         "inline" => {
-            "Function with this annotation will be automatically inlined during compilation"
+            "Requests in-place inlining: the compiler inserts the function body at each direct \
+             call site. If this is not possible, compilation fails.\n\n\
+             Tolk 1.5 supports early `return` in `if` and `match` statements. Each such statement \
+             must leave at most one path to the following code. A fully terminating `if` or \
+             `match` that contains `return` must be the last statement in its block.\n\n\
+             Inlining is not supported for:\n\n\
+             - Recursive functions or functions used as values\n\
+             - Contract entrypoints, getters, or functions with `@method_id`\n\
+             - Functions without a Tolk body, such as `asm` functions\n\
+             - `return` inside loops, `try/catch`, standalone blocks, or expressions"
         }
         "inline_ref" => {
             "Function with this annotation will be automatically inlined by reference during \

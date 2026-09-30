@@ -25,6 +25,7 @@ All notable changes to this project will be documented in this file.
 
 ### IDE
 
+- Describe `@inline` eligibility and supported early returns in annotation hover.
 - Match Tolk 1.5 alias equality and method selection, including alias chains,
   generic receivers, and methods on declared types after smart casts.
 - Match Tolk 1.5 smart casts after branch merges, including alias restoration,
