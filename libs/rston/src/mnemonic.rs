@@ -468,7 +468,7 @@ mod tests {
                 .to_key_pair()?;
         assert_eq!(without_password, empty_password);
 
-        for password in ["caf\u{e9}", "cafe\u{301}"] {
+        for password in ["café", "cafe\u{301}"] {
             let key_pair = Mnemonic::from_str_with_scheme(
                 phrase,
                 Some(password.to_owned()),
