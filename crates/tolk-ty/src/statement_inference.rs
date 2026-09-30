@@ -1,6 +1,6 @@
 use crate::flow_inference::{FlowContext, SinkExpr, UnreachableKind};
 use crate::try_flow;
-use crate::type_inference::TypeInferenceWalker;
+use crate::type_inference::{LoopFlowFrame, TypeInferenceWalker};
 use crate::type_interner::TyId;
 use tolk_resolver::AstNodeSpanExt;
 use tolk_syntax::{
@@ -79,13 +79,27 @@ impl<'t> TypeInferenceWalker<'_, '_> {
         let after_count = self.infer_expr(count, flow, false, None);
         let loop_entry_flow = after_count.out_flow.clone();
         let mut loop_flow = after_count.out_flow;
+        self.loop_stack.push(LoopFlowFrame::default());
 
         loop {
+            self.loop_stack
+                .last_mut()
+                .expect("active loop frame")
+                .reset_in_fixpoint(&loop_entry_flow);
             let body_flow = self.process_block_stmt(body, loop_flow.clone());
-            let next_loop_flow = loop_entry_flow.merge_flow(&body_flow, self.intrn());
+            let back_edge = body_flow.merge_flow(
+                &self
+                    .loop_stack
+                    .last()
+                    .expect("active loop frame")
+                    .continue_flow,
+                self.ctx.type_db.intrn,
+            );
+            let next_loop_flow = loop_entry_flow.merge_flow(&back_edge, self.intrn());
 
             if next_loop_flow.equivalent_to(&loop_flow) {
-                return next_loop_flow;
+                let frame = self.loop_stack.pop().expect("active loop frame");
+                return next_loop_flow.merge_flow(&frame.break_flow, self.intrn());
             }
 
             loop_flow = next_loop_flow;
@@ -99,14 +113,30 @@ impl<'t> TypeInferenceWalker<'_, '_> {
 
         let loop_entry_flow = flow.clone();
         let mut loop_flow = flow;
+        self.loop_stack.push(LoopFlowFrame::default());
 
         loop {
+            self.loop_stack
+                .last_mut()
+                .expect("active loop frame")
+                .reset_in_fixpoint(&loop_entry_flow);
             let after_condition = self.infer_expr(condition, loop_flow.clone(), true, None);
             let body_flow = self.process_block_stmt(body, after_condition.true_flow);
-            let next_loop_flow = loop_entry_flow.merge_flow(&body_flow, self.intrn());
+            let back_edge = body_flow.merge_flow(
+                &self
+                    .loop_stack
+                    .last()
+                    .expect("active loop frame")
+                    .continue_flow,
+                self.ctx.type_db.intrn,
+            );
+            let next_loop_flow = loop_entry_flow.merge_flow(&back_edge, self.intrn());
 
             if next_loop_flow.equivalent_to(&loop_flow) {
-                return after_condition.false_flow;
+                let frame = self.loop_stack.pop().expect("active loop frame");
+                return after_condition
+                    .false_flow
+                    .merge_flow(&frame.break_flow, self.intrn());
             }
 
             loop_flow = next_loop_flow;
@@ -120,15 +150,31 @@ impl<'t> TypeInferenceWalker<'_, '_> {
 
         let loop_entry_flow = flow.clone();
         let mut loop_flow = flow;
+        self.loop_stack.push(LoopFlowFrame::default());
 
         loop {
+            self.loop_stack
+                .last_mut()
+                .expect("active loop frame")
+                .reset_in_fixpoint(&loop_entry_flow);
             let body_flow = self.process_block_stmt(body, loop_flow.clone());
-            let after_condition = self.infer_expr(condition, body_flow, true, None);
+            let condition_input = body_flow.merge_flow(
+                &self
+                    .loop_stack
+                    .last()
+                    .expect("active loop frame")
+                    .continue_flow,
+                self.ctx.type_db.intrn,
+            );
+            let after_condition = self.infer_expr(condition, condition_input, true, None);
             let next_loop_flow =
                 loop_entry_flow.merge_flow(&after_condition.true_flow, self.intrn());
 
             if next_loop_flow.equivalent_to(&loop_flow) {
-                return after_condition.false_flow;
+                let frame = self.loop_stack.pop().expect("active loop frame");
+                return after_condition
+                    .false_flow
+                    .merge_flow(&frame.break_flow, self.intrn());
             }
 
             loop_flow = next_loop_flow;
@@ -225,16 +271,24 @@ impl<'t> TypeInferenceWalker<'_, '_> {
     }
 
     //+ CHECKED
-    const fn process_break_stmt(&self, _: Break, flow: FlowContext) -> FlowContext {
-        // for now there is no break statement in Tolk
+    fn process_break_stmt(&mut self, _: Break, flow: FlowContext) -> FlowContext {
+        if let Some(frame) = self.loop_stack.last_mut() {
+            frame.break_flow = frame.break_flow.merge_flow(&flow, self.ctx.type_db.intrn);
+        }
+
         let mut flow = flow;
         flow.mark_unreachable(UnreachableKind::Break);
         flow
     }
 
     //+ CHECKED
-    const fn process_continue_stmt(&self, _: Continue, flow: FlowContext) -> FlowContext {
-        // for now there is no continue statement in Tolk
+    fn process_continue_stmt(&mut self, _: Continue, flow: FlowContext) -> FlowContext {
+        if let Some(frame) = self.loop_stack.last_mut() {
+            frame.continue_flow = frame
+                .continue_flow
+                .merge_flow(&flow, self.ctx.type_db.intrn);
+        }
+
         let mut flow = flow;
         flow.mark_unreachable(UnreachableKind::Continue);
         flow

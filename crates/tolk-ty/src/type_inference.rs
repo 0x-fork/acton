@@ -1,4 +1,6 @@
-use crate::flow_inference::{FlowContext, InferenceContext, InferenceResult, SinkExpr};
+use crate::flow_inference::{
+    FlowContext, InferenceContext, InferenceResult, SinkExpr, UnreachableKind,
+};
 use crate::type_db::TypeDb;
 use crate::type_interner::{TyId, TypeInterner};
 use crate::type_substitutor::TypeSubstitutor;
@@ -80,13 +82,34 @@ pub fn infer(
     InferenceResult::new(walker.ctx)
 }
 
+/// Collects transfers to the nearest enclosing loop during one fixed-point pass.
+#[derive(Default)]
+pub(crate) struct LoopFlowFrame {
+    pub break_flow: FlowContext,
+    pub continue_flow: FlowContext,
+}
+
+impl LoopFlowFrame {
+    pub(crate) fn reset_in_fixpoint(&mut self, loop_entry_facts: &FlowContext) {
+        self.break_flow = loop_entry_facts.clone();
+        self.break_flow.mark_unreachable(UnreachableKind::Break);
+        self.continue_flow = loop_entry_facts.clone();
+        self.continue_flow
+            .mark_unreachable(UnreachableKind::Continue);
+    }
+}
+
 pub(crate) struct TypeInferenceWalker<'db, 'a> {
     pub ctx: InferenceContext<'db, 'a>,
+    pub loop_stack: Vec<LoopFlowFrame>,
 }
 
 impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
     pub(crate) const fn new(ctx: InferenceContext<'db, 'a>) -> Self {
-        Self { ctx }
+        Self {
+            ctx,
+            loop_stack: Vec::new(),
+        }
     }
 
     pub(crate) const fn intrn(&mut self) -> &mut TypeInterner {

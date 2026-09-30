@@ -22,6 +22,8 @@ All notable changes to this project will be documented in this file.
 
 ### IDE
 
+- Track `break` and `continue` paths when inferring loop types, including
+  subsequent iterations, loop exits, and nested loops.
 - Match Tolk 1.5 by using `bitsN` for fixed-size bit strings and resolving
   explicitly declared `bytesN` aliases as user-defined types.
 - Complete `break` and `continue` inside loop bodies, respecting function and

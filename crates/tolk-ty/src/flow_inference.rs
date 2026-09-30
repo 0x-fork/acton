@@ -235,7 +235,7 @@ impl FlowContext {
 /// Examples: `localVar`, `localTensor.1`, `localTuple.1.2.3`, `localObj.field`
 /// These are NOT sink expressions: `globalVar`, `f()`, `f().1`
 /// Note, that globals are NOT sink: don't encourage to use a global twice, it costs gas, better assign it to a local.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq)]
 pub(crate) struct SinkExpr {
     /// smart casts and data flow applies only to locals
     pub def: LocalDefId,
@@ -243,6 +243,12 @@ pub(crate) struct SinkExpr {
     pub index_path: u64,
     /// Name of local for debug
     pub name: SmolStr,
+}
+
+impl PartialEq for SinkExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.def == other.def && self.index_path == other.index_path
+    }
 }
 
 impl Hash for SinkExpr {

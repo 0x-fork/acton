@@ -2489,6 +2489,7 @@ impl<'t> TypeInferenceWalker<'_, '_> {
 
         if let Some(body) = v.body() {
             let old_return_types = std::mem::take(&mut self.ctx.return_types);
+            let old_loop_stack = std::mem::take(&mut self.loop_stack);
             let old_declared_return_type = self.ctx.declared_return_ty;
             let old_inferred_return_type = self.ctx.inferred_return_type;
 
@@ -2506,6 +2507,7 @@ impl<'t> TypeInferenceWalker<'_, '_> {
             let final_return_type = self.ctx.inferred_return_type.unwrap_or(return_type);
 
             self.ctx.return_types = old_return_types;
+            self.loop_stack = old_loop_stack;
             self.ctx.declared_return_ty = old_declared_return_type;
             self.ctx.inferred_return_type = old_inferred_return_type;
 
