@@ -11,12 +11,10 @@ use tolk_ty::InferenceResult;
 /// ### What it does
 /// Checks for calls to `@pure` functions where the result is not used.
 ///
-/// ### Why check this?
+/// ### Why is this bad?
 /// An unused result may indicate a missing assignment or check.
-/// However, `@pure` does not mean that the call cannot throw an exception.
-/// The call may validate input even when its result is ignored.
-/// For example, `s.preloadUint(32);` throws if the slice has fewer than 32 bits.
-/// Use the return value, or write `val _ = s.preloadUint(32);` to discard it explicitly.
+/// A `@pure` call can still throw an exception.
+/// Use the result, or discard it explicitly with `val _ = ...`.
 ///
 /// ### Example
 /// ```tolk twoslash

@@ -874,7 +874,7 @@
         },
         "pure-function-call-unused": {
           "title": "E006: pure-function-call-unused",
-          "description": "### What it does\nChecks for calls to `@pure` functions where the result is not used.\n\n### Why check this?\nAn unused result may indicate a missing assignment or check.\nHowever, `@pure` does not mean that the call cannot throw an exception.\nThe call may validate input even when its result is ignored.\nFor example, `s.preloadUint(32);` throws if the slice has fewer than 32 bits.\nUse the return value, or write `val _ = s.preloadUint(32);` to discard it explicitly.\n\n### Example\n```tolk twoslash\nfun main() {\n    createEmptyCell();\n//  ^^^^^^^^^^^^^^^^^ E006: result of pure function is not used\n}\n```",
+          "description": "### What it does\nChecks for calls to `@pure` functions where the result is not used.\n\n### Why is this bad?\nAn unused result may indicate a missing assignment or check.\nA `@pure` call can still throw an exception.\nUse the result, or discard it explicitly with `val _ = ...`.\n\n### Example\n```tolk twoslash\nfun main() {\n    createEmptyCell();\n//  ^^^^^^^^^^^^^^^^^ E006: result of pure function is not used\n}\n```",
           "anyOf": [
             {
               "$ref": "#/definitions/LintRuleLevel"
