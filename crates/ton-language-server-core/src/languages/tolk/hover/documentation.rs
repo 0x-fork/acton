@@ -11,8 +11,9 @@ pub(super) fn annotation(name: &str) -> Option<&'static str> {
             "Function with this annotation will not be inlined even if compiler can inline it"
         }
         "pure" => {
-            "Function with this annotation has no side effects and can be optimized away by the \
-             compiler"
+            "Marks an `asm` or `builtin` function as having no side effects, allowing the compiler \
+             to remove calls whose results are unused. Tolk 1.5 does not allow `@pure` on functions \
+             with a Tolk body."
         }
         "deprecated" => {
             "Symbol with this annotation is deprecated and should not be used in new code. First \

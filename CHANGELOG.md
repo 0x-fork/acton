@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### IDE
+
+- Complete `break` and `continue` inside loop bodies, respecting function and
+  `try`/`catch` boundaries in Tolk 1.5.
+- Offer `@pure` only for `asm` and `builtin` functions and describe its scope in hover.
+
 ### Dependencies
 
 - Remove Localton's `ton` dependency. Get-method stacks use `tvm-ffi` and `rston`,

@@ -233,8 +233,8 @@ annotation_tests!(
     ),
     (
         annotation_pure,
-        "@<caret>pure\nfun f() {}",
-        "Function with this annotation has no side effects and can be optimized away by the compiler"
+        "@<caret>pure\nfun f(): int asm \"ZERO\"",
+        "Marks an `asm` or `builtin` function as having no side effects, allowing the compiler to remove calls whose results are unused. Tolk 1.5 does not allow `@pure` on functions with a Tolk body."
     ),
     (
         annotation_deprecated,

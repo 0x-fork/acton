@@ -4,7 +4,7 @@ use crate::completion::{
     CompletionCategory, CompletionCollector, CompletionProvider, CompletionRank,
 };
 use crate::{CompletionItem, CompletionItemKind};
-use tolk_syntax::{AnnotatedDeclaration, HasAnnotations, HasName};
+use tolk_syntax::{AnnotatedDeclaration, FuncBody, HasAnnotations, HasName};
 
 /// Completes root, ABI, test, and declaration-specific annotations.
 ///
@@ -88,13 +88,22 @@ fn annotation_applies(
     owner: Option<AnnotatedDeclaration<'_>>,
     source: &str,
 ) -> bool {
-    if annotation.owners.contains(&AnnotationOwner::Any) || owner.is_none() {
+    if annotation.owners.contains(&AnnotationOwner::Any) {
         return true;
     }
-    let Some(owner) = owner else { return true };
+    let Some(owner) = owner else {
+        return !annotation
+            .owners
+            .contains(&AnnotationOwner::AsmOrBuiltinFunction);
+    };
     annotation.owners.iter().any(|kind| match kind {
         AnnotationOwner::Any => true,
         AnnotationOwner::Function => owner.is_function(),
+        AnnotationOwner::AsmOrBuiltinFunction => matches!(
+            owner,
+            AnnotatedDeclaration::Function(function)
+                if matches!(function.body(), Some(FuncBody::AsmBody(_) | FuncBody::BuiltinSpecifier(_)))
+        ),
         AnnotationOwner::GetMethod => owner.is_get_method(),
         AnnotationOwner::Struct => owner.is_struct(),
         AnnotationOwner::Field => owner.is_field(),
@@ -106,6 +115,7 @@ fn annotation_applies(
 enum AnnotationOwner {
     Any,
     Function,
+    AsmOrBuiltinFunction,
     GetMethod,
     Struct,
     Field,
@@ -136,7 +146,7 @@ const ROOT_ANNOTATIONS: &[AnnotationSpec] = &[
     AnnotationSpec {
         label: "pure",
         full_name: "pure",
-        owners: FUNCTIONS,
+        owners: &[AnnotationOwner::AsmOrBuiltinFunction],
         insertion: None,
     },
     AnnotationSpec {

@@ -265,7 +265,7 @@ fn shows_documentation_for_all_supported_annotations() {
             Function with this annotation will not be inlined even if compiler can inline it
             Defines the policy for handling bounced messages. Right now, only `"manual"` value is supported.
             Defines the policy for handling potential builder overflow. Right now, only `"suppress"` value is supported. See <https://docs.ton.org/v3/documentation/smart-contracts/tolk/tolk-vs-func/pack-to-from-cells#what-if-data-exceeds-1023-bits> for more details
-            Function with this annotation has no side effects and can be optimized away by the compiler
+            Marks an `asm` or `builtin` function as having no side effects, allowing the compiler to remove calls whose results are unused. Tolk 1.5 does not allow `@pure` on functions with a Tolk body.
             Marks the test as skipped.
             Specifies the method ID (as a number literal) for the function in smart contract interface. See <https://docs.ton.org/v3/guidelines/smart-contracts/get-methods> for more details
             Defines the minimal message value for a message struct in ABI metadata.

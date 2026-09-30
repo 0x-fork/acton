@@ -144,3 +144,74 @@ fn applies_statement_snippets() {
                 } }"#]],
     );
 }
+
+#[test]
+fn completes_loop_transfer_in_while() {
+    CompletionTest::new("fun main() { while (true) { <caret> } }").check_applied(
+        "break",
+        expect!["fun main() { while (true) { break;<caret> } }"],
+    );
+}
+
+#[test]
+fn completes_loop_transfer_in_repeat() {
+    CompletionTest::new("fun main() { repeat (3) { <caret> } }").check_applied(
+        "continue",
+        expect!["fun main() { repeat (3) { continue;<caret> } }"],
+    );
+}
+
+#[test]
+fn completes_loop_transfer_in_do_while() {
+    CompletionTest::new("fun main() { do { <caret> } while (true); }").check_applied(
+        "break",
+        expect!["fun main() { do { break;<caret> } while (true); }"],
+    );
+}
+
+#[test]
+fn completes_loop_transfer_in_nested_block() {
+    CompletionTest::new("fun main() { while (true) { if (true) { <caret> } } }").check_applied(
+        "continue",
+        expect!["fun main() { while (true) { if (true) { continue;<caret> } } }"],
+    );
+}
+
+#[test]
+fn completes_loop_transfer_in_lambda_loop() {
+    CompletionTest::new(
+        "fun main() { try { val f = fun() { while (true) { <caret> } }; } catch (e) {} }",
+    )
+    .check_applied(
+        "break",
+        expect![
+            "fun main() { try { val f = fun() { while (true) { break;<caret> } }; } catch (e) {} }"
+        ],
+    );
+}
+
+#[test]
+fn completes_loop_transfer_in_existing_semicolon() {
+    CompletionTest::new("fun main() { while (true) { br<caret>; } }").check_applied(
+        "break",
+        expect!["fun main() { while (true) { break<caret>; } }"],
+    );
+}
+
+#[test]
+fn respects_loop_transfer_boundaries() {
+    for source in [
+        "fun main() { <caret> }",
+        "fun main() { while (true) { val f = fun() { <caret> }; } }",
+        "fun main() { while (true) { try { <caret> } catch (e) {} } }",
+        "fun main() { while (true) { try {} catch (e) { <caret> } } }",
+        "fun main() { try { while (true) { <caret> } } catch (e) {} }",
+        "fun main() { while (match (1) { else => { <caret> } }) {} }",
+        "fun main() { repeat (match (1) { else => { <caret> } }) {} }",
+        "fun main() { do {} while (match (1) { else => { <caret> } }); }",
+    ] {
+        CompletionTest::new(source)
+            .labels(&["break", "continue"])
+            .check(expect!["<none>"]);
+    }
+}

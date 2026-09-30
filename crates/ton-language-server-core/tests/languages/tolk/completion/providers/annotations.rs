@@ -27,8 +27,7 @@ fn completes_function_get_method_and_entry_point_annotations() {
         inline      Event          0:1-0:1  inline
         inline_ref  Event          0:1-0:1  inline_ref
         method_id   Event          0:1-0:1  method_id(${1:0x1})$0
-        noinline    Event          0:1-0:1  noinline
-        pure        Event          0:1-0:1  pure"#]]);
+        noinline    Event          0:1-0:1  noinline"#]]);
 
     // A get method additionally offers @test and @method_id.
     CompletionTest::new(
@@ -402,4 +401,29 @@ fn applies_parameterized_annotation_completions() {
             @test.fail_with(<caret>)
             get fun foo() {}"#]],
     );
+}
+
+#[test]
+fn completes_pure_for_asm_and_builtin_bodies() {
+    for source in [
+        "@<caret>\nfun zero(): int asm \"ZERO\"",
+        "@<caret>\nfun zero(): int builtin",
+        "@<caret>\nfun int.identity(self): int asm \"NOP\"",
+    ] {
+        CompletionTest::new(source)
+            .labels(&["pure"])
+            .check(expect![[r#"
+            label  kind   detail  edit     text
+            pure   Event          0:1-0:1  pure"#]]);
+    }
+
+    for source in [
+        "@<caret>",
+        "@<caret>\nfun f() {}",
+        "@<caret>\nget fun f() {}",
+    ] {
+        CompletionTest::new(source)
+            .labels(&["pure"])
+            .check(expect!["<none>"]);
+    }
 }

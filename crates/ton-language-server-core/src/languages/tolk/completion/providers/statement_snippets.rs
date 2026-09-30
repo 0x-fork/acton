@@ -4,8 +4,8 @@ use crate::completion::{CompletionCategory, CompletionCollector, CompletionProvi
 
 /// Completes common statement snippets in statement contexts.
 ///
-/// The `catch` snippet is added only after a compatible `try` statement, avoiding
-/// invalid control-flow fragments elsewhere in a function body.
+/// Loop transfers require an enclosing loop body in the same function and cannot
+/// occur inside `try`/`catch`. `catch` is offered after a compatible `try` statement.
 pub(crate) struct StatementSnippetCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for StatementSnippetCompletionProvider {
@@ -27,6 +27,21 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for StatementSnippetC
                 CompletionCategory::Snippet,
             );
         }
+        if allows_loop_transfer(context) {
+            for (label, snippet) in [("break", "break;"), ("continue", "continue;")] {
+                add_snippet(
+                    context.syntax,
+                    collector,
+                    label,
+                    if context.syntax.before_semicolon {
+                        label
+                    } else {
+                        snippet
+                    },
+                    CompletionCategory::Snippet,
+                );
+            }
+        }
         if follows_try_statement(context) {
             add_snippet(
                 context.syntax,
@@ -38,6 +53,33 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for StatementSnippetC
         }
         Some(())
     }
+}
+
+/// Checks lexical restrictions on loop transfers; compiler control-flow analysis
+/// remains responsible for restrictions involving other statements in the loop.
+fn allows_loop_transfer(context: &TolkCompletionProviderContext<'_>) -> bool {
+    let Some(mut child) = context.syntax.cursor_node() else {
+        return false;
+    };
+    let mut inside_loop = false;
+    while let Some(parent) = child.parent() {
+        match parent.kind() {
+            "function_declaration"
+            | "method_declaration"
+            | "get_method_declaration"
+            | "lambda_expression" => break,
+            "try_catch_statement" => return false,
+            "while_statement" | "do_while_statement" | "repeat_statement" => {
+                if parent.child_by_field_name("body") != Some(child) {
+                    return false;
+                }
+                inside_loop = true;
+            }
+            _ => {}
+        }
+        child = parent;
+    }
+    inside_loop
 }
 
 fn follows_try_statement(context: &TolkCompletionProviderContext<'_>) -> bool {

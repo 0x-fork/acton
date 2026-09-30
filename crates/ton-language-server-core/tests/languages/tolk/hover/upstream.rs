@@ -30,7 +30,7 @@ fn annotations_01_annotations_documentation() {
             Function with this annotation will not be inlined even if compiler can inline it
             Defines the policy for handling bounced messages. Right now, only `"manual"` value is supported.
             Defines the policy for handling potential builder overflow. Right now, only `"suppress"` value is supported. See <https://docs.ton.org/v3/documentation/smart-contracts/tolk/tolk-vs-func/pack-to-from-cells#what-if-data-exceeds-1023-bits> for more details
-            Function with this annotation has no side effects and can be optimized away by the compiler
+            Marks an `asm` or `builtin` function as having no side effects, allowing the compiler to remove calls whose results are unused. Tolk 1.5 does not allow `@pure` on functions with a Tolk body.
             Marks the test as skipped.
             Overrides the client-facing ABI type for a struct field. This is useful when generated wrappers should expose a different representation than the serialized Tolk field type."#]],
     );
