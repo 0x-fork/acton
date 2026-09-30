@@ -65,7 +65,8 @@ Both macros are available through `rston::prelude` without a separate dependency
 The `models` module includes addresses, messages, accounts, transactions, blocks, shard states, and blockchain configuration.
 For custom cell formats, `CellBuilder` and `CellSlice` provide operations for individual fields.
 
-The `mnemonic` module validates 24-word TON mnemonics and derives Ed25519 key pairs.
+The `mnemonic` module validates 24-word TON mnemonics and 12-word BIP39 mnemonics,
+then derives Ed25519 key pairs. BIP39 phrases use SLIP-0010 at `m/44'/607'/0'`.
 It exposes `Mnemonic`, `KeyPair`, and the English `WORDLIST_EN_SET`.
 
 The `wallet` module derives wallet addresses and prepares signed external messages

@@ -1,10 +1,11 @@
-//! TON mnemonic validation and Ed25519 key derivation.
+//! TON and BIP39 mnemonic validation and Ed25519 wallet key derivation.
 
 use crate::error::MnemonicError;
 use ed25519_dalek::{KEYPAIR_LENGTH, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SecretKey, SigningKey};
 use hmac::{Hmac, Mac};
 use pbkdf2::pbkdf2_hmac;
 use sha2::Sha512;
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::sync::LazyLock;
 use std::{cmp, convert::TryInto, fmt};
@@ -20,13 +21,22 @@ const PBKDF_ITERATIONS: u32 = 100000;
 pub static WORDLIST_EN_SET: LazyLock<HashSet<&'static str>> =
     LazyLock::new(|| WORDLIST_EN.split('\n').filter(|w| !w.is_empty()).collect());
 
-/// An owned TON mnemonic whose words and optional password are zeroized on drop.
+/// An owned wallet mnemonic whose words and optional password are zeroized on drop.
+///
+/// Imports 24-word TON phrases or 12-word BIP39 phrases. BIP39 wallet keys use
+/// SLIP-0010 Ed25519 derivation at `m/44'/607'/0'`, as described in the
+/// [TON wallet guidelines](https://github.com/ton-blockchain/TEPs/blob/master/text/0003-wallets.md).
 ///
 /// Borrowed input passed to [`Mnemonic::new`] or [`Mnemonic::from_str`] remains
 /// owned by the caller and cannot be cleared by this type.
 pub struct Mnemonic {
-    words: Zeroizing<Vec<String>>,
+    words: MnemonicWords,
     password: Zeroizing<Option<String>>,
+}
+
+enum MnemonicWords {
+    Ton(Zeroizing<Vec<String>>),
+    Bip39(bip39::Mnemonic),
 }
 
 /// An Ed25519 key pair whose secret key bytes are zeroized on drop.
@@ -57,22 +67,23 @@ impl fmt::Debug for KeyPair {
 }
 
 impl Mnemonic {
-    /// Imports an existing TON mnemonic from 24 English words.
+    /// Imports 24 English words as a TON mnemonic or 12 as a BIP39 mnemonic.
     ///
     /// Trims each word and converts it to lowercase before validation.
     ///
     /// `password` is the mnemonic password used for key derivation.
     /// `None` and an empty string both mean no password. Nonempty passwords
-    /// retain their original whitespace and case.
+    /// retain their whitespace and case. BIP39 passphrases are normalized to
+    /// Unicode NFKD during key derivation and do not affect checksum validation.
     ///
     /// # Errors
     ///
     /// Returns [`MnemonicError`] for an incorrect word count, an unknown word,
-    /// or a phrase that fails TON seed validation.
+    /// or a phrase that fails TON seed validation or the BIP39 checksum.
     pub fn new(words: Vec<&str>, password: Option<String>) -> Result<Mnemonic, MnemonicError> {
         let password = Zeroizing::new(password);
 
-        if words.len() != 24 {
+        if !matches!(words.len(), 12 | 24) {
             return Err(MnemonicError::WordCount(words.len()));
         }
 
@@ -88,6 +99,15 @@ impl Mnemonic {
             .find(|word| !WORDLIST_EN_SET.contains(word.as_str()))
         {
             return Err(MnemonicError::UnknownWord(word.clone()));
+        }
+
+        if normalized_words.len() == 12 {
+            let phrase = Zeroizing::new(normalized_words.join(" "));
+            let words = bip39::Mnemonic::parse_in_normalized(bip39::Language::English, &phrase)?;
+            return Ok(Mnemonic {
+                words: MnemonicWords::Bip39(words),
+                password,
+            });
         }
 
         match &*password {
@@ -124,12 +144,12 @@ impl Mnemonic {
         }
 
         Ok(Mnemonic {
-            words: normalized_words,
+            words: MnemonicWords::Ton(normalized_words),
             password,
         })
     }
 
-    /// Imports an existing TON mnemonic from a space-separated phrase.
+    /// Imports a 12-word BIP39 or 24-word TON mnemonic from a space-separated phrase.
     ///
     /// Accepts repeated spaces and whitespace around each word.
     /// Tabs and line breaks do not separate words.
@@ -143,11 +163,21 @@ impl Mnemonic {
         Mnemonic::new(words, password)
     }
 
-    /// Derives the Ed25519 key pair using the TON default seed parameters.
+    /// Derives the Ed25519 wallet key pair for this phrase's scheme.
+    ///
+    /// TON phrases use the TON default seed parameters. BIP39 phrases use
+    /// SLIP-0010 at `m/44'/607'/0'` (the first TON account).
     /// The returned pair owns its secret bytes and clears them on drop.
     pub fn to_key_pair(&self) -> Result<KeyPair, MnemonicError> {
-        let entropy = to_entropy(&self.words, (*self.password).as_ref())?;
-        let seed = pbkdf2_sha512(entropy, "TON default seed", PBKDF_ITERATIONS, 64)?;
+        let seed = match &self.words {
+            MnemonicWords::Ton(words) => {
+                let entropy = to_entropy(words, (*self.password).as_ref())?;
+                pbkdf2_sha512(entropy, "TON default seed", PBKDF_ITERATIONS, 64)?
+            }
+            MnemonicWords::Bip39(words) => {
+                bip39_wallet_seed(words, self.password.as_deref().unwrap_or_default())?
+            }
+        };
 
         let secret_key_bytes: &SecretKey = seed
             .get(..SECRET_KEY_LENGTH)
@@ -163,6 +193,33 @@ impl Mnemonic {
             secret_key: signing_key.to_keypair_bytes(),
         })
     }
+}
+
+/// Derives the first TON account using hardened SLIP-0010 Ed25519 children.
+fn bip39_wallet_seed(
+    mnemonic: &bip39::Mnemonic,
+    password: &str,
+) -> Result<Zeroizing<Vec<u8>>, MnemonicError> {
+    let mut passphrase = Cow::Borrowed(password);
+    bip39::Mnemonic::normalize_utf8_cow(&mut passphrase);
+    let passphrase = Zeroizing::new(passphrase.into_owned());
+    let seed = Zeroizing::new(mnemonic.to_seed_normalized(&passphrase));
+
+    let mut mac = Hmac::<Sha512>::new_from_slice(b"ed25519 seed")?;
+    mac.update(seed.as_slice());
+    let mut derived = Zeroizing::new(<[u8; 64]>::from(mac.finalize().into_bytes()));
+
+    // m/44'/607'/0': BIP44 purpose, TON coin type, first account.
+    // Each result holds the private key followed by its chain code.
+    for index in [44u32, 607, 0] {
+        let mut mac = Hmac::<Sha512>::new_from_slice(&derived[32..])?;
+        mac.update(&[0]);
+        mac.update(&derived[..32]);
+        mac.update(&(index | (1 << 31)).to_be_bytes());
+        derived = Zeroizing::new(<[u8; 64]>::from(mac.finalize().into_bytes()));
+    }
+
+    Ok(Zeroizing::new(derived.to_vec()))
 }
 
 fn to_entropy(
@@ -253,5 +310,64 @@ mod tests {
         assert_eq!(kp.secret_key.as_slice(), expected.as_slice());
 
         Ok(())
+    }
+
+    #[test]
+    fn bip39_wallet_keys_match_reference() -> anyhow::Result<()> {
+        // BIP39 test phrases, with keys derived by @ton/crypto's
+        // deriveEd25519Path(seed, [44, 607, 0]) and keyPairFromSeed.
+        let cases = [
+            (
+                "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+                None,
+                "b477ef5ed17fb8a2b8faddd7a9835a227243a82c70b190c7af4896155aa7df9f7952e94118f34607c75e23258dd9220d66ccac5a3ee074125c25068e8107bfbf",
+            ),
+            (
+                "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+                Some("TREZOR"),
+                "d0f0c5522593343e960933db00c1df873c0c1f87771c853c2bf0ef23b2f97b413a2da797ef192099b8d918e55e5e2c54ea228637fdec66d77264ac22e447db4a",
+            ),
+            (
+                "legal winner thank year wave sausage worth useful legal winner thank yellow",
+                None,
+                "930b30bc355699d639e8b9561c5e650edfc696294f9917cc19a453dcd526cf84434908c4c092113fcced4eec061b09c02b7b8934a9ca555e2032505aab7558ea",
+            ),
+        ];
+
+        for (phrase, password, expected) in cases {
+            let mnemonic = Mnemonic::from_str(phrase, password.map(str::to_owned))?;
+            let key_pair = mnemonic.to_key_pair()?;
+            assert_eq!(hex::encode(key_pair.secret_key), expected);
+            assert_eq!(key_pair.public_key, key_pair.secret_key[32..]);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn bip39_normalizes_words_and_passphrase() -> anyhow::Result<()> {
+        let phrase = "  ABANDON abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon  ABOUT ";
+        let without_password = Mnemonic::from_str(phrase, None)?.to_key_pair()?;
+        let empty_password = Mnemonic::from_str(phrase, Some(String::new()))?.to_key_pair()?;
+        assert_eq!(without_password, empty_password);
+
+        for password in ["caf\u{e9}", "cafe\u{301}"] {
+            let key_pair = Mnemonic::from_str(phrase, Some(password.to_owned()))?.to_key_pair()?;
+            assert_eq!(
+                hex::encode(key_pair.public_key),
+                "001a3e145602093c24330c1515319b9cf68ed74a3412310008fd6407fc025f0c",
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn bip39_validates_checksum() {
+        let result = Mnemonic::new(vec!["abandon"; 12], None);
+        assert!(matches!(
+            result,
+            Err(MnemonicError::InvalidBip39(bip39::Error::InvalidChecksum)),
+        ));
     }
 }

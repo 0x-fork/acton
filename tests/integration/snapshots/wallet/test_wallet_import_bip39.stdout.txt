@@ -1,0 +1,7 @@
+{
+  "address": "[WALLET_ADDRESS_BASE]",
+  "is_global": false,
+  "kind": "v5r1",
+  "name": "bip39-wallet",
+  "success": true
+}

@@ -1,4 +1,4 @@
 Error: Invalid mnemonic phrase
 
 Caused by:
-  expected 24 words mnemonic, got 3
+  expected 12 or 24 mnemonic words, got 3

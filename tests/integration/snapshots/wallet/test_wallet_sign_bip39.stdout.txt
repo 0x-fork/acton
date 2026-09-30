@@ -1,0 +1,6 @@
+{
+  "output": "hex",
+  "signed_body": "[BOC_HEX]",
+  "success": true,
+  "wallet": "bip39-wallet"
+}

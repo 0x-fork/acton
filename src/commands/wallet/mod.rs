@@ -1993,7 +1993,7 @@ fn import_wallet(
     let config_path = get_config_path(&name, is_global)?;
 
     let mnemonic_str = if mnemonics.is_empty() {
-        Text::new("Enter mnemonic (24 words):").prompt()?
+        Text::new("Enter mnemonic (12 or 24 words):").prompt()?
     } else {
         mnemonics.join(" ")
     };

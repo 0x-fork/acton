@@ -33,12 +33,15 @@ pub enum WalletError {
     PublicKeyMismatch,
 }
 
-/// Errors reported by TON mnemonic validation and key derivation.
+/// Errors reported by wallet mnemonic validation and key derivation.
 #[derive(Debug, thiserror::Error)]
 pub enum MnemonicError {
-    /// The phrase does not contain the required 24 words.
-    #[error("expected 24 words mnemonic, got {0}")]
+    /// The phrase contains neither 12 BIP39 words nor 24 TON words.
+    #[error("expected 12 or 24 mnemonic words, got {0}")]
     WordCount(usize),
+    /// The 12-word phrase fails BIP39 validation, including its checksum.
+    #[error("invalid BIP39 mnemonic: {0}")]
+    InvalidBip39(#[from] bip39::Error),
     /// A normalized word is absent from the English mnemonic word list.
     #[error("unknown mnemonic word: {0}")]
     UnknownWord(String),

@@ -51,8 +51,10 @@ fun crypto.createMnemonic(): Mnemonic {
 
 /// Derives an Ed25519 [KeyPair] from a mnemonic phrase.
 ///
-/// `self` must be a valid 24-word TON [Mnemonic] (`array<string>`),
+/// Accepts a valid 24-word TON [Mnemonic] (`array<string>`),
 /// for example as returned by [crypto.createMnemonic].
+/// Also accepts 12-word BIP39 phrases, deriving the first TON account with
+/// SLIP-0010 Ed25519 at `m/44'/607'/0'`. Available since trunk.
 ///
 /// Example:
 /// ```tolk

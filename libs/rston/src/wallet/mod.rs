@@ -21,7 +21,8 @@
 //!
 //! # Derive a wallet address
 //!
-//! Read a 24-word TON mnemonic from `WALLET_MNEMONIC` and derive its V5R1 mainnet address.
+//! Read a 24-word TON or 12-word BIP39 mnemonic from `WALLET_MNEMONIC`
+//! and derive its V5R1 mainnet address.
 //! The same key can have different addresses for different wallet versions or IDs.
 //!
 //! ```no_run
@@ -199,7 +200,8 @@ impl Wallet {
         Self::new_with_params(version, key_pair, 0, wallet_id)
     }
 
-    /// Imports a 24-word TON mnemonic and derives a wallet with the default parameters.
+    /// Imports a 24-word TON or 12-word BIP39 mnemonic and derives a wallet
+    /// with the default parameters. BIP39 phrases use `m/44'/607'/0'`.
     ///
     /// `seed` contains a space-separated phrase, not raw seed bytes.
     /// `pass` is the optional mnemonic password. Parsing follows [`Mnemonic::from_str`].

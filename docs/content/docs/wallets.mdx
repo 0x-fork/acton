@@ -47,6 +47,12 @@ Import a wallet when the mnemonic already exists:
 acton wallet import --name deployer --local "word1 word2 ... word24"
 ```
 
+<AvailabilityBadge since="trunk" />
+
+You can also import a 12-word BIP39 phrase. Its keys use SLIP-0010 Ed25519
+derivation at `m/44'/607'/0'` (the first TON account).
+Wallets that use another derivation path are not supported.
+
 For interactive import, omit the mnemonic:
 
 ```bash

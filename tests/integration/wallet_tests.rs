@@ -20,6 +20,8 @@ use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_EN
 const KEYRING_SERVICE: &str = "ton.acton.wallet";
 const TEST_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
 const SECOND_TEST_MNEMONIC: &str = "section garden tomato dinner season dice renew length useful spin trade intact use universe what post spike keen mandate behind concert egg doll rug";
+const BIP39_TEST_MNEMONIC: &str =
+    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED";
 const TEST_KEYRING_DIR_ENV: &str = "ACTON_TEST_KEYRING_DIR";
 const TEST_TONCENTER_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_V3_URL";
@@ -819,7 +821,7 @@ fn test_wallet_import_all_fields_interactive() {
     session.expect("Save wallet to:");
     session.send_line("", "failed to select default local wallet config");
 
-    session.expect("Enter mnemonic (24 words):");
+    session.expect("Enter mnemonic (12 or 24 words):");
     session.send_line(TEST_MNEMONIC, "failed to send mnemonic");
 
     session.expect("Wallet type:");
@@ -852,6 +854,48 @@ fn test_wallet_import_invalid_mnemonic() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/wallet/test_wallet_import_invalid_mnemonic.stderr.txt",
         );
+}
+
+#[test]
+fn test_wallet_import_bip39_and_sign() {
+    let project = ProjectBuilder::new("wallet-import-bip39").build();
+    let (_, body_base64, _) = wallet_sign_fixture_for_mnemonic(BIP39_TEST_MNEMONIC);
+
+    let output = project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("bip39-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg("--json")
+        .arg(BIP39_TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let imported: Value = serde_json::from_str(&output.get_stdout()).unwrap();
+    expect_test::expect!["kQCf9EYCGEnzNflKo0BRm4IM0g2i094C_uqgJBSBmHZMUDL-"]
+        .assert_eq(imported["address"].as_str().unwrap());
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/wallet/test_wallet_import_bip39.stdout.txt",
+    );
+    output.assert_file_snapshot_matches(
+        "wallets.toml",
+        "integration/snapshots/wallet/test_wallet_import_bip39.wallets.toml.txt",
+    );
+
+    project
+        .acton()
+        .wallet_sign()
+        .arg("bip39-wallet")
+        .arg("--body")
+        .arg(&body_base64)
+        .arg("--json")
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/wallet/test_wallet_sign_bip39.stdout.txt");
 }
 
 #[test]

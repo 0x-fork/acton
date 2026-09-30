@@ -258,7 +258,7 @@ export const WalletApp: React.FC<Props> = ({vscode}) => {
                 }}
                 required
                 rows={3}
-                placeholder="24 words separated by spaces"
+                placeholder="12 or 24 words separated by spaces"
               />
             </div>
             <div className={styles.formGroup}>

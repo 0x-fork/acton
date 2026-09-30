@@ -72,6 +72,8 @@ All notable changes to this project will be documented in this file.
 
 ### Rust libraries
 
+- Import 12-word BIP39 wallet mnemonics through `rston`, using SLIP-0010 Ed25519
+  derivation at `m/44'/607'/0'`. Existing 24-word TON mnemonics keep their derivation.
 - Use `rston` for address and hash handling in Studio and contract verification,
   preserving raw/friendly inputs and address display flags.
 - Add `Boc::decode_any()` to `rston` for hex or base64 input and use it in wallet

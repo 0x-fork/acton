@@ -107,6 +107,10 @@ characters are removed.
 
 Import an existing mnemonic-based wallet.
 
+Accepts 12-word BIP39 phrases and 24-word TON phrases. BIP39 keys use
+SLIP-0010 Ed25519 derivation at `m/44'/607'/0'` (the first TON account).
+Support for 12-word phrases is available since trunk.
+
 #### Synopsis
 
 `acton wallet import` [_options_] [_mnemonics_...]

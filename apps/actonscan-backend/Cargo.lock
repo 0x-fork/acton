@@ -213,6 +213,7 @@ dependencies = [
  "rand_core",
  "serde",
  "unicode-normalization",
+ "zeroize",
 ]
 
 [[package]]
@@ -1506,6 +1507,7 @@ version = "0.3.5"
 dependencies = [
  "ahash",
  "base64",
+ "bip39",
  "bitflags",
  "crc32c",
  "ed25519-dalek",

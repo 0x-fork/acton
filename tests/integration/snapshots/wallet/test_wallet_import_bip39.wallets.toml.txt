@@ -1,0 +1,7 @@
+[wallets.bip39-wallet]
+kind = "v5r1"
+workchain = 0
+keys = { [MNEMONIC] }
+
+[wallets.bip39-wallet.expected]
+[WALLET_ADDRESS_TESTNET]

@@ -114,6 +114,10 @@ Wallet names are normalized to lowercase, spaces become \fB\-\fR, and unsupporte
 characters are removed.
 .SS "acton wallet import"
 Import an existing mnemonic\-based wallet.
+.sp
+Accepts 12\-word BIP39 phrases and 24\-word TON phrases. BIP39 keys use
+SLIP\-0010 Ed25519 derivation at \fBm/44'/607'/0'\fR (the first TON account).
+Support for 12\-word phrases is available since trunk.
 .SS "Synopsis"
 \fBacton wallet import\fR [\fIoptions\fR] [\fImnemonics\fR\[u2026]]
 .SS "Options"

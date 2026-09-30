@@ -21,6 +21,8 @@
   V5 storage exposes signature authorization as `is_signature_allowed`.
 - TON mnemonic validation, English word list, and Ed25519 key derivation, with
   typed `MnemonicError` results and automatic clearing of owned secret data on drop.
+  Import also accepts 12-word BIP39 mnemonics, using SLIP-0010 Ed25519 derivation
+  at `m/44'/607'/0'`.
 
 ### Changed
 
