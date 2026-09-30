@@ -9,19 +9,16 @@ _TARGET_PATTERN: re.Pattern[str] = re.compile(r"^(?P<arch>[^-]+)-(?P<vendor>[^-]
 _VERSION_PATTERNS: dict[str, re.Pattern[str]] = {
     "GLIBC": re.compile(r"\bGLIBC_(?P<version>\d+\.\d+(?:\.\d+)?)\b"),
     "GLIBCXX": re.compile(r"\bGLIBCXX_(?P<version>\d+\.\d+(?:\.\d+)?)\b"),
-    "OPENSSL": re.compile(r"\bOPENSSL_(?P<version>\d+\.\d+(?:\.\d+)?)\b"),
 }
 
 _TARGET_MAP: dict[str, dict[str, str]] = {
     "x86_64-unknown-linux-gnu": {
         "GLIBC": "2.34",
         "GLIBCXX": "3.4.29",
-        "OPENSSL": "3.0.0",
     },
     "aarch64-unknown-linux-gnu": {
         "GLIBC": "2.34",
         "GLIBCXX": "3.4.29",
-        "OPENSSL": "3.0.0",
     },
     "x86_64-apple-darwin": {
         "LC_VERSION_MIN_MACOSX.version": "10.12",
