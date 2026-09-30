@@ -14,13 +14,18 @@ use dap::responses::{
 use dap::types::{Capabilities, Source, SourceBreakpoint};
 use log::{debug, info};
 use std::io::{BufRead, BufReader, BufWriter, Read, Write};
-use std::net::TcpStream;
+use std::net::{Shutdown, TcpStream};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
 
 static REQUEST_SEQ: AtomicU64 = AtomicU64::new(1);
 
+/// Owns a DAP connection and receives responses and events on a background thread.
+///
+/// The connection stays open during idle periods; callers set their own deadlines
+/// when waiting for responses or events. Dropping the client closes the connection
+/// and unblocks the reader thread.
 pub struct DapClient {
     writer: BufWriter<TcpStream>,
     reader: BufReader<TcpStream>,
@@ -33,7 +38,6 @@ pub struct DapClient {
 impl DapClient {
     pub fn connect(address: &str) -> Result<Self> {
         let stream = TcpStream::connect(address)?;
-        stream.set_read_timeout(Some(Duration::from_secs(30)))?;
         stream.set_write_timeout(Some(Duration::from_secs(30)))?;
 
         let writer_stream = stream.try_clone()?;
@@ -435,6 +439,12 @@ impl DapClient {
         let response = self.wait_for_response(seq, Duration::from_secs(10))?;
         debug!("Terminate response: {response:?}");
         Ok(())
+    }
+}
+
+impl Drop for DapClient {
+    fn drop(&mut self) {
+        let _ = self.writer.get_ref().shutdown(Shutdown::Both);
     }
 }
 

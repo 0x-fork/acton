@@ -51,6 +51,7 @@ All notable changes to this project will be documented in this file.
 
 ### Debugger
 
+- Keep the DAP connection open while the debugger is idle or executing a long step.
 - Close lexical scopes by their source ranges after `break`, `continue`, and
   inline returns, keeping outer variables visible when a scope is closed again.
 
