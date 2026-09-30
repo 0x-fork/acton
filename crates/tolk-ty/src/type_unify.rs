@@ -6,7 +6,7 @@ use crate::types::TyData;
 /// Example: `fun f() { ... return 1; ... return null; }` inferred as `int?`.
 ///
 /// Besides function returns, it's also used for ternary `return cond ? 1 : null` and `match` expression.
-/// If types can't be unified (a function returns int and cell, for example), `unify()` returns false, handled outside.
+/// A destination hint can select the declared union variant or widen compatible branch types.
 pub(crate) struct TypeInferringUnifyStrategy {
     unified_result: Option<TyId>,
 }
@@ -36,12 +36,18 @@ impl TypeInferringUnifyStrategy {
         // example: `var r = ... ? int8 : int16`, will be inferred as `int8 | int16` (via unification)
         // but `var r: int = ... ? int8 : int16`, will be inferred as `int` (it's dest_hint)
         if let Some(dest_hint) = dest_hint
-            && !type_interner.is_type_undefined_from_var_lhs_decl(dest_hint)
+            && dest_hint != type_interner.ty_unknown
+            && !type_interner.has_not_inferred_inside(dest_hint)
+            && !type_interner.has_generics(dest_hint)
         {
             let unwrapped = type_interner.unwrap_alias(dest_hint);
-            if !matches!(type_interner.data(unwrapped), TyData::Union(_))
-                && type_interner.can_rhs_be_assigned(dest_hint, next)
-            {
+            if let TyData::Union(variants) = type_interner.data(unwrapped) {
+                if let Some(variant) =
+                    type_interner.calculate_exact_variant_to_fit_rhs(unwrapped, variants, next)
+                {
+                    next = variant;
+                }
+            } else if type_interner.can_rhs_be_assigned(dest_hint, next) {
                 next = dest_hint;
             }
         }
@@ -51,7 +57,7 @@ impl TypeInferringUnifyStrategy {
             return;
         };
 
-        if type_interner.equals(current, next) {
+        if current == next {
             return;
         }
 

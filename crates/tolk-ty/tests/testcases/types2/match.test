@@ -15,19 +15,17 @@ fun main() {
 ok
 
 ========================================================================
-Match expression with single type arm and else
+Match expression with constant arm and else
 ========================================================================
-fun main() {
-    val value: int | bool;
-
+fun check(value: int) {
     match (value) {
-        int => {
+        0 => {
             value;
 //!         ^ int
         },
         else => {
             value;
-//!         ^ int | bool
+//!         ^ int
         }
     }
 }

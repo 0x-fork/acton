@@ -13,6 +13,27 @@ use tolk_resolver::resolve_index::LocalDefId;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub struct TyId(u32);
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TypeLcaStatus {
+    Unchanged,
+    Union,
+    InvalidDuplicate,
+}
+
+struct TypeLcaResult {
+    ty: TyId,
+    status: TypeLcaStatus,
+}
+
+impl TypeLcaResult {
+    const fn new(ty: TyId) -> Self {
+        Self {
+            ty,
+            status: TypeLcaStatus::Unchanged,
+        }
+    }
+}
+
 /// Helper struct for displaying types using an interner.
 ///
 /// This struct implements `std::fmt::Display` by delegating to `TypeFormatter`.
@@ -181,6 +202,14 @@ impl TypeInterner {
     ///
     /// This method automatically flattens nested unions and deduplicates types.
     pub fn union(&mut self, elements: Vec<TyId>) -> TyId {
+        self.union_with_invalid_duplicates(elements, None)
+    }
+
+    fn union_with_invalid_duplicates(
+        &mut self,
+        elements: Vec<TyId>,
+        mut invalid_duplicates: Option<&mut bool>,
+    ) -> TyId {
         // Reserve to avoid multiple reallocations if possible
         let mut flat_variants = Vec::with_capacity(elements.len());
 
@@ -188,10 +217,18 @@ impl TypeInterner {
             let unwrapped = self.unwrap_alias(el);
             if let TyData::Union(variants) = self.data(unwrapped) {
                 for &v in variants {
-                    self.append_union_variant(v, &mut flat_variants);
+                    self.append_union_variant(
+                        v,
+                        &mut flat_variants,
+                        invalid_duplicates.as_deref_mut(),
+                    );
                 }
             } else {
-                self.append_union_variant(el, &mut flat_variants);
+                self.append_union_variant(
+                    el,
+                    &mut flat_variants,
+                    invalid_duplicates.as_deref_mut(),
+                );
             }
         }
 
@@ -202,15 +239,23 @@ impl TypeInterner {
         self.intern(TyData::Union(flat_variants))
     }
 
-    fn append_union_variant(&self, variant: TyId, out: &mut Vec<TyId>) {
+    fn append_union_variant(
+        &self,
+        variant: TyId,
+        out: &mut Vec<TyId>,
+        invalid_duplicates: Option<&mut bool>,
+    ) {
         let underlying = self.unwrap_alias(variant);
-        let is_duplicate = out.iter().any(|&existing| {
-            // C++: existing->equal_to(underlying_variant)
-            self.equals(existing, underlying)
-        });
-        if !is_duplicate {
-            out.push(variant);
+        for &existing in out.iter() {
+            if self.equals(existing, underlying) {
+                if let Some(invalid_duplicates) = invalid_duplicates {
+                    *invalid_duplicates |=
+                        existing != variant && self.format(existing) != self.format(variant);
+                }
+                return;
+            }
         }
+        out.push(variant);
     }
 
     /// Creates a function type.
@@ -340,18 +385,38 @@ impl TypeInterner {
         ty
     }
 
-    /// when `var v = rhs`, `v` is `undefined` before assignment (before rhs->inferred_type is assigned to it);
-    /// when `var (v1,v2,v3) = rhs`, left side is `(undefined,undefined,undefined)`
-    pub(crate) fn is_type_undefined_from_var_lhs_decl(&self, id: TyId) -> bool {
-        if id == self.ty_undefined {
-            return true;
+    /// Rejects incomplete destination hints, including partially typed destructuring.
+    pub(crate) fn has_not_inferred_inside(&self, id: TyId) -> bool {
+        match self.data(id) {
+            TyData::Undefined => true,
+            TyData::TypeAlias { inner_ty, args, .. } => {
+                self.has_not_inferred_inside(*inner_ty)
+                    || args.as_ref().is_some_and(|args| {
+                        args.iter().any(|&arg| self.has_not_inferred_inside(arg))
+                    })
+            }
+            TyData::Tensor(items) | TyData::Tuple(items) | TyData::Union(items) => {
+                items.iter().any(|&item| self.has_not_inferred_inside(item))
+            }
+            TyData::Array(item) => self.has_not_inferred_inside(*item),
+            TyData::Func { params, return_ty } => {
+                params
+                    .iter()
+                    .any(|&param| self.has_not_inferred_inside(param))
+                    || self.has_not_inferred_inside(*return_ty)
+            }
+            TyData::GenericTypeWithTs { inner_ty, types } => {
+                self.has_not_inferred_inside(*inner_ty)
+                    || types.iter().any(|&ty| self.has_not_inferred_inside(ty))
+            }
+            TyData::Struct { args, .. } => args
+                .as_ref()
+                .is_some_and(|args| args.iter().any(|&arg| self.has_not_inferred_inside(arg))),
+            TyData::MapKV { key, value } => {
+                self.has_not_inferred_inside(*key) || self.has_not_inferred_inside(*value)
+            }
+            _ => false,
         }
-        if let TyData::Tensor(items) = self.data(id) {
-            return items
-                .iter()
-                .all(|&item| self.is_type_undefined_from_var_lhs_decl(item));
-        }
-        false
     }
 
     /// Unwraps type aliases to get the underlying type.
@@ -617,14 +682,6 @@ impl TypeInterner {
                     .all(|(&ea, &eb)| self.equals(ea, eb))
             }
             _ => false,
-        }
-    }
-
-    fn array_element_type(&self, ty: TyId) -> Option<TyId> {
-        let ty = self.unwrap_alias(ty);
-        match self.data(ty) {
-            TyData::Array(item) => Some(*item),
-            _ => None,
         }
     }
 
@@ -1109,68 +1166,81 @@ impl TypeInterner {
     /// 3) when two data flows rejoin
     ///    example: `if (tensorVar != null) ... else ...` rejoin `(int,int)` and `null` into `(int,int)?`
     ///
-    /// when lca can't be calculated (example: `(int,int)` and `(int,int,int)`), nullptr is returned
+    /// Tensor elements are joined separately only when no element introduces a new union.
+    /// Otherwise the result retains the union of whole tensors.
     pub fn calculate_type_lca(&mut self, a: TyId, b: TyId) -> TyId {
-        if self.equals(a, b) {
-            return a;
-        }
+        self.calculate_type_lca_with_status(a, b).ty
+    }
 
+    fn calculate_union_lca(&mut self, a: TyId, b: TyId) -> TypeLcaResult {
+        let mut invalid_duplicates = false;
+        let ty = self.union_with_invalid_duplicates(vec![a, b], Some(&mut invalid_duplicates));
+        let status = if invalid_duplicates {
+            TypeLcaStatus::InvalidDuplicate
+        } else if !self.equals(a, ty) && !self.equals(b, ty) {
+            TypeLcaStatus::Union
+        } else {
+            TypeLcaStatus::Unchanged
+        };
+        TypeLcaResult { ty, status }
+    }
+
+    fn calculate_type_lca_with_status(&mut self, a: TyId, b: TyId) -> TypeLcaResult {
         if a == self.ty_undefined || b == self.ty_undefined {
-            return self.ty_undefined;
+            return TypeLcaResult::new(self.ty_undefined);
         }
-
         if a == self.ty_unknown || b == self.ty_unknown {
-            return self.ty_unknown;
+            return TypeLcaResult::new(self.ty_unknown);
         }
-
         if a == self.ty_never {
-            return b;
+            return TypeLcaResult::new(b);
         }
         if b == self.ty_never {
-            return a;
+            return TypeLcaResult::new(a);
         }
-
         if a == self.ty_null {
-            return self.nullable_union(b);
+            return TypeLcaResult::new(self.nullable_union(b));
         }
         if b == self.ty_null {
-            return self.nullable_union(a);
+            return TypeLcaResult::new(self.nullable_union(a));
         }
 
         let data_a = self.data(a).clone();
         let data_b = self.data(b).clone();
-
         if let (TyData::Tensor(tensor1), TyData::Tensor(tensor2)) = (&data_a, &data_b)
             && tensor1.len() == tensor2.len()
         {
             let mut types_lca = Vec::with_capacity(tensor1.len());
-            for i in 0..tensor1.len() {
-                let next = self.calculate_type_lca(tensor1[i], tensor2[i]);
-                types_lca.push(next);
+            let mut element_became_union = false;
+            for (&item_a, &item_b) in tensor1.iter().zip(tensor2) {
+                let next = self.calculate_type_lca_with_status(item_a, item_b);
+                element_became_union |= next.status != TypeLcaStatus::Unchanged;
+                types_lca.push(next.ty);
             }
-            return self.tensor(types_lca);
-        }
-
-        if let (TyData::Tuple(tuple1), TyData::Tuple(tuple2)) = (&data_a, &data_b)
-            && tuple1.len() == tuple2.len()
-        {
-            let mut types_lca = Vec::with_capacity(tuple1.len());
-            for i in 0..tuple1.len() {
-                let next = self.calculate_type_lca(tuple1[i], tuple2[i]);
-                types_lca.push(next);
+            if !element_became_union {
+                return TypeLcaResult::new(self.tensor(types_lca));
             }
-            return self.tuple(types_lca);
+            return self.calculate_union_lca(a, b);
         }
 
-        if let (Some(item_a), Some(item_b)) =
-            (self.array_element_type(a), self.array_element_type(b))
+        if let (
+            TyData::TypeAlias {
+                def: def_a,
+                args: args_a,
+                ..
+            },
+            TyData::TypeAlias {
+                def: def_b,
+                args: args_b,
+                ..
+            },
+        ) = (&data_a, &data_b)
+            && def_a == def_b
+            && args_a == args_b
         {
-            let item_lca = self.calculate_type_lca(item_a, item_b);
-            return self.array(item_lca);
+            return TypeLcaResult::new(a);
         }
-
-        // became_union parameter omitted for simplicity since we don't need it
-        self.union(vec![a, b])
+        self.calculate_union_lca(a, b)
     }
 
     /// return `T`, so that `T + subtract_type` = type

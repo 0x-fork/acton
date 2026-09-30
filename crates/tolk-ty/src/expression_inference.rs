@@ -608,17 +608,15 @@ impl<'t> TypeInferenceWalker<'_, '_> {
                 .intrn()
                 .calculate_type_subtract_rhs_type(lhs_type, ty_null);
 
-            if without_null_ty == self.intrn().ty_never && lhs_type != ty_null {
-                // Keep semantic data for unreachable code without letting it affect the result.
-                self.infer_expr(rhs, after_lhs.out_flow.clone(), false, hint);
-                self.ctx.set_node_type(&v, lhs_type);
-                return ExprFlow::create(after_lhs.out_flow, as_cond);
-            }
-
+            let flow_before_branching = after_lhs.out_flow.clone();
             let sink = self.extract_sink_expression(lhs);
             let mut lhs_flow = after_lhs.out_flow.clone();
             let mut rhs_flow = after_lhs.out_flow;
-            if let Some(sink) = sink {
+            if lhs_type == ty_null {
+                lhs_flow.mark_unreachable(UnreachableKind::CantHappen);
+            } else if without_null_ty == self.intrn().ty_never {
+                rhs_flow.mark_unreachable(UnreachableKind::CantHappen);
+            } else if let Some(sink) = sink {
                 lhs_flow.register_known_type(sink.clone(), without_null_ty);
                 rhs_flow.register_known_type(sink, ty_null);
             }
@@ -629,6 +627,8 @@ impl<'t> TypeInferenceWalker<'_, '_> {
             let rhs_ty = self.ctx.get_node_type_or_unknown(&rhs);
             if lhs_type == ty_null {
                 self.ctx.set_node_type(&v, rhs_ty);
+            } else if without_null_ty == self.intrn().ty_never {
+                self.ctx.set_node_type(&v, lhs_type);
             } else {
                 let mut branches_unifier = TypeInferringUnifyStrategy::new();
                 branches_unifier.unify_with(without_null_ty, hint, self.intrn());
@@ -637,7 +637,8 @@ impl<'t> TypeInferenceWalker<'_, '_> {
                 self.ctx.set_node_type(&v, result_ty);
             }
 
-            let out_flow = lhs_flow.merge_flow(&rhs_out_flow, self.intrn());
+            let mut out_flow = lhs_flow.merge_flow(&rhs_out_flow, self.intrn());
+            out_flow.reanchor_to(&flow_before_branching, &mut self.ctx);
             return ExprFlow::create(out_flow, as_cond);
         }
 
@@ -707,15 +708,18 @@ impl<'t> TypeInferenceWalker<'_, '_> {
                 let intrn = self.intrn();
 
                 if !as_cond {
-                    let out_flow = after_lhs.false_flow.merge_flow(&after_rhs.out_flow, intrn);
+                    let mut out_flow = after_lhs.false_flow.merge_flow(&after_rhs.out_flow, intrn);
+                    out_flow.reanchor_to(&after_lhs.out_flow, &mut self.ctx);
                     return ExprFlow::create(out_flow, false);
                 }
 
-                let out_flow = after_lhs.out_flow.merge_flow(&after_rhs.out_flow, intrn);
+                let mut out_flow = after_lhs.out_flow.merge_flow(&after_rhs.out_flow, intrn);
                 let true_flow = after_rhs.true_flow;
-                let false_flow = after_lhs
+                let mut false_flow = after_lhs
                     .false_flow
                     .merge_flow(&after_rhs.false_flow, intrn);
+                out_flow.reanchor_to(&after_lhs.out_flow, &mut self.ctx);
+                false_flow.reanchor_to(&after_lhs.out_flow, &mut self.ctx);
 
                 ExprFlow {
                     out_flow,
@@ -733,13 +737,16 @@ impl<'t> TypeInferenceWalker<'_, '_> {
                 let intrn = self.intrn();
 
                 if !as_cond {
-                    let out_flow = after_lhs.true_flow.merge_flow(&after_rhs.out_flow, intrn);
+                    let mut out_flow = after_lhs.true_flow.merge_flow(&after_rhs.out_flow, intrn);
+                    out_flow.reanchor_to(&after_lhs.out_flow, &mut self.ctx);
                     return ExprFlow::create(out_flow, false);
                 }
 
-                let out_flow = after_lhs.out_flow.merge_flow(&after_rhs.out_flow, intrn);
-                let true_flow = after_lhs.true_flow.merge_flow(&after_rhs.true_flow, intrn);
+                let mut out_flow = after_lhs.out_flow.merge_flow(&after_rhs.out_flow, intrn);
+                let mut true_flow = after_lhs.true_flow.merge_flow(&after_rhs.true_flow, intrn);
                 let false_flow = after_rhs.false_flow;
+                out_flow.reanchor_to(&after_lhs.out_flow, &mut self.ctx);
+                true_flow.reanchor_to(&after_lhs.out_flow, &mut self.ctx);
 
                 ExprFlow {
                     out_flow,
@@ -777,8 +784,6 @@ impl<'t> TypeInferenceWalker<'_, '_> {
     ) -> ExprFlow {
         let cond = try_expr_flow!(flow, v.condition());
         let after_cond = self.infer_expr(cond, flow, true, None);
-        let true_reachable = !after_cond.true_flow.is_unreachable();
-        let false_reachable = !after_cond.false_flow.is_unreachable();
 
         let when_true = try_expr_flow!(after_cond.out_flow, v.consequence());
         let when_false = try_expr_flow!(after_cond.out_flow, v.alternative());
@@ -786,17 +791,11 @@ impl<'t> TypeInferenceWalker<'_, '_> {
         let after_true = self.infer_expr(when_true, after_cond.true_flow, as_cond, hint);
         let after_false = self.infer_expr(when_false, after_cond.false_flow, as_cond, hint);
 
-        // always true/false omitted, TODO: do we need them?
-
         let mut branches_unifier = TypeInferringUnifyStrategy::new();
         let true_ty = self.ctx.get_node_type_or_unknown(&when_true);
         let false_ty = self.ctx.get_node_type_or_unknown(&when_false);
-        if true_reachable {
-            branches_unifier.unify_with(true_ty, hint, self.intrn());
-        }
-        if false_reachable {
-            branches_unifier.unify_with(false_ty, hint, self.intrn());
-        }
+        branches_unifier.unify_with(true_ty, hint, self.intrn());
+        branches_unifier.unify_with(false_ty, hint, self.intrn());
 
         // if branches_unifier.is_union_of_different_types() {
         //     // `... ? intVar : sliceVar` results in `int | slice`, probably it's not what the user expected
@@ -805,23 +804,20 @@ impl<'t> TypeInferenceWalker<'_, '_> {
         //     // TODO: report error if hint is unknown?
         // }
 
-        let ty = if true_reachable && !false_reachable {
-            true_ty
-        } else if false_reachable && !true_reachable {
-            false_ty
-        } else {
-            branches_unifier.get_result(self.const_intrn())
-        };
+        let ty = branches_unifier.get_result(self.const_intrn());
         self.ctx.set_node_type(&v.0, ty);
 
         let intrn = self.intrn();
-        let out_flow = after_true.out_flow.merge_flow(&after_false.out_flow, intrn);
-        let true_flow = after_true
+        let mut out_flow = after_true.out_flow.merge_flow(&after_false.out_flow, intrn);
+        let mut true_flow = after_true
             .true_flow
             .merge_flow(&after_false.true_flow, intrn);
-        let false_flow = after_true
+        let mut false_flow = after_true
             .false_flow
             .merge_flow(&after_false.false_flow, intrn);
+        out_flow.reanchor_to(&after_cond.out_flow, &mut self.ctx);
+        true_flow.reanchor_to(&after_cond.out_flow, &mut self.ctx);
+        false_flow.reanchor_to(&after_cond.out_flow, &mut self.ctx);
 
         ExprFlow::new(out_flow, true_flow, false_flow)
     }
@@ -949,10 +945,16 @@ impl<'t> TypeInferenceWalker<'_, '_> {
         if let Some(s_expr) = self.extract_sink_expression(expr) {
             if is_always_true {
                 false_flow.mark_unreachable(UnreachableKind::CantHappen);
-                false_flow.register_known_type(s_expr, self.intrn().ty_never);
+                false_flow.register_known_type(s_expr.clone(), self.intrn().ty_never);
+                if !is_negated {
+                    true_flow.register_known_type(s_expr, rhs_ty);
+                }
             } else if is_always_false {
                 true_flow.mark_unreachable(UnreachableKind::CantHappen);
-                true_flow.register_known_type(s_expr, self.intrn().ty_never);
+                true_flow.register_known_type(s_expr.clone(), self.intrn().ty_never);
+                if is_negated {
+                    false_flow.register_known_type(s_expr, rhs_ty);
+                }
             } else if !is_negated {
                 true_flow.register_known_type(s_expr.clone(), rhs_ty);
                 false_flow.register_known_type(s_expr, non_rhs_ty);
@@ -1517,8 +1519,7 @@ impl<'t> TypeInferenceWalker<'_, '_> {
 
             let declared_type = declared_type.unwrap_or_else(|| self.intrn().ty_undefined);
 
-            let declared_or_smart_casted =
-                flow.smart_cast_or_original(sink_expr, declared_type, self.intrn());
+            let declared_or_smart_casted = flow.smart_cast_or(sink_expr, declared_type);
 
             self.ctx.set_node_type(&ident, declared_or_smart_casted);
             return ExprFlow::create(flow, as_cond);
@@ -1700,8 +1701,7 @@ impl<'t> TypeInferenceWalker<'_, '_> {
                 }
 
                 if let Some(s_expr) = self.extract_sink_expression(Expr::DotAccess(v)) {
-                    inferred_type =
-                        flow.smart_cast_or_original(s_expr, inferred_type, self.intrn());
+                    inferred_type = flow.smart_cast_or(s_expr, inferred_type);
                 }
 
                 self.ctx.set_node_type(&v, inferred_type);
@@ -1727,8 +1727,7 @@ impl<'t> TypeInferenceWalker<'_, '_> {
 
                     let mut inferred_type = items[index_at];
                     if let Some(s_expr) = self.extract_sink_expression(Expr::DotAccess(v)) {
-                        inferred_type =
-                            flow.smart_cast_or_original(s_expr, inferred_type, self.intrn());
+                        inferred_type = flow.smart_cast_or(s_expr, inferred_type);
                     }
                     self.ctx.set_node_type(&v, inferred_type);
                     self.ctx.set_node_type(&field, inferred_type);
@@ -1744,8 +1743,7 @@ impl<'t> TypeInferenceWalker<'_, '_> {
                 _ => {
                     if let Some(mut inferred_type) = self.array_element_type(unwrapped_obj_type) {
                         if let Some(s_expr) = self.extract_sink_expression(Expr::DotAccess(v)) {
-                            inferred_type =
-                                flow.smart_cast_or_original(s_expr, inferred_type, self.intrn());
+                            inferred_type = flow.smart_cast_or(s_expr, inferred_type);
                         }
                         self.ctx.set_node_type(&v, inferred_type);
                         self.ctx.set_node_type(&field, inferred_type);
@@ -2630,11 +2628,12 @@ impl<'t> TypeInferenceWalker<'_, '_> {
                     has_expr_arm = true;
                 }
                 MatchPattern::Else => {
+                    if has_type_arm && let Some(ref sink) = s_expr {
+                        arm_flow.register_known_type(sink.clone(), self.intrn().ty_never);
+                    }
                     has_else_arm = true;
                 }
             }
-
-            let _ = has_expr_arm;
 
             // Infer body
             let body_ty;
@@ -2684,26 +2683,31 @@ impl<'t> TypeInferenceWalker<'_, '_> {
 
         let mut final_flow = match_out_flow.unwrap_or(arms_entry_facts);
 
-        // Exhaustiveness check (basic)
-        // TODO: check enum members
-        let is_exhaustive = has_else_arm || has_type_arm;
+        let subject_underlying = self.intrn().unwrap_alias(subject_ty);
+        let mut is_exhaustive = has_else_arm
+            || has_type_arm
+            || matches!(self.intrn().data(subject_underlying), TyData::Enum { .. });
+        if subject_underlying == self.intrn().ty_bool && v.arms().count() == 2 && has_expr_arm {
+            let mut arms = v.arms();
+            if let (Some(first), Some(second)) = (arms.next(), arms.next())
+                && let (
+                    MatchPattern::Expr(Expr::BoolLit(first)),
+                    MatchPattern::Expr(Expr::BoolLit(second)),
+                ) = (first.pattern(), second.pattern())
+            {
+                is_exhaustive |= first.value() != second.value();
+            }
+        }
 
         // If not exhaustive, merge with implicit else (empty)
         if !is_exhaustive && v.arms().count() > 0 {
-            // Implicit else -> fallthrough with entry facts
-            // Actually, if it's not exhaustive, it means we might skip match?
-            // In Tolk C++, it merges with else_flow (which is entry facts if no side effects)
-            // `match_out_flow = FlowContext::merge_flow(std::move(match_out_flow), std::move(else_flow));`
-            // where else_flow is `process_any_statement(empty_expression, arms_entry_facts)`
-            // so it is essentially arms_entry_facts.
-            // But we need to merge it with current final_flow.
-            let else_flow = flow; // arms_entry_facts was derived from flow
-            final_flow = final_flow.merge_flow(&else_flow, self.intrn());
+            final_flow = final_flow.merge_flow(&flow, self.intrn());
         }
 
         let result_ty = branches_unifier.get_result(self.intrn());
         self.ctx.set_node_type(&v.0, result_ty);
 
+        final_flow.reanchor_to(&flow, &mut self.ctx);
         ExprFlow::create(final_flow, as_cond)
     }
 

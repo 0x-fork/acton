@@ -8,6 +8,10 @@ When restoring the corpus, replace `bytesN` with `bits(N * 8)` in type reference
 expected types. Use `bits1023` for the former `bytes128` boundary case, as in upstream
 commit `9334027d63528da1a78b2efbe898bc586d4e6cec`.
 
+The smart-cast and cell-builder fixtures also include the Tolk 1.5 changes for
+ternary expressions: their result type includes both branches, even for a constant
+condition. The older warning fixture expects the nullable result for the same reason.
+
 The fixtures are intentionally not synchronized automatically. Update them as a reviewed change,
 then run the `tolk_compiler_corpus` test and account for every new semantic difference explicitly.
 

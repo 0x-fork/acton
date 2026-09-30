@@ -1,6 +1,8 @@
+use crate::generics_helpers::GenericSubstitutionsDeducing;
 use crate::overload_resolution::MethodCallCandidate;
 use crate::type_db::TypeDb;
 use crate::type_interner::{TyId, TypeInterner};
+use crate::type_substitutor::TypeSubstitutor;
 use crate::types::TyData;
 use rustc_hash::FxHashMap;
 use smol_str::SmolStr;
@@ -134,24 +136,59 @@ impl FlowContext {
 
     //+ CHECKED
     /// get the resulting type of variable or struct field
-    pub(crate) fn smart_cast_or_original(
-        &self,
-        s_expr: SinkExpr,
-        originally_declared_type: TyId,
-        intrn: &TypeInterner,
-    ) -> TyId {
-        let Some(facts) = self.known_facts.get(&s_expr) else {
-            return originally_declared_type;
-        };
+    pub(crate) fn smart_cast_or(&self, s_expr: SinkExpr, originally_declared_type: TyId) -> TyId {
+        self.known_facts
+            .get(&s_expr)
+            .map_or(originally_declared_type, |facts| facts.expr_type)
+    }
 
-        let smart_casted = facts.expr_type;
-        if intrn.equals(smart_casted, originally_declared_type) {
-            // given `var a: dict`, after merging control flow branches, restore `a: dict` instead of `a: cell?`
-            // (same for struct fields and other sink expressions)
-            return originally_declared_type;
+    /// Reads a field type through the smart casts of each parent in its path.
+    fn get_effective_type(&self, expr: &SinkExpr, ctx: &mut InferenceContext) -> Option<TyId> {
+        let mut remaining_path = expr.index_path;
+        let mut parent = expr.clone();
+        parent.index_path = 0;
+        let mut current = self.smart_cast_or(parent.clone(), parent.get_declared_type(ctx)?);
+        let mut shift = 0;
+
+        while remaining_path != 0 {
+            let index = (remaining_path & 0xff) as usize - 1;
+            parent.index_path |= (remaining_path & 0xff) << shift;
+            current = if let Some(facts) = self.known_facts.get(&parent) {
+                facts.expr_type
+            } else {
+                get_child_type(current, index, ctx.type_db)?
+            };
+            remaining_path >>= 8;
+            shift += 8;
         }
+        Some(current)
+    }
 
-        smart_casted
+    /// Restores source-level types after branches rejoin without losing narrower casts.
+    /// Parent casts from the entry flow take precedence over declared field types.
+    pub(crate) fn reanchor_to(&mut self, before: &Self, ctx: &mut InferenceContext) {
+        self.known_facts.retain(|expr, facts| {
+            if let Some(type_before) = before.get_effective_type(expr, ctx)
+                && ctx.type_db.intrn.equals(facts.expr_type, type_before)
+            {
+                if let Some(entry_facts) = before.known_facts.get(expr) {
+                    facts.expr_type = entry_facts.expr_type;
+                    return true;
+                }
+                return false;
+            }
+
+            if let Some(declared_type) = expr.get_declared_type(ctx)
+                && ctx.type_db.intrn.equals(facts.expr_type, declared_type)
+            {
+                if expr.index_path == 0 {
+                    facts.expr_type = declared_type;
+                    return true;
+                }
+                return false;
+            }
+            true
+        });
     }
 
     /// update current type of `local_var` / `tensorVar.0` / `obj.field`
@@ -166,7 +203,7 @@ impl FlowContext {
         let mut index_mask = 0u64;
 
         while index_path > 0 {
-            index_mask = index_path << 8 | 0xff;
+            index_mask = index_mask << 8 | 0xff;
             index_path >>= 8;
         }
         self.invalidate_all_subfields(expr.def, expr.index_path, index_mask);
@@ -283,6 +320,49 @@ impl SinkExpr {
             name,
         }
     }
+
+    fn get_declared_type(&self, ctx: &mut InferenceContext) -> Option<TyId> {
+        let local = ctx
+            .type_db
+            .project_index
+            .get_resolved_uses(self.def.file_id)?
+            .find_local(self.def)?;
+        let mut current = ctx.get_type(local.def_span)?;
+        let mut remaining_path = self.index_path;
+        while remaining_path != 0 {
+            let index = (remaining_path & 0xff) as usize - 1;
+            current = get_child_type(current, index, ctx.type_db)?;
+            remaining_path >>= 8;
+        }
+        Some(current)
+    }
+}
+
+/// Looks up a declared field or tuple element, substituting generic struct arguments.
+fn get_child_type(parent: TyId, index: usize, type_db: &mut TypeDb) -> Option<TyId> {
+    let mut parent = type_db.intrn.unwrap_alias(parent);
+    if let Some((inner, _)) = type_db.intrn.as_nullable_union(parent) {
+        parent = type_db.intrn.unwrap_alias(inner);
+    }
+    if let TyData::Tensor(items) | TyData::Tuple(items) = type_db.intrn.data(parent) {
+        return items.get(index).copied();
+    }
+
+    let def = type_db.find_struct(parent)?;
+    let symbol = type_db.project_index.resolve_symbol(def)?;
+    let tolk_resolver::SymbolKind::Struct { fields, .. } = &symbol.kind else {
+        return None;
+    };
+    let field = type_db.find_struct_field(def, &fields.get(index)?.name)?;
+    let mut field_type = field.declared_type;
+    if type_db.intrn.has_generics(field_type) {
+        let struct_type = type_db.get_top_level_type(None, def)?;
+        let mut deducer = GenericSubstitutionsDeducing::new();
+        deducer.auto_deduce_from_argument(struct_type, parent, type_db.intrn);
+        field_type = TypeSubstitutor::new(type_db.intrn)
+            .substitute(field_type, &deducer.substitutions.mapping);
+    }
+    Some(field_type)
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]

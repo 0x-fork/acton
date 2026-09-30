@@ -41,24 +41,15 @@ pub(crate) const SYNTAX_EXCLUSIONS: &[SyntaxExclusion] = &[];
 
 // These semantic cases were previously hidden by exclusions of entire files whose
 // syntax was unsupported. Keep the exclusions narrow now that the files can be checked.
-pub(crate) const TYPE_EXPECTATION_EXCLUSIONS: &[TypeExpectationExclusion] = &[
-    TypeExpectationExclusion {
-        fixture: "union-types-tests.tolk",
-        line: 56,
-        expression: "match (0 as int?) { int => 10>3 ? match(0) { int => 0 } : match (10>3 ? 6 : null) { null => 0, int => { return; } }, null => match(null) { null => 0 } }",
-        expected: "int",
-        actual: "int | T",
-        reason: "a nested match with an unreachable arm retains the generic call's type hint",
-    },
-    TypeExpectationExclusion {
+pub(crate) const TYPE_EXPECTATION_EXCLUSIONS: &[TypeExpectationExclusion] =
+    &[TypeExpectationExclusion {
         fixture: "union-types-tests.tolk",
         line: 262,
         expression: "p",
         expected: "(int, int)",
         actual: "Pair2Or3",
         reason: "a statically false && condition loses the tuple variant's smart cast",
-    },
-];
+    }];
 
 // The compiler infers a generic function body only after creating a concrete
 // instantiation. The same source member can therefore resolve to different symbols at

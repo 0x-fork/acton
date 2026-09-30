@@ -25,6 +25,8 @@ All notable changes to this project will be documented in this file.
 
 ### IDE
 
+- Match Tolk 1.5 smart casts after branch merges, including alias restoration,
+  tensor unions, and the types of both ternary branches.
 - Track `break` and `continue` paths when inferring loop types, including
   subsequent iterations, loop exits, and nested loops.
 - Match Tolk 1.5 by using `bitsN` for fixed-size bit strings and resolving

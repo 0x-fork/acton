@@ -67,7 +67,9 @@ impl<'t> TypeInferenceWalker<'_, '_> {
             None => after_cond.false_flow,
         };
 
-        true_flow.merge_flow(&false_flow, self.intrn())
+        let mut out_flow = true_flow.merge_flow(&false_flow, self.intrn());
+        out_flow.reanchor_to(&after_cond.out_flow, &mut self.ctx);
+        out_flow
     }
 
     //+ CHECKED
@@ -194,7 +196,7 @@ impl<'t> TypeInferenceWalker<'_, '_> {
         // `arg` is a curious thing, it can be any TVM primitive, so assign unknown to it
         // hence, using `fInt(arg)` (int from parameter is a target type) or `arg as slice` works well
         // it's not truly correct, because `arg as (int,int)` also compiles, but can never happen, but let it be user responsibility
-        let mut catch_flow = before_try;
+        let mut catch_flow = before_try.clone();
 
         // first catch variable represents exit code, so it always an int.
         if let Some(catch_var1) = catch_clause.catch_var1() {
@@ -209,7 +211,9 @@ impl<'t> TypeInferenceWalker<'_, '_> {
         }
 
         let catch_end = self.process_block_stmt(catch_body, catch_flow);
-        try_end.merge_flow(&catch_end, self.intrn())
+        let mut out_flow = try_end.merge_flow(&catch_end, self.intrn());
+        out_flow.reanchor_to(&before_try, &mut self.ctx);
+        out_flow
     }
 
     //+ CHECKED
