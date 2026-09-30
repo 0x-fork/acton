@@ -106,7 +106,11 @@ export function normalizeAddress(address: string, options?: AddressFormatOptions
   return toDisplayAddress(address, options) ?? address
 }
 
-export function toAccountQrAddress(
+/**
+ * Formats account addresses when indexed user-friendly addresses are unavailable.
+ * Account state determines bounceability; the caller supplies the current network.
+ */
+export function formatAccountAddress(
   address: string,
   status: AddressInformation["status"] | undefined,
   options?: AddressFormatOptions,

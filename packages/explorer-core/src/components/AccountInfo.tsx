@@ -21,7 +21,12 @@ import {
 import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {TonClient} from "../api/client"
 import type {ContractAbiLink, ExtendedContractABI} from "../api/compilerAbi"
-import {useAddressBook, useAddressName, useAddressNameSources} from "../hooks/useAddressBook"
+import {
+  useAccountAddress,
+  useAddressBook,
+  useAddressName,
+  useAddressNameSources,
+} from "../hooks/useAddressBook"
 import {useFavoriteAccounts} from "../hooks/useFavoriteAccounts"
 import {useNetworkInfo, type ExplorerNetworkId} from "../hooks/useNetworkInfo"
 
@@ -35,7 +40,7 @@ import {
 } from "./imageFallbacks"
 import {getAccountNameDetails} from "./accountNameDetails"
 import {getContractTypeLabels} from "./contractTypeLabels"
-import {formatAddress, normalizeAddress, toAccountQrAddress, toRawAddress} from "./utils"
+import {normalizeAddress, toRawAddress} from "./utils"
 
 const TOKEN_PREVIEW_LIMIT = 5
 
@@ -122,11 +127,10 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const resolvedName = useAddressName(address)
   const nameSources = useAddressNameSources(address)
   const {addressFormat, forkNetwork, network} = useNetworkInfo()
-  const displayAddress = normalizeAddress(address, addressFormat)
+  const displayAddress = useAccountAddress(address, state?.status)
   const bounceableAddress = normalizeAddress(address, {...addressFormat, bounceable: true})
   const nonBounceableAddress = normalizeAddress(address, {...addressFormat, bounceable: false})
   const rawAddress = toRawAddress(address)
-  const qrAddress = toAccountQrAddress(address, state?.status, addressFormat)
 
   const [tokenMastersByAddress, setTokenMastersByAddress] = useState<
     Map<string, JettonMasterMetadata>
@@ -237,7 +241,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const contractLinks = getContractAbiLinks(extendedContractAbi)
   const hasContractDescriptionPopover = Boolean(contractDescription || contractLinks.length > 0)
   const statusInfo = getStatusInfo(state)
-  const shortAddress = formatAddress(displayAddress, true, addressFormat)
+  const shortAddress = shortenMiddle(displayAddress, {start: 6, end: 6})
   const addressRowText = hasContextCard ? shortAddress : displayAddress
   const statusAddress = formatRawAddress(displayAddress)
   const tonscanUrl = getTonscanUrl(displayAddress, network.id, forkNetwork)
@@ -276,7 +280,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const qrCode = stateLoading ? (
     <div className={`${styles.skeleton} ${styles.qrSkeleton}`} aria-hidden="true" />
   ) : (
-    <AddressQrCode value={qrAddress} />
+    <AddressQrCode value={displayAddress} />
   )
   const addressFormats = (
     <div className={styles.addressFormats}>

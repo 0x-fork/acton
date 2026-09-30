@@ -122,7 +122,7 @@ interface BlockDetailsState {
 export const BlocksPage: FC<BlocksPageProps> = ({client, loadNetworkTps}) => {
   const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
-  const {prefetchNames, updateDomains} = useAddressBook()
+  const {prefetchNames, updateAddressBook} = useAddressBook()
   const [state, setState] = useState<BlocksPageState>({
     transactions: [],
     masterchainBlocks: [],
@@ -166,7 +166,7 @@ export const BlocksPage: FC<BlocksPageProps> = ({client, loadNetworkTps}) => {
           return
         }
 
-        updateDomains(transactions.address_book)
+        updateAddressBook(transactions.address_book)
         setState({
           transactions: transactions.transactions,
           masterchainBlocks: masterchainBlocks.blocks,
@@ -202,7 +202,7 @@ export const BlocksPage: FC<BlocksPageProps> = ({client, loadNetworkTps}) => {
         globalThis.clearTimeout(timeoutId)
       }
     }
-  }, [client, updateDomains])
+  }, [client, updateAddressBook])
 
   return (
     <div className={styles.container}>
@@ -292,7 +292,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
   const {isFavorite: isFavoriteBlock, toggleFavorite: toggleFavoriteBlock} = useFavoriteBlocks()
   const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
-  const {prefetchNames, updateDomains} = useAddressBook()
+  const {prefetchNames, updateAddressBook} = useAddressBook()
   const forkBlockNumber = nodeInfo?.fork_block_number ?? undefined
   const rawBlockNetwork: RawBlockNetwork | undefined =
     network.id === "mainnet" || network.id === "testnet" ? network.id : undefined
@@ -411,7 +411,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
           rawBlockMetadataPromise,
         ])
 
-        updateDomains(transactionsResponse.addressBook)
+        updateAddressBook(transactionsResponse.addressBook)
 
         if (!isActive) {
           return
@@ -458,7 +458,15 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
     return () => {
       isActive = false
     }
-  }, [client, latest, publicBlockNetwork, routeShard, routeSeqno, routeWorkchain, updateDomains])
+  }, [
+    client,
+    latest,
+    publicBlockNetwork,
+    routeShard,
+    routeSeqno,
+    routeWorkchain,
+    updateAddressBook,
+  ])
 
   const loadMoreTransactions = useCallback(() => {
     const block = state.block
@@ -489,7 +497,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
           transactionsLoadMoreLimit,
           cursor,
         )
-        updateDomains(response.addressBook)
+        updateAddressBook(response.addressBook)
 
         setState(current => {
           if (
@@ -541,7 +549,7 @@ export const BlockDetailsPage: FC<BlockDetailsPageProps> = ({
     state.transactions.length,
     state.transactionsCursor,
     transactionsLoadMoreLimit,
-    updateDomains,
+    updateAddressBook,
   ])
 
   const workchain = latest ? (state.block?.workchain ?? -1) : routeWorkchain

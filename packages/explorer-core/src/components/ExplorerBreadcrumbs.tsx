@@ -3,6 +3,7 @@ import {Link} from "react-router"
 import type {FC, ReactNode} from "react"
 
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
+import {useAccountAddress} from "../hooks/useAddressBook"
 import {ExplorerAddressChip} from "./ExplorerAddressChip"
 import styles from "./ExplorerBreadcrumbs.module.css"
 import {formatAddress} from "./utils"
@@ -36,6 +37,11 @@ function createBreadcrumbLink(path: string): BreadcrumbLink {
   )
 }
 
+function AccountAddressCopyAction({value, ...labels}: NonNullable<ExplorerBreadcrumbItem["copy"]>) {
+  const address = useAccountAddress(value)
+  return <CopyInlineAction {...labels} value={address} />
+}
+
 function formatItem(item: ExplorerBreadcrumbItem): ReactNode {
   const label = item.isAddress ? (
     <ExplorerAddressChip
@@ -55,11 +61,11 @@ function formatItem(item: ExplorerBreadcrumbItem): ReactNode {
       <InlineActions
         visibility="hover"
         actions={
-          <CopyInlineAction
-            value={item.copy.value}
-            label={item.copy.label}
-            copiedLabel={item.copy.copiedLabel}
-          />
+          item.isAddress ? (
+            <AccountAddressCopyAction {...item.copy} />
+          ) : (
+            <CopyInlineAction {...item.copy} />
+          )
         }
       >
         {label}

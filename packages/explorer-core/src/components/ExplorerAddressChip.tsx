@@ -2,7 +2,7 @@ import type {FC} from "react"
 
 import {AddressChip, type AddressChipCopyPlacement, type AddressChipVariant} from "@acton/ui"
 
-import {useAddressName} from "../hooks/useAddressBook"
+import {useAccountAddress, useAddressName} from "../hooks/useAddressBook"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
 
@@ -46,6 +46,7 @@ export const ExplorerAddressChip: FC<ExplorerAddressChipProps> = ({
   variant,
 }) => {
   const addressFormat = useAddressFormat()
+  const displayAddress = useAccountAddress(address)
   const resolvedName = useAddressName(resolveName ? address : "")
   const addressVariants = [
     {
@@ -65,9 +66,7 @@ export const ExplorerAddressChip: FC<ExplorerAddressChipProps> = ({
       copyable={copyable}
       copyPlacement={copyPlacement}
       fallback={fallback}
-      formatAddress={
-        displayFormat === "raw" ? undefined : value => formatAddress(value, false, addressFormat)
-      }
+      formatAddress={displayFormat === "raw" ? undefined : () => displayAddress}
       highlighted={highlighted}
       label={resolveName ? resolvedName || nameFallback : undefined}
       onAddressClick={onAddressClick}

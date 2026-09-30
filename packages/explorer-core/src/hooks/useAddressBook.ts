@@ -13,6 +13,8 @@ import {
 import type {FC, ReactNode} from "react"
 
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
+import type {AddressInformation} from "../api/types"
+import {formatAccountAddress} from "../components/utils"
 import {useNetworkInfo} from "./useNetworkInfo"
 
 type AddressName = string | undefined
@@ -31,8 +33,9 @@ export function resolveAddressName(
   return customName ?? registryName ?? domainName
 }
 
-interface AddressBookDomainRow {
+interface AddressBookRow {
   readonly domain?: string | null
+  readonly user_friendly?: string | null
 }
 
 export interface RegistryNameMatch {
@@ -47,11 +50,12 @@ interface AddressBookContextValue {
   readonly localAddressNames: readonly RegistryNameMatch[]
   readonly getNameSources: (address: string) => AddressNameSources
   readonly getCachedName: (address: string) => AddressName | undefined
+  readonly getFriendlyAddress: (address: string) => string | undefined
   readonly fetchName: (address: string) => Promise<AddressName>
   readonly prefetchNames: (addresses: readonly string[]) => Promise<void>
   readonly searchRegistryNames: (query: string, limit?: number) => readonly RegistryNameMatch[]
   readonly updateName: (address: string, name: AddressName) => void
-  readonly updateDomains: (addressBook: Readonly<Record<string, AddressBookDomainRow>>) => void
+  readonly updateAddressBook: (addressBook: Readonly<Record<string, AddressBookRow>>) => void
   readonly setAddressName: (address: string, name: string) => Promise<void>
   readonly version: number
 }
@@ -94,11 +98,17 @@ export const AddressBookProvider: FC<{
   )
   const cacheRef = useRef(new Map<string, AddressName>())
   const domainsRef = useRef(new Map<string, string>())
+  const friendlyAddresses = useMemo(() => new Map<string, string>(), [network.id])
   const pendingRef = useRef(new Map<string, Promise<AddressName>>())
   const pendingBatchRef = useRef(new Map<string, PendingNameRequest>())
   const batchScheduledRef = useRef(false)
   const [version, setVersion] = useState(0)
   const [storedAddressNames, setStoredAddressNames] = useState<readonly RegistryNameMatch[]>([])
+
+  const getFriendlyAddress = useCallback(
+    (address: string) => friendlyAddresses.get(normalizeKey(address)),
+    [friendlyAddresses],
+  )
 
   const getNameSources = useCallback(
     (address: string): AddressNameSources => {
@@ -163,12 +173,26 @@ export const AddressBookProvider: FC<{
     }
   }, [metadataRegistry, updateNames])
 
-  const updateDomains = useCallback(
-    (addressBook: Readonly<Record<string, AddressBookDomainRow>>) => {
+  const updateAddressBook = useCallback(
+    (addressBook: Readonly<Record<string, AddressBookRow>>) => {
       let changed = false
       for (const [address, row] of Object.entries(addressBook)) {
         if (!address) continue
         const key = normalizeKey(address)
+        if (row.user_friendly) {
+          try {
+            const friendly = Address.parseFriendly(row.user_friendly)
+            if (
+              friendly.address.toRawString() === key &&
+              friendlyAddresses.get(key) !== row.user_friendly
+            ) {
+              friendlyAddresses.set(key, row.user_friendly)
+              changed = true
+            }
+          } catch {
+            // Malformed metadata must not change the address displayed or copied.
+          }
+        }
         const domain = row.domain?.trim() || undefined
         if (domain) {
           if (domainsRef.current.get(key) !== domain) {
@@ -183,7 +207,7 @@ export const AddressBookProvider: FC<{
         setVersion(prev => prev + 1)
       }
     },
-    [],
+    [friendlyAddresses],
   )
 
   const flushPendingBatch = useCallback(() => {
@@ -295,23 +319,25 @@ export const AddressBookProvider: FC<{
       localAddressNames: storedAddressNames,
       getNameSources,
       getCachedName,
+      getFriendlyAddress,
       fetchName,
       prefetchNames,
       searchRegistryNames,
       updateName,
-      updateDomains,
+      updateAddressBook,
       setAddressName,
       version,
     }),
     [
       fetchName,
       getCachedName,
+      getFriendlyAddress,
       getNameSources,
       storedAddressNames,
       prefetchNames,
       searchRegistryNames,
       setAddressName,
-      updateDomains,
+      updateAddressBook,
       updateName,
       version,
     ],
@@ -326,6 +352,16 @@ export const useAddressBook = () => {
     throw new Error("useAddressBook must be used within AddressBookProvider")
   }
   return ctx
+}
+
+/**
+ * Uses the current network's indexed address unchanged for display, copying and QR codes.
+ * Without an address-book entry, the account state determines the friendly-format fallback.
+ */
+export function useAccountAddress(address: string, status?: AddressInformation["status"]): string {
+  const {addressFormat} = useNetworkInfo()
+  const {getFriendlyAddress} = useAddressBook()
+  return getFriendlyAddress(address) ?? formatAccountAddress(address, status, addressFormat)
 }
 
 export const useAddressName = (address: string) => {

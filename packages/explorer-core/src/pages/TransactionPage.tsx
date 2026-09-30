@@ -339,7 +339,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     Map<string, ContractVerifiedSource>
   >(new Map())
   const [error, setError] = useState<string | undefined>()
-  const {fetchName, updateDomains} = useAddressBook()
+  const {fetchName, updateAddressBook} = useAddressBook()
   const {network} = useNetworkInfo()
   const {isFavorite, toggleFavorite} = useFavoriteTransactions()
   const metadataRegistry = useMetadataRegistry()
@@ -626,7 +626,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
           includeActions: supportsTraceActions,
         })
         if (!isActive) return
-        updateDomains(data.address_book)
+        updateAddressBook(data.address_book)
 
         if (data.traces && data.traces.length > 0) {
           const trace = data.traces[0]
@@ -645,7 +645,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
             }
 
             transactionsMap = {[transaction.hash]: transaction}
-            updateDomains(transactionData.address_book)
+            updateAddressBook(transactionData.address_book)
             setTraceWarning(
               trace.warning
                 ? `Full trace is unavailable: ${trace.warning}. Showing the requested transaction only.`
@@ -679,7 +679,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                     origin: originTransaction,
                     selected: transaction,
                   })
-                  updateDomains(originData.address_book)
+                  updateAddressBook(originData.address_book)
                 }
               } catch {
                 // Keep the requested transaction available when a compatible API does not
@@ -732,7 +732,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     return () => {
       isActive = false
     }
-  }, [client, metadataRegistry, supportsTraceActions, traceLookupHash, updateDomains])
+  }, [client, metadataRegistry, supportsTraceActions, traceLookupHash, updateAddressBook])
 
   const applyPartialTraceState = useCallback(
     async (nextState: PartialTraceState, requestedTraceHash: string): Promise<boolean> => {
@@ -806,7 +806,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
         return
       }
 
-      result.addressBooks.forEach(updateDomains)
+      result.addressBooks.forEach(updateAddressBook)
       const applied = await applyPartialTraceState(result.state, requestedTraceHash)
       if (applied && result.failedRequests > 0) {
         setTraceGapError(
@@ -825,7 +825,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
         setTraceGapLoading(false)
       }
     }
-  }, [applyPartialTraceState, client, partialTraceState, traceGapLoading, updateDomains])
+  }, [applyPartialTraceState, client, partialTraceState, traceGapLoading, updateAddressBook])
 
   useEffect(() => {
     const requestedHash = traceLookupHash.toLowerCase()

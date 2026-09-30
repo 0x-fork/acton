@@ -5,10 +5,10 @@ import {
   formatDnsName,
   mergeAccountDomains,
   parseTonDnsSearchQuery,
-  toAccountQrAddress,
+  formatAccountAddress,
 } from "../src/components/utils"
 
-describe("toAccountQrAddress", () => {
+describe("formatAccountAddress", () => {
   const rawAddress = "0:ca6e321c7cce9ecedf0a8ca2492ec8592494aa5fb5ce0387dff96ef6af982a3e"
 
   test("uses account-aware user-friendly URL-safe addresses", () => {
@@ -16,10 +16,16 @@ describe("toAccountQrAddress", () => {
 
     expect({
       mainnet: Object.fromEntries(
-        statuses.map(status => [status, toAccountQrAddress(rawAddress, status, {testOnly: false})]),
+        statuses.map(status => [
+          status,
+          formatAccountAddress(rawAddress, status, {testOnly: false}),
+        ]),
       ),
       testnet: Object.fromEntries(
-        statuses.map(status => [status, toAccountQrAddress(rawAddress, status, {testOnly: true})]),
+        statuses.map(status => [
+          status,
+          formatAccountAddress(rawAddress, status, {testOnly: true}),
+        ]),
       ),
     }).toMatchSnapshot()
   })

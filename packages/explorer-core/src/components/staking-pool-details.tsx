@@ -61,7 +61,7 @@ export function NominatorPoolOverview({
 }: NominatorPoolOverviewProps) {
   const [state, setState] = useState<NominatorPoolDetailsState>({status: "loading"})
   const [reloadKey, setReloadKey] = useState(0)
-  const {updateDomains} = useAddressBook()
+  const {updateAddressBook} = useAddressBook()
 
   useEffect(() => {
     let active = true
@@ -74,7 +74,7 @@ export function NominatorPoolOverview({
       .then(data => {
         if (!active) return
 
-        updateDomains(data.address_book)
+        updateAddressBook(data.address_book)
         const successState = {status: "success", data} as const
         setState(successState)
         onStateChange(successState)
@@ -93,7 +93,7 @@ export function NominatorPoolOverview({
     return () => {
       active = false
     }
-  }, [address, client, onStateChange, reloadKey, updateDomains])
+  }, [address, client, onStateChange, reloadKey, updateAddressBook])
 
   if (state.status === "loading") {
     return <PoolOverviewSkeleton label="Loading nominator pool" />

@@ -238,7 +238,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     ecosystemNetwork,
   } = useNftImageVisibility()
   const metadataRegistry = useMetadataRegistry()
-  const {updateDomains} = useAddressBook()
+  const {updateAddressBook} = useAddressBook()
   const [accountState, setAccountState] = useState<AddressInformation | undefined>()
   const [accountStateV3, setAccountStateV3] = useState<V3AccountState | undefined>()
   const [accountSuspendedUntil, setAccountSuspendedUntil] = useState<number | undefined>()
@@ -471,7 +471,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             throw new Error("Toncenter did not return this multisig wallet.")
           }
           if (active) {
-            updateDomains(response.address_book)
+            updateAddressBook(response.address_book)
             setMultisigDetails({
               status: "success",
               address: formattedAddress,
@@ -488,7 +488,7 @@ export const AccountPage: FC<AccountPageProps> = ({
           throw new Error("Toncenter did not return this multisig order.")
         }
         if (active) {
-          updateDomains(response.address_book)
+          updateAddressBook(response.address_book)
           setMultisigDetails({
             status: "success",
             address: formattedAddress,
@@ -518,7 +518,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     isMultisigOrderAccount,
     isMultisigWalletAccount,
     multisigReloadKey,
-    updateDomains,
+    updateAddressBook,
   ])
 
   useEffect(() => {
@@ -673,7 +673,7 @@ export const AccountPage: FC<AccountPageProps> = ({
           const currentTokenInfo = getAccountTokenInfo(stateV3)
           const currentDomain = getAccountDomain(stateV3)
           if (!isActive) return
-          if (stateV3) updateDomains(stateV3.address_book)
+          if (stateV3) updateAddressBook(stateV3.address_book)
           loadedAccountKeyRef.current = accountRequestKey
           setAccountState(state)
           setAccountStateV3(stateV3 ? stateV3.accounts[0] : undefined)
@@ -739,7 +739,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             historySortOrder,
           )
           if (!isActive) return
-          updateDomains(txs.address_book)
+          updateAddressBook(txs.address_book)
           setTransactions([...txs.transactions])
           transactionHashesRef.current = transactionHashSet(txs.transactions)
           setTransactionsHasMore(txs.transactions.length === initialTransactionLimit)
@@ -780,7 +780,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             historySortOrder,
           )
           if (!isActive) return
-          updateDomains(response.address_book)
+          updateAddressBook(response.address_book)
           const merged = mergeAutomaticActionPage(
             [],
             response.actions,
@@ -830,7 +830,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     setActions,
     setActionTracesLoadMore,
     supportsAccountActions,
-    updateDomains,
+    updateAddressBook,
   ])
 
   useEffect(() => {
@@ -893,7 +893,7 @@ export const AccountPage: FC<AccountPageProps> = ({
         transactions.length,
         historySortOrder,
       )
-      updateDomains(txs.address_book)
+      updateAddressBook(txs.address_book)
       transactionHashesRef.current = transactionHashSet([...transactions, ...txs.transactions])
       setTransactions(current => appendUniqueTransactions(current, txs.transactions))
       setTransactionsHasMore(txs.transactions.length === transactionPageSize)
@@ -928,7 +928,7 @@ export const AccountPage: FC<AccountPageProps> = ({
         historySortOrder,
         {startLt: cursor.startLt, endLt: cursor.endLt},
       )
-      updateDomains(response.address_book)
+      updateAddressBook(response.address_book)
       const merged = mergeAutomaticActionPage(
         actions,
         response.actions,
@@ -978,7 +978,7 @@ export const AccountPage: FC<AccountPageProps> = ({
       )
       if (activeHistoryRequestKeyRef.current !== requestKey) return
 
-      updateDomains(response.address_book)
+      updateAddressBook(response.address_book)
       const page = response.actions.slice(0, ACTION_TRACE_LOAD_MORE_PAGE_SIZE)
       const nextActions = appendUniqueActions(actions, page)
       setActions(nextActions)
@@ -1125,7 +1125,7 @@ export const AccountPage: FC<AccountPageProps> = ({
             }
 
             if (event.address_book) {
-              updateDomains(event.address_book)
+              updateAddressBook(event.address_book)
             }
             if (event.metadata) {
               setActionMetadata(current => ({...current, ...event.metadata}))
@@ -1156,7 +1156,7 @@ export const AccountPage: FC<AccountPageProps> = ({
     enableTransactionStreaming,
     historySortOrder,
     supportsAccountActions,
-    updateDomains,
+    updateAddressBook,
   ])
 
   useEffect(() => {

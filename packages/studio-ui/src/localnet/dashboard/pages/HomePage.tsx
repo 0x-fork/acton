@@ -118,7 +118,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   const localnetRoutes = useLocalnetRoutes()
   const openPath = useOpenExplorerPath()
   const {showToast, updateToast} = useToast()
-  const {prefetchNames, updateDomains} = useAddressBook()
+  const {prefetchNames, updateAddressBook} = useAddressBook()
   const [nodeInfo, setNodeInfo] = useState<LocalnetNodeInfo | undefined>()
   const [networkNodeInfo, setNetworkNodeInfo] = useState<NetworkNodeInfo | undefined>()
   const [isTimeModalOpen, setIsTimeModalOpen] = useState(false)
@@ -301,7 +301,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
 
       try {
         const transactionsResponse = await client.getRecentTransactions(8)
-        updateDomains(transactionsResponse.address_book)
+        updateAddressBook(transactionsResponse.address_book)
         const transactions = transactionsResponse.transactions
         const accounts = collectRecentAccounts(transactions)
         let accountStatesByAddress: Record<string, V3AccountState> = {}
@@ -309,7 +309,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         if (accounts.length > 0) {
           try {
             const accountStates = await client.getAccountStates(accounts, false)
-            updateDomains(accountStates.address_book)
+            updateAddressBook(accountStates.address_book)
             accountStatesByAddress = Object.fromEntries(
               accountStates.accounts.map(account => [addressKey(account.address), account]),
             )
@@ -353,7 +353,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         globalThis.clearTimeout(timeoutId)
       }
     }
-  }, [client, updateDomains])
+  }, [client, updateAddressBook])
 
   useEffect(() => {
     void prefetchNames(displayedAddresses)

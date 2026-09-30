@@ -279,6 +279,8 @@ keys.
 
 #### Accounts and networks
 
+- Display and copy account addresses with indexed bounceability and the selected
+  network flag, consistently with address QR codes.
 - Blur NFT images outside recognized ecosystem collections by default. Reveal
   one image temporarily, remember an NFT, or allow its whole collection in the
   browser. NFT pages, history thumbnails, and account previews share these

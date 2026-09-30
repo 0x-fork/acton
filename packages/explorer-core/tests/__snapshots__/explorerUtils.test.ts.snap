@@ -1,6 +1,6 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`toAccountQrAddress uses account-aware user-friendly URL-safe addresses 1`] = `
+exports[`formatAccountAddress uses account-aware user-friendly URL-safe addresses 1`] = `
 {
   "mainnet": {
     "active": "EQDKbjIcfM6ezt8KjKJJLshZJJSqX7XOA4ff-W72r5gqPrHF",
