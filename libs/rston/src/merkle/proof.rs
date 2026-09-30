@@ -500,9 +500,10 @@ impl BuilderImpl<'_, '_, '_> {
                     // Check if child is in a tree
                     match self.filter.check(child_repr_hash) {
                         // Included subtrees are used as is
-                        FilterAction::IncludeSubtree => {
-                            last.references.peek_prev_cloned().expect("mut not fail")
-                        }
+                        FilterAction::IncludeSubtree => last
+                            .references
+                            .peek_prev_cloned()
+                            .ok_or(Error::CellUnderflow)?,
                         // Replace all skipped subtrees with pruned branch cells
                         FilterAction::Skip
                             if descriptor.reference_count() > 0
@@ -650,7 +651,9 @@ impl<'a> ParBuilderImpl<'a, '_, '_> {
                     match self.filter.check(child_repr_hash) {
                         // Included subtrees are used as is
                         FilterAction::IncludeSubtree => ExtCell::Ordinary(
-                            last.references.peek_prev_cloned().expect("mut not fail"),
+                            last.references
+                                .peek_prev_cloned()
+                                .ok_or(Error::CellUnderflow)?,
                         ),
                         // Replace all skipped subtrees with pruned branch cells
                         FilterAction::Skip

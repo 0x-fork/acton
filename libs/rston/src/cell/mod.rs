@@ -707,14 +707,12 @@ impl HashBytes {
     /// Array of zero bytes.
     pub const ZERO: Self = Self([0; 32]);
 
-    /// Converts slice to a hash bytes.
+    /// Copies a 32-byte slice into a hash.
     ///
-    /// # Panics
-    ///
-    /// Panics if the length of the slice is not 32 bytes.
+    /// Returns an error if the slice does not contain exactly 32 bytes.
     #[inline]
-    pub fn from_slice(slice: &[u8]) -> Self {
-        Self(slice.try_into().expect("slice with incorrect length"))
+    pub fn from_slice(slice: &[u8]) -> Result<Self, std::array::TryFromSliceError> {
+        slice.try_into().map(Self)
     }
 
     /// Converts integer into zero-padded big-endian bytes.
@@ -733,14 +731,11 @@ impl HashBytes {
     /// Returns `None` on overflow.
     #[cfg(feature = "bigint")]
     pub fn from_biguint(uint: &num_bigint::BigUint) -> Option<Self> {
-        let mut bytes = uint.to_bytes_le();
-        if bytes.len() > 32 {
+        if uint.bits() > 256 {
             return None;
         }
 
-        bytes.resize(32, 0);
-        bytes.reverse();
-        Some(Self::from_slice(&bytes))
+        Some(Self::from_biguint_lossy(uint))
     }
 
     /// Converts integer into zero-padded big-endian bytes.
@@ -748,10 +743,11 @@ impl HashBytes {
     /// Ignores all bits after 256th.
     #[cfg(feature = "bigint")]
     pub fn from_biguint_lossy(uint: &num_bigint::BigUint) -> Self {
-        let mut bytes = uint.to_bytes_le();
-        bytes.resize(32, 0);
-        bytes.reverse();
-        Self::from_slice(&bytes)
+        let mut bytes = [0; 32];
+        for (target, byte) in bytes.iter_mut().rev().zip(uint.to_bytes_le()) {
+            *target = byte;
+        }
+        Self(bytes)
     }
 
     /// Wraps a reference to an internal array into a newtype reference.
@@ -1922,6 +1918,38 @@ pub const MAX_REF_COUNT: usize = 4;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hash_bytes_from_slice() -> anyhow::Result<()> {
+        let bytes = std::array::from_fn::<_, 32, _>(|index| index as u8);
+        assert_eq!(HashBytes::from_slice(&bytes)?, HashBytes(bytes));
+
+        for length in [0, 1, 31, 33, 64] {
+            assert!(HashBytes::from_slice(&vec![0; length]).is_err());
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "bigint")]
+    #[test]
+    fn hash_bytes_from_biguint() {
+        use num_bigint::BigUint;
+
+        let bytes = std::array::from_fn::<_, 32, _>(|index| index as u8 + 1);
+        for expected in [HashBytes::ZERO, HashBytes(bytes), HashBytes([0xff; 32])] {
+            let value = BigUint::from_bytes_be(&expected.0);
+            assert_eq!(HashBytes::from_biguint(&value), Some(expected));
+            assert_eq!(HashBytes::from_biguint_lossy(&value), expected);
+        }
+
+        let overflowing = (BigUint::from(1u8) << 256) + BigUint::from_bytes_be(&bytes);
+        assert_eq!(HashBytes::from_biguint(&overflowing), None);
+        assert_eq!(
+            HashBytes::from_biguint_lossy(&overflowing),
+            HashBytes(bytes)
+        );
+    }
 
     #[test]
     fn parse_hash_bytes() {

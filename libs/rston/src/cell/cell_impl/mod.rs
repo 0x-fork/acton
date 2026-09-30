@@ -430,7 +430,7 @@ impl<const N: usize> CellImpl for PrunedBranch<N> {
 /// [`CellBuilder`]: crate::cell::CellBuilder
 pub struct AbsentCell {
     d1: u8,
-    hashes: Box<[(HashBytes, u16)]>,
+    hashes: [(HashBytes, u16); 4],
 }
 
 impl AbsentCell {
@@ -444,17 +444,20 @@ impl AbsentCell {
         // Copy only level mask bits and fill the rest with absent mask.
         let d1 = (desc.d1 & CellDescriptor::LEVEL_MASK) | CellDescriptor::ABSENT_MASK;
 
-        let hash_count = 1 + desc.level_mask().level() as usize;
-        let mut hashes = Vec::with_capacity(hash_count);
-        for level in desc.level_mask() {
-            hashes.push((*cell.hash(level), cell.depth(level)));
-        }
-        debug_assert_eq!(hash_count, hashes.len());
+        let hashes = [0, 1, 2, 3].map(|level| (*cell.hash(level), cell.depth(level)));
 
-        Cell(CellInner::new(Self {
-            d1,
-            hashes: hashes.into_boxed_slice(),
-        }))
+        Cell(CellInner::new(Self { d1, hashes }))
+    }
+
+    /// Every TON level has a cached value; higher levels use level 3.
+    fn hash_and_depth(&self, level: u8) -> &(HashBytes, u16) {
+        let [level0, level1, level2, level3] = &self.hashes;
+        match level {
+            0 => level0,
+            1 => level1,
+            2 => level2,
+            _ => level3,
+        }
     }
 }
 
@@ -493,23 +496,11 @@ impl CellImpl for AbsentCell {
     }
 
     fn hash(&self, level: u8) -> &HashBytes {
-        let descriptor = CellDescriptor { d1: self.d1, d2: 0 };
-        let hash_index = hash_index(descriptor, level);
-        let (hash, _) = &self
-            .hashes
-            .get(hash_index as usize)
-            .expect("absent cell must be well-formed");
-        hash
+        &self.hash_and_depth(level).0
     }
 
     fn depth(&self, level: u8) -> u16 {
-        let descriptor = CellDescriptor { d1: self.d1, d2: 0 };
-        let hash_index = hash_index(descriptor, level);
-        let (_, depth) = &self
-            .hashes
-            .get(hash_index as usize)
-            .expect("absent cell must be well-formed");
-        *depth
+        self.hash_and_depth(level).1
     }
 }
 
@@ -788,14 +779,31 @@ mod tests {
             make_pruned_branch(pruned_level1.as_ref(), 1, Cell::empty_context()).unwrap();
         let pruned_level3 =
             make_pruned_branch(pruned_level2.as_ref(), 2, Cell::empty_context()).unwrap();
+        let pruned_mask2 =
+            make_pruned_branch(simple_cell.as_ref(), 1, Cell::empty_context()).unwrap();
+        let pruned_mask4 =
+            make_pruned_branch(simple_cell.as_ref(), 2, Cell::empty_context()).unwrap();
+        let pruned_mask5 =
+            make_pruned_branch(pruned_level1.as_ref(), 2, Cell::empty_context()).unwrap();
+        let pruned_mask6 =
+            make_pruned_branch(pruned_mask2.as_ref(), 2, Cell::empty_context()).unwrap();
 
-        for cell in [simple_cell, pruned_level1, pruned_level2, pruned_level3] {
+        for cell in [
+            simple_cell,
+            pruned_level1,
+            pruned_mask2,
+            pruned_level2,
+            pruned_mask4,
+            pruned_mask5,
+            pruned_mask6,
+            pruned_level3,
+        ] {
             let absent_direct = AbsentCell::new(&cell);
             assert_eq!(absent_direct.level_mask(), cell.level_mask());
             assert_eq!(absent_direct.repr_hash(), cell.repr_hash());
             assert_eq!(absent_direct.repr_depth(), cell.repr_depth());
 
-            for level in cell.level_mask() {
+            for level in 0..=u8::MAX {
                 assert_eq!(absent_direct.hash(level), cell.hash(level));
                 assert_eq!(absent_direct.depth(level), cell.depth(level));
             }

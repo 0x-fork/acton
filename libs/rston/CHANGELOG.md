@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Breaking changes
+
+- `HashBytes::from_slice()` now returns `Result<HashBytes, TryFromSliceError>`.
+  Input lengths other than 32 bytes return an error instead of panicking.
+
 ### Added
 
 - TG Wallet rev00 code, deployment data, and transfer bodies, with separate
@@ -30,6 +35,11 @@
 
 ### Changed
 
+- Reject `expect()` calls in the library's Clippy checks.
+- Store all four TON hash levels in `AbsentCell` so hash and depth lookup cannot
+  index beyond the stored values.
+- Return `CellUnderflow` when an included subtree reference is unavailable during
+  sequential or parallel Merkle proof construction.
 - Require a `0x` or `0X` prefix for 66-character hex hashes.
 - Include all benchmark targets in Clippy checks.
 - Match TON capability names and masks.
