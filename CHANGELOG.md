@@ -39,6 +39,8 @@ All notable changes to this project will be documented in this file.
 
 ### Linting
 
+- Follow `break` and `continue` through nested loops and match arms in dataflow
+  checks, excluding unreachable statements and evaluating `repeat` counts once.
 - Clarify E006 (`pure-function-call-unused`): an unused result may be intentional
   because a `@pure` call can validate input and throw an exception.
 

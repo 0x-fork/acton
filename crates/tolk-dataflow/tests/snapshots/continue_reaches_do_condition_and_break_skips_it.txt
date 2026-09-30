@@ -1,0 +1,32 @@
+0 Entry reachable "" R:[] W:[] live:[flag]
+  Unconditional -> 2
+1 Exit reachable "" R:[] W:[] live:[]
+2 Expr reachable "var x: int" R:[] W:[x] live:[flag]
+  Unconditional -> 5
+3 Condition reachable "x < 0" R:[x] W:[] live:[flag, x]
+  LoopBack -> 5
+  FalseBranch -> 4
+4 Join reachable "do {" R:[] W:[] live:[x]
+  Unconditional -> 14
+5 Condition reachable "flag == 1" R:[flag] W:[] live:[flag]
+  TrueBranch -> 6
+  FalseBranch -> 8
+6 Expr reachable "x = 4" R:[] W:[x] live:[flag]
+  Unconditional -> 7
+7 Continue reachable "continue" R:[] W:[] live:[flag, x]
+  Continue -> 3
+8 Nop reachable "if (flag == 1) { x = 4; continue; }" R:[] W:[] live:[flag]
+  Unconditional -> 9
+9 Condition reachable "flag == 2" R:[flag] W:[] live:[flag]
+  TrueBranch -> 10
+  FalseBranch -> 12
+10 Expr reachable "x = 7" R:[] W:[x] live:[]
+  Unconditional -> 11
+11 Break reachable "break" R:[] W:[] live:[x]
+  Break -> 4
+12 Nop reachable "if (flag == 2) { x = 7; break; }" R:[] W:[] live:[flag]
+  Unconditional -> 13
+13 Expr reachable "x = 9" R:[] W:[x] live:[flag]
+  Unconditional -> 3
+14 Return reachable "return x" R:[x] W:[] live:[x]
+  Return -> 1

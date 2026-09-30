@@ -199,3 +199,48 @@ fn test_check_divide_before_multiply_reports_in_return_expression() {
         function_name!(),
     );
 }
+
+#[test]
+#[named]
+fn test_check_divide_before_multiply_loop_transfers_skip_dead_assignments() {
+    run_divide_before_multiply_test(
+        r"
+            fun main(flag: int, value: int) {
+                var result = 10;
+                while (true) {
+                    result = match (flag) {
+                        0 => { break; value / 2 }
+                        else => value
+                    };
+                    break;
+                    result = value / 3;
+                    debug.print(value / 4 * 5);
+                }
+                debug.print(result * 6);
+            }
+        ",
+        function_name!(),
+    );
+}
+
+#[test]
+#[named]
+fn test_check_divide_before_multiply_loop_transfers_keep_live_taint() {
+    run_divide_before_multiply_test(
+        r"
+            fun main(flag: int, value: int) {
+                var result = 10;
+                repeat (3) {
+                    if (flag == 0) { continue; }
+                    result = match (flag) {
+                        1 => { break; value }
+                        else => value / 2
+                    };
+                    break;
+                }
+                debug.print(result * 6);
+            }
+        ",
+        function_name!(),
+    );
+}

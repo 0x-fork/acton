@@ -132,7 +132,7 @@ pub fn find_issues(
     let mut issues = Vec::new();
 
     for node in cfg.nodes() {
-        if node.taint.multiplication_operations.is_empty() {
+        if !dataflow.is_reachable(node.id) || node.taint.multiplication_operations.is_empty() {
             continue;
         }
 

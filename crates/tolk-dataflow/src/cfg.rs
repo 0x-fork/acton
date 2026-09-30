@@ -269,6 +269,29 @@ impl ControlFlowGraph {
             .map(|edge_id| &self.edges[edge_id.index()])
     }
 
+    /// Returns entry reachability, indexed by [`NodeId::index`].
+    ///
+    /// Nodes inside a reachable infinite loop are included even if the function
+    /// exit is unreachable. Disconnected statements remain available for CFG
+    /// inspection but must not contribute facts to dataflow analyses.
+    #[must_use]
+    pub fn reachable_nodes(&self) -> Vec<bool> {
+        let mut reachable = vec![false; self.node_count()];
+        let mut pending = vec![self.entry()];
+        reachable[self.entry().index()] = true;
+
+        while let Some(node) = pending.pop() {
+            for edge in self.successors(node) {
+                if !reachable[edge.to.index()] {
+                    reachable[edge.to.index()] = true;
+                    pending.push(edge.to);
+                }
+            }
+        }
+
+        reachable
+    }
+
     /// Collects all locals touched by read/write sets in this graph.
     #[must_use]
     pub fn all_locals(&self) -> FxHashSet<LocalDefId> {

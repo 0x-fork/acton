@@ -1,0 +1,41 @@
+0 Entry reachable "" R:[] W:[] live:[count, flag]
+  Unconditional -> 2
+1 Exit reachable "" R:[] W:[] live:[]
+2 Expr reachable "count += 1" R:[count] W:[count] live:[count, flag]
+  Unconditional -> 3
+3 Condition reachable "" R:[] W:[] live:[count, flag]
+  TrueBranch -> 5
+  FalseBranch -> 4
+4 Join reachable "repeat (count += 1) {" R:[] W:[] live:[count]
+  Unconditional -> 18
+5 Condition reachable "flag > 0" R:[flag] W:[] live:[count, flag]
+  TrueBranch -> 7
+  FalseBranch -> 6
+6 Join reachable "while (flag > 0) {" R:[] W:[] live:[count, flag]
+  Unconditional -> 14
+7 Condition reachable "match (flag) {" R:[flag] W:[] live:[count, flag]
+  Unconditional -> 9
+8 Join dead "match (flag) {" R:[] W:[] live:[]
+  LoopBack -> 5
+9 MatchPattern reachable "1" R:[] W:[] live:[count, flag]
+  TrueBranch -> 10
+  FalseBranch -> 12
+10 Expr reachable "flag -= 1" R:[flag] W:[flag] live:[count, flag]
+  Unconditional -> 11
+11 Continue reachable "continue" R:[] W:[] live:[count, flag]
+  Continue -> 5
+12 MatchPattern reachable "else => break," R:[] W:[] live:[count, flag]
+  Unconditional -> 13
+13 Break reachable "break" R:[] W:[] live:[count, flag]
+  Break -> 6
+14 Condition reachable "flag == 0" R:[flag] W:[] live:[count, flag]
+  TrueBranch -> 15
+  FalseBranch -> 16
+15 Continue reachable "continue" R:[] W:[] live:[count, flag]
+  Continue -> 3
+16 Nop reachable "if (flag == 0) { continue; }" R:[] W:[] live:[count]
+  Unconditional -> 17
+17 Break reachable "break" R:[] W:[] live:[count]
+  Break -> 4
+18 Expr reachable "debug.print(count)" R:[count] W:[] live:[count]
+  Unconditional -> 1

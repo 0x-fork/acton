@@ -50,9 +50,17 @@ pub struct DataflowResult<State> {
     pub out_state: Vec<State>,
     pub iterations: usize,
     pub converged: bool,
+    reachable: Vec<bool>,
 }
 
 impl<State> DataflowResult<State> {
+    /// Whether this node can execute from the function entry. Unreachable nodes
+    /// retain bottom states and must be excluded when reporting diagnostics.
+    #[must_use]
+    pub fn is_reachable(&self, node: NodeId) -> bool {
+        self.reachable[node.index()]
+    }
+
     #[must_use]
     pub fn in_at(&self, node: NodeId) -> &State {
         &self.in_state[node.index()]
@@ -79,6 +87,7 @@ pub fn solve_with_config<A: DataflowAnalysis>(
     config: SolverConfig,
 ) -> DataflowResult<A::State> {
     let node_count = cfg.node_count();
+    let reachable = cfg.reachable_nodes();
     let bottom = analysis.bottom(cfg);
 
     let mut in_state = vec![bottom.clone(); node_count];
@@ -89,7 +98,9 @@ pub fn solve_with_config<A: DataflowAnalysis>(
             in_state[cfg.entry().index()] = analysis.boundary(cfg);
         }
         Direction::Backward => {
-            out_state[cfg.exit().index()] = analysis.boundary(cfg);
+            if reachable[cfg.exit().index()] {
+                out_state[cfg.exit().index()] = analysis.boundary(cfg);
+            }
         }
     }
 
@@ -97,6 +108,9 @@ pub fn solve_with_config<A: DataflowAnalysis>(
     let mut in_queue = vec![false; node_count];
 
     for node in initial_order(cfg, analysis.direction()) {
+        if !reachable[node.index()] {
+            continue;
+        }
         queue.push_back(node);
         in_queue[node.index()] = true;
     }
@@ -112,6 +126,7 @@ pub fn solve_with_config<A: DataflowAnalysis>(
                 out_state,
                 iterations,
                 converged: false,
+                reachable,
             };
         }
 
@@ -124,7 +139,9 @@ pub fn solve_with_config<A: DataflowAnalysis>(
                 };
 
                 for pred in cfg.predecessors(node) {
-                    analysis.merge(&mut merged_in, &out_state[pred.from.index()]);
+                    if reachable[pred.from.index()] {
+                        analysis.merge(&mut merged_in, &out_state[pred.from.index()]);
+                    }
                 }
 
                 let in_changed = merged_in != in_state[node.index()];
@@ -171,7 +188,7 @@ pub fn solve_with_config<A: DataflowAnalysis>(
 
                 if in_changed {
                     for pred in cfg.predecessors(node) {
-                        if !in_queue[pred.from.index()] {
+                        if reachable[pred.from.index()] && !in_queue[pred.from.index()] {
                             queue.push_back(pred.from);
                             in_queue[pred.from.index()] = true;
                         }
@@ -186,6 +203,7 @@ pub fn solve_with_config<A: DataflowAnalysis>(
         out_state,
         iterations,
         converged: true,
+        reachable,
     }
 }
 

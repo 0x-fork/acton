@@ -152,20 +152,38 @@ impl<'idx> CfgBuilder<'idx> {
                 .add_edge(*exit, right.entry, EdgeKind::Unconditional);
         }
         left.nodes.extend(right.nodes.iter().copied());
-        left.exits = right.exits;
+        if !left.exits.is_empty() {
+            left.exits = right.exits;
+        }
         left
     }
 
     fn build_block_fragment(&mut self, block: tolk_syntax::Block<'_>) -> Fragment {
-        let mut stmt_iter = block.stmts();
+        self.build_value_block_fragment(block, None)
+    }
+
+    fn build_value_block_fragment<'tree>(
+        &mut self,
+        block: tolk_syntax::Block<'tree>,
+        assigned_to: Option<Expr<'tree>>,
+    ) -> Fragment {
+        let mut stmt_iter = block.stmts().peekable();
         let Some(first_stmt) = stmt_iter.next() else {
             return self.make_nop_fragment(Some(block.span()));
         };
 
-        let mut fragment = self.build_stmt_fragment(first_stmt);
+        let mut fragment = if stmt_iter.peek().is_none() {
+            self.build_value_stmt_fragment(first_stmt, assigned_to)
+        } else {
+            self.build_stmt_fragment(first_stmt)
+        };
 
-        for stmt in stmt_iter {
-            let next = self.build_stmt_fragment(stmt);
+        while let Some(stmt) = stmt_iter.next() {
+            let next = if stmt_iter.peek().is_none() {
+                self.build_value_stmt_fragment(stmt, assigned_to)
+            } else {
+                self.build_stmt_fragment(stmt)
+            };
             fragment = self.append_fragments(fragment, next);
         }
 
@@ -176,9 +194,7 @@ impl<'idx> CfgBuilder<'idx> {
         match stmt {
             Stmt::ExprStmt(expr_stmt) => {
                 if let Some(expr) = expr_stmt.expr() {
-                    let node = self.cfg.add_node(FlowNodeKind::Expr, Some(expr.span()));
-                    self.collect_expr_into_node(node, expr, AccessMode::Read);
-                    Fragment::single(node)
+                    self.build_value_expr_fragment(expr, None)
                 } else {
                     self.make_nop_fragment(Some(expr_stmt.span()))
                 }
@@ -200,6 +216,60 @@ impl<'idx> CfgBuilder<'idx> {
                 self.make_nop_fragment(Some(tolk_resolver::Span::from_syntax(&unmapped.0)))
             }
         }
+    }
+
+    // A match arm assigns its result only on paths that produce a value. A
+    // break/continue inside the arm bypasses both its suffix and the assignment.
+    fn build_value_stmt_fragment<'tree>(
+        &mut self,
+        stmt: Stmt<'tree>,
+        assigned_to: Option<Expr<'tree>>,
+    ) -> Fragment {
+        if let Stmt::ExprStmt(stmt) = stmt
+            && let Some(expr) = stmt.expr()
+        {
+            return self.build_value_expr_fragment(expr, assigned_to);
+        }
+        if let Stmt::Match(stmt) = stmt
+            && let Some(expr) = stmt.expr()
+        {
+            return self.build_match_expr_fragment(expr, assigned_to);
+        }
+        self.build_stmt_fragment(stmt)
+    }
+
+    fn build_value_expr_fragment<'tree>(
+        &mut self,
+        expr: Expr<'tree>,
+        assigned_to: Option<Expr<'tree>>,
+    ) -> Fragment {
+        let value = self.collector.strip_taint_wrappers(expr);
+        if let Expr::Match(match_expr) = value {
+            return self.build_match_expr_fragment(match_expr, assigned_to);
+        }
+        if let Expr::Assign(assign) = value
+            && let Some(right) = assign.right()
+            && matches!(self.collector.strip_taint_wrappers(right), Expr::Match(_))
+        {
+            return self.build_value_expr_fragment(right, assign.left());
+        }
+
+        let node = self.cfg.add_node(FlowNodeKind::Expr, Some(expr.span()));
+        self.collect_expr_into_node(node, expr, AccessMode::Read);
+        if let Some(target) = assigned_to {
+            let flow_node = self.cfg.node_mut(node);
+            self.collector.collect_expr(
+                target,
+                AccessMode::Write,
+                &mut flow_node.reads,
+                &mut flow_node.writes,
+            );
+            self.collector.collect_rhs_division_spans(
+                expr,
+                &mut flow_node.taint.direct_assignment_division_spans,
+            );
+        }
+        Fragment::single(node)
     }
 
     fn build_if_fragment(&mut self, if_stmt: tolk_syntax::If<'_>) -> Fragment {
@@ -225,10 +295,15 @@ impl<'idx> CfgBuilder<'idx> {
             None => self.make_nop_fragment(Some(if_stmt.span())),
         };
 
-        self.cfg
-            .add_edge(cond_node, then_fragment.entry, EdgeKind::TrueBranch);
-        self.cfg
-            .add_edge(cond_node, else_fragment.entry, EdgeKind::FalseBranch);
+        let condition = if_stmt.condition().and_then(literal_condition);
+        if condition != Some(false) {
+            self.cfg
+                .add_edge(cond_node, then_fragment.entry, EdgeKind::TrueBranch);
+        }
+        if condition != Some(true) {
+            self.cfg
+                .add_edge(cond_node, else_fragment.entry, EdgeKind::FalseBranch);
+        }
 
         let mut nodes = vec![cond_node];
         nodes.extend(then_fragment.nodes.iter().copied());
@@ -272,10 +347,15 @@ impl<'idx> CfgBuilder<'idx> {
 
         self.loops.pop();
 
-        self.cfg
-            .add_edge(cond_node, body_fragment.entry, EdgeKind::TrueBranch);
-        self.cfg
-            .add_edge(cond_node, after_loop, EdgeKind::FalseBranch);
+        let condition = while_stmt.condition().and_then(literal_condition);
+        if condition != Some(false) {
+            self.cfg
+                .add_edge(cond_node, body_fragment.entry, EdgeKind::TrueBranch);
+        }
+        if condition != Some(true) {
+            self.cfg
+                .add_edge(cond_node, after_loop, EdgeKind::FalseBranch);
+        }
 
         for exit in &body_fragment.exits {
             self.cfg.add_edge(*exit, cond_node, EdgeKind::LoopBack);
@@ -294,7 +374,7 @@ impl<'idx> CfgBuilder<'idx> {
     fn build_repeat_fragment(&mut self, repeat_stmt: tolk_syntax::Repeat<'_>) -> Fragment {
         let count_span = repeat_stmt.count().map(|count| count.span());
         let count_node = self.cfg.add_node(
-            FlowNodeKind::Condition,
+            FlowNodeKind::Expr,
             count_span.or_else(|| Some(repeat_stmt.span())),
         );
 
@@ -302,13 +382,19 @@ impl<'idx> CfgBuilder<'idx> {
             self.collect_expr_into_node(count_node, count, AccessMode::Read);
         }
 
+        // REPEAT consumes the count once. CONTINUE advances the VM loop counter,
+        // without evaluating the source expression again.
+        let counter_node = self.cfg.add_node(FlowNodeKind::Condition, None);
+        self.cfg
+            .add_edge(count_node, counter_node, EdgeKind::Unconditional);
+
         let after_loop = self
             .cfg
             .add_node(FlowNodeKind::Join, Some(repeat_stmt.span()));
 
         self.loops.push(LoopContext {
             break_target: after_loop,
-            continue_target: count_node,
+            continue_target: counter_node,
         });
 
         let body_fragment = if let Some(body) = repeat_stmt.body() {
@@ -320,15 +406,15 @@ impl<'idx> CfgBuilder<'idx> {
         self.loops.pop();
 
         self.cfg
-            .add_edge(count_node, body_fragment.entry, EdgeKind::TrueBranch);
+            .add_edge(counter_node, body_fragment.entry, EdgeKind::TrueBranch);
         self.cfg
-            .add_edge(count_node, after_loop, EdgeKind::FalseBranch);
+            .add_edge(counter_node, after_loop, EdgeKind::FalseBranch);
 
         for exit in &body_fragment.exits {
-            self.cfg.add_edge(*exit, count_node, EdgeKind::LoopBack);
+            self.cfg.add_edge(*exit, counter_node, EdgeKind::LoopBack);
         }
 
-        let mut nodes = vec![count_node, after_loop];
+        let mut nodes = vec![count_node, counter_node, after_loop];
         nodes.extend(body_fragment.nodes.iter().copied());
 
         Fragment {
@@ -370,10 +456,15 @@ impl<'idx> CfgBuilder<'idx> {
             self.cfg.add_edge(*exit, cond_node, EdgeKind::Unconditional);
         }
 
-        self.cfg
-            .add_edge(cond_node, body_fragment.entry, EdgeKind::LoopBack);
-        self.cfg
-            .add_edge(cond_node, after_loop, EdgeKind::FalseBranch);
+        let condition = do_while_stmt.condition().and_then(literal_condition);
+        if condition != Some(false) {
+            self.cfg
+                .add_edge(cond_node, body_fragment.entry, EdgeKind::LoopBack);
+        }
+        if condition != Some(true) {
+            self.cfg
+                .add_edge(cond_node, after_loop, EdgeKind::FalseBranch);
+        }
 
         let mut nodes = vec![cond_node, after_loop];
         nodes.extend(body_fragment.nodes.iter().copied());
@@ -549,10 +640,14 @@ impl<'idx> CfgBuilder<'idx> {
         let Some(match_expr) = match_stmt.expr() else {
             return self.make_nop_fragment(Some(match_stmt.span()));
         };
-        self.build_match_expr_fragment(match_expr)
+        self.build_match_expr_fragment(match_expr, None)
     }
 
-    fn build_match_expr_fragment(&mut self, match_expr: Match<'_>) -> Fragment {
+    fn build_match_expr_fragment<'tree>(
+        &mut self,
+        match_expr: Match<'tree>,
+        assigned_to: Option<Expr<'tree>>,
+    ) -> Fragment {
         let dispatch = self
             .cfg
             .add_node(FlowNodeKind::Condition, Some(match_expr.span()));
@@ -589,7 +684,8 @@ impl<'idx> CfgBuilder<'idx> {
                 self.cfg.add_edge(prev, pattern_node, edge_kind);
             }
 
-            let body_fragment = self.build_match_arm_body_fragment(arm.body(), arm.span());
+            let body_fragment =
+                self.build_match_arm_body_fragment(arm.body(), arm.span(), assigned_to);
             let to_body = if matches!(pattern, MatchPattern::Else) {
                 EdgeKind::Unconditional
             } else {
@@ -624,25 +720,22 @@ impl<'idx> CfgBuilder<'idx> {
         }
     }
 
-    fn build_match_arm_body_fragment(
+    fn build_match_arm_body_fragment<'tree>(
         &mut self,
-        body: Option<MatchArmBody<'_>>,
+        body: Option<MatchArmBody<'tree>>,
         fallback_span: tolk_resolver::Span,
+        assigned_to: Option<Expr<'tree>>,
     ) -> Fragment {
         let Some(body) = body else {
             return self.make_nop_fragment(Some(fallback_span));
         };
 
         match body {
-            MatchArmBody::Block(block) => self.build_block_fragment(block),
+            MatchArmBody::Block(block) => self.build_value_block_fragment(block, assigned_to),
             MatchArmBody::Return(ret) => self.build_return_fragment(ret),
             MatchArmBody::Throw(throw) => self.build_throw_fragment(throw),
             MatchArmBody::Statement(stmt) => self.build_stmt_fragment(stmt),
-            MatchArmBody::Expr(expr) => {
-                let node = self.cfg.add_node(FlowNodeKind::Expr, Some(expr.span()));
-                self.collect_expr_into_node(node, expr, AccessMode::Read);
-                Fragment::single(node)
-            }
+            MatchArmBody::Expr(expr) => self.build_value_expr_fragment(expr, assigned_to),
         }
     }
 
@@ -779,6 +872,14 @@ impl<'idx> CfgBuilder<'idx> {
                 .called_global_symbols
                 .extend(called_globals);
         }
+    }
+}
+
+fn literal_condition(expr: Expr<'_>) -> Option<bool> {
+    match expr {
+        Expr::BoolLit(value) => Some(value.value()),
+        Expr::Paren(paren) => paren.inner().and_then(literal_condition),
+        _ => None,
     }
 }
 
@@ -1134,6 +1235,10 @@ impl<'idx> UseDefCollector<'idx> {
             return;
         };
 
+        self.collect_rhs_division_spans(rhs, out);
+    }
+
+    fn collect_rhs_division_spans(&self, rhs: Expr<'_>, out: &mut Vec<tolk_resolver::Span>) {
         let rhs = self.strip_taint_wrappers(rhs);
         let Expr::Bin(bin) = rhs else {
             return;

@@ -1,0 +1,27 @@
+0 Entry reachable "" R:[] W:[] live:[flag, value]
+  Unconditional -> 2
+1 Exit reachable "" R:[] W:[] live:[]
+2 Expr reachable "var result = 10" R:[] W:[result] live:[flag, value]
+  Unconditional -> 3
+3 Condition reachable "true" R:[] W:[] live:[flag, result, value]
+  TrueBranch -> 5
+4 Join reachable "while (true) {" R:[] W:[] live:[result]
+  Unconditional -> 13
+5 Condition reachable "match (flag) {" R:[flag] W:[] live:[flag, result, value]
+  Unconditional -> 7
+6 Join reachable "match (flag) {" R:[] W:[] live:[result]
+  Unconditional -> 12
+7 MatchPattern reachable "0" R:[] W:[] live:[result, value]
+  TrueBranch -> 8
+  FalseBranch -> 10
+8 Break reachable "break" R:[] W:[] live:[result]
+  Break -> 4
+9 Expr dead "value / 2" R:[value] W:[result] live:[]
+10 MatchPattern reachable "else => value" R:[] W:[] live:[value]
+  Unconditional -> 11
+11 Expr reachable "value" R:[value] W:[result] live:[value]
+  Unconditional -> 6
+12 Break reachable "break" R:[] W:[] live:[result]
+  Break -> 4
+13 Return reachable "return result" R:[result] W:[] live:[result]
+  Return -> 1

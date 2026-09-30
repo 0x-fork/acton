@@ -426,3 +426,40 @@ fn test_check_random_requires_initialization_allows_when_non_initialized_path_th
         function_name!(),
     );
 }
+
+#[test]
+#[named]
+fn test_check_random_loop_transfers_initialize_on_all_break_paths() {
+    run_random_requires_initialization_test(
+        r"
+            fun main(flag: int) {
+                while (true) {
+                    match (flag) {
+                        0 => continue,
+                        else => { random.initialize(); break; }
+                    }
+                }
+                debug.print(random.uint256());
+            }
+        ",
+        function_name!(),
+    );
+}
+
+#[test]
+#[named]
+fn test_check_random_loop_transfers_break_bypasses_initialization() {
+    run_random_requires_initialization_test(
+        r"
+            fun main(flag: int) {
+                do {
+                    if (flag == 0) { break; }
+                    random.initialize();
+                    continue;
+                } while (false);
+                debug.print(random.uint256());
+            }
+        ",
+        function_name!(),
+    );
+}

@@ -1,0 +1,20 @@
+0 Entry reachable "" R:[] W:[] live:[value]
+  Unconditional -> 2
+1 Exit dead "" R:[] W:[] live:[]
+2 Condition reachable "true" R:[] W:[] live:[value]
+  TrueBranch -> 4
+3 Join dead "while (true) {" R:[] W:[] live:[]
+  Unconditional -> 10
+4 Expr reachable "debug.print(value)" R:[value] W:[] live:[value]
+  Unconditional -> 5
+5 Condition reachable "false" R:[] W:[] live:[value]
+  FalseBranch -> 7
+6 Break dead "break" R:[] W:[] live:[]
+  Break -> 3
+7 Nop reachable "if (false) { break; }" R:[] W:[] live:[value]
+  Unconditional -> 8
+8 Continue reachable "continue" R:[] W:[] live:[value]
+  Continue -> 2
+9 Expr dead "value = flag" R:[flag] W:[value] live:[]
+10 Return dead "return flag" R:[flag] W:[] live:[]
+  Return -> 1

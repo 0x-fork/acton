@@ -5177,7 +5177,9 @@ dependencies = [
 name = "tolk-dataflow"
 version = "1.2.0"
 dependencies = [
+ "expect-test",
  "rustc-hash 2.1.1",
+ "tempfile",
  "tolk-resolver",
  "tolk-syntax",
 ]

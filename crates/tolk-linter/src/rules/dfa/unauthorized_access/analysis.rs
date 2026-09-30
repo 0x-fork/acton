@@ -74,7 +74,7 @@ pub fn find_unchecked_storage_writes(
     let mut issues = Vec::new();
 
     for node in cfg.nodes() {
-        if !node.taint.has_storage_write_sink {
+        if !dataflow.is_reachable(node.id) || !node.taint.has_storage_write_sink {
             continue;
         }
 

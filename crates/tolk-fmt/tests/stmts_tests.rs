@@ -835,6 +835,88 @@ fn test_continue_statement() {
 }
 
 #[test]
+fn test_loop_transfers_in_match_arms() {
+    check(
+        r"fun test(x: int) { while (true) { match (x) {
+            0 => break, // leave this loop
+            1 => continue, // next iteration
+            2 => { if (x > 0) { break; } continue; }
+            else => { repeat (x) { match (x) { 0 => continue, else => break, } } break; }
+        } } }",
+        expect![[r"
+            fun test(x: int) {
+                while (true) {
+                    match (x) {
+                        0 => break,    // leave this loop
+                        1 => continue, // next iteration
+                        2 => {
+                            if (x > 0) {
+                                break;
+                            }
+                            continue;
+                        }
+                        else => {
+                            repeat (x) {
+                                match (x) {
+                                    0 => continue,
+                                    else => break,
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }"]],
+    );
+}
+
+#[test]
+fn test_loop_transfers_in_match_expression() {
+    check(
+        r"fun test(x: int) { var result = 10; while (true) {
+            result = match (x) { 0 => { break; 20 } else => 30 };
+            break;
+        } return result; }",
+        expect![[r"
+            fun test(x: int) {
+                var result = 10;
+                while (true) {
+                    result = match (x) {
+                        0 => {
+                            break;
+                            20;
+                        }
+                        else => 30,
+                    };
+                    break;
+                }
+                return result;
+            }"]],
+    );
+}
+
+#[test]
+fn test_do_while_continue_in_match() {
+    check(
+        r"fun test(x: int) { do { match (x) {
+            0 => { x = 1; continue; } else => break,
+        } } while (x < 0); }",
+        expect![[r"
+            fun test(x: int) {
+                do {
+                    match (x) {
+                        0 => {
+                            x = 1;
+                            continue;
+                        }
+                        else => break,
+                    }
+                } while (x < 0);
+            }"]],
+    );
+}
+
+#[test]
 fn test_empty_statement() {
     check("fun test() { ; }", expect!["fun test() {}"]);
 }

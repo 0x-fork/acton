@@ -84,3 +84,49 @@ fn test_check_storage_write_without_admin_check_skips_guarded_storage_write() {
         function_name!(),
     );
 }
+
+#[test]
+#[named]
+fn test_check_authorization_loop_transfers_guard_all_break_paths() {
+    run_unauthorized_access_test(
+        r"
+            struct Storage { adminAddress: address }
+
+            fun onInternalMessage(in: InMessage) {
+                val storage = lazy Storage.fromCell(contract.getData());
+                while (true) {
+                    match (in.body.loadUint(32)) {
+                        0 => continue,
+                        else => {
+                            assert (in.senderAddress == storage.adminAddress) throw 100;
+                            break;
+                        }
+                    }
+                }
+                contract.setData(contract.getData());
+            }
+        ",
+        function_name!(),
+    );
+}
+
+#[test]
+#[named]
+fn test_check_authorization_loop_transfers_break_bypasses_guard() {
+    run_unauthorized_access_test(
+        r"
+            struct Storage { adminAddress: address }
+
+            fun onInternalMessage(in: InMessage) {
+                val storage = lazy Storage.fromCell(contract.getData());
+                do {
+                    if (in.body.loadUint(32) == 0) { break; }
+                    assert (in.senderAddress == storage.adminAddress) throw 100;
+                    continue;
+                } while (false);
+                contract.setData(contract.getData());
+            }
+        ",
+        function_name!(),
+    );
+}
