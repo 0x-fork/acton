@@ -176,7 +176,7 @@ fn run_script_file(
 ) -> anyhow::Result<()> {
     let mappings = mappings.cloned();
 
-    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
+    let compiler = tolk_compiler::Compiler::new().with_mappings(&mappings);
     let need_debug_info = debug || backtrace == Some(BacktraceMode::Full);
     let mut verbosity = executor_verbosity_for_cli_level(verbose);
 

@@ -1933,6 +1933,16 @@ fn code_action_to_lsp(action: CodeAction) -> anyhow::Result<lsp::CodeActionOrCom
 }
 
 fn diagnostic_to_lsp(diagnostic: CoreDiagnostic) -> lsp::Diagnostic {
+    let related_information = diagnostic
+        .related_information
+        .into_iter()
+        .filter_map(|related| {
+            Some(lsp::DiagnosticRelatedInformation {
+                location: location_to_lsp(&related.location)?,
+                message: related.message,
+            })
+        })
+        .collect::<Vec<_>>();
     let severity = match diagnostic.severity {
         CoreDiagnosticSeverity::Error => lsp::DiagnosticSeverity::ERROR,
         CoreDiagnosticSeverity::Warning => lsp::DiagnosticSeverity::WARNING,
@@ -1955,6 +1965,7 @@ fn diagnostic_to_lsp(diagnostic: CoreDiagnostic) -> lsp::Diagnostic {
         source: Some(diagnostic.source),
         message: diagnostic.message,
         tags: (!tags.is_empty()).then_some(tags),
+        related_information: (!related_information.is_empty()).then_some(related_information),
         ..lsp::Diagnostic::default()
     }
 }

@@ -180,7 +180,7 @@ impl Fixture {
         );
         let path = Path::new("/retrace-tests/prev-blocks.tolk");
         let compiler =
-            tolk_compiler::Compiler::new(2).with_source_overrides([(path, source.as_str())]);
+            tolk_compiler::Compiler::new().with_source_overrides([(path, source.as_str())]);
         let compiled = match compiler.compile(path, false) {
             tolk_compiler::CompilerResult::Success(compiled) => compiled,
             other @ tolk_compiler::CompilerResult::Error(_) => {

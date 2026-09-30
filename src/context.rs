@@ -413,7 +413,7 @@ pub(crate) fn compile_project_contract_with_cache(
     let path_display = path.display().to_string();
 
     let result = if let Some(file_cache) = file_cache {
-        if let Some(cached) = file_cache.get(&path_display, need_debug_info, false, 2, "1.4") {
+        if let Some(cached) = file_cache.get(&path_display, need_debug_info, false, false) {
             tolk_compiler::compiler::CompilerResultSuccess {
                 fift_code: cached.fift_code.unwrap_or_default(),
                 code_boc64: cached.code_boc64,
@@ -426,8 +426,7 @@ pub(crate) fn compile_project_contract_with_cache(
             }
         } else {
             let result = compile_project_contract(acton_config, &path, need_debug_info)?;
-            if let Err(err) =
-                file_cache.put(&path_display, &result, need_debug_info, false, 2, "1.4")
+            if let Err(err) = file_cache.put(&path_display, &result, need_debug_info, false, false)
             {
                 warn!("Failed to cache build for {path_display}: {err}");
             }
@@ -456,7 +455,7 @@ fn compile_project_contract(
     need_debug_info: bool,
 ) -> anyhow::Result<tolk_compiler::compiler::CompilerResultSuccess> {
     let mappings = acton_config.mappings();
-    match tolk_compiler::Compiler::new(2)
+    match tolk_compiler::Compiler::new()
         .with_mappings(&mappings)
         .compile(path, need_debug_info)
     {

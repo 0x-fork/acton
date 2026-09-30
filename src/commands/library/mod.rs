@@ -66,7 +66,7 @@ pub fn publish_cmd(
 
         println!("  {} Compiling contract", "→".blue().bold());
         let mappings = config.mappings();
-        let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
+        let compiler = tolk_compiler::Compiler::new().with_mappings(&mappings);
         let compilation_result = compiler.compile(Path::new(&contract_path), false);
 
         match compilation_result {
@@ -1230,7 +1230,7 @@ fn compile_librarian_with_duration(duration: u64) -> anyhow::Result<Cell> {
     tmp_file.write_all(content.as_bytes())?;
 
     let acton_config = ActonConfig::load();
-    let mut compiler = tolk_compiler::Compiler::new(2);
+    let mut compiler = tolk_compiler::Compiler::new();
     if let Ok(config) = &acton_config {
         let mappings = config.mappings();
         compiler = compiler.with_mappings(&mappings);

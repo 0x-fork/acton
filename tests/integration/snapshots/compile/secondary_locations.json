@@ -1,0 +1,30 @@
+{
+  "errors": [
+    {
+      "in_function": "in function main",
+      "message": "field `unknown` not found in struct `Record`",
+      "range": {
+        "end_char_no": 45,
+        "end_line_no": 2,
+        "file_name": "[ROOT]/contracts/main.tolk",
+        "start_char_no": 38,
+        "start_line_no": 2,
+        "text_inside": "unknown"
+      },
+      "secondary_locations": [
+        {
+          "note": "struct declared here",
+          "range": {
+            "end_char_no": 14,
+            "end_line_no": 1,
+            "file_name": "[ROOT]/contracts/types.tolk",
+            "start_char_no": 8,
+            "start_line_no": 1,
+            "text_inside": "Record"
+          }
+        }
+      ]
+    }
+  ],
+  "success": false
+}

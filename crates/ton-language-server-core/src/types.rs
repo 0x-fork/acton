@@ -298,6 +298,15 @@ pub enum DiagnosticTag {
     Deprecated,
 }
 
+/// A navigable source note attached to a diagnostic rather than a separate error.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DiagnosticRelatedInformation {
+    /// Source location explaining a diagnostic, including declarations in other files.
+    pub location: Location,
+    /// Compiler or analyzer note associated with the location.
+    pub message: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Diagnostic {
     pub range: Range,
@@ -306,6 +315,8 @@ pub struct Diagnostic {
     pub source: String,
     pub message: String,
     pub tags: Vec<DiagnosticTag>,
+    /// Additional locations that explain the primary diagnostic.
+    pub related_information: Vec<DiagnosticRelatedInformation>,
 }
 
 impl Diagnostic {
@@ -323,6 +334,7 @@ impl Diagnostic {
             source: source.into(),
             message: message.into(),
             tags: Vec::new(),
+            related_information: Vec::new(),
         }
     }
 

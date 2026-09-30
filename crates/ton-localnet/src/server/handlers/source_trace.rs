@@ -49,7 +49,7 @@ fn build_source_trace_response(
         .root
         .join(safe_relative_path(&payload.source_bundle.entrypoint)?);
     let mappings = temp_import_mappings(&temp_dir.root, &payload.source_bundle)?;
-    let compiler = Compiler::new(2).with_mappings(&Some(mappings));
+    let compiler = Compiler::new().with_mappings(&Some(mappings));
     let compilation_result = compiler.compile(&entrypoint_path, true);
 
     let compiled = match compilation_result {

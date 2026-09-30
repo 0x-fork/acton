@@ -58,7 +58,9 @@ Conflicts with `--wallet`.
 {{#option "`--compiler-version` _version_" }}
 Tolk compiler version to request on the verifier side.
 
-Currently defaults to `1.4.2`.
+Available since trunk.
+
+Defaults to the bundled Tolk compiler version used for local compilation.
 {{/option}}
 
 {{#option "`--dry-run`" }}

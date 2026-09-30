@@ -3,6 +3,8 @@ error[C001]: method `some` not found
   |
 6 |                 a.some();
   |                   ^^^^
+  |
+  = in function main
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.

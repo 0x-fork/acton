@@ -115,7 +115,7 @@ fn build_model(
         let precompiled = read_precompiled_boc(&contract_path, &contract_config.src)?;
         (interface.abi, precompiled.code_boc64, interface.source_map)
     } else {
-        let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
+        let compiler = tolk_compiler::Compiler::new().with_mappings(&mappings);
         match compiler.compile(&contract_path, false) {
             CompilerResult::Success(result) => (
                 result.abi.ok_or_else(|| {

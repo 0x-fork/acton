@@ -56,12 +56,9 @@ pub fn compile_cmd(
 
     let need_debug_info = source_map.is_some();
     let need_fift = fift.is_some();
-    let cache_profile = if allow_no_entrypoint {
-        "1.4+allow-no-entrypoint"
-    } else {
-        "1.4"
-    };
-    if let Some(cached_entry) = file_cache.get(path, need_debug_info, need_fift, 2, cache_profile) {
+    if let Some(cached_entry) =
+        file_cache.get(path, need_debug_info, need_fift, allow_no_entrypoint)
+    {
         let elapsed = start_time.elapsed();
         info!(
             "Compile {path} from file cache ({}) in {elapsed:?}",
@@ -89,12 +86,12 @@ pub fn compile_cmd(
     let compile_start = Instant::now();
     let with_debug_info = source_map.is_some();
 
-    let mut compiler = tolk_compiler::Compiler::new(2);
+    let mut compiler = tolk_compiler::Compiler::new().with_allow_no_entrypoint(allow_no_entrypoint);
     if let Some(acton_config) = &acton_config {
         let mappings = acton_config.mappings();
         compiler = compiler.with_mappings(&mappings);
     }
-    compiler = compiler.with_allow_no_entrypoint(allow_no_entrypoint);
+    compiler.json_errors = json;
 
     let compilation_result = compiler.compile(Path::new(path), with_debug_info);
     let compile_time = compile_start.elapsed();
@@ -106,9 +103,13 @@ pub fn compile_cmd(
                 "Compile {path} from source (compilation: {compile_time:?}, total: {total_elapsed:?})"
             );
 
-            if let Err(e) =
-                file_cache.put(path, &result, with_debug_info, need_fift, 2, cache_profile)
-                && !json
+            if let Err(e) = file_cache.put(
+                path,
+                &result,
+                with_debug_info,
+                need_fift,
+                allow_no_entrypoint,
+            ) && !json
             {
                 eprintln!("Warning: Failed to cache compilation result: {e}");
             }
@@ -132,15 +133,19 @@ pub fn compile_cmd(
         tolk_compiler::CompilerResult::Error(error) => {
             let total_elapsed = start_time.elapsed();
             info!(
-                "Compile {} failed after {:?}: {}",
-                path, total_elapsed, error.message
+                "Compile {} failed after {:?}: {} source diagnostics; {}",
+                path,
+                total_elapsed,
+                error.errors.len(),
+                error.message
             );
 
             if json {
-                let json_output = serde_json::json!({
-                    "success": false,
-                    "error": error.message
-                });
+                let json_output = if error.errors.is_empty() {
+                    serde_json::json!({ "success": false, "error": error.message })
+                } else {
+                    serde_json::json!({ "success": false, "errors": error.errors })
+                };
                 println!("{}", serde_json::to_string_pretty(&json_output)?);
                 std::process::exit(1);
             } else {

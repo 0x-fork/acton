@@ -23,9 +23,9 @@ pub mod compiler;
 mod version;
 
 pub use compiler::{
-    Compiler, CompilerError, CompilerErrorRange, CompilerInternalResult, CompilerResult, compile,
-    prime_debug_cp0,
+    Compiler, CompilerError, CompilerErrorRange, CompilerErrorSecondaryLocation,
+    CompilerInternalResult, CompilerResult, compile, prime_debug_cp0,
 };
 pub use tolk_source_map::SourceMap;
 pub use tolk_source_map::{abi, debug_marks_dict, dynamic_unpack, source_map, types_kernel};
-pub use version::{NativeTolkVersion, native_tolk_version};
+pub use version::{NativeTolkVersion, TOLK_COMMIT_HASH, TOLK_VERSION, native_tolk_version};

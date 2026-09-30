@@ -333,7 +333,7 @@ fn test_compile_json_error() {
 
     let stdout = output.get_stdout();
     assert!(stdout.contains("\"success\": false"));
-    assert!(stdout.contains("\"error\""));
+    assert!(stdout.contains("\"errors\""));
 }
 
 #[test]
@@ -867,4 +867,32 @@ fn test_compile_invalid_fift_output_path() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/compile/test_compile_invalid_fift_output_path.stderr.txt",
         );
+}
+
+#[test]
+fn test_compile_json_preserves_secondary_locations() {
+    let project = ProjectBuilder::new("compile-related-errors")
+        .file("contracts/types", "struct Record { value: int }\n")
+        .contract(
+            "main",
+            "import \"types\"\nfun main(): Record { return Record { unknown: 1 }; }\n",
+        )
+        .build();
+    let output = project
+        .acton()
+        .compile("contracts/main.tolk")
+        .with_json()
+        .run()
+        .failure();
+    let normalized = crate::support::snapshots::normalize_output_preserve_escapes(
+        &output.get_stdout(),
+        project.path(),
+    );
+    crate::common::assertion().normalize_paths(false).eq(
+        normalized,
+        snapbox::Data::read_from(
+            Path::new("tests/integration/snapshots/compile/secondary_locations.json"),
+            None,
+        ),
+    );
 }

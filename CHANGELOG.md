@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Breaking changes
+
+- `acton compile --json` now returns source diagnostics in an `errors` array,
+  including source ranges, function context, and related locations.
+  Input, configuration, and fatal compiler failures still use the `error`
+  string. Consumers must handle both response shapes.
+
+### Compiler and build cache
+
+- Key Tolk build caches by the linked compiler version and commit, compilation
+  settings, and requested artifacts. Existing cache entries are rebuilt.
+- Use the bundled Tolk version by default when requesting source verification.
+- Remove the obsolete optimization level from the Rust Tolk compiler API.
+- Preserve compiler function context and related source locations in check
+  output and IDE diagnostics.
+
 ### IDE
 
 - Complete `break` and `continue` inside loop bodies, respecting function and

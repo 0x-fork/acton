@@ -568,6 +568,82 @@ async fn publishes_linter_diagnostics_on_open_change_and_close() -> anyhow::Resu
 }
 
 #[tokio::test]
+async fn compiler_diagnostics_include_related_locations_in_other_files() -> anyhow::Result<()> {
+    let workspace = tempfile::tempdir()?;
+    fs::write(workspace.path().join("Acton.toml"), "")?;
+    fs::write(
+        workspace.path().join("types.tolk"),
+        "struct Record { value: int }\n",
+    )?;
+    let main_uri = Url::from_file_path(workspace.path().join("main.tolk")).unwrap();
+    let types_uri = Url::from_file_path(workspace.path().join("types.tolk")).unwrap();
+    let root_uri = Url::from_directory_path(workspace.path()).unwrap();
+    let (mut client, server) = LspTestClient::start(ServerConfig::new(workspace.path())).await;
+    client
+        .request(
+            "initialize",
+            json!({"processId": null, "rootUri": root_uri, "capabilities": {}}),
+        )
+        .await?;
+    client.notify("initialized", json!({})).await?;
+    client.notify("textDocument/didOpen", json!({
+        "textDocument": {
+            "uri": main_uri, "languageId": "tolk", "version": 1,
+            "text": "import \"types\"\nfun main(): Record { return Record { unknown: 1 }; }\n"
+        }
+    })).await?;
+    let initial_count = published_diagnostics_count(&client);
+    let published = wait_for_published_diagnostics(&mut client, initial_count).await?;
+    let diagnostics = published["diagnostics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|diagnostic| diagnostic["source"] == "tolk-compiler")
+        .collect::<Vec<_>>();
+    let rendered =
+        serde_json::to_string_pretty(&diagnostics)?.replace(types_uri.as_str(), "$TYPES");
+    expect![[r#"
+        [
+          {
+            "code": "C001",
+            "message": "field `unknown` not found in struct `Record`\nin function main",
+            "range": {
+              "end": {
+                "character": 44,
+                "line": 1
+              },
+              "start": {
+                "character": 37,
+                "line": 1
+              }
+            },
+            "relatedInformation": [
+              {
+                "location": {
+                  "range": {
+                    "end": {
+                      "character": 13,
+                      "line": 0
+                    },
+                    "start": {
+                      "character": 7,
+                      "line": 0
+                    }
+                  },
+                  "uri": "$TYPES"
+                },
+                "message": "struct declared here"
+              }
+            ],
+            "severity": 1,
+            "source": "tolk-compiler"
+          }
+        ]"#]]
+    .assert_eq(&rendered);
+    client.shutdown(server).await
+}
+
+#[tokio::test]
 async fn compiler_diagnostics_handle_cyrillic_return_type() -> anyhow::Result<()> {
     let workspace = tempfile::tempdir()?;
     fs::write(workspace.path().join("Acton.toml"), "")?;
@@ -871,7 +947,7 @@ async fn compiler_diagnostics_use_unsaved_document_text() -> anyhow::Result<()> 
           "open": [
             {
               "code": "C001",
-              "message": "undefined symbol `missingName`",
+              "message": "undefined symbol `missingName`\nin function helper",
               "range": {
                 "end": {
                   "character": 55,

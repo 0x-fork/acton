@@ -1,0 +1,55 @@
+{
+  "diagnostics": [
+    {
+      "annotations": [
+        {
+          "is_primary": true,
+          "range": {
+            "end": {
+              "character": 44,
+              "line": 1
+            },
+            "start": {
+              "character": 37,
+              "line": 1
+            }
+          }
+        }
+      ],
+      "code": "C001",
+      "file": "[ROOT]/contracts/main.tolk",
+      "fixes": [],
+      "help": "in function main",
+      "message": "field `unknown` not found in struct `Record`",
+      "name": "compiler-error",
+      "severity": "error",
+      "source": "tolk"
+    },
+    {
+      "annotations": [
+        {
+          "is_primary": true,
+          "message": "struct declared here",
+          "range": {
+            "end": {
+              "character": 13,
+              "line": 0
+            },
+            "start": {
+              "character": 7,
+              "line": 0
+            }
+          }
+        }
+      ],
+      "code": "C001",
+      "file": "[ROOT]/contracts/types.tolk",
+      "fixes": [],
+      "message": "struct declared here",
+      "name": "compiler-error",
+      "severity": "info",
+      "source": "tolk"
+    }
+  ],
+  "success": false
+}

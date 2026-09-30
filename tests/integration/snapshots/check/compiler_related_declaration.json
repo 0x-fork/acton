@@ -1,0 +1,44 @@
+{
+  "diagnostics": [
+    {
+      "annotations": [
+        {
+          "is_primary": true,
+          "range": {
+            "end": {
+              "character": 11,
+              "line": 2
+            },
+            "start": {
+              "character": 4,
+              "line": 2
+            }
+          }
+        },
+        {
+          "is_primary": false,
+          "message": "declared as `val` here; use `var` to allow modifications",
+          "range": {
+            "end": {
+              "character": 15,
+              "line": 1
+            },
+            "start": {
+              "character": 8,
+              "line": 1
+            }
+          }
+        }
+      ],
+      "code": "C001",
+      "file": "[ROOT]/contracts/main.tolk",
+      "fixes": [],
+      "help": "in function main",
+      "message": "modifying immutable variable `storage`\nhint: it's declared `val storage`, keyword 'val' means 'immutable'",
+      "name": "compiler-error",
+      "severity": "error",
+      "source": "tolk"
+    }
+  ],
+  "success": false
+}

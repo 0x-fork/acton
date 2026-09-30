@@ -761,6 +761,14 @@ struct LspDiagnostic {
     message: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tags: Vec<u8>,
+    #[serde(rename = "relatedInformation", skip_serializing_if = "Vec::is_empty")]
+    related_information: Vec<LspDiagnosticRelatedInformation>,
+}
+
+#[derive(Serialize)]
+struct LspDiagnosticRelatedInformation {
+    location: LspLocation,
+    message: String,
 }
 
 #[derive(Serialize)]
@@ -985,6 +993,14 @@ fn diagnostics_to_lsp(diagnostics: Vec<Diagnostic>) -> Vec<LspDiagnostic> {
             code: diagnostic.code,
             source: diagnostic.source,
             message: diagnostic.message,
+            related_information: diagnostic
+                .related_information
+                .into_iter()
+                .map(|related| LspDiagnosticRelatedInformation {
+                    location: location_to_lsp(related.location),
+                    message: related.message,
+                })
+                .collect(),
             tags: diagnostic
                 .tags
                 .into_iter()

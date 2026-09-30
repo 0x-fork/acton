@@ -12,6 +12,23 @@ interface TolkCompileJsonResult {
   readonly success: boolean
   readonly code_boc64?: string
   readonly error?: string
+  readonly errors?: readonly TolkCompileDiagnostic[]
+}
+
+interface TolkCompileDiagnostic {
+  readonly message: string
+  readonly range?: TolkCompileDiagnosticRange | null
+  readonly in_function?: string | null
+  readonly secondary_locations?: readonly {
+    readonly note: string
+    readonly range?: TolkCompileDiagnosticRange | null
+  }[]
+}
+
+interface TolkCompileDiagnosticRange {
+  readonly file_name: string
+  readonly start_line_no: number
+  readonly start_char_no: number
 }
 
 interface TolkDisasmJsonResult {
@@ -320,7 +337,7 @@ export class ActonAssemblyPreviewProvider implements vscode.TextDocumentContentP
   private parseCompileResult(output: string): string {
     const result = this.parseJson(output, "compile JSON") as TolkCompileJsonResult
     if (!result.success) {
-      throw new Error(result.error ?? "Compilation failed")
+      throw new Error(this.parseJsonError(output) ?? "Compilation failed")
     }
     if (!result.code_boc64 || result.code_boc64.trim() === "") {
       throw new Error("Compilation JSON did not include code_boc64")
@@ -679,8 +696,24 @@ export class ActonAssemblyPreviewProvider implements vscode.TextDocumentContentP
     }
 
     try {
-      const parsed = this.parseJson(output, "error JSON") as {readonly error?: string}
-      return parsed.error
+      const parsed = this.parseJson(output, "error JSON") as TolkCompileJsonResult
+      const errors = parsed.errors?.map(error => {
+        const location = error.range
+        const prefix = location
+          ? `${location.file_name}:${location.start_line_no}:${location.start_char_no}: `
+          : ""
+        const parts = [`${prefix}${error.message}`]
+        if (error.in_function) parts.push(error.in_function)
+        for (const note of error.secondary_locations ?? []) {
+          const range = note.range
+          const suffix = range
+            ? ` (${range.file_name}:${range.start_line_no}:${range.start_char_no})`
+            : ""
+          parts.push(`note: ${note.note}${suffix}`)
+        }
+        return parts.join("\n")
+      })
+      return errors?.join("\n\n") || parsed.error
     } catch {
       return undefined
     }

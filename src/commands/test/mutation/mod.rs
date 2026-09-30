@@ -1163,7 +1163,7 @@ pub fn test_mutate_cmd(paths: &[String], config: &TestConfig) -> anyhow::Result<
     });
 
     let mappings = acton_config.mappings();
-    let compiler = tolk_compiler::Compiler::new(0).with_mappings(&mappings);
+    let compiler = tolk_compiler::Compiler::new().with_mappings(&mappings);
     let source_map = match compiler.compile(&sources[0].path, false) {
         tolk_compiler::CompilerResult::Success(result) => result
             .source_map

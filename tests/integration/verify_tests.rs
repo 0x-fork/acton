@@ -398,7 +398,7 @@ fn test_verify_verifier_sends_api_payload_and_reports_success() {
     let ticket: serde_json::Value =
         serde_json::from_slice(&captured[1].body).expect("ticket request should be JSON");
     assert_eq!(ticket["compiler"], "tolk");
-    assert_eq!(ticket["compiler_version"], "1.4.2");
+    assert_eq!(ticket["compiler_version"], tolk_compiler::TOLK_VERSION);
     let ticket_body = String::from_utf8_lossy(&captured[1].body);
     assert!(
         ticket_body.contains(VERIFY_TEST_CODE_HASH),
@@ -418,7 +418,11 @@ fn test_verify_verifier_sends_api_payload_and_reports_success() {
         "multipart request must include Tolk language, got: {body}"
     );
     assert!(
-        body.contains("name=\"compile_params\"") && body.contains("\"compiler_version\":\"1.4.2\""),
+        body.contains("name=\"compile_params\"")
+            && body.contains(&format!(
+                "\"compiler_version\":\"{}\"",
+                tolk_compiler::TOLK_VERSION
+            )),
         "multipart request must include compiler params, got: {body}"
     );
     assert!(

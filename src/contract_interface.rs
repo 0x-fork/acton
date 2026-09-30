@@ -140,7 +140,7 @@ fn compile_contract_interface(
     let mut file_cache = file_cache;
     let cached = file_cache
         .as_mut()
-        .and_then(|cache| cache.get(&types_path_key, false, false, 2, "1.4+allow-no-entrypoint"));
+        .and_then(|cache| cache.get(&types_path_key, false, false, true));
 
     if let Some(cached) = cached {
         let abi = cached.abi.ok_or_else(|| {
@@ -162,7 +162,7 @@ fn compile_contract_interface(
     }
 
     let mappings = config.mappings();
-    let compiler = tolk_compiler::Compiler::new(2)
+    let compiler = tolk_compiler::Compiler::new()
         .with_allow_no_entrypoint(true)
         .with_mappings(&mappings);
 
@@ -184,14 +184,7 @@ fn compile_contract_interface(
             })?;
 
             if let Some(cache) = file_cache.as_mut() {
-                let _ = cache.put(
-                    &types_path_key,
-                    &result,
-                    false,
-                    false,
-                    2,
-                    "1.4+allow-no-entrypoint",
-                );
+                let _ = cache.put(&types_path_key, &result, false, false, true);
             }
 
             Ok(ContractInterface { abi, source_map })

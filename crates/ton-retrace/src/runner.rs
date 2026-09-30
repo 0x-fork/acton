@@ -682,7 +682,7 @@ mod tests {
 
     fn fixture() -> anyhow::Result<(StdAddr, ShardAccount)> {
         let path = Path::new("/retrace-tests/tick-tock.tolk");
-        let compiler = tolk_compiler::Compiler::new(2).with_source_overrides([(path, CONTRACT)]);
+        let compiler = tolk_compiler::Compiler::new().with_source_overrides([(path, CONTRACT)]);
         let tolk_compiler::CompilerResult::Success(compiled) = compiler.compile(path, false) else {
             anyhow::bail!("Cannot compile tick-tock test contract");
         };

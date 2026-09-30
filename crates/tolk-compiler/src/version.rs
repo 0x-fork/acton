@@ -2,6 +2,15 @@ use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 use std::ffi::{CStr, c_char, c_void};
 
+/// Version of Tolk bundled with this crate.
+///
+/// Use this constant for defaults such as verification requests.
+pub const TOLK_VERSION: &str = "1.5.0";
+
+/// TON source revision of the bundled native compiler. Persistent build caches
+/// include it to distinguish compiler builds with the same Tolk version.
+pub const TOLK_COMMIT_HASH: &str = "9334027d63528da1a78b2efbe898bc586d4e6cec";
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct NativeTolkVersion {
     #[serde(rename = "tolkVersion")]
@@ -47,6 +56,13 @@ unsafe extern "C" {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bundled_version_matches_linked_compiler() {
+        let native = native_tolk_version().unwrap();
+        assert_eq!(native.version, TOLK_VERSION);
+        assert_eq!(native.ton_commit_hash, TOLK_COMMIT_HASH);
+    }
 
     #[test]
     fn tolk_version_json_deserializes() {

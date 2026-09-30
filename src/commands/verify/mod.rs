@@ -80,7 +80,7 @@ pub fn verify_cmd(
     }
 
     println!("  {} Compiling contract", "→".blue().bold());
-    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&config.mappings());
+    let compiler = tolk_compiler::Compiler::new().with_mappings(&config.mappings());
     let compilation_result = compiler.compile(Path::new(&contract_path), false);
 
     let (code_boc64, source_map) = match compilation_result {
@@ -113,7 +113,7 @@ pub fn verify_cmd(
         return Ok(());
     }
 
-    let version = compiler_version.unwrap_or_else(|| "1.4.2".to_owned());
+    let version = compiler_version.unwrap_or_else(|| tolk_compiler::TOLK_VERSION.to_owned());
     let Some(payment_quote) = take_verifier_ticket(&code_hash_hex, &version)? else {
         return Ok(());
     };

@@ -34,7 +34,7 @@ use std::sync::Arc;
 /// ```
 #[must_use]
 pub fn compile(path: &Path, debug: bool) -> CompilerResult {
-    Compiler::new(2).compile(path, debug)
+    Compiler::new().compile(path, debug)
 }
 
 pub fn prime_debug_cp0() -> anyhow::Result<()> {
@@ -74,14 +74,15 @@ impl From<c_int> for FsReadCallbackKind {
 
 /// Simple wrapper over C++ implemented Tolk compiler.
 pub struct Compiler {
-    /// Level of optimizations, 0 – no optimizations, 2 – all optimizations.
-    pub opt_level: i64,
     /// Show comments with stack for instructions in Fift code.
     pub with_stack_comments: bool,
     /// Show comments with Tolk source file references in Fift code.
     pub with_src_line_comments: bool,
     /// Allow compilation without a contract entrypoint.
     pub allow_no_entrypoint: bool,
+    /// Return structured source diagnostics from `compile`. Human-readable
+    /// native messages remain the default; `check` always requests JSON errors.
+    pub json_errors: bool,
     /// Mappings for paths (e.g. "@core" -> "/path/to/core")
     pub mappings: FxHashMap<String, String>,
     /// In-memory sources that take precedence over files on disk.
@@ -89,13 +90,15 @@ pub struct Compiler {
 }
 
 impl Compiler {
+    /// Creates a compiler with Fift comments enabled and human-readable errors.
+    /// Import mappings and in-memory sources are supplied by the caller.
     #[must_use]
-    pub fn new(opt_level: i64) -> Self {
+    pub fn new() -> Self {
         Self {
-            opt_level,
             with_stack_comments: true,
             with_src_line_comments: true,
             allow_no_entrypoint: false,
+            json_errors: false,
             mappings: FxHashMap::default(),
             source_overrides: FxHashMap::default(),
         }
@@ -150,7 +153,8 @@ impl Compiler {
 
         match result {
             CompilerCheckResult::Success(_) => Ok(vec![]),
-            CompilerCheckResult::Error(errors) => Ok(errors.errors),
+            CompilerCheckResult::Error(error) if !error.errors.is_empty() => Ok(error.errors),
+            CompilerCheckResult::Error(error) => anyhow::bail!(error.message),
         }
     }
 
@@ -182,6 +186,7 @@ impl Compiler {
                         Err(err) => {
                             return CompilerResult::Error(CompilerResultError {
                                 message: err.to_string(),
+                                errors: Vec::new(),
                             });
                         }
                     };
@@ -208,6 +213,7 @@ impl Compiler {
             Ok(CompilerInternalResult::Error(result)) => CompilerResult::Error(result),
             Err(err) => CompilerResult::Error(CompilerResultError {
                 message: err.to_string(),
+                errors: Vec::new(),
             }),
         }
     }
@@ -225,16 +231,15 @@ impl Compiler {
 
         let config = serde_json::to_string(&CompilerConfig {
             entrypoint_file_name: path.to_string_lossy().to_string(),
-            optimization_level: self.opt_level,
             with_stack_comments: self.with_stack_comments,
             with_src_line_comments: self.with_src_line_comments,
             with_symbol_types: true,
             with_debug_marks,
-            json_errors: check_only,
+            json_errors: check_only || self.json_errors,
             check_only,
             allow_no_entrypoint: self.allow_no_entrypoint,
         })
-        .expect("Critical error, cannot serializer path to JSON, should not happen");
+        .expect("Critical error, cannot serialize compiler config to JSON");
 
         // SAFETY: we're calling safe C function
         let compilation_result = unsafe {
@@ -368,6 +373,12 @@ impl Compiler {
     }
 }
 
+impl Default for Compiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 struct FsCallbackContext {
     mappings: FxHashMap<String, String>,
     source_overrides: FxHashMap<PathBuf, Arc<str>>,
@@ -442,8 +453,6 @@ impl FsCallbackContext {
 pub struct CompilerConfig {
     #[serde(rename = "entrypointFileName")]
     pub entrypoint_file_name: String,
-    #[serde(rename = "optimizationLevel")]
-    pub optimization_level: i64,
     #[serde(rename = "withStackComments")]
     pub with_stack_comments: bool,
     #[serde(rename = "withSrcLineComments")]
@@ -480,10 +489,12 @@ pub struct CompilerResultSuccess {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(untagged)]
+#[serde(tag = "status")]
 #[allow(clippy::large_enum_variant)]
 pub enum CompilerInternalResult {
+    #[serde(rename = "ok")]
     Success(CompilerInternalResultSuccess),
+    #[serde(rename = "error")]
     Error(CompilerResultError),
 }
 
@@ -511,15 +522,24 @@ pub struct CompilerInternalResultSuccess {
 
 #[derive(Debug, Deserialize)]
 pub struct CompilerResultError {
+    /// Native text output when JSON diagnostics are disabled, or a fatal/config/Fift
+    /// failure message even when JSON diagnostics are enabled.
+    #[serde(default)]
     pub message: String,
+    /// Source diagnostics when JSON errors were requested. Native infrastructure
+    /// failures may have only a message and no source location.
+    #[serde(default)]
+    pub errors: Vec<CompilerError>,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(untagged)]
+#[serde(tag = "status")]
 #[allow(clippy::large_enum_variant)]
 pub enum CompilerCheckResult {
+    #[serde(rename = "ok")]
     Success(CompilerCheckResultSuccess),
-    Error(CompilerCheckError),
+    #[serde(rename = "error")]
+    Error(CompilerResultError),
 }
 
 #[derive(Debug, Deserialize)]
@@ -527,19 +547,27 @@ pub struct CompilerCheckResultSuccess {
     pub stderr: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct CompilerCheckError {
-    pub errors: Vec<CompilerError>,
-}
-
+/// A compiler diagnostic, including notes pointing to declarations in other files.
+/// Line and column numbers in its ranges are one-based UTF-8 byte positions.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CompilerError {
     pub message: String,
-    #[serde(default, alias = "isWarning")]
-    pub is_warning: bool,
-    pub range: CompilerErrorRange,
+    pub range: Option<CompilerErrorRange>,
+    /// Function context supplied by the compiler, absent for top-level errors.
+    pub in_function: Option<String>,
+    #[serde(default)]
+    pub secondary_locations: Vec<CompilerErrorSecondaryLocation>,
 }
 
+/// A related declaration or expression that explains the primary diagnostic.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CompilerErrorSecondaryLocation {
+    pub note: String,
+    pub range: Option<CompilerErrorRange>,
+}
+
+/// A source range from the native compiler. Positions use one-based lines and
+/// UTF-8 byte columns; IDE clients must convert columns to their wire encoding.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CompilerErrorRange {
     pub file_name: String,
@@ -588,55 +616,14 @@ type WasmFsReadCallback = Option<
 
 #[cfg(test)]
 mod tests {
-    use super::{Compiler, CompilerError};
+    use super::Compiler;
     use std::sync::Arc;
-
-    #[test]
-    fn compiler_error_deserializes_warning_flag() {
-        let error: CompilerError = serde_json::from_str(
-            r#"{
-                "message":"warning message",
-                "is_warning":true,
-                "range":{
-                    "file_name":"main.tolk",
-                    "start_line_no":1,
-                    "start_char_no":1,
-                    "end_line_no":1,
-                    "end_char_no":5,
-                    "text_inside":"main"
-                }
-            }"#,
-        )
-        .expect("failed to deserialize compiler warning");
-
-        assert!(error.is_warning);
-    }
-
-    #[test]
-    fn compiler_error_defaults_warning_flag_to_false() {
-        let error: CompilerError = serde_json::from_str(
-            r#"{
-                "message":"error message",
-                "range":{
-                    "file_name":"main.tolk",
-                    "start_line_no":1,
-                    "start_char_no":1,
-                    "end_line_no":1,
-                    "end_char_no":5,
-                    "text_inside":"main"
-                }
-            }"#,
-        )
-        .expect("failed to deserialize compiler error");
-
-        assert!(!error.is_warning);
-    }
 
     #[test]
     fn compiler_reads_a_nonexistent_source_from_memory() {
         let directory = tempfile::tempdir().expect("failed to create temporary directory");
         let path = directory.path().join("new.tolk");
-        let errors = Compiler::new(2)
+        let errors = Compiler::new()
             .with_allow_no_entrypoint(true)
             .with_source_overrides([(
                 path.clone(),
@@ -654,7 +641,7 @@ mod tests {
         let path = directory.path().join("main.tolk");
         std::fs::write(&path, "fun helper(): int { return 1; }\n")
             .expect("failed to write source file");
-        let errors = Compiler::new(2)
+        let errors = Compiler::new()
             .with_allow_no_entrypoint(true)
             .with_source_overrides([(
                 path.clone(),

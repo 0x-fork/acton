@@ -226,7 +226,7 @@ pub(crate) fn run_script_file(
 
         let config = load_project_config(project_root);
 
-        let mut compiler = tolk_compiler::Compiler::new(2).with_allow_no_entrypoint(true);
+        let mut compiler = tolk_compiler::Compiler::new().with_allow_no_entrypoint(true);
         if let Ok(config) = &config {
             let mappings = config.mappings();
             compiler = compiler.with_mappings(&mappings);

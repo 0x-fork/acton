@@ -475,7 +475,7 @@ fn build_contract_trace_artifacts(contract_name: &str) -> anyhow::Result<Contrac
     }
 
     let mappings = acton_config.mappings();
-    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
+    let compiler = tolk_compiler::Compiler::new().with_mappings(&mappings);
     let compilation_result = compiler.compile(&contract_path, true);
 
     match compilation_result {

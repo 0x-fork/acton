@@ -273,7 +273,7 @@ pub(crate) fn load_explicit_contract_match(
         if !path.is_file() {
             anyhow::bail!("Tolk ABI source not found: {}", path.display());
         }
-        let compiler = tolk_compiler::Compiler::new(2)
+        let compiler = tolk_compiler::Compiler::new()
             .with_allow_no_entrypoint(true)
             .with_mappings(&config.mappings());
         match compiler.compile(path, false) {
@@ -522,7 +522,7 @@ fn load_local_contract_candidate(
     let contract_path_key = contract_path.to_string_lossy().to_string();
     let cached = file_cache
         .as_mut()
-        .and_then(|cache| cache.get(&contract_path_key, false, false, 2, "1.4"));
+        .and_then(|cache| cache.get(&contract_path_key, false, false, false));
     let (code_boc64, abi, source_map) = if let Some(cached) = cached {
         (
             cached.code_boc64,
@@ -530,11 +530,12 @@ fn load_local_contract_candidate(
             cached.source_map.map(Arc::new),
         )
     } else {
-        let compiler = tolk_compiler::Compiler::new(2).with_mappings(&config.mappings());
+        let compiler = tolk_compiler::Compiler::new().with_mappings(&config.mappings());
+
         match compiler.compile(&contract_path, false) {
             tolk_compiler::CompilerResult::Success(result) => {
                 if let Some(cache) = file_cache.as_mut() {
-                    let _ = cache.put(&contract_path_key, &result, false, false, 2, "1.4");
+                    let _ = cache.put(&contract_path_key, &result, false, false, false);
                 }
                 (
                     result.code_boc64,

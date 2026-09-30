@@ -502,7 +502,7 @@ fn process_contract(
         debug!("Cache bypass for '{contract_cache_key}' because dependency changed");
         None
     } else {
-        file_cache.get(contract_cache_key, with_debug_info, with_fift, 2, "1.4")
+        file_cache.get(contract_cache_key, with_debug_info, with_fift, false)
     };
 
     if let Some(cached_result) = cached_result {
@@ -530,7 +530,7 @@ fn process_contract(
     println!("   {} {}", "Compiling".green().bold(), display_name);
 
     let mappings = acton_config.mappings();
-    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
+    let compiler = tolk_compiler::Compiler::new().with_mappings(&mappings);
     let compilation_result = compiler.compile(contract_path, with_debug_info);
     let compile_time = compile_start.elapsed();
 
@@ -541,8 +541,7 @@ fn process_contract(
                 &result,
                 with_debug_info,
                 with_fift,
-                2,
-                "1.4",
+                false,
             ) {
                 eprintln!("Warning: Failed to cache compilation result for {display_name}: {e}");
             }

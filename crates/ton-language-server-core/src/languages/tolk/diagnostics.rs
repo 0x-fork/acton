@@ -6,6 +6,8 @@ use crate::{
     profiling::Profiler,
 };
 use std::collections::BTreeMap;
+#[cfg(feature = "tolk-compiler")]
+use std::fmt::Write;
 use tolk_linter::Checker;
 use tolk_linter::diagnostic::{
     Annotation, Diagnostic as LintDiagnostic, DiagnosticTag as LintDiagnosticTag, Severity,
@@ -110,7 +112,7 @@ fn compiler_diagnostics(
 
     let compiler = {
         let _profile = profiler.span("tolk.diagnostics.compiler.prepare");
-        tolk_compiler::Compiler::new(2)
+        tolk_compiler::Compiler::new()
             .with_allow_no_entrypoint(!config.is_contract_root(file.path()))
             .with_mappings(&config.import_mappings)
             .with_source_overrides(snapshot.file_db.iter().map(|source_file| {
@@ -129,15 +131,53 @@ fn compiler_diagnostics(
     match result {
         Ok(errors) => errors
             .into_iter()
-            .filter(|error| compiler_error_belongs_to_file(&error.range.file_name, file.path()))
+            .filter(|error| {
+                error.range.as_ref().is_none_or(|range| {
+                    compiler_error_belongs_to_file(&range.file_name, file.path())
+                })
+            })
             .map(|error| {
-                let range = compiler_error_range(file, &error.range);
-                let severity = if error.is_warning {
-                    DiagnosticSeverity::Warning
-                } else {
-                    DiagnosticSeverity::Error
-                };
-                Diagnostic::new(range, severity, "tolk-compiler", error.message).with_code("C001")
+                let range = error.range.as_ref().map_or(
+                    Range::new(Position::new(0, 0), Position::new(0, 0)),
+                    |range| compiler_error_range(file, range),
+                );
+                let mut message = error.message;
+                if let Some(context) = error.in_function {
+                    message.push('\n');
+                    message.push_str(&context);
+                }
+                let mut diagnostic =
+                    Diagnostic::new(range, DiagnosticSeverity::Error, "tolk-compiler", message)
+                        .with_code("C001");
+                for note in error.secondary_locations {
+                    let location = note.range.as_ref().and_then(|range| {
+                        let related_file = snapshot.file_db.iter().find(|candidate| {
+                            compiler_error_belongs_to_file(&range.file_name, candidate.path())
+                        })?;
+                        Some(crate::Location::new(
+                            snapshot.file_uri(related_file.id())?.clone(),
+                            compiler_error_range(&related_file, range),
+                        ))
+                    });
+                    if let Some(location) = location {
+                        diagnostic
+                            .related_information
+                            .push(crate::DiagnosticRelatedInformation {
+                                location,
+                                message: note.note,
+                            });
+                    } else {
+                        let _ = write!(diagnostic.message, "\nnote: {}", note.note);
+                        if let Some(range) = note.range {
+                            let _ = write!(
+                                diagnostic.message,
+                                " ({}:{}:{})",
+                                range.file_name, range.start_line_no, range.start_char_no
+                            );
+                        }
+                    }
+                }
+                diagnostic
             })
             .collect(),
         Err(error) => vec![

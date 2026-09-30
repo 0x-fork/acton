@@ -46,12 +46,12 @@ pub use settings::{
 pub use text::TextIndex;
 pub use types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
-    CodeActionKind, CodeLens, Command, Diagnostic, DiagnosticSeverity, DiagnosticTag,
-    DocumentEdits, DocumentHighlight, DocumentHighlightKind, DocumentSnapshot, DocumentSymbol,
-    DocumentSymbolKind, DocumentUri, FileRename, FoldingRange, Hover, InlayHint, InlayHintCategory,
-    InlayHintKind, InlayHintLabel, InlayHintLabelPart, LanguageId, Location, Position,
-    PrepareRename, Range, SelectionRange, SignatureHelp, SignatureInformation, TextEdit,
-    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    CodeActionKind, CodeLens, Command, Diagnostic, DiagnosticRelatedInformation,
+    DiagnosticSeverity, DiagnosticTag, DocumentEdits, DocumentHighlight, DocumentHighlightKind,
+    DocumentSnapshot, DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename, FoldingRange,
+    Hover, InlayHint, InlayHintCategory, InlayHintKind, InlayHintLabel, InlayHintLabelPart,
+    LanguageId, Location, Position, PrepareRename, Range, SelectionRange, SignatureHelp,
+    SignatureInformation, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 
 #[must_use]

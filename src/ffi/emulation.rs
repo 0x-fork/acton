@@ -362,11 +362,6 @@ fn build_contract(ctx: &mut Context, path: &str, id: &str) -> anyhow::Result<Cel
     }
 
     let allow_no_entrypoint = is_types_tolk_path(&path);
-    let cache_profile = if allow_no_entrypoint {
-        "1.4+allow-no-entrypoint"
-    } else {
-        "1.4"
-    };
 
     // File build cache is persistent cache that outlives reruns. If this contract was already
     // built we return cached cell for the contract. Since lookup in this cache is quite expensive
@@ -375,8 +370,7 @@ fn build_contract(ctx: &mut Context, path: &str, id: &str) -> anyhow::Result<Cel
         &path_display,
         ctx.build.need_debug_info,
         false,
-        2,
-        cache_profile,
+        allow_no_entrypoint,
     ) {
         let elapsed = start_time.elapsed();
         info!(
@@ -406,9 +400,10 @@ fn build_contract(ctx: &mut Context, path: &str, id: &str) -> anyhow::Result<Cel
     let compile_start = Instant::now();
 
     let mappings = ctx.env.config.mappings();
-    let compiler = tolk_compiler::Compiler::new(2)
+    let compiler = tolk_compiler::Compiler::new()
         .with_mappings(&mappings)
         .with_allow_no_entrypoint(allow_no_entrypoint);
+
     let result = compiler.compile(&path, ctx.build.need_debug_info);
 
     let compile_time = compile_start.elapsed();
@@ -422,8 +417,7 @@ fn build_contract(ctx: &mut Context, path: &str, id: &str) -> anyhow::Result<Cel
                 &success,
                 ctx.build.need_debug_info,
                 false,
-                2,
-                cache_profile,
+                allow_no_entrypoint,
             ) {
                 warn!("Failed to build cached code BoC for {path_display}: {err}");
             }

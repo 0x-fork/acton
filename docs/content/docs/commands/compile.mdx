@@ -65,6 +65,13 @@ Path to the Tolk source file to compile.
 
 Print the compilation result as structured JSON.
 
+<AvailabilityBadge since="trunk" />
+
+Source diagnostics use an `errors` array. Each diagnostic preserves its message,
+optional source range, function context, and related locations. Positions use one-based line numbers
+and UTF-8 byte columns. Diagnostics without source locations have a null `range`.
+Input, configuration, and fatal compiler failures use the `error` string instead.
+
 <CommandOptionMeta label="Conflicts with">
 
 `--base64-only`

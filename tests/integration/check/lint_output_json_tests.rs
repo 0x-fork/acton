@@ -279,3 +279,58 @@ fn check_lint_json_rejects_fix_with_non_plain_output() {
         "contract source should not be fixed when --fix is rejected"
     );
 }
+
+#[test]
+fn check_compiler_related_locations_in_other_files() {
+    let project = ProjectBuilder::new("check-related-errors")
+        .file("contracts/types", "struct Record { value: int }\n")
+        .contract(
+            "main",
+            "import \"types\"\nfun main(): Record { return Record { unknown: 1 }; }\n",
+        )
+        .build();
+
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .check()
+        .arg("main")
+        .arg("--output-format")
+        .arg("json")
+        .arg("--output-file")
+        .arg("report.json")
+        .run()
+        .failure()
+        .assert_file_snapshot_matches(
+            "report.json",
+            "integration/snapshots/check/compiler_related_locations.json",
+        );
+}
+
+#[test]
+fn check_compiler_related_declaration_in_same_file() {
+    let project = ProjectBuilder::new("check-related-declaration")
+        .contract(
+            "main",
+            "fun main() {\n    val storage = 0;\n    storage += 1;\n}\n",
+        )
+        .build();
+
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .check()
+        .arg("main")
+        .arg("--output-format")
+        .arg("json")
+        .arg("--output-file")
+        .arg("report.json")
+        .run()
+        .failure()
+        .assert_file_snapshot_matches(
+            "report.json",
+            "integration/snapshots/check/compiler_related_declaration.json",
+        );
+}
