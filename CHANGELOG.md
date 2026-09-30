@@ -62,6 +62,7 @@ All notable changes to this project will be documented in this file.
 
 ### Dependencies
 
+- Use `brace-expansion` version `5.0.12` in generated dApps.
 - Allow the CC0-1.0 dependencies used by BIP39 wallet support in dependency checks.
 - Remove Localton's `ton` dependency. Get-method stacks use `tvm-ffi` and `rston`,
   and block monitoring uses `rston` block models.
