@@ -39,12 +39,13 @@ const MAX_PAGE_LIMIT: usize = 100;
     get,
     path = "/api/v1/verification/status",
     params(
+        ("User-Agent" = Option<String>, Header, description = "Optional client identifier. Blueprint versions below 0.47.1 are rejected"),
         ("address" = Option<String>, Query, description = "TON address to resolve to the current code hash"),
         ("code_hash" = Option<String>, Query, description = "Code hash to check directly")
     ),
     responses(
         (status = 200, description = "Verification status for the resolved code hash", body = VerificationStatusResponse),
-        (status = 400, description = "Invalid or missing verification target", body = crate::error::ErrorResponse),
+        (status = 400, description = "Invalid or missing verification target, or unsupported Blueprint version", body = crate::error::ErrorResponse),
         (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
         (status = 409, description = "The address exists on both TON networks", body = crate::error::ErrorResponse),
         (status = 502, description = "Blockchain or registry lookup failure", body = crate::error::ErrorResponse)

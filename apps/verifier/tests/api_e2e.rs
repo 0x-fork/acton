@@ -23,8 +23,9 @@ use support::{
     failing_source_storage_app_state, failing_source_storage_app_state_with_payment_outcomes,
     file_part, get, head, mapped_compiler_app_state, owned_file_part, owned_text_part,
     payment_error_app_state, payment_transaction, post_verify, post_verify_with_api_key,
-    post_verify_without_payment, recording_app_state, recording_payment_app_state,
-    recording_source_storage_app_state, recording_source_storage_app_state_with_generated_sources,
+    post_verify_with_user_agent, post_verify_without_payment, recording_app_state,
+    recording_payment_app_state, recording_source_storage_app_state,
+    recording_source_storage_app_state_with_generated_sources,
     recording_source_storage_app_state_with_source_map_data,
     recording_source_storage_app_state_with_used_sources, recovering_payment_app_state,
     response_json, text_part, timing_out_compiler_app_state_with_payment_outcomes,
@@ -254,6 +255,177 @@ async fn verification_user_agent_check_preserves_method_not_allowed() {
     for path in ["/api/v1/take_ticket", "/api/v1/verify"] {
         let response = get(app_state(&[], CODE_HASH_ONE), path).await;
         assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED, "{path}");
+    }
+}
+
+#[tokio::test]
+async fn verification_endpoints_reject_old_blueprint_before_processing_requests() {
+    for (method, path) in [
+        (Method::GET, "/api/v1/verification/status"),
+        (Method::POST, "/api/v1/take_ticket"),
+        (Method::POST, "/api/v1/verify"),
+    ] {
+        for user_agents in [
+            vec!["blueprint/0.1.0"],
+            vec!["blueprint/0.45.0"],
+            vec!["blueprint/0.46.0-rc.1"],
+            vec!["blueprint/0.46.0"],
+            vec!["blueprint/0.46.0+build.1"],
+            vec!["blueprint/0.46.1"],
+            vec!["blueprint/0.47.0"],
+            vec!["blueprint/0.47.1-rc.1"],
+            vec!["BLUEPRINT/0.47.0 node/24.0.0"],
+            vec!["blueprint/0.47.1", "blueprint/0.47.0"],
+            vec!["blueprint/0.47.0", "blueprint/0.47.1"],
+        ] {
+            let (state, compiler_requests) = recording_app_state(&[], CODE_HASH_ONE);
+            let mut request = Request::builder()
+                .method(method.clone())
+                .uri(path)
+                .header(header::CONTENT_TYPE, "application/octet-stream")
+                .header("X-Verifier-Key", API_KEY);
+            for user_agent in &user_agents {
+                request = request.header(header::USER_AGENT, *user_agent);
+            }
+            let response =
+                app::router_with_state(state.with_api_key(Some(API_KEY)).with_max_request_bytes(1))
+                    .oneshot(
+                        request
+                            .body(Body::from("this body is intentionally ignored"))
+                            .expect("verification request"),
+                    )
+                    .await
+                    .expect("verification response");
+
+            assert_eq!(
+                response.status(),
+                StatusCode::BAD_REQUEST,
+                "{path}: {user_agents:?}"
+            );
+            assert_eq!(
+                response_json::<Value>(response).await,
+                json!({
+                    "error": "This version of Blueprint is no longer supported. Update @ton/blueprint to version 0.47.1 or newer"
+                }),
+                "{path}: {user_agents:?}",
+            );
+            assert!(
+                compiler_requests
+                    .lock()
+                    .expect("compiler requests")
+                    .is_empty()
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn supported_blueprint_and_other_clients_can_complete_verification() {
+    for user_agent in [
+        "blueprint/0.47.1",
+        "blueprint/0.47.1+build.1",
+        "BLUEPRINT/0.47.1 node/24.0.0",
+        "blueprint/0.47.2",
+        "blueprint/0.48.0-rc.1",
+        "blueprint/0.100.0",
+        "blueprint/1.0.0",
+        "acton/1.2.0",
+        "curl/8.0.0",
+    ] {
+        let state = app_state(&[], CODE_HASH_ONE);
+        let router = app::router_with_state(state.clone());
+        let status_request = Request::builder()
+            .uri(format!(
+                "/api/v1/verification/status?code_hash={CODE_HASH_ONE}"
+            ))
+            .header(header::USER_AGENT, user_agent)
+            .body(Body::empty())
+            .expect("status request");
+        let response = router
+            .clone()
+            .oneshot(status_request)
+            .await
+            .expect("status response");
+        assert_eq!(response.status(), StatusCode::OK, "{user_agent}");
+
+        let ticket_request = Request::builder()
+            .method(Method::POST)
+            .uri("/api/v1/take_ticket")
+            .header(header::USER_AGENT, user_agent)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                json!({
+                    "code_hash": CODE_HASH_ONE,
+                    "compiler": "tolk",
+                    "compiler_version": "1.4.1",
+                })
+                .to_string(),
+            ))
+            .expect("ticket request");
+        let response = router
+            .oneshot(ticket_request)
+            .await
+            .expect("ticket response");
+        assert_eq!(response.status(), StatusCode::OK, "{user_agent}");
+        assert_eq!(
+            response_json::<Value>(response).await["status"],
+            "payment_required"
+        );
+
+        let response = post_verify_with_user_agent(state, valid_verify_parts(), user_agent).await;
+        assert_eq!(response.status(), StatusCode::OK, "{user_agent}");
+        assert_eq!(
+            response_json::<Value>(response).await["verification_result"],
+            "match"
+        );
+    }
+}
+
+#[tokio::test]
+async fn blueprint_version_check_preserves_other_routes_and_method_not_allowed() {
+    for (method, path, expected_status) in [
+        (Method::GET, "/api/v1/status", StatusCode::OK),
+        (Method::GET, "/api/v1/openapi.json", StatusCode::OK),
+        (
+            Method::GET,
+            "/api/v1/verification/source",
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            Method::GET,
+            "/api/v1/take_ticket",
+            StatusCode::METHOD_NOT_ALLOWED,
+        ),
+        (
+            Method::GET,
+            "/api/v1/verify",
+            StatusCode::METHOD_NOT_ALLOWED,
+        ),
+        (
+            Method::POST,
+            "/api/v1/verification/status",
+            StatusCode::METHOD_NOT_ALLOWED,
+        ),
+    ] {
+        let request = Request::builder()
+            .method(method)
+            .uri(path)
+            .header(header::USER_AGENT, "blueprint/0.47.0")
+            .body(Body::empty())
+            .expect("request");
+        let response = app::router_with_state(app_state(&[], CODE_HASH_ONE))
+            .oneshot(request)
+            .await
+            .expect("response");
+        assert_eq!(response.status(), expected_status, "{path}");
+        if path == "/api/v1/verification/source" {
+            assert!(
+                !response_json::<Value>(response).await["error"]
+                    .as_str()
+                    .expect("error")
+                    .contains("Blueprint")
+            );
+        }
     }
 }
 
@@ -783,11 +955,16 @@ async fn openapi_json_documents_verifier_api() {
     let last_verified = &body["paths"]["/api/v1/last_verified"]["get"];
     let last_verified_head = &body["paths"]["/api/v1/last_verified"]["head"];
     let source = &body["paths"]["/api/v1/verification/source"]["get"];
+    let verification_status = &body["paths"]["/api/v1/verification/status"]["get"];
     assert_eq!(take_ticket["operationId"], "take_ticket");
     assert_eq!(service_status["operationId"], "service_status");
     assert_eq!(response_statuses(service_status), ["200"]);
     assert_eq!(verify["operationId"], "verify");
-    for operation in [take_ticket, verify] {
+    for (operation, required) in [
+        (take_ticket, true),
+        (verify, true),
+        (verification_status, false),
+    ] {
         let user_agent = operation["parameters"]
             .as_array()
             .expect("operation parameters")
@@ -795,7 +972,13 @@ async fn openapi_json_documents_verifier_api() {
             .find(|parameter| parameter["name"] == "User-Agent")
             .expect("User-Agent parameter");
         assert_eq!(user_agent["in"], "header");
-        assert_eq!(user_agent["required"], true);
+        assert_eq!(user_agent["required"], required);
+        assert!(
+            user_agent["description"]
+                .as_str()
+                .expect("User-Agent description")
+                .contains("0.47.1")
+        );
     }
     assert_eq!(
         response_statuses(take_ticket),

@@ -403,6 +403,14 @@ GET /api/v1/statistics/history
 the request body if the header is missing, blank, or contains non-text bytes.
 This requirement also applies to requests authenticated with `X-Verifier-Key`.
 
+`GET /api/v1/verification/status`, `POST /api/v1/take_ticket`, and
+`POST /api/v1/verify` also reject `User-Agent: blueprint/<version>` below
+`0.47.1` with `400` and a JSON error asking the client to update `@ton/blueprint`.
+The version check runs before query or body processing, including for requests
+authenticated with `X-Verifier-Key`. Versions use semantic version precedence:
+`0.47.1-rc.1` is rejected, while `0.47.1+build.1` is accepted. The status endpoint
+still accepts requests without a `User-Agent` header.
+
 Status responses include:
 
 - `code_hash`

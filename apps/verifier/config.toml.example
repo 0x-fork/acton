@@ -40,7 +40,7 @@ path = "verifier-index.sqlite3"
 # A name matches all versions; name@version matches one exact version, including suffixes.
 # For example: ["tact", "func@0.4.4", "tolk@1.4.1"]. No range or wildcard expansion.
 # Disabled compilers are rejected before payment and compilation.
-# Acton <=1.2.0 and Blueprint <=0.46.0 are exempt for backward compatibility.
+# Acton <=1.2.0 is exempt for backward compatibility. Blueprint requires >=0.47.1.
 # Docker env: VERIFIER_COMPILER_DISABLED=tact,func@0.4.4 (used when generating config).
 disabled = []
 node_bin = "node"

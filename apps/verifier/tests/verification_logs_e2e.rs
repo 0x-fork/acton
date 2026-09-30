@@ -57,7 +57,7 @@ async fn verification_logs_report_outcomes_without_uploading_source_payloads_to_
     let failure = post_verify_with_user_agent(
         failing_compiler_app_state(&[], "expected compiler error"),
         valid_verify_parts(),
-        "blueprint/0.42.0",
+        "blueprint/0.47.1",
     )
     .with_subscriber(subscriber.clone())
     .await;
@@ -77,8 +77,8 @@ async fn verification_logs_report_outcomes_without_uploading_source_payloads_to_
     let expected_events = [
         ("started", "acton/1.2.3"),
         ("match", "acton/1.2.3"),
-        ("started", "blueprint/0.42.0"),
-        ("error", "blueprint/0.42.0"),
+        ("started", "blueprint/0.47.1"),
+        ("error", "blueprint/0.47.1"),
         ("started", "acton/timeout-test"),
         ("error", "acton/timeout-test"),
     ];

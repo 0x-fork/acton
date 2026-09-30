@@ -82,14 +82,17 @@ a payment quote is issued or a verification payment is claimed. Already verified
 bundles remain available.
 
 New verification tickets require `compiler` and `compiler_version`. Clients with
-`User-Agent: acton/<version>` at or below `1.2.0` or `User-Agent: blueprint/<version>`
-at or below `0.46.0` may omit both fields. For backward compatibility, these
-clients are exempt from `compiler.disabled` in both `/api/v1/take_ticket` and
-`/api/v1/verify`, even when
-compiler metadata is supplied. All other clients are checked against the deny
-list before a payment quote or verification payment claim.
+`User-Agent: acton/<version>` at or below `1.2.0` may omit both fields. For backward
+compatibility, these clients are exempt from `compiler.disabled` in both
+`/api/v1/take_ticket` and `/api/v1/verify`, even when compiler metadata is supplied.
+All other clients are checked against the deny list before a payment quote or
+verification payment claim.
 A missing or unrecognized User-Agent does not grant an exception. Verification
 still uses the existing language and compiler parameters needed for compilation.
+
+Blueprint clients must use version `0.47.1` or newer. Requests with an older
+`User-Agent: blueprint/<version>` receive HTTP 400 with an upgrade message on
+`/api/v1/verification/status`, `/api/v1/take_ticket`, and `/api/v1/verify`.
 
 As with the other generated settings, an existing config file takes precedence.
 Use `VERIFIER_FORCE_GENERATE_CONFIG=1` to regenerate it from the environment.

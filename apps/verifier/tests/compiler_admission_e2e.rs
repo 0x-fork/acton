@@ -25,21 +25,15 @@ const LEGACY_USER_AGENTS: &[&str] = &[
     "acton/1.2.0+build.1",
     "acton/1.1.0+build.1",
     "ACTON/1.1.0 (linux)",
-    "blueprint/0.1.0",
-    "blueprint/0.45.0",
-    "blueprint/0.46.0-rc.1",
-    "blueprint/0.46.0",
-    "blueprint/0.46.0+build.1",
-    "blueprint/0.46.0 node/24.0.0",
 ];
 const NON_LEGACY_USER_AGENTS: &[Option<&str>] = &[
     Some("acton/1.2.1-rc.1"),
     Some("acton/1.2.1"),
     Some("acton/1.10.0"),
     Some("acton/2.0.0"),
-    Some("blueprint/0.46.1"),
-    Some("blueprint/0.47.0"),
-    Some("blueprint/0.46.1-rc.1"),
+    Some("blueprint/0.47.1"),
+    Some("blueprint/0.47.1+build.1"),
+    Some("blueprint/0.48.0-rc.1"),
     Some("acton/garbage"),
     Some("acton/1.1"),
     Some("blueprint/0.46.0oops"),
@@ -299,6 +293,26 @@ async fn rejected_compilers_do_not_claim_or_consume_payment() {
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
         assert!(outcomes.lock().expect("payment outcomes").is_empty());
     }
+}
+
+#[tokio::test]
+async fn unsupported_blueprint_does_not_claim_payment() {
+    let state = payment_error_app_state(CODE_HASH, PaymentError::AlreadyUsed);
+    let response =
+        post_verify_with_user_agent(state.clone(), parts("tolk", "1.4.1"), "blueprint/0.47.0")
+            .await;
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert!(
+        response_json::<Value>(response).await["error"]
+            .as_str()
+            .expect("error")
+            .contains("Update @ton/blueprint to version 0.47.1 or newer")
+    );
+
+    // The one-shot claim error must still be present after the rejected request.
+    let response =
+        post_verify_with_user_agent(state, parts("tolk", "1.4.1"), "blueprint/0.47.1").await;
+    assert_eq!(response.status(), StatusCode::CONFLICT);
 }
 
 #[tokio::test]
