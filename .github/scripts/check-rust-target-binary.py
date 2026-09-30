@@ -11,7 +11,9 @@ _VERSION_PATTERNS: dict[str, re.Pattern[str]] = {
     "GLIBCXX": re.compile(r"\bGLIBCXX_(?P<version>\d+\.\d+(?:\.\d+)?)\b"),
 }
 
-_TARGET_MAP: dict[str, dict[str, str]] = {
+_READELF_NEEDED_PATTERN: re.Pattern[str] = re.compile(r"\(NEEDED\).*?\[([^]]+)]")
+
+_TARGET_VERSION_MAP: dict[str, dict[str, str]] = {
     "x86_64-unknown-linux-gnu": {
         "GLIBC": "2.34",
         "GLIBCXX": "3.4.29",
@@ -28,9 +30,19 @@ _TARGET_MAP: dict[str, dict[str, str]] = {
     },
 }
 
+_TARGET_DEPENDENCY_MAP: dict[str, set[str]] = {
+    "x86_64-unknown-linux-gnu": {
+        "libstdc++.so.6",
+        "libgcc_s.so.1",
+        "libm.so.6",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2",
+    },
+}
+
 _OTOOL_PATH = "/usr/bin/otool"
 _STRINGS_PATH = "/usr/bin/strings"
-_NM_PATH = "/usr/bin/nm"
+_READELF_PATH = "/usr/bin/readelf"
 
 
 class RustTarget(NamedTuple):
@@ -151,6 +163,39 @@ class StringsParser:
         return self.parse_versions(pattern)
 
 
+class ReadelfParser:
+    def __init__(self, output: str) -> None:
+        self.output = output
+
+    @staticmethod
+    def _run(binary_path: str) -> str:
+        try:
+            result = subprocess.run(
+                [_READELF_PATH, "--dynamic", "--wide", "--", binary_path],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError as error:
+            message = "readelf is not available"
+            raise ValueError(message) from error
+
+        if result.returncode != 0:
+            message = result.stderr.strip()
+            if len(message) == 0:
+                message = f"readelf failed for '{binary_path}'"
+            raise ValueError(message)
+
+        return result.stdout
+
+    @classmethod
+    def from_binary_path(cls, binary_path: str) -> "ReadelfParser":
+        return cls(cls._run(binary_path))
+
+    def parse_dependencies(self) -> list[str]:
+        return _READELF_NEEDED_PATTERN.findall(self.output)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Parse a Rust target string for GitHub Actions")
     parser.add_argument(
@@ -185,13 +230,13 @@ def parse_target(value: str) -> RustTarget:
 
 def _run_linux_checks(target: RustTarget, binary_path: str) -> list[str]:
     target_key = target.format()
-    expected_versions = _TARGET_MAP[target_key]
-    parser = StringsParser.from_binary_path(binary_path)
+    expected_versions = _TARGET_VERSION_MAP[target_key]
+    strings_parser = StringsParser.from_binary_path(binary_path)
 
     errors: list[str] = []
     for symbol_name, expected_version in expected_versions.items():
         try:
-            versions = parser.parse_symbol_versions(symbol_name)
+            versions = strings_parser.parse_symbol_versions(symbol_name)
             actual_version = versions[-1]
         except ValueError as error:
             errors.append(f"linux check failed for '{target_key}': {error}")
@@ -205,6 +250,21 @@ def _run_linux_checks(target: RustTarget, binary_path: str) -> list[str]:
                     f"possible versions {versions}"
                 ),
             )
+
+    expected_dependencies = _TARGET_DEPENDENCY_MAP[target_key]
+    readelf_parser = ReadelfParser.from_binary_path(binary_path)
+    actual_dependencies = set(readelf_parser.parse_dependencies())
+
+    if actual_dependencies != expected_dependencies:
+        missing_dependencies = sorted(expected_dependencies - actual_dependencies)
+        unexpected_dependencies = sorted(actual_dependencies - expected_dependencies)
+        errors.append(
+            (
+                f"linux check failed for '{target_key}': shared library dependencies, "
+                f"missing {missing_dependencies}, "
+                f"unexpected {unexpected_dependencies}"
+            ),
+        )
 
     return errors
 
@@ -221,7 +281,7 @@ def _create_apple_parser(target: RustTarget, binary_path: str) -> OtoolParser:
 
 def _run_apple_checks(target: RustTarget, binary_path: str) -> list[str]:
     target_key = target.format()
-    expected_values = _TARGET_MAP[target_key]
+    expected_values = _TARGET_VERSION_MAP[target_key]
     parser = _create_apple_parser(target, binary_path)
 
     errors: list[str] = []
