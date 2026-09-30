@@ -2,19 +2,16 @@ use super::file_info::FileInfoExt;
 use super::{TolkResolveSnapshot, TolkWorkspaceEngine};
 use crate::{DocumentSnapshot, Hover, Position, Range};
 use tolk_analysis::{
-    ConstantEvaluator, SerializationSizeContext, compute_get_method_id,
-    estimate_serialization_size, is_simple_literal,
+    ConstantEvaluator, compute_get_method_id, estimate_serialization_size, is_simple_literal,
 };
 use tolk_resolver::resolve_index::{LocalDef, LocalDefKind};
-use tolk_resolver::{
-    IndexedContract, IndexedContractField, Resolved, Symbol, SymbolId, SymbolKind,
-};
+use tolk_resolver::{IndexedContract, IndexedContractField, Resolved, Symbol, SymbolKind};
 use tolk_syntax::{
     Annotation, Assert, AstNode, CatchClause, EnumMember, Expr, FunctionLike, HasGenericParams,
     HasName, Import, NumberLit, Parameter, StringLit, StructField, Throw, TopLevel, TryFromNode,
     Type, TypeAliasUnderlyingType, TypeParameter, Unary, VarDecl,
 };
-use tolk_ty::{TyData, TyId, TypeInterner};
+use tolk_ty::{TyData, TypeDb};
 
 mod documentation;
 
@@ -238,7 +235,16 @@ impl TolkResolveSnapshot {
             && let Some(size) = self
                 .type_db_cache
                 .top_level_type(symbol.id)
-                .map(|ty| estimate_serialization_size(self, ty))
+                .map(|ty| {
+                    let mut interner = self.type_interner.as_ref().clone();
+                    let mut type_db = TypeDb::new_for_query(
+                        &mut interner,
+                        &self.file_db,
+                        &self.project_index,
+                        &self.type_db_cache,
+                    );
+                    estimate_serialization_size(self, &mut type_db, ty)
+                })
                 .filter(|size| size.valid)
         {
             documentation = join_documentation(
@@ -385,20 +391,6 @@ impl TolkResolveSnapshot {
 
     fn range_for_node(&self, file_id: u32, node: tree_sitter::Node<'_>) -> Option<Range> {
         self.range_for_span(file_id, tolk_resolver::Span::from_syntax(&node))
-    }
-}
-
-impl SerializationSizeContext for TolkResolveSnapshot {
-    fn type_interner(&self) -> &TypeInterner {
-        &self.type_interner
-    }
-
-    fn type_of_symbol(&self, symbol_id: SymbolId) -> Option<TyId> {
-        self.type_db_cache.top_level_type(symbol_id)
-    }
-
-    fn method_receiver_type(&self, symbol_id: SymbolId) -> Option<TyId> {
-        self.type_db_cache.method_receiver_type(symbol_id)
     }
 }
 

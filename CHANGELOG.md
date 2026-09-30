@@ -25,6 +25,9 @@ All notable changes to this project will be documented in this file.
 
 ### IDE
 
+- Select custom serializers by receiver type when estimating serialized size,
+  including generic specializations and alias chains. Ambiguous serializers
+  have an unpredictable size.
 - Describe `@inline` eligibility and supported early returns in annotation hover.
 - Match Tolk 1.5 alias equality and method selection, including alias chains,
   generic receivers, and methods on declared types after smart casts.

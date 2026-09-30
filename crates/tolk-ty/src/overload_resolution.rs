@@ -127,16 +127,24 @@ pub(crate) fn calculate_shape_score(id: TyId, interner: &TypeInterner) -> ShapeS
 }
 
 #[derive(Clone, Debug)]
+/// An applicable method and the substitutions inferred from its receiver.
+/// Type identities belong to the database passed to [`resolve_methods_for_call`].
 pub struct MethodCallCandidate {
+    /// Receiver declared by the method, before generic substitution.
     pub original_receiver: TyId,
+    /// Receiver after substituting parameters inferred from the provided type.
     pub instantiated_receiver: TyId,
     /// Alias distance to the receiver; implicit coercions sort after subtype matches.
     pub receiver_distance: usize,
+    /// Declaration selected from the project index.
     pub method_id: SymbolId,
+    /// Inferred generic parameters keyed by their interned identities.
     pub substitutions: FxHashMap<TyId, TyId>,
 }
 
 impl MethodCallCandidate {
+    /// Whether the declared receiver requires generic substitution.
+    #[must_use]
     pub fn is_generic(&self, interner: &TypeInterner) -> bool {
         interner.has_generics(self.original_receiver)
     }
@@ -180,7 +188,7 @@ fn receiver_distance(receiver: TyId, provided: TyId, interner: &TypeInterner) ->
 
 /// the main "overload resolution" entrypoint: given `obj.method()`, find best applicable methods;
 /// if there are many (no one is better than others), a caller side will emit "ambiguous call"
-pub(crate) fn resolve_methods_for_call(
+pub fn resolve_methods_for_call(
     provided_receiver: TyId,
     called_name: &str,
     type_db: &mut TypeDb,

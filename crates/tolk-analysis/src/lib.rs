@@ -16,9 +16,7 @@ pub use constant_evaluator::{
     ConstantEvaluationContext, ConstantEvaluator, ConstantValue, is_simple_literal,
 };
 pub use hashes::{compute_get_method_id, compute_struct_opcode};
-pub use serialization_size::{
-    SerializationSize, SerializationSizeContext, estimate_serialization_size,
-};
+pub use serialization_size::{SerializationSize, estimate_serialization_size};
 
 bitflags::bitflags! {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]

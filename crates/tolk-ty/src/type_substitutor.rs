@@ -2,14 +2,17 @@ use crate::type_interner::{TyId, TypeInterner};
 use crate::types::TyData;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-pub(crate) struct TypeSubstitutor<'a> {
+/// Substitutes generic parameters by their interned identities, including nested types.
+/// All input types and replacements must belong to the supplied interner.
+pub struct TypeSubstitutor<'a> {
     interner: &'a mut TypeInterner,
     apply_defaults: bool,
     visiting: FxHashSet<TyId>,
 }
 
 impl<'a> TypeSubstitutor<'a> {
-    pub(crate) fn new(interner: &'a mut TypeInterner) -> Self {
+    /// Leaves parameters without a replacement unchanged, without applying defaults.
+    pub fn new(interner: &'a mut TypeInterner) -> Self {
         Self {
             interner,
             apply_defaults: false,
@@ -25,7 +28,8 @@ impl<'a> TypeSubstitutor<'a> {
         }
     }
 
-    pub(crate) fn substitute(&mut self, id: TyId, mapping: &FxHashMap<TyId, TyId>) -> TyId {
+    /// Interns the substituted type. Cyclic replacements leave the repeated parameter intact.
+    pub fn substitute(&mut self, id: TyId, mapping: &FxHashMap<TyId, TyId>) -> TyId {
         let data = self.interner.data(id).clone();
         match data {
             TyData::TypeParameter { default_type, .. } => {

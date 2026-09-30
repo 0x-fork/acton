@@ -1,22 +1,18 @@
 use std::collections::{HashMap, HashSet};
 
 use num_bigint::{BigInt, Sign};
+use rustc_hash::FxHashMap;
+use tolk_resolver::resolve_index::LocalDefId;
 use tolk_resolver::{SymbolId, SymbolKind};
 use tolk_syntax::{AstNode, TopLevel};
-use tolk_ty::{AddressKind, IntTy, TyData, TyId, TypeInterner};
+use tolk_ty::{
+    AddressKind, IntTy, TyData, TyId, TypeDb, TypeInterner, TypeSubstitutor,
+    resolve_methods_for_call,
+};
 
 use crate::constant_evaluator::{ConstantEvaluationContext, ConstantEvaluator, ConstantValue};
 
 const UNBOUNDED_BITS: u32 = 9_999;
-
-/// Supplies the semantic data needed to estimate a Tolk value's serialized size.
-pub trait SerializationSizeContext: ConstantEvaluationContext {
-    fn type_interner(&self) -> &TypeInterner;
-
-    fn type_of_symbol(&self, symbol_id: SymbolId) -> Option<TyId>;
-
-    fn method_receiver_type(&self, symbol_id: SymbolId) -> Option<TyId>;
-}
 
 /// Minimum and maximum number of bits and references used by a serialized value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -109,33 +105,41 @@ impl SerializationSize {
     }
 }
 
-/// Estimates the serialized size of a Tolk type using resolver and inference metadata.
+/// Estimates a Tolk type's serialized size, including custom serializer selection.
+///
+/// `ty` and the context must belong to the same analysis snapshot as `type_db`.
+/// Generic receivers and fields can intern substituted types in the database.
+/// Custom or ambiguous serializers produce an unpredictable size.
 #[must_use]
 pub fn estimate_serialization_size(
-    context: &dyn SerializationSizeContext,
+    context: &dyn ConstantEvaluationContext,
+    type_db: &mut TypeDb<'_>,
     ty: TyId,
 ) -> SerializationSize {
     Estimator {
         context,
+        type_db,
         visiting: HashMap::new(),
         cell_ref_depth: 0,
     }
-    .estimate(ty, true, &HashMap::new())
+    .estimate(ty, true, &FxHashMap::default())
 }
 
-struct Estimator<'a> {
-    context: &'a dyn SerializationSizeContext,
+struct Estimator<'a, 'db> {
+    context: &'a dyn ConstantEvaluationContext,
+    type_db: &'a mut TypeDb<'db>,
     visiting: HashMap<TyId, u32>,
     cell_ref_depth: u32,
 }
 
-impl Estimator<'_> {
+impl Estimator<'_, '_> {
     fn estimate(
         &mut self,
         ty: TyId,
         include_struct_prefix: bool,
-        substitutions: &HashMap<String, TyId>,
+        substitutions: &FxHashMap<TyId, TyId>,
     ) -> SerializationSize {
+        let ty = TypeSubstitutor::new(self.type_db.intrn).substitute(ty, substitutions);
         if let Some(previous_depth) = self.visiting.get(&ty) {
             return if self.cell_ref_depth > *previous_depth {
                 SerializationSize::exact(0)
@@ -145,13 +149,7 @@ impl Estimator<'_> {
         }
         self.visiting.insert(ty, self.cell_ref_depth);
 
-        let substitution = match self.context.type_interner().data(ty) {
-            TyData::TypeParameter { name, .. } => substitutions.get(name).copied(),
-            _ => None,
-        };
-        let mut size = if let Some(substitution) = substitution {
-            self.estimate(substitution, include_struct_prefix, substitutions)
-        } else if self.has_custom_serializer(ty) {
+        let mut size = if self.has_custom_serializer(ty) {
             SerializationSize::unpredictable()
         } else {
             self.calculate(ty, include_struct_prefix, substitutions)
@@ -167,9 +165,9 @@ impl Estimator<'_> {
         &mut self,
         ty: TyId,
         include_struct_prefix: bool,
-        substitutions: &HashMap<String, TyId>,
+        substitutions: &FxHashMap<TyId, TyId>,
     ) -> SerializationSize {
-        match self.context.type_interner().data(ty).clone() {
+        match self.type_db.intrn.data(ty).clone() {
             TyData::Struct {
                 def, base, args, ..
             } => {
@@ -178,7 +176,6 @@ impl Estimator<'_> {
                     let Some(inner) = args.as_deref().and_then(|args| args.first()).copied() else {
                         return SerializationSize::invalid();
                     };
-                    let inner = self.resolve_substitution(inner, substitutions);
                     let previous_depth = self.cell_ref_depth;
                     self.cell_ref_depth = self.cell_ref_depth.saturating_add(1);
                     let inner_is_valid = self.estimate(inner, true, substitutions).valid;
@@ -224,7 +221,7 @@ impl Estimator<'_> {
             }
             TyData::Union(elements) => self.union_size(&elements, substitutions),
             TyData::GenericTypeWithTs { inner_ty, types } => {
-                let def = type_definition(self.context.type_interner(), inner_ty);
+                let def = type_definition(self.type_db.intrn, inner_ty);
                 let substitutions = def.map_or_else(
                     || substitutions.clone(),
                     |def| self.substitutions(def, Some(&types), substitutions),
@@ -268,7 +265,7 @@ impl Estimator<'_> {
         def: SymbolId,
         args: Option<&[TyId]>,
         include_prefix: bool,
-        inherited: &HashMap<String, TyId>,
+        inherited: &FxHashMap<TyId, TyId>,
     ) -> SerializationSize {
         let Some(symbol) = self.context.project_index().resolve_symbol(def) else {
             return SerializationSize::invalid();
@@ -286,7 +283,7 @@ impl Estimator<'_> {
         };
 
         for field in fields {
-            let Some(field_ty) = self.context.type_of_symbol(field.id) else {
+            let Some(field_ty) = self.type_db.top_level_types.get(&field.id).copied() else {
                 return SerializationSize::invalid();
             };
             size = size.sum(self.estimate(field_ty, true, &substitutions));
@@ -338,7 +335,7 @@ impl Estimator<'_> {
     fn union_size(
         &mut self,
         elements: &[TyId],
-        substitutions: &HashMap<String, TyId>,
+        substitutions: &FxHashMap<TyId, TyId>,
     ) -> SerializationSize {
         if elements.is_empty() {
             return SerializationSize::invalid();
@@ -461,21 +458,22 @@ impl Estimator<'_> {
         result
     }
 
-    fn has_custom_serializer(&self, ty: TyId) -> bool {
-        let Some(def) = type_definition(self.context.type_interner(), ty) else {
+    fn has_custom_serializer(&mut self, ty: TyId) -> bool {
+        if !matches!(
+            self.type_db.intrn.data(ty),
+            TyData::Struct { .. } | TyData::TypeAlias { .. } | TyData::Enum { .. }
+        ) {
             return false;
-        };
-        self.context
-            .project_index()
-            .methods_by_name()
-            .get("packToBuilder")
-            .into_iter()
-            .flatten()
-            .any(|method| {
-                self.context
-                    .method_receiver_type(*method)
-                    .and_then(|receiver| type_definition(self.context.type_interner(), receiver))
-                    == Some(def)
+        }
+
+        let candidates = resolve_methods_for_call(ty, "packToBuilder", self.type_db);
+        // Ambiguous serializers cannot be treated as a standard field layout.
+        candidates.len() > 1
+            || candidates.first().is_some_and(|candidate| {
+                !self
+                    .type_db
+                    .intrn
+                    .has_generics(candidate.instantiated_receiver)
             })
     }
 
@@ -498,37 +496,22 @@ impl Estimator<'_> {
             })
     }
 
-    fn resolve_substitution(&self, ty: TyId, substitutions: &HashMap<String, TyId>) -> TyId {
-        match self.context.type_interner().data(ty) {
-            TyData::TypeParameter { name, .. } => substitutions.get(name).copied().unwrap_or(ty),
-            _ => ty,
-        }
-    }
-
     fn is_null(&self, ty: TyId) -> bool {
         matches!(
-            self.context
-                .type_interner()
-                .data(self.context.type_interner().unwrap_alias(ty)),
+            self.type_db.intrn.data(self.type_db.intrn.unwrap_alias(ty)),
             TyData::Null
         )
     }
 
     fn is_void(&self, ty: TyId) -> bool {
         matches!(
-            self.context
-                .type_interner()
-                .data(self.context.type_interner().unwrap_alias(ty)),
+            self.type_db.intrn.data(self.type_db.intrn.unwrap_alias(ty)),
             TyData::Void
         )
     }
 
     fn is_internal_address(&self, ty: TyId) -> bool {
-        match self
-            .context
-            .type_interner()
-            .data(self.context.type_interner().unwrap_alias(ty))
-        {
+        match self.type_db.intrn.data(self.type_db.intrn.unwrap_alias(ty)) {
             TyData::Address(AddressKind::Internal) => true,
             TyData::Builtin { name } => name.as_ref() == "address",
             _ => false,
@@ -536,11 +519,11 @@ impl Estimator<'_> {
     }
 
     fn substitutions(
-        &self,
+        &mut self,
         def: SymbolId,
         args: Option<&[TyId]>,
-        inherited: &HashMap<String, TyId>,
-    ) -> HashMap<String, TyId> {
+        inherited: &FxHashMap<TyId, TyId>,
+    ) -> FxHashMap<TyId, TyId> {
         let mut result = inherited.clone();
         let Some(args) = args else {
             return result;
@@ -560,22 +543,23 @@ impl Estimator<'_> {
             return result;
         };
 
-        for (parameter, ty) in parameters.iter().zip(args) {
-            let ty = self.resolve_substitution(*ty, inherited);
-            if matches!(
-                self.context.type_interner().data(ty),
-                TyData::TypeParameter { name, .. } if name == parameter.name.as_ref()
-            ) {
-                continue;
+        for (parameter, &ty) in parameters.iter().zip(args) {
+            let parameter_ty = self.type_db.intrn.scoped_type_parameter(
+                LocalDefId::new(def.file_id, parameter.span.start),
+                parameter.name.to_string(),
+                None,
+            );
+            let ty = TypeSubstitutor::new(self.type_db.intrn).substitute(ty, inherited);
+            if parameter_ty != ty {
+                result.insert(parameter_ty, ty);
             }
-            result.insert(parameter.name.to_string(), ty);
         }
         result
     }
 
     fn type_prefix(&self, ty: TyId) -> Option<String> {
-        let ty = self.context.type_interner().unwrap_alias(ty);
-        let TyData::Struct { def, base, .. } = self.context.type_interner().data(ty) else {
+        let ty = self.type_db.intrn.unwrap_alias(ty);
+        let TyData::Struct { def, base, .. } = self.type_db.intrn.data(ty) else {
             return None;
         };
         self.struct_prefix(base.unwrap_or(*def))

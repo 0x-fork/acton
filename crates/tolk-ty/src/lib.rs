@@ -90,10 +90,13 @@ use tolk_resolver::{FileId, SymbolId};
 
 pub use flow_inference::InferenceResult;
 pub use global_usages::{GlobalUsage, GlobalUsages};
-pub use overload_resolution::method_ids_for_completion;
+pub use overload_resolution::{
+    MethodCallCandidate, method_ids_for_completion, resolve_methods_for_call,
+};
 pub use type_db::{TypeDb, TypeDbCache};
 pub use type_inference::infer;
 pub use type_interner::{TyId, TypeInterner};
+pub use type_substitutor::TypeSubstitutor;
 pub use types::{AddressKind, IntTy, TyData};
 
 /// Inference results for every top-level declaration in one source file.

@@ -1108,6 +1108,184 @@ fn matches_compiler_serialization_estimates() {
 }
 
 #[test]
+fn selects_custom_serializers_for_generic_specializations() {
+    case_tolk_hover(
+        r"
+            struct Box<T> { value: T }
+            struct Outer<T> { value: Box<T> }
+
+            @noinline
+            fun Box<uint32>.packToBuilder(self, mutate b: builder) {
+                if (self.value == 0) { return; }
+                b.storeUint(self.value, 32);
+            }
+
+            type <caret>Custom = Box<uint32>;
+            type <caret>Standard = Box<bool>;
+            type <caret>NestedCustom = Outer<uint32>;
+            type <caret>NestedStandard = Outer<bool>;
+
+            struct Envelope<T> { value: T }
+            fun Envelope<T>.packToBuilder(self, mutate b: builder) {
+                b.storeUint(0, 1);
+            }
+            type <caret>GenericCustom = Envelope<uint16>;
+        ",
+        expect![[r#"
+            ```tolk
+            type Custom = Box<uint32>
+            ```
+            **Size:** 0..9999 bits, 0..4 refs.
+
+            ---
+            ```tolk
+            type Standard = Box<bool>
+            ```
+            **Size:** 1 bits.
+
+            ---
+            ```tolk
+            type NestedCustom = Outer<uint32>
+            ```
+            **Size:** 0..9999 bits, 0..4 refs.
+
+            ---
+            ```tolk
+            type NestedStandard = Outer<bool>
+            ```
+            **Size:** 1 bits.
+
+            ---
+            ```tolk
+            type GenericCustom = Envelope<uint16>
+            ```
+            **Size:** 0..9999 bits, 0..4 refs.
+
+            ---"#]],
+    );
+}
+
+#[test]
+fn selects_custom_serializers_in_alias_direction() {
+    case_tolk_hover(
+        r"
+            type <caret>Base = uint32;
+            type <caret>Custom = Base;
+            type <caret>Derived = Custom;
+            type <caret>Sibling = Base;
+
+            fun Custom.packToBuilder(self, mutate b: builder) {
+                b.storeUint(self, 32);
+            }
+
+            type <caret>PlainAddress = address;
+            type <caret>CustomAddress = PlainAddress;
+            type DerivedAddress = CustomAddress;
+            type <caret>MaybePlainAddress = PlainAddress?;
+            type <caret>MaybeCustomAddress = CustomAddress?;
+            type <caret>MaybeDerivedAddress = DerivedAddress?;
+
+            fun CustomAddress.packToBuilder(self, mutate b: builder) {
+                b.storeAddress(self);
+            }
+        ",
+        expect![[r#"
+            ```tolk
+            type Base = uint32
+            ```
+            **Size:** 32 bits.
+
+            ---
+            ```tolk
+            type Custom = Base
+            ```
+            **Size:** 0..9999 bits, 0..4 refs.
+
+            ---
+            ```tolk
+            type Derived = Custom
+            ```
+            **Size:** 0..9999 bits, 0..4 refs.
+
+            ---
+            ```tolk
+            type Sibling = Base
+            ```
+            **Size:** 32 bits.
+
+            ---
+            ```tolk
+            type PlainAddress = address
+            ```
+            **Size:** 267 bits.
+
+            ---
+            ```tolk
+            type CustomAddress = PlainAddress
+            ```
+            **Size:** 0..9999 bits, 0..4 refs.
+
+            ---
+            ```tolk
+            type MaybePlainAddress = PlainAddress?
+            ```
+            **Size:** 2..267 bits, 0 refs.
+
+            ---
+            ```tolk
+            type MaybeCustomAddress = CustomAddress?
+            ```
+            **Size:** 1..9999 bits, 0..4 refs.
+
+            ---
+            ```tolk
+            type MaybeDerivedAddress = DerivedAddress?
+            ```
+            **Size:** 1..9999 bits, 0..4 refs.
+
+            ---"#]],
+    );
+}
+
+#[test]
+fn keeps_ambiguous_serializers_unpredictable() {
+    case_tolk_hover(
+        r"
+            struct Pair<T, U> { first: T second: U }
+            fun Pair<uint8, T>.packToBuilder(self, mutate b: builder) {
+                b.storeUint(0, 1);
+            }
+            fun Pair<T, uint8>.packToBuilder(self, mutate b: builder) {
+                b.storeUint(0, 2);
+            }
+
+            type <caret>Ambiguous = Pair<uint8, uint8>;
+            type <caret>Single = Pair<uint8, bool>;
+            type <caret>Standard = Pair<bool, bool>;
+        ",
+        expect![[r#"
+            ```tolk
+            type Ambiguous = Pair<uint8, uint8>
+            ```
+            **Size:** 0..9999 bits, 0..4 refs.
+
+            ---
+            ```tolk
+            type Single = Pair<uint8, bool>
+            ```
+            **Size:** 0..9999 bits, 0..4 refs.
+
+            ---
+            ```tolk
+            type Standard = Pair<bool, bool>
+            ```
+            **Size:** 2 bits.
+
+            ---"#]],
+    );
+}
+
+#[test]
 fn hides_serialization_size_for_compiler_rejected_types() {
     case_tolk_hover(
         r"
