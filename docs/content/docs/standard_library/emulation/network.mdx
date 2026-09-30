@@ -1383,7 +1383,7 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(
 Expect the transaction list to have a **failed** transaction.
 
 This matcher sets `params.success = false`.
-`params.exitCode` is required and must be non-zero.
+`params.exitCode` is required and accepts a non-zero integer or a predicate.
 If `exitCode` is null or `0`, matcher fails immediately before transaction search.
 
 Any additional non-null `SearchParams` fields further narrow the search.
@@ -1398,7 +1398,15 @@ expect(txs).toHaveFailedTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1565" />
+An exit-code predicate receives the actual compute exit code (available since trunk):
+```tolk
+expect(txs).toHaveFailedTx({
+    to: counter.address,
+    exitCode: fun(code) { return code == 123 || code == 124; },
+});
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1573" />
 
 ## `Expectation<SendResultList>.toHaveAllSuccessfulTxs`
 
@@ -1414,7 +1422,7 @@ val txs = net.send(wallet.address, msg);
 expect(txs).toHaveAllSuccessfulTxs();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1595" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1602" />
 
 ## `Expectation<SendResultList>.toEmitExternalMessage`
 
@@ -1429,7 +1437,7 @@ Example:
 expect(txs).toEmitExternalMessage<IncreaseCounter>();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1611" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1618" />
 
 ## `Expectation<SendResult>.toConsumeLessThan`
 
@@ -1445,5 +1453,5 @@ val txs = net.send(deployer.address, message);
 expect(txs.at(0)).toConsumeLessThan(1000);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1636" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/network.tolk#L1643" />
 

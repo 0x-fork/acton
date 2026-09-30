@@ -417,6 +417,25 @@ get fun `test-ae-failed-tx-missing-exit-code`() {
 }
 
 #[test]
+fn to_have_failed_tx_rejects_zero_exit_code_param() {
+    run_failure_case(
+        "ae-stdlib-failed-tx-zero-exit-code",
+        r"
+get fun `test failed tx rejects zero exitCode`() {
+    val (sender, harness, _) = deployHarness();
+    val res = sendPing(sender, harness, 1);
+
+    expect(res).toHaveFailedTx<Ping>({
+        to: harness.address,
+        exitCode: 0,
+    });
+}
+",
+        "integration/snapshots/test-runner/to_have_successful_tx_matches_success_and_opcode_filters/to_have_failed_tx_rejects_zero_exit_code_param.stdout.txt",
+    );
+}
+
+#[test]
 fn to_have_successful_tx_failure_shows_contract_abi_exit_code_name() {
     run_failure_case(
         "ae-stdlib-successful-tx-failure-shows-abi-exit-code",

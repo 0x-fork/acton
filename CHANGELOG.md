@@ -160,6 +160,8 @@ All notable changes to this project will be documented in this file.
 
 ### Testing
 
+- Accept an `exitCode` predicate in `toHaveFailedTx`, matching the predicate
+  against actual transaction exit codes while still requiring a failed transaction.
 - Mutation testing limits each mutant to 60 seconds by default, including compilation and tests.
   Set `--mutation-timeout` or `[test.mutation] timeout` to change the limit.
   Timed-out mutants appear as `TIMED OUT`, remain outside the mutation score,

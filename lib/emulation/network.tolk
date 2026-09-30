@@ -1548,7 +1548,7 @@ fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(
 /// Expect the transaction list to have a **failed** transaction.
 ///
 /// This matcher sets `params.success = false`.
-/// `params.exitCode` is required and must be non-zero.
+/// `params.exitCode` is required and accepts a non-zero integer or a predicate.
 /// If `exitCode` is null or `0`, matcher fails immediately before transaction search.
 ///
 /// Any additional non-null `SearchParams` fields further narrow the search.
@@ -1562,6 +1562,14 @@ fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(
 ///     exitCode: 123,
 /// });
 /// ```
+///
+/// An exit-code predicate receives the actual compute exit code (available since trunk):
+/// ```tolk
+/// expect(txs).toHaveFailedTx({
+///     to: counter.address,
+///     exitCode: fun(code) { return code == 123 || code == 124; },
+/// });
+/// ```
 fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(
     self,
     params: SearchParams = {},
@@ -1572,9 +1580,8 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(
     }
     params.success = false;
 
-    val nonZeroExitCode = params.exitCode is int32 && params.exitCode as int32 != 0;
-    if (!nonZeroExitCode) {
-        self.fail("expect(<actual>).toHaveFailedTx(params) must have non zero exitCode parameter in params");
+    if (params.exitCode == null || (params.exitCode is int32 && params.exitCode as int32 == 0)) {
+        self.fail("expect(<actual>).toHaveFailedTx(params) requires a non-zero exitCode or a predicate");
     }
 
     impl.findTransactionOrFail(

@@ -8,7 +8,7 @@
  TEST  [ROOT]
 
  > tests/tx_expect.test.tolk (1 test)
-  ✗ ae-failed-tx-missing-exit-code [TIME]
+  ✗ failed tx rejects zero exitCode [TIME]
     └─ Error: expect(actual).toHaveFailedTx(params) requires a non-zero exitCode or a predicate
       └─ at tests/tx_expect.test[LINE]
 

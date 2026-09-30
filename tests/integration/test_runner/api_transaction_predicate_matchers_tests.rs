@@ -638,6 +638,73 @@ get fun `test predicate failed transaction fields`() {
 }
 
 #[test]
+fn failed_tx_accepts_exit_code_predicates() {
+    run_success_case(
+        "ae-predicate-failed-tx-exit-code",
+        r#"
+get fun `test failed tx accepts exitCode predicates`() {
+    val (sender, harness, _) = deployHarness();
+    val res = sendPing(sender, harness, 10);
+
+    expect(res).toHaveFailedTx<Ping>({
+        from: sender.address,
+        to: harness.address,
+        exitCode: fun(code) {
+            println("failed.exitCode={}", code);
+            return code == ERR_FAIL;
+        },
+    });
+    expect(res).toHaveFailedTx({
+        to: harness.address,
+        exitCode: fun(code: int32): bool {
+            return code >= 700 && code < 800;
+        },
+    });
+}
+"#,
+        "failed_tx_accepts_exit_code_predicates",
+    );
+}
+
+#[test]
+fn failed_tx_reports_exit_code_predicate_mismatch() {
+    run_failure_case(
+        "ae-predicate-failed-tx-exit-code-mismatch",
+        r"
+get fun `test failed tx reports exitCode predicate mismatch`() {
+    val (sender, harness, _) = deployHarness();
+    val res = sendPing(sender, harness, 10);
+
+    expect(res).toHaveFailedTx<Ping>({
+        to: harness.address,
+        exitCode: fun(code) { return code == ERR_FAIL + 1; },
+    });
+}
+",
+        "failed_tx_reports_exit_code_predicate_mismatch",
+    );
+}
+
+#[test]
+fn failed_tx_predicate_does_not_match_successful_transactions() {
+    run_failure_case(
+        "ae-predicate-failed-tx-successful-transaction",
+        r"
+get fun `test failed tx predicate excludes successful transactions`() {
+    val (sender, harness, _) = deployHarness();
+    val res = sendPing(sender, harness, 1);
+
+    expect(res).toHaveFailedTx<Ping>({
+        to: harness.address,
+        exitCode: fun(code) { return true; },
+    });
+}
+",
+        "failed_tx_predicate_does_not_match_successful_transactions",
+    );
+}
+
+#[test]
 fn predicate_matchers_cover_action_exit_code_field() {
     run_success_case(
         "ae-predicate-action-exit-code-field",
