@@ -7,3 +7,404 @@ Step 1 (before):
      15|     val transferAmount = grams("5");
   Registers:
     c4 (storage): cell = empty cell
+
+Step 2 (step_over):
+  Code:
+     13| get fun `test wallet: owner can send jettons`() {
+     14|     val (minter, deployer, notDeployer) = setupTest();
+     15|     val transferAmount = grams("5");
+                                  ^^^^^^^^^^
+     16|     val senderWallet = mintTo(minter, deployer, deployer.address, grams("20"));
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 3 (step_over):
+  Code:
+     14|     val (minter, deployer, notDeployer) = setupTest();
+     15|     val transferAmount = grams("5");
+     16|     val senderWallet = mintTo(minter, deployer, deployer.address, grams("20"));
+                                                                           ^^^^^^^^^^^
+     17|     val receiverWallet = userWallet(minter, notDeployer.address);
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 4 (step_over):
+  Code:
+     15|     val transferAmount = grams("5");
+     16|     val senderWallet = mintTo(minter, deployer, deployer.address, grams("20"));
+     17|     val receiverWallet = userWallet(minter, notDeployer.address);
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     18|
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+    senderWallet: JettonWallet
+      address: address = 0:6fef21bb19046fca3b4fb7c6e18d3a8d2b8863b380a1911fd02fc091cfe4d617
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 5 (step_over):
+  Code:
+     19|     val res = senderWallet.sendTransfer(
+     20|         deployer.address,
+     21|         DEFAULT_TRANSFER_MSG_VALUE,
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+     22|         transferAmount,
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2 (last seen)
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+    senderWallet: JettonWallet
+      address: address = 0:6fef21bb19046fca3b4fb7c6e18d3a8d2b8863b380a1911fd02fc091cfe4d617
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    receiverWallet: JettonWallet
+      address: address = 0:4802107ccfe18c22e884c051121ccc611105871a17c3e8bda9a5e71eebc9374a
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 6 (step_over):
+  Code:
+     23|         notDeployer.address,
+     24|         deployer.address,
+     25|         null,
+                 ^^^^
+     26|         DEFAULT_FORWARD_TON_AMOUNT,
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2 (last seen)
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+    senderWallet: JettonWallet
+      address: address = 0:6fef21bb19046fca3b4fb7c6e18d3a8d2b8863b380a1911fd02fc091cfe4d617
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    receiverWallet: JettonWallet
+      address: address = 0:4802107ccfe18c22e884c051121ccc611105871a17c3e8bda9a5e71eebc9374a
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 7 (step_over):
+  Code:
+     24|         deployer.address,
+     25|         null,
+     26|         DEFAULT_FORWARD_TON_AMOUNT,
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+     27|         null,
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2 (last seen)
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+    senderWallet: JettonWallet
+      address: address = 0:6fef21bb19046fca3b4fb7c6e18d3a8d2b8863b380a1911fd02fc091cfe4d617
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    receiverWallet: JettonWallet
+      address: address = 0:4802107ccfe18c22e884c051121ccc611105871a17c3e8bda9a5e71eebc9374a
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 8 (step_over):
+  Code:
+     25|         null,
+     26|         DEFAULT_FORWARD_TON_AMOUNT,
+     27|         null,
+                 ^^^^
+     28|     );
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2 (last seen)
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+    senderWallet: JettonWallet
+      address: address = 0:6fef21bb19046fca3b4fb7c6e18d3a8d2b8863b380a1911fd02fc091cfe4d617
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    receiverWallet: JettonWallet
+      address: address = 0:4802107ccfe18c22e884c051121ccc611105871a17c3e8bda9a5e71eebc9374a
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 9 (step_over):
+  Code:
+     17|     val receiverWallet = userWallet(minter, notDeployer.address);
+     18|
+     19|     val res = senderWallet.sendTransfer(
+                                    ^^^^^^^^^^^^
+     20|         deployer.address,
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2 (last seen)
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+    senderWallet: JettonWallet
+      address: address = 0:6fef21bb19046fca3b4fb7c6e18d3a8d2b8863b380a1911fd02fc091cfe4d617
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    receiverWallet: JettonWallet
+      address: address = 0:4802107ccfe18c22e884c051121ccc611105871a17c3e8bda9a5e71eebc9374a
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 10 (step_over):
+  Code:
+     27|         null,
+     28|     );
+     29|     expect(res).toHaveSuccessfulTx<AskToTransfer>({
+             ^^^^^^^^^^^
+     30|         from: deployer.address,
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2 (last seen)
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury = (last seen)
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+    senderWallet: JettonWallet
+      address: address = 0:6fef21bb19046fca3b4fb7c6e18d3a8d2b8863b380a1911fd02fc091cfe4d617
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    receiverWallet: JettonWallet
+      address: address = 0:4802107ccfe18c22e884c051121ccc611105871a17c3e8bda9a5e71eebc9374a
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    res: BigArray<SendResult> = 4 items
+      0: SendResult
+      1: SendResult
+      2: SendResult
+      3: SendResult
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 11 (step_over):
+  Code:
+     29|     expect(res).toHaveSuccessfulTx<AskToTransfer>({
+     30|         from: deployer.address,
+     31|         to: senderWallet.address,
+                     ^^^^^^^^^^^^^^^^^^^^
+     32|     });
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2 (last seen)
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury = (last seen)
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+    senderWallet: JettonWallet
+      address: address = 0:6fef21bb19046fca3b4fb7c6e18d3a8d2b8863b380a1911fd02fc091cfe4d617
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    receiverWallet: JettonWallet
+      address: address = 0:4802107ccfe18c22e884c051121ccc611105871a17c3e8bda9a5e71eebc9374a
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    res: BigArray<SendResult> = 4 items
+      0: SendResult
+      1: SendResult
+      2: SendResult
+      3: SendResult
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 12 (step_over):
+  Code:
+     28|     );
+     29|     expect(res).toHaveSuccessfulTx<AskToTransfer>({
+     30|         from: deployer.address,
+                 ^^^^^^^^^^^^^^^^^^^^^^
+     31|         to: senderWallet.address,
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2 (last seen)
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury = (last seen)
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+    senderWallet: JettonWallet
+      address: address = 0:6fef21bb19046fca3b4fb7c6e18d3a8d2b8863b380a1911fd02fc091cfe4d617
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    receiverWallet: JettonWallet
+      address: address = 0:4802107ccfe18c22e884c051121ccc611105871a17c3e8bda9a5e71eebc9374a
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    res: BigArray<SendResult> = 4 items (last seen)
+      0: SendResult
+      1: SendResult
+      2: SendResult
+      3: SendResult
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 13 (step_over):
+  Code:
+     27|         null,
+     28|     );
+     29|     expect(res).toHaveSuccessfulTx<AskToTransfer>({
+                                                           ^
+     30|         from: deployer.address,
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2 (last seen)
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury = (last seen)
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+    senderWallet: JettonWallet
+      address: address = 0:6fef21bb19046fca3b4fb7c6e18d3a8d2b8863b380a1911fd02fc091cfe4d617
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    receiverWallet: JettonWallet
+      address: address = 0:4802107ccfe18c22e884c051121ccc611105871a17c3e8bda9a5e71eebc9374a
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    res: BigArray<SendResult> = 4 items (last seen)
+      0: SendResult
+      1: SendResult
+      2: SendResult
+      3: SendResult
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 14 (step_over):
+  Code:
+     32|     });
+     33|
+     34|     expect(senderWallet.getJettonBalance()).toEqual(grams("15"));
+                                 ^^^^^^^^^^^^^^^^
+     35|     expect(receiverWallet.getJettonBalance()).toEqual(transferAmount);
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2 (last seen)
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury = (last seen)
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury = (last seen)
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+    senderWallet: JettonWallet
+      address: address = 0:6fef21bb19046fca3b4fb7c6e18d3a8d2b8863b380a1911fd02fc091cfe4d617
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    receiverWallet: JettonWallet
+      address: address = 0:4802107ccfe18c22e884c051121ccc611105871a17c3e8bda9a5e71eebc9374a
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    res: BigArray<SendResult> = 4 items (last seen)
+      0: SendResult
+      1: SendResult
+      2: SendResult
+      3: SendResult
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 15 (step_over):
+  Code:
+     33|
+     34|     expect(senderWallet.getJettonBalance()).toEqual(grams("15"));
+     35|     expect(receiverWallet.getJettonBalance()).toEqual(transferAmount);
+                                   ^^^^^^^^^^^^^^^^
+     36| }
+  Variables:
+    minter: JettonMinter
+      address: address = 0:38b5d8c1e752e707e31c6eab9ef000d3a6c643e7d3881181e43c17ecb324e3c2 (last seen)
+      stateInit = <optimized out>
+      toShard = <optimized out>
+    deployer: Treasury = (last seen)
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury = (last seen)
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+    senderWallet: JettonWallet = (last seen)
+      address: address = 0:6fef21bb19046fca3b4fb7c6e18d3a8d2b8863b380a1911fd02fc091cfe4d617
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    receiverWallet: JettonWallet
+      address: address = 0:4802107ccfe18c22e884c051121ccc611105871a17c3e8bda9a5e71eebc9374a
+      stateInit: ContractState? = null
+      toShard: AddressShardingOptions? = null
+    res: BigArray<SendResult> = 4 items (last seen)
+      0: SendResult
+      1: SendResult
+      2: SendResult
+      3: SendResult
+  Registers:
+    c4 (storage): cell = empty cell

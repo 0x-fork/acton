@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::fs;
 
 use crate::support::TestOutputExt;
@@ -248,6 +249,67 @@ fn studio_reporting_rejects_a_descriptor_for_another_workspace() {
     );
 
     studio.stop();
+}
+
+#[test]
+fn studio_started_runs_keep_reports_when_the_server_does_not_respond() {
+    // Keep the port bound without accepting requests so discovery and event
+    // delivery reach their deadlines while the tests themselves can finish.
+    let (_listener, port) = reserve_studio_port();
+    let mut summary = String::new();
+    for (name, expected_value) in [("passing", 1), ("failing", 2)] {
+        let project = ProjectBuilder::new(&format!("studio-unresponsive-{name}"))
+            .test_file(
+                "reporting",
+                &format!(
+                    r#"
+import "../../lib/testing/expect"
+
+get fun `test Studio history`() {{
+    expect(1).toEqual({expected_value});
+}}
+"#,
+                ),
+            )
+            .build();
+        let output = project
+            .acton()
+            .env("ACTON_STUDIO_URL", &format!("http://127.0.0.1:{port}"))
+            .env("ACTON_STUDIO_RUN_SOURCE", "studio")
+            .env("ACTON_STUDIO_RUN_ID", name)
+            .test()
+            .run();
+        if expected_value == 1 {
+            output.success().assert_passed(1);
+        } else {
+            output.failure();
+        }
+
+        let run_path = project
+            .path()
+            .join(format!(".studio/tests/runs/{name}.json"));
+        let run: Value = serde_json::from_slice(
+            &fs::read(run_path).expect("Studio-started runs must persist their reports"),
+        )
+        .expect("run history must be valid JSON");
+        writeln!(
+            summary,
+            "{}: {}, exit={}, total={}, passed={}, failed={}, report={}",
+            run["source"],
+            run["status"],
+            run["exitCode"],
+            run["stats"]["total"],
+            run["stats"]["passed"],
+            run["stats"]["failed"],
+            run["reports"][0]["status"],
+        )
+        .unwrap();
+    }
+    expect_test::expect![[r#"
+        "studio": "passed", exit=0, total=1, passed=1, failed=0, report="Passed"
+        "studio": "failed", exit=1, total=1, passed=0, failed=1, report="Failed"
+    "#]]
+    .assert_eq(&summary);
 }
 
 #[test]

@@ -256,12 +256,10 @@ pub fn check_cmd(
         }
     }
 
-    // Deduplicate all diagnostic for JSON output to avoid duplicate errors in IDEs
-    let all_diagnostics = all_diagnostics
-        .into_iter()
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
+    // Keep compiler diagnostics before their related locations when removing
+    // duplicates from shared dependencies.
+    let mut seen_diagnostics = HashSet::new();
+    all_diagnostics.retain(|diagnostic| seen_diagnostics.insert(diagnostic.clone()));
     let status = diagnostics_status(&all_diagnostics, max_warnings);
 
     let mut writer: Box<dyn Write> = match output_file {

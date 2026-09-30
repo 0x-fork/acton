@@ -67,7 +67,13 @@ impl StudioReporter {
         let project_root =
             dunce::canonicalize(project_root).unwrap_or_else(|_| project_root.to_path_buf());
         let dropped_events = Arc::new(AtomicUsize::new(0));
-        let studio_url = studio_discovery::running_studio_url(&project_root, workspace_name)?;
+        // Studio already owns these runs. Keep their durable reports even when
+        // the server is too busy to answer discovery or receive live events.
+        let studio_url = if source == TestRunSource::Studio {
+            studio_discovery::configured_studio_url(&project_root)?
+        } else {
+            studio_discovery::running_studio_url(&project_root, workspace_name)?
+        };
 
         let event_worker =
             start_event_worker(studio_url, run_id.clone(), Arc::clone(&dropped_events))?;

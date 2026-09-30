@@ -531,16 +531,15 @@ impl DebugClient {
     }
 
     fn is_closed_transport_error(err: &anyhow::Error) -> bool {
-        err.to_string().contains("Timeout waiting for response")
-            || err.downcast_ref::<std::io::Error>().is_some_and(|io_err| {
-                matches!(
-                    io_err.kind(),
-                    std::io::ErrorKind::BrokenPipe
-                        | std::io::ErrorKind::ConnectionReset
-                        | std::io::ErrorKind::NotConnected
-                        | std::io::ErrorKind::UnexpectedEof
-                )
-            })
+        err.downcast_ref::<std::io::Error>().is_some_and(|io_err| {
+            matches!(
+                io_err.kind(),
+                std::io::ErrorKind::BrokenPipe
+                    | std::io::ErrorKind::ConnectionReset
+                    | std::io::ErrorKind::NotConnected
+                    | std::io::ErrorKind::UnexpectedEof
+            )
+        })
     }
 }
 

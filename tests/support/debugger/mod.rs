@@ -42,7 +42,7 @@ const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 // so serialize setup while keeping the debug session itself parallel.
 static DEBUG_COMPILER_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 pub(crate) const DEBUG_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const DEBUG_EVENT_TIMEOUT: Duration = Duration::from_secs(15);
+const DEBUG_EVENT_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Clone)]
 pub(crate) struct DebugMethod {
@@ -134,22 +134,27 @@ impl DebuggerClient {
     }
 
     pub(crate) fn step_in(&mut self, thread_id: i64) -> anyhow::Result<()> {
-        self.client.step_in(thread_id)
+        self.client.step_in(thread_id)?;
+        wait_for_stopped(&self.client)
     }
 
     pub(crate) fn continue_execution(
         &mut self,
         thread_id: i64,
     ) -> anyhow::Result<ContinueResponse> {
-        self.client.continue_execution(thread_id)
+        let response = self.client.continue_execution(thread_id)?;
+        wait_for_stopped(&self.client)?;
+        Ok(response)
     }
 
     pub(crate) fn step_over(&mut self, thread_id: i64) -> anyhow::Result<()> {
-        self.client.step_over(thread_id)
+        self.client.step_over(thread_id)?;
+        wait_for_stopped(&self.client)
     }
 
     pub(crate) fn step_out(&mut self, thread_id: i64) -> anyhow::Result<()> {
-        self.client.step_out(thread_id)
+        self.client.step_out(thread_id)?;
+        wait_for_stopped(&self.client)
     }
 
     pub(crate) fn stack_trace(&mut self, thread_id: i64) -> anyhow::Result<Vec<StackFrame>> {
@@ -200,10 +205,14 @@ fn wait_for_stopped(client: &DapClient) -> anyhow::Result<()> {
         if Instant::now() >= deadline {
             anyhow::bail!("Timed out waiting for DAP stopped event after {DEBUG_EVENT_TIMEOUT:?}");
         }
-        if let Ok(Some(event)) = client.try_receive_event(Duration::from_millis(100))
-            && matches!(event, Event::Stopped(_))
-        {
-            return Ok(());
+        match client.try_receive_event(Duration::from_millis(100))? {
+            Some(Event::Stopped(_)) => return Ok(()),
+            Some(Event::Terminated(_)) => {
+                anyhow::bail!(
+                    "The debugger terminated, probably because you stepped too many times, check stacktrace"
+                );
+            }
+            _ => {}
         }
     }
 }

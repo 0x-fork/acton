@@ -43,6 +43,7 @@ All notable changes to this project will be documented in this file.
 
 ### Linting
 
+- Preserve diagnostic order in JSON reports, including related compiler locations.
 - Follow `break` and `continue` through nested loops and match arms in dataflow
   checks, excluding unreachable statements and evaluating `repeat` counts once.
 - Clarify E006 (`pure-function-call-unused`): an unused result may be intentional
@@ -52,6 +53,11 @@ All notable changes to this project will be documented in this file.
 
 - Close lexical scopes by their source ranges after `break`, `continue`, and
   inline returns, keeping outer variables visible when a scope is closed again.
+
+### Studio
+
+- Keep completed test reports and statistics for Studio-started runs when the
+  Studio server does not respond within the discovery timeout.
 
 ### Dependencies
 

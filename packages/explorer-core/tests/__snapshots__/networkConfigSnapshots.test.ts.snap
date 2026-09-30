@@ -73304,8 +73304,6 @@ exports[`real network configuration snapshots parses testnet config at mastercha
     {
       "contractBytecode": {
         "bytecodeHash": "6f177fd863213d7bd3b24a694b0b7efb7425721ed1d21490d052ae93276c4406",
-        "repositoryUrl": "https://github.com/ton-blockchain/tg-wallet-contract/tree/rev00",
-        "revision": "00",
       },
       "description": "Shared WalletTg contract bytecode used by Telegram's native Gram Wallet",
       "hasParsedValue": false,
