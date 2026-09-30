@@ -1,0 +1,121 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "CalcSwapCostReply"
+    },
+    {
+      "kind": "tensor",
+      "items_ty_idx": [
+        6,
+        6
+      ]
+    },
+    {
+      "kind": "uintN",
+      "n": 8
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "CalcSwapCostReply",
+      "ty_idx": 12,
+      "fields": [
+        {
+          "name": "from",
+          "ty_idx": 7
+        },
+        {
+          "name": "to",
+          "ty_idx": 7
+        },
+        {
+          "name": "cost",
+          "ty_idx": 6
+        }
+      ]
+    }
+  ],
+  "incoming_messages": [],
+  "incoming_external": [],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "storage": {},
+  "get_methods": [
+    {
+      "tvm_method_id": 86806,
+      "name": "calc_swap_cost",
+      "parameters": [
+        {
+          "name": "from",
+          "ty_idx": 7
+        }
+      ],
+      "return_ty_idx": 12
+    },
+    {
+      "tvm_method_id": 108535,
+      "name": "pool_reserves",
+      "parameters": [
+        {
+          "name": "precision",
+          "ty_idx": 14,
+          "default_value": {
+            "kind": "int",
+            "v": "9"
+          },
+          "description": "number of decimal places"
+        }
+      ],
+      "return_ty_idx": 13
+    }
+  ],
+  "thrown_errors": [],
+  "compiler_name": "tolk",
+  "compiler_version": "1.5.0"
+}

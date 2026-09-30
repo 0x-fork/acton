@@ -402,7 +402,8 @@ fn build_contract(ctx: &mut Context, path: &str, id: &str) -> anyhow::Result<Cel
     let mappings = ctx.env.config.mappings();
     let compiler = tolk_compiler::Compiler::new()
         .with_mappings(&mappings)
-        .with_allow_no_entrypoint(allow_no_entrypoint);
+        .with_allow_no_entrypoint(allow_no_entrypoint)
+        .with_allow_empty_get_fun(allow_no_entrypoint);
 
     let result = compiler.compile(&path, ctx.build.need_debug_info);
 

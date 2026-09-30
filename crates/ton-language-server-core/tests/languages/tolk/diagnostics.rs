@@ -174,3 +174,36 @@ fn refreshes_diagnostics_after_document_changes() {
         render(&after)
     ));
 }
+
+#[cfg(feature = "tolk-compiler")]
+#[test]
+fn accepts_getter_prototypes_in_contract_interfaces() {
+    for (filename, manifest) in [
+        ("pool.types.tolk", ""),
+        (
+            "pool-api.tolk",
+            "[contracts.pool]\nsrc = 'pool.boc'\ntypes = 'pool-api.tolk'\n",
+        ),
+    ] {
+        let uri = DocumentUri::from(format!("file:///workspace/{filename}"));
+        let mut service = LanguageService::new(LanguageServiceConfig::default());
+        service.register_language(TolkLanguage::new());
+        service
+            .set_workspace_config(
+                LANGUAGE_ID,
+                WorkspaceConfig::new("file:///workspace", None, manifest),
+            )
+            .expect("workspace configuration should be accepted");
+        service
+            .open_document(
+                uri.clone(),
+                LANGUAGE_ID,
+                1,
+                "get fun poolReserves(precision: uint8 = 9): (coins, coins);\n",
+            )
+            .expect("interface should open");
+
+        let diagnostics = service.diagnostics(&uri).expect("interface diagnostics");
+        expect!["<none>"].assert_eq(&render(&diagnostics));
+    }
+}

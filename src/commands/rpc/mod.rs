@@ -275,6 +275,7 @@ pub(crate) fn load_explicit_contract_match(
         }
         let compiler = tolk_compiler::Compiler::new()
             .with_allow_no_entrypoint(true)
+            .with_allow_empty_get_fun(true)
             .with_mappings(&config.mappings());
         match compiler.compile(path, false) {
             tolk_compiler::CompilerResult::Success(result) => result.abi.ok_or_else(|| {

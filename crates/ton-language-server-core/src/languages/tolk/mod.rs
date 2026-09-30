@@ -938,6 +938,7 @@ struct TolkProjectConfig {
     use_embedded_stdlib: bool,
     import_mappings: Option<BTreeMap<String, String>>,
     contract_ids: Vec<String>,
+    contract_interfaces: BTreeSet<PathBuf>,
     wallet_names: Vec<String>,
     lint_settings: HashMap<Rule, LintLevel>,
     contract_lint_settings: BTreeMap<PathBuf, HashMap<Rule, LintLevel>>,
@@ -953,6 +954,7 @@ impl Default for TolkProjectConfig {
             use_embedded_stdlib: true,
             import_mappings: None,
             contract_ids: Vec::new(),
+            contract_interfaces: BTreeSet::new(),
             wallet_names: Vec::new(),
             lint_settings: RuleSettingsBuilder::new().build(),
             contract_lint_settings: BTreeMap::new(),
@@ -969,6 +971,7 @@ impl TolkProjectConfig {
             || self.use_embedded_stdlib != other.use_embedded_stdlib
             || self.import_mappings != other.import_mappings
             || self.contract_ids != other.contract_ids
+            || self.contract_interfaces != other.contract_interfaces
             || self.wallet_names != other.wallet_names
     }
 
@@ -999,6 +1002,12 @@ impl TolkProjectConfig {
         Ok(Self {
             import_mappings: normalize_import_mappings(manifest.import_mappings, &project_root),
             contract_ids: manifest.contracts.keys().cloned().collect(),
+            contract_interfaces: manifest
+                .contracts
+                .values()
+                .filter_map(|value| value.get("types")?.as_str())
+                .map(|path| normalize_path(&project_root.join(path)))
+                .collect(),
             wallet_names: manifest.wallets.keys().cloned().collect(),
             lint_settings,
             contract_lint_settings,
@@ -1020,6 +1029,15 @@ impl TolkProjectConfig {
     #[cfg(feature = "tolk-compiler")]
     fn is_contract_root(&self, path: &Path) -> bool {
         self.contract_lint_settings.contains_key(path)
+    }
+
+    #[cfg(feature = "tolk-compiler")]
+    fn is_contract_interface(&self, path: &Path) -> bool {
+        self.contract_interfaces.contains(path)
+            || path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(".types.tolk"))
     }
 }
 

@@ -18,9 +18,7 @@ struct (0x00000001) Increment {
     value: int32
 }
 
-get fun currentCounter(): int {
-    return 0;
-}
+get fun currentCounter(): int;
 
 contract Precompiled {
     incomingMessages: Increment

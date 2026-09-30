@@ -164,6 +164,7 @@ fn compile_contract_interface(
     let mappings = config.mappings();
     let compiler = tolk_compiler::Compiler::new()
         .with_allow_no_entrypoint(true)
+        .with_allow_empty_get_fun(true)
         .with_mappings(&mappings);
 
     match compiler.compile(types_path, false) {

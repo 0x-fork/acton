@@ -114,6 +114,7 @@ fn compiler_diagnostics(
         let _profile = profiler.span("tolk.diagnostics.compiler.prepare");
         tolk_compiler::Compiler::new()
             .with_allow_no_entrypoint(!config.is_contract_root(file.path()))
+            .with_allow_empty_get_fun(config.is_contract_interface(file.path()))
             .with_mappings(&config.import_mappings)
             .with_source_overrides(snapshot.file_db.iter().map(|source_file| {
                 (

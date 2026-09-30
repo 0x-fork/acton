@@ -80,6 +80,9 @@ pub struct Compiler {
     pub with_src_line_comments: bool,
     /// Allow compilation without a contract entrypoint.
     pub allow_no_entrypoint: bool,
+    /// Allow bodyless `get fun` declarations in ABI sources. These declarations
+    /// describe getters in the ABI but do not generate executable methods.
+    pub allow_empty_get_fun: bool,
     /// Return structured source diagnostics from `compile`. Human-readable
     /// native messages remain the default; `check` always requests JSON errors.
     pub json_errors: bool,
@@ -98,6 +101,7 @@ impl Compiler {
             with_stack_comments: true,
             with_src_line_comments: true,
             allow_no_entrypoint: false,
+            allow_empty_get_fun: false,
             json_errors: false,
             mappings: FxHashMap::default(),
             source_overrides: FxHashMap::default(),
@@ -107,6 +111,15 @@ impl Compiler {
     #[must_use]
     pub const fn with_allow_no_entrypoint(mut self, allow_no_entrypoint: bool) -> Self {
         self.allow_no_entrypoint = allow_no_entrypoint;
+        self
+    }
+
+    /// Allows getter prototypes when compiling or checking an ABI interface.
+    /// Prototypes preserve getter signatures in the ABI without generating
+    /// method bodies. Enable `allow_no_entrypoint` separately for standalone interfaces.
+    #[must_use]
+    pub const fn with_allow_empty_get_fun(mut self, allow_empty_get_fun: bool) -> Self {
+        self.allow_empty_get_fun = allow_empty_get_fun;
         self
     }
 
@@ -238,6 +251,7 @@ impl Compiler {
             json_errors: check_only || self.json_errors,
             check_only,
             allow_no_entrypoint: self.allow_no_entrypoint,
+            allow_empty_get_fun: self.allow_empty_get_fun,
         })
         .expect("Critical error, cannot serialize compiler config to JSON");
 
@@ -467,6 +481,9 @@ pub struct CompilerConfig {
     pub json_errors: bool,
     #[serde(rename = "allowNoEntrypoint")]
     pub allow_no_entrypoint: bool,
+    /// Accept ABI getter prototypes without generating method bodies.
+    #[serde(rename = "allowEmptyGetFun")]
+    pub allow_empty_get_fun: bool,
 }
 
 #[allow(clippy::large_enum_variant)]

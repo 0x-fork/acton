@@ -193,9 +193,7 @@ struct Storage {
     counter: uint32
 }
 
-get fun currentCounter(): int {
-    return 0;
-}
+get fun currentCounter(): int;
 
 contract ExplicitCounter {
     storage: Storage

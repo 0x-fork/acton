@@ -11,6 +11,8 @@ struct (0x12345678) TypesOnlyMessage {
     value: uint32
 }
 
+get fun currentValue(): int;
+
 contract TypesOnly {
     incomingMessages: TypesOnlyMessage
 }

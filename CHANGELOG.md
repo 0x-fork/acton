@@ -13,6 +13,9 @@ All notable changes to this project will be documented in this file.
 
 ### Compiler and build cache
 
+- Support bodyless `get fun` declarations in ABI interfaces for precompiled
+  contracts, runtime builds, RPC ABI sources, and native IDE diagnostics.
+- Expose Tolk's `allowEmptyGetFun` option in the Rust compiler API.
 - Key Tolk build caches by the linked compiler version and commit, compilation
   settings, and requested artifacts. Existing cache entries are rebuilt.
 - Use the bundled Tolk version by default when requesting source verification.
