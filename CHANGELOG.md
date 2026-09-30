@@ -45,6 +45,11 @@ All notable changes to this project will be documented in this file.
 - Clarify E006 (`pure-function-call-unused`): an unused result may be intentional
   because a `@pure` call can validate input and throw an exception.
 
+### Debugger
+
+- Close lexical scopes by their source ranges after `break`, `continue`, and
+  inline returns, keeping outer variables visible when a scope is closed again.
+
 ### Dependencies
 
 - Remove Localton's `ton` dependency. Get-method stacks use `tvm-ffi` and `rston`,

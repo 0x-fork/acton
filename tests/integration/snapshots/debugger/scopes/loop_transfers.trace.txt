@@ -1,0 +1,673 @@
+Step 1 (before):
+  Code:
+      1| fun main(limit: int): int {
+      2|     val outer = limit + 100;
+                         ^^^^^^^^^^^
+      3|     var total = 0;
+  Variables:
+    limit: int = 4
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 2 (step_in):
+  Code:
+      1| fun main(limit: int): int {
+      2|     val outer = limit + 100;
+      3|     var total = 0;
+                         ^
+      4|     var i = 0;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 3 (step_in):
+  Code:
+      2|     val outer = limit + 100;
+      3|     var total = 0;
+      4|     var i = 0;
+                 ^
+      5|     while (i < limit) {
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 0
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 4 (step_in):
+  Code:
+      3|     var total = 0;
+      4|     var i = 0;
+      5|     while (i < limit) {
+             ^^^^^
+      6|         val loopValue = i + 10;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 0
+    i: int = 0
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 5 (step_in):
+  Code:
+      4|     var i = 0;
+      5|     while (i < limit) {
+      6|         val loopValue = i + 10;
+                                 ^^^^^^
+      7|         i += 1;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 0
+    i: int = 0
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 6 (step_in):
+  Code:
+      5|     while (i < limit) {
+      6|         val loopValue = i + 10;
+      7|         i += 1;
+                 ^^^^^^
+      8|         val nested = loopValue + 20;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 0
+    i: int = 0
+    loopValue: int = 10
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 7 (step_in):
+  Code:
+      6|         val loopValue = i + 10;
+      7|         i += 1;
+      8|         val nested = loopValue + 20;
+                              ^^^^^^^^^^^^^^
+      9|         if (i == 1) {
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 0
+    i: int = 1
+    loopValue: int = 10
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 8 (step_in):
+  Code:
+      7|         i += 1;
+      8|         val nested = loopValue + 20;
+      9|         if (i == 1) {
+                 ^^
+     10|             val skipped = nested + 1;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 0
+    i: int = 1
+    loopValue: int = 10
+    nested: int = 30
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 9 (step_in):
+  Code:
+      8|         val nested = loopValue + 20;
+      9|         if (i == 1) {
+     10|             val skipped = nested + 1;
+                                   ^^^^^^^^^^
+     11|             total += skipped;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 0
+    i: int = 1
+    loopValue: int = 10 (last seen)
+    nested: int = 30
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 10 (step_in):
+  Code:
+      9|         if (i == 1) {
+     10|             val skipped = nested + 1;
+     11|             total += skipped;
+                     ^^^^^^^^^^^^^^^^
+     12|             continue;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 0
+    i: int = 1
+    loopValue: int = 10 (last seen)
+    nested: int = 30 (last seen)
+    skipped: int = 31
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 11 (step_in):
+  Code:
+      3|     var total = 0;
+      4|     var i = 0;
+      5|     while (i < limit) {
+                    ^^^^^^^^^
+      6|         val loopValue = i + 10;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 31
+    i: int = 1
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 12 (step_in):
+  Code:
+      4|     var i = 0;
+      5|     while (i < limit) {
+      6|         val loopValue = i + 10;
+                                 ^^^^^^
+      7|         i += 1;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 31
+    i: int = 1
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 13 (step_in):
+  Code:
+      5|     while (i < limit) {
+      6|         val loopValue = i + 10;
+      7|         i += 1;
+                 ^^^^^^
+      8|         val nested = loopValue + 20;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 31
+    i: int = 1
+    loopValue: int = 11
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 14 (step_in):
+  Code:
+      6|         val loopValue = i + 10;
+      7|         i += 1;
+      8|         val nested = loopValue + 20;
+                              ^^^^^^^^^^^^^^
+      9|         if (i == 1) {
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 31
+    i: int = 2
+    loopValue: int = 11
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 15 (step_in):
+  Code:
+      7|         i += 1;
+      8|         val nested = loopValue + 20;
+      9|         if (i == 1) {
+                 ^^
+     10|             val skipped = nested + 1;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 31
+    i: int = 2
+    loopValue: int = 11
+    nested: int = 31
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 16 (step_in):
+  Code:
+     12|             continue;
+     13|         }
+     14|         repeat (2) {
+                 ^^^^^^
+     15|             val innerLoop = nested + 30;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 31
+    i: int = 2
+    loopValue: int = 11
+    nested: int = 31
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 17 (step_in):
+  Code:
+     13|         }
+     14|         repeat (2) {
+     15|             val innerLoop = nested + 30;
+                                     ^^^^^^^^^^^
+     16|             if (innerLoop > 0) {
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 31
+    i: int = 2
+    loopValue: int = 11
+    nested: int = 31
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 18 (step_in):
+  Code:
+     14|         repeat (2) {
+     15|             val innerLoop = nested + 30;
+     16|             if (innerLoop > 0) {
+                     ^^
+     17|                 val breaking = innerLoop + 40;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 31
+    i: int = 2
+    loopValue: int = 11
+    nested: int = 31
+    innerLoop: int = 61
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 19 (step_in):
+  Code:
+     15|             val innerLoop = nested + 30;
+     16|             if (innerLoop > 0) {
+     17|                 val breaking = innerLoop + 40;
+                                        ^^^^^^^^^^^^^^
+     18|                 total += breaking;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 31
+    i: int = 2
+    loopValue: int = 11
+    nested: int = 31
+    innerLoop: int = 61
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 20 (step_in):
+  Code:
+     16|             if (innerLoop > 0) {
+     17|                 val breaking = innerLoop + 40;
+     18|                 total += breaking;
+                         ^^^^^^^^^^^^^^^^^
+     19|                 break;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 31
+    i: int = 2
+    loopValue: int = 11
+    nested: int = 31
+    innerLoop: int = 61 (last seen)
+    breaking: int = 101
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 21 (step_in):
+  Code:
+     17|                 val breaking = innerLoop + 40;
+     18|                 total += breaking;
+     19|                 break;
+                         ^^^^^
+     20|             }
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 132
+    i: int = 2
+    loopValue: int = 11
+    nested: int = 31
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 22 (step_in):
+  Code:
+     20|             }
+     21|         }
+     22|         total += loopValue;
+                 ^^^^^^^^^^^^^^^^^^
+     23|         if (i == 3) {
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 132
+    i: int = 2
+    loopValue: int = 11
+    nested: int = 31 (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 23 (step_in):
+  Code:
+     21|         }
+     22|         total += loopValue;
+     23|         if (i == 3) {
+                 ^^
+     24|             break;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 143
+    i: int = 2
+    loopValue: int = 11 (last seen)
+    nested: int = 31 (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 24 (step_in):
+  Code:
+     24|             break;
+     25|         }
+     26|         total += outer;
+                 ^^^^^^^^^^^^^^
+     27|     }
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 143
+    i: int = 2
+    loopValue: int = 11 (last seen)
+    nested: int = 31 (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 25 (step_in):
+  Code:
+      3|     var total = 0;
+      4|     var i = 0;
+      5|     while (i < limit) {
+                    ^^^^^^^^^
+      6|         val loopValue = i + 10;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 247
+    i: int = 2
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 26 (step_in):
+  Code:
+      4|     var i = 0;
+      5|     while (i < limit) {
+      6|         val loopValue = i + 10;
+                                 ^^^^^^
+      7|         i += 1;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 247
+    i: int = 2
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 27 (step_in):
+  Code:
+      5|     while (i < limit) {
+      6|         val loopValue = i + 10;
+      7|         i += 1;
+                 ^^^^^^
+      8|         val nested = loopValue + 20;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 247
+    i: int = 2
+    loopValue: int = 12
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 28 (step_in):
+  Code:
+      6|         val loopValue = i + 10;
+      7|         i += 1;
+      8|         val nested = loopValue + 20;
+                              ^^^^^^^^^^^^^^
+      9|         if (i == 1) {
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 247
+    i: int = 3
+    loopValue: int = 12
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 29 (step_in):
+  Code:
+      7|         i += 1;
+      8|         val nested = loopValue + 20;
+      9|         if (i == 1) {
+                 ^^
+     10|             val skipped = nested + 1;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 247
+    i: int = 3
+    loopValue: int = 12
+    nested: int = 32
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 30 (step_in):
+  Code:
+     12|             continue;
+     13|         }
+     14|         repeat (2) {
+                 ^^^^^^
+     15|             val innerLoop = nested + 30;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 247
+    i: int = 3
+    loopValue: int = 12
+    nested: int = 32
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 31 (step_in):
+  Code:
+     13|         }
+     14|         repeat (2) {
+     15|             val innerLoop = nested + 30;
+                                     ^^^^^^^^^^^
+     16|             if (innerLoop > 0) {
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 247
+    i: int = 3
+    loopValue: int = 12
+    nested: int = 32
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 32 (step_in):
+  Code:
+     14|         repeat (2) {
+     15|             val innerLoop = nested + 30;
+     16|             if (innerLoop > 0) {
+                     ^^
+     17|                 val breaking = innerLoop + 40;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 247
+    i: int = 3
+    loopValue: int = 12
+    nested: int = 32
+    innerLoop: int = 62
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 33 (step_in):
+  Code:
+     15|             val innerLoop = nested + 30;
+     16|             if (innerLoop > 0) {
+     17|                 val breaking = innerLoop + 40;
+                                        ^^^^^^^^^^^^^^
+     18|                 total += breaking;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 247
+    i: int = 3
+    loopValue: int = 12
+    nested: int = 32
+    innerLoop: int = 62
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 34 (step_in):
+  Code:
+     16|             if (innerLoop > 0) {
+     17|                 val breaking = innerLoop + 40;
+     18|                 total += breaking;
+                         ^^^^^^^^^^^^^^^^^
+     19|                 break;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 247
+    i: int = 3
+    loopValue: int = 12
+    nested: int = 32
+    innerLoop: int = 62 (last seen)
+    breaking: int = 102
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 35 (step_in):
+  Code:
+     17|                 val breaking = innerLoop + 40;
+     18|                 total += breaking;
+     19|                 break;
+                         ^^^^^
+     20|             }
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 349
+    i: int = 3
+    loopValue: int = 12
+    nested: int = 32
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 36 (step_in):
+  Code:
+     20|             }
+     21|         }
+     22|         total += loopValue;
+                 ^^^^^^^^^^^^^^^^^^
+     23|         if (i == 3) {
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 349
+    i: int = 3
+    loopValue: int = 12
+    nested: int = 32 (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 37 (step_in):
+  Code:
+     21|         }
+     22|         total += loopValue;
+     23|         if (i == 3) {
+                 ^^
+     24|             break;
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 361
+    i: int = 3
+    loopValue: int = 12 (last seen)
+    nested: int = 32 (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 38 (step_in):
+  Code:
+     22|         total += loopValue;
+     23|         if (i == 3) {
+     24|             break;
+                     ^^^^^
+     25|         }
+  Variables:
+    limit: int = 4
+    outer: int = 104
+    total: int = 361
+    i: int = 3
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 39 (step_in):
+  Code:
+     26|         total += outer;
+     27|     }
+     28|     val afterLoop = total + outer;
+                             ^^^^^^^^^^^^^
+     29|     return afterLoop;
+  Variables:
+    limit: int = 4 (last seen)
+    outer: int = 104
+    total: int = 361
+    i: int = 3 (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 40 (step_in):
+  Code:
+     27|     }
+     28|     val afterLoop = total + outer;
+     29|     return afterLoop;
+             ^^^^^^^^^^^^^^^^
+     30| }
+  Variables:
+    limit: int = 4 (last seen)
+    outer: int = 104 (last seen)
+    total: int = 361 (last seen)
+    i: int = 3 (last seen)
+    afterLoop: int = 465
+    (return value): int = 465
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 41 (step_in):
+  Code:
+     26|         total += outer;
+     27|     }
+     28|     val afterLoop = total + outer;
+                 ^^^^^^^^^
+     29|     return afterLoop;
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 42 (step_in):
+  Code:
+     27|     }
+     28|     val afterLoop = total + outer;
+     29|     return afterLoop;
+             ^^^^^^^^^^^^^^^^
+     30| }
+  Registers:
+    c4 (storage): cell = empty cell

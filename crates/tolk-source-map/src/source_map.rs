@@ -431,7 +431,7 @@ struct DeclarationIndex {
 // Source location: [file_id, start_line, start_col, end_line, end_col]
 // ---------------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct SrcRange(pub Vec<usize>);
 
 impl SrcRange {
@@ -615,7 +615,7 @@ pub enum DebugMark {
     #[serde(rename = "scope_start")]
     ScopeStart { mark_id: usize, range: SrcRange },
     #[serde(rename = "scope_end")]
-    ScopeEnd { mark_id: usize },
+    ScopeEnd { mark_id: usize, range: SrcRange },
     #[serde(rename = "smart_cast")]
     SmartCast {
         mark_id: usize,
@@ -685,8 +685,8 @@ impl fmt::Display for DebugMark {
             DebugMark::ScopeStart { mark_id, range } => {
                 write!(f, "#{mark_id} SCOPE_START {range}")
             }
-            DebugMark::ScopeEnd { mark_id } => {
-                write!(f, "#{mark_id} SCOPE_END")
+            DebugMark::ScopeEnd { mark_id, range } => {
+                write!(f, "#{mark_id} SCOPE_END {range}")
             }
             DebugMark::SmartCast {
                 mark_id,

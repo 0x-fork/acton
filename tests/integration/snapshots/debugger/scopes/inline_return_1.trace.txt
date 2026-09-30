@@ -1,0 +1,171 @@
+Step 1 (before):
+  Code:
+     14|
+     15| fun main(value: int): int {
+     16|     val caller = value + 100;
+                          ^^^^^^^^^^^
+     17|     {
+  Variables:
+    value: int = 1
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 2 (step_in):
+  Code:
+     16|     val caller = value + 100;
+     17|     {
+     18|         val kept = caller + 200;
+                                     ^^^
+     19|         val result = choose(value);
+  Variables:
+    value: int = 1
+    caller: int = 101
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 3 (step_in):
+  Code:
+     17|     {
+     18|         val kept = caller + 200;
+     19|         val result = choose(value);
+                              ^^^^^^^^^^^^^
+     20|         val afterCall = kept + result;
+  Variables:
+    value: int = 1
+    caller: int = 101 (last seen)
+    kept: int = 301
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 4 (step_in):
+  Code:
+      1| @inline
+      2| fun choose(value: int): int {
+      3|     val outer = value + 10;
+                         ^^^^^^^^^^
+      4|     if (value > 0) {
+  Variables:
+    value: int = 1
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 5 (step_in):
+  Code:
+      2| fun choose(value: int): int {
+      3|     val outer = value + 10;
+      4|     if (value > 0) {
+             ^^
+      5|         val nested = outer + 20;
+  Variables:
+    value: int = 1
+    outer: int = 11
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 6 (step_in):
+  Code:
+      3|     val outer = value + 10;
+      4|     if (value > 0) {
+      5|         val nested = outer + 20;
+                              ^^^^^^^^^^
+      6|         if (value == 1) {
+  Variables:
+    value: int = 1
+    outer: int = 11
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 7 (step_in):
+  Code:
+      4|     if (value > 0) {
+      5|         val nested = outer + 20;
+      6|         if (value == 1) {
+                 ^^
+      7|             return nested;
+  Variables:
+    value: int = 1
+    outer: int = 11
+    nested: int = 31
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 8 (step_in):
+  Code:
+      5|         val nested = outer + 20;
+      6|         if (value == 1) {
+      7|             return nested;
+                     ^^^^^^^^^^^^^
+      8|         }
+  Variables:
+    value: int = 1 (last seen)
+    outer: int = 11 (last seen)
+    nested: int = 31
+    (return value): int = 31
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 9 (step_in):
+  Code:
+     17|     {
+     18|         val kept = caller + 200;
+     19|         val result = choose(value);
+                     ^^^^^^
+     20|         val afterCall = kept + result;
+  Variables:
+    value: int = 1 (last seen)
+    caller: int = 101 (last seen)
+    kept: int = 301
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 10 (step_in):
+  Code:
+     18|         val kept = caller + 200;
+     19|         val result = choose(value);
+     20|         val afterCall = kept + result;
+                                 ^^^^^^^^^^^^^
+     21|         return afterCall;
+  Variables:
+    value: int = 1 (last seen)
+    caller: int = 101 (last seen)
+    kept: int = 301
+    result: int = 31
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 11 (step_in):
+  Code:
+     19|         val result = choose(value);
+     20|         val afterCall = kept + result;
+     21|         return afterCall;
+                 ^^^^^^^^^^^^^^^^
+     22|     }
+  Variables:
+    value: int = 1 (last seen)
+    caller: int = 101 (last seen)
+    kept: int = 301 (last seen)
+    result: int = 31 (last seen)
+    afterCall: int = 332
+    (return value): int = 332
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 12 (step_in):
+  Code:
+     18|         val kept = caller + 200;
+     19|         val result = choose(value);
+     20|         val afterCall = kept + result;
+                     ^^^^^^^^^
+     21|         return afterCall;
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 13 (step_in):
+  Code:
+     19|         val result = choose(value);
+     20|         val afterCall = kept + result;
+     21|         return afterCall;
+                 ^^^^^^^^^^^^^^^^
+     22|     }
+  Registers:
+    c4 (storage): cell = empty cell

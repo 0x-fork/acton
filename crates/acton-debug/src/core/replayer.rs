@@ -523,7 +523,9 @@ pub enum Tick {
     ScopeStart {
         range: SrcRange,
     },
-    ScopeEnd,
+    ScopeEnd {
+        range: SrcRange,
+    },
 
     TvmStackValues {
         stack: RuntimeStack,
@@ -1147,8 +1149,10 @@ impl TolkReplayer {
                     range: range.clone(),
                 });
             }
-            DebugMark::ScopeEnd { .. } => {
-                self.pending_ticks.push_back(Tick::ScopeEnd);
+            DebugMark::ScopeEnd { range, .. } => {
+                self.pending_ticks.push_back(Tick::ScopeEnd {
+                    range: range.clone(),
+                });
             }
         }
     }
@@ -1424,10 +1428,15 @@ impl TolkReplayer {
                     });
                 }
             }
-            Tick::ScopeEnd => {
-                if let Some(frame) = self.call_stack.last_mut() {
-                    // .expect("no last frame");
-                    frame.scope_stack.pop();
+            Tick::ScopeEnd { range } => {
+                if let Some(frame) = self.call_stack.last_mut()
+                    && let Some(index) = frame
+                        .scope_stack
+                        .iter()
+                        .rposition(|scope| scope.range == range)
+                {
+                    // Loop transfers can close several nested scopes at once.
+                    frame.scope_stack.truncate(index);
                 }
             }
         }
