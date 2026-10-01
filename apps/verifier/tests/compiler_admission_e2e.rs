@@ -33,7 +33,12 @@ const NON_LEGACY_USER_AGENTS: &[Option<&str>] = &[
     Some("acton/2.0.0"),
     Some("blueprint/0.47.1"),
     Some("blueprint/0.47.1+build.1"),
+    Some("BLUEPRINT/0.47.1 node/24.0.0"),
     Some("blueprint/0.48.0-rc.1"),
+    Some("blueprint/1.0.0"),
+    Some("blueprint/unknown"),
+    Some("blueprint/"),
+    Some("blueprint"),
     Some("acton/garbage"),
     Some("acton/1.1"),
     Some("blueprint/0.46.0oops"),
@@ -98,28 +103,87 @@ fn parts(language: &str, version: &str) -> Vec<MultipartPart> {
 }
 
 #[tokio::test]
-async fn only_legacy_clients_can_omit_ticket_compiler_metadata() {
-    for &user_agent in LEGACY_USER_AGENTS {
-        for body in [
-            json!({"code_hash": CODE_HASH}),
-            json!({"code_hash": CODE_HASH, "compiler": null, "compiler_version": null}),
-        ] {
-            let response = ticket(app_state(&[], CODE_HASH), body, Some(user_agent)).await;
-            assert_eq!(response.status(), StatusCode::OK, "{user_agent}");
+async fn legacy_clients_can_omit_ticket_compiler_metadata() {
+    let verified_state = app_state(&[], CODE_HASH);
+    let response = post_verify(verified_state.clone(), parts("tolk", "1.4.1")).await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    for (state, expected_status) in [
+        (app_state(&[], CODE_HASH), "payment_required"),
+        (verified_state, "already_verified"),
+    ] {
+        for &user_agent in LEGACY_USER_AGENTS {
+            for body in [
+                json!({"code_hash": CODE_HASH}),
+                json!({"code_hash": CODE_HASH, "compiler": null, "compiler_version": null}),
+                json!({"code_hash": CODE_HASH, "compiler": "tolk", "compiler_version": "1.4.1"}),
+            ] {
+                let response = ticket(state.clone(), body, Some(user_agent)).await;
+                assert_eq!(response.status(), StatusCode::OK, "{user_agent}");
+                assert_eq!(
+                    response_json::<Value>(response).await["status"],
+                    expected_status,
+                    "{user_agent}",
+                );
+            }
         }
     }
-    for &user_agent in NON_LEGACY_USER_AGENTS {
-        let response = ticket(
-            app_state(&[], CODE_HASH),
-            json!({"code_hash": CODE_HASH}),
-            user_agent,
-        )
-        .await;
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{user_agent:?}");
-        assert_eq!(
-            response_json::<Value>(response).await["error"],
-            "compiler and compiler_version are required"
-        );
+}
+
+#[tokio::test]
+async fn non_legacy_clients_require_ticket_compiler_metadata_even_for_verified_code() {
+    let verified_state = app_state(&[], CODE_HASH);
+    let response = post_verify(verified_state.clone(), parts("tolk", "1.4.1")).await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    for (state, expected_status) in [
+        (app_state(&[], CODE_HASH), "payment_required"),
+        (verified_state.clone(), "already_verified"),
+        (
+            verified_state
+                .with_read_only(true)
+                .with_compiler_policy(policy(&["tolk"])),
+            "already_verified",
+        ),
+    ] {
+        for &user_agent in NON_LEGACY_USER_AGENTS {
+            for body in [
+                json!({"code_hash": CODE_HASH}),
+                json!({"code_hash": CODE_HASH, "compiler": null, "compiler_version": null}),
+            ] {
+                let response = ticket(state.clone(), body, user_agent).await;
+                assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{user_agent:?}");
+                assert_eq!(
+                    response_json::<Value>(response).await["error"],
+                    "compiler and compiler_version are required",
+                    "{user_agent:?}",
+                );
+            }
+            for body in [
+                json!({"code_hash": CODE_HASH, "compiler": "tolk"}),
+                json!({"code_hash": CODE_HASH, "compiler_version": "1.4.1"}),
+            ] {
+                let response = ticket(state.clone(), body, user_agent).await;
+                assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{user_agent:?}");
+                assert_eq!(
+                    response_json::<Value>(response).await["error"],
+                    "compiler and compiler_version must be provided together",
+                    "{user_agent:?}",
+                );
+            }
+            let response = ticket(
+                state.clone(),
+                json!({"code_hash": CODE_HASH, "compiler": "tolk", "compiler_version": "1.4.1"}),
+                user_agent,
+            )
+            .await;
+            assert_eq!(response.status(), StatusCode::OK, "{user_agent:?}");
+            assert_eq!(
+                response_json::<Value>(response).await["status"],
+                expected_status,
+                "{user_agent:?}",
+            );
+        }
     }
 }
 

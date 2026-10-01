@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    client_compatibility::is_legacy_client, config::TonNetwork, error::ApiError,
+    client_compatibility::is_legacy_acton_client, config::TonNetwork, error::ApiError,
     payment::PaymentError, registry::VerifiedBundleRequest, state::AppState,
 };
 
@@ -22,7 +22,7 @@ use super::validation;
         (status = 503, description = "Verifier is read-only or payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),
     params(
-        ("User-Agent" = String, Header, description = "Required non-empty client identifier. Blueprint versions below 0.47.1 are rejected. Acton at or below 1.2.0 may omit compiler metadata and is exempt from compiler restrictions")
+        ("User-Agent" = String, Header, description = "Required non-empty client identifier. Only Acton at or below 1.2.0 may omit compiler metadata and is exempt from compiler restrictions. All other clients must provide compiler and compiler_version, including for already verified code hashes. Blueprint versions below 0.47.1 are rejected")
     ),
     tag = "verification"
 )]
@@ -37,6 +37,19 @@ pub async fn handler(
             "compiler and compiler_version must be provided together".to_owned(),
         ));
     }
+    let compiler_metadata = if is_legacy_acton_client(&headers) {
+        None
+    } else {
+        let (Some(compiler), Some(version)) = (
+            request.compiler.as_deref(),
+            request.compiler_version.as_deref(),
+        ) else {
+            return Err(ApiError::bad_request(
+                "compiler and compiler_version are required".to_owned(),
+            ));
+        };
+        Some((compiler, version))
+    };
 
     if let Some(bundle) = state
         .verification_registry()
@@ -57,15 +70,7 @@ pub async fn handler(
         return Err(ApiError::read_only());
     }
 
-    if !is_legacy_client(&headers) {
-        let (Some(compiler), Some(version)) = (
-            request.compiler.as_deref(),
-            request.compiler_version.as_deref(),
-        ) else {
-            return Err(ApiError::bad_request(
-                "compiler and compiler_version are required".to_owned(),
-            ));
-        };
+    if let Some((compiler, version)) = compiler_metadata {
         state.ensure_compiler_allowed(compiler, version)?;
     }
 
@@ -87,9 +92,10 @@ pub async fn handler(
 pub(super) struct TakeTicketRequest {
     #[schema(example = "a873d8c2d163f7fa10bbe38769706f0554505e8ea2dcea3f115288db8becf2ab")]
     code_hash: String,
-    /// Compiler name, provided together with `compiler_version`. Required for new verification
-    /// except for Acton at or below 1.2.0 (identified by User-Agent).
-    /// The same clients are exempt from the server's compiler deny list.
+    /// Compiler name, provided together with `compiler_version`.
+    /// Required, including for already verified code hashes, except for Acton at or below 1.2.0
+    /// (identified by User-Agent).
+    /// These Acton clients are also exempt from the server's compiler deny list.
     #[schema(example = "tolk")]
     compiler: Option<String>,
     /// Exact compiler version. Has the same compatibility exceptions as `compiler`.

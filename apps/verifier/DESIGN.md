@@ -121,11 +121,17 @@ payment claim.
 
 `POST /api/v1/take_ticket` accepts a code hash. If the code hash is verified,
 the endpoint returns the stored bundle metadata. No payment is necessary.
-The request also accepts optional `compiler` (name) and `compiler_version`
-strings. Both must be provided together or both omitted; `null` is treated as
-omitted. An incomplete pair returns HTTP 400, including for already verified
-code hashes. Compiler names and versions are not checked for support and do
-not affect the ticket or payment quote.
+The request also accepts `compiler` (name) and `compiler_version` strings.
+Only clients identified by `User-Agent: acton/<version>`
+at or below `1.2.0` may omit both fields. All other clients must provide them,
+including for already verified code hashes. Missing or unparseable client versions
+do not grant an exception. This check is independent of the minimum supported
+Blueprint version.
+`null` is treated as omitted. An incomplete pair returns HTTP 400 for every
+client, including for already verified code hashes. Compiler names and versions
+are checked against `compiler.disabled` before issuing a new payment quote,
+except for Acton at or below `1.2.0`. They are not otherwise checked for support
+and do not affect the ticket or payment quote.
 
 When `server.read_only` is enabled, `/take_ticket` and `/verify` return `503`
 for code hashes that are not already registered. Existing bundles and all read

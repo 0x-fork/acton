@@ -16,7 +16,7 @@ use utoipa::ToSchema;
 
 use crate::{
     blockchain::{is_valid_hash, normalize_code_hash, normalize_hash},
-    client_compatibility::is_legacy_client,
+    client_compatibility::is_legacy_acton_client,
     compilers::{
         CompileGeneratedSource, CompileOutput, CompileRequest, CompileSource, CompilerError,
     },
@@ -199,7 +199,7 @@ async fn handle_multipart(
     let compile_input = if verified_bundle.is_none() {
         let input = prepare_compile_input(&language, &compile_params, sources, files)
             .map_err(|error| error.with_code_hash(&request_code_hash))?;
-        if !is_legacy_client(headers) {
+        if !is_legacy_acton_client(headers) {
             state
                 .ensure_compiler_allowed(
                     &input.configuration.language,

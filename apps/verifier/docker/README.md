@@ -81,7 +81,8 @@ format validation or range expansion. Disabled compilers return HTTP 403 before
 a payment quote is issued or a verification payment is claimed. Already verified
 bundles remain available.
 
-New verification tickets require `compiler` and `compiler_version`. Clients with
+Verification tickets require `compiler` and `compiler_version`, including for
+already verified code hashes. Only clients with
 `User-Agent: acton/<version>` at or below `1.2.0` may omit both fields. For backward
 compatibility, these clients are exempt from `compiler.disabled` in both
 `/api/v1/take_ticket` and `/api/v1/verify`, even when compiler metadata is supplied.
@@ -93,6 +94,9 @@ still uses the existing language and compiler parameters needed for compilation.
 Blueprint clients must use version `0.47.1` or newer. Requests with an older
 `User-Agent: blueprint/<version>` receive HTTP 400 with an upgrade message on
 `/api/v1/verification/status`, `/api/v1/take_ticket`, and `/api/v1/verify`.
+The compiler metadata requirement is independent of this version check. Missing
+or unparseable client versions do not grant the Acton compatibility exception;
+omitted or `null` compiler metadata returns HTTP 400 for these clients.
 
 As with the other generated settings, an existing config file takes precedence.
 Use `VERIFIER_FORCE_GENERATE_CONFIG=1` to regenerate it from the environment.
