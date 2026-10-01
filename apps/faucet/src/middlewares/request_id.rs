@@ -1,14 +1,29 @@
-use axum::{extract::Request, middleware::Next, response::Response};
+use axum::{extract::Request, http::header::USER_AGENT, middleware::Next, response::Response};
 use tracing::{Instrument, info_span};
 use uuid::Uuid;
+
+use super::request_headers::ACTON_CLIENT_HEADER;
 
 pub async fn enter_request_span(mut request: Request, next: Next) -> Response {
     let request_id = Uuid::new_v4();
     request.extensions_mut().insert(request_id);
+    let client = request
+        .headers()
+        .get(ACTON_CLIENT_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .or_else(|| {
+            request
+                .headers()
+                .get(USER_AGENT)
+                .and_then(|value| value.to_str().ok())
+        });
+    let span = info_span!(
+        "request",
+        %request_id,
+        client,
+    );
 
-    next.run(request)
-        .instrument(info_span!("request", %request_id))
-        .await
+    next.run(request).instrument(span).await
 }
 
 #[cfg(test)]
