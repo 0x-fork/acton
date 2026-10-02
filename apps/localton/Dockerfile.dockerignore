@@ -11,8 +11,10 @@
 !crates/
 !crates/**
 !libs/
+libs/*
 !libs/rston/
 !libs/rston/**
+libs/rston/target/
 !xtask/
 !xtask/**
 !packages/

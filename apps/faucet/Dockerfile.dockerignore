@@ -4,6 +4,12 @@
 !bun.lock
 !Cargo.toml
 
+!libs/
+libs/*
+!libs/rston/
+!libs/rston/**
+libs/rston/target/
+
 !src/
 src/*
 !src/lib.rs
@@ -11,10 +17,6 @@ src/*
 !crates/
 crates/*
 !crates/toncenter/
-
-!libs/
-!libs/rston/
-libs/rston/target/
 
 !apps/
 apps/*

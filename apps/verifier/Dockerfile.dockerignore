@@ -6,6 +6,7 @@
 !libs/
 libs/*
 !libs/rston/
+!libs/rston/**
 libs/rston/target/
 
 !apps/

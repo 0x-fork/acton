@@ -6,7 +6,9 @@
 !crates/
 crates/**/target/
 !libs/
+libs/*
 !libs/rston/
+!libs/rston/**
 libs/rston/target/
 !xtask/
 
