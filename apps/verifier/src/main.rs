@@ -19,6 +19,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "starting verifier backend"
     );
     tracing::info!(
+        disabled_compilers_config = ?config.disabled_compilers(),
+        "compiler deny list"
+    );
+    tracing::info!(
         address = %config.payment_address().unwrap_or("disabled"),
         min_amount_nano = %config
             .payment_min_amount_nano()
