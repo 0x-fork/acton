@@ -12,6 +12,10 @@ src/*
 crates/*
 !crates/toncenter/
 
+!libs/
+!libs/rston/
+libs/rston/target/
+
 !apps/
 apps/*
 !apps/faucet/

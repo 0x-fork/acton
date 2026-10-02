@@ -21,6 +21,7 @@ RUN apt-get update \
 COPY Cargo.toml /build/Cargo.toml
 COPY src/lib.rs /build/src/lib.rs
 COPY crates/toncenter /build/crates/toncenter
+COPY libs/rston /build/libs/rston
 COPY apps/faucet/Cargo.toml apps/faucet/Cargo.lock apps/faucet/rust-toolchain.toml apps/faucet/build.rs ./
 COPY apps/faucet/crates ./crates
 COPY apps/faucet/src ./src
