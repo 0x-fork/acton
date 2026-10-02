@@ -95,7 +95,7 @@ Blueprint clients must use version `0.47.1` or newer. Requests with an older
 `User-Agent: blueprint/<version>` receive HTTP 400 with an upgrade message on
 `/api/v1/verification/status`, `/api/v1/take_ticket`, and `/api/v1/verify`.
 The compiler metadata requirement is independent of this version check. Missing
-or unparseable client versions do not grant the Acton compatibility exception;
+or unparsable client versions do not grant the Acton compatibility exception;
 omitted or `null` compiler metadata returns HTTP 400 for these clients.
 
 As with the other generated settings, an existing config file takes precedence.

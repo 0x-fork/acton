@@ -181,7 +181,7 @@ EXIT STATUS
 
        o  1: Manifest parsing, stdlib installation, writing or patching project
           files, or another hard filesystem operation failed. Contract
-          discovery skips unreadable/unparseable .tolk files, and overlay
+          discovery skips unreadable/unparsable .tolk files, and overlay
           symlink failures only warn. In --stdlib-only mode, manifest parsing
           and overlay symlink operations are skipped.
 

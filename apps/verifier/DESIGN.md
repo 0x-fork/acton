@@ -124,7 +124,7 @@ the endpoint returns the stored bundle metadata. No payment is necessary.
 The request also accepts `compiler` (name) and `compiler_version` strings.
 Only clients identified by `User-Agent: acton/<version>`
 at or below `1.2.0` may omit both fields. All other clients must provide them,
-including for already verified code hashes. Missing or unparseable client versions
+including for already verified code hashes. Missing or unparsable client versions
 do not grant an exception. This check is independent of the minimum supported
 Blueprint version.
 `null` is treated as omitted. An incomplete pair returns HTTP 400 for every

@@ -163,7 +163,7 @@ With `--stdlib-only`, `acton init` writes only inside `.acton/`.
 - `0`: Initialization completed successfully, including no-op repeat runs.
 - `1`: Manifest parsing, stdlib installation, writing or patching project
   files, or another hard filesystem operation failed. Contract discovery skips
-  unreadable/unparseable `.tolk` files, and overlay symlink failures only warn.
+  unreadable/unparsable `.tolk` files, and overlay symlink failures only warn.
   In `--stdlib-only` mode, manifest parsing and overlay symlink operations are
   skipped.
 
