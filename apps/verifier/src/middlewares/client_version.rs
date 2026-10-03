@@ -1,10 +1,7 @@
 use axum::{extract::Request, http::header::USER_AGENT, middleware::Next, response::Response};
 use semver::Version;
 
-use crate::{
-    client_compatibility::BLUEPRINT_MIN_VERSION,
-    error::ApiError,
-};
+use crate::{client_compatibility::BLUEPRINT_MIN_VERSION, error::ApiError};
 
 pub async fn require_supported_blueprint(
     request: Request,
