@@ -23,17 +23,6 @@ pub fn is_legacy_acton_client(headers: &HeaderMap) -> bool {
         && version.cmp_precedence(&ACTON_LEGACY_MAX_VERSION).is_le()
 }
 
-pub fn is_unsupported_blueprint_client(headers: &HeaderMap) -> bool {
-    headers
-        .get_all(USER_AGENT)
-        .iter()
-        .filter_map(|value| value.to_str().ok().and_then(client_version))
-        .any(|(client, version)| {
-            client.eq_ignore_ascii_case("blueprint")
-                && version.cmp_precedence(&BLUEPRINT_MIN_VERSION).is_lt()
-        })
-}
-
 fn client_version(user_agent: &str) -> Option<(&str, Version)> {
     let (client, version) = user_agent.split_whitespace().next()?.split_once('/')?;
     Some((client, Version::parse(version).ok()?))
