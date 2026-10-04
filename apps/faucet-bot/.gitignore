@@ -1,0 +1,17 @@
+# IDE
+.idea
+
+# Rust build artifacts
+target/
+
+# Acton generated/local state
+/.acton/
+/build/
+/dist/
+/gen/
+/lcov.info
+/wallets.toml
+/libraries.toml
+/.env
+/config.toml
+/.codegraph/
