@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.1] - 05.10.2026
+
 ### Breaking changes
 
 - `acton compile --json` now returns source diagnostics in an `errors` array,
@@ -74,80 +76,6 @@ All notable changes to this project will be documented in this file.
 - Limit Faucet's direct SQLx dependency to its SQLite runtime features.
 - Reject RSA dependencies in Faucet builds while excluding the unused SQLx MySQL
   driver's RSA advisory from lockfile audits.
-
-### Rust libraries
-
-- Import 12- or 24-word BIP39 wallet mnemonics through `rston`, using SLIP-0010 Ed25519
-  derivation at `m/44'/607'/0'`. Existing 24-word TON mnemonics keep their derivation.
-- Use `rston` for address and hash handling in Studio and contract verification,
-  preserving raw/friendly inputs and address display flags.
-- Add `Boc::decode_any()` to `rston` for hex or base64 input and use it in wallet
-  signing, disassembly, library publishing, and `envCell`.
-- Use `rston` for wallet addresses, deployment state, mnemonic keys, signing, and
-  wallet message parsing in Acton, localnet, Localton, and Faucet.
-- Add the shared TON types library `rston` in `libs/rston`, with its own workspace,
-  tests, benchmarks, and fuzz targets. Acton, its Rust crates, Localton, Actonscan,
-  and Verifier use this local library.
-- Preserve TON message bounce flags in BoC serialization, TON Center v3 responses,
-  and messages reconstructed from v3 data. The legacy `ihr_fee` response field is zero.
-- Add TON mnemonic validation and Ed25519 key derivation to `rston`, with typed
-  `MnemonicError` results and automatic clearing of owned secret data on drop.
-- Add the MIT-licensed `toncenter` crate with typed TON Center v2 and v3 requests and
-  responses, field documentation, generated OpenAPI, and opt-in live contract tests.
-- Use the shared `toncenter` v2 and v3 types across Rust clients and simulator endpoints.
-  Address information always includes the boolean `suspended` field.
-  Transaction replay uses the `ext.transaction` response format of `getTransactions`.
-- Remove unused dependencies from `ton-emulator` and `tvm-ffi`.
-- Add `ton-node-db` for reading validator database snapshots, querying account
-  states lazily, and persisting masterchain and shard state updates in a separate
-  database, including shard splits and merges. P2P synchronization resumes from
-  the last fully applied masterchain checkpoint without modifying the source snapshot.
-  State commits reuse known persisted cells and a bounded record cache to avoid
-  redundant snapshot lookups. Immutable read snapshots retain a complete committed
-  frontier while the writer applies subsequent blocks.
-- Add `ton-state` to synchronize a validator snapshot through P2P and serve
-  `/api/masterchainInfo` and `/api/account` from the last applied state with
-  TON Center v2 response formats, plus finalized transaction subscriptions at
-  `/api/streaming/sse` with address filters and TON Center v3 fields.
-  SSE subscriptions also support account state updates in the
-  `/api/account` format, once per changed account and committed checkpoint.
-  Each subscription receives code and data on its first account event and then
-  only when those fields change; all other state fields remain complete.
-  Subscriptions can set `include_code_data: false` to omit both BoCs entirely.
-  Storage field subscriptions accept a Tolk ABI and selected field paths, send an
-  initial snapshot, and emit the full data BoC with the names of changed fields.
-  `/storage` subscribes from an address, JSON ABI, and field paths, and displays
-  a live event history with storage decoded on the client and complete data BoCs.
-  `/account` displays a live account state from an address input and keeps it
-  updated through SSE, reconnecting and refreshing the snapshot after a gap.
-  Its code/data checkbox switches subscription mode and preserves the choice in the URL.
-  Account responses report their shard-state time in `sync_utime`.
-  HTTP requests pin one committed checkpoint without waiting for block application.
-  `/api/simulate` emulates an external message and its internal-message trace on
-  that checkpoint with TON Center v3 transaction fields, account states before
-  and after execution, and optional deduplicated code/data BoCs. Bounded traces
-  report incomplete results explicitly; simulation never broadcasts or commits state.
-  P2P responses do not wait for periodic peer-rating writes; statistics are
-  buffered and saved in the background. A bounded record cache accelerates state
-  reads across checkpoints. State updates reuse decoded blocks, and
-  commit logs expose application, cell encoding, and durable write timings.
-  Shard updates load independent Merkle branches in a bounded worker pool.
-  `/api/send` accepts external-message BoCs and broadcasts them directly through
-  P2P, including FEC transport for larger messages. Submission does not confirm
-  execution or inclusion in a block.
-  `/api/sendAndWaitTransaction` submits an external message and waits for its
-  transaction in a committed block, with a bounded timeout, normalized message
-  matching, and the transaction and block coordinates in the response.
-  `/api/sendAndWaitTrace` waits until every internal message in the submitted
-  message's trace is consumed and returns the root transaction hash, with a
-  two-minute default timeout and a configurable limit of up to ten minutes.
-  `/docs` provides an interactive Scalar page for all supported HTTP methods,
-  with a generated utoipa specification at `/openapi.json`.
-  `/api/transactions` reads account history from cached blocks through a persistent
-  block logical-time index, with `address`, `limit`, and `lt`/`hash` pagination.
-  `/api/runGetMethod` executes get methods locally with TON Center v2 requests and
-  results, using account state, network configuration, previous blocks, and
-  libraries from one committed checkpoint, with bounded gas and concurrency.
 
 ### Actonscan
 
