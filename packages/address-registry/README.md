@@ -55,16 +55,16 @@ from `src/addresses.ts`.
 
 Explorer token search uses the generated jetton catalog from `ton-assets`. The
 generator validates each master address and keeps the name, symbol, and optional
-image URL used by search. It prefers indexed Toncenter images and falls back to
-the image published by `ton-assets`. Images are loaded lazily only for visible
+image URL used by search. It includes an image only when Toncenter returns a valid
+HTTPS URL from `proxy.toncenter.com`. Images are loaded lazily only for visible
 results:
 
 ```sh
 bun run generate:jettons
 ```
 
-Set `TONCENTER_API_KEY` so Toncenter image resolution does not fall back because
-of public rate limits.
+Set `TONCENTER_API_KEY` to reduce image resolution failures caused by public rate
+limits.
 
 The stable TypeScript binding exposes this mainnet catalog through
 `getMainnetJettons()`.

@@ -65,7 +65,7 @@ const parseToncenterImages = (text: string): ReadonlyMap<string, string> => {
 
     try {
       const imageUrl = new URL(image)
-      if (imageUrl.protocol !== "http:" && imageUrl.protocol !== "https:") {
+      if (imageUrl.protocol !== "https:" || imageUrl.hostname !== "proxy.toncenter.com") {
         continue
       }
 
@@ -137,9 +137,9 @@ const resolveImages = async (
     }),
   )
 
-  return jettons.map(jetton => {
-    const image = images.get(jetton.address) ?? jetton.image
-    return image ? {...jetton, image} : jetton
+  return jettons.map(({address, name, symbol}) => {
+    const image = images.get(address)
+    return {address, ...(image ? {image} : {}), name, symbol}
   })
 }
 
