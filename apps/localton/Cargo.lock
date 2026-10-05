@@ -2735,7 +2735,7 @@ dependencies = [
 
 [[package]]
 name = "ton-fullnode-master"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "futures",
@@ -2749,7 +2749,7 @@ dependencies = [
 
 [[package]]
 name = "ton-hardfork"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "base64",
@@ -2762,7 +2762,7 @@ dependencies = [
 
 [[package]]
 name = "ton-indexer-core"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "async-trait",
  "hex",
@@ -2775,7 +2775,7 @@ dependencies = [
 
 [[package]]
 name = "ton-indexer-liteserver"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "async-trait",
  "futures",
@@ -2786,7 +2786,7 @@ dependencies = [
 
 [[package]]
 name = "ton-liteapi"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "aes",
  "ctr",
@@ -3010,7 +3010,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tvm-ffi"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "num-bigint",

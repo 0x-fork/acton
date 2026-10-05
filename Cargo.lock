@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "acton"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "acton-abi-catalog",
  "acton-config",
@@ -116,7 +116,7 @@ dependencies = [
 
 [[package]]
 name = "acton-abi-catalog"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "acton-config"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -141,7 +141,7 @@ dependencies = [
 
 [[package]]
 name = "acton-debug"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "crossbeam-channel",
@@ -160,7 +160,7 @@ dependencies = [
 
 [[package]]
 name = "acton-faucet-pow-wasm"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "sha2",
  "wasm-bindgen",
@@ -168,7 +168,7 @@ dependencies = [
 
 [[package]]
 name = "acton-localnet"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -198,7 +198,7 @@ dependencies = [
 
 [[package]]
 name = "acton-mdman"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "handlebars",
@@ -209,7 +209,7 @@ dependencies = [
 
 [[package]]
 name = "acton-source-trace"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "acton-debug",
  "anyhow",
@@ -223,7 +223,7 @@ dependencies = [
 
 [[package]]
 name = "acton-source-trace-wasm"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "acton-source-trace",
  "console_error_panic_hook",
@@ -234,7 +234,7 @@ dependencies = [
 
 [[package]]
 name = "acton-studio"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "acton-localnet",
  "axum",
@@ -1281,7 +1281,7 @@ dependencies = [
 
 [[package]]
 name = "dap-client"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "crossbeam-channel",
@@ -1789,7 +1789,7 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "fift-syntax"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -1910,7 +1910,7 @@ checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
 
 [[package]]
 name = "func-resolver"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "expect-test",
@@ -1920,7 +1920,7 @@ dependencies = [
 
 [[package]]
 name = "func-syntax"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "expect-test",
@@ -1932,7 +1932,7 @@ dependencies = [
 
 [[package]]
 name = "func-ty"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "expect-test",
  "func-resolver",
@@ -4472,7 +4472,7 @@ dependencies = [
 
 [[package]]
 name = "service-pool"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "expect-test",
  "futures",
@@ -4809,7 +4809,7 @@ dependencies = [
 
 [[package]]
 name = "tasm-core"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "num-bigint",
@@ -4825,7 +4825,7 @@ dependencies = [
 
 [[package]]
 name = "tasm-syntax"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -5042,7 +5042,7 @@ dependencies = [
 
 [[package]]
 name = "tlb-syntax"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -5143,7 +5143,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-analysis"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "bitflags 2.9.4",
  "crc",
@@ -5161,7 +5161,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-compiler"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "dunce",
@@ -5177,7 +5177,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-dataflow"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "expect-test",
  "rustc-hash 2.1.1",
@@ -5188,7 +5188,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-fmt"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -5202,7 +5202,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-linter"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "dunce",
  "heck 0.5.0",
@@ -5221,7 +5221,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-macros"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "heck 0.5.0",
  "itertools 0.14.0",
@@ -5232,7 +5232,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-resolver"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "dashmap 7.0.0-rc2",
@@ -5248,7 +5248,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-source-map"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "expect-test",
@@ -5261,7 +5261,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-syntax"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -5271,7 +5271,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-ty"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "dunce",
  "expect-test",
@@ -5300,7 +5300,7 @@ dependencies = [
 
 [[package]]
 name = "toml-syntax"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -5385,7 +5385,7 @@ checksum = "ab16f14aed21ee8bfd8ec22513f7287cd4a91aa92e44edfe2c17ddd004e92607"
 
 [[package]]
 name = "ton-api"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "log",
@@ -5427,7 +5427,7 @@ dependencies = [
 
 [[package]]
 name = "ton-emulator"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "acton-config",
  "anyhow",
@@ -5445,7 +5445,7 @@ dependencies = [
 
 [[package]]
 name = "ton-executor"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "hex",
@@ -5461,7 +5461,7 @@ dependencies = [
 
 [[package]]
 name = "ton-fullnode-master"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "futures",
@@ -5475,7 +5475,7 @@ dependencies = [
 
 [[package]]
 name = "ton-hardfork"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "base64",
@@ -5488,7 +5488,7 @@ dependencies = [
 
 [[package]]
 name = "ton-indexer-contracts"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "base64",
@@ -5504,7 +5504,7 @@ dependencies = [
 
 [[package]]
 name = "ton-indexer-core"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "async-trait",
  "hex",
@@ -5518,7 +5518,7 @@ dependencies = [
 
 [[package]]
 name = "ton-indexer-liteserver"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "async-trait",
  "futures",
@@ -5529,7 +5529,7 @@ dependencies = [
 
 [[package]]
 name = "ton-indexer-p2p"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5542,7 +5542,7 @@ dependencies = [
 
 [[package]]
 name = "ton-json-schema"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "jsonptr",
@@ -5554,7 +5554,7 @@ dependencies = [
 
 [[package]]
 name = "ton-language-server-core"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "dunce",
@@ -5589,7 +5589,7 @@ dependencies = [
 
 [[package]]
 name = "ton-language-server-native"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "expect-test",
@@ -5607,7 +5607,7 @@ dependencies = [
 
 [[package]]
 name = "ton-language-server-wasm"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "console_error_panic_hook",
  "serde",
@@ -5621,7 +5621,7 @@ dependencies = [
 
 [[package]]
 name = "ton-liteapi"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "aes",
  "ctr",
@@ -5646,7 +5646,7 @@ dependencies = [
 
 [[package]]
 name = "ton-localnet"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "acton-config",
  "acton-source-trace",
@@ -5692,7 +5692,7 @@ dependencies = [
 
 [[package]]
 name = "ton-networks"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "schemars 0.8.22",
@@ -5701,7 +5701,7 @@ dependencies = [
 
 [[package]]
 name = "ton-node-db"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "base64",
@@ -5727,7 +5727,7 @@ dependencies = [
 
 [[package]]
 name = "ton-objs"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "pkg-config",
  "sha2",
@@ -5736,7 +5736,7 @@ dependencies = [
 
 [[package]]
 name = "ton-p2p"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5761,7 +5761,7 @@ dependencies = [
 
 [[package]]
 name = "ton-retrace"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "base64",
@@ -5785,7 +5785,7 @@ dependencies = [
 
 [[package]]
 name = "ton-state"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -5820,7 +5820,7 @@ dependencies = [
 
 [[package]]
 name = "ton-syntax"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "memchr",
@@ -5879,7 +5879,7 @@ dependencies = [
 
 [[package]]
 name = "toncenter-keys"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "ton-networks",
 ]
@@ -6212,7 +6212,7 @@ dependencies = [
 
 [[package]]
 name = "tvm-ffi"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "num-bigint",
@@ -6226,7 +6226,7 @@ dependencies = [
 
 [[package]]
 name = "tvm-ffi-derive"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6235,7 +6235,7 @@ dependencies = [
 
 [[package]]
 name = "tvm-logs"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "thiserror 2.0.20",
  "winnow 0.7.13",
@@ -7174,7 +7174,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "acton-config",
  "anyhow",

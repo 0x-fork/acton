@@ -1756,7 +1756,7 @@ dependencies = [
 
 [[package]]
 name = "service-pool"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "futures",
  "serde",
@@ -2198,7 +2198,7 @@ checksum = "756daf9b1013ebe47a8776667b466417e2d4c5679d441c26230efd9ef78692db"
 
 [[package]]
 name = "ton-fullnode-master"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "futures",
@@ -2212,7 +2212,7 @@ dependencies = [
 
 [[package]]
 name = "ton-indexer-core"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "async-trait",
  "hex",
@@ -2225,7 +2225,7 @@ dependencies = [
 
 [[package]]
 name = "ton-indexer-liteserver"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "async-trait",
  "futures",
@@ -2236,7 +2236,7 @@ dependencies = [
 
 [[package]]
 name = "ton-indexer-p2p"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2249,7 +2249,7 @@ dependencies = [
 
 [[package]]
 name = "ton-liteapi"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "aes",
  "ctr",
@@ -2272,7 +2272,7 @@ dependencies = [
 
 [[package]]
 name = "ton-p2p"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2468,7 +2468,7 @@ dependencies = [
 
 [[package]]
 name = "tvm-ffi"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "anyhow",
  "num-bigint",

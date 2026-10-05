@@ -19,7 +19,7 @@ members = ["crates/*", "xtask"]
 exclude = ["apps/", "libs/"]
 
 [workspace.package]
-version = "1.2.0"
+version = "1.2.1"
 authors = ["TON Core"]
 edition = "2024"
 rust-version = "1.98.1"
