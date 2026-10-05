@@ -3,6 +3,7 @@ import {env} from "node:process"
 
 import {Address} from "@ton/core"
 
+import {fetchWithRetry} from "./network/fetch-with-retry.ts"
 import type {TonAssetsJetton} from "./sources/ton-assets.ts"
 import {TON_ASSETS_JETTONS_URL, parseTonAssetsJettons} from "./sources/ton-assets.ts"
 import {readText} from "./sources/shared.ts"
@@ -11,7 +12,6 @@ const JETTONS_JSON_URL = new URL("../src/jettons.json", import.meta.url)
 const TONCENTER_JETTON_MASTERS_URL = "https://toncenter.com/api/v3/jetton/masters"
 const TONCENTER_ADDRESS_BATCH_SIZE = 50
 const TONCENTER_REQUEST_DELAY_MS = 100
-const TONCENTER_REQUEST_TIMEOUT_MS = 15_000
 
 const wait = (durationMs: number): Promise<void> =>
   new Promise(resolve => globalThis.setTimeout(resolve, durationMs))
@@ -19,10 +19,7 @@ const wait = (durationMs: number): Promise<void> =>
 const readToncenterText = async (url: string): Promise<string> => {
   // biome-ignore lint/style/noProcessEnv: credentials are optional local generator inputs
   const apiKey = env.TONCENTER_API_KEY
-  const response = await fetch(url, {
-    headers: apiKey ? {"X-API-Key": apiKey} : undefined,
-    signal: AbortSignal.timeout(TONCENTER_REQUEST_TIMEOUT_MS),
-  })
+  const response = await fetchWithRetry(url, {apiKey})
   if (!response.ok) {
     throw new Error(`Failed to read Toncenter metadata: HTTP ${response.status}`)
   }
