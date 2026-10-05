@@ -246,6 +246,16 @@ export const CONFLICT_RESOLUTIONS = [
     source: "ton-assets",
     name: "STON.fi DEX",
   },
+  {
+    address: "0:18aa8e2eed51747dae033c079b93883d941cad8f65459f2ee9cd7474b6b8ed5d",
+    source: "ton-assets",
+    name: "DeDust USDT vault",
+  },
+  {
+    address: "0:a9bc094e3b3a9c23f354c7007476ac3fcddd12af6aed4b4168337e47692c5323",
+    source: "ton-assets",
+    name: "DeDust GRAM vault",
+  },
 
   {
     address: "0:9b8ab637507230b99de26a55ea6d9cd4fef0cffcaafe2d1f15e835d5f5d38a43",
@@ -450,12 +460,12 @@ export const CONFLICT_RESOLUTIONS = [
   {
     address: "0:43512860d54980cf24d59868a30e679927fb1373c10964db7500edcdf690abc4",
     source: "address-book",
-    name: "Telegram Rewards",
+    name: "Telegram Stars Withdraw 2",
   },
   {
     address: "0:e6f3d8824f46b1efbab9afc684793428c55fed69b46a15a49be69a29bc49e530",
     source: "address-book",
-    name: "Telegram Rewards",
+    name: "Telegram Stars Withdraw 1",
   },
   {
     address: "0:2ecf5e47d591eb67fa6c56b02b6bb1de6a530855e16ad3082eaa59859e8d5fdc",

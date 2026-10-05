@@ -1908,10 +1908,6 @@
     "name": "OPTUS DEX"
   },
   {
-    "address": "0:43512860d54980cf24d59868a30e679927fb1373c10964db7500edcdf690abc4",
-    "name": "Telegram Rewards"
-  },
-  {
     "address": "0:436a76c2794a88e3fbfec6b9c0374fc8db046f10868b835420d9937973a665d4",
     "name": "Wallet Bot 2"
   },
@@ -2349,7 +2345,7 @@
   },
   {
     "address": "0:75123f090e1c7ea8bc1fd12b8b8c07fac750da75ecc454f317a85760b2c8cc8f",
-    "name": "Gram Foundation"
+    "name": "Grm Foundation"
   },
   {
     "address": "0:75726a716f747e60b0371cb0d5d35471e8e1e931003fecc3a0961a8bd82c09c7",
@@ -2933,7 +2929,7 @@
   },
   {
     "address": "0:b8ef4f77a17e5785bd31ba4da50abd91852f2b8febee97ad6ee16d941f939198",
-    "name": "GRAM Master"
+    "name": "GRM Master"
   },
   {
     "address": "0:ba0cd081bf4efa4c896244c7ceb76d11a5b4bbacd2837d2932dd6ac511aa45b7",
@@ -3350,10 +3346,6 @@
   {
     "address": "0:e58d0685ac8e90a05c34bef9fa18375bb7ea090b7834197061a2cfaf4b6aa0e4",
     "name": "Marketapp Gift Sender"
-  },
-  {
-    "address": "0:e6f3d8824f46b1efbab9afc684793428c55fed69b46a15a49be69a29bc49e530",
-    "name": "Telegram Rewards"
   },
   {
     "address": "0:e796c95723646d2355a12e6b5e9646f8095406c6bf04ff14888e5d0783bf6336",
