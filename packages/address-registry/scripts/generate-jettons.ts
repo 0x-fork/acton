@@ -64,9 +64,14 @@ const parseToncenterImages = (text: string): ReadonlyMap<string, string> => {
     }
 
     try {
+      const imageUrl = new URL(image)
+      if (imageUrl.protocol !== "http:" && imageUrl.protocol !== "https:") {
+        continue
+      }
+
       images.set(Address.parse(sourceAddress).toRawString(), image)
     } catch {
-      // Ignore metadata keys that are not TON addresses.
+      // Ignore invalid image URLs and metadata keys that are not TON addresses.
     }
   }
 
