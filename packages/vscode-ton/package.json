@@ -636,7 +636,7 @@
     "@types/vscode": "^1.88.0",
     "@vitejs/plugin-react": "^6.0.2",
     "@vscode/test-electron": "^2.4.1",
-    "@vscode/vsce": "^3.6.0",
+    "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.1",
     "typescript": "^7.0.2",
     "vite": "^8.2.0",

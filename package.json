@@ -41,7 +41,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.0",
     "@playwright/test": "1.59.0",
-    "react-doctor": "^0.9.3"
+    "react-doctor": "^0.9.17"
   },
   "packageManager": "bun@1.4.0"
 }
