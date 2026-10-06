@@ -2,12 +2,17 @@
 name = "faucet"
 description = "TON testnet faucet backend"
 version = { workspace = true }
+default-run = "faucet"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
 rust-version = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
+
+[[bin]]
+name = "faucet-cli"
+path = "faucet-cli/main.rs"
 
 [workspace]
 members = ["crates/*"]

@@ -1,10 +1,10 @@
 all: precommit
 
 build: build-ui
-    cargo build --release --locked
+    cargo build --release --locked --bins
 
 build-dev:
-    cargo build --locked
+    cargo build --locked --bins
 
 build-ci: build
 

@@ -27,6 +27,7 @@ apps/faucet/*
 !apps/faucet/rust-toolchain.toml
 !apps/faucet/build.rs
 !apps/faucet/src/
+!apps/faucet/faucet-cli/
 !apps/faucet/crates/
 
 !packages/

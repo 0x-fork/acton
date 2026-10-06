@@ -25,9 +25,10 @@ COPY libs/rston /build/libs/rston
 COPY apps/faucet/Cargo.toml apps/faucet/Cargo.lock apps/faucet/rust-toolchain.toml apps/faucet/build.rs ./
 COPY apps/faucet/crates ./crates
 COPY apps/faucet/src ./src
+COPY apps/faucet/faucet-cli ./faucet-cli
 COPY --from=frontend-builder /workspace/packages/faucet-ui/dist /build/packages/faucet-ui/dist
 
-RUN FAUCET_GIT_HASH="${VCS_REF}" cargo build --release --locked --bin faucet
+RUN FAUCET_GIT_HASH="${VCS_REF}" cargo build --release --locked --bins
 
 FROM debian:bookworm-slim AS runtime
 ARG BUILD_VERSION=dev
@@ -53,6 +54,7 @@ RUN mkdir -p /data/faucet /data/antifraud && chown -R faucet:faucet /data
 WORKDIR /var/lib/faucet
 
 COPY --from=rust-builder /build/apps/faucet/target/release/faucet /usr/local/bin/faucet
+COPY --from=rust-builder /build/apps/faucet/target/release/faucet-cli /usr/local/bin/faucet-cli
 
 USER faucet
 
