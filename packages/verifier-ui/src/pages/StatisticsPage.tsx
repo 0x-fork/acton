@@ -81,7 +81,6 @@ const FALLBACK_LANGUAGE_COLOR = "var(--acton-color-text-subtle)"
 const HISTORY_SERIES_COLOR = "var(--acton-color-accent)"
 const LEGEND_SKELETON_KEYS = ["first", "second", "third"] as const
 const SHOW_SOURCE_BY_LANGUAGE = false
-const SHOW_VERSIONS_BY_LANGUAGE = false
 const CHART_TOOLTIP_STYLE = {
   background: "var(--acton-color-surface-raised)",
   border: "1px solid var(--acton-color-border)",
@@ -199,12 +198,13 @@ export function StatisticsPage({api}: StatisticsPageProps) {
         .sort((left, right) => right.total - left.total),
     [statistics],
   )
-  const versionCount = languages.reduce((count, language) => count + language.versions.length, 0)
   const historySeries = useMemo(() => buildHistorySeries(history?.items ?? []), [history])
-  const compilerLanguages = [...languages].sort(
-    (left, right) =>
-      Number(right.language.toLowerCase() === "tolk") -
-      Number(left.language.toLowerCase() === "tolk"),
+  const compilerLanguages = languages.filter(
+    language => language.language.trim().toLowerCase() === "tolk",
+  )
+  const versionCount = compilerLanguages.reduce(
+    (count, language) => count + language.versions.length,
+    0,
   )
 
   return (
@@ -493,116 +493,113 @@ export function StatisticsPage({api}: StatisticsPageProps) {
             </div>
           </section>
 
-          {/* biome-ignore lint/suspicious/noUnnecessaryConditions: This section is temporarily hidden behind a local feature flag. */}
-          {SHOW_VERSIONS_BY_LANGUAGE && (
-            <section className={styles.compilerSection}>
-              <header className={styles.compilerHeading}>
-                <h2>Versions by language</h2>
-                <span>
-                  {isLoading ? "Loading" : <CountValue singular="version" value={versionCount} />}
-                </span>
-              </header>
+          <section className={styles.compilerSection}>
+            <header className={styles.compilerHeading}>
+              <h2>Tolk compiler versions</h2>
+              <span>
+                {isLoading ? "Loading" : <CountValue singular="version" value={versionCount} />}
+              </span>
+            </header>
 
-              {isLoading ? (
-                <DataTable title="Compiler versions" meta="Loading" minWidth="36rem">
-                  <DataTableTable aria-label="Loading compiler statistics">
-                    <DataTableHead>
-                      <DataTableRow>
-                        <DataTableHeaderCell columnWidth="40%">Version</DataTableHeaderCell>
-                        <DataTableHeaderCell align="right">Contracts</DataTableHeaderCell>
-                        <DataTableHeaderCell align="right">Language share</DataTableHeaderCell>
-                        <DataTableHeaderCell align="right">Registry share</DataTableHeaderCell>
-                      </DataTableRow>
-                    </DataTableHead>
-                    <DataTableBody>
-                      <DataTableSkeletonRows
-                        columns={4}
-                        rows={6}
-                        widths={["8rem", "4rem", "4rem", "4rem"]}
-                        alignments={["left", "right", "right", "right"]}
-                      />
-                    </DataTableBody>
-                  </DataTableTable>
-                </DataTable>
-              ) : languages.length === 0 ? (
-                <DataTable title="Compiler versions" minWidth="36rem">
-                  <DataTableTable aria-label="Verified contracts by compiler version">
-                    <DataTableBody>
-                      <DataTableEmpty colSpan={4}>
-                        No compiler statistics indexed yet
-                      </DataTableEmpty>
-                    </DataTableBody>
-                  </DataTableTable>
-                </DataTable>
-              ) : (
-                <div className={styles.versionTables}>
-                  {compilerLanguages.map(language => (
-                    <DataTable
-                      key={language.language}
-                      title={
-                        <span className={styles.languageTitle}>
-                          <span
-                            className={styles.legendDot}
-                            style={{backgroundColor: language.fill}}
-                            aria-hidden="true"
-                          />
-                          {language.label}
-                        </span>
-                      }
-                      meta={
-                        <>
-                          <CountValue singular="contract" value={language.total} /> ·{" "}
-                          <CountValue singular="version" value={language.versions.length} />
-                        </>
-                      }
-                      minWidth="36rem"
+            {isLoading ? (
+              <DataTable title="Tolk" meta="Loading" minWidth="36rem">
+                <DataTableTable aria-label="Loading Tolk compiler statistics">
+                  <DataTableHead>
+                    <DataTableRow>
+                      <DataTableHeaderCell columnWidth="40%">Version</DataTableHeaderCell>
+                      <DataTableHeaderCell align="right">Contracts</DataTableHeaderCell>
+                      <DataTableHeaderCell align="right">Language share</DataTableHeaderCell>
+                      <DataTableHeaderCell align="right">Registry share</DataTableHeaderCell>
+                    </DataTableRow>
+                  </DataTableHead>
+                  <DataTableBody>
+                    <DataTableSkeletonRows
+                      columns={4}
+                      rows={6}
+                      widths={["8rem", "4rem", "4rem", "4rem"]}
+                      alignments={["left", "right", "right", "right"]}
+                    />
+                  </DataTableBody>
+                </DataTableTable>
+              </DataTable>
+            ) : compilerLanguages.length === 0 ? (
+              <DataTable title="Tolk" minWidth="36rem">
+                <DataTableTable aria-label="Tolk verified contracts by compiler version">
+                  <DataTableBody>
+                    <DataTableEmpty colSpan={4}>
+                      No Tolk compiler statistics indexed yet
+                    </DataTableEmpty>
+                  </DataTableBody>
+                </DataTableTable>
+              </DataTable>
+            ) : (
+              <div className={styles.versionTables}>
+                {compilerLanguages.map(language => (
+                  <DataTable
+                    key={language.language}
+                    title={
+                      <span className={styles.languageTitle}>
+                        <span
+                          className={styles.legendDot}
+                          style={{backgroundColor: language.fill}}
+                          aria-hidden="true"
+                        />
+                        {language.label}
+                      </span>
+                    }
+                    meta={
+                      <>
+                        <CountValue singular="contract" value={language.total} /> ·{" "}
+                        <CountValue singular="version" value={language.versions.length} />
+                      </>
+                    }
+                    minWidth="36rem"
+                  >
+                    <DataTableTable
+                      aria-label={`${language.label} verified contracts by compiler version`}
                     >
-                      <DataTableTable
-                        aria-label={`${language.label} verified contracts by compiler version`}
-                      >
-                        <DataTableHead>
-                          <DataTableRow>
-                            <DataTableHeaderCell columnWidth="40%">Version</DataTableHeaderCell>
-                            <DataTableHeaderCell align="right">Contracts</DataTableHeaderCell>
-                            <DataTableHeaderCell align="right">Language share</DataTableHeaderCell>
-                            <DataTableHeaderCell align="right">Registry share</DataTableHeaderCell>
-                          </DataTableRow>
-                        </DataTableHead>
-                        <DataTableBody>
-                          {language.versions.length === 0 ? (
-                            <DataTableEmpty colSpan={4}>No versions indexed</DataTableEmpty>
-                          ) : (
-                            language.versions.map(row => (
-                              <DataTableRow key={`${language.language}:${row.version}`} hover>
-                                <DataTableCell mono>{row.version}</DataTableCell>
-                                <DataTableCell align="right" tone="strong">
-                                  <NumberValue value={row.total} />
-                                </DataTableCell>
-                                <DataTableCell align="right" tone="muted">
-                                  <Percentage
-                                    maximumFractionDigits={1}
-                                    total={language.total}
-                                    value={row.total}
-                                  />
-                                </DataTableCell>
-                                <DataTableCell align="right" tone="muted">
-                                  <Percentage
-                                    maximumFractionDigits={1}
-                                    total={total}
-                                    value={row.total}
-                                  />
-                                </DataTableCell>
-                              </DataTableRow>
-                            ))
-                          )}
-                        </DataTableBody>
-                      </DataTableTable>
-                    </DataTable>
-                  ))}
-                </div>
-              )}
-            </section>
-          )}
+                      <DataTableHead>
+                        <DataTableRow>
+                          <DataTableHeaderCell columnWidth="40%">Version</DataTableHeaderCell>
+                          <DataTableHeaderCell align="right">Contracts</DataTableHeaderCell>
+                          <DataTableHeaderCell align="right">Language share</DataTableHeaderCell>
+                          <DataTableHeaderCell align="right">Registry share</DataTableHeaderCell>
+                        </DataTableRow>
+                      </DataTableHead>
+                      <DataTableBody>
+                        {language.versions.length === 0 ? (
+                          <DataTableEmpty colSpan={4}>No versions indexed</DataTableEmpty>
+                        ) : (
+                          language.versions.map(row => (
+                            <DataTableRow key={`${language.language}:${row.version}`} hover>
+                              <DataTableCell mono>{row.version}</DataTableCell>
+                              <DataTableCell align="right" tone="strong">
+                                <NumberValue value={row.total} />
+                              </DataTableCell>
+                              <DataTableCell align="right" tone="muted">
+                                <Percentage
+                                  maximumFractionDigits={1}
+                                  total={language.total}
+                                  value={row.total}
+                                />
+                              </DataTableCell>
+                              <DataTableCell align="right" tone="muted">
+                                <Percentage
+                                  maximumFractionDigits={1}
+                                  total={total}
+                                  value={row.total}
+                                />
+                              </DataTableCell>
+                            </DataTableRow>
+                          ))
+                        )}
+                      </DataTableBody>
+                    </DataTableTable>
+                  </DataTable>
+                ))}
+              </div>
+            )}
+          </section>
         </>
       )}
     </section>
