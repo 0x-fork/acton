@@ -353,20 +353,22 @@ async fn verify_target(
         ));
     }
 
-    tracing::info!(
-        operation = "verify",
-        code_hash = %resolved_target.code_hash,
-        user_agent = %user_agent,
-        language = %language,
-        outcome = "started",
-        "verification started"
-    );
-
     let CompileInput {
         configuration,
         sources: mut retained_sources,
     } = compile_input
         .ok_or_else(|| ApiError::internal("missing prepared compiler input".to_owned()))?;
+
+    tracing::info!(
+        operation = "verify",
+        code_hash = %resolved_target.code_hash,
+        user_agent = %user_agent,
+        language = %language,
+        file_count = retained_sources.len(),
+        outcome = "started",
+        "verification started"
+    );
+
     let compiled = run_compiler(
         state,
         &resolved_target.code_hash,
