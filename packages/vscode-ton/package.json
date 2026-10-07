@@ -626,7 +626,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-icons": "^5.5.0",
-    "smol-toml": "^1.6.1",
+    "smol-toml": "^1.9.0",
     "vscode-languageclient": "^10.1.0"
   },
   "devDependencies": {
