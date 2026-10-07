@@ -1295,13 +1295,8 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
     fn should_use_opcode_fallback(opcode: Option<u32>, body_tail: Option<&CellSlice<'_>>) -> bool {
         // `0x00000001` with no payload is too common to decode through the
         // global catalog. A code-hash matched ABI can still decode it earlier.
-        if opcode == Some(1)
-            && body_tail.is_some_and(|tail| tail.size_bits() == 0 && tail.size_refs() == 0)
-        {
-            return false;
-        }
-
-        true
+        !(opcode == Some(1)
+            && body_tail.is_some_and(|tail| tail.size_bits() == 0 && tail.size_refs() == 0))
     }
 
     fn compiler_message_candidates(

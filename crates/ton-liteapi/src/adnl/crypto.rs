@@ -166,8 +166,9 @@ impl PublicKey {
     /// NOTE: `[u8]` is representation differently in TL. Use [PublicKey::verify_raw] if
     /// you need to verify raw bytes signature
     pub fn verify_tl<T: tl_proto::TlWrite>(&self, message: T, signature: &[u8; 64]) -> bool {
-        let target_r = CompressedEdwardsY(signature[..32].try_into().unwrap());
-        let s = match check_scalar(signature[32..].try_into().unwrap()) {
+        let target_r =
+            CompressedEdwardsY(signature[..32].try_into().expect("signature R is 32 bytes"));
+        let s = match check_scalar(signature[32..].try_into().expect("signature S is 32 bytes")) {
             Some(s) => s,
             None => return false,
         };
@@ -185,8 +186,9 @@ impl PublicKey {
 
     /// Verifies message signature as it is
     pub fn verify_raw(&self, message: &[u8], signature: &[u8; 64]) -> bool {
-        let target_r = CompressedEdwardsY(signature[..32].try_into().unwrap());
-        let s = match check_scalar(signature[32..].try_into().unwrap()) {
+        let target_r =
+            CompressedEdwardsY(signature[..32].try_into().expect("signature R is 32 bytes"));
+        let s = match check_scalar(signature[32..].try_into().expect("signature S is 32 bytes")) {
             Some(s) => s,
             None => return false,
         };
@@ -218,7 +220,11 @@ impl From<&'_ SecretKey> for PublicKey {
         let mut h = Sha512::new();
         h.update(secret_key.0.as_slice());
         let hash: [u8; 64] = h.finalize().into();
-        Self::from_scalar(hash[..32].try_into().unwrap())
+        Self::from_scalar(
+            hash[..32]
+                .try_into()
+                .expect("SHA-512 lower half is 32 bytes"),
+        )
     }
 }
 
@@ -246,10 +252,10 @@ impl Eq for PublicKey {}
 impl std::fmt::Display for PublicKey {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut output = [0u8; 64];
-        hex::encode_to_slice(self.compressed.as_bytes(), &mut output).ok();
+        hex::encode_to_slice(self.compressed.as_bytes(), &mut output)
+            .expect("64-byte buffer fits a hex-encoded 32-byte public key");
 
-        // SAFETY: output is guaranteed to contain only [0-9a-f]
-        let output = unsafe { std::str::from_utf8_unchecked(&output) };
+        let output = std::str::from_utf8(&output).expect("hex encoding produces ASCII");
         f.write_str(output)
     }
 }
@@ -388,8 +394,12 @@ impl From<&'_ SecretKey> for ExpandedSecretKey {
         h.update(secret_key.0.as_slice());
         let hash: [u8; 64] = h.finalize().into();
 
-        let lower: [u8; 32] = hash[..32].try_into().unwrap();
-        let nonce: [u8; 32] = hash[32..].try_into().unwrap();
+        let lower: [u8; 32] = hash[..32]
+            .try_into()
+            .expect("SHA-512 lower half is 32 bytes");
+        let nonce: [u8; 32] = hash[32..]
+            .try_into()
+            .expect("SHA-512 upper half is 32 bytes");
 
         let key_bytes = curve25519_dalek::scalar::clamp_integer(lower);
 

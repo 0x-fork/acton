@@ -103,11 +103,21 @@ impl AdnlHandshake {
         packet: &[u8; 256],
         keypair_selector: F,
     ) -> Result<Self, AdnlError> {
-        let receiver = packet[..32].try_into().unwrap();
-        let sender = PublicKey::from_bytes(packet[32..64].try_into().unwrap())
-            .ok_or(AdnlError::InvalidPublicKey)?;
-        let hash: [u8; 32] = packet[64..96].try_into().unwrap();
-        let mut raw_params: [u8; 160] = packet[96..256].try_into().unwrap();
+        let receiver = packet[..32]
+            .try_into()
+            .expect("receiver address is 32 bytes");
+        let sender = PublicKey::from_bytes(
+            packet[32..64]
+                .try_into()
+                .expect("sender public key is 32 bytes"),
+        )
+        .ok_or(AdnlError::InvalidPublicKey)?;
+        let hash: [u8; 32] = packet[64..96]
+            .try_into()
+            .expect("handshake hash is 32 bytes");
+        let mut raw_params: [u8; 160] = packet[96..256]
+            .try_into()
+            .expect("handshake AES parameters are 160 bytes");
 
         let keypair =
             keypair_selector(&receiver).ok_or_else(|| AdnlError::UnknownAddr(receiver.clone()))?;

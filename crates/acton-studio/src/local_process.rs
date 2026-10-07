@@ -234,7 +234,7 @@ impl EnvironmentRuntime for LocalProcessEnvironmentRuntime {
             let id_number = self
                 .inner
                 .next_id
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next_id| {
+                .try_update(Ordering::Relaxed, Ordering::Relaxed, |next_id| {
                     next_id.checked_add(1)
                 })
                 .map_err(|_| EnvironmentRuntimeError::Internal {

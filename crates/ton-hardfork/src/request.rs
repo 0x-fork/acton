@@ -1,4 +1,4 @@
-//! Validated account edits. Balances are decimal nanotons; cells are base64 BoCs.
+//! Validated account edits. Balances are decimal nanograms; cells are base64 `BoCs`.
 
 use crate::{AccountWrite, AdminBatch, HardforkSources};
 use anyhow::{Context, Result, bail, ensure};
@@ -181,15 +181,15 @@ fn apply_edit(
         return Ok(AccountWrite::remove(address.address));
     }
 
-    let mut record = existing.unwrap_or(ShardAccount {
-        account: Lazy::new(&OptionalAccount(None))?,
-        last_trans_hash: HashBytes::ZERO,
-        last_trans_lt: 0,
-    });
-
-    if let AccountChange::Replace { boc } = change {
-        record = decode_cell(boc)?.parse()?;
-    }
+    let mut record = if let AccountChange::Replace { boc } = change {
+        decode_cell(boc)?.parse()?
+    } else {
+        existing.unwrap_or(ShardAccount {
+            account: Lazy::new(&OptionalAccount(None))?,
+            last_trans_hash: HashBytes::ZERO,
+            last_trans_lt: 0,
+        })
+    };
 
     let mut account = record.load_account()?.unwrap_or(Account {
         address: IntAddr::Std(address.clone()),

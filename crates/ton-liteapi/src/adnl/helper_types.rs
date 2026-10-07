@@ -55,11 +55,13 @@ pub struct AdnlAesParams {
 impl From<[u8; 160]> for AdnlAesParams {
     fn from(raw_buffer: [u8; 160]) -> Self {
         Self {
-            rx_key: raw_buffer[..32].try_into().unwrap(),
-            tx_key: raw_buffer[32..64].try_into().unwrap(),
-            rx_nonce: raw_buffer[64..80].try_into().unwrap(),
-            tx_nonce: raw_buffer[80..96].try_into().unwrap(),
-            padding: raw_buffer[96..160].try_into().unwrap(),
+            rx_key: raw_buffer[..32].try_into().expect("RX key is 32 bytes"),
+            tx_key: raw_buffer[32..64].try_into().expect("TX key is 32 bytes"),
+            rx_nonce: raw_buffer[64..80].try_into().expect("RX nonce is 16 bytes"),
+            tx_nonce: raw_buffer[80..96].try_into().expect("TX nonce is 16 bytes"),
+            padding: raw_buffer[96..160]
+                .try_into()
+                .expect("AES padding is 64 bytes"),
         }
     }
 }

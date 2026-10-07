@@ -34,7 +34,7 @@ impl From<usize> for SchemaPathSegment {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SchemaDoc {
     pub title: Option<String>,
     pub description: Option<String>,
@@ -47,7 +47,7 @@ pub struct SchemaDoc {
 
 impl SchemaDoc {
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.title.is_none()
             && self.description.is_none()
             && self.schema_type.is_none()
@@ -58,14 +58,14 @@ impl SchemaDoc {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompletionProperty {
     pub name: String,
     pub required: bool,
     pub doc: SchemaDoc,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CompletionInfo {
     pub properties: Vec<CompletionProperty>,
     pub has_pattern_properties: bool,

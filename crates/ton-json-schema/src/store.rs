@@ -139,8 +139,7 @@ impl SchemaStore {
 
         states.into_iter().any(|state| {
             jsonschema::validator_for(&state.schema)
-                .map(|validator| validator.is_valid(value))
-                .unwrap_or(false)
+                .is_ok_and(|validator| validator.is_valid(value))
         })
     }
 
@@ -294,7 +293,6 @@ impl SchemaStore {
         segment: &SchemaPathSegment,
     ) -> Vec<SchemaState<'a>> {
         match (&state.schema, segment) {
-            (Value::Bool(false), _) => Vec::new(),
             (Value::Bool(true), _) => vec![state],
             (Value::Object(obj), SchemaPathSegment::Key(key)) => {
                 self.follow_object_key(state.resolver, obj, key)
@@ -313,14 +311,16 @@ impl SchemaStore {
         key: &str,
     ) -> Vec<SchemaState<'a>> {
         let mut result = Vec::new();
-        let mut matched_explicit = false;
 
-        if let Some(properties) = obj.get("properties").and_then(Value::as_object)
+        let mut matched_explicit = if let Some(properties) =
+            obj.get("properties").and_then(Value::as_object)
             && let Some(value) = properties.get(key)
         {
             result.push(self.make_child_state(&resolver, value.clone()));
-            matched_explicit = true;
-        }
+            true
+        } else {
+            false
+        };
 
         if let Some(pattern_properties) = obj.get("patternProperties").and_then(Value::as_object) {
             for (pattern, schema) in pattern_properties {
@@ -336,7 +336,6 @@ impl SchemaStore {
 
         if !matched_explicit {
             match obj.get("additionalProperties") {
-                Some(Value::Bool(false)) => {}
                 Some(Value::Bool(true)) => {
                     result.push(self.make_child_state(&resolver, Value::Object(Map::new())));
                 }
@@ -397,7 +396,6 @@ impl SchemaStore {
                 Value::Bool(true) => {
                     result.push(self.make_child_state(&resolver, Value::Object(Map::new())));
                 }
-                Value::Bool(false) | Value::Null => {}
                 _ => {}
             }
         } else if Self::type_allows(obj, "array") {
@@ -440,14 +438,13 @@ impl SchemaStore {
     fn required_properties(obj: &Map<String, Value>) -> BTreeSet<String> {
         obj.get("required")
             .and_then(Value::as_array)
-            .map(|entries| {
+            .map_or_default(|entries| {
                 entries
                     .iter()
                     .filter_map(Value::as_str)
                     .map(ToString::to_string)
                     .collect::<BTreeSet<_>>()
             })
-            .unwrap_or_default()
     }
 
     fn type_allows(obj: &Map<String, Value>, expected: &str) -> bool {
