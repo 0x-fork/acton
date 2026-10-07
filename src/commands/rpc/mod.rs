@@ -688,9 +688,8 @@ fn print_get_methods(abi: &ContractABI) {
 
 fn print_get_method_hint(address: &str, network: &Network, block_number: Option<u64>) {
     let net_arg = format_rpc_network_arg(network);
-    let block_arg = block_number
-        .map(|block_number| format!(" --block-number {block_number}"))
-        .unwrap_or_default();
+    let block_arg =
+        block_number.map_or_default(|block_number| format!(" --block-number {block_number}"));
     let command = format!("acton rpc call --net {net_arg}{block_arg} {address} <METHOD> [ARGS...]");
 
     println!(

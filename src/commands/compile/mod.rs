@@ -247,9 +247,8 @@ fn handle_compilation_result(
         if from_cache {
             println!("{}", "✓ Compilation successful (from cache)".green().bold());
         } else {
-            let elapsed_msg = elapsed
-                .map(|e| format!(" (compiled in {e:?})").dimmed().to_string())
-                .unwrap_or_default();
+            let elapsed_msg =
+                elapsed.map_or_default(|e| format!(" (compiled in {e:?})").dimmed().to_string());
             println!(
                 "{}{}",
                 "✓ Compilation successful".green().bold(),

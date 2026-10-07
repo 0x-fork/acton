@@ -696,13 +696,11 @@ fn print_test_trace_table_comparison(
 ) {
     print_section_header(&format!("CHAIN GAS & FEES · {test_name}"));
 
-    let baseline_by_key = baseline_rows
-        .map(|rows| {
-            rows.iter()
-                .map(|(snapshot_key, trace)| (*snapshot_key, *trace))
-                .collect::<HashMap<_, _>>()
-        })
-        .unwrap_or_default();
+    let baseline_by_key = baseline_rows.map_or_default(|rows| {
+        rows.iter()
+            .map(|(snapshot_key, trace)| (*snapshot_key, *trace))
+            .collect::<HashMap<_, _>>()
+    });
 
     let mut table = Table::new();
     table
@@ -1264,7 +1262,7 @@ fn collect_profile_executions(runner: &TestRunner) -> Vec<ProfileExecutionInput>
                     test_name: test_name.clone(),
                     vm_log: get_result.vm_log.clone(),
                     initial_gas: Some(DEFAULT_GET_METHOD_GAS_LIMIT as u64),
-                    source_map: build_result.source_map.clone(),
+                    source_map: build_result.source_map,
                     contract_display_name: None,
                 });
             }

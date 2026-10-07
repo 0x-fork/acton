@@ -246,31 +246,6 @@ fn embedded_ui_response(path: &str, contents: &'static [u8]) -> Response {
         .into_response()
 }
 
-#[cfg(test)]
-mod embedded_ui_tests {
-    use expect_test::expect;
-
-    use super::embedded_ui_response;
-
-    #[test]
-    fn response_identifies_embedded_gzip_asset() {
-        let response = embedded_ui_response("assets/app.js", b"compressed asset");
-
-        expect![[r"
-            content-type: application/javascript
-            content-encoding: gzip
-            vary: Accept-Encoding"]]
-        .assert_eq(
-            &response
-                .headers()
-                .iter()
-                .map(|(name, value)| format!("{name}: {}", value.to_str().unwrap()))
-                .collect::<Vec<_>>()
-                .join("\n"),
-        );
-    }
-}
-
 async fn handle_api_reports(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
     let reports = state
         .reports
@@ -501,4 +476,29 @@ fn non_empty_text(value: &str) -> Option<String> {
 
 fn sanitize_optional_text(value: Option<&str>) -> Option<String> {
     value.and_then(non_empty_text)
+}
+
+#[cfg(test)]
+mod embedded_ui_tests {
+    use expect_test::expect;
+
+    use super::embedded_ui_response;
+
+    #[test]
+    fn response_identifies_embedded_gzip_asset() {
+        let response = embedded_ui_response("assets/app.js", b"compressed asset");
+
+        expect![[r"
+            content-type: application/javascript
+            content-encoding: gzip
+            vary: Accept-Encoding"]]
+        .assert_eq(
+            &response
+                .headers()
+                .iter()
+                .map(|(name, value)| format!("{name}: {}", value.to_str().unwrap()))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+    }
 }

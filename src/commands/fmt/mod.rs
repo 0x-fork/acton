@@ -157,7 +157,7 @@ pub fn fmt_cmd(
             Ok(formatted) => {
                 if content != formatted {
                     if check {
-                        unformatted_files.push(file_path.clone());
+                        unformatted_files.push(file_path);
 
                         print_format_diff(&display_path, &content, &formatted);
                     } else {

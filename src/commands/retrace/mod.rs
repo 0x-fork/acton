@@ -354,7 +354,7 @@ fn print_retrace_result(
                             println!(
                                 "     {:<15} {}",
                                 "Body:".dimmed(),
-                                Boc::encode_hex(msg.body.1.clone()).yellow()
+                                Boc::encode_hex(msg.body.1).yellow()
                             );
                         } else {
                             println!(

@@ -194,8 +194,7 @@ fn diagnostic_to_rule_descriptor(
     let full_description_markdown = explanation_markdown.clone();
     let explanation_text = explanation_markdown
         .as_deref()
-        .map(markdown_to_plain_text)
-        .unwrap_or_default();
+        .map_or_default(markdown_to_plain_text);
     let short_description_text = format!("{rule_id}: {}", diagnostic.message);
     let full_description_text = if explanation_text.trim().is_empty() {
         diagnostic.message.clone()

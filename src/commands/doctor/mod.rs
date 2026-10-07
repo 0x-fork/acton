@@ -475,15 +475,13 @@ fn inspect_wallet_overlays(local_path: &Path, global_path: Option<&Path>) -> Doc
     let local = inspect_overlay_file::<WalletsFile>(local_path, |file| {
         file.wallets
             .as_ref()
-            .map(|wallets| wallets.wallets.keys().cloned().collect())
-            .unwrap_or_default()
+            .map_or_default(|wallets| wallets.wallets.keys().cloned().collect())
     });
     let global = global_path.map(|path| {
         inspect_overlay_file::<WalletsFile>(path, |file| {
             file.wallets
                 .as_ref()
-                .map(|wallets| wallets.wallets.keys().cloned().collect())
-                .unwrap_or_default()
+                .map_or_default(|wallets| wallets.wallets.keys().cloned().collect())
         })
     });
     let load_ok = local.load_ok && global.as_ref().is_none_or(|global| global.load_ok);
@@ -510,15 +508,13 @@ fn inspect_library_overlays(local_path: &Path, global_path: Option<&Path>) -> Do
     let local = inspect_overlay_file::<LibrariesFile>(local_path, |file| {
         file.libraries
             .as_ref()
-            .map(|libraries| libraries.libraries.keys().cloned().collect())
-            .unwrap_or_default()
+            .map_or_default(|libraries| libraries.libraries.keys().cloned().collect())
     });
     let global = global_path.map(|path| {
         inspect_overlay_file::<LibrariesFile>(path, |file| {
             file.libraries
                 .as_ref()
-                .map(|libraries| libraries.libraries.keys().cloned().collect())
-                .unwrap_or_default()
+                .map_or_default(|libraries| libraries.libraries.keys().cloned().collect())
         })
     });
     let load_ok = local.load_ok && global.as_ref().is_none_or(|global| global.load_ok);

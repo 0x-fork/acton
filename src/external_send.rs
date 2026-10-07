@@ -45,17 +45,15 @@ fn wallet_airdrop_command(wallet_name: &str, network_name: &str) -> Option<Strin
 }
 
 fn wallet_airdrop_fix_hint(wallet_name: &str, network_name: &str) -> String {
-    wallet_airdrop_command(wallet_name, network_name)
-        .map(|airdrop_command| {
-            format!(
-                r"
+    wallet_airdrop_command(wallet_name, network_name).map_or_default(|airdrop_command| {
+        format!(
+            r"
 
 Possible fix:
 - request funds to the wallet with {}",
-                airdrop_command.yellow()
-            )
-        })
-        .unwrap_or_default()
+            airdrop_command.yellow()
+        )
+    })
 }
 
 fn transport_failure_fix_hint(network_name: &str) -> String {

@@ -929,9 +929,7 @@ global-id = 42
     let mut results = Vec::new();
 
     for configured_id in [None, Some(0), Some(u32::MAX)] {
-        let id_field = configured_id
-            .map(|id| format!("wallet-id = {id}\n"))
-            .unwrap_or_default();
+        let id_field = configured_id.map_or_default(|id| format!("wallet-id = {id}\n"));
         let file: WalletsFile = toml::from_str(&format!(
             "[wallets.deployer]\nkind = \"v5r1\"\nmnemonic-scheme = \"bip39\"\n{id_field}keys = {{ mnemonic = \"{BIP39_TEST_MNEMONIC}\" }}\n"
         ))?;

@@ -96,7 +96,7 @@ pub(super) fn collect_coverage(
         }
 
         files.push(FileCoverage {
-            file: file.clone(),
+            file,
             executable_lines_count,
             covered_lines_count,
             line_hits,

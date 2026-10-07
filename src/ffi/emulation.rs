@@ -2616,7 +2616,7 @@ fn run_get_method_impl(
         code: Boc::encode_base64(&code),
         data: Boc::encode_base64(data),
         verbosity: ctx.env.default_log_level,
-        libs: libs_root.map(Boc::encode_base64).unwrap_or_default(),
+        libs: libs_root.map_or_default(Boc::encode_base64),
         address: addr_str,
         unixtime,
         balance,
@@ -2744,10 +2744,9 @@ fn run_get_method_impl(
 
             let suggested_name = if result.vm_exit_code == 11 {
                 // TODO: right now get methods may not include all get methods
-                let get_methods: Vec<&str> = abi
-                    .as_ref()
-                    .map(|abi| abi.get_methods.iter().map(|m| m.name.as_str()).collect())
-                    .unwrap_or_default();
+                let get_methods: Vec<&str> = abi.as_ref().map_or_default(|abi| {
+                    abi.get_methods.iter().map(|m| m.name.as_str()).collect()
+                });
                 suggest_name(&name, &get_methods).map(ToOwned::to_owned)
             } else {
                 None
@@ -3673,7 +3672,7 @@ pub(super) fn run_tolk_continuation(
         code,
         data,
         verbosity,
-        libs: libs_root.map(Boc::encode_base64).unwrap_or_default(),
+        libs: libs_root.map_or_default(Boc::encode_base64),
         address: addr_str,
         unixtime,
         balance,
@@ -4790,14 +4789,12 @@ fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> TxInfo {
                 .gas_used
                 .as_deref()
                 .and_then(|s| s.parse::<u64>().ok())
-                .map(VarUint56::new)
-                .unwrap_or_default(),
+                .map_or_default(VarUint56::new),
             gas_limit: cp
                 .gas_limit
                 .as_deref()
                 .and_then(|s| s.parse::<u64>().ok())
-                .map(VarUint56::new)
-                .unwrap_or_default(),
+                .map_or_default(VarUint56::new),
             gas_credit: cp
                 .gas_credit
                 .as_deref()
@@ -4871,21 +4868,18 @@ fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> TxInfo {
         total_message_size: ap
             .tot_msg_size
             .as_ref()
-            .map(|s| StorageUsedShort {
+            .map_or_default(|s| StorageUsedShort {
                 cells: s
                     .cells
                     .as_deref()
                     .and_then(|v| v.parse::<u64>().ok())
-                    .map(VarUint56::new)
-                    .unwrap_or_default(),
+                    .map_or_default(VarUint56::new),
                 bits: s
                     .bits
                     .as_deref()
                     .and_then(|v| v.parse::<u64>().ok())
-                    .map(VarUint56::new)
-                    .unwrap_or_default(),
-            })
-            .unwrap_or_default(),
+                    .map_or_default(VarUint56::new),
+            }),
     });
 
     let credit_phase = desc
@@ -4963,8 +4957,7 @@ fn parse_int_addr(address: &str) -> anyhow::Result<IntAddr> {
 
 fn parse_tokens_opt(s: Option<&str>) -> Tokens {
     s.and_then(|v| v.parse::<u128>().ok())
-        .map(Tokens::new)
-        .unwrap_or_default()
+        .map_or_default(Tokens::new)
 }
 
 fn parse_account_status(s: &str) -> AccountStatus {

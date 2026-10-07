@@ -494,7 +494,7 @@ fn fail_external_send_not_accepted_impl(
     let diagnostic_id = tuple_optional_int(&error, 3).and_then(|value| value.to_u64());
     let missing_libraries = diagnostic_id
         .and_then(|id| ctx.chain.emulations.find_failed_message(id))
-        .map(|message| {
+        .map_or_default(|message| {
             let mut libraries = message
                 .missing_libraries
                 .iter()
@@ -502,8 +502,7 @@ fn fail_external_send_not_accepted_impl(
                 .collect::<Vec<_>>();
             libraries.sort_unstable();
             libraries
-        })
-        .unwrap_or_default();
+        });
 
     *ctx.asserts.assert_failure = Some(AssertFailure::ExternalSendNotAccepted(
         ExternalSendNotAcceptedFailure {

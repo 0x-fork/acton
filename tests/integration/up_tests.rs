@@ -1016,9 +1016,7 @@ impl GitHubMockServer {
                 captured_thread
                     .lock()
                     .expect("captured GitHub requests mutex poisoned")
-                    .push(CapturedHttpRequest {
-                        path: request.path.clone(),
-                    });
+                    .push(CapturedHttpRequest { path: request.path });
 
                 write_http_response(
                     &mut stream,

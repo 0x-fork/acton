@@ -291,8 +291,7 @@ pub fn open_wallets(
     let wallets = config
         .wallets
         .as_ref()
-        .map(|w| w.wallets.clone())
-        .unwrap_or_default();
+        .map_or_default(|w| w.wallets.clone());
 
     let mut open_wallets: BTreeMap<String, Wallet> = BTreeMap::new();
 
@@ -364,7 +363,7 @@ pub fn open_wallets(
         open_wallets.insert(
             name.clone(),
             Wallet {
-                name: name.clone(),
+                name,
                 wallet: ton_wallet,
                 seqno: None,
             },
@@ -437,8 +436,7 @@ pub fn open_selected_wallets(
     let configured_wallets = config
         .wallets
         .as_ref()
-        .map(|wallets| wallets.wallets.clone())
-        .unwrap_or_default();
+        .map_or_default(|wallets| wallets.wallets.clone());
 
     if configured_wallets.is_empty() {
         anyhow::bail!("No wallets are configured in Acton.toml");

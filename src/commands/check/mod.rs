@@ -651,7 +651,7 @@ fn check_root_file(
                 code: None,
                 rule: Rule::CompilerError,
                 name: "parse-error",
-                message: parse_error.message.clone(),
+                message: parse_error.message,
                 annotations: vec![Annotation {
                     span: Span {
                         start: start_byte as u32,

@@ -1173,8 +1173,7 @@ fn list_wallets(balance: bool, json: bool) -> anyhow::Result<()> {
         let wallets: WalletsFile = toml::from_str(&content)?;
         wallets
             .wallets
-            .map(|w| w.wallets.keys().cloned().collect())
-            .unwrap_or_default()
+            .map_or_default(|w| w.wallets.keys().cloned().collect())
     } else {
         Default::default()
     };

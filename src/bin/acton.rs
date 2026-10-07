@@ -1703,10 +1703,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         .map(|subcommand| {
             (
                 subcommand.get_name().to_owned(),
-                subcommand
-                    .get_about()
-                    .map(ToString::to_string)
-                    .unwrap_or_default(),
+                subcommand.get_about().map_or_default(ToString::to_string),
             )
         })
         .collect::<HashMap<_, _>>();
@@ -1746,10 +1743,9 @@ fn root_help(show_global_options: bool) -> StyledStr {
             let hint = arg
                 .get_value_names()
                 .and_then(|value_names| value_names.first())
-                .map(|value_name| format!("<{value_name}>"))
-                .unwrap_or_default();
+                .map_or_default(|value_name| format!("<{value_name}>"));
 
-            let description = arg.get_help().map(ToString::to_string).unwrap_or_default();
+            let description = arg.get_help().map_or_default(ToString::to_string);
             if description.is_empty() {
                 return None;
             }
@@ -1787,8 +1783,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         for (name, hint) in entries {
             let description = command_descriptions
                 .get(*name)
-                .map(String::as_str)
-                .unwrap_or_default();
+                .map_or_default(String::as_str);
             let _ = write!(
                 writer,
                 "\n  {command_style}{name:<align_name$}{command_style:#}  "

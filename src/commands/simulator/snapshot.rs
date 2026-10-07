@@ -94,10 +94,7 @@ pub async fn simulator_snapshot_cmd(
             let path = resolve_project_path(path);
             let bytes = fs::read(&path)
                 .with_context(|| format!("Cannot read snapshot {}", path.display()))?;
-            let query = name
-                .as_deref()
-                .map(|name| vec![("name", name)])
-                .unwrap_or_default();
+            let query = name.as_deref().map_or_default(|name| vec![("name", name)]);
 
             super::post_localnet_control_bytes(
                 port,

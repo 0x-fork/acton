@@ -64,28 +64,6 @@ fn parse_abi_opcode(value: &str) -> Option<u32> {
     BigInt::parse_bytes(digits.as_bytes(), radix).and_then(|value| value.to_u32())
 }
 
-#[cfg(test)]
-mod preferred_opcode_message_name_tests {
-    use super::preferred_opcode_message_name;
-
-    #[test]
-    fn maps_standard_jetton_opcodes_to_canonical_messages() {
-        let expected = [
-            (0x0f8a_7ea5, "JettonTransfer"),
-            (0x178d_4519, "JettonInternalTransfer"),
-            (0x595f_07bc, "JettonBurn"),
-            (0x7362_d09c, "JettonTransferNotification"),
-            (0x7bdd_97de, "JettonBurnNotification"),
-            (0xd532_76db, "JettonExcesses"),
-        ];
-
-        for (opcode, message_name) in expected {
-            assert_eq!(preferred_opcode_message_name(opcode), Some(message_name));
-        }
-        assert_eq!(preferred_opcode_message_name(0), None);
-    }
-}
-
 #[derive(Debug, Clone)]
 struct SendResult {
     tx: Transaction,
@@ -2277,9 +2255,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             let loc = installed.and_then(|installed| {
                 self.find_source_loc(tx, installed.loc_hash(), installed.loc_offset())
             });
-            let location_part = loc
-                .map(|l| format!("at {}", l.format()))
-                .unwrap_or_default();
+            let location_part = loc.map_or_default(|l| format!("at {}", l.format()));
 
             match action {
                 ExecutedAction::SendMessage {
@@ -3731,19 +3707,15 @@ impl FormatterContext<'_> {
                     child_transactions: res.children_ids.iter().map(ToString::to_string).collect(),
                     shard_account_before: String::new(),
                     shard_account: String::new(),
-                    vm_log_diff: vm_log
-                        .map(tvm_logs::convert_to_diff_logs)
-                        .unwrap_or_default(),
-                    executor_logs: executor_logs.map(Arc::from).unwrap_or_default(),
-                    executor_actions: executor_logs
-                        .map(|logs| {
-                            crate::commands::test::trace::parse_executor_actions(
-                                logs,
-                                &installed_actions,
-                                source_map,
-                            )
-                        })
-                        .unwrap_or_default(),
+                    vm_log_diff: vm_log.map_or_default(tvm_logs::convert_to_diff_logs),
+                    executor_logs: executor_logs.map_or_default(Arc::from),
+                    executor_actions: executor_logs.map_or_default(|logs| {
+                        crate::commands::test::trace::parse_executor_actions(
+                            logs,
+                            &installed_actions,
+                            source_map,
+                        )
+                    }),
                     actions: Some(Boc::encode_base64(&res.actions).into()),
                 }
             })
@@ -4097,4 +4069,26 @@ fn visible_len(s: &str) -> usize {
         }
     }
     len
+}
+
+#[cfg(test)]
+mod preferred_opcode_message_name_tests {
+    use super::preferred_opcode_message_name;
+
+    #[test]
+    fn maps_standard_jetton_opcodes_to_canonical_messages() {
+        let expected = [
+            (0x0f8a_7ea5, "JettonTransfer"),
+            (0x178d_4519, "JettonInternalTransfer"),
+            (0x595f_07bc, "JettonBurn"),
+            (0x7362_d09c, "JettonTransferNotification"),
+            (0x7bdd_97de, "JettonBurnNotification"),
+            (0xd532_76db, "JettonExcesses"),
+        ];
+
+        for (opcode, message_name) in expected {
+            assert_eq!(preferred_opcode_message_name(opcode), Some(message_name));
+        }
+        assert_eq!(preferred_opcode_message_name(0), None);
+    }
 }

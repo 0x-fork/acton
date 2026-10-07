@@ -1412,8 +1412,7 @@ fn run_file_tests(
             .acton_config
             .wallets
             .as_ref()
-            .map(|wallets| wallets.wallets.keys().cloned().collect::<Vec<_>>())
-            .unwrap_or_default();
+            .map_or_default(|wallets| wallets.wallets.keys().cloned().collect::<Vec<_>>());
         let failure_execution = if test_passed {
             None
         } else {
@@ -1438,7 +1437,7 @@ fn run_file_tests(
             vm_log,
             assert_failure: assert_failure.clone(),
             expected_exit_code,
-            fuzz: fuzz.clone(),
+            fuzz,
             failure: failure_execution,
         });
 
@@ -1456,7 +1455,7 @@ fn run_file_tests(
                 known_code_cells: Cow::Borrowed(&runner.known_code_cells),
                 show_bodies: runner.config.show_bodies,
                 has_wallets_config,
-                available_wallets: available_wallets.clone(),
+                available_wallets,
                 backtrace: runner.config.backtrace,
                 fork_net: runner.config.fork_net.clone(),
                 network: runner.config.fork_net.clone(),

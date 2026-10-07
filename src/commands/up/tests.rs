@@ -929,11 +929,7 @@ impl MockReleaseClient {
         let data = format!(
             "binary-data-{}{}",
             asset.version,
-            asset
-                .content
-                .as_ref()
-                .map(|c| format!(": {c}"))
-                .unwrap_or_default()
+            asset.content.as_ref().map_or_default(|c| format!(": {c}"))
         );
 
         let mut header = tar::Header::new_gnu();

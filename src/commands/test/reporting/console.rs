@@ -676,8 +676,7 @@ fn assertion_backtrace_lines(test: &TestReport, result: &GetMethodResultSuccess)
     }
 
     retrace::find_exception_info(&result.vm_log, &test.source_map)
-        .map(|info| FormatterContext::format_backtrace(&info.backtrace))
-        .unwrap_or_default()
+        .map_or_default(|info| FormatterContext::format_backtrace(&info.backtrace))
 }
 
 fn external_send_contract_backtrace_lines(
