@@ -161,30 +161,30 @@ test("deduplicates a combined image fallback chain", () => {
   ).toEqual(["https://images.example/small.png", "https://images.example/original.png"])
 })
 
-test.each([
-  TOKEN_PLACEHOLDER_IMAGE,
-  NFT_PLACEHOLDER_IMAGE,
-])("a duplicated fallback chain reaches the placeholder instead of restarting", placeholder => {
-  const image = {
-    src: "https://images.example/small.png",
-    getAttribute: () => image.src,
-  }
-  const event = {currentTarget: image} as unknown as Parameters<
-    typeof replaceBrokenImageWithFallback
-  >[0]
-  const sources = [
-    "https://images.example/small.png",
-    "https://images.example/original.png",
-    "https://images.example/small.png",
-    "https://images.example/original.png",
-  ]
+test.each([TOKEN_PLACEHOLDER_IMAGE, NFT_PLACEHOLDER_IMAGE])(
+  "a duplicated fallback chain reaches the placeholder instead of restarting",
+  placeholder => {
+    const image = {
+      src: "https://images.example/small.png",
+      getAttribute: () => image.src,
+    }
+    const event = {currentTarget: image} as unknown as Parameters<
+      typeof replaceBrokenImageWithFallback
+    >[0]
+    const sources = [
+      "https://images.example/small.png",
+      "https://images.example/original.png",
+      "https://images.example/small.png",
+      "https://images.example/original.png",
+    ]
 
-  replaceBrokenImageWithFallback(event, sources, placeholder)
-  expect(image.src).toBe("https://images.example/original.png")
+    replaceBrokenImageWithFallback(event, sources, placeholder)
+    expect(image.src).toBe("https://images.example/original.png")
 
-  replaceBrokenImageWithFallback(event, sources, placeholder)
-  expect(image.src).toBe(placeholder)
+    replaceBrokenImageWithFallback(event, sources, placeholder)
+    expect(image.src).toBe(placeholder)
 
-  replaceBrokenImageWithFallback(event, sources, placeholder)
-  expect(image.src).toBe(placeholder)
-})
+    replaceBrokenImageWithFallback(event, sources, placeholder)
+    expect(image.src).toBe(placeholder)
+  },
+)

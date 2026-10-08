@@ -21,10 +21,10 @@ describe("external config account explorer links", () => {
     })
   })
 
-  test.each([
-    "Ethereum",
-    "Polygon",
-  ] as const)("does not use a mainnet explorer for %s testnet accounts", externalChain => {
-    expect(getExternalAccountExplorerLink(externalChain, true, "0x1234")).toBeUndefined()
-  })
+  test.each(["Ethereum", "Polygon"] as const)(
+    "does not use a mainnet explorer for %s testnet accounts",
+    externalChain => {
+      expect(getExternalAccountExplorerLink(externalChain, true, "0x1234")).toBeUndefined()
+    },
+  )
 })

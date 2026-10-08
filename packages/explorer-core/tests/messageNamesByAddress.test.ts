@@ -35,23 +35,23 @@ test("transaction history ignores undisplayed bulk-send recipients", () => {
   ])
 })
 
-test.each([
-  undefined,
-  null,
-  "",
-  " ",
-  "invalid",
-  "0x100000000",
-])("messages without a valid opcode (%s) need address names but no ABI lookups", opcode => {
-  const transaction = {
-    account: "account",
-    in_msg: message({source: "sender", destination: "account", opcode}),
-    out_msgs: [message({source: "account", destination: "recipient", opcode})],
-  } as V3TransactionListItem
+test.each([undefined, null, "", " ", "invalid", "0x100000000"])(
+  "messages without a valid opcode (%s) need address names but no ABI lookups",
+  opcode => {
+    const transaction = {
+      account: "account",
+      in_msg: message({source: "sender", destination: "account", opcode}),
+      out_msgs: [message({source: "account", destination: "recipient", opcode})],
+    } as V3TransactionListItem
 
-  expect(collectTransactionListAbiAddresses([transaction])).toEqual([])
-  expect(collectTransactionListAddresses([transaction])).toEqual(["account", "sender", "recipient"])
-})
+    expect(collectTransactionListAbiAddresses([transaction])).toEqual([])
+    expect(collectTransactionListAddresses([transaction])).toEqual([
+      "account",
+      "sender",
+      "recipient",
+    ])
+  },
+)
 
 test("ABI lookups include only endpoints of messages with opcodes, including zero", () => {
   const transactions = [

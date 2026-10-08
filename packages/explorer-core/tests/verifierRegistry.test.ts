@@ -172,54 +172,56 @@ test.each([429, 500])("HTTP %s verifier failures do not become cached misses", a
   }
 })
 
-test.each([
-  429, 500,
-])("strict composite lookups propagate HTTP %s failures and recover without caching them", async status => {
-  const originalFetch = globalThis.fetch
-  const fetch = mockFetch(async () => Response.json({error: "unavailable"}, {status}))
-  globalThis.fetch = fetch
-  try {
-    const registry = new CompositeMetadataRegistry([
-      new NullMetadataRegistry(),
-      new VerifierMetadataRegistry(),
-      new NullMetadataRegistry(),
-    ])
-    await expect(registry.getCompilerAbis([CODE_HASH], {throwOnError: true})).rejects.toThrow(
-      `Verifier ABI request failed with HTTP ${status}`,
-    )
+test.each([429, 500])(
+  "strict composite lookups propagate HTTP %s failures and recover without caching them",
+  async status => {
+    const originalFetch = globalThis.fetch
+    const fetch = mockFetch(async () => Response.json({error: "unavailable"}, {status}))
+    globalThis.fetch = fetch
+    try {
+      const registry = new CompositeMetadataRegistry([
+        new NullMetadataRegistry(),
+        new VerifierMetadataRegistry(),
+        new NullMetadataRegistry(),
+      ])
+      await expect(registry.getCompilerAbis([CODE_HASH], {throwOnError: true})).rejects.toThrow(
+        `Verifier ABI request failed with HTTP ${status}`,
+      )
 
-    fetch.mockImplementation(async () =>
-      Response.json({items: [{code_hash: CODE_HASH, abi: {contract_name: "RecoveredContract"}}]}),
-    )
-    const recovered = await registry.getCompilerAbis([CODE_HASH], {throwOnError: true})
-    expect(recovered[CODE_HASH]?.compiler_abi.contract_name).toBe("RecoveredContract")
-    expect(await registry.getCompilerAbis([CODE_HASH], {throwOnError: true})).toEqual(recovered)
-    expect(fetch).toHaveBeenCalledTimes(2)
-  } finally {
-    globalThis.fetch = originalFetch
-  }
-})
+      fetch.mockImplementation(async () =>
+        Response.json({items: [{code_hash: CODE_HASH, abi: {contract_name: "RecoveredContract"}}]}),
+      )
+      const recovered = await registry.getCompilerAbis([CODE_HASH], {throwOnError: true})
+      expect(recovered[CODE_HASH]?.compiler_abi.contract_name).toBe("RecoveredContract")
+      expect(await registry.getCompilerAbis([CODE_HASH], {throwOnError: true})).toEqual(recovered)
+      expect(fetch).toHaveBeenCalledTimes(2)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  },
+)
 
-test.each([
-  404, 200,
-])("strict composite lookups preserve genuine HTTP %s misses as cached nulls", async status => {
-  const originalFetch = globalThis.fetch
-  const fetch = mockFetch(async () => Response.json({items: []}, {status}))
-  globalThis.fetch = fetch
-  try {
-    const registry = new CompositeMetadataRegistry([
-      new NullMetadataRegistry(),
-      new VerifierMetadataRegistry(),
-    ])
-    expect(await registry.getCompilerAbis([CODE_HASH], {throwOnError: true})).toEqual({
-      [CODE_HASH]: null,
-    })
-    expect(await registry.getCompilerAbis([CODE_HASH])).toEqual({[CODE_HASH]: null})
-    expect(fetch).toHaveBeenCalledTimes(1)
-  } finally {
-    globalThis.fetch = originalFetch
-  }
-})
+test.each([404, 200])(
+  "strict composite lookups preserve genuine HTTP %s misses as cached nulls",
+  async status => {
+    const originalFetch = globalThis.fetch
+    const fetch = mockFetch(async () => Response.json({items: []}, {status}))
+    globalThis.fetch = fetch
+    try {
+      const registry = new CompositeMetadataRegistry([
+        new NullMetadataRegistry(),
+        new VerifierMetadataRegistry(),
+      ])
+      expect(await registry.getCompilerAbis([CODE_HASH], {throwOnError: true})).toEqual({
+        [CODE_HASH]: null,
+      })
+      expect(await registry.getCompilerAbis([CODE_HASH])).toEqual({[CODE_HASH]: null})
+      expect(fetch).toHaveBeenCalledTimes(1)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  },
+)
 
 test("strict composite lookups propagate verifier timeouts", async () => {
   const originalFetch = globalThis.fetch

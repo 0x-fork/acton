@@ -39,7 +39,7 @@
     "bun-types": "^1.4.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.0",
+    "@biomejs/biome": "^2.5.15",
     "@playwright/test": "1.59.0",
     "react-doctor": "^0.9.17"
   },
