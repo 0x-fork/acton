@@ -1094,6 +1094,12 @@ enum Commands {
             conflicts_with_all = ["list", "check"]
         )]
         force: bool,
+        #[arg(
+            long,
+            help = "Roll back to the previous version from a local backup",
+            conflicts_with_all = ["version", "trunk", "stable", "force", "list", "check"]
+        )]
+        rollback: bool,
         #[arg(long, help = "List available versions", conflicts_with = "check")]
         list: bool,
         #[arg(long, hide = true, help = "Check for updates and return info as JSON")]
@@ -2500,9 +2506,10 @@ fn main() {
             force,
             list,
             check,
+            rollback,
             yes: _,
         } => {
-            let result = up_cmd(version, trunk, stable, force, list, check);
+            let result = up_cmd(version, trunk, stable, force, list, check, rollback);
             if check {
                 report_error_as_json(result);
                 return;

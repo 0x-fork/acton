@@ -3,9 +3,11 @@ use anyhow::{Context, Result, bail};
 use flate2::read::GzDecoder;
 use semver::Version;
 use sha2::{Digest, Sha256};
+use std::cmp::Ordering;
 use std::fs::{self, File};
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 use tar::Archive;
 
 use super::client::{Asset, Release, ReleaseClient};
@@ -189,6 +191,118 @@ pub(super) fn run_update<C: ReleaseClient>(
     Ok(())
 }
 
+/// Restore the previously installed Acton binary from a local backup.
+///
+/// `install_binary` keeps a copy of every replaced binary next to the current
+/// one (named `acton-<version>`), so the rollback works fully offline and
+/// never talks to GitHub. It restores the most recently modified backup and
+/// does not create or overwrite any backups, which keeps repeated calls
+/// idempotent: once the restored version is the current one, further
+/// rollbacks are no-ops.
+pub(super) fn run_rollback(current_exe: &Path, current_version: &str) -> Result<()> {
+    let backup_path = latest_backup_path(current_exe)?;
+
+    if backup_path
+        .as_ref()
+        .is_some_and(|path| backup_version(path) == current_version)
+    {
+        println!(
+            "  {} Acton is already at version {} (no rollback needed)",
+            "Up to date".green().bold(),
+            current_version
+        );
+        return Ok(());
+    }
+
+    let backup_path = backup_path.ok_or_else(|| {
+        anyhow::anyhow!(
+            "No previous Acton version was found next to the current binary — backups are created by `acton up` when it replaces the binary"
+        )
+    })?;
+
+    let backup_version = backup_version(&backup_path);
+
+    println!(
+        "  {} to {} (current: {})",
+        "Rolling back".green().bold(),
+        backup_version,
+        current_version
+    );
+    println!(
+        "       {} {}",
+        "Found".green().bold(),
+        backup_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+    );
+
+    swap_binary(&backup_path, current_exe, "restored Acton binary")?;
+
+    println!(
+        "     {} to {}",
+        "Rolled back".green().bold(),
+        backup_version
+    );
+
+    Ok(())
+}
+
+/// Find the most recently modified `acton-<version>` backup in the directory
+/// of the current binary. Mtime is the only available recency signal; file
+/// name breaks ties deterministically.
+fn latest_backup_path(current_exe: &Path) -> Result<Option<PathBuf>> {
+    let bin_dir = current_exe.parent().ok_or_else(|| {
+        anyhow::anyhow!("Could not determine the directory of the current Acton binary")
+    })?;
+
+    let mut candidates: Vec<(Option<SystemTime>, String, PathBuf)> = Vec::new();
+
+    for entry in fs::read_dir(bin_dir).with_context(|| {
+        format!(
+            "Failed to read the directory of the current Acton binary at {}",
+            bin_dir.display()
+        )
+    })? {
+        let entry = entry?;
+        let path = entry.path();
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+
+        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        let Some(version) = name.strip_prefix("acton-") else {
+            continue;
+        };
+        if version.is_empty() {
+            continue;
+        }
+
+        let modified = fs::metadata(&path).and_then(|meta| meta.modified()).ok();
+        candidates.push((modified, name.to_owned(), path));
+    }
+
+    candidates.sort_by(|(mtime_a, name_a, _), (mtime_b, name_b, _)| {
+        mtime_a
+            .partial_cmp(mtime_b)
+            .unwrap_or(Ordering::Equal)
+            .then_with(|| name_a.cmp(name_b))
+    });
+
+    Ok(candidates.into_iter().next_back().map(|(_, _, path)| path))
+}
+
+/// Extract the version from an `acton-<version>` backup file name.
+fn backup_version(backup_path: &Path) -> String {
+    backup_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.strip_prefix("acton-").unwrap_or(name).to_owned())
+        .unwrap_or_default()
+}
+
 fn print_forced_install_release(
     target_version: &Version,
     current_version: Option<&Version>,
@@ -358,7 +472,7 @@ fn install_binary(tarball_path: &Path, current_exe: &Path, current_version: &str
     let backup_name = format!("acton-{current_version}");
     let backup_path = bin_dir.join(&backup_name);
 
-    // 1. Create backup by copying current binary
+    // 1. Keep a backup of the current binary so `acton up --rollback` can restore it offline
     fs::copy(current_exe, &backup_path).with_context(|| {
         format!(
             "Failed to create a backup of the current Acton binary at {}",
@@ -366,14 +480,31 @@ fn install_binary(tarball_path: &Path, current_exe: &Path, current_version: &str
         )
     })?;
 
-    // 2. Prepare new binary in a temporary file in the same directory to ensure atomic rename
+    // 2. Atomically replace the current binary with the downloaded one
+    swap_binary(&new_bin_path, current_exe, "new Acton binary")?;
+
+    let _ = fs::remove_file(tarball_path);
+
+    Ok(())
+}
+
+/// Atomically replace `current_exe` with the binary at `source`.
+///
+/// The replacement is staged in a temporary file inside the binary's own
+/// directory so the final rename stays on a single filesystem and is atomic.
+/// `subject` names the source binary in failure messages to make them
+/// specific to the caller (new release vs restored backup).
+fn swap_binary(source: &Path, current_exe: &Path, subject: &str) -> Result<()> {
+    let bin_dir = current_exe.parent().ok_or_else(|| {
+        anyhow::anyhow!("Could not determine the directory of the current Acton binary")
+    })?;
+
     let temp_file = tempfile::NamedTempFile::new_in(bin_dir)
-        .context("Failed to create a temporary file for the new Acton binary")?;
+        .with_context(|| format!("Failed to create a temporary file for the {subject}"))?;
 
-    fs::copy(&new_bin_path, temp_file.path())
-        .context("Failed to copy the new Acton binary into the temporary file")?;
+    fs::copy(source, temp_file.path())
+        .with_context(|| format!("Failed to copy the {subject} into the temporary file"))?;
 
-    // 3. Set permissions on the temporary file
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -382,12 +513,9 @@ fn install_binary(tarball_path: &Path, current_exe: &Path, current_version: &str
         fs::set_permissions(temp_file.path(), perms)?;
     }
 
-    // 4. Atomically replace the current binary
     temp_file.persist(current_exe).context(
         "Failed to replace the current Acton binary. Try re-running with sufficient permissions.",
     )?;
-
-    let _ = fs::remove_file(tarball_path);
 
     Ok(())
 }

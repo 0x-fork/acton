@@ -39,6 +39,13 @@ Install the latest stable release.
 Install the selected release even if Acton is already up to date.
 .RE
 .sp
+\fB\-\-rollback\fR
+.RS 4
+Roll back to the previous version from a local backup.
+.sp
+Available since trunk.
+.RE
+.sp
 \fB\-\-list\fR
 .RS 4
 List available release tags and exit.
@@ -92,7 +99,11 @@ When installing a release, Acton:
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'replaces the current \fBacton\fR binary
+\h'-04'\(bu\h'+03'keeps a copy of the replaced binary next to it, named \fBacton\-<version>\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'atomically replaces the current \fBacton\fR binary
 .RE
 .sp
 \fBacton up \-\-list\fR is read\-only and skips download or replacement.
@@ -127,16 +138,24 @@ When installing a release, Acton:
 \h'-04'\(bu\h'+03'\fBacton up <version>\fR installs the explicit version even if it is older or
 newer than the current one
 .RE
+.SH "ROLLBACK"
+\fBacton up \-\-rollback\fR restores the most recently modified backup from the
+directory of the current binary and works fully offline. It never downloads
+anything and never creates or overwrites backups, so running it again is a
+no\-op once the restored version is current.
+.sp
+Available since trunk.
 .SH "EXIT STATUS"
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB0\fR: The requested release information was listed, Acton was already up to
-date, or the selected version was installed successfully.
+date, the selected version was installed successfully, or the previous
+version was rolled back.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB1\fR: Release lookup failed, checksum verification failed, or archive
-replacement failed.
+\h'-04'\(bu\h'+03'\fB1\fR: Release lookup failed, checksum verification failed, archive
+replacement failed, or no backup was available to roll back.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -196,6 +215,16 @@ acton up \-\-force
 .RS 4
 .nf
 acton up \-\-stable
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Roll back to the previous version:
+.sp
+.RS 4
+.nf
+acton up \-\-rollback
 .fi
 .RE
 .RE

@@ -41,6 +41,12 @@ Install the latest stable release.
 Install the selected release even if Acton is already up to date.
 {{/option}}
 
+{{#option "`--rollback`" }}
+Roll back to the previous version from a local backup.
+
+Available since trunk.
+{{/option}}
+
 {{#option "`--list`" }}
 List available release tags and exit.
 {{/option}}
@@ -69,7 +75,8 @@ When installing a release, Acton:
 - downloads the archive and its `.sha256` file
 - verifies the SHA256 digest
 - unpacks the archive
-- replaces the current `acton` binary
+- keeps a copy of the replaced binary next to it, named `acton-<version>`
+- atomically replaces the current `acton` binary
 
 `acton up --list` is read-only and skips download or replacement.
 
@@ -87,12 +94,22 @@ When installing a release, Acton:
 - `acton up <version>` installs the explicit version even if it is older or
   newer than the current one
 
+## Rollback
+
+`acton up --rollback` restores the most recently modified backup from the
+directory of the current binary and works fully offline. It never downloads
+anything and never creates or overwrites backups, so running it again is a
+no-op once the restored version is current.
+
+Available since trunk.
+
 ## Exit Status
 
 - `0`: The requested release information was listed, Acton was already up to
-  date, or the selected version was installed successfully.
-- `1`: Release lookup failed, checksum verification failed, or archive
-  replacement failed.
+  date, the selected version was installed successfully, or the previous
+  version was rolled back.
+- `1`: Release lookup failed, checksum verification failed, archive
+  replacement failed, or no backup was available to roll back.
 
 ## Examples
 
@@ -130,6 +147,12 @@ When installing a release, Acton:
 
    ```bash
    acton up --stable
+   ```
+
+7. Roll back to the previous version:
+
+   ```bash
+   acton up --rollback
    ```
 
 ## See Also

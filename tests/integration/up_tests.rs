@@ -16,6 +16,9 @@ use std::time::{Duration, Instant};
 const TEST_GITHUB_API_BASE_ENV: &str = "ACTON_TEST_UP_GITHUB_API_BASE";
 const TEST_CURRENT_EXE_ENV: &str = "ACTON_TEST_UP_CURRENT_EXE";
 
+/// URL that is never reachable, used to prove rollback never touches GitHub.
+const ROLLBACK_OFFLINE_URL: &str = "http://127.0.0.1:9";
+
 #[test]
 // Verifies that `acton up --list` lists versions from the Acton release repository.
 fn test_up_list_lists_versions_from_release_repository() {
@@ -748,6 +751,57 @@ fn test_up_downloads_assets_via_api_url_when_github_token_is_set() -> Result<()>
         .assert_file_snapshot_matches(
             "captured-paths.txt",
             "integration/snapshots/up/test_up_downloads_assets_via_api_url_when_github_token_is_set.captured.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+// Verifies that `acton up --rollback` restores the most recent local backup without touching GitHub.
+fn test_up_rollback_restores_previous_version() -> Result<()> {
+    let (project, fake_binary) = setup_up_project("up-rollback")?;
+    let fake_bin_dir = project.path().join(".fake-bin");
+    fs::write(fake_bin_dir.join("acton-1.0.0"), "binary-data-1.0.0")?;
+    fs::write(&fake_binary, "binary-data-broken")?;
+
+    let output = up_command(&project)
+        .arg("--rollback")
+        .env(TEST_GITHUB_API_BASE_ENV, ROLLBACK_OFFLINE_URL)
+        .env(TEST_CURRENT_EXE_ENV, &fake_binary.to_string_lossy())
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/up/test_up_rollback_restores_previous_version.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            ".fake-bin/acton",
+            "integration/snapshots/up/test_up_rollback_restores_previous_version.binary.txt",
+        );
+
+    Ok(())
+}
+
+#[test]
+// Verifies that `acton up --rollback` fails clearly when no backup exists and leaves the binary untouched.
+fn test_up_rollback_fails_without_backup() -> Result<()> {
+    let (project, fake_binary) = setup_up_project("up-rollback-no-backup")?;
+
+    let output = up_command(&project)
+        .arg("--rollback")
+        .env(TEST_GITHUB_API_BASE_ENV, ROLLBACK_OFFLINE_URL)
+        .env(TEST_CURRENT_EXE_ENV, &fake_binary.to_string_lossy())
+        .run()
+        .failure();
+
+    output
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/up/test_up_rollback_fails_without_backup.stderr.txt",
+        )
+        .assert_file_snapshot_matches(
+            ".fake-bin/acton",
+            "integration/snapshots/up/test_up_rollback_fails_without_backup.binary.txt",
         );
 
     Ok(())

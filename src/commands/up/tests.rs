@@ -743,6 +743,64 @@ fn test_update_succeeds_for_homebrew_style_install_path() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_rollback_restores_most_recent_backup() -> Result<()> {
+    let (_dir, bin_path) = setup_env()?;
+    let bin_dir = bin_path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("No parent dir"))?;
+
+    fs::write(bin_dir.join("acton-0.1.0"), "backup-binary-0.1.0")?;
+    fs::write(&bin_path, "broken-binary")?;
+    // make the second backup strictly more recent
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    fs::write(bin_dir.join("acton-0.1.1"), "backup-binary-0.1.1")?;
+
+    workflow::run_rollback(&bin_path, "0.2.0")?;
+
+    assert_eq!(fs::read_to_string(&bin_path)?, "backup-binary-0.1.1");
+
+    // the rollback must not create or overwrite backups
+    assert_eq!(
+        fs::read_to_string(bin_dir.join("acton-0.1.0"))?,
+        "backup-binary-0.1.0"
+    );
+    assert!(!bin_dir.join("acton-0.2.0").exists());
+
+    Ok(())
+}
+
+#[test]
+fn test_rollback_without_backup_fails() -> Result<()> {
+    let (_dir, bin_path) = setup_env()?;
+
+    let err = workflow::run_rollback(&bin_path, "0.2.0").expect_err("missing backup must fail");
+    assert_error_snapshot("test_rollback_without_backup_fails", err.to_string());
+    assert_eq!(fs::read_to_string(&bin_path)?, "old_binary");
+
+    Ok(())
+}
+
+#[test]
+fn test_rollback_is_noop_when_current_matches_backup() -> Result<()> {
+    let (_dir, bin_path) = setup_env()?;
+    let bin_dir = bin_path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("No parent dir"))?;
+
+    fs::write(bin_dir.join("acton-0.2.0"), "backup-binary")?;
+
+    workflow::run_rollback(&bin_path, "0.2.0")?;
+
+    assert_eq!(fs::read_to_string(&bin_path)?, "old_binary");
+    assert_eq!(
+        fs::read_to_string(bin_dir.join("acton-0.2.0"))?,
+        "backup-binary"
+    );
+
+    Ok(())
+}
+
 fn assert_error_snapshot(snapshot_name: &str, actual: impl AsRef<str>) {
     let snapshot_path = unit_snapshot_path(snapshot_name);
     let normalized = normalize_error_text(actual.as_ref());

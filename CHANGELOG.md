@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### CLI
+
+- `acton up --rollback` restores the previous version from the local backup
+  that `acton up` creates before replacing the binary. The rollback is
+  offline, picks the most recently modified backup, and is a no-op once the
+  restored version is current.
+
 ## [1.2.1] - 05.10.2026
 
 ### Breaking changes

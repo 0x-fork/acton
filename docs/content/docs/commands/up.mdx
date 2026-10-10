@@ -39,7 +39,7 @@ Specific version tag to install.
 
 <CommandOptionMeta label="Conflicts with">
 
-`--trunk`, `--stable`, `--list`
+`--trunk`, `--stable`, `--list`, `--rollback`
 
 </CommandOptionMeta>
 
@@ -57,7 +57,7 @@ Install the most recent trunk release.
 
 <CommandOptionMeta label="Conflicts with">
 
-`--stable`, `--list`, _version_
+`--stable`, `--list`, _version_, `--rollback`
 
 </CommandOptionMeta>
 
@@ -75,7 +75,7 @@ Install the latest stable release.
 
 <CommandOptionMeta label="Conflicts with">
 
-`--list`, _version_, `--trunk`
+`--list`, _version_, `--trunk`, `--rollback`
 
 </CommandOptionMeta>
 
@@ -93,7 +93,27 @@ Install the selected release even if Acton is already up to date.
 
 <CommandOptionMeta label="Conflicts with">
 
-`--list`
+`--list`, `--rollback`
+
+</CommandOptionMeta>
+
+</CommandOption>
+
+
+<CommandOption>
+<CommandOptionTitle>
+
+`--rollback`
+
+</CommandOptionTitle>
+
+Roll back to the previous version from a local backup.
+
+<AvailabilityBadge since="trunk" />
+
+<CommandOptionMeta label="Conflicts with">
+
+_version_, `--trunk`, `--stable`, `--force`, `--list`
 
 </CommandOptionMeta>
 
@@ -111,7 +131,7 @@ List available release tags and exit.
 
 <CommandOptionMeta label="Conflicts with">
 
-_version_, `--trunk`, `--stable`, `--force`
+_version_, `--trunk`, `--stable`, `--force`, `--rollback`
 
 </CommandOptionMeta>
 
@@ -222,7 +242,8 @@ When installing a release, Acton:
 - downloads the archive and its `.sha256` file
 - verifies the SHA256 digest
 - unpacks the archive
-- replaces the current `acton` binary
+- keeps a copy of the replaced binary next to it, named `acton-<version>`
+- atomically replaces the current `acton` binary
 
 `acton up --list` is read-only and skips download or replacement.
 
@@ -240,12 +261,22 @@ When installing a release, Acton:
 - `acton up <version>` installs the explicit version even if it is older or
   newer than the current one
 
+## Rollback
+
+`acton up --rollback` restores the most recently modified backup from the
+directory of the current binary and works fully offline. It never downloads
+anything and never creates or overwrites backups, so running it again is a
+no-op once the restored version is current.
+
+<AvailabilityBadge since="trunk" />
+
 ## Exit Status
 
 - `0`: The requested release information was listed, Acton was already up to
-  date, or the selected version was installed successfully.
-- `1`: Release lookup failed, checksum verification failed, or archive
-  replacement failed.
+  date, the selected version was installed successfully, or the previous
+  version was rolled back.
+- `1`: Release lookup failed, checksum verification failed, archive
+  replacement failed, or no backup was available to roll back.
 
 ## Examples
 
@@ -283,6 +314,12 @@ When installing a release, Acton:
 
    ```bash
    acton up --stable
+   ```
+
+7. Roll back to the previous version:
+
+   ```bash
+   acton up --rollback
    ```
 
 ## See Also

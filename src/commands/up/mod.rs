@@ -11,7 +11,7 @@ use std::env;
 use std::path::PathBuf;
 
 use client::{GitHubClient, ReleaseClient};
-use workflow::{check_update, run_update};
+use workflow::{check_update, run_rollback, run_update};
 
 #[cfg(debug_assertions)]
 const TEST_CURRENT_EXE_ENV: &str = "ACTON_TEST_UP_CURRENT_EXE"; // non-release test hook only
@@ -23,10 +23,19 @@ pub fn up_cmd(
     force: bool,
     list: bool,
     check: bool,
+    rollback: bool,
 ) -> Result<()> {
+    let current_version_str = build_info::PACKAGE_VERSION;
+
+    // Rollback only reads and restores local backup files,
+    // so it never needs the GitHub client.
+    if rollback {
+        let current_exe = current_executable_path()?;
+        return run_rollback(&current_exe, current_version_str);
+    }
+
     let token = env::var("GITHUB_TOKEN").ok();
     let client = GitHubClient::new(token);
-    let current_version_str = build_info::PACKAGE_VERSION;
     let current_is_trunk = build_info::is_trunk_build();
     let requested_release =
         requested_release_label(version.as_deref(), trunk, stable, current_is_trunk);

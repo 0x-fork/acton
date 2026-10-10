@@ -1,0 +1,1 @@
+Error: No previous Acton version was found next to the current binary — backups are created by `acton up` when it replaces the binary
