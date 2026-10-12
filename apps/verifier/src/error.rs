@@ -147,6 +147,16 @@ impl ApiError {
         Self::service_unavailable(READ_ONLY_ERROR.to_owned())
     }
 
+    /// Maps registry failures for ticket and verification requests.
+    pub(crate) fn from_registry_write(err: RegistryError) -> Self {
+        match err {
+            RegistryError::CodeHashBlocked { ref code_hash } => {
+                Self::forbidden(err.to_string()).with_code_hash(code_hash)
+            }
+            err => Self::from(err),
+        }
+    }
+
     #[must_use]
     pub const fn is_payment_retryable(&self) -> bool {
         self.payment_retryable

@@ -119,8 +119,8 @@ fn parts(field: &'static str, target: &str) -> Vec<MultipartPart> {
     ]
 }
 
-async fn assert_blocked(response: axum::response::Response) {
-    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+async fn assert_blocked(response: axum::response::Response, expected_status: StatusCode) {
+    assert_eq!(response.status(), expected_status);
     let body = response_json::<Value>(response).await;
     assert_eq!(
         body["error"],
@@ -136,21 +136,24 @@ async fn assert_blocked_reads(state: &AppState) {
     ] {
         for endpoint in ["verification/source", "abi"] {
             let path = format!("/api/v1/{endpoint}?code_hash={hash}");
-            assert_blocked(get(state.clone(), &path).await).await;
+            assert_blocked(get(state.clone(), &path).await, StatusCode::NOT_FOUND).await;
             assert_eq!(
                 head(state.clone(), &path).await.status(),
                 StatusCode::NOT_FOUND
             );
         }
     }
-    assert_blocked(
-        get(
-            state.clone(),
-            &format!("/api/v1/verification/source?address={ADDRESS}"),
-        )
-        .await,
-    )
-    .await;
+    for query in [
+        format!("address={ADDRESS}"),
+        format!("address={ADDRESS}&code_hash={BLOCKED}"),
+    ] {
+        let path = format!("/api/v1/verification/source?{query}");
+        assert_blocked(get(state.clone(), &path).await, StatusCode::NOT_FOUND).await;
+        assert_eq!(
+            head(state.clone(), &path).await.status(),
+            StatusCode::NOT_FOUND
+        );
+    }
 }
 
 async fn assert_status_for_blocked_hash(state: &AppState, verified: bool) {
@@ -183,15 +186,24 @@ async fn assert_blocked_submissions(state: &AppState) {
         ("code_hash", BLOCKED_BASE64.to_owned()),
         ("address", ADDRESS.to_owned()),
     ] {
-        assert_blocked(post_verify(state.clone(), parts(field, &target)).await).await;
-        assert_blocked(post_verify_without_payment(state.clone(), parts(field, &target)).await)
-            .await;
+        assert_blocked(
+            post_verify(state.clone(), parts(field, &target)).await,
+            StatusCode::FORBIDDEN,
+        )
+        .await;
+        assert_blocked(
+            post_verify_without_payment(state.clone(), parts(field, &target)).await,
+            StatusCode::FORBIDDEN,
+        )
+        .await;
         assert_blocked(
             post_verify_with_api_key(state.clone(), parts(field, &target), API_KEY).await,
+            StatusCode::FORBIDDEN,
         )
         .await;
         assert_blocked(
             post_verify_with_user_agent(state.clone(), parts(field, &target), "acton/1.2.0").await,
+            StatusCode::FORBIDDEN,
         )
         .await;
     }
@@ -216,6 +228,7 @@ async fn assert_blocked_submissions(state: &AppState) {
                     .oneshot(request)
                     .await
                     .expect("ticket response"),
+                StatusCode::FORBIDDEN,
             )
             .await;
         }
@@ -411,6 +424,7 @@ ledger_path = "{}"
             &format!("/api/v1/verification/source?code_hash={BLOCKED}"),
         )
         .await,
+        StatusCode::NOT_FOUND,
     )
     .await;
 

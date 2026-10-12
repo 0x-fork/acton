@@ -982,7 +982,7 @@ async fn openapi_json_documents_verifier_api() {
     }
     assert_eq!(
         response_statuses(take_ticket),
-        ["200", "400", "403", "404", "502", "503"]
+        ["200", "400", "403", "502", "503"]
     );
     assert_eq!(
         response_statuses(verify),

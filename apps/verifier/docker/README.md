@@ -68,8 +68,9 @@ hashes while keeping verified source and metadata lookups available.
 Set `VERIFIER_BLOCKED_CODE_HASHES` to a comma-separated list of code hashes to
 deny source/ABI access and verification for those contracts. Hexadecimal hashes
 (case-insensitive) and base64 hashes are accepted; invalid entries prevent startup.
-Direct source, ABI, ticket, and verification requests return `404` with
-`code_hash_blocked`, including for existing bundles, API keys, and legacy clients.
+Ticket and verification requests return `403`; source and ABI reads return
+`404`, including source lookups by address. Both responses use `code_hash_blocked`,
+including for existing bundles, API keys, and legacy clients.
 Blocked contracts are omitted from listings and statistics, with pagination,
 totals, and `Last-Modified` calculated from the remaining contracts.
 `GET/HEAD /api/v1/verification/status` continues to return the actual verification

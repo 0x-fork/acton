@@ -58,8 +58,8 @@ const API_KEY_HEADER: &str = "x-verifier-key";
         (status = 400, description = "Invalid verification request, missing or invalid User-Agent, unsupported Blueprint version, or compilation failure", body = crate::error::ErrorResponse),
         (status = 401, description = "A valid API key is required to set verified_at or skip payment", body = crate::error::ErrorResponse),
         (status = 402, description = "Payment is missing or invalid", body = crate::error::ErrorResponse),
-        (status = 403, description = "Compiler disabled by server configuration", body = crate::error::ErrorResponse),
-        (status = 404, description = "Code hash blocked by server configuration or current code hash was not found for the requested address", body = crate::error::ErrorResponse),
+        (status = 403, description = "Code hash blocked or compiler disabled by server configuration", body = crate::error::ErrorResponse),
+        (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
         (status = 409, description = "Payment is already used or in progress, or the address exists on both TON networks", body = crate::error::ErrorResponse),
         (status = 413, description = "The request exceeds the configured upload limit", body = crate::error::ErrorResponse),
         (status = 502, description = "Compiler, blockchain, payment provider, or source storage failure", body = crate::error::ErrorResponse),
@@ -433,7 +433,7 @@ async fn verify_target(
                 outcome = if stored.is_ok() { "completed" } else { "failed" },
                 "source bundle storage finished"
             );
-            let stored = stored?;
+            let stored = stored.map_err(ApiError::from_registry_write)?;
             if !stored.storage.created {
                 verification_result = VerificationResult::AlreadyVerified;
             }
@@ -577,7 +577,8 @@ async fn find_verified_bundle(
         .verified_bundle(VerifiedBundleRequest {
             code_hash: code_hash.to_owned(),
         })
-        .await?
+        .await
+        .map_err(ApiError::from_registry_write)?
         .bundle)
 }
 
