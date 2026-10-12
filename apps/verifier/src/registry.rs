@@ -13,6 +13,7 @@ use tokio::sync::Mutex;
 use crate::{
     blockchain::normalize_code_hash,
     bundle_validation::{StoredBundleValidationError, validate_stored_bundle},
+    code_hash_policy::CodeHashPolicy,
     registry_index::{
         IndexedAbiContract, IndexedAbiContractsQuery, IndexedLanguageStatistics,
         IndexedVerificationStatisticsHistoryItem, IndexedVerifiedBundleSummary,
@@ -132,6 +133,7 @@ pub struct AbiContractsReceipt {
 pub struct SourceVerificationRegistry {
     source_storage: SharedSourceStorage,
     verification_index: SharedVerificationIndex,
+    code_hash_policy: CodeHashPolicy,
     /// Avoids checking the source storage revision on every read after the index is initialized.
     index_ready: Arc<AtomicBool>,
     /// Serializes index rebuilds and the complete source-storage-to-index update sequence.
@@ -147,13 +149,20 @@ impl SourceVerificationRegistry {
         Self {
             source_storage,
             verification_index,
+            code_hash_policy: CodeHashPolicy::default(),
             index_ready: Arc::new(AtomicBool::new(false)),
             index_update_lock: Arc::new(Mutex::new(())),
         }
     }
 
+    #[must_use]
+    pub fn with_code_hash_policy(mut self, policy: CodeHashPolicy) -> Self {
+        self.code_hash_policy = policy;
+        self
+    }
+
     fn ensure_code_hash_allowed(&self, code_hash: &str) -> Result<(), RegistryError> {
-        if self.verification_index.is_code_hash_blocked(code_hash) {
+        if self.code_hash_policy.is_blocked(code_hash) {
             return Err(RegistryError::CodeHashBlocked {
                 code_hash: normalize_code_hash(code_hash.trim()),
             });

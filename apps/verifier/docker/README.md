@@ -68,16 +68,19 @@ hashes while keeping verified source and metadata lookups available.
 Set `VERIFIER_BLOCKED_CODE_HASHES` to a comma-separated list of code hashes to
 deny source/ABI access and verification for those contracts. Hexadecimal hashes
 (case-insensitive) and base64 hashes are accepted; invalid entries prevent startup.
-Ticket and verification requests return `403`; source and ABI reads return
-`404`, including source lookups by address. Both responses use `code_hash_blocked`,
-including for existing bundles, API keys, and legacy clients.
-Blocked contracts are omitted from listings and statistics, with pagination,
-totals, and `Last-Modified` calculated from the remaining contracts.
+Ticket and verification requests return `403`; source reads and ABI lookups by
+`code_hash` return `404`, including source lookups by address. Both responses use
+`code_hash_blocked`, including for existing bundles, API keys, and legacy clients.
 `GET/HEAD /api/v1/verification/status` continues to return the actual verification
 status, including for blocked code hashes.
-Stored sources and payment history are retained. Restart the service to apply
+The blocklist does not modify stored sources or payment history. Restart the service to apply
 changes. This environment variable is used when generating the config; for a
 mounted config, set `server.blocked_code_hashes` directly.
+
+Listings, the ABI collection, statistics, and pagination follow the source
+repository. To exclude a contract, delete its bundle from the repository, commit
+the deletion, update the service's local checkout, and restart the verifier. The
+index rebuilds when the Git revision changes.
 
 Set `VERIFIER_COMPILER_DISABLED` to a comma-separated list of compiler rules:
 

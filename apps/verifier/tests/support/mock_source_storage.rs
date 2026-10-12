@@ -24,13 +24,17 @@ pub struct MockSourceStorage {
 
 impl MockSourceStorage {
     pub fn confirmed() -> Self {
+        Self::snapshot("mock-revision", Vec::new())
+    }
+
+    pub fn snapshot(revision: &str, bundles: Vec<StoredSourceBundle>) -> Self {
         Self {
             outcome: MockSourceStorageOutcome::Confirmed(SourceStorageReceipt {
-                revision: "mock-revision".to_owned(),
+                revision: revision.to_owned(),
                 created: true,
             }),
             recorded_requests: Arc::new(Mutex::new(Vec::new())),
-            stored_bundles: Arc::new(Mutex::new(Vec::new())),
+            stored_bundles: Arc::new(Mutex::new(bundles)),
         }
     }
 
@@ -159,7 +163,14 @@ impl SourceStorage for MockSourceStorage {
     }
 
     async fn current_revision(&self) -> Result<Option<String>, SourceStorageError> {
-        Ok(Some("mock-revision".to_owned()))
+        let revision = match &self.outcome {
+            MockSourceStorageOutcome::Confirmed(receipt)
+            | MockSourceStorageOutcome::FailOnce { receipt, .. } => &receipt.revision,
+            MockSourceStorageOutcome::Failed(_) | MockSourceStorageOutcome::IoFailed(_) => {
+                "mock-revision"
+            }
+        };
+        Ok(Some(revision.to_owned()))
     }
 }
 

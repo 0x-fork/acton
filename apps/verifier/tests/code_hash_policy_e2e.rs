@@ -94,11 +94,15 @@ fn state(
     storage: Arc<MockSourceStorage>,
     compiler: Arc<MockCompilerService>,
     index: SqliteVerificationIndex,
+    code_hash_policy: CodeHashPolicy,
 ) -> AppState {
     AppState::new(
         Arc::new(MockBlockchainClient::new(&[(ADDRESS, BLOCKED)])),
         compiler,
-        Arc::new(SourceVerificationRegistry::new(storage, Arc::new(index))),
+        Arc::new(
+            SourceVerificationRegistry::new(storage, Arc::new(index))
+                .with_code_hash_policy(code_hash_policy),
+        ),
         Arc::new(OnchainPaymentVerifier::new(
             Arc::new(StaticPaymentBlockchainClient::new(None, Vec::new())),
             PaymentLedger::in_memory().expect("payment ledger"),
@@ -240,10 +244,8 @@ async fn verification_status_ignores_blocklist_for_unverified_hashes() {
     let state = state(
         Arc::new(MockSourceStorage::confirmed()),
         compiler(BLOCKED),
-        SqliteVerificationIndex::in_memory()
-            .expect("index")
-            .with_code_hash_policy(policy(&[BLOCKED]))
-            .expect("policy"),
+        SqliteVerificationIndex::in_memory().expect("index"),
+        policy(&[BLOCKED]),
     );
     assert_status_for_blocked_hash(&state, false).await;
 }
@@ -255,10 +257,8 @@ async fn blocked_hashes_are_rejected_before_payment_compilation_or_storage() {
     let state = state(
         storage.clone(),
         compiler.clone(),
-        SqliteVerificationIndex::in_memory()
-            .expect("index")
-            .with_code_hash_policy(policy(&[BLOCKED]))
-            .expect("policy"),
+        SqliteVerificationIndex::in_memory().expect("index"),
+        policy(&[BLOCKED]),
     );
     assert_blocked_reads(&state).await;
     assert_blocked_submissions(&state).await;
@@ -289,7 +289,7 @@ fn compiler(code_hash: &str) -> Arc<MockCompilerService> {
 }
 
 #[tokio::test]
-async fn existing_bundles_are_hidden_with_correct_pagination_and_restored_after_unblocking() {
+async fn policy_blocks_direct_access_without_changing_indexed_collections() {
     let directory = tempfile::tempdir().expect("index directory");
     let path = directory.path().join("index.sqlite3");
     let storage = Arc::new(MockSourceStorage::confirmed());
@@ -298,6 +298,7 @@ async fn existing_bundles_are_hidden_with_correct_pagination_and_restored_after_
             storage.clone(),
             compiler(hash),
             SqliteVerificationIndex::open(&path).expect("index"),
+            CodeHashPolicy::default(),
         );
         let mut parts = parts("code_hash", hash);
         parts.push(text_part("verified_at", timestamp));
@@ -318,9 +319,8 @@ async fn existing_bundles_are_hidden_with_correct_pagination_and_restored_after_
     let state = state(
         storage.clone(),
         compiler(BLOCKED),
-        index
-            .with_code_hash_policy(policy(&[BLOCKED]))
-            .expect("policy"),
+        index,
+        policy(&[BLOCKED]),
     );
 
     assert_status_for_blocked_hash(&state, true).await;
@@ -348,16 +348,16 @@ async fn existing_bundles_are_hidden_with_correct_pagination_and_restored_after_
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
             response.headers()[header::LAST_MODIFIED],
-            "Thu, 01 Jan 1970 00:16:40 GMT"
+            "Thu, 01 Jan 1970 00:33:20 GMT"
         );
         let body = response_json::<Value>(response).await;
-        assert_eq!(body["total"], 1);
+        assert_eq!(body["total"], 2);
         assert_eq!(body["items"].as_array().expect("items").len(), 1);
-        assert_eq!(body["items"][0]["code_hash"], ALLOWED);
+        assert_eq!(body["items"][0]["code_hash"], BLOCKED);
         let response = head(state.clone(), &format!("/api/v1/{endpoint}?offset=99")).await;
         assert_eq!(
             response.headers()[header::LAST_MODIFIED],
-            "Thu, 01 Jan 1970 00:16:40 GMT"
+            "Thu, 01 Jan 1970 00:33:20 GMT"
         );
         let body = response_json::<Value>(
             get(
@@ -367,20 +367,23 @@ async fn existing_bundles_are_hidden_with_correct_pagination_and_restored_after_
             .await,
         )
         .await;
-        assert_eq!(body["total"], 1);
-        assert_eq!(body["items"], json!([]));
+        assert_eq!(body["total"], 2);
+        assert_eq!(body["items"].as_array().expect("items").len(), 1);
+        assert_eq!(body["items"][0]["code_hash"], ALLOWED);
     }
     let statistics = response_json::<Value>(get(state.clone(), "/api/v1/statistics").await).await;
-    assert_eq!(statistics["total"], 1);
+    assert_eq!(statistics["total"], 2);
     let history = response_json::<Value>(get(state, "/api/v1/statistics/history").await).await;
-    assert_eq!(history["items"].as_array().expect("history").len(), 1);
+    assert_eq!(history["items"].as_array().expect("history").len(), 2);
     assert_eq!(history["items"][0]["timestamp"], 1000);
+    assert_eq!(history["items"][1]["timestamp"], 2000);
 
     // Reopening the same index with no restrictions restores access without reindexing.
     let restored = self::state(
         storage,
         compiler(BLOCKED),
         SqliteVerificationIndex::open(&path).expect("reopen index"),
+        CodeHashPolicy::default(),
     );
     assert_eq!(
         get(
@@ -400,7 +403,7 @@ async fn existing_bundles_are_hidden_with_correct_pagination_and_restored_after_
 }
 
 #[tokio::test]
-async fn runtime_config_applies_policy_and_all_blocked_collections_are_empty() {
+async fn runtime_config_applies_policy() {
     let directory = tempfile::tempdir().expect("state directory");
     let config = config(&format!(
         r#"
@@ -427,12 +430,18 @@ ledger_path = "{}"
         StatusCode::NOT_FOUND,
     )
     .await;
+}
 
+#[tokio::test]
+async fn collections_and_status_follow_source_removal_after_restart() {
+    let directory = tempfile::tempdir().expect("index directory");
+    let path = directory.path().join("index.sqlite3");
     let storage = Arc::new(MockSourceStorage::confirmed());
     let initial = state(
         storage.clone(),
         compiler(BLOCKED),
         SqliteVerificationIndex::in_memory().expect("index"),
+        CodeHashPolicy::default(),
     );
     assert_eq!(
         post_verify_with_api_key(initial, parts("code_hash", BLOCKED), API_KEY)
@@ -440,17 +449,46 @@ ledger_path = "{}"
             .status(),
         StatusCode::OK
     );
-    // Rebuilding from storage must retain the policy as well.
+    // A fresh index includes all source bundles, even with an active blocklist.
     let blocked = state(
         storage,
         compiler(BLOCKED),
-        SqliteVerificationIndex::in_memory()
-            .expect("index")
-            .with_code_hash_policy(policy(&[BLOCKED]))
-            .expect("policy"),
+        SqliteVerificationIndex::open(&path).expect("index"),
+        policy(&[BLOCKED]),
     );
+    assert_status_for_blocked_hash(&blocked, true).await;
+    assert_blocked_reads(&blocked).await;
     for endpoint in ["last_verified", "abi"] {
         let response = get(blocked.clone(), &format!("/api/v1/{endpoint}")).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(response.headers().contains_key(header::LAST_MODIFIED));
+        let body = response_json::<Value>(response).await;
+        assert_eq!(body["total"], 1);
+        assert_eq!(body["items"].as_array().expect("items").len(), 1);
+        assert_eq!(body["items"][0]["code_hash"], BLOCKED);
+    }
+    assert_eq!(
+        response_json::<Value>(get(blocked.clone(), "/api/v1/statistics").await).await["total"],
+        1
+    );
+    drop(blocked);
+
+    // A committed deletion changes the source revision. Restarting with the same
+    // persisted index must rebuild it and discard records absent from the repository.
+    let restarted = state(
+        Arc::new(MockSourceStorage::snapshot(
+            "revision-after-removal",
+            Vec::new(),
+        )),
+        compiler(BLOCKED),
+        SqliteVerificationIndex::open(&path).expect("reopen index"),
+        policy(&[BLOCKED]),
+    );
+    assert_status_for_blocked_hash(&restarted, false).await;
+    assert_blocked_reads(&restarted).await;
+    assert_blocked_submissions(&restarted).await;
+    for endpoint in ["last_verified", "abi"] {
+        let response = get(restarted.clone(), &format!("/api/v1/{endpoint}")).await;
         assert_eq!(response.status(), StatusCode::OK);
         assert!(!response.headers().contains_key(header::LAST_MODIFIED));
         assert_eq!(
@@ -458,18 +496,18 @@ ledger_path = "{}"
             json!({"items": [], "total": 0})
         );
         assert!(
-            !head(blocked.clone(), &format!("/api/v1/{endpoint}"))
+            !head(restarted.clone(), &format!("/api/v1/{endpoint}"))
                 .await
                 .headers()
                 .contains_key(header::LAST_MODIFIED)
         );
     }
     assert_eq!(
-        response_json::<Value>(get(blocked.clone(), "/api/v1/statistics").await).await["total"],
+        response_json::<Value>(get(restarted.clone(), "/api/v1/statistics").await).await["total"],
         0
     );
     assert_eq!(
-        response_json::<Value>(get(blocked, "/api/v1/statistics/history").await).await["items"],
+        response_json::<Value>(get(restarted, "/api/v1/statistics/history").await).await["items"],
         json!([])
     );
 }

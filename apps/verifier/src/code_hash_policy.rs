@@ -4,8 +4,8 @@ use thiserror::Error;
 
 use crate::blockchain::{is_valid_code_hash, normalize_code_hash};
 
-/// Code hashes blocked from verification, source/ABI reads, listings, and statistics.
-/// Verification status remains available.
+/// Code hashes blocked from verification and direct source/ABI reads.
+/// Verification status, listings, and statistics reflect the source repository.
 #[derive(Clone, Debug, Default)]
 pub struct CodeHashPolicy {
     blocked: BTreeSet<String>,
@@ -37,10 +37,6 @@ impl CodeHashPolicy {
     pub fn is_blocked(&self, code_hash: &str) -> bool {
         self.blocked
             .contains(&normalize_code_hash(code_hash.trim()))
-    }
-
-    pub(crate) const fn blocked(&self) -> &BTreeSet<String> {
-        &self.blocked
     }
 }
 

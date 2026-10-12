@@ -154,15 +154,20 @@ available.
 
 Set `VERIFIER_BLOCKED_CODE_HASHES` to comma-separated hexadecimal or base64 code
 hashes to deny source/ABI access and verification for those contracts. Ticket
-and verification requests return `403`; source and ABI reads return `404`,
-including source lookups by address. Both responses use `code_hash_blocked`.
-Blocked entries are omitted from listings, ABI responses, and statistics.
-This also applies to existing bundles,
-API keys, and legacy clients. Stored sources and payment history are retained.
+and verification requests return `403`; source reads and ABI lookups by
+`code_hash` return `404`, including source lookups by address. Both responses use
+`code_hash_blocked`. This also applies to existing bundles, API keys, and legacy
+clients. The blocklist does not modify stored sources or payment history.
 `GET/HEAD /api/v1/verification/status` continues to return the actual verification
 status, including for blocked code hashes.
 The default list is empty. Restart after changing the list; if using a mounted
 TOML config, set `blocked_code_hashes = ["<code_hash>"]` under `[server]`.
+
+The source repository determines the contents of listings, the ABI collection,
+and statistics. To remove an entry from these responses, delete its bundle from
+the repository, commit the deletion, update the service's local checkout, and
+restart the verifier. The index rebuilds when the Git revision changes. The
+blocklist alone does not remove entries from collections or change pagination.
 
 `VERIFIER_UPLOAD_MAX_REQUEST_BYTES` is expressed in bytes, limits the complete
 multipart body, and defaults to 512 KiB. When nginx proxies the verifier,

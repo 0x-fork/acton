@@ -44,14 +44,12 @@ impl AppState {
     pub fn from_config(config: &Config) -> Result<Self, StateError> {
         let compiler_policy = CompilerPolicy::from_disabled(config.disabled_compilers())?;
         let source_storage = Arc::new(GitSourceStorage::from_config(config));
-        let verification_index = Arc::new(
-            SqliteVerificationIndex::open(config.registry_index_path())?
-                .with_code_hash_policy(config.code_hash_policy().clone())?,
+        let verification_index =
+            Arc::new(SqliteVerificationIndex::open(config.registry_index_path())?);
+        let verification_registry = Arc::new(
+            SourceVerificationRegistry::new(source_storage, verification_index)
+                .with_code_hash_policy(config.code_hash_policy().clone()),
         );
-        let verification_registry = Arc::new(SourceVerificationRegistry::new(
-            source_storage,
-            verification_index,
-        ));
         let payment_verifier = Arc::new(OnchainPaymentVerifier::from_config(config)?);
 
         Ok(Self::new(
