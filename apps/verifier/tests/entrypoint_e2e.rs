@@ -8,7 +8,7 @@ use std::{
 };
 
 use tempfile::TempDir;
-use verifier::{compiler_policy::CompilerPolicy, config::Config};
+use verifier::{code_hash_policy::CodeHashPolicy, compiler_policy::CompilerPolicy, config::Config};
 
 type TestEnvEntry = (&'static str, OsString);
 
@@ -88,11 +88,13 @@ fn generates_blocked_code_hashes_from_environment() {
         assert!(output.status.success(), "{output:?}");
         let config = Config::load_from_path(temp_dir.path().join("config.toml"))
             .expect("generated blocklist");
+        let policy =
+            CodeHashPolicy::from_blocked(config.blocked_code_hashes()).expect("code hash policy");
         assert_eq!(
-            config.code_hash_policy().is_blocked(&code_hash),
+            policy.is_blocked(&code_hash),
             value.is_some_and(|value| !value.is_empty())
         );
-        assert!(!config.code_hash_policy().is_blocked(&"b".repeat(64)));
+        assert!(!policy.is_blocked(&"b".repeat(64)));
     }
 }
 

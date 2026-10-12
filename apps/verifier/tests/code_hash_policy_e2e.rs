@@ -16,7 +16,7 @@ use verifier::{
     payment::{OnchainPaymentVerifier, PaymentLedger},
     registry::SourceVerificationRegistry,
     registry_index::{SqliteVerificationIndex, VerificationIndex},
-    state::AppState,
+    state::{AppState, StateError},
 };
 
 use support::{
@@ -49,39 +49,61 @@ fn policy(entries: &[&str]) -> CodeHashPolicy {
 }
 
 #[test]
-fn config_defaults_to_allowing_all_hashes_and_normalizes_blocked_entries() {
+fn config_stores_raw_hashes_and_policy_normalizes_blocked_entries() {
     for config in [
         Config::default(),
         config("").expect("defaults"),
         config("[server]\nblocked_code_hashes = []").expect("empty list"),
     ] {
-        assert!(!config.code_hash_policy().is_blocked(BLOCKED));
+        assert!(config.blocked_code_hashes().is_empty());
+        let policy = CodeHashPolicy::from_blocked(config.blocked_code_hashes())
+            .expect("empty code hash policy");
+        assert!(!policy.is_blocked(BLOCKED));
     }
     let config = config(&format!(
         "[server]\nblocked_code_hashes = [\" {} \", \"{BLOCKED_BASE64}\", \"{BLOCKED}\"]",
         BLOCKED.to_ascii_uppercase()
     ))
-    .expect("normalized entries");
+    .expect("raw entries");
+    assert_eq!(
+        config.blocked_code_hashes(),
+        [
+            format!(" {} ", BLOCKED.to_ascii_uppercase()),
+            BLOCKED_BASE64.to_owned(),
+            BLOCKED.to_owned(),
+        ]
+    );
+    let policy =
+        CodeHashPolicy::from_blocked(config.blocked_code_hashes()).expect("code hash policy");
     for hash in [
         BLOCKED.to_owned(),
         BLOCKED.to_uppercase(),
         BLOCKED_BASE64.to_owned(),
     ] {
-        assert!(config.code_hash_policy().is_blocked(&hash));
+        assert!(policy.is_blocked(&hash));
     }
-    assert!(!config.code_hash_policy().is_blocked(ALLOWED));
+    assert!(!policy.is_blocked(ALLOWED));
 }
 
 #[test]
-fn invalid_blocked_entries_prevent_config_loading() {
+fn invalid_blocked_entries_are_rejected_by_policy_and_application_initialization() {
     for entry in ["", " ", "not-a-hash", &"a".repeat(63), &"a".repeat(65)] {
+        let config = config(&format!(
+            "[server]\nblocked_code_hashes = [\"{BLOCKED}\", \"{entry}\"]"
+        ))
+        .expect("config stores code hashes as raw strings");
+        assert_eq!(config.blocked_code_hashes(), [BLOCKED, entry]);
+        let error = CodeHashPolicy::from_blocked(config.blocked_code_hashes()).expect_err(entry);
+        assert_eq!(error.entry, entry);
         assert!(matches!(
-            config(&format!(
-                "[server]\nblocked_code_hashes = [\"{BLOCKED}\", \"{entry}\"]"
-            )),
-            Err(ConfigError::CodeHashPolicy(_))
+            AppState::from_config(&config),
+            Err(StateError::CodeHashPolicy(_))
         ));
     }
+}
+
+#[test]
+fn blocked_code_hashes_requires_a_list_of_strings() {
     for value in ["true", "42", "[42]", "\"hash\""] {
         assert!(matches!(
             config(&format!("[server]\nblocked_code_hashes = {value}")),
