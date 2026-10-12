@@ -1,5 +1,5 @@
 use tracing_subscriber::EnvFilter;
-use verifier::{app, config::Config, state::AppState};
+use verifier::{app, config::Config, state::AppState, utils::shorten_code_hash};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,6 +22,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         disabled_compilers_config = ?config.disabled_compilers(),
         "compiler deny list"
     );
+    let blocked_code_hashes_config = config
+        .blocked_code_hashes()
+        .iter()
+        .map(|code_hash| shorten_code_hash(code_hash))
+        .collect::<Vec<_>>();
+    tracing::info!(?blocked_code_hashes_config, "code hash deny list");
     tracing::info!(
         address = %config.payment_address().unwrap_or("disabled"),
         min_amount_nano = %config

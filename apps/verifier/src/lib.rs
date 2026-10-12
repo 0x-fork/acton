@@ -11,6 +11,7 @@ pub mod registry;
 pub mod registry_index;
 pub mod source_storage;
 pub mod state;
+pub mod utils;
 
 pub mod bundle_validation;
 mod error;
