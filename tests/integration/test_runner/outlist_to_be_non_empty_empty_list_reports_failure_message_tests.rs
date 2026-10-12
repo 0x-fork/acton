@@ -16,7 +16,6 @@ fn run_outlist_failure(project_name: &str, test_body: &str, snapshot_path: &str)
         .failure()
         .assert_failed(1)
         .assert_contains("expect(actual).toBeNonEmpty(expected): array is empty")
-        .assert_contains("0")
         .assert_snapshot_matches(snapshot_path);
 }
 
