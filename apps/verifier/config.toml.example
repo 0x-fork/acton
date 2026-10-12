@@ -2,7 +2,8 @@
 bind_addr = "127.0.0.1:3000"
 # api_key = "migration-api-key"
 read_only = false
-# Deny all API access and verification for these code hashes, including existing bundles.
+# Deny source/ABI access and verification for these code hashes, including existing bundles.
+# GET/HEAD /api/v1/verification/status continues to return the actual verification status.
 # Accepts 64-character hexadecimal hashes (case-insensitive) or base64 hashes.
 # Blocked hashes are also excluded from listings, ABI responses, and statistics.
 # Restart the service after changes. Docker env: VERIFIER_BLOCKED_CODE_HASHES=hash1,hash2.

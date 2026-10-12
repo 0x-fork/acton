@@ -194,7 +194,8 @@ impl SqliteVerificationIndex {
         })
     }
 
-    /// Applies the code hash policy to public index reads without deleting stored bundles.
+    /// Applies the code hash policy to public index reads except verification status.
+    /// Stored bundles are retained.
     ///
     /// # Errors
     ///
@@ -357,7 +358,7 @@ impl VerificationIndex for SqliteVerificationIndex {
         let verified = {
             let connection = self.connection()?;
             connection.query_row(
-                "select exists(select 1 from visible_verified_bundles where code_hash = ?1)",
+                "select exists(select 1 from verified_bundles where code_hash = ?1)",
                 params![code_hash],
                 |row| row.get::<_, bool>(0),
             )?

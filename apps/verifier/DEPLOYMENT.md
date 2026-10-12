@@ -153,10 +153,13 @@ contracts, while already verified contracts and all lookup endpoints remain
 available.
 
 Set `VERIFIER_BLOCKED_CODE_HASHES` to comma-separated hexadecimal or base64 code
-hashes to deny all API access and verification for those contracts. Direct
-requests return `404` with `code_hash_blocked`; blocked entries are omitted from
-listings, ABI responses, and statistics. This also applies to existing bundles,
+hashes to deny source/ABI access and verification for those contracts. Source,
+ABI, ticket, and verification requests return `404` with `code_hash_blocked`;
+blocked entries are omitted from listings, ABI responses, and statistics.
+This also applies to existing bundles,
 API keys, and legacy clients. Stored sources and payment history are retained.
+`GET/HEAD /api/v1/verification/status` continues to return the actual verification
+status, including for blocked code hashes.
 The default list is empty. Restart after changing the list; if using a mounted
 TOML config, set `blocked_code_hashes = ["<code_hash>"]` under `[server]`.
 

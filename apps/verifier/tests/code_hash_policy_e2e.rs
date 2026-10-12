@@ -134,7 +134,7 @@ async fn assert_blocked_reads(state: &AppState) {
         BLOCKED.to_ascii_uppercase(),
         BLOCKED_BASE64.to_owned(),
     ] {
-        for endpoint in ["verification/status", "verification/source", "abi"] {
+        for endpoint in ["verification/source", "abi"] {
             let path = format!("/api/v1/{endpoint}?code_hash={hash}");
             assert_blocked(get(state.clone(), &path).await).await;
             assert_eq!(
@@ -143,15 +143,36 @@ async fn assert_blocked_reads(state: &AppState) {
             );
         }
     }
-    for endpoint in ["verification/status", "verification/source"] {
-        assert_blocked(
-            get(
-                state.clone(),
-                &format!("/api/v1/{endpoint}?address={ADDRESS}"),
-            )
-            .await,
+    assert_blocked(
+        get(
+            state.clone(),
+            &format!("/api/v1/verification/source?address={ADDRESS}"),
         )
-        .await;
+        .await,
+    )
+    .await;
+}
+
+async fn assert_status_for_blocked_hash(state: &AppState, verified: bool) {
+    for query in [
+        format!("code_hash={BLOCKED}"),
+        format!("code_hash={}", BLOCKED.to_ascii_uppercase()),
+        format!("code_hash={BLOCKED_BASE64}"),
+        format!("address={ADDRESS}"),
+        format!("address={ADDRESS}&code_hash={BLOCKED}"),
+    ] {
+        let path = format!("/api/v1/verification/status?{query}");
+        let response = get(state.clone(), &path).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response_json::<Value>(response).await,
+            json!({
+                "code_hash": BLOCKED,
+                "verified": verified,
+                "status": if verified { "verified" } else { "unverified" },
+            })
+        );
+        assert_eq!(head(state.clone(), &path).await.status(), StatusCode::OK);
     }
 }
 
@@ -199,6 +220,19 @@ async fn assert_blocked_submissions(state: &AppState) {
             .await;
         }
     }
+}
+
+#[tokio::test]
+async fn verification_status_ignores_blocklist_for_unverified_hashes() {
+    let state = state(
+        Arc::new(MockSourceStorage::confirmed()),
+        compiler(BLOCKED),
+        SqliteVerificationIndex::in_memory()
+            .expect("index")
+            .with_code_hash_policy(policy(&[BLOCKED]))
+            .expect("policy"),
+    );
+    assert_status_for_blocked_hash(&state, false).await;
 }
 
 #[tokio::test]
@@ -276,6 +310,7 @@ async fn existing_bundles_are_hidden_with_correct_pagination_and_restored_after_
             .expect("policy"),
     );
 
+    assert_status_for_blocked_hash(&state, true).await;
     assert_blocked_reads(&state).await;
     assert_blocked_submissions(&state).await;
     assert_eq!(

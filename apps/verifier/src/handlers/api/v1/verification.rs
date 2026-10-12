@@ -46,7 +46,7 @@ const MAX_PAGE_LIMIT: usize = 100;
     responses(
         (status = 200, description = "Verification status for the resolved code hash", body = VerificationStatusResponse),
         (status = 400, description = "Invalid or missing verification target, or unsupported Blueprint version", body = crate::error::ErrorResponse),
-        (status = 404, description = "Code hash blocked by server configuration or current code hash was not found for the requested address", body = crate::error::ErrorResponse),
+        (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
         (status = 409, description = "The address exists on both TON networks", body = crate::error::ErrorResponse),
         (status = 502, description = "Blockchain or registry lookup failure", body = crate::error::ErrorResponse)
     ),

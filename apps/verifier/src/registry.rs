@@ -245,7 +245,6 @@ impl VerificationRegistry for SourceVerificationRegistry {
         &self,
         request: VerificationStatusRequest,
     ) -> Result<VerificationStatusReceipt, RegistryError> {
-        self.ensure_code_hash_allowed(&request.code_hash)?;
         self.ensure_current().await?;
         let status = self.verification_index.status(&request.code_hash).await?;
 
