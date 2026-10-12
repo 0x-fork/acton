@@ -46,8 +46,7 @@ const MAX_PAGE_LIMIT: usize = 100;
     responses(
         (status = 200, description = "Verification status for the resolved code hash", body = VerificationStatusResponse),
         (status = 400, description = "Invalid or missing verification target, or unsupported Blueprint version", body = crate::error::ErrorResponse),
-        (status = 403, description = "Code hash blocked by server configuration", body = crate::error::ErrorResponse),
-        (status = 404, description = "Current code hash was not found for the requested address", body = crate::error::ErrorResponse),
+        (status = 404, description = "Code hash blocked by server configuration or current code hash was not found for the requested address", body = crate::error::ErrorResponse),
         (status = 409, description = "The address exists on both TON networks", body = crate::error::ErrorResponse),
         (status = 502, description = "Blockchain or registry lookup failure", body = crate::error::ErrorResponse)
     ),
@@ -86,8 +85,7 @@ pub async fn status_handler(
     responses(
         (status = 200, description = "Verified source bundle for the resolved code hash", body = VerificationSourceResponse),
         (status = 400, description = "Invalid or missing verification target", body = crate::error::ErrorResponse),
-        (status = 403, description = "Code hash blocked by server configuration", body = crate::error::ErrorResponse),
-        (status = 404, description = "Current code hash or verified source bundle was not found", body = crate::error::ErrorResponse),
+        (status = 404, description = "Code hash blocked by server configuration or current code hash or verified source bundle was not found", body = crate::error::ErrorResponse),
         (status = 409, description = "The address exists on both TON networks", body = crate::error::ErrorResponse),
         (status = 502, description = "Blockchain, registry, or source lookup failure", body = crate::error::ErrorResponse)
     ),
@@ -245,8 +243,7 @@ pub async fn statistics_history_handler(
             )
         ),
         (status = 400, description = "Invalid code hash", body = crate::error::ErrorResponse),
-        (status = 403, description = "Code hash blocked by server configuration", body = crate::error::ErrorResponse),
-        (status = 404, description = "ABI was not found for the requested code hash", body = crate::error::ErrorResponse),
+        (status = 404, description = "Code hash blocked by server configuration or ABI was not found for the requested code hash", body = crate::error::ErrorResponse),
         (status = 502, description = "Registry lookup failure", body = crate::error::ErrorResponse)
     ),
     tag = "verification"
@@ -302,8 +299,7 @@ pub async fn abi_handler(
             )
         ),
         (status = 400, description = "Invalid code hash", body = crate::error::ErrorResponse),
-        (status = 403, description = "Code hash blocked by server configuration", body = crate::error::ErrorResponse),
-        (status = 404, description = "ABI was not found for the requested code hash", body = crate::error::ErrorResponse),
+        (status = 404, description = "Code hash blocked by server configuration or ABI was not found for the requested code hash", body = crate::error::ErrorResponse),
         (status = 502, description = "Registry lookup failure", body = crate::error::ErrorResponse)
     ),
     tag = "verification"

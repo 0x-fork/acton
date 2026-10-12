@@ -120,7 +120,7 @@ fn parts(field: &'static str, target: &str) -> Vec<MultipartPart> {
 }
 
 async fn assert_blocked(response: axum::response::Response) {
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
     let body = response_json::<Value>(response).await;
     assert_eq!(
         body["error"],
@@ -139,7 +139,7 @@ async fn assert_blocked_reads(state: &AppState) {
             assert_blocked(get(state.clone(), &path).await).await;
             assert_eq!(
                 head(state.clone(), &path).await.status(),
-                StatusCode::FORBIDDEN
+                StatusCode::NOT_FOUND
             );
         }
     }

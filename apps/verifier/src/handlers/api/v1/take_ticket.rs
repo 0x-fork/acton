@@ -17,7 +17,8 @@ use super::validation;
     responses(
         (status = 200, description = "Verification status or payment quote", body = TakeTicketResponse),
         (status = 400, description = "Invalid code hash, missing compiler metadata, missing or invalid User-Agent, or unsupported Blueprint version", body = crate::error::ErrorResponse),
-        (status = 403, description = "Code hash blocked or compiler disabled by server configuration", body = crate::error::ErrorResponse),
+        (status = 403, description = "Compiler disabled by server configuration", body = crate::error::ErrorResponse),
+        (status = 404, description = "Code hash blocked by server configuration", body = crate::error::ErrorResponse),
         (status = 502, description = "Verification registry failure", body = crate::error::ErrorResponse),
         (status = 503, description = "Verifier is read-only or payment history recovery is in progress", body = crate::error::ErrorResponse)
     ),

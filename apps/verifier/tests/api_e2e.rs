@@ -982,7 +982,7 @@ async fn openapi_json_documents_verifier_api() {
     }
     assert_eq!(
         response_statuses(take_ticket),
-        ["200", "400", "403", "502", "503"]
+        ["200", "400", "403", "404", "502", "503"]
     );
     assert_eq!(
         response_statuses(verify),
@@ -990,22 +990,19 @@ async fn openapi_json_documents_verifier_api() {
             "200", "400", "401", "402", "403", "404", "409", "413", "502", "503"
         ]
     );
-    assert_eq!(response_statuses(abi), ["200", "400", "403", "404", "502"]);
-    assert_eq!(
-        response_statuses(abi_head),
-        ["200", "400", "403", "404", "502"]
-    );
+    assert_eq!(response_statuses(abi), ["200", "400", "404", "502"]);
+    assert_eq!(response_statuses(abi_head), ["200", "400", "404", "502"]);
     assert_eq!(response_statuses(last_verified), ["200", "502"]);
     assert_eq!(response_statuses(last_verified_head), ["200", "502"]);
     assert!(abi["responses"]["200"]["headers"]["Last-Modified"].is_object());
     assert!(last_verified["responses"]["200"]["headers"]["Last-Modified"].is_object());
     assert_eq!(
         response_statuses(source),
-        ["200", "400", "403", "404", "409", "502"]
+        ["200", "400", "404", "409", "502"]
     );
     assert_eq!(
         response_statuses(verification_status),
-        ["200", "400", "403", "404", "409", "502"]
+        ["200", "400", "404", "409", "502"]
     );
 }
 
