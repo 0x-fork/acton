@@ -2,6 +2,8 @@
 
 Minimal Rust project scaffold for a TON faucet bot using teloxide.
 
+Логика будущего бота и вопросы для обсуждения описаны в [DESIGN.md](DESIGN.md).
+
 ```text
 faucet-bot/
 ├── .gitignore

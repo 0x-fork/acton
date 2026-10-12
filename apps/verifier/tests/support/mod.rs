@@ -26,9 +26,9 @@ use verifier::{
     state::AppState,
 };
 
-mod mock_blockchain;
-mod mock_compiler;
-mod mock_source_storage;
+pub mod mock_blockchain;
+pub mod mock_compiler;
+pub mod mock_source_storage;
 
 const MULTIPART_BOUNDARY: &str = "verifier-test-boundary";
 pub const TEST_USER_AGENT: &str = "verifier-tests/1.0";

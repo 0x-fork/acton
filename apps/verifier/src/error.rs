@@ -238,6 +238,9 @@ impl From<CompilerError> for ApiError {
 impl From<RegistryError> for ApiError {
     fn from(err: RegistryError) -> Self {
         match err {
+            RegistryError::CodeHashBlocked { ref code_hash } => {
+                Self::forbidden(err.to_string()).with_code_hash(code_hash)
+            }
             RegistryError::SourceStorage(err)
             | RegistryError::VerificationIndex(VerificationIndexError::SourceStorage(err)) => {
                 Self::from(err)

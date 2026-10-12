@@ -118,6 +118,7 @@ Example `/opt/ton-verifier/verifier.env`:
 VERIFIER_LOG_LEVEL=info
 VERIFIER_API_KEY=
 VERIFIER_READ_ONLY=false
+VERIFIER_BLOCKED_CODE_HASHES=
 VERIFIER_TONCENTER_MAINNET_BASE_URL=https://toncenter.com
 VERIFIER_TONCENTER_MAINNET_API_KEY=
 VERIFIER_TONCENTER_TESTNET_BASE_URL=https://testnet.toncenter.com
@@ -150,6 +151,14 @@ Set `VERIFIER_READ_ONLY=true` during maintenance to disable verification of new
 code hashes. `/api/v1/take_ticket` and `/api/v1/verify` return `503` for new
 contracts, while already verified contracts and all lookup endpoints remain
 available.
+
+Set `VERIFIER_BLOCKED_CODE_HASHES` to comma-separated hexadecimal or base64 code
+hashes to deny all API access and verification for those contracts. Direct
+requests return `403` with `code_hash_blocked`; blocked entries are omitted from
+listings, ABI responses, and statistics. This also applies to existing bundles,
+API keys, and legacy clients. Stored sources and payment history are retained.
+The default list is empty. Restart after changing the list; if using a mounted
+TOML config, set `blocked_code_hashes = ["<code_hash>"]` under `[server]`.
 
 `VERIFIER_UPLOAD_MAX_REQUEST_BYTES` is expressed in bytes, limits the complete
 multipart body, and defaults to 512 KiB. When nginx proxies the verifier,

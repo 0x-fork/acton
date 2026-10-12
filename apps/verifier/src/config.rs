@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use utoipa::ToSchema;
 
+use crate::code_hash_policy::{CodeHashPolicy, CodeHashPolicyError};
+
 const DEFAULT_CONFIG_PATH: &str = "config.toml";
 const CONFIG_PATH_ENV: &str = "VERIFIER_CONFIG";
 const DEFAULT_LOG_LEVEL: &str = "info";
@@ -33,6 +35,7 @@ pub struct Config {
     bind_addr: SocketAddr,
     api_key: Option<String>,
     read_only: bool,
+    code_hash_policy: CodeHashPolicy,
     logging_level: String,
     toncenter_mainnet_base_url: Option<String>,
     toncenter_mainnet_api_key: Option<String>,
@@ -65,7 +68,7 @@ impl Config {
     /// # Errors
     ///
     /// Returns an error if the config file cannot be read, parsed as TOML, or has an invalid
-    /// compiler limit.
+    /// compiler limit or blocked code hash.
     pub fn load() -> Result<Self, ConfigError> {
         let path = env::var_os(CONFIG_PATH_ENV)
             .map_or_else(|| PathBuf::from(DEFAULT_CONFIG_PATH), PathBuf::from);
@@ -78,7 +81,7 @@ impl Config {
     /// # Errors
     ///
     /// Returns an error if the config file cannot be read, parsed as TOML, or has an invalid
-    /// compiler limit.
+    /// compiler limit or blocked code hash.
     pub fn load_from_path(path: impl AsRef<Path>) -> Result<Self, ConfigError> {
         let path = path.as_ref();
         let raw_config = fs::read_to_string(path).map_err(|source| ConfigError::Read {
@@ -107,6 +110,11 @@ impl Config {
     #[must_use]
     pub const fn read_only(&self) -> bool {
         self.read_only
+    }
+
+    #[must_use]
+    pub const fn code_hash_policy(&self) -> &CodeHashPolicy {
+        &self.code_hash_policy
     }
 
     #[must_use]
@@ -240,6 +248,7 @@ impl Default for Config {
             bind_addr: default_bind_addr(),
             api_key: None,
             read_only: false,
+            code_hash_policy: CodeHashPolicy::default(),
             logging_level: DEFAULT_LOG_LEVEL.to_owned(),
             toncenter_mainnet_base_url: None,
             toncenter_mainnet_api_key: None,
@@ -295,6 +304,8 @@ impl fmt::Display for TonNetwork {
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
+    #[error(transparent)]
+    CodeHashPolicy(#[from] CodeHashPolicyError),
     #[error("failed to read config {path}: {source}")]
     Read { path: PathBuf, source: io::Error },
     #[error("failed to parse config {path}: {source}")]
@@ -346,6 +357,7 @@ impl ConfigFile {
             bind_addr: self.server.bind_addr.unwrap_or_else(default_bind_addr),
             api_key: self.server.api_key.filter(|api_key| !api_key.is_empty()),
             read_only: self.server.read_only.unwrap_or(false),
+            code_hash_policy: CodeHashPolicy::from_blocked(&self.server.blocked_code_hashes)?,
             logging_level: self
                 .logging
                 .level
@@ -419,6 +431,8 @@ struct ServerConfig {
     bind_addr: Option<SocketAddr>,
     api_key: Option<String>,
     read_only: Option<bool>,
+    #[serde(default)]
+    blocked_code_hashes: Vec<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]

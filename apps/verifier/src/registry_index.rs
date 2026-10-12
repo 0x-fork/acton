@@ -13,6 +13,7 @@ use thiserror::Error;
 
 use crate::{
     bundle_validation::{StoredBundleValidationError, validate_stored_bundle},
+    code_hash_policy::CodeHashPolicy,
     source_storage::{
         CompilerMetadata, SourceBundleManifest, SourceMapData, SourceStorage, SourceStorageError,
         StoredSourceBundle, StoredSourceFile,
@@ -24,6 +25,8 @@ const UNKNOWN_REVISION: &str = "unknown";
 
 #[async_trait]
 pub trait VerificationIndex: Send + Sync + 'static {
+    fn is_code_hash_blocked(&self, code_hash: &str) -> bool;
+
     async fn ensure_current(
         &self,
         source_storage: &dyn SourceStorage,
@@ -140,6 +143,7 @@ pub struct IndexedAbiContract {
 
 pub struct SqliteVerificationIndex {
     connection: Mutex<Connection>,
+    code_hash_policy: CodeHashPolicy,
 }
 
 impl SqliteVerificationIndex {
@@ -175,9 +179,45 @@ impl SqliteVerificationIndex {
 
     fn from_connection(connection: Connection) -> Result<Self, VerificationIndexError> {
         initialize_schema(&connection)?;
+        // Connection-local policy keeps the durable index intact across policy changes.
+        connection.execute_batch(
+            r"
+            create temp table blocked_code_hashes (code_hash text primary key);
+            create temp view visible_verified_bundles as
+              select * from verified_bundles
+              where code_hash not in (select code_hash from blocked_code_hashes);
+            ",
+        )?;
         Ok(Self {
             connection: Mutex::new(connection),
+            code_hash_policy: CodeHashPolicy::default(),
         })
+    }
+
+    /// Applies the code hash policy to public index reads without deleting stored bundles.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the connection-local blocklist cannot be populated.
+    pub fn with_code_hash_policy(
+        mut self,
+        policy: CodeHashPolicy,
+    ) -> Result<Self, VerificationIndexError> {
+        {
+            let mut connection = self.connection()?;
+            let transaction = connection.transaction()?;
+            transaction.execute("delete from blocked_code_hashes", [])?;
+            for code_hash in policy.blocked() {
+                transaction.execute(
+                    "insert into blocked_code_hashes (code_hash) values (?1)",
+                    params![code_hash],
+                )?;
+            }
+            transaction.commit()?;
+            drop(connection);
+        }
+        self.code_hash_policy = policy;
+        Ok(self)
     }
 
     fn connection(&self) -> Result<MutexGuard<'_, Connection>, VerificationIndexError> {
@@ -227,6 +267,10 @@ impl SqliteVerificationIndex {
 
 #[async_trait]
 impl VerificationIndex for SqliteVerificationIndex {
+    fn is_code_hash_blocked(&self, code_hash: &str) -> bool {
+        self.code_hash_policy.is_blocked(code_hash)
+    }
+
     async fn ensure_current(
         &self,
         source_storage: &dyn SourceStorage,
@@ -313,7 +357,7 @@ impl VerificationIndex for SqliteVerificationIndex {
         let verified = {
             let connection = self.connection()?;
             connection.query_row(
-                "select exists(select 1 from verified_bundles where code_hash = ?1)",
+                "select exists(select 1 from visible_verified_bundles where code_hash = ?1)",
                 params![code_hash],
                 |row| row.get::<_, bool>(0),
             )?
@@ -337,7 +381,7 @@ impl VerificationIndex for SqliteVerificationIndex {
                   compiler_json,
                   storage_revision,
                   source_map_json
-                from verified_bundles
+                from visible_verified_bundles
                 where code_hash = ?1
                 ",
                 params![code_hash],
@@ -371,7 +415,7 @@ impl VerificationIndex for SqliteVerificationIndex {
         let offset_i64 = usize_to_i64("offset", offset)?;
         let connection = self.connection()?;
         let (total, last_modified) = connection.query_row(
-            "select count(*), max(verified_at) from verified_bundles",
+            "select count(*), max(verified_at) from visible_verified_bundles",
             [],
             |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<i64>>(1)?)),
         )?;
@@ -400,7 +444,7 @@ impl VerificationIndex for SqliteVerificationIndex {
                 order by bundle_abis.path asc
                 limit 1
               ) as abi_json
-            from verified_bundles
+            from visible_verified_bundles as verified_bundles
             left join bundle_files
               on bundle_files.code_hash = verified_bundles.code_hash
             group by
@@ -442,9 +486,10 @@ impl VerificationIndex for SqliteVerificationIndex {
 
     async fn statistics(&self) -> Result<IndexedVerificationStatistics, VerificationIndexError> {
         let connection = self.connection()?;
-        let total = connection.query_row("select count(*) from verified_bundles", [], |row| {
-            row.get::<_, i64>(0)
-        })?;
+        let total =
+            connection.query_row("select count(*) from visible_verified_bundles", [], |row| {
+                row.get::<_, i64>(0)
+            })?;
         let total = i64_to_usize("total", total)?;
         let mut statement = connection.prepare(
             r"
@@ -452,7 +497,7 @@ impl VerificationIndex for SqliteVerificationIndex {
               json_extract(compiler_json, '$.language') as language,
               json_extract(compiler_json, '$.version') as version,
               count(*) as total
-            from verified_bundles
+            from visible_verified_bundles
             group by
               json_extract(compiler_json, '$.language'),
               json_extract(compiler_json, '$.version')
@@ -503,7 +548,7 @@ impl VerificationIndex for SqliteVerificationIndex {
               verified_at,
               json_extract(compiler_json, '$.language') as compiler,
               json_extract(compiler_json, '$.version') as version
-            from verified_bundles
+            from visible_verified_bundles
             order by verified_at asc, compiler asc, version asc, code_hash asc
             ",
         )?;
@@ -546,7 +591,7 @@ impl VerificationIndex for SqliteVerificationIndex {
                 bundle_abis.abi_json,
                 max(verified_bundles.verified_at) as verified_at
               from bundle_abis
-              join verified_bundles
+              join visible_verified_bundles as verified_bundles
                 on verified_bundles.code_hash = bundle_abis.code_hash
               where (?1 is null or bundle_abis.code_hash = ?1)
               group by bundle_abis.code_hash, bundle_abis.abi_json
@@ -565,7 +610,7 @@ impl VerificationIndex for SqliteVerificationIndex {
               bundle_abis.code_hash,
               bundle_abis.abi_json
             from bundle_abis
-            join verified_bundles
+            join visible_verified_bundles as verified_bundles
               on verified_bundles.code_hash = bundle_abis.code_hash
             where (?1 is null or bundle_abis.code_hash = ?1)
             group by bundle_abis.code_hash, bundle_abis.abi_json

@@ -11,6 +11,7 @@ use thiserror::Error;
 use tokio::sync::Mutex;
 
 use crate::{
+    blockchain::normalize_code_hash,
     bundle_validation::{StoredBundleValidationError, validate_stored_bundle},
     registry_index::{
         IndexedAbiContract, IndexedAbiContractsQuery, IndexedLanguageStatistics,
@@ -151,6 +152,15 @@ impl SourceVerificationRegistry {
         }
     }
 
+    fn ensure_code_hash_allowed(&self, code_hash: &str) -> Result<(), RegistryError> {
+        if self.verification_index.is_code_hash_blocked(code_hash) {
+            return Err(RegistryError::CodeHashBlocked {
+                code_hash: normalize_code_hash(code_hash.trim()),
+            });
+        }
+        Ok(())
+    }
+
     async fn refresh_index(&self) -> Result<(), RegistryError> {
         self.verification_index
             .ensure_current(self.source_storage.as_ref())
@@ -195,6 +205,7 @@ impl VerificationRegistry for SourceVerificationRegistry {
         &self,
         request: StoreSourceBundleRequest,
     ) -> Result<StoreVerifiedBundleReceipt, RegistryError> {
+        self.ensure_code_hash_allowed(&request.code_hash)?;
         // Keep the source write and index update in one serialized operation.
         let lock_started = Instant::now();
         let _guard = self.index_update_lock.lock().await;
@@ -234,6 +245,7 @@ impl VerificationRegistry for SourceVerificationRegistry {
         &self,
         request: VerificationStatusRequest,
     ) -> Result<VerificationStatusReceipt, RegistryError> {
+        self.ensure_code_hash_allowed(&request.code_hash)?;
         self.ensure_current().await?;
         let status = self.verification_index.status(&request.code_hash).await?;
 
@@ -246,6 +258,7 @@ impl VerificationRegistry for SourceVerificationRegistry {
         &self,
         request: VerifiedBundleRequest,
     ) -> Result<VerifiedBundleReceipt, RegistryError> {
+        self.ensure_code_hash_allowed(&request.code_hash)?;
         self.ensure_current().await?;
         Ok(VerifiedBundleReceipt {
             bundle: self.verification_index.bundle(&request.code_hash).await?,
@@ -292,6 +305,9 @@ impl VerificationRegistry for SourceVerificationRegistry {
         &self,
         request: AbiContractsRequest,
     ) -> Result<AbiContractsReceipt, RegistryError> {
+        if let Some(code_hash) = &request.code_hash {
+            self.ensure_code_hash_allowed(code_hash)?;
+        }
         self.ensure_current().await?;
         let page = self
             .verification_index
@@ -317,6 +333,8 @@ impl VerificationRegistry for SourceVerificationRegistry {
 
 #[derive(Debug, Error)]
 pub enum RegistryError {
+    #[error("code_hash_blocked: access to code_hash {code_hash} is disabled")]
+    CodeHashBlocked { code_hash: String },
     #[error(transparent)]
     SourceStorage(#[from] SourceStorageError),
     #[error(transparent)]

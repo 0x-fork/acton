@@ -71,6 +71,32 @@ fn variable(name: &'static str, value: impl Into<OsString>) -> (&'static str, Os
 }
 
 #[test]
+fn generates_blocked_code_hashes_from_environment() {
+    let code_hash = "a".repeat(64);
+    for value in [
+        None,
+        Some(String::new()),
+        Some(format!(" {},{code_hash}", code_hash.to_uppercase())),
+    ] {
+        let temp_dir = tempfile::tempdir().expect("config directory");
+        let environment = value
+            .as_ref()
+            .map(|value| variable("VERIFIER_BLOCKED_CODE_HASHES", value))
+            .into_iter()
+            .collect::<Vec<_>>();
+        let output = run_entrypoint(&temp_dir, &environment);
+        assert!(output.status.success(), "{output:?}");
+        let config = Config::load_from_path(temp_dir.path().join("config.toml"))
+            .expect("generated blocklist");
+        assert_eq!(
+            config.code_hash_policy().is_blocked(&code_hash),
+            value.is_some_and(|value| !value.is_empty())
+        );
+        assert!(!config.code_hash_policy().is_blocked(&"b".repeat(64)));
+    }
+}
+
+#[test]
 fn generates_disabled_compilers_from_environment() {
     for value in [
         None,

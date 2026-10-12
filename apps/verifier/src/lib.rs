@@ -1,6 +1,7 @@
 pub mod app;
 pub mod blockchain;
 mod client_compatibility;
+pub mod code_hash_policy;
 mod compilation_queue;
 pub mod compiler_policy;
 pub mod compilers;

@@ -65,6 +65,17 @@ example sets the minimum payment to `0.5 GRAM`.
 Set `VERIFIER_READ_ONLY=true` to reject tickets and submissions for new code
 hashes while keeping verified source and metadata lookups available.
 
+Set `VERIFIER_BLOCKED_CODE_HASHES` to a comma-separated list of code hashes to
+deny all API access and verification for those contracts. Hexadecimal hashes
+(case-insensitive) and base64 hashes are accepted; invalid entries prevent startup.
+Direct status, source, ABI, ticket, and verification requests return `403` with
+`code_hash_blocked`, including for existing bundles, API keys, and legacy clients.
+Blocked contracts are omitted from listings and statistics, with pagination,
+totals, and `Last-Modified` calculated from the remaining contracts.
+Stored sources and payment history are retained. Restart the service to apply
+changes. This environment variable is used when generating the config; for a
+mounted config, set `server.blocked_code_hashes` directly.
+
 Set `VERIFIER_COMPILER_DISABLED` to a comma-separated list of compiler rules:
 
 ```bash
