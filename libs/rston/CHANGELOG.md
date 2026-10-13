@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Breaking changes
+
+- `BlockSignatures` is now an enum with `Ordinary` and `Simplex` variants.
+  Construct ordinary signatures with `OrdinaryBlockSignatures` and access fields
+  by matching the variant.
+
+### Added
+
+- Read and write Simplex block signatures (`#12`) in block proofs, retaining the
+  original candidate cell chain. Ordinary signatures (`#11`) and the outer
+  `BlockProof` format (`#c3`) keep their existing binary representation.
+
 ## [0.4.0]
 
 ### Breaking changes

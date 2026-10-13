@@ -10,7 +10,6 @@ fn serialize_any<T: Store>(data: T) -> Cell {
 fn check_block(boc: &[u8], expected_shards: Option<Vec<ShardIdent>>) -> Cell {
     let boc = Boc::decode(boc).unwrap();
     let block = boc.parse::<Block>().unwrap();
-    println!("block: {block:#?}");
 
     let info = block.load_info().unwrap();
 
@@ -26,23 +25,17 @@ fn check_block(boc: &[u8], expected_shards: Option<Vec<ShardIdent>>) -> Cell {
         assert_eq!(serialize_any(info), parsed_boc);
     }
 
-    println!("info: {info:#?}");
-    let prev_ref = info.load_prev_ref().unwrap();
-    println!("prev_ref: {prev_ref:#?}");
+    info.load_prev_ref().unwrap();
     assert_eq!(serialize_any(info), block.info);
 
     let value_flow = block.load_value_flow().unwrap();
-    println!("value_flow: {value_flow:#?}");
     assert_eq!(serialize_any(value_flow), block.value_flow);
 
     let state_update = block.load_state_update().unwrap();
-    println!("state_update: {state_update:#?}");
     assert_eq!(serialize_any(state_update), block.state_update);
 
     let extra = block.load_extra().unwrap();
-    println!("extra: {extra:#?}");
     let account_blocks = extra.account_blocks.load().unwrap();
-    println!("account_blocks: {account_blocks:#?}");
 
     for entry in account_blocks.iter() {
         let (account, _, account_block) = entry.unwrap();
@@ -59,34 +52,22 @@ fn check_block(boc: &[u8], expected_shards: Option<Vec<ShardIdent>>) -> Cell {
     let custom = extra.load_custom().unwrap();
     assert_eq!(expected_shards.is_some(), custom.is_some());
     if let Some(custom) = &custom {
-        println!("custom: {custom:#?}");
-
         let expected_shards = expected_shards.unwrap();
 
         let shards = custom.shards.get_workchain_shards(0).unwrap().unwrap();
         let mut shard_ids = Vec::new();
         for entry in shards.raw_iter() {
             let (shard, _value) = entry.unwrap();
-            println!("shard: {shard:?}");
             shard_ids.push(shard);
         }
         assert_eq!(expected_shards, shard_ids);
 
-        for entry in custom.shards.iter() {
-            let (shard, value) = entry.unwrap();
-            println!("shard {shard:?}: {value:#?}");
-        }
-        println!(
-            "origin encoded {}",
-            BocRepr::encode_base64(&custom.shards).unwrap()
-        );
         let shards = custom
             .shards
             .iter()
             .map(|x| x.unwrap())
             .collect::<HashMap<_, _>>();
         let encoded = ShardHashes::from_shards(&shards).unwrap();
-        println!("encoded {}", BocRepr::encode_base64(&encoded).unwrap());
 
         let parsed = encoded.iter().collect::<Result<Vec<_>, _>>().unwrap();
         for (a, b) in shard_ids.iter().zip(parsed.iter()) {
@@ -94,8 +75,7 @@ fn check_block(boc: &[u8], expected_shards: Option<Vec<ShardIdent>>) -> Cell {
         }
 
         for item in custom.shards.latest_blocks() {
-            let block_id = item.unwrap();
-            println!("block_id: {block_id}");
+            item.unwrap();
         }
 
         assert_eq!(serialize_any(custom), extra.custom.as_ref().unwrap())
@@ -157,7 +137,6 @@ fn parse_block_id() {
     };
 
     let s = block_id.to_string();
-    println!("S: {s}");
     assert_eq!(s.parse::<BlockId>().unwrap(), block_id);
 }
 
@@ -343,3 +322,5 @@ fn proof_for_shardchain_block() {
 
     assert_eq!(serialize_any(proof).as_ref(), boc.as_ref());
 }
+
+mod block_proof;
