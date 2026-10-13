@@ -12,6 +12,8 @@ services:
       - --observability-bind
       - 0.0.0.0
       __LOCALTON_IMPORTED_ACCOUNTS__
+    environment:
+      LOCALTON_HOST_LITESERVER_PORT: "__LOCALTON_LITESERVER_PORT__"
     stop_grace_period: 60s
     restart: unless-stopped
     ports:
@@ -19,6 +21,7 @@ services:
       - "127.0.0.1:__LOCALTON_ADMIN_PORT__:18001"
       - "127.0.0.1:__LOCALTON_V2_PORT__:18002"
       - "127.0.0.1:__LOCALTON_OBSERVABILITY_PORT__:18007"
+      - "127.0.0.1:__LOCALTON_LITESERVER_PORT__:18004"
     volumes:
       - localton-state:/var/lib/localton
       - localton-snapshots:/var/lib/localton-snapshots

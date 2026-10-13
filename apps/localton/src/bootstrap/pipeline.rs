@@ -6,9 +6,9 @@
 //! supervise everything until shutdown. Technical details live in sibling
 //! modules and do not obscure this sequence.
 
-use std::{net::SocketAddrV4, time::Duration};
+use std::{net::SocketAddrV4, num::NonZeroU16, time::Duration};
 
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use tracing::info;
 
 use crate::{
@@ -263,6 +263,17 @@ fn prepare_settings(layout: &Layout, args: &BootstrapArgs) -> Result<Settings> {
     }
     settings.validate()?;
     settings.save_atomic(&layout.settings)?;
+
+    settings.services.host_liteserver_port = std::env::var_os("LOCALTON_HOST_LITESERVER_PORT")
+        .map(|value| {
+            value
+                .to_str()
+                .context("LOCALTON_HOST_LITESERVER_PORT must be valid UTF-8")?
+                .parse::<NonZeroU16>()
+                .context("LOCALTON_HOST_LITESERVER_PORT must be a TCP port from 1 to 65535")
+                .map(NonZeroU16::get)
+        })
+        .transpose()?;
 
     // These CLI values affect only this bootstrap invocation and are not persisted.
     if let Some(bind) = args.config_http_bind {

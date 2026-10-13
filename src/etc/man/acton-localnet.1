@@ -130,8 +130,9 @@ after readiness checks finish. Use \fBstop\fR to shut them down later.
 .sp
 \fB\-\-port\-base\fR \fIport\fR
 .RS 4
-First of five consecutive host ports for Config, Admin, API v2, API v3,
-and the observability dashboard, in that order.
+First of six consecutive host ports for Config, Admin, API v2, API v3,
+the observability dashboard, and LiteServer, in that order.
+Available since trunk.
 .sp
 Acton automatically selects an available range starting at 19000 when omitted.
 Saved networks reserve their assigned ports even while stopped.
@@ -428,6 +429,17 @@ submission.
 \h'-04'\(bu\h'+03'Dashboard: \fBhttp://127.0.0.1:19004\fR for node health, synchronization, and elections.
 .RE
 .sp
+.RS 4
+\h'-04'\(bu\h'+03'LiteServer: \fBtcp://127.0.0.1:19005\fR for direct authenticated queries.
+.RE
+.sp
+Available since trunk.
+.sp
+Download \fB<config endpoint>/localhost.global.config.json\fR to connect a LiteServer
+client from the host. This file contains the host port and server public key.
+No proxy container or manual port changes are necessary.
+Available since trunk.
+.sp
 The ports bind to loopback. Use a local Docker engine so Acton can reach
 these endpoints. Port assignments belong to the saved network, so use its
 reported URLs when several networks exist.
@@ -515,7 +527,7 @@ After fixing Docker or the connection, retry \fBstart\fR with the existing name.
 Keep its creation options out of the restart command.
 .SS "A port range is unavailable"
 Another process or saved network already uses the requested range. Choose
-five free consecutive ports with \fB\-\-port\-base\fR when creating a new network.
+six free consecutive ports with \fB\-\-port\-base\fR when creating a new network.
 For an existing network, stop the conflicting process before restarting it.
 .SS "Genesis options are rejected"
 The name identifies an existing network. Run \fBstart <name>\fR to resume it,

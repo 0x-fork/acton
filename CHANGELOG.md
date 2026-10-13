@@ -11,6 +11,11 @@ All notable changes to this project will be documented in this file.
   offline, picks the most recently modified backup, and is a no-op once the
   restored version is current.
 
+### Localnet
+
+- Publish each network's LiteServer port on loopback and include the assigned
+  host port in the local global config. New networks reserve six host ports.
+
 ## [1.2.1] - 05.10.2026
 
 ### Breaking changes

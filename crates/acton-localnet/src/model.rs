@@ -35,7 +35,7 @@ pub struct StartupWallet {
 }
 
 /// Optional host bindings for applications with independently configured endpoints.
-/// Unspecified ports use the CLI's five-port range; reservations include stopped networks.
+/// Unspecified ports use the CLI's six-port range; reservations include stopped networks.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PortOptions {
@@ -44,6 +44,8 @@ pub struct PortOptions {
     pub api_v2: Option<u16>,
     pub api_v3: Option<u16>,
     pub observability: Option<u16>,
+    /// Host TCP binding for direct `LiteServer` clients
+    pub liteserver: Option<u16>,
 }
 
 /// Concrete endpoint bindings owned by one network, independent of its caller.
@@ -55,18 +57,21 @@ pub struct NetworkPorts {
     pub api_v2: u16,
     pub api_v3: u16,
     pub observability: u16,
+    /// Host TCP port forwarded to the genesis node's authenticated `LiteServer`.
+    pub liteserver: u16,
 }
 
 impl NetworkPorts {
     /// Enumerates bindings for reservation checks, including networks currently stopped.
     #[must_use]
-    pub const fn all(self) -> [u16; 5] {
+    pub const fn all(self) -> [u16; 6] {
         [
             self.config,
             self.admin,
             self.api_v2,
             self.api_v3,
             self.observability,
+            self.liteserver,
         ]
     }
 }
@@ -95,6 +100,7 @@ pub struct Endpoints {
     pub admin: String,
     pub config: String,
     pub observability: String,
+    pub liteserver: String,
 }
 
 impl NetworkConfig {
@@ -107,6 +113,7 @@ impl NetworkConfig {
             api_v2: self.port_base + 2,
             api_v3: self.port_base + 3,
             observability: self.port_base + 4,
+            liteserver: self.port_base + 5,
         })
     }
 
@@ -118,6 +125,7 @@ impl NetworkConfig {
             api_v2: format!("http://127.0.0.1:{}/api/v2", ports.api_v2),
             api_v3: format!("http://127.0.0.1:{}/api/v3", ports.api_v3),
             observability: format!("http://127.0.0.1:{}", ports.observability),
+            liteserver: format!("tcp://127.0.0.1:{}", ports.liteserver),
         }
     }
 }

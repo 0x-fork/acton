@@ -456,3 +456,122 @@ async fn faucet_submission_returns_confirmed_internal_message_hash() {
     assert!(transaction_attempts.load(Ordering::SeqCst) >= 2);
     backend_task.abort();
 }
+
+#[tokio::test]
+async fn global_config_routes_distinguish_host_and_internal_liteserver_ports() {
+    use crate::{
+        binaries::TonBinaries,
+        storage::Layout,
+        ton::{
+            global_config::GlobalConfig,
+            toolchain::Toolchain,
+            tools::types::{TonBlockHash, TonPublicKey, ZeroStateId},
+        },
+    };
+
+    let directory = tempfile::tempdir_in("/tmp").unwrap();
+    let layout = Layout::new(directory.path().to_path_buf());
+    layout.create_dirs().unwrap();
+    let advertised = GlobalConfig::local(
+        ZeroStateId::new(
+            TonBlockHash::from_bytes([1; 32]),
+            TonBlockHash::from_bytes([2; 32]),
+        ),
+        Vec::new(),
+        Ipv4Addr::new(10, 0, 0, 2),
+        18004,
+        TonPublicKey::from_bytes([3; 32]),
+    );
+    advertised.save_atomic(&layout.global_config).unwrap();
+    let internal = advertised
+        .clone()
+        .with_local_liteserver(18004, TonPublicKey::from_bytes([3; 32]));
+    internal.save_atomic(&layout.node.global_config).unwrap();
+    let internal_bytes = std::fs::read(&layout.node.global_config).unwrap();
+    let advertised_json = serde_json::to_value(&advertised).unwrap();
+    let internal_json = serde_json::to_value(&internal).unwrap();
+    let toolchain = Toolchain::official(
+        layout.clone(),
+        TonBinaries {
+            root: directory.path().join("ton"),
+        },
+    );
+    let client = reqwest::Client::new();
+    let mut samples = Vec::new();
+
+    for host_port in [None, Some(19005), Some(23456)] {
+        let mut settings = Settings::default();
+        let listener = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        settings.services.config_http.port = listener.local_addr().unwrap().port();
+        settings.services.host_liteserver_port = host_port;
+        drop(listener);
+        let (shutdown, receiver) = tokio::sync::watch::channel(false);
+        let service = config::start(layout.clone(), toolchain.clone(), settings, receiver)
+            .await
+            .unwrap();
+        let local: Value = client
+            .get(format!("{}/localhost.global.config.json", service.endpoint))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        let remote: Value = client
+            .get(format!("{}/config", service.endpoint))
+            .send()
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        shutdown.send(true).unwrap();
+        service.task.await.unwrap();
+        samples.push(json!({
+            "hostPort": host_port,
+            "localPort": local["liteservers"][0]["port"],
+            "loopback": local["liteservers"][0]["ip"] == 2130706433_i32,
+            "sameKey": local["liteservers"][0]["id"] == internal_json["liteservers"][0]["id"],
+            "sameNetwork": local["validator"] == internal_json["validator"]
+                && local["dht"] == internal_json["dht"],
+            "advertisedUnchanged": remote == advertised_json,
+            "internalUnchanged": std::fs::read(&layout.node.global_config).unwrap() == internal_bytes,
+        }));
+    }
+
+    expect![[r#"
+        [
+          {
+            "advertisedUnchanged": true,
+            "hostPort": null,
+            "internalUnchanged": true,
+            "localPort": 18004,
+            "loopback": true,
+            "sameKey": true,
+            "sameNetwork": true
+          },
+          {
+            "advertisedUnchanged": true,
+            "hostPort": 19005,
+            "internalUnchanged": true,
+            "localPort": 19005,
+            "loopback": true,
+            "sameKey": true,
+            "sameNetwork": true
+          },
+          {
+            "advertisedUnchanged": true,
+            "hostPort": 23456,
+            "internalUnchanged": true,
+            "localPort": 23456,
+            "loopback": true,
+            "sameKey": true,
+            "sameNetwork": true
+          }
+        ]"#]]
+    .assert_eq(&serde_json::to_string_pretty(&samples).unwrap());
+}

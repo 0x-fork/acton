@@ -31,7 +31,7 @@ async fn concurrent_creation_reserves_distinct_ports() {
             .config
             .port_base
             .abs_diff(second.network.config.port_base)
-            >= 5,
+            >= 6,
         catalog::list(root.path()).await.expect("catalog").len(),
     ));
 }
@@ -80,7 +80,7 @@ async fn explicit_endpoint_ports_do_not_collide_with_automatic_defaults() {
     let mut unique = ports.all().to_vec();
     unique.sort_unstable();
     unique.dedup();
-    expect![["true:5:true"]].assert_eq(&format!(
+    expect![["true:6:true"]].assert_eq(&format!(
         "{}:{}:{}",
         ports.admin == admin,
         unique.len(),
@@ -149,8 +149,8 @@ async fn definitions_validate_genesis_and_reserve_names_and_ports() {
         Network demo already exists
         Block time must be greater than zero
         Election time must be at least 4 seconds
-        The requested five-port range is unavailable
-        The requested five-port range is unavailable
+        The requested six-port range is unavailable
+        The requested six-port range is unavailable
         Imported ShardAccount BoCs must be nonempty hexadecimal strings
     "]]
     .assert_eq(&format!("{}\n", errors.join("\n")));
@@ -288,4 +288,61 @@ async fn readable_directories_preserve_identity_and_move_only_selected_history()
     expect![["preserved log"]].assert_eq(
         &std::fs::read_to_string(again.path.join("startup.log")).expect("preserved log"),
     );
+}
+
+#[tokio::test]
+async fn liteserver_ports_are_persisted_and_reserved_while_stopped() {
+    let root = tempfile::tempdir_in("/tmp").expect("catalog directory");
+    let first = catalog::create(
+        root.path(),
+        CreateNetwork {
+            name: "first".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("first network");
+    let port = first.network.config.ports().liteserver;
+    let conflict = catalog::create(
+        root.path(),
+        CreateNetwork {
+            name: "conflicting LiteServer".into(),
+            ports: acton_localnet::PortOptions {
+                liteserver: Some(port),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    )
+    .await
+    .err()
+    .expect("stopped network reserves its LiteServer");
+    let loaded = catalog::list(root.path()).await.expect("reopened catalog");
+    let saved = &loaded[0].network;
+    let occupied = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+        .expect("occupied host port");
+    let occupied_port = occupied.local_addr().unwrap().port();
+    let unavailable = catalog::create(
+        root.path(),
+        CreateNetwork {
+            name: "occupied LiteServer".into(),
+            ports: acton_localnet::PortOptions {
+                liteserver: Some(occupied_port),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    )
+    .await
+    .err()
+    .expect("occupied LiteServer port is rejected");
+    expect![["Stopped:true:true:true:true"]].assert_eq(&format!(
+        "{:?}:{}:{}:{}:{}",
+        saved.status,
+        saved.config.ports().liteserver == port,
+        saved.endpoints.liteserver == format!("tcp://127.0.0.1:{port}"),
+        conflict.to_string() == format!("Port {port} is unavailable or used by another endpoint"),
+        unavailable.to_string()
+            == format!("Port {occupied_port} is unavailable or used by another endpoint"),
+    ));
 }

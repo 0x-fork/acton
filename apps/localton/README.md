@@ -644,10 +644,16 @@ The configuration API on port `18000` provides these routes:
 
 - `GET /openapi.json` returns its generated OpenAPI document.
 - `GET /` returns the network manifest and service endpoints.
-- `GET /localhost.global.config.json` returns the global configuration.
-- `GET /config` returns the same global configuration.
+- `GET /localhost.global.config.json` returns the global configuration for host clients.
+- `GET /config` returns the global configuration advertised to joining nodes.
 - `POST /faucet` sends one development grant to a node-owned wallet.
 - `GET /livez` and `GET /healthz` return liveness data.
+
+If Docker forwards LiteServer TCP port `18004` to another host port, set
+`LOCALTON_HOST_LITESERVER_PORT` to that host port. The local config response uses
+that port and loopback address. Internal node configuration and `/config` retain
+their original endpoints. The environment variable applies to one run.
+Acton allocates the host port and sets this variable automatically.
 
 The administrative API on port `18001` provides these routes:
 

@@ -118,7 +118,7 @@ pub struct CreateOptions {
 
     #[arg(
         long,
-        help = "First of five consecutive host ports for Config, Admin, V2, V3, and observability"
+        help = "First of six consecutive host ports for Config, Admin, V2, V3, observability, and LiteServer"
     )]
     pub port_base: Option<u16>,
 

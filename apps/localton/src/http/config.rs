@@ -238,7 +238,8 @@ pub(super) fn root_document(settings: &Settings, runtime: &RuntimeState) -> Conf
 
 /// Get the TON global config for local clients
 ///
-/// The response contains the liteserver and DHT entries for this network
+/// The response uses the host port when TCP forwarding is configured.
+/// Internal clients and joining nodes use their own unchanged global config.
 #[utoipa::path(
     get,
     path = "/localhost.global.config.json",
@@ -251,7 +252,15 @@ pub(super) fn root_document(settings: &Settings, runtime: &RuntimeState) -> Conf
 async fn localhost_global_config_handler(
     State(state): State<ConfigState>,
 ) -> Result<Json<GlobalConfig>, HttpError> {
-    read_global_config(&state.layout.node.global_config).await
+    let Json(mut config) = read_global_config(&state.layout.node.global_config).await?;
+    if let Some(port) = state.settings.services.host_liteserver_port {
+        let (_, _, key) = config
+            .liteserver_endpoints()
+            .next()
+            .context("local global config has no liteserver")?;
+        config = config.with_local_liteserver(port, key);
+    }
+    Ok(Json(config))
 }
 
 /// Get the TON global config

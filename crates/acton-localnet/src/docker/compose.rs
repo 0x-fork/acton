@@ -21,6 +21,10 @@ pub(super) fn render_compose(image: &str, config: &NetworkConfig, nodes: &[Node]
         .replace("__LOCALTON_ADMIN_PORT__", &ports.admin.to_string())
         .replace("__LOCALTON_CONFIG_PORT__", &ports.config.to_string())
         .replace(
+            "__LOCALTON_LITESERVER_PORT__",
+            &ports.liteserver.to_string(),
+        )
+        .replace(
             "__LOCALTON_OBSERVABILITY_PORT__",
             &ports.observability.to_string(),
         )
@@ -134,5 +138,56 @@ mod tests {
             - --add-account
             - "ccdd""#]]
         .assert_eq(&accounts);
+    }
+
+    #[test]
+    fn publishes_liteserver_with_matching_host_config_port() {
+        let mut config = NetworkConfig {
+            port_base: 19000,
+            ports: None,
+            block_time_ms: None,
+            election_time_seconds: None,
+            imported_account_bocs: Vec::new(),
+            startup_wallets: Vec::new(),
+        };
+        let mut samples = Vec::new();
+        for custom_port in [None, Some(23456)] {
+            let mut ports = config.ports();
+            if let Some(port) = custom_port {
+                ports.liteserver = port;
+            }
+            config.ports = Some(ports);
+            let saved = serde_json::to_string(&config).unwrap();
+            let restored = serde_json::from_str(&saved).unwrap();
+            let compose = render_compose("localton", &restored, &[]);
+            samples.push(
+                compose
+                    .lines()
+                    .filter(|line| {
+                        line.contains("LOCALTON_HOST_LITESERVER_PORT:")
+                            || line.trim_start().starts_with("- \"127.0.0.1:")
+                    })
+                    .map(str::trim)
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            );
+        }
+        expect_test::expect![[r#"
+            LOCALTON_HOST_LITESERVER_PORT: "19005"
+            - "127.0.0.1:19000:18000"
+            - "127.0.0.1:19001:18001"
+            - "127.0.0.1:19002:18002"
+            - "127.0.0.1:19004:18007"
+            - "127.0.0.1:19005:18004"
+            - "127.0.0.1:19003:18003"
+
+            LOCALTON_HOST_LITESERVER_PORT: "23456"
+            - "127.0.0.1:19000:18000"
+            - "127.0.0.1:19001:18001"
+            - "127.0.0.1:19002:18002"
+            - "127.0.0.1:19004:18007"
+            - "127.0.0.1:23456:18004"
+            - "127.0.0.1:19003:18003""#]]
+        .assert_eq(&samples.join("\n\n"));
     }
 }

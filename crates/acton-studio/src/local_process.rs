@@ -1236,6 +1236,7 @@ async fn resolve_request(
                     api_v2: api_v2_port,
                     api_v3: api_v3_port,
                     observability: observability_port,
+                    liteserver: None,
                 },
                 reserved_ports: reserved_ports.to_vec(),
                 ..Default::default()

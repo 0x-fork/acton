@@ -502,6 +502,11 @@ impl NodeSettings {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(default)]
 pub struct ServiceSettings {
+    /// Runtime-only host port for local global config responses behind TCP forwarding.
+    /// Internal clients continue to use the node listener port.
+    #[serde(skip)]
+    #[schema(ignore)]
+    pub host_liteserver_port: Option<u16>,
     /// Config API settings
     pub config_http: HttpServiceSettings,
     /// Admin API settings
@@ -515,6 +520,7 @@ pub struct ServiceSettings {
 impl Default for ServiceSettings {
     fn default() -> Self {
         Self {
+            host_liteserver_port: None,
             config_http: HttpServiceSettings {
                 enabled: true,
                 bind: Ipv4Addr::LOCALHOST,

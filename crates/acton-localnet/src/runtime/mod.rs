@@ -65,7 +65,7 @@ impl Runtime {
         let path = root.join("network.json");
         let mut record: Network = storage::read_json(&path).await?;
         storage::validate_id(&record.id)?;
-        if record.config.port_base == 0 || record.config.port_base > 65531 {
+        if record.config.port_base == 0 || record.config.port_base > 65530 {
             return Err(Error::invalid("Invalid persisted port range"));
         }
 

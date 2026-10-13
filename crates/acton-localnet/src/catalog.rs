@@ -163,6 +163,7 @@ pub async fn create(root: &Path, request: CreateNetwork) -> Result<NetworkDirect
         request.ports.api_v2,
         request.ports.api_v3,
         request.ports.observability,
+        request.ports.liteserver,
     ];
     let available_port = |port: u16| {
         port > 0
@@ -186,8 +187,8 @@ pub async fn create(root: &Path, request: CreateNetwork) -> Result<NetworkDirect
     // in the first default range, so that range must be skipped, not rejected.
     let available = |base: u16| {
         base > 0
-            && base <= 65531
-            && (base..=base + 4)
+            && base <= 65530
+            && (base..=base + 5)
                 .zip(requested)
                 .all(|(port, explicit_port)| {
                     explicit_port.is_some() || (!explicit.contains(&port) && available_port(port))
@@ -198,11 +199,11 @@ pub async fn create(root: &Path, request: CreateNetwork) -> Result<NetworkDirect
         Some(base) if available(base) => base,
         Some(_) => {
             return Err(Error::invalid(
-                "The requested five-port range is unavailable",
+                "The requested six-port range is unavailable",
             ));
         }
-        None => (19000..=65531)
-            .step_by(5)
+        None => (19000..=65530)
+            .step_by(6)
             .find(|base| available(*base))
             .ok_or_else(|| Error::invalid("No port range is available"))?,
     };
@@ -213,6 +214,7 @@ pub async fn create(root: &Path, request: CreateNetwork) -> Result<NetworkDirect
         port_base + 2,
         port_base + 3,
         port_base + 4,
+        port_base + 5,
     ];
     let selected: Vec<_> = requested
         .into_iter()
@@ -225,6 +227,7 @@ pub async fn create(root: &Path, request: CreateNetwork) -> Result<NetworkDirect
         api_v2: selected[2],
         api_v3: selected[3],
         observability: selected[4],
+        liteserver: selected[5],
     };
 
     let config = NetworkConfig {

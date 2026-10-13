@@ -7,7 +7,7 @@ use anyhow::Result;
 use serde_json::{Value, json};
 
 #[tokio::test]
-#[ignore = "requires Docker, ACTON_LOCALNET_IMAGE built from this checkout, and free ports 29550-29554"]
+#[ignore = "requires Docker, ACTON_LOCALNET_IMAGE built from this checkout, and free ports 29550-29555"]
 async fn joined_node_serves_same_chain() -> Result<()> {
     let directory = tempfile::tempdir_in("/tmp")?;
     let location = catalog::create(

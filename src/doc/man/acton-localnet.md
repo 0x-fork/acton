@@ -135,8 +135,9 @@ after readiness checks finish. Use `stop` to shut them down later.
 {{/option}}
 
 {{#option "`--port-base` _port_" }}
-First of five consecutive host ports for Config, Admin, API v2, API v3,
-and the observability dashboard, in that order.
+First of six consecutive host ports for Config, Admin, API v2, API v3,
+the observability dashboard, and LiteServer, in that order.
+Available since trunk.
 
 Acton automatically selects an available range starting at 19000 when omitted.
 Saved networks reserve their assigned ports even while stopped.
@@ -422,6 +423,14 @@ Acton assigns these endpoints:
   submission.
 - API v3: `http://127.0.0.1:19003/api/v3` for indexed transactions and account data.
 - Dashboard: `http://127.0.0.1:19004` for node health, synchronization, and elections.
+- LiteServer: `tcp://127.0.0.1:19005` for direct authenticated queries.
+
+Available since trunk.
+
+Download `<config endpoint>/localhost.global.config.json` to connect a LiteServer
+client from the host. This file contains the host port and server public key.
+No proxy container or manual port changes are necessary.
+Available since trunk.
 
 The ports bind to loopback. Use a local Docker engine so Acton can reach
 these endpoints. Port assignments belong to the saved network, so use its
@@ -509,7 +518,7 @@ Keep its creation options out of the restart command.
 ### A port range is unavailable
 
 Another process or saved network already uses the requested range. Choose
-five free consecutive ports with `--port-base` when creating a new network.
+six free consecutive ports with `--port-base` when creating a new network.
 For an existing network, stop the conflicting process before restarting it.
 
 ### Genesis options are rejected
