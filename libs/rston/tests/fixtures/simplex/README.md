@@ -1,6 +1,6 @@
 # Simplex signature fixture
 
-`mc_simplex_signatures.boc` contains the `block_signatures_simplex#12` signature
+`mainnet-signatures.boc` contains the `block_signatures_simplex#12` signature
 set for mainnet masterchain block 98841714. It is a signature cell, not a complete
 block proof.
 
@@ -20,3 +20,13 @@ verified with `ton.CheckBlockSignaturesSimplex` before encoding.
 The original boxed TL candidate is 160 bytes. Its snake contains 127 bytes in
 the first cell and 33 bytes in the second cell, without a comment prefix.
 The Rust tests retain both cells and round-trip the signature dictionary.
+
+`mainnet-validator-set.boc` and `mainnet-catchain-config.boc` retain the
+original configuration cells from parameters 34 and 28 at that block.
+Verification tests select the masterchain validator subset from these cells.
+
+`candidates.json` contains candidate and signing-payload vectors encoded
+with tonutils-go v1.17.2. They cover ordinary candidates with and without a parent,
+and empty candidates whose parent identifier is bare TL.
+The vectors use block 42, root hash bytes `0x41`, file hash bytes `0x42`,
+session bytes `0x51`, and slot 77.

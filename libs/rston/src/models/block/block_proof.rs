@@ -4,6 +4,8 @@ use crate::dict::Dict;
 use crate::error::Error;
 use crate::models::shard::ValidatorBaseInfo;
 
+mod simplex;
+
 /// Typed block proof.
 #[derive(Clone, Debug)]
 pub struct BlockProof {
@@ -127,6 +129,8 @@ pub struct OrdinaryBlockSignatures {
 ///
 /// The candidate is retained as an opaque cell chain. Loading does not parse its
 /// TL payload, bind it to a block, or authenticate the signatures and their weight.
+/// Use [`Self::check_signatures`] with an independently trusted validator subset
+/// to verify the finalization signatures.
 #[derive(Debug, Clone, Store, Load)]
 #[tlb(tag = "#12")]
 pub struct SimplexBlockSignatures {

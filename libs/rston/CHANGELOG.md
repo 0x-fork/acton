@@ -10,6 +10,10 @@
 
 ### Added
 
+- Verify Simplex finalization signatures against an expected block and trusted
+  validator subset, including candidate binding, signature count and weight,
+  validator metadata, and a quorum strictly greater than two thirds.
+  `SimplexBlockSignatures::build_data_for_sign()` constructs the signed TL payload.
 - Read and write Simplex block signatures (`#12`) in block proofs, retaining the
   original candidate cell chain. Ordinary signatures (`#11`) and the outer
   `BlockProof` format (`#c3`) keep their existing binary representation.

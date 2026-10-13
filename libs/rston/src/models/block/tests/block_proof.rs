@@ -5,9 +5,12 @@ use super::*;
 use crate::dict::Dict;
 use crate::models::shard::ValidatorBaseInfo;
 
+const SIMPLEX_SIGNATURES: &[u8] =
+    include_bytes!("../../../../tests/fixtures/simplex/mainnet-signatures.boc");
+
 #[test]
 fn simplex_signatures_fixture() {
-    let cell = Boc::decode(include_bytes!("mc_simplex_signatures.boc")).unwrap();
+    let cell = Boc::decode(SIMPLEX_SIGNATURES).unwrap();
     let mut slice = cell.as_slice().unwrap();
     let BlockSignatures::Simplex(mut signatures) = BlockSignatures::load_from(&mut slice).unwrap()
     else {
@@ -97,7 +100,7 @@ fn ordinary_signatures_fixture() {
 
 #[test]
 fn simplex_block_proof_roundtrip() {
-    let signatures_cell = Boc::decode(include_bytes!("mc_simplex_signatures.boc")).unwrap();
+    let signatures_cell = Boc::decode(SIMPLEX_SIGNATURES).unwrap();
     let proof = BlockProof {
         proof_for: BlockId {
             shard: ShardIdent::MASTERCHAIN,
@@ -185,7 +188,7 @@ fn signature_tags_and_truncated_data() {
         ));
     }
 
-    let cell = Boc::decode(include_bytes!("mc_simplex_signatures.boc")).unwrap();
+    let cell = Boc::decode(SIMPLEX_SIGNATURES).unwrap();
     for references in 0..2 {
         let mut slice = cell.as_slice().unwrap();
         slice.only_first(cell.bit_len(), references).unwrap();
@@ -212,7 +215,7 @@ fn signatures_inside_a_slice() {
             .unwrap()
             .reference_cloned(1)
             .unwrap(),
-        Boc::decode(include_bytes!("mc_simplex_signatures.boc")).unwrap(),
+        Boc::decode(SIMPLEX_SIGNATURES).unwrap(),
     ];
 
     for cell in cells {
