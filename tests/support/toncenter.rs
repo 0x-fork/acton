@@ -8,6 +8,7 @@ use rston::boc::{Boc, BocRepr};
 use rston::cell::HashBytes;
 use rston::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Lazy, Store};
 use rston::dict::{Dict, RawDict};
+use rston::models::vm::{Tuple, TupleItem};
 use rston::models::{
     Account, AccountState, CurrencyCollection, IntAddr, IntMsgInfo, MsgInfo, OptionalAccount,
     OwnedMessage, ShardAccount, StateInit, StdAddr, StdAddrFormat,
@@ -24,7 +25,6 @@ use ton_executor::DEFAULT_CONFIG_DICT;
 use ton_localnet::types::Addr;
 use toncenter::v2::responses;
 use tvm_ffi::json_stack::legacy_stack_to_json;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 #[derive(Clone)]
 pub(crate) struct ToncenterV2MockResponse {

@@ -81,6 +81,39 @@ Pass outgoing messages as `Vec<WalletMessage>`. Each entry contains the complete
 message cell in `msg` and a `SendMsgFlags` bitmask in `mode`.
 Combine flags with `|`, such as `SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR`.
 
+## TVM stack encoding
+
+Use `models::vm` to encode get-method arguments and decode result stacks.
+The `models` feature is enabled by default.
+
+```toml
+[dependencies]
+rston = { version = "0.4.0", features = ["models"] }
+```
+
+```rust
+use rston::boc::Boc;
+use rston::cell::CellBuilder;
+use rston::models::vm::{Tuple, TupleItem};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let arguments = Tuple(vec![TupleItem::Int(42.into())]);
+    let bytes = Boc::encode(CellBuilder::build_from(&arguments)?);
+    let decoded = Boc::decode(bytes)?.parse::<Tuple>()?;
+
+    assert_eq!(decoded, arguments);
+    Ok(())
+}
+```
+
+`Tuple` stores the bottom stack value first and the top value last.
+Slice values contain the selected bits and references in a separate cell;
+the original cell and slice offsets are not retained.
+Supported continuations are normalized into `ContData`, which stores code,
+captured stack, save list, and arity. Encoding emits a standard continuation
+with codepage zero; decoding rejects unsupported continuation constructors.
+Use this module to prepare or read stack data. It does not execute smart contracts.
+
 ## LiteAPI queries
 
 Enable `liteclient` and use Tokio to query the liteservers in a trusted global config:

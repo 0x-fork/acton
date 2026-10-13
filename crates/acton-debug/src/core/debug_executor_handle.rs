@@ -5,10 +5,10 @@
 
 use super::replayer::RuntimeDebugSnapshot;
 use rston::boc::Boc;
+use rston::cell::Load;
+use rston::models::vm::{Tuple, TupleItem};
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::message::step::StepExecutor;
-use tvm_ffi::serde::parse_tuple_item;
-use tvm_ffi::stack::{Tuple, TupleItem};
 use tvm_logs::parser::{CellLike, CellSlice, VmStackValue};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -189,6 +189,6 @@ fn tuple_item_to_vm_stack_value(item: &TupleItem) -> VmStackValue {
 fn parse_base64_tuple_item_to_vm_stack_value(boc_base64: &str) -> Option<VmStackValue> {
     let cell = Boc::decode_base64(boc_base64).ok()?;
     let mut slice = cell.as_slice_allow_exotic();
-    let item = parse_tuple_item(&mut slice).ok()?;
+    let item = TupleItem::load_from(&mut slice).ok()?;
     Some(tuple_item_to_vm_stack_value(&item))
 }

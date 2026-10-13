@@ -4,11 +4,11 @@ use anyhow::anyhow;
 use num_bigint::BigInt;
 use rston::boc::Boc;
 use rston::cell::{Cell, CellBuilder, CellFamily, Store};
+use rston::models::vm::{Tuple, TupleItem};
 use rston::models::{StdAddr, StdAddrFormat};
 use tolk_compiler::abi::{ABIFunctionParameter, ContractABI, Ty};
 use tolk_compiler::types_kernel::TyIdx;
 use tolk_syntax::ast::expressions::parse_tolk_int_literal;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 pub fn parse_main_stack_args(abi: Option<&ContractABI>, args: &[String]) -> anyhow::Result<Tuple> {
     let Some(abi) = abi else {

@@ -11,6 +11,7 @@ use num_bigint::BigInt;
 use rston::boc::Boc;
 use rston::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use rston::dict::Dict;
+use rston::models::vm::{ContData, Tuple, TupleItem};
 use rston::models::{IntAddr, LibDescr, StdAddr, Transaction};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
@@ -27,7 +28,6 @@ use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSucce
 use ton_emulator::world_state::WorldState;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
-use tvm_ffi::stack::{ContData, Tuple, TupleItem};
 
 #[derive(Debug)]
 pub struct DebugStopRequested;

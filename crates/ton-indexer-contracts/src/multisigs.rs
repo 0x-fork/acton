@@ -3,7 +3,7 @@ use crate::types::Map;
 use num_bigint::BigInt;
 use rston::cell::Cell;
 use rston::models::IntAddr;
-use tvm_ffi::stack::{Tuple, TupleItem};
+use rston::models::vm::{Tuple, TupleItem};
 
 #[derive(Debug, Clone, tvm_ffi::FromStackTuple)]
 pub struct MultisigData {

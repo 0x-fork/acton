@@ -2,10 +2,10 @@ use anyhow::Context;
 use num_bigint::{BigInt, Sign};
 use rston::boc::Boc;
 use rston::cell::CellBuilder;
+use rston::models::vm::{Tuple, TupleItem};
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 /// Result of a transaction emulation.
 #[derive(Deserialize, Debug, Clone)]
@@ -105,13 +105,7 @@ impl PrevBlocksInfo {
         }
 
         let tuple_item = TupleItem::Tuple(Tuple(fields));
-        let mut builder = CellBuilder::new();
-
-        tvm_ffi::serde::serialize_tuple_item(&mut builder, &tuple_item)
-            .context("failed to serialize prev_blocks_info tuple item")?;
-
-        let cell = builder
-            .build()
+        let cell = CellBuilder::build_from(&tuple_item)
             .context("failed to build prev_blocks_info stack-entry cell")?;
 
         Ok(Boc::encode_base64(&cell))

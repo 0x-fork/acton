@@ -10,6 +10,7 @@ use rston::cell::{CellBuilder, CellContext, CellSlice, Load, Store};
 use rston::dict::Dict;
 use rston::error::Error;
 use rston::models::StdAddr;
+use rston::models::vm::{Tuple, TupleItem};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use tasm_core::decompile::Disassembler;
@@ -19,7 +20,6 @@ use ton_emulator::{extension, register_ext_methods};
 use ton_executor::get::DEFAULT_GET_METHOD_GAS_LIMIT;
 use ton_executor::{BaseExecutor, ExecutorVerbosity};
 use ton_retrace::trace::{Trace, TraceStep};
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 extension!(measure in (Context) with (location: String, addr: StdAddr, args: TupleItem, baseline: TupleItem, function: TupleItem) using measure_impl);
 fn measure_impl(

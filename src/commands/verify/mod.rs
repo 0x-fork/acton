@@ -10,6 +10,7 @@ use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
 use rston::boc::Boc;
 use rston::cell::{Cell, CellBuilder, CellSliceParts, HashBytes};
+use rston::models::vm::Tuple;
 use rston::models::{
     Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, MsgInfo, OwnedMessage,
     StdAddr, StdAddrFormat,
@@ -23,7 +24,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use ton_api::{Network, TonApiClient};
 use toncenter::v3;
-use tvm_ffi::stack::Tuple;
 
 const VERIFIER_BACKEND: &str = "https://verifier.ton.org";
 const VERIFY_BACKEND_ENV: &str = "ACTON_VERIFY_BACKEND";

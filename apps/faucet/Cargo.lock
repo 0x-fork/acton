@@ -2043,6 +2043,8 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "hmac",
+ "num-bigint",
+ "num-traits",
  "pbkdf2",
  "rston-proc",
  "scc",

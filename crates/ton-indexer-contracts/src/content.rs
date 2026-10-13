@@ -1,9 +1,9 @@
 use rston::cell::Cell;
 use rston::dict::Dict;
+use rston::models::vm::Tuple;
 use rston::prelude::HashBytes;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use tvm_ffi::stack::Tuple;
 
 pub(crate) fn parse_token_content(content_cell: Cell, keys: &[&str]) -> Value {
     let Ok(mut parser) = content_cell.as_slice() else {

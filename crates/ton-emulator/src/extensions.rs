@@ -2,10 +2,10 @@
 #![allow(unsafe_code)]
 use rston::boc::Boc;
 use rston::cell::Cell;
+use rston::models::vm::Tuple;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use tvm_ffi::from_stack::{ArgError, FromStack};
-use tvm_ffi::stack::Tuple;
 
 pub fn pop_arg<T: FromStack>(t: &mut Tuple) -> Result<T, ArgError> {
     let item = t.pop().ok_or(ArgError::StackUnderflow)?;
@@ -39,11 +39,11 @@ macro_rules! extension {
         unsafe extern "C" fn $fn_name(ctx: *mut $ctx_ty, ptr: *const std::os::raw::c_char) -> *const std::os::raw::c_char {
             unsafe {
                 let ctx = &mut *(ctx as *mut $ctx_ty);
-                $crate::extensions::with_tuple(ptr, |__t: &mut tvm_ffi::stack::Tuple| {
+                $crate::extensions::with_tuple(ptr, |__t: &mut rston::models::vm::Tuple| {
                     let r: anyhow::Result<()> = $body(ctx, __t);
                     if let Err(e) = r {
                         ctx.asserts.fail(format!("{:#}", e));
-                        __t.push(tvm_ffi::stack::TupleItem::Null);
+                        __t.push(rston::models::vm::TupleItem::Null);
                     }
                 })
             }
@@ -53,13 +53,13 @@ macro_rules! extension {
         unsafe extern "C" fn $fn_name(ctx: *mut $ctx_ty, ptr: *const std::os::raw::c_char) -> *const std::os::raw::c_char {
             unsafe {
                 let ctx = &mut *(ctx as *mut $ctx_ty);
-                $crate::extensions::with_tuple(ptr, |__t: &mut tvm_ffi::stack::Tuple| {
+                $crate::extensions::with_tuple(ptr, |__t: &mut rston::models::vm::Tuple| {
                     match $crate::extensions::pop_arg::<$ty>(__t) {
                         Ok($an) => {
                             let r: anyhow::Result<()> = $body(ctx, __t, $an);
                             if let Err(e) = r {
                                 ctx.asserts.fail(format!("{:#}", e));
-                                __t.push(tvm_ffi::stack::TupleItem::Null);
+                                __t.push(rston::models::vm::TupleItem::Null);
                             }
                         }
                         Err(e) => {
@@ -76,7 +76,7 @@ macro_rules! extension {
                 debug_assert!(!ctx.is_null());
                 debug_assert!(!ptr.is_null());
                 let ctx = &mut *(ctx as *mut $ctx_ty);
-                $crate::extensions::with_tuple(ptr, |__t: &mut tvm_ffi::stack::Tuple| {
+                $crate::extensions::with_tuple(ptr, |__t: &mut rston::models::vm::Tuple| {
                     match $crate::pop_args!(__t, $($ty),*) {
                         Ok(__vals) => {
                             #[allow(non_snake_case, unused_variables)]
@@ -84,7 +84,7 @@ macro_rules! extension {
                             let r: anyhow::Result<()> = $body(ctx, __t, $($an, )*);
                             if let Err(e) = r {
                                 ctx.asserts.fail(format!("{:#}", e));
-                                __t.push(tvm_ffi::stack::TupleItem::Null);
+                                __t.push(rston::models::vm::TupleItem::Null);
                             }
                         }
                         Err(e) => {
@@ -119,7 +119,7 @@ pub unsafe fn with_tuple(ptr: *const c_char, f: impl FnOnce(&mut Tuple)) -> *con
     };
 
     let mut tuple = match Boc::decode_base64(boc) {
-        Ok(cell) => tvm_ffi::serde::parse_tuple(&cell).unwrap_or_else(|error| {
+        Ok(cell) => Tuple::deserialize(&cell).unwrap_or_else(|error| {
             eprintln!("failed to parse extension stack tuple: {error:#}");
             eprintln!("extension stack BoC: {boc}");
             Tuple::empty()
@@ -132,7 +132,7 @@ pub unsafe fn with_tuple(ptr: *const c_char, f: impl FnOnce(&mut Tuple)) -> *con
 
     f(&mut tuple);
 
-    cell_to_ffi_boc64(&tvm_ffi::serde::serialize_tuple(&tuple).expect("Failed to serialize tuple"))
+    cell_to_ffi_boc64(&tuple.serialize().expect("Failed to serialize tuple"))
 }
 
 #[macro_export]

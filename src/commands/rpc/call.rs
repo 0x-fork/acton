@@ -15,6 +15,7 @@ use log::warn;
 use num_traits::ToPrimitive;
 use rston::boc::Boc;
 use rston::cell::Cell;
+use rston::models::vm::{Tuple, TupleItem};
 use rston::models::{AnyAddr, IntAddr, StdAddr, StdAddrFormat};
 use std::io::{Write, stderr, stdout};
 use std::path::PathBuf;
@@ -23,7 +24,6 @@ use tolk_compiler::abi::{ABIDeclaration, ABIGetMethod, ABIStructField, ContractA
 use tolk_compiler::types_kernel::{TyIdx, calc_width_on_stack};
 use ton_api::{Network, TonApiClient};
 use tvm_ffi::json_stack::legacy_stack_to_json;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 pub(super) struct RpcCallOptions {
     pub(super) abi: Option<PathBuf>,

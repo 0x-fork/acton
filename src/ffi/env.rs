@@ -2,12 +2,12 @@ use crate::context::Context;
 use num_bigint::BigInt;
 use rston::boc::Boc;
 use rston::cell::{Cell, CellBuilder, CellFamily, Store};
+use rston::models::vm::{Tuple, TupleItem};
 use rston::models::{StdAddr, StdAddrFormat};
 use std::env;
 use std::str::FromStr;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 extension!(env_int in (Context) with (name: String) using env_int_impl);
 fn env_int_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {

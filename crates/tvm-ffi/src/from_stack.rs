@@ -1,10 +1,10 @@
 //! This module provides functionality for converting `TupleItem` to Rust types.
 //!
 //! This module is mostly used for defining FFI functions that are called from the TVM emulator.
-use crate::stack::{Tuple, TupleItem};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use rston::cell::{Cell, HashBytes, Load};
+use rston::models::vm::{Tuple, TupleItem};
 use rston::models::{AnyAddr, IntAddr, ShardAccount, StdAddr};
 use thiserror::Error;
 
@@ -297,8 +297,8 @@ impl FromStack for ShardAccount {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stack::{Tuple, TupleItem};
     use rston::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Store};
+    use rston::models::vm::{Tuple, TupleItem};
     use rston::models::{OptionalAccount, ShardAccount, StdAddr};
 
     #[test]

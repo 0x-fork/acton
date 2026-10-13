@@ -20,6 +20,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use rston::boc::Boc;
 use rston::cell::{Cell, CellBuilder, CellSlice, HashBytes};
+use rston::models::vm::{Tuple, TupleItem};
 use rston::models::{
     AccountState, AccountStatus, Base64StdAddrFlags, ComputePhase, ComputePhaseSkipReason,
     DisplayBase64StdAddr, ExecutedComputePhase, IntAddr, Message, MsgInfo, RelaxedMessage,
@@ -38,7 +39,6 @@ use tolk_compiler::types_kernel::TyIdx;
 use tolk_source_map::SourceLocation;
 use ton_api::Network;
 use tvm_ffi::message::original_message_body;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT: i32 = 678;
 const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE: i32 = 679;

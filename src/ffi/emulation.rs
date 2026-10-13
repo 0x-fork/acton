@@ -34,6 +34,7 @@ use rand::RngCore;
 use rston::boc::Boc;
 use rston::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Load, Store};
 use rston::dict::Dict;
+use rston::models::vm::{ContData, Tuple, TupleItem};
 use rston::models::{
     AccountState, AccountStatus, AccountStatusChange, ActionPhase, ComputePhase,
     ComputePhaseSkipReason, CurrencyCollection, ExtInMsgInfo, ExtOutMsgInfo,
@@ -63,8 +64,6 @@ use ton_executor::message::step::StepExecutor;
 use ton_executor::{BaseExecutor, ExecutorVerbosity};
 use ton_executor::{MissingLibrariesContext, missing_library_callback};
 use toncenter::v3;
-use tvm_ffi::serde::serialize_tuple;
-use tvm_ffi::stack::{ContData, Tuple, TupleItem};
 
 const ZERO_RANDOM_SEED_HEX: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
@@ -1896,13 +1895,11 @@ fn hide_trace_from_ui_impl(
 
 /// Call a TVM predicate continuation with a single argument. Returns the bool result.
 fn call_predicate(executor: &GetExecutor, cont: &ContData, arg: TupleItem) -> anyhow::Result<bool> {
-    let mut cont_builder = CellBuilder::new();
-    tvm_ffi::serde::serialize_vm_cont(&mut cont_builder, cont)?;
-    let cont_cell = cont_builder.build()?;
+    let cont_cell = CellBuilder::build_from(cont)?;
     let cont_boc = Boc::encode_base64(cont_cell);
 
     let args = Tuple(vec![arg]);
-    let stack_boc = serialize_tuple(&args)
+    let stack_boc = CellBuilder::build_from(&args)
         .map(|t| Boc::encode_base64(&t))
         .context("Cannot serialize predicate arg")?;
 
@@ -2642,7 +2639,7 @@ fn run_get_method_impl(
         .and_then(|result| result.abi.clone());
 
     let config_b64 = ctx.chain.world_state.get_config_b64();
-    let args_b64 = serialize_tuple(&args)
+    let args_b64 = CellBuilder::build_from(&args)
         .map(|t| Boc::encode_base64(&t))
         .context("Cannot serialize tuple")?;
 
@@ -3622,14 +3619,12 @@ pub(super) fn run_tolk_continuation(
     };
 
     // Serialize the VmCont (with savelist, captured stack, code)
-    let mut cont_builder = CellBuilder::new();
-    tvm_ffi::serde::serialize_vm_cont(&mut cont_builder, &cont)?;
-    let cont_cell = cont_builder.build()?;
+    let cont_cell = CellBuilder::build_from(&cont)?;
     let cont_boc = Boc::encode_base64(cont_cell);
 
     // Serialize args as VmStack
     let args = args_stack.unwrap_empty().unwrap_tuple();
-    let stack_boc = serialize_tuple(&args)
+    let stack_boc = CellBuilder::build_from(&args)
         .map(|t| Boc::encode_base64(&t))
         .context("Cannot serialize args stack")?;
 

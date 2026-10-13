@@ -3,8 +3,8 @@ use crate::content::{merge_token_content, parse_token_content, token_content_uri
 use num_bigint::BigInt;
 use rston::cell::{Cell, CellBuilder};
 use rston::models::IntAddr;
+use rston::models::vm::{Tuple, TupleItem};
 use serde_json::Value;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 const JETTON_CONTENT_KEYS: &[&str] = &[
     "uri",

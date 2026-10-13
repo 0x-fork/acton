@@ -10,11 +10,11 @@ use crate::support::verifier::{VerifierMockResponse, abi_response, spawn_verifie
 use rston::boc::Boc;
 use rston::cell::{Cell, CellBuilder, CellFamily, Store};
 use rston::models::message::IntAddr;
+use rston::models::vm::TupleItem;
 use serde_json::Value as JsonValue;
 use std::fs;
 use std::path::Path;
 use std::time::Duration;
-use tvm_ffi::stack::TupleItem;
 
 const RAW_INFO_ADDRESS: &str = "0:1111111111111111111111111111111111111111111111111111111111111111";
 const MATCHED_INFO_ADDRESS: &str =

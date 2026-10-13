@@ -24,6 +24,7 @@ use num_bigint::BigInt;
 use rston::boc::Boc;
 use rston::cell::{Cell, CellBuilder, CellSlice, HashBytes};
 use rston::dict::Dict;
+use rston::models::vm::{Tuple, TupleItem};
 use rston::models::{
     AccountStatusChange, ActionPhase, ComputePhase, ComputePhaseSkipReason, IntAddr,
     OwnedRelaxedMessage, RelaxedMsgInfo, TxInfo,
@@ -34,7 +35,6 @@ use ton_api::toncenter::emulate::v1 as emulate;
 use ton_indexer_contracts::methods::parse_contract_methods;
 use toncenter::v2::responses as v2_response;
 use toncenter::v3 as response;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 #[must_use]
 pub fn map_account_balances(accounts: &[LocalnetAccountBalance]) -> Vec<response::AccountBalance> {
@@ -1893,9 +1893,9 @@ mod tests {
     use num_bigint::BigInt;
     use rston::boc::Boc;
     use rston::cell::Cell;
+    use rston::models::vm::{Tuple, TupleItem};
     use serde_json::json;
     use std::sync::Arc;
-    use tvm_ffi::stack::{Tuple, TupleItem};
 
     fn sample_jetton_master() -> JettonMasterMeta {
         JettonMasterMeta {

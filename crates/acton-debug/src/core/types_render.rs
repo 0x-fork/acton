@@ -2,6 +2,7 @@ use owo_colors::OwoColorize;
 use rston::boc::Boc;
 use rston::cell::{Cell, CellBuilder, CellSlice as TyCellSlice, Load};
 use rston::dict;
+use rston::models::vm::{Tuple, TupleItem};
 use rston::models::{
     AnyAddr, Base64StdAddrFlags, ChangeLibraryMode, CurrencyCollection, DisplayBase64StdAddr,
     IntAddr, LibRef, OutAction, OutActionsRevIter, OwnedRelaxedMessage, RelaxedMsgInfo,
@@ -17,7 +18,6 @@ use tolk_source_map::source_map::{AbiStruct, Declaration};
 use tolk_source_map::types_kernel::{Ty, TyIdx, calc_width_on_stack, render_ty};
 use tolk_source_map::{SourceMap, types_kernel};
 use tvm_ffi::from_stack::FromStack;
-use tvm_ffi::stack::{Tuple, TupleItem};
 use tvm_logs::parser::{CellLike, CellSlice, VmStackValue};
 
 // ---------------------------------------------------------------------------

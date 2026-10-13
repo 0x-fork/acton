@@ -1,12 +1,11 @@
 use rston::boc::Boc;
-use rston::cell::Cell;
+use rston::cell::{Cell, CellBuilder};
+use rston::models::vm::Tuple;
 use std::collections::HashMap;
 use std::time::UNIX_EPOCH;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use tvm_ffi::from_stack::FromStackTuple;
-use tvm_ffi::serde::serialize_tuple;
-use tvm_ffi::stack::Tuple;
 
 pub fn run_get_method<T: FromStackTuple>(
     address: String,
@@ -64,7 +63,7 @@ fn run_get_method_raw(
 
     let executor = GetExecutor::new(&params)?;
 
-    let stack = Boc::encode_base64(serialize_tuple(&stack)?);
+    let stack = Boc::encode_base64(CellBuilder::build_from(&stack)?);
     let result = executor.run_get_method(&stack, &params, None)?;
 
     match result {
@@ -75,7 +74,7 @@ fn run_get_method_raw(
 
             let cell = Boc::decode_base64(result.stack.as_ref())?;
 
-            Tuple::deserialize(&cell)
+            Ok(Tuple::deserialize(&cell)?)
         }
         GetMethodResult::Error(error) => {
             anyhow::bail!("{}", error.error)

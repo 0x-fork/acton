@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Rust libraries
+
+- TVM stack types and their cell codec are available in `rston::models::vm`.
+  Import stack types directly from this module. Replace `tvm_ffi::serde` codec calls with
+  `Load`, `Store`, or `CellBuilder::build_from`; TON Center entry conversions
+  use functions in `tvm_ffi::json_stack`.
+
 ### CLI
 
 - `acton up --rollback` restores the previous version from the local backup

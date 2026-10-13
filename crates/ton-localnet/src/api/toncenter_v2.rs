@@ -19,12 +19,12 @@ use anyhow::Context;
 use base64::Engine;
 use rston::boc::Boc;
 use rston::cell::HashBytes as CellHashBytes;
+use rston::models::vm::{Tuple, TupleItem};
 use rston::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 use serde_json::value::Value;
 use ton_indexer_contracts::{WalletType, categorize_wallet};
 use toncenter::v2::{responses as response, stack};
 use tvm_ffi::json_stack::std_stack_from_tuple;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 /// Simulator get-method result with the VM trace produced during execution.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -626,7 +626,7 @@ pub fn map_run_get_method_std(
 
 fn decode_run_get_method_stack(r: &LocalnetRunGetMethodResult) -> anyhow::Result<Tuple> {
     let stack_cell = Boc::decode(&r.stack)?;
-    Tuple::deserialize(&stack_cell)
+    Ok(Tuple::deserialize(&stack_cell)?)
 }
 
 fn ensure_std_stack_depth(stack: &Tuple) -> anyhow::Result<()> {

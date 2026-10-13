@@ -1,0 +1,22 @@
+[
+  {
+    "boc": "te6ccgEBAQEABQAABgAAAA==",
+    "name": "empty"
+  },
+  {
+    "boc": "te6ccgEBDgEAbwADLwAACQYgAoAAAICAAAAAAAAABKAAAAAQBAINAQACdgMGBwACBQQDABIBAAAAAAAAAAcAAgACAgUGCAIJBAAAgCAHCAICAwkIAAKrAQQC/woBEgH/////////hQsBEgEAAAAAAAAAKgwBAgANAAA=",
+    "name": "values"
+  },
+  {
+    "boc": "te6ccgEBAgEAKgABSgAAAQIA//////////////////////////////////////////8BAAA=",
+    "name": "positive_int257"
+  },
+  {
+    "boc": "te6ccgEBAgEAKgABSgAAAQIBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAA=",
+    "name": "negative_int257"
+  },
+  {
+    "boc": "te6ccgEBBAEAkgACDwAAAQQAPwBgAwEB/GFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQIAAmEAAA==",
+    "name": "snake_string"
+  }
+]

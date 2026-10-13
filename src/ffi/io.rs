@@ -13,6 +13,7 @@ use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use rston::cell::{DynCell, LevelMask};
+use rston::models::vm::{Tuple, TupleItem};
 use rston::models::{StdAddr, StdAddrFormat};
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -23,7 +24,6 @@ use tolk_compiler::types_kernel::{TyIdx, render_ty};
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvm_ffi::from_stack::FromStack;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 extension!(println in (Context) with (arg6: TupleItem, type6: BigInt, arg5: TupleItem, type5: BigInt, arg4: TupleItem, type4: BigInt, arg3: TupleItem, type3: BigInt, arg2: TupleItem, type2: BigInt, arg1: TupleItem, type1: BigInt) using println_impl);
 #[allow(clippy::too_many_arguments)]

@@ -15,6 +15,7 @@ use log::warn;
 use num_bigint::BigInt;
 use rston::boc::Boc;
 use rston::cell::{HashBytes, Lazy};
+use rston::models::vm::TupleItem;
 use rston::models::{
     Account, AccountState as TychoAccountState, CurrencyCollection, IntAddr, OptionalAccount,
     ShardAccount, StateInit, StdAddr, StdAddrFormat, StorageInfo,
@@ -28,7 +29,6 @@ use std::sync::Arc;
 use tolk_compiler::SourceMap;
 use ton_api::{Network, TonApiClient};
 use toncenter::v3;
-use tvm_ffi::stack::TupleItem;
 
 pub(super) fn rpc_trace_cmd(
     hash: &str,

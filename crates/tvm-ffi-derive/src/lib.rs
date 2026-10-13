@@ -87,7 +87,7 @@ fn expand_from_stack_tuple(mut input: DeriveInput) -> syn::Result<proc_macro2::T
             #where_clause
         {
             fn from_tuple(
-                __tuple: ::tvm_ffi::stack::Tuple,
+                __tuple: ::rston::models::vm::Tuple,
             ) -> Result<Self, ::tvm_ffi::from_stack::ArgError> {
                 let __actual_len = __tuple.len();
                 if __actual_len != #field_count {

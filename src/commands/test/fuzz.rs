@@ -6,12 +6,12 @@ use num_bigint::{BigInt, Sign};
 use rand::rngs::StdRng;
 use rand::{Rng, RngCore, SeedableRng};
 use rston::cell::{Cell, HashBytes};
+use rston::models::vm::{Tuple, TupleItem};
 use rston::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::{ABIFunctionParameter, ContractABI, Ty};
 use tolk_compiler::types_kernel::TyIdx;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 const DEFAULT_FUZZ_RUNS: usize = 256;
 const DEFAULT_FUZZ_REJECT_BUDGET_MULTIPLIER: usize = 256;

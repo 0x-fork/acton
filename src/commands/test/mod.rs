@@ -43,6 +43,7 @@ use path_absolutize::Absolutize;
 use regex::Regex;
 use rston::boc::Boc;
 use rston::cell::{Cell, CellBuilder, HashBytes};
+use rston::models::vm::Tuple;
 use rston::models::{ShardAccount, StdAddr};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -65,8 +66,6 @@ use ton_emulator::world_state::{
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use tvm_ffi::serde::serialize_tuple;
-use tvm_ffi::stack::Tuple;
 use walkdir::WalkDir;
 
 mod annotations;
@@ -410,7 +409,7 @@ impl<'a> TestRunner<'a> {
             execution_started_at: params.unixtime,
         };
 
-        let stack = Boc::encode_base64(serialize_tuple(stack)?);
+        let stack = Boc::encode_base64(CellBuilder::build_from(stack)?);
 
         let (result, captured_stdout, captured_stderr, assert_failure, expected_exit_code) =
             if self.config.debug {

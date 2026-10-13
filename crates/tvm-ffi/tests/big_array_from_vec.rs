@@ -1,5 +1,5 @@
 use num_bigint::BigInt;
-use tvm_ffi::stack::{Tuple, TupleItem};
+use rston::models::vm::{Tuple, TupleItem};
 
 #[test]
 fn big_array_from_vec_small_values() {

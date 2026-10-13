@@ -1,7 +1,7 @@
-use crate::stack::{Tuple, TupleItem};
 use anyhow::Context;
 use num_bigint::BigInt;
 use rston::boc::Boc;
+use rston::models::vm::{Tuple, TupleItem};
 use serde_json::Value;
 
 use toncenter::v2::stack::{TvmStackEntry, TvmStackEntryUnsupported};
@@ -50,68 +50,69 @@ pub fn json_to_legacy_stack(entries: Vec<Value>) -> anyhow::Result<Tuple> {
     Ok(Tuple(items))
 }
 
-impl TryFrom<TvmStackEntry> for TupleItem {
-    type Error = anyhow::Error;
-
-    fn try_from(entry: TvmStackEntry) -> Result<Self, Self::Error> {
-        match entry {
-            TvmStackEntry::Slice(entry) => {
-                let slice = entry.slice;
-                let cell =
-                    Boc::decode_base64(&slice.bytes).context("Failed to decode slice BOC")?;
-                Ok(TupleItem::Slice(cell))
-            }
-            TvmStackEntry::Cell(entry) => {
-                let cell = entry.cell;
-                let cell = Boc::decode_base64(&cell.bytes).context("Failed to decode cell BOC")?;
-                Ok(TupleItem::Cell(cell))
-            }
-            TvmStackEntry::Number(entry) => {
-                let number = entry.number;
-                Ok(TupleItem::Int(
-                    number
-                        .number
-                        .parse::<BigInt>()
-                        .context("Failed to parse stack number")?,
-                ))
-            }
-            TvmStackEntry::Tuple(entry) => {
-                let tuple = entry.tuple;
-                Ok(TupleItem::Tuple(Tuple(
-                    tuple
-                        .elements
-                        .into_iter()
-                        .map(Self::try_from)
-                        .collect::<anyhow::Result<_>>()?,
-                )))
-            }
-            TvmStackEntry::List(entry) => {
-                let list = entry.list;
-                Ok(TupleItem::Tuple(Tuple(
-                    list.elements
-                        .into_iter()
-                        .map(Self::try_from)
-                        .collect::<anyhow::Result<_>>()?,
-                )))
-            }
-            TvmStackEntry::Unsupported(_) => anyhow::bail!("Unsupported TVM stack entry"),
+/// Decode one TON Center stack entry into the shared TVM model.
+/// Unsupported entries return the same conversion error as a full stack decode.
+pub fn std_item_to_tuple_item(entry: TvmStackEntry) -> anyhow::Result<TupleItem> {
+    match entry {
+        TvmStackEntry::Slice(entry) => {
+            let slice = entry.slice;
+            let cell = Boc::decode_base64(&slice.bytes).context("Failed to decode slice BOC")?;
+            Ok(TupleItem::Slice(cell))
         }
+        TvmStackEntry::Cell(entry) => {
+            let cell = entry.cell;
+            let cell = Boc::decode_base64(&cell.bytes).context("Failed to decode cell BOC")?;
+            Ok(TupleItem::Cell(cell))
+        }
+        TvmStackEntry::Number(entry) => {
+            let number = entry.number;
+            Ok(TupleItem::Int(
+                number
+                    .number
+                    .parse::<BigInt>()
+                    .context("Failed to parse stack number")?,
+            ))
+        }
+        TvmStackEntry::Tuple(entry) => {
+            let tuple = entry.tuple;
+            Ok(TupleItem::Tuple(Tuple(
+                tuple
+                    .elements
+                    .into_iter()
+                    .map(std_item_to_tuple_item)
+                    .collect::<anyhow::Result<_>>()?,
+            )))
+        }
+        TvmStackEntry::List(entry) => {
+            let list = entry.list;
+            Ok(TupleItem::Tuple(Tuple(
+                list.elements
+                    .into_iter()
+                    .map(std_item_to_tuple_item)
+                    .collect::<anyhow::Result<_>>()?,
+            )))
+        }
+        TvmStackEntry::Unsupported(_) => anyhow::bail!("Unsupported TVM stack entry"),
     }
 }
 
-impl From<&TupleItem> for TvmStackEntry {
-    fn from(item: &TupleItem) -> Self {
-        match item {
-            TupleItem::Int(value) => Self::number(value),
-            TupleItem::Cell(cell) => Self::cell(Boc::encode_base64(cell)),
-            TupleItem::Slice(cell) => Self::slice(Boc::encode_base64(cell)),
-            TupleItem::Cont(continuation) => Self::slice(Boc::encode_base64(&continuation.code)),
-            TupleItem::Tuple(tuple) => Self::tuple(tuple.0.iter().map(Self::from).collect()),
-            TupleItem::Null | TupleItem::Nan | TupleItem::Builder(_) => {
-                Self::Unsupported(TvmStackEntryUnsupported {
-                    type_tag: Default::default(),
-                })
-            }
+/// Encode one shared TVM value in the TON Center JSON representation.
+/// Values without a standard JSON representation use the unsupported discriminator.
+pub fn tuple_item_to_std_item(item: &TupleItem) -> TvmStackEntry {
+    match item {
+        TupleItem::Int(value) => TvmStackEntry::number(value),
+        TupleItem::Cell(cell) => TvmStackEntry::cell(Boc::encode_base64(cell)),
+        TupleItem::Slice(cell) => TvmStackEntry::slice(Boc::encode_base64(cell)),
+        TupleItem::Cont(continuation) => {
+            TvmStackEntry::slice(Boc::encode_base64(&continuation.code))
+        }
+        TupleItem::Tuple(tuple) => {
+            TvmStackEntry::tuple(tuple.0.iter().map(tuple_item_to_std_item).collect())
+        }
+        TupleItem::Null | TupleItem::Nan | TupleItem::Builder(_) => {
+            TvmStackEntry::Unsupported(TvmStackEntryUnsupported {
+                type_tag: Default::default(),
+            })
         }
     }
 }
@@ -120,14 +121,14 @@ pub fn std_stack_into_tuple(entries: Vec<TvmStackEntry>) -> anyhow::Result<Tuple
     Ok(Tuple(
         entries
             .into_iter()
-            .map(TupleItem::try_from)
+            .map(std_item_to_tuple_item)
             .collect::<anyhow::Result<_>>()?,
     ))
 }
 
 #[must_use]
 pub fn std_stack_from_tuple(stack: &Tuple) -> Vec<TvmStackEntry> {
-    stack.0.iter().map(TvmStackEntry::from).collect()
+    stack.0.iter().map(tuple_item_to_std_item).collect()
 }
 
 fn json_to_mixed_item(value: Value) -> anyhow::Result<TupleItem> {
@@ -136,7 +137,7 @@ fn json_to_mixed_item(value: Value) -> anyhow::Result<TupleItem> {
         Err(legacy_err) => {
             let entry: TvmStackEntry = serde_json::from_value(value)
                 .with_context(|| format!("Failed to parse stack entry as legacy or std format. Legacy error: {legacy_err}"))?;
-            TupleItem::try_from(entry)
+            std_item_to_tuple_item(entry)
         }
     }
 }
@@ -206,7 +207,7 @@ pub fn json_to_legacy_item(value: Value) -> anyhow::Result<TupleItem> {
                 .and_then(|v| v.as_str())
                 .context("cont must have bytes")?;
             let c = Boc::decode_base64(bytes)?;
-            Ok(TupleItem::Cont(crate::stack::ContData::from_code(c)))
+            Ok(TupleItem::Cont(rston::models::vm::ContData::from_code(c)))
         }
         "list" => {
             let elements = val
@@ -253,9 +254,9 @@ fn legacy_stack_bytes<'a>(value: &'a Value, stack_type: &str) -> anyhow::Result<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stack::TupleItem;
     use num_bigint::BigInt;
     use rston::cell::CellBuilder;
+    use rston::models::vm::TupleItem;
 
     #[test]
     fn test_std_stack_uses_tonlib_wire_types() {
@@ -369,7 +370,7 @@ mod tests {
     #[test]
     fn test_std_stack_rejects_unsupported_input() {
         assert_eq!(
-            TupleItem::try_from(TvmStackEntry::Unsupported(TvmStackEntryUnsupported {
+            std_item_to_tuple_item(TvmStackEntry::Unsupported(TvmStackEntryUnsupported {
                 type_tag: Default::default()
             }))
             .unwrap_err()

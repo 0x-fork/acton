@@ -22,6 +22,7 @@ use acton_debug::{ReplayerDebugSession, reserve_dap_listener, start_dap_server_w
 use anyhow::anyhow;
 use rston::boc::Boc;
 use rston::cell::{Cell, CellBuilder, HashBytes};
+use rston::models::vm::Tuple;
 use rston::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StateInit, StdAddr};
 use rustc_hash::FxHashMap;
 use std::collections::{BTreeMap, HashMap};
@@ -44,8 +45,6 @@ use ton_emulator::world_state::{
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use tvm_ffi::serde::serialize_tuple;
-use tvm_ffi::stack::Tuple;
 
 const ASSERTION_FAILED_EXIT_CODE: i32 = 567;
 
@@ -393,7 +392,7 @@ fn execute_script(
         execution_started_at: params.unixtime,
     };
 
-    let stack_b64 = Boc::encode_base64(serialize_tuple(&stack)?);
+    let stack_b64 = Boc::encode_base64(CellBuilder::build_from(&stack)?);
 
     if debug {
         let mut executor = StepGetExecutor::new(&stack_b64, &params, Some(config_b64))?;

@@ -1,7 +1,7 @@
 use rston::cell::{Cell, Load};
 use rston::dict::{Dict, DictKey, LoadDictKey};
+use rston::models::vm::TupleItem;
 use tvm_ffi::from_stack::{ArgError, FromStack};
-use tvm_ffi::stack::TupleItem;
 
 #[derive(Debug, Clone)]
 pub struct Map<K, V> {

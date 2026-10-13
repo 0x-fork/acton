@@ -11,6 +11,7 @@ use anyhow::Context;
 use rston::boc::Boc;
 use rston::boc::ser::BocHeader;
 use rston::liteclient::types::LiteError;
+use rston::models::vm::Tuple;
 use rston::tl::common::{BlockIdExt, LibraryEntry, String as TlString, TransactionId3};
 use rston::tl::request::{
     GetAccountState, GetAllShardsInfo, GetBlock, GetBlockHeader, GetBlockProof, GetConfigAll,
@@ -28,7 +29,6 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::{Instant, sleep};
-use tvm_ffi::stack::Tuple;
 
 const SEND_MESSAGE_ACCEPTED_STATUS: u32 = 1;
 const RUN_SMC_METHOD_RESULT_MODE: u32 = 1 << 2;

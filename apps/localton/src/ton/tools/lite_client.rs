@@ -11,12 +11,13 @@ use anyhow::{Context, Result, bail, ensure};
 use async_trait::async_trait;
 use num_bigint::BigInt;
 use rston::boc::Boc as CellBoc;
+use rston::cell::Load;
 use rston::cell::{Cell, CellBuilder, CellSlice};
 use rston::models::config::ValidatorSet as ChainValidatorSet;
+use rston::models::vm::TupleItem;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use tracing::{Instrument, debug, field, info_span};
-use tvm_ffi::{serde::parse_tuple_item, stack::TupleItem};
 
 use crate::ton::lite::{AccountInfo, BlockRef, LocalLiteClient, TransactionRef};
 
@@ -703,7 +704,7 @@ fn parse_stack(cell: &Cell) -> Result<Vec<StackValue>> {
 
 /// Converts a complete `VmStackValue` into the stable response model.
 ///
-/// Continuations stay opaque: `parse_tuple` reduces them to executable code and
+/// Continuations stay opaque: `Tuple::load_from` reduces them to executable code and
 /// control data, which would lose their original constructor in `bytes_hex`.
 fn stack_value(mut slice: CellSlice<'_>) -> Result<StackValue> {
     let tag = slice.get_u8(0)?;
@@ -736,7 +737,7 @@ fn stack_value(mut slice: CellSlice<'_>) -> Result<StackValue> {
         });
     }
 
-    Ok(match parse_tuple_item(&mut slice)? {
+    Ok(match TupleItem::load_from(&mut slice)? {
         TupleItem::Null => StackValue::Null,
         TupleItem::Int(value) => StackValue::Int {
             decimal: value.to_string(),

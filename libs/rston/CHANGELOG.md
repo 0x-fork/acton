@@ -10,6 +10,11 @@
 
 ### Added
 
+- `models::vm` provides stack values, cell encoding and decoding,
+  continuation data, and snake byte/string helpers for get-method arguments
+  and results. Stack types implement `Load` and `Store` for the `VmStack`
+  wire format. They work independently of LiteAPI and native TVM execution.
+
 - Optional `tl`, `adnl`, and `liteclient` modules provide LiteAPI wire types,
   ADNL/TCP client and server transport, raw and typed queries, bounded waits,
   multiple liteservers, and global network configuration. Network responses

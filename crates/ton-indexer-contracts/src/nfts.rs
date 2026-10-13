@@ -3,8 +3,8 @@ use crate::content::parse_token_content;
 use num_bigint::BigInt;
 use rston::cell::Cell;
 use rston::models::IntAddr;
+use rston::models::vm::{Tuple, TupleItem};
 use serde_json::Value;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 const NFT_CONTENT_KEYS: &[&str] = &[
     "uri",

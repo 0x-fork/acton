@@ -5,9 +5,9 @@ use num_bigint::{BigInt, Sign};
 use rand::RngCore;
 use rston::cell::{Cell, CellBuilder};
 use rston::mnemonic::{Mnemonic, MnemonicScheme};
+use rston::models::vm::{Tuple, TupleItem};
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 extension!(get_secure_random_bytes in (Context) with (bytes_num: BigInt) using get_secure_random_bytes_impl);
 fn get_secure_random_bytes_impl(

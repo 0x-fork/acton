@@ -5,10 +5,10 @@ use anyhow::{Context, Result, bail, ensure};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use num_bigint::{BigInt, Sign};
 use rston::boc::Boc;
-use rston::cell::{CellSlice, DynCell};
+use rston::cell::{CellSlice, DynCell, Load};
+use rston::models::vm::{ContData, Tuple, TupleItem};
 use toncenter::v2::Int64Input;
 use toncenter::v2::stack::{self as wire, LegacyStackEntry, TvmStackEntry};
-use tvm_ffi::stack::{ContData, Tuple, TupleItem};
 
 const MAX_VALUES: usize = 1000;
 const MAX_DEPTH: usize = 64;
@@ -212,7 +212,7 @@ fn decode_value(mut slice: CellSlice<'_>, depth: usize, budget: &mut Budget) -> 
             values.reverse();
             Ok(TupleItem::Tuple(Tuple(values)))
         }
-        _ => tvm_ffi::serde::parse_tuple_item(&mut slice),
+        _ => Ok(TupleItem::load_from(&mut slice)?),
     }
 }
 

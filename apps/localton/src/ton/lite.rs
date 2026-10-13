@@ -9,9 +9,10 @@ use crate::ton::tools::types::parse_account_address;
 use anyhow::{Context, Result, anyhow, ensure};
 use crc::{CRC_16_XMODEM, Crc};
 use num_bigint::BigInt;
+use rston::models::vm::{Tuple, TupleItem};
 use rston::{
     boc::Boc,
-    cell::{Cell, CellFamily, LoadCell},
+    cell::{Cell, CellBuilder, CellFamily, LoadCell},
     merkle::MerkleProof,
     models::{Block, ShardIdent, ShardStateUnsplit, config::BlockchainConfigParams},
     prelude::HashBytes,
@@ -36,10 +37,6 @@ use rston::{
 use serde::{Deserialize, Serialize};
 use ton_hardfork::{HardforkPrevBlock, HardforkSources, ShardSource};
 use tracing::info;
-use tvm_ffi::{
-    serde::serialize_tuple,
-    stack::{Tuple, TupleItem},
-};
 
 use crate::ton::{global_config::GlobalConfig, tools::types::TonPublicKey};
 
@@ -436,7 +433,7 @@ impl LocalLiteClient {
                 },
                 method_id: ton_method_id(method),
                 params: Boc::encode(
-                    serialize_tuple(&stack)
+                    CellBuilder::build_from(&stack)
                         .context("failed to serialize canonical TVM argument stack")?,
                 ),
             }))

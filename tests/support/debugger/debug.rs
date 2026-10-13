@@ -8,6 +8,7 @@ use crate::support::snapshots::normalize_output;
 use crate::support::tempdir::create_tmp_dir;
 use anyhow::Context;
 use dap::types::StackFrame;
+use rston::models::vm::{Tuple, TupleItem};
 use std::cmp::max;
 use std::ffi::OsString;
 use std::fmt::Write as _;
@@ -20,7 +21,6 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
-use tvm_ffi::stack::{Tuple, TupleItem};
 
 pub(crate) struct ProjectRef {
     pub path: PathBuf,
