@@ -1133,7 +1133,7 @@ impl CellDataBuilder {
         }
     }
 
-    /// Stores `bits`-width [`BigInt`] to the builder.
+    /// Stores `bits`-width [`BigInt`](num_bigint::BigInt) to the builder.
     #[cfg(feature = "bigint")]
     pub fn store_bigint(
         &mut self,
@@ -1150,7 +1150,7 @@ impl CellDataBuilder {
         self.store_bigint_truncate(x, bits, signed)
     }
 
-    /// Stores `bits`-width [`BigInt`] to the builder.
+    /// Stores `bits`-width [`BigInt`](num_bigint::BigInt) to the builder.
     /// `x` bit size is ignored and only low `bits` of it are written.
     #[cfg(feature = "bigint")]
     pub fn store_bigint_truncate(
@@ -1195,7 +1195,7 @@ impl CellDataBuilder {
         }
     }
 
-    /// Stores `bits`-width [`BigUint`] to the builder.
+    /// Stores `bits`-width [`BigUint`](num_bigint::BigUint) to the builder.
     #[cfg(feature = "bigint")]
     pub fn store_biguint(
         &mut self,
@@ -1212,7 +1212,7 @@ impl CellDataBuilder {
         self.store_biguint_truncate(x, bits)
     }
 
-    /// Stores `bits`-width [`BigUint`] to the builder.
+    /// Stores `bits`-width [`BigUint`](num_bigint::BigUint) to the builder.
     /// `x` bit size is ignored and only low `bits` of it are written.
     #[cfg(feature = "bigint")]
     pub fn store_biguint_truncate(
@@ -1245,7 +1245,7 @@ impl CellDataBuilder {
         }
     }
 
-    /// Loads variable length [`BigInt`] to the builder.
+    /// Loads variable length [`BigInt`](num_bigint::BigInt) to the builder.
     #[cfg(feature = "bigint")]
     pub fn store_var_bigint(
         &mut self,
@@ -1265,7 +1265,7 @@ impl CellDataBuilder {
         self.store_bigint_truncate(x, bytes * 8, signed)
     }
 
-    /// Loads variable length [`BigInt`] to the builder.
+    /// Loads variable length [`BigInt`](num_bigint::BigInt) to the builder.
     #[cfg(feature = "bigint")]
     pub fn store_var_biguint(
         &mut self,

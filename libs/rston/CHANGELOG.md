@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.0]
+
 ### Breaking changes
 
 - `HashBytes::from_slice()` now returns `Result<HashBytes, TryFromSliceError>`.

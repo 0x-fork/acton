@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - ".github/workflows/check-rston.yml"
+      - ".github/workflows/publish-rston.yml"
       - "libs/rston/**"
       - "rust-toolchain.toml"
       - "rustfmt.toml"
@@ -14,13 +15,15 @@ on:
       - master
     paths:
       - ".github/workflows/check-rston.yml"
+      - ".github/workflows/publish-rston.yml"
       - "libs/rston/**"
       - "rust-toolchain.toml"
       - "rustfmt.toml"
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
-  group: check-rston-${{ github.ref }}
+  group: check-rston-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions: { }
@@ -48,16 +51,56 @@ jobs:
           workspaces: libs/rston -> target
 
       - name: Install Rust
-        run: rustup toolchain install
+        run: rustup toolchain install --no-self-update
 
       - name: Check formatting
         run: cargo fmt --all -- --check
 
       - name: Test library
-        run: cargo test --workspace --all-features
+        run: cargo test --workspace --all-features --locked
 
       - name: Check library
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
       - name: Check minimal features
-        run: cargo check --lib --no-default-features
+        run: cargo check --lib --no-default-features --locked
+
+      - name: Check individual features without defaults
+        run: |
+          for feature in base64 serde models sync wallet bigint rand8 rand9 rayon arbitrary; do
+            cargo check -p rston --lib --no-default-features --features "$feature" --locked
+          done
+
+      - name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --all-features --locked
+
+      - name: Verify release packages
+        run: cargo publish -p rston-proc -p rston --dry-run --locked
+
+      - name: Test release archives
+        run: |
+          rston_version=$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json, sys; print(next(p["version"] for p in json.load(sys.stdin)["packages"] if p["name"] == "rston"))')
+          rston_package_dir="$(pwd)/target/package"
+          cargo test --manifest-path "$rston_package_dir/rston-$rston_version/Cargo.toml" --all-features --offline \
+            --config "patch.crates-io.rston-proc.path=\"$rston_package_dir/rston-proc-$rston_version\""
+
+  msrv:
+    name: Check rston MSRV
+    runs-on: ubicloud-standard-2-ubuntu-2204
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: libs/rston
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust 1.88
+        run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
+      - name: Check minimal features on Rust 1.88
+        run: cargo +1.88.0 check -p rston --lib --no-default-features --locked
+      - name: Check all features on Rust 1.88
+        run: cargo +1.88.0 check -p rston --lib --all-features --locked

@@ -15,7 +15,7 @@ Add `rston` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rston = "0.3.5"
+rston = "0.4.0"
 ```
 
 ## Basic usage

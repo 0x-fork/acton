@@ -1,0 +1,83 @@
+name: Publish rston
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version shared by rston and rston-proc
+        required: true
+        default: "0.4.0"
+        type: string
+      dry_run:
+        description: Verify without publishing to crates.io
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-rston
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Validate release version
+    runs-on: ubicloud-standard-2-ubuntu-2204
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        run: rustup toolchain install --no-self-update
+      - name: Validate selected release
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          cargo metadata --manifest-path libs/rston/Cargo.toml --no-deps --format-version 1 > /tmp/rston-metadata.json
+          python3 - <<'PYTHON'
+          import json
+          import os
+
+          with open("/tmp/rston-metadata.json") as source:
+              packages = {package["name"]: package for package in json.load(source)["packages"]}
+          version = os.environ["RELEASE_VERSION"]
+          for name in ("rston", "rston-proc"):
+              if packages[name]["version"] != version:
+                  raise SystemExit(f"{name} does not match requested version {version}")
+          dependency = next(item for item in packages["rston"]["dependencies"] if item["name"] == "rston-proc")
+          if dependency["req"] != f"={version}":
+              raise SystemExit("rston must depend on the matching rston-proc version")
+          if os.environ["RELEASE_DRY_RUN"] == "false" and os.environ["GITHUB_REF"] != "refs/heads/master":
+              raise SystemExit("Publish rston from master")
+          PYTHON
+
+  verify:
+    needs: version
+    uses: ./.github/workflows/check-rston.yml
+
+  publish:
+    name: Publish both crates
+    needs: verify
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubicloud-standard-2-ubuntu-2204
+    defaults:
+      run:
+        working-directory: libs/rston
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        run: rustup toolchain install --no-self-update
+      - name: Publish release
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if [[ -z "$CARGO_REGISTRY_TOKEN" ]]; then
+            echo "Configure the CARGO_REGISTRY_TOKEN repository secret before publishing" >&2
+            exit 1
+          fi
+          cargo publish -p rston-proc -p rston --locked

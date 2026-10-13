@@ -103,11 +103,8 @@
 //! [`Cell`]: cell::Cell
 //! [`Rc`]: std::rc::Rc
 //! [`Arc`]: std::sync::Arc
-//! [`RcCell`]: prelude::RcCell
-//! [`ArcCell`]: prelude::ArcCell
 //! [`CellSlice`]: cell::CellSlice
 //! [`CellBuilder`]: cell::CellBuilder
-//! [`Cell::as_slice`]: cell::CellImpl::as_slice
 //! [`CellBuilder::build_ext`]: cell::CellBuilder::build_ext
 //! [`CellContext`]: cell::CellContext
 //! [`Boc`]: boc::Boc

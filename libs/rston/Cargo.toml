@@ -3,10 +3,24 @@ name = "rston"
 description = "TON cells, BoC encoding, dictionaries, Merkle proofs, and blockchain models."
 authors = ["Ivan Kalinin <i.kalinin@dexpa.io>"]
 repository = "https://github.com/ton-blockchain/acton"
-version = "0.3.5"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.88"
-include = ["src/**/*.rs", "resources/mnemonics/*.txt", "resources/ton_wallet_code/*.code", "benches/**/*.rs", "LICENSE-*", "README.md", "CONTRIBUTING.md"]
+readme = "README.md"
+documentation = "https://docs.rs/rston"
+keywords = ["ton", "blockchain", "cell", "boc", "wallet"]
+categories = ["data-structures", "encoding", "cryptography"]
+publish = ["crates-io"]
+include = [
+    "src/**",
+    "resources/**",
+    "tests/**",
+    "benches/**",
+    "LICENSE-*",
+    "README.md",
+    "CONTRIBUTING.md",
+    "CHANGELOG.md",
+]
 license = "MIT OR Apache-2.0"
 
 [[bench]]
@@ -96,7 +110,7 @@ tl-proto = { version = "0.5.3", optional = true }
 tycho-crypto = { version = "0.4", features = ["tl-proto"], optional = true }
 zeroize = "1"
 
-rston-proc = { version = "=0.3.0", path = "proc" }
+rston-proc = { version = "=0.4.0", path = "proc" }
 
 [dev-dependencies]
 anyhow = "1.0"
@@ -142,7 +156,7 @@ opt-level = 3
 opt-level = 1
 
 [package.metadata.docs.rs]
-features = ["base64", "serde", "models", "sync", "bigint"]
+all-features = true
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }

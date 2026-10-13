@@ -143,7 +143,7 @@ pub struct ValidatorBaseInfo {
     pub catchain_seqno: u32,
 }
 
-/// Entry value for the [`OldMcBlocksInfo`] dictionary.
+/// Entry value for the previous masterchain blocks in [`McStateExtra::prev_blocks`].
 #[derive(Debug, Clone, Eq, PartialEq, Store, Load)]
 pub struct KeyBlockRef {
     /// Whether the referenced block is a key block.
@@ -152,7 +152,7 @@ pub struct KeyBlockRef {
     pub block_ref: BlockRef,
 }
 
-/// Value augmentation for the [`OldMcBlocksInfo`] dictionary.
+/// Subtree summary for the previous masterchain blocks in [`McStateExtra::prev_blocks`].
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Store, Load)]
 pub struct KeyMaxLt {
     /// Has key block in a subtree.

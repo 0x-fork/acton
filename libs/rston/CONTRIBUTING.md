@@ -91,3 +91,49 @@ Build the API documentation:
 ```sh
 cargo doc --no-deps --all-features --open
 ```
+
+
+## Publishing a release
+
+`rston` and `rston-proc` share one release version. Update both manifests,
+the exact `rston-proc` dependency, the README example, and the changelog.
+Commit the release changes before publishing.
+
+Check Rust 1.88 with minimal and all features:
+
+```sh
+cargo +1.88.0 check -p rston --lib --no-default-features --locked
+cargo +1.88.0 check -p rston --lib --all-features --locked
+```
+
+Use Cargo 1.90 or later to verify both packages without uploading:
+
+```sh
+cargo publish -p rston-proc -p rston --dry-run --locked
+```
+
+Cargo verifies the packaged sources and resolves the macro dependency from
+its local staging registry. Inspect both archives under `target/package`.
+They include the README and both license files. The library archive also
+includes wallet resources and test fixtures.
+
+Publication is manual. The **Publish rston** GitHub Actions workflow accepts
+`version` and `dry_run` inputs. The version must match both manifests.
+Leave `dry_run` enabled to repeat verification without uploading.
+To publish, run it from `master` with `dry_run` disabled.
+Store a publishing token in the repository secret `CARGO_REGISTRY_TOKEN`.
+
+Before the first publication, sign in to crates.io, verify your email,
+and create a publishing token. The token must permit creation of both crates.
+For later releases, the token owner must own both crates.
+
+To publish the committed release from your computer:
+
+```sh
+cargo login
+cargo publish -p rston-proc -p rston --locked
+```
+
+Cargo publishes the macro crate before the library. See
+[Cargo publishing](https://doc.rust-lang.org/cargo/reference/publishing.html)
+for account and ownership requirements.
