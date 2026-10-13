@@ -13,6 +13,9 @@ All notable changes to this project will be documented in this file.
 
 ### Localnet
 
+- LiteAPI clients share the pure Rust ADNL/TCP transport from `rston`, with
+  bounded connection and request deadlines.
+
 - Publish each network's LiteServer port on loopback and include the assigned
   host port in the local global config. New networks reserve six host ports.
 

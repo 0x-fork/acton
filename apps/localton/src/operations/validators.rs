@@ -1,9 +1,9 @@
 use std::{fs, path::Path, time::Duration};
 
+use crate::ton::tools::types::parse_account_address;
 use anyhow::{Context, Result, ensure};
 use num_bigint::{BigInt, Sign};
 use serde::{Deserialize, Serialize};
-use tonutils::tvm::Address;
 
 use crate::{
     cli::{StateArgs, ValidatorCommand},
@@ -576,8 +576,8 @@ async fn reap_node(
     elector: &str,
 ) -> Result<ReapResult> {
     let wallet = wallets::wallet(&toolchain.layout, wallet_name)?;
-    let wallet_address = Address::from_str(&wallet.address)?;
-    let wallet_hash = BigInt::from_bytes_be(Sign::Plus, &wallet_address.hash_part);
+    let wallet_address = parse_account_address(&wallet.address)?;
+    let wallet_hash = BigInt::from_bytes_be(Sign::Plus, wallet_address.address.as_slice());
     let available_nano = run_method_u64(
         toolchain,
         elector,

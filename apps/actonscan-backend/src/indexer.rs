@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use ton_indexer_core::{
     Batch, BlockSource, CanonicalBlockSource, CheckpointStore, IndexPipeline, RunOutcome, Sink,
 };
-use ton_indexer_liteserver::TonutilsLiteClient;
+use ton_indexer_liteserver::LiteClient;
 use ton_indexer_p2p::{P2pBlockSource, start};
 use ton_p2p::{Client, ClientOptions, NetworkConfig, NetworkOptions, load_identity};
 
@@ -89,7 +89,7 @@ async fn run_connection(
         return run_pipeline(source, config, tps_stats, opcode_stats, storage).await;
     }
 
-    let mut client = TonutilsLiteClient::connect_path_with_parallelism(
+    let mut client = LiteClient::connect_path_with_parallelism(
         &config.global_config_path,
         config.parallelism,
     )

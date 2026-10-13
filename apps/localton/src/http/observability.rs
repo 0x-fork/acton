@@ -8,6 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::ton::tools::types::parse_account_address;
 use anyhow::{Context, Result};
 use axum::{
     Json, Router,
@@ -27,7 +28,6 @@ use localton_indexer::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::{sync::RwLock, sync::watch, task::JoinHandle, time::MissedTickBehavior};
-use tonutils::tvm::Address;
 #[cfg(debug_assertions)]
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::{info, warn};
@@ -775,8 +775,12 @@ async fn publish_runtime_observation(
         validator_stake_nano,
         validator_wallet_address: validator_wallet
             .as_ref()
-            .and_then(|wallet| Address::from_str(&wallet.address).ok())
-            .map(|address| address.to_string(true, true, true, true)),
+            .and_then(|wallet| parse_account_address(&wallet.address).ok())
+            .map(|address| {
+                let mut display = address.display_base64_url(true);
+                display.flags.testnet = true;
+                display.to_string()
+            }),
         validator_wallet_version: validator_wallet.map(|wallet| wallet.version.as_str().to_owned()),
     };
     let observation = store.write().await.publish(telemetry, now, ttl_seconds)?;

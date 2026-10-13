@@ -19,6 +19,15 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
 use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
 
+/// Parse a standard account address from raw, base64, or URL-safe base64 text.
+/// Address flags affect presentation; callers choose bounce and network flags
+/// separately when building a message or displaying an address.
+pub fn parse_account_address(value: &str) -> Result<rston::models::StdAddr> {
+    rston::models::StdAddr::from_str_ext(value, rston::models::StdAddrFormat::any())
+        .map(|(address, _)| address)
+        .with_context(|| format!("invalid TON address `{value}`"))
+}
+
 const ED25519_PUBLIC_KEY_TL_CONSTRUCTOR: [u8; 4] = [0xc6, 0xb4, 0x13, 0x48];
 
 /// Execution policy and diagnostic identity shared by one semantic tool call.
@@ -730,6 +739,22 @@ mod tests {
     use expect_test::expect;
 
     use super::*;
+
+    #[test]
+    fn account_addresses_accept_raw_and_friendly_formats() {
+        let address = rston::models::StdAddr::new(-1, rston::cell::HashBytes([7; 32]));
+        let formats = [
+            address.to_string(),
+            address.display_base64(true).to_string(),
+            address.display_base64_url(false).to_string(),
+        ];
+
+        for text in formats {
+            assert_eq!(parse_account_address(&text).unwrap(), address);
+        }
+
+        assert!(parse_account_address("not an address").is_err());
+    }
 
     #[test]
     fn key_ids_have_one_canonical_spelling() {

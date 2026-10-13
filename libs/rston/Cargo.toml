@@ -86,6 +86,16 @@ members = ["proc", "fuzz"]
 
 [dependencies]
 ahash = "0.8.11"
+aes = { version = "0.8", optional = true }
+ctr = { version = "0.9", optional = true }
+futures = { version = "0.3", optional = true }
+log = { version = "0.4", optional = true }
+pin-project = { version = "1.1", optional = true }
+serde_json = { version = "1", optional = true }
+tokio = { version = "1", features = ["net", "io-util", "time", "rt", "sync"], optional = true }
+tokio-tower = { version = "0.6", optional = true }
+tokio-util = { version = "0.7", features = ["codec"], optional = true }
+tower = { version = "0.5", features = ["make", "util"], optional = true }
 arbitrary = { version = "1", features = ["derive"], optional = true }
 base64 = { version = "0.22", optional = true }
 bip39 = { version = "2.2", features = ["zeroize"] }
@@ -113,6 +123,8 @@ zeroize = "1"
 rston-proc = { version = "=0.4.0", path = "proc" }
 
 [dev-dependencies]
+tl-scheme = "0.3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "test-util"] }
 anyhow = "1.0"
 base64 = "0.22"
 criterion = "0.7"
@@ -131,6 +143,9 @@ sync = ["dep:scc"]
 serde = ["dep:serde", "base64"]
 rand8 = ["dep:rand8"]
 rand9 = ["dep:rand9"]
+tl = ["dep:tl-proto", "dep:tycho-crypto", "dep:rand8"]
+adnl = ["tl", "dep:aes", "dep:ctr", "dep:futures", "dep:pin-project", "dep:log", "dep:tokio", "dep:tokio-util", "tycho-crypto/serde"]
+liteclient = ["adnl", "dep:tower", "dep:tokio-tower", "dep:serde", "dep:serde_json", "base64"]
 models = ["dep:tycho-crypto", "dep:tl-proto"]
 wallet = ["models", "base64", "sync"]
 rayon = ["sync", "dep:rayon", "dep:dashmap"]

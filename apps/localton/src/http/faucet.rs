@@ -7,6 +7,7 @@
 
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
+use crate::ton::tools::types::parse_account_address;
 use anyhow::{Context, Result, bail};
 use axum::{
     Json,
@@ -22,7 +23,6 @@ use toncenter::v2::{
     requests::{SendBocRequest, TransactionsRequest},
     responses::{ExtMessageInfo, Transaction},
 };
-use tonutils::tvm::Address;
 use utoipa::ToSchema;
 
 use crate::operations::wallets;
@@ -258,7 +258,7 @@ async fn transactions(state: &State, source_address: &str) -> Result<Vec<Transac
 }
 
 fn same_ton_address(left: &str, right: &str) -> bool {
-    match (Address::from_str(left), Address::from_str(right)) {
+    match (parse_account_address(left), parse_account_address(right)) {
         (Ok(left), Ok(right)) => left == right,
         _ => left == right,
     }

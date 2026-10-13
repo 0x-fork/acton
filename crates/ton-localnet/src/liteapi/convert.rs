@@ -1,8 +1,8 @@
 use crate::LocalnetError;
 use crate::localnet::{LocalnetBlockHeader, LocalnetBlockId, LocalnetMasterchainInfo};
 use crate::types::Addr;
-use ton_liteapi::tl::common::{AccountId, BlockIdExt, Int256, ZeroStateIdExt};
-use ton_liteapi::tl::response::{BlockHeader, MasterchainInfo, MasterchainInfoExt};
+use rston::tl::common::{AccountId, BlockIdExt, Int256, ZeroStateIdExt};
+use rston::tl::response::{BlockHeader, MasterchainInfo, MasterchainInfoExt};
 
 use super::{LITEAPI_CAPABILITIES, LITEAPI_VERSION};
 

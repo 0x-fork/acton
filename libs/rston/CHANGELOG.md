@@ -10,6 +10,11 @@
 
 ### Added
 
+- Optional `tl`, `adnl`, and `liteclient` modules provide LiteAPI wire types,
+  ADNL/TCP client and server transport, raw and typed queries, bounded waits,
+  multiple liteservers, and global network configuration. Network responses
+  require proof verification by the caller.
+
 - Verify Simplex finalization signatures against an expected block and trusted
   validator subset, including candidate binding, signature count and weight,
   validator metadata, and a quorum strictly greater than two thirds.

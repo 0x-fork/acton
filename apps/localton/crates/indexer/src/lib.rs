@@ -20,7 +20,7 @@ use ton_indexer_core::{
     Batch, BlockId, CanonicalBlockSource, CheckpointStore, Error as IndexerError, IndexPipeline,
     Sink,
 };
-use ton_indexer_liteserver::TonutilsLiteClient;
+use ton_indexer_liteserver::LiteClient;
 use tracing::{info, warn};
 
 // Covers at least fifteen minutes at Localton's fastest supported 400 ms cadence.
@@ -388,7 +388,7 @@ async fn run_session(
     shutdown: &mut watch::Receiver<bool>,
     started_at: Instant,
 ) -> Result<(), StoreError> {
-    let mut client = TonutilsLiteClient::connect_path(global_config)
+    let mut client = LiteClient::connect_path(global_config)
         .await
         .map_err(StoreError::source)?;
     let latest = client.latest().await.map_err(StoreError::source)?;

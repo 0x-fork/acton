@@ -1,25 +1,27 @@
 //! Direct `LiteAPI` source for canonical, decoded TON batches.
 //!
-//! [`TonutilsLiteClient`] owns the ADNL/LiteAPI transport. Canonical traversal
+//! [`LiteClient`] owns the ADNL/LiteAPI transport. Canonical traversal
 //! lives in [`ton_indexer_core::CanonicalBlockSource`] and is shared with P2P.
-
-#[cfg(test)]
-mod tests;
 
 use std::{collections::HashMap, path::Path, time::Duration};
 
 use async_trait::async_trait;
 use futures::{StreamExt, future::join_all, stream::FuturesUnordered};
+use rston::{
+    liteclient::{
+        ConfigGlobal, ConfigLiteServer, LiteClient as TransportLiteClient, LiteClientOptions,
+    },
+    tl::{
+        common::{BlockId as LiteBlockId, BlockIdExt as LiteBlockIdExt, Int256},
+        request::{GetBlock, GetOutMsgQueueSizes, LookupBlock, Request},
+        response::{BlockData as LiteBlockData, BlockHeader, MasterchainInfo, OutMsgQueueSizes},
+    },
+};
 use ton_indexer_core::{
     BlockData, BlockGraphClient, BlockId, BlockIdShort, Hash256, RawBlock, SourceError,
 };
-use tonutils::{
-    liteclient::client::LiteClient,
-    network_config::{ConfigGlobal, ConfigLiteServer},
-    tl::common::{BlockId as LiteBlockId, BlockIdExt as LiteBlockIdExt, Int256},
-};
 
-/// Counts `LiteServer` TL requests issued by [`TonutilsLiteClient`].
+/// Counts `LiteServer` TL requests issued by [`LiteClient`].
 ///
 /// The counters are incremented immediately before a request is sent, so failed
 /// requests are included. Establishing the ADNL connection itself is a transport
@@ -69,15 +71,15 @@ impl LiteRequestStats {
     }
 }
 
-/// Direct ADNL/LiteAPI client backed by `tonutils`.
-pub struct TonutilsLiteClient {
-    inner: LiteClient,
-    exact_clients: Vec<LiteClient>,
+/// Direct ADNL/LiteAPI client backed by `rston::liteclient`.
+pub struct LiteClient {
+    inner: TransportLiteClient,
+    exact_clients: Vec<TransportLiteClient>,
     decoded: HashMap<BlockId, BlockData>,
     request_stats: LiteRequestStats,
 }
 
-impl TonutilsLiteClient {
+impl LiteClient {
     const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
     const WORKER_CONNECT_TIMEOUT: Duration = Duration::from_secs(1);
     const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
@@ -212,7 +214,7 @@ impl TonutilsLiteClient {
         self.request_stats.get_masterchain_info += 1;
         let info = self
             .inner
-            .get_masterchain_info()
+            .query_typed::<MasterchainInfo>(Request::GetMasterchainInfo)
             .await
             .map_err(|error| SourceError::Transport(error.to_string()))?;
 
@@ -248,7 +250,11 @@ impl TonutilsLiteClient {
     pub async fn out_msg_queue_size(&mut self) -> Result<u64, SourceError> {
         let sizes = self
             .inner
-            .get_out_msg_queue_sizes(None)
+            .query_typed::<OutMsgQueueSizes>(Request::GetOutMsgQueueSizes(GetOutMsgQueueSizes {
+                mode: (),
+                wc: None,
+                shard: None,
+            }))
             .await
             .map_err(|error| SourceError::Transport(error.to_string()))?;
 
@@ -282,31 +288,36 @@ impl TonutilsLiteClient {
 async fn connect_liteserver(
     liteserver: &ConfigLiteServer,
     connect_timeout: Duration,
-) -> (bool, Result<LiteClient, String>) {
-    let connection = LiteClient::connect_with_timeout(
-        liteserver.socket_addr(),
-        liteserver.public_key(),
-        connect_timeout,
+) -> (bool, Result<TransportLiteClient, String>) {
+    let connection = TransportLiteClient::connect_liteserver(
+        liteserver,
+        LiteClientOptions {
+            connect_timeout,
+            request_timeout: LiteClient::REQUEST_TIMEOUT,
+        },
     )
     .await;
     let mut client = match connection {
-        Ok(client) => client.with_request_timeout(TonutilsLiteClient::REQUEST_TIMEOUT),
+        Ok(client) => client,
         Err(error) => return (false, Err(format!("connect failed: {error}"))),
     };
 
-    match client.get_masterchain_info().await {
+    match client
+        .query_typed::<MasterchainInfo>(Request::GetMasterchainInfo)
+        .await
+    {
         Ok(_) => (true, Ok(client)),
         Err(error) => (true, Err(format!("probe failed: {error}"))),
     }
 }
 
 #[async_trait]
-impl BlockGraphClient for TonutilsLiteClient {
+impl BlockGraphClient for LiteClient {
     async fn latest_masterchain_block(&mut self) -> Result<BlockId, SourceError> {
         self.request_stats.get_masterchain_info += 1;
         let info = self
             .inner
-            .get_masterchain_info()
+            .query_typed::<MasterchainInfo>(Request::GetMasterchainInfo)
             .await
             .map_err(|error| SourceError::Transport(error.to_string()))?;
         from_lite_block_id(&info.last)
@@ -317,28 +328,28 @@ impl BlockGraphClient for TonutilsLiteClient {
         self.request_stats.lookup_block += 1;
         let header = self
             .inner
-            .lookup_block(
-                (),
-                lite_id,
-                Some(()),
-                None,
-                None,
-                false,
-                false,
-                false,
-                false,
-                false,
-            )
+            .query_typed::<BlockHeader>(Request::LookupBlock(LookupBlock {
+                mode: (),
+                id: lite_id,
+                seqno: Some(()),
+                lt: None,
+                utime: None,
+                with_state_update: None,
+                with_value_flow: None,
+                with_extra: None,
+                with_shard_hashes: None,
+                with_prev_blk_signatures: None,
+            }))
             .await
             .map_err(|error| SourceError::Transport(error.to_string()))?;
         let full_id = from_lite_block_id(&header.id)?;
         self.request_stats.get_block += 1;
         let boc = self
             .inner
-            .get_block(header.id)
+            .query_typed::<LiteBlockData>(Request::GetBlock(GetBlock { id: header.id }))
             .await
             .map_err(|error| SourceError::Transport(error.to_string()))?;
-        Ok(RawBlock::new(full_id, boc))
+        Ok(RawBlock::new(full_id, boc.data))
     }
 
     async fn load_block_exact(&mut self, id: BlockId) -> Result<RawBlock, SourceError> {
@@ -369,8 +380,7 @@ impl BlockGraphClient for TonutilsLiteClient {
 
             for result in join_all(requests).await {
                 let (id, boc) = result?;
-                // `tonutils::get_block` returns only the response payload. Decode
-                // it now to verify both hashes and all block coordinates. Caching
+                // Decode the response payload to verify both hashes and all block coordinates. Caching
                 // also prevents a second decode during traversal.
                 self.decoded.insert(id, BlockData::decode(id, &boc)?);
                 blocks.push(RawBlock::new(id, boc));
@@ -417,14 +427,16 @@ fn to_lite_block_id_ext(id: BlockId) -> Result<LiteBlockIdExt, SourceError> {
 }
 
 async fn download_exact_block(
-    client: &mut LiteClient,
+    client: &mut TransportLiteClient,
     id: BlockId,
 ) -> Result<(BlockId, Vec<u8>), SourceError> {
     let boc = client
-        .get_block(to_lite_block_id_ext(id)?)
+        .query_typed::<LiteBlockData>(Request::GetBlock(GetBlock {
+            id: to_lite_block_id_ext(id)?,
+        }))
         .await
         .map_err(|error| SourceError::Transport(error.to_string()))?;
-    Ok((id, boc))
+    Ok((id, boc.data))
 }
 
 fn from_lite_block_id(id: &LiteBlockIdExt) -> Result<BlockId, SourceError> {
@@ -437,3 +449,6 @@ fn from_lite_block_id(id: &LiteBlockIdExt) -> Result<BlockId, SourceError> {
         file_hash: Hash256::new(id.file_hash.0),
     })
 }
+
+#[cfg(test)]
+mod tests;

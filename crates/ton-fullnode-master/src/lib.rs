@@ -9,7 +9,7 @@
 //! The cheapest network path into a stock node is its full-node *master*. When
 //! `fullnodeslaves` is set in the engine config, `FullNodeImpl::get_query_sender`
 //! routes every download query to that master over ADNL-over-TCP — the same
-//! transport the liteserver uses, which [`ton_liteapi`] already implements. The
+//! transport the liteserver uses, which [`rston::adnl`] already implements. The
 //! answers travel the ordinary `DownloadBlockNew` path, so the block is accepted
 //! as a normal download instead of a fork, and only its `BlockProof` link is
 //! verified.
@@ -26,12 +26,12 @@ use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
 use futures::{SinkExt, StreamExt};
+use rston::adnl::AdnlPeer;
+use rston::adnl::crypto::{KeyPair, SecretKey};
 use rston::models::block::BlockId;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::RwLock;
 use tokio_util::bytes::Bytes;
-use ton_liteapi::adnl::AdnlPeer;
-use ton_liteapi::adnl::crypto::{KeyPair, SecretKey};
 
 use self::tl::{Answer, BlockIdExt, Query, TON_NODE_QUERY_PREFIX};
 
@@ -133,7 +133,7 @@ impl BlockSource {
 
     /// Builds the ADNL response for one inbound ADNL packet.
     async fn respond(&self, packet: &[u8]) -> anyhow::Result<Option<Bytes>> {
-        use ton_liteapi::tl::adnl::Message;
+        use rston::tl::adnl::Message;
 
         let Ok(message) = tl_proto::deserialize::<Message>(packet) else {
             return Ok(None);

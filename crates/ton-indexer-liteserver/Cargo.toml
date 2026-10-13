@@ -14,11 +14,7 @@ async-trait.workspace = true
 futures.workspace = true
 tokio.workspace = true
 ton-indexer-core = { path = "../ton-indexer-core" }
-tonutils = { version = "=1.1.0", default-features = false, features = [
-  "liteclient",
-  "network-config",
-  "std",
-] }
+rston = { workspace = true, features = ["liteclient"] }
 
 [dev-dependencies]
 tokio.workspace = true

@@ -67,7 +67,7 @@ jobs:
 
       - name: Check individual features without defaults
         run: |
-          for feature in base64 serde models sync wallet bigint rand8 rand9 rayon arbitrary; do
+          for feature in base64 serde models sync wallet bigint rand8 rand9 rayon arbitrary tl adnl liteclient; do
             cargo check -p rston --lib --no-default-features --features "$feature" --locked
           done
 

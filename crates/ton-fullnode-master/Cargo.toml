@@ -11,14 +11,13 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ton-liteapi = { workspace = true }
 anyhow = { workspace = true }
 futures = { workspace = true }
 tl-proto = { workspace = true }
 tokio = { workspace = true, features = ["net", "rt", "sync", "macros"] }
 tokio-util = { workspace = true, features = ["codec"] }
 tracing = { workspace = true }
-rston = { workspace = true }
+rston = { workspace = true, features = ["adnl"] }
 
 [lints]
 workspace = true

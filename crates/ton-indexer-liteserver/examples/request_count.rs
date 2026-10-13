@@ -6,7 +6,7 @@
 use std::{env, error::Error, time::Instant};
 
 use ton_indexer_core::CanonicalBlockSource;
-use ton_indexer_liteserver::{LiteRequestStats, TonutilsLiteClient};
+use ton_indexer_liteserver::{LiteClient, LiteRequestStats};
 
 const MAINNET_CONFIG: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -38,8 +38,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("config: {config}");
     println!("connecting to the first responsive configured liteserver...");
     let connect_started = Instant::now();
-    let mut client =
-        TonutilsLiteClient::connect_path_with_parallelism(&config, parallelism).await?;
+    let mut client = LiteClient::connect_path_with_parallelism(&config, parallelism).await?;
     print_stats(
         "connect probe",
         client.request_stats(),

@@ -5,6 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::ton::tools::types::parse_account_address;
 use anyhow::{Context, Result, anyhow, ensure};
 use crc::{CRC_16_XMODEM, Crc};
 use num_bigint::BigInt;
@@ -15,22 +16,25 @@ use rston::{
     models::{Block, ShardIdent, ShardStateUnsplit, config::BlockchainConfigParams},
     prelude::HashBytes,
 };
-use serde::{Deserialize, Serialize};
-use ton_hardfork::{HardforkPrevBlock, HardforkSources, ShardSource};
-use tonutils::{
-    liteclient::{
-        boc::{SimpleAccount, SimpleAccountState},
-        client::LiteClient,
-    },
-    network_config::{ConfigGlobal, ConfigLiteServer, ConfigPublicKey},
+use rston::{
+    liteclient::{ConfigGlobal, ConfigLiteServer, ConfigPublicKey, LiteClient, LiteClientOptions},
+    models::{AccountState, OptionalAccount},
     tl::{
         Int256,
-        common::{BlockId, BlockIdExt},
-        response::TransactionId,
+        common::{AccountId, BlockId, BlockIdExt},
+        request::{
+            GetAccountState, GetBlock, GetConfigParams, GetState, ListBlockTransactions,
+            LookupBlock, Request, RunSmcMethod, SendMessage,
+        },
+        response::{
+            AccountState as AccountStateResponse, BlockData, BlockHeader, BlockState,
+            BlockTransactions, ConfigInfo, MasterchainInfo, RunMethodResult, SendMsgStatus,
+            TransactionId,
+        },
     },
-    tlb::Account,
-    tvm::Address,
 };
+use serde::{Deserialize, Serialize};
+use ton_hardfork::{HardforkPrevBlock, HardforkSources, ShardSource};
 use tracing::info;
 use tvm_ffi::{
     serde::serialize_tuple,
@@ -48,11 +52,7 @@ const RUN_METHOD_MODE: u32 = 0x17;
 
 /// Computes the selector used by TON to dispatch a named get method.
 ///
-/// TON deliberately uses CRC-16/XMODEM here. `tonutils::method_name_to_id`
-/// currently uses CRC-16/IBM-SDLC, which produces a different selector and can
-/// make the VM execute the contract fallback path instead of the requested
-/// method. Keeping this small protocol rule next to the liteserver adapter makes
-/// every Localton get-method call use the same ID as the official lite-client.
+/// Named methods use CRC-16/XMODEM with bit 16 set, as in the official lite-client.
 fn ton_method_id(name: &str) -> u64 {
     const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
     u64::from(CRC16.checksum(name.as_bytes())) | 0x1_0000
@@ -96,7 +96,7 @@ impl LocalLiteClient {
     /// cannot prevent the remaining authenticated endpoints from being tried.
     pub async fn connect(global_config: &Path) -> Result<Self> {
         let config = GlobalConfig::load(global_config)?;
-        Self::connect_config(tonutils_config(&config)).await
+        Self::connect_config(liteapi_config(&config)).await
     }
 
     /// Connects directly to one host-local liteserver from its typed endpoint identity.
@@ -105,7 +105,7 @@ impl LocalLiteClient {
     /// path neither reads nor rewrites the durable network configuration.
     pub async fn connect_node(port: u16, public_key: TonPublicKey) -> Result<Self> {
         let config = ConfigGlobal {
-            liteservers: vec![tonutils_liteserver(Ipv4Addr::LOCALHOST, port, public_key)],
+            liteservers: vec![liteapi_liteserver(Ipv4Addr::LOCALHOST, port, public_key)],
         };
 
         Self::connect_config(config).await
@@ -121,10 +121,12 @@ impl LocalLiteClient {
         let mut failures = Vec::with_capacity(config.liteservers.len());
         for liteserver in &config.liteservers {
             let endpoint = liteserver.socket_addr();
-            match LiteClient::connect_with_timeout(
-                endpoint,
-                liteserver.public_key(),
-                CONNECT_TIMEOUT,
+            match LiteClient::connect_liteserver(
+                liteserver,
+                LiteClientOptions {
+                    connect_timeout: CONNECT_TIMEOUT,
+                    ..Default::default()
+                },
             )
             .await
             {
@@ -142,7 +144,11 @@ impl LocalLiteClient {
     /// Downloads both chain states at one paused head and authenticates their roots.
     /// The caller owns suspending block production; a changed head rejects the snapshot.
     pub async fn hardfork_sources(&mut self, cache_dir: &Path) -> Result<HardforkSources> {
-        let head = self.inner.get_masterchain_info().await?.last;
+        let head = self
+            .inner
+            .query_typed::<MasterchainInfo>(Request::GetMasterchainInfo)
+            .await?
+            .last;
         let mc = self.complete_state(head.clone(), cache_dir).await?;
         let state = mc.parse::<ShardStateUnsplit>()?;
         let shards = state
@@ -177,7 +183,11 @@ impl LocalLiteClient {
             });
         }
         ensure!(
-            self.inner.get_masterchain_info().await?.last == head,
+            self.inner
+                .query_typed::<MasterchainInfo>(Request::GetMasterchainInfo)
+                .await?
+                .last
+                == head,
             "Chain advanced while reading hardfork sources"
         );
         Ok(HardforkSources {
@@ -192,7 +202,11 @@ impl LocalLiteClient {
     }
 
     async fn checked_block(&mut self, id: BlockIdExt) -> Result<Block> {
-        let bytes = self.inner.get_block(id.clone()).await?;
+        let bytes = self
+            .inner
+            .query_typed::<BlockData>(Request::GetBlock(GetBlock { id: id.clone() }))
+            .await?
+            .data;
         let root = Boc::decode(&bytes)?;
         ensure!(
             root.repr_hash().0 == id.root_hash.0 && Boc::file_hash(&bytes).0 == id.file_hash.0,
@@ -247,7 +261,12 @@ impl LocalLiteClient {
                         .load()?
                         .new_hash
                 };
-                let cell = Boc::decode(self.inner.get_state(seed).await?.data)?;
+                let cell = Boc::decode(
+                    self.inner
+                        .query_typed::<BlockState>(Request::GetState(GetState { id: seed }))
+                        .await?
+                        .data,
+                )?;
                 ensure!(
                     *cell.repr_hash() == expected,
                     "Initial state does not match its block"
@@ -296,21 +315,32 @@ impl LocalLiteClient {
     pub async fn last(&mut self) -> Result<BlockRef> {
         let info = self
             .inner
-            .get_masterchain_info()
+            .query_typed::<MasterchainInfo>(Request::GetMasterchainInfo)
             .await
             .context("getMasterchainInfo failed")?;
         Ok(info.last.into())
     }
 
     pub async fn account(&mut self, address: &str) -> Result<AccountInfo> {
-        let parsed = Address::from_str(address)
+        let parsed = parse_account_address(address)
             .with_context(|| format!("invalid TON address `{address}`"))?;
-        let account = self
+        let block = self
             .inner
-            .get_account_state_simple(parsed)
+            .query_typed::<MasterchainInfo>(Request::GetMasterchainInfo)
+            .await?
+            .last;
+        let response = self
+            .inner
+            .query_typed::<AccountStateResponse>(Request::GetAccountState(GetAccountState {
+                id: block,
+                account: AccountId {
+                    workchain: i32::from(parsed.workchain),
+                    id: Int256(parsed.address.0),
+                },
+            }))
             .await
             .with_context(|| format!("getAccountState failed for {address}"))?;
-        Ok(account_info(address, account))
+        account_info(address, response)
     }
 
     pub async fn block(
@@ -337,7 +367,16 @@ impl LocalLiteClient {
         // pruned exotic cells even though the four requested config values exist.
         let response = self
             .inner
-            .list_block_transactions(id, count, None, false, false)
+            .query_typed::<BlockTransactions>(Request::ListBlockTransactions(
+                ListBlockTransactions {
+                    id,
+                    mode: (),
+                    count,
+                    after: None,
+                    reverse_order: None,
+                    want_proof: None,
+                },
+            ))
             .await
             .context("listBlockTransactions failed")?;
         Ok((
@@ -349,8 +388,9 @@ impl LocalLiteClient {
 
     pub async fn send_boc(&mut self, body: Vec<u8>) -> Result<u32> {
         self.inner
-            .send_message(body)
+            .query_typed::<SendMsgStatus>(Request::SendMessage(SendMessage { body }))
             .await
+            .map(|response| response.status)
             .context("sendMessage failed")
     }
 
@@ -367,11 +407,11 @@ impl LocalLiteClient {
         method: &str,
         arguments: Vec<BigInt>,
     ) -> Result<Cell> {
-        let account = Address::from_str(address)
+        let account = parse_account_address(address)
             .with_context(|| format!("invalid TON address `{address}`"))?;
         let block = self
             .inner
-            .get_masterchain_info()
+            .query_typed::<MasterchainInfo>(Request::GetMasterchainInfo)
             .await
             .context("getMasterchainInfo failed before run method")?
             .last;
@@ -387,16 +427,19 @@ impl LocalLiteClient {
         }
         let result = self
             .inner
-            .run_smc_method(
-                RUN_METHOD_MODE,
-                block,
-                account,
-                ton_method_id(method),
-                Boc::encode(
+            .query_typed::<RunMethodResult>(Request::RunSmcMethod(RunSmcMethod {
+                mode: RUN_METHOD_MODE,
+                id: block,
+                account: AccountId {
+                    workchain: i32::from(account.workchain),
+                    id: Int256(account.address.0),
+                },
+                method_id: ton_method_id(method),
+                params: Boc::encode(
                     serialize_tuple(&stack)
                         .context("failed to serialize canonical TVM argument stack")?,
                 ),
-            )
+            }))
             .await
             .with_context(|| format!("run get method `{method}` failed for {address}"))?;
         anyhow::ensure!(
@@ -421,15 +464,28 @@ impl LocalLiteClient {
     pub async fn config_params(&mut self, params: Vec<i32>) -> Result<BlockchainConfigParams> {
         let block = self
             .inner
-            .get_masterchain_info()
+            .query_typed::<MasterchainInfo>(Request::GetMasterchainInfo)
             .await
             .context("getMasterchainInfo failed before config query")?
             .last;
         let response = self
             .inner
-            .get_config_params(
-                block, params, true, true, true, true, true, true, true, true, true, true, false,
-            )
+            .query_typed::<ConfigInfo>(Request::GetConfigParams(GetConfigParams {
+                mode: (),
+                id: block,
+                param_list: params,
+                with_state_root: Some(()),
+                with_libraries: Some(()),
+                with_state_extra_root: Some(()),
+                with_shard_hashes: Some(()),
+                with_validator_set: Some(()),
+                with_special_smc: Some(()),
+                with_accounts_root: Some(()),
+                with_prev_blocks: Some(()),
+                with_workchain_info: Some(()),
+                with_capabilities: Some(()),
+                extract_from_key_block: None,
+            }))
             .await
             .context("getConfigParams failed")?;
         let proof_root = Boc::decode(&response.config_proof)
@@ -456,22 +512,22 @@ impl LocalLiteClient {
         let seqno = i32::try_from(seqno).context("block seqno exceeds i32")?;
         let header = self
             .inner
-            .lookup_block(
-                (),
-                BlockId {
+            .query_typed::<BlockHeader>(Request::LookupBlock(LookupBlock {
+                mode: (),
+                id: BlockId {
                     workchain,
                     shard,
                     seqno,
                 },
-                Some(()),
-                None,
-                None,
-                false,
-                false,
-                false,
-                false,
-                false,
-            )
+                seqno: Some(()),
+                lt: None,
+                utime: None,
+                with_state_update: None,
+                with_value_flow: None,
+                with_extra: None,
+                with_shard_hashes: None,
+                with_prev_blk_signatures: None,
+            }))
             .await
             .context("lookupBlock failed")?;
         Ok(header.id)
@@ -480,26 +536,26 @@ impl LocalLiteClient {
     async fn download_block(&mut self, id: BlockIdExt) -> Result<(BlockRef, Vec<u8>)> {
         let bytes = self
             .inner
-            .get_block(id.clone())
+            .query_typed::<BlockData>(Request::GetBlock(GetBlock { id: id.clone() }))
             .await
             .context("getBlock failed")?;
-        Ok((id.into(), bytes))
+        Ok((id.into(), bytes.data))
     }
 }
 
-/// Converts Localton's complete network config to the subset consumed by tonutils.
-fn tonutils_config(config: &GlobalConfig) -> ConfigGlobal {
+/// Converts Localton's complete network config to the subset consumed by the LiteAPI client.
+fn liteapi_config(config: &GlobalConfig) -> ConfigGlobal {
     ConfigGlobal {
         liteservers: config
             .liteserver_endpoints()
-            .map(|(ip, port, public_key)| tonutils_liteserver(ip, port, public_key))
+            .map(|(ip, port, public_key)| liteapi_liteserver(ip, port, public_key))
             .collect(),
     }
 }
 
-fn tonutils_liteserver(ip: Ipv4Addr, port: u16, public_key: TonPublicKey) -> ConfigLiteServer {
+fn liteapi_liteserver(ip: Ipv4Addr, port: u16, public_key: TonPublicKey) -> ConfigLiteServer {
     ConfigLiteServer {
-        ip: i32::from_be_bytes(ip.octets()).into(),
+        ip: i32::from_be_bytes(ip.octets()),
         port,
         id: ConfigPublicKey::Ed25519 {
             key: *public_key.as_bytes(),
@@ -553,26 +609,33 @@ impl From<TransactionId> for TransactionRef {
     }
 }
 
-fn account_info(address: &str, account: SimpleAccount) -> AccountInfo {
-    let state = match account.state {
-        SimpleAccountState::None => "nonexist",
-        SimpleAccountState::Uninit => "uninit",
-        SimpleAccountState::Frozen => "frozen",
-        SimpleAccountState::Active => "active",
+/// Decode account storage without treating the response as a verified state proof.
+/// The transaction hash is unavailable without extracting an authenticated shard account.
+fn account_info(address: &str, response: AccountStateResponse) -> Result<AccountInfo> {
+    let account = if response.state.is_empty() {
+        None
+    } else {
+        Boc::decode(&response.state)?.parse::<OptionalAccount>()?.0
     };
-    let balance_nano = match account.account.as_ref() {
-        Some(Account::Full { storage, .. }) => storage.balance.grams.0.to_string(),
-        Some(Account::None) | None => "0".to_owned(),
+    let state = match account.as_ref().map(|account| &account.state) {
+        None => "nonexist",
+        Some(AccountState::Uninit) => "uninit",
+        Some(AccountState::Frozen(_)) => "frozen",
+        Some(AccountState::Active(_)) => "active",
     };
-    AccountInfo {
+
+    Ok(AccountInfo {
         address: address.to_owned(),
         state: state.to_owned(),
-        balance_nano,
-        last_transaction_lt: account.last_transaction_lt,
-        last_transaction_hash: account.last_transaction_hash.map(hex::encode),
-        block: account.block_id.into(),
-        shard_block: account.shard_block_id.into(),
-    }
+        balance_nano: account
+            .as_ref()
+            .map(|account| account.balance.tokens.into_inner().to_string())
+            .unwrap_or_else(|| "0".to_owned()),
+        last_transaction_lt: account.as_ref().map(|account| account.last_trans_lt),
+        last_transaction_hash: None,
+        block: response.id.into(),
+        shard_block: response.shardblk.into(),
+    })
 }
 
 pub fn require_existing_config(path: &Path) -> Result<()> {
@@ -597,10 +660,60 @@ fn save_state_cache(path: &Path, cell: &Cell) -> Result<()> {
 mod tests {
     use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
 
-    use tonutils::network_config::ConfigGlobal;
+    use rston::liteclient::ConfigGlobal;
 
-    use super::{LocalLiteClient, parse_shard, ton_method_id, tonutils_liteserver};
+    use super::{LocalLiteClient, liteapi_liteserver, parse_shard, ton_method_id};
     use crate::ton::tools::types::TonPublicKey;
+
+    #[test]
+    fn account_view_decodes_canonical_states_and_balances() {
+        use rston::cell::CellBuilder;
+        use rston::models::{
+            Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, StdAddr,
+        };
+
+        let address = StdAddr::new(0, rston::cell::HashBytes([3; 32]));
+        let states = [
+            (AccountState::Uninit, "uninit"),
+            (
+                AccountState::Frozen(rston::cell::HashBytes([4; 32])),
+                "frozen",
+            ),
+            (AccountState::Active(Default::default()), "active"),
+        ];
+        let block = rston::tl::BlockIdExt {
+            workchain: -1,
+            shard: i64::MIN,
+            seqno: 7,
+            root_hash: rston::tl::Int256([1; 32]),
+            file_hash: rston::tl::Int256([2; 32]),
+        };
+
+        for (state, expected) in states {
+            let account = OptionalAccount(Some(Account {
+                address: IntAddr::Std(address.clone()),
+                storage_stat: Default::default(),
+                last_trans_lt: 42,
+                balance: CurrencyCollection::new(123_456_789),
+                state,
+            }));
+            let response = super::AccountStateResponse {
+                id: block.clone(),
+                shardblk: block.clone(),
+                shard_proof: Vec::new(),
+                proof: Vec::new(),
+                state: super::Boc::encode(CellBuilder::build_from(account).unwrap()),
+            };
+
+            let view = super::account_info(&address.to_string(), response).unwrap();
+
+            assert_eq!(view.state, expected);
+            assert_eq!(view.balance_nano, "123456789");
+            assert_eq!(view.last_transaction_lt, Some(42));
+            assert_eq!(view.last_transaction_hash, None);
+            assert_eq!(view.block.seqno, 7);
+        }
+    }
 
     #[tokio::test]
     async fn connection_failover_attempts_every_configured_liteserver() {
@@ -612,12 +725,12 @@ mod tests {
 
         let config = ConfigGlobal {
             liteservers: vec![
-                tonutils_liteserver(
+                liteapi_liteserver(
                     Ipv4Addr::LOCALHOST,
                     first_port,
                     TonPublicKey::from_bytes([1; 32]),
                 ),
-                tonutils_liteserver(
+                liteapi_liteserver(
                     Ipv4Addr::LOCALHOST,
                     second_port,
                     TonPublicKey::from_bytes([2; 32]),
@@ -648,8 +761,8 @@ mod tests {
     }
 
     #[test]
-    fn tonutils_liteserver_preserves_typed_endpoint() {
-        let config = tonutils_liteserver(
+    fn liteapi_liteserver_preserves_typed_endpoint() {
+        let config = liteapi_liteserver(
             Ipv4Addr::new(192, 168, 27, 4),
             18_004,
             TonPublicKey::from_bytes([7; 32]),
@@ -659,6 +772,6 @@ mod tests {
             config.socket_addr(),
             SocketAddrV4::new(Ipv4Addr::new(192, 168, 27, 4), 18_004)
         );
-        assert_eq!(config.public_key(), [7; 32]);
+        assert_eq!(config.public_key(), &[7; 32]);
     }
 }

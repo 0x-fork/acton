@@ -141,6 +141,15 @@ macro_rules! assert_impl_all {
 
 extern crate self as rston;
 
+#[cfg(feature = "tl")]
+pub mod tl;
+
+#[cfg(feature = "adnl")]
+pub mod adnl;
+
+#[cfg(feature = "liteclient")]
+pub mod liteclient;
+
 pub mod boc;
 pub mod cell;
 pub mod crc;

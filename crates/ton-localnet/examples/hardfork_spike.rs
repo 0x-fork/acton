@@ -23,6 +23,7 @@
 use anyhow::{Context, bail};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
+use rston::adnl::crypto::{KeyPair, SecretKey};
 use rston::boc::Boc;
 use rston::cell::Cell;
 use rston::models::account::AccountState;
@@ -41,7 +42,6 @@ use ton_hardfork::{
     HardforkBlock, HardforkPrevBlock, HardforkSources, ShardSource, build_hardfork,
     request::{AccountChange, AccountEdit, account_batch},
 };
-use ton_liteapi::adnl::crypto::{KeyPair, SecretKey};
 
 fn main() -> anyhow::Result<()> {
     let mut args = std::env::args().skip(1);

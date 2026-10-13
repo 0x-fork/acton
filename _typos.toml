@@ -7,7 +7,7 @@ extend-exclude = [
   "crates/tasm-core/spec/**",
   "crates/tolk-compiler/assets/**",
   "crates/ton-indexer-liteserver/fixtures/mainnet-global.config.json",
-  "crates/ton-liteapi/src/tl/schemas/**",
+  "libs/rston/src/tl/schemas/**",
   "crates/ton-state/src/storage-decoder.js",
   "dist-workspace.toml",
   "docs/.next/**",

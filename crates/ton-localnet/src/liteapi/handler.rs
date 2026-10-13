@@ -10,24 +10,24 @@ use crate::{LiteServerErrorCode, LocalnetError};
 use anyhow::Context;
 use rston::boc::Boc;
 use rston::boc::ser::BocHeader;
-use std::collections::BTreeMap;
-use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::time::{Instant, sleep};
-use ton_liteapi::liteclient::types::LiteError;
-use ton_liteapi::tl::common::{BlockIdExt, LibraryEntry, String as TlString, TransactionId3};
-use ton_liteapi::tl::request::{
+use rston::liteclient::types::LiteError;
+use rston::tl::common::{BlockIdExt, LibraryEntry, String as TlString, TransactionId3};
+use rston::tl::request::{
     GetAccountState, GetAllShardsInfo, GetBlock, GetBlockHeader, GetBlockProof, GetConfigAll,
     GetConfigParams, GetLibraries, GetLibrariesWithProof, GetOneTransaction, GetShardBlockProof,
     GetShardInfo, GetTransactions, ListBlockTransactions, LookupBlock, LookupBlockWithProof,
     Request, RunSmcMethod, SendMessage, WaitMasterchainSeqno, WrappedRequest,
 };
-use ton_liteapi::tl::response::{
+use rston::tl::response::{
     AccountState, AllShardsInfo, BlockData, BlockTransactions, BlockTransactionsExt, ConfigInfo,
     CurrentTime, Error as TlServerError, LibraryResult, LibraryResultWithProof, LookupBlockResult,
     PartialBlockProof, Response, RunMethodResult, SendMsgStatus, ShardBlockLink, ShardBlockProof,
     ShardInfo, TransactionId, TransactionInfo, TransactionList, Version,
 };
+use std::collections::BTreeMap;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::time::{Instant, sleep};
 use tvm_ffi::stack::Tuple;
 
 const SEND_MESSAGE_ACCEPTED_STATUS: u32 = 1;

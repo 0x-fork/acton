@@ -4,7 +4,7 @@ use std::{path::Path, time::Duration};
 
 use anyhow::{Context, Result};
 use tokio::time::{Instant, timeout};
-use ton_indexer_liteserver::TonutilsLiteClient;
+use ton_indexer_liteserver::LiteClient;
 use ton_p2p::NetworkConfig;
 use tracing::info;
 
@@ -47,8 +47,7 @@ pub async fn use_latest_block(
 
     let zero_state = config.zero_state();
     let latest = timeout(request_timeout, async {
-        let mut client =
-            TonutilsLiteClient::connect_path_with_parallelism(global_config, 1).await?;
+        let mut client = LiteClient::connect_path_with_parallelism(global_config, 1).await?;
         client.latest_for_network(zero_state.into()).await
     })
     .await

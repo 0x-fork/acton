@@ -6,6 +6,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use crate::ton::tools::types::parse_account_address;
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use ed25519_dalek::SigningKey;
 use rand::{RngCore, rngs::OsRng};
@@ -20,7 +21,6 @@ use rston::{
     },
 };
 use serde::{Deserialize, Serialize};
-use tonutils::tvm::Address;
 use utoipa::ToSchema;
 
 use crate::{
@@ -485,7 +485,7 @@ async fn create_wallet(
         }
     };
 
-    let address = read_address_file(&address_file)?.to_raw();
+    let address = read_address_file(&address_file)?.to_string();
     ensure_private_permissions(&base.with_extension("pk"))?;
     let record = WalletRecord {
         name: name.to_owned(),
@@ -581,9 +581,9 @@ pub async fn build_fund_account_message(
             "amount exceeds the TON Grams range".to_owned(),
         ));
     }
-    let destination = Address::from_str(address)
+    let destination = parse_account_address(address)
         .map_err(|_| FundAccountError::InvalidRequest(format!("invalid TON address `{address}`")))?
-        .to_raw();
+        .to_string();
     let toolchain = Toolchain::resolve(state_dir, None)
         .await
         .map_err(FundAccountError::Infrastructure)?;
@@ -999,7 +999,7 @@ fn import_genesis_wallets(layout: &Layout, registry: &mut WalletRegistry) -> Res
                 version,
                 workchain: i32::from(address.workchain),
                 wallet_id,
-                address: address.to_raw(),
+                address: address.to_string(),
                 key_base: base,
                 address_file,
                 deploy_boc: None,
@@ -1015,12 +1015,12 @@ fn resolve_wallet_or_address(registry: &WalletRegistry, value: &str) -> Result<S
     if let Some(wallet) = registry.wallets.get(value) {
         return Ok(wallet.address.clone());
     }
-    Ok(Address::from_str(value)
+    Ok(parse_account_address(value)
         .with_context(|| format!("unknown wallet or invalid TON address `{value}`"))?
-        .to_raw())
+        .to_string())
 }
 
-fn read_address_file(path: &Path) -> Result<Address> {
+fn read_address_file(path: &Path) -> Result<StdAddr> {
     let bytes = fs::read(path).with_context(|| format!("failed to read {}", path.display()))?;
     ensure!(
         bytes.len() == 36,
@@ -1032,7 +1032,7 @@ fn read_address_file(path: &Path) -> Result<Address> {
     let workchain = i32::from_le_bytes(bytes[32..].try_into()?);
     let workchain = i8::try_from(workchain)
         .with_context(|| format!("unsupported workchain in {}", path.display()))?;
-    Ok(Address::new(workchain, hash))
+    Ok(StdAddr::new(workchain, hash.into()))
 }
 
 fn write_address_file(path: &Path, address: &StdAddr) -> Result<()> {

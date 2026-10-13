@@ -17,9 +17,8 @@ ton-executor = { workspace = true }
 ton-emulator = { workspace = true }
 ton-networks = { workspace = true }
 ton-api = { workspace = true }
-ton-liteapi = { workspace = true }
 acton-config = { workspace = true }
-rston = { workspace = true }
+rston = { workspace = true, features = ["liteclient"] }
 tvm-ffi = { workspace = true }
 crc = { workspace = true }
 dashmap = { workspace = true }

@@ -81,6 +81,40 @@ Pass outgoing messages as `Vec<WalletMessage>`. Each entry contains the complete
 message cell in `msg` and a `SendMsgFlags` bitmask in `mode`.
 Combine flags with `|`, such as `SendMsgFlags::PAY_FEE_SEPARATELY | SendMsgFlags::IGNORE_ERROR`.
 
+## LiteAPI queries
+
+Enable `liteclient` and use Tokio to query the liteservers in a trusted global config:
+
+```toml
+[dependencies]
+rston = { version = "0.4.0", features = ["liteclient"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+```
+
+```rust
+use rston::liteclient::{ConfigGlobal, LiteClientOptions, LiteClientPool};
+use rston::tl::{Request, response::MasterchainInfo};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config: ConfigGlobal = std::fs::read_to_string("global.config.json")?.parse()?;
+    let mut client = LiteClientPool::new(config, LiteClientOptions::default())?;
+    let info: MasterchainInfo = client.query_typed(Request::GetMasterchainInfo).await?;
+
+    println!("Masterchain sequence: {}", info.last.seqno);
+    Ok(())
+}
+```
+
+The pool rotates between endpoints and skips connection failures before sending.
+It does not retry a sent request. `LiteClient` provides one persistent connection.
+Both support `query_raw()` for constructors outside the typed API.
+The default setup and query deadlines are ten seconds each; change them with `LiteClientOptions`.
+Responses remain unverified. Validate proofs against trusted blocks and validator sets before relying on blockchain data.
+
+The ADNL and LiteAPI wire modules originate from [tonutils-rs](https://github.com/lapismyt/tonutils-rs), under the MIT license in `LICENSE-tonutils`.
+The upstream transport also credits [adnl-rs](https://github.com/tonstack/adnl-rs) and [lite-client](https://github.com/tonstack/lite-client).
+
 ## Features
 
 The default features are `base64`, `serde`, `models`, `sync`, and `wallet`.
@@ -90,6 +124,9 @@ The default features are `base64`, `serde`, `models`, `sync`, and `wallet`.
 | `base64` | Base64 helpers for BoC and byte representations |
 | `serde` | Serde serialization for supported types. Enables `base64` |
 | `models` | TON blockchain models |
+| `tl` | LiteAPI wire types and TL encoding, without networking |
+| `adnl` | ADNL/TCP handshake and encrypted frames. Enables `tl` |
+| `liteclient` | Raw and typed queries, server services, deadlines, pools, and global config. Enables `adnl` and `tl` |
 | `wallet` | Wallet contracts and signed messages. Enables `models`, `base64`, and `sync` |
 | `sync` | Cells that can be shared across threads |
 | `bigint` | Conversion helpers for `num-bigint` integers |

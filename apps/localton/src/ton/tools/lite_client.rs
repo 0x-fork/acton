@@ -6,6 +6,7 @@
 
 use std::{fmt, future::Future, path::PathBuf, time::Instant};
 
+use crate::ton::tools::types::parse_account_address;
 use anyhow::{Context, Result, bail, ensure};
 use async_trait::async_trait;
 use num_bigint::BigInt;
@@ -14,7 +15,6 @@ use rston::cell::{Cell, CellBuilder, CellSlice};
 use rston::models::config::ValidatorSet as ChainValidatorSet;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use tonutils::tvm::Address;
 use tracing::{Instrument, debug, field, info_span};
 use tvm_ffi::{serde::parse_tuple_item, stack::TupleItem};
 
@@ -135,9 +135,9 @@ pub struct AccountStateRequest {
 impl AccountStateRequest {
     /// Parses and normalizes a friendly or raw TON address.
     pub fn new(address: &str) -> Result<Self> {
-        let address = Address::from_str(address)
+        let address = parse_account_address(address)
             .with_context(|| format!("invalid TON address `{address}`"))?
-            .to_raw();
+            .to_string();
         Ok(Self { address })
     }
 
@@ -162,9 +162,9 @@ pub struct RunMethodRequest {
 impl RunMethodRequest {
     /// Validates the account and method name before either backend sees them.
     pub fn new(address: &str, method: impl Into<String>, arguments: Vec<BigInt>) -> Result<Self> {
-        let address = Address::from_str(address)
+        let address = parse_account_address(address)
             .with_context(|| format!("invalid TON address `{address}`"))?
-            .to_raw();
+            .to_string();
         let method = method.into();
         ensure!(
             !method.is_empty()
@@ -663,7 +663,7 @@ impl LiteClient for NativeLiteClient {
                 .get_next_validator_set()
                 .context("config parameter 36 has an invalid next validator set")?;
             Ok(ElectionStatus {
-                elector_address: Address::new(-1, elector.0).to_raw(),
+                elector_address: rston::models::StdAddr::new(-1, elector).to_string(),
                 validators_elected_for: timing.validators_elected_for,
                 elections_start_before: timing.elections_start_before,
                 elections_end_before: timing.elections_end_before,
