@@ -36,14 +36,16 @@ impl Default for LiteClientOptions {
 /// LiteAPI queries through an authenticated ADNL/TCP connection.
 ///
 /// The caller supplies a trusted server identity. Responses, including proofs,
-/// remain unverified blockchain data. Requests are never retried automatically.
+/// from raw and typed queries remain unverified. High-level methods require
+/// explicit trusted blocks and verify their data proofs.
+/// Requests are never retried automatically.
 /// Dropping the client releases its connection. A failed transport requires a
 /// new connection; a request timeout alone does not discard the connection.
 pub struct LiteClient {
     inner: tower::util::BoxService<RawWrappedRequest, Vec<u8>, LiteError>,
-    request_timeout: Duration,
+    pub(super) request_timeout: Duration,
     wait_seqno: Option<WaitMasterchainSeqno>,
-    target: String,
+    pub(super) target: String,
 }
 
 impl LiteClient {

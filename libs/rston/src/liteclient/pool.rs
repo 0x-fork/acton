@@ -8,7 +8,9 @@ use crate::tl::{Request, utils::FromResponse};
 /// Each query rotates to the next endpoint. Connection failures skip an endpoint
 /// before sending any request. Once sent, a query is never retried, including
 /// state-changing operations and ambiguous timeouts. Subsequent queries can use
-/// another server. No server response is treated as a verified blockchain proof.
+/// another server. Raw and typed queries do not verify blockchain proofs.
+/// High-level methods use one selected connection and verify against explicit
+/// trusted blocks, with the same guarantees as [`LiteClient`].
 pub struct LiteClientPool {
     servers: Vec<(ConfigLiteServer, Option<LiteClient>)>,
     next: usize,
@@ -33,7 +35,7 @@ impl LiteClientPool {
         })
     }
 
-    async fn next_client(&mut self) -> Result<&mut LiteClient, LiteError> {
+    pub(super) async fn next_client(&mut self) -> Result<&mut LiteClient, LiteError> {
         let mut last_error = LiteError::NoServers;
 
         for _ in 0..self.servers.len() {

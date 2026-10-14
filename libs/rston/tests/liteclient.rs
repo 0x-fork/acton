@@ -338,3 +338,6 @@ fn network_config_rejects_invalid_identity_lengths_and_ports() {
     );
     assert!(json.parse::<ConfigGlobal>().is_err());
 }
+
+#[path = "liteclient/proofs.rs"]
+mod proofs;

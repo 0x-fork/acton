@@ -10,6 +10,12 @@
 
 ### Added
 
+- High-level LiteClient queries authenticate account state, configuration, and
+  transaction inclusion against explicit trusted blocks. Masterchain proof chains
+  support Ordinary and Simplex signatures. Get-method results distinguish verified
+  source state from server execution, and message submission does not imply
+  transaction confirmation.
+
 - `models::vm` provides stack values, cell encoding and decoding,
   continuation data, and snake byte/string helpers for get-method arguments
   and results. Stack types implement `Load` and `Store` for the `VmStack`
@@ -17,8 +23,8 @@
 
 - Optional `tl`, `adnl`, and `liteclient` modules provide LiteAPI wire types,
   ADNL/TCP client and server transport, raw and typed queries, bounded waits,
-  multiple liteservers, and global network configuration. Network responses
-  require proof verification by the caller.
+  multiple liteservers, and global network configuration. Raw and typed wire
+  queries return unverified responses.
 
 - Verify Simplex finalization signatures against an expected block and trusted
   validator subset, including candidate binding, signature count and weight,

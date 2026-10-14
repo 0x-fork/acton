@@ -143,10 +143,68 @@ The pool rotates between endpoints and skips connection failures before sending.
 It does not retry a sent request. `LiteClient` provides one persistent connection.
 Both support `query_raw()` for constructors outside the typed API.
 The default setup and query deadlines are ten seconds each; change them with `LiteClientOptions`.
-Responses remain unverified. Validate proofs against trusted blocks and validator sets before relying on blockchain data.
+Raw and typed wire queries return unverified responses.
+Use the following methods to authenticate data against a trusted block.
+
+## Verified LiteAPI queries
+
+Start with a complete block identifier from an independently trusted source.
+`VerifiedBlock::from_trusted` records that trust decision; it does not verify the identifier.
+`get_masterchain_info` verifies a proof chain from your checkpoint to the server's reported head.
+The caller decides whether that head is recent enough.
+
+This example authenticates the head and reads the elector's account state:
+
+```rust
+use rston::liteclient::{ConfigGlobal, LiteClientOptions, LiteClientPool, VerifiedBlock};
+use rston::models::{BlockId, StdAddr};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config: ConfigGlobal = std::fs::read_to_string("global.config.json")?.parse()?;
+    let checkpoint: BlockId = std::fs::read_to_string("trusted-block.txt")?.trim().parse()?;
+    let checkpoint = VerifiedBlock::from_trusted(checkpoint);
+    let mut client = LiteClientPool::new(config, LiteClientOptions::default())?;
+    let head = client.get_masterchain_info(&checkpoint).await?;
+    let elector: StdAddr =
+        "-1:3333333333333333333333333333333333333333333333333333333333333333".parse()?;
+    let state = client.get_account(&head, &elector).await?;
+
+    if let Some(account) = state.account {
+        println!("Elector balance: {} nanograms", account.balance.tokens);
+    }
+    Ok(())
+}
+```
+
+`trusted-block.txt` contains the full identifier in
+`workchain:shard:seqno:root_hash:file_hash` format.
+Both hashes use hexadecimal encoding. Keep the checkpoint with your application's trusted network configuration.
+
+| Method | Guarantee |
+| --- | --- |
+| `get_account` | Account state, balance, transaction cursor, or absence matches the requested block; shard ancestry is checked |
+| `get_config` | Requested masterchain parameters match the committed state; an empty selection requests the complete configuration |
+| `get_transaction` | Transaction inclusion, address, and logical time match the request; pass its containing shard block |
+| `get_block_proof` | Retrieves unverified links; call the response's `verify` method before using its destination |
+| `verify_proof_chain` | Authenticates forward and backward links, validator subsets, Ordinary or Simplex signatures, and a weight strictly above two thirds |
+| `run_get_method` | Authenticates source account state; returned stack values and exit codes remain server claims |
+| `send_message` | Submits an external incoming message once and returns its hash after acknowledgement; acknowledgement does not confirm inclusion |
+
+Successful get-method exit codes are zero and one. Other codes return `LiteError::ContractExecution`.
+Arguments and results use `Tuple` in bottom-to-top order.
+Recompute the method locally if your application needs authenticated execution results.
+
+Offline response `verify` methods use the same checks without a network connection.
+Missing required proofs and pruned required data return errors.
+Verification accepts at most 8 MiB per proof or data BoC payload.
+Proof chains accept at most 64 responses and 1024 links, with at most 128 links per response.
+The request deadline covers the whole chain. Verification checks that deadline between synchronous proof batches.
+The supplied checkpoint stays unchanged on failure or cancellation.
 
 The ADNL and LiteAPI wire modules originate from [tonutils-rs](https://github.com/lapismyt/tonutils-rs), under the MIT license in `LICENSE-tonutils`.
 The upstream transport also credits [adnl-rs](https://github.com/tonstack/adnl-rs) and [lite-client](https://github.com/tonstack/lite-client).
+The high-level proof verification follows [tonutils-go](https://github.com/xssnick/tonutils-go), under the [MIT license](LICENSE-tonutils-go).
 
 ## Features
 
@@ -159,7 +217,7 @@ The default features are `base64`, `serde`, `models`, `sync`, and `wallet`.
 | `models` | TON blockchain models |
 | `tl` | LiteAPI wire types and TL encoding, without networking |
 | `adnl` | ADNL/TCP handshake and encrypted frames. Enables `tl` |
-| `liteclient` | Raw and typed queries, server services, deadlines, pools, and global config. Enables `adnl` and `tl` |
+| `liteclient` | Raw, typed, and verified queries, server services, deadlines, pools, and global config. Enables `adnl`, `tl`, and `models` |
 | `wallet` | Wallet contracts and signed messages. Enables `models`, `base64`, and `sync` |
 | `sync` | Cells that can be shared across threads |
 | `bigint` | Conversion helpers for `num-bigint` integers |
