@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let state = AppState::from_config(&config)?;
-    let published_payment_transaction_hashes = if config.source_repository_path().is_some() {
+    let published_payment_transaction_hashes = if config.source_repository().path.is_some() {
         state.ensure_registry_current().await?;
         state.published_payment_transaction_hashes().await?
     } else {

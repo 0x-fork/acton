@@ -25,17 +25,15 @@ fn example_config_toml_loads() {
         "https://testnet.toncenter.com"
     );
     assert_eq!(config.toncenter_testnet_api_key(), None);
-    assert_eq!(config.source_repository_path(), None);
-    assert_eq!(config.source_repository_remote(), "origin");
-    assert_eq!(config.source_repository_storage_root(), "sources");
-    assert_eq!(config.source_repository_branch(), None);
-    assert!(config.source_repository_commit_enabled());
-    assert!(config.source_repository_push_enabled());
-    assert_eq!(config.source_repository_author_name(), "ton-verifier");
-    assert_eq!(
-        config.source_repository_author_email(),
-        "ton-verifier@example.invalid"
-    );
+    let repository = config.source_repository();
+    assert_eq!(repository.path, None);
+    assert_eq!(repository.remote, "origin");
+    assert_eq!(repository.storage_root, "sources");
+    assert_eq!(repository.branch, None);
+    assert!(repository.commit_enabled);
+    assert!(repository.push_enabled);
+    assert_eq!(repository.author_name, "ton-verifier");
+    assert_eq!(repository.author_email, "ton-verifier@example.invalid");
     assert_eq!(
         config.registry_index_path().to_string_lossy(),
         "verifier-index.sqlite3"
@@ -298,6 +296,31 @@ ledger_path = "{}"
 }
 
 #[test]
+fn source_repository_defaults_apply_to_missing_and_partial_sections() {
+    let mut configs = vec![Config::default()];
+    for contents in [
+        "",
+        "[source_repository]",
+        "[source_repository]\npath = '/tmp/verifier-sources'",
+    ] {
+        let mut file = tempfile::NamedTempFile::new().expect("config file");
+        file.write_all(contents.as_bytes()).expect("write config");
+        configs.push(Config::load_from_path(file.path()).expect("config with defaults"));
+    }
+
+    for config in configs {
+        let repository = config.source_repository();
+        assert_eq!(repository.remote, "origin");
+        assert_eq!(repository.storage_root, "sources");
+        assert_eq!(repository.branch, None);
+        assert!(repository.commit_enabled);
+        assert!(repository.push_enabled);
+        assert_eq!(repository.author_name, "ton-verifier");
+        assert_eq!(repository.author_email, "ton-verifier@example.invalid");
+    }
+}
+
+#[test]
 fn source_repository_config_loads_from_toml() {
     let mut config_file =
         tempfile::NamedTempFile::new().expect("temporary config file should be created");
@@ -351,25 +374,21 @@ ledger_path = "/tmp/verifier-payments.sqlite3"
     assert_eq!(config.toncenter_mainnet_api_key(), Some("mainnet-key"));
     assert_eq!(config.toncenter_testnet_base_url(), "http://127.0.0.1:5412");
     assert_eq!(config.toncenter_testnet_api_key(), Some("test-key"));
+    let repository = config.source_repository();
     assert_eq!(
-        config
-            .source_repository_path()
+        repository
+            .path
+            .as_deref()
             .map(|path| path.to_string_lossy()),
         Some("/tmp/verifier-sources".into())
     );
-    assert_eq!(config.source_repository_remote(), "github");
-    assert_eq!(
-        config.source_repository_storage_root(),
-        "verified/contracts"
-    );
-    assert_eq!(config.source_repository_branch(), Some("verified-sources"));
-    assert!(!config.source_repository_commit_enabled());
-    assert!(!config.source_repository_push_enabled());
-    assert_eq!(config.source_repository_author_name(), "Verifier Bot");
-    assert_eq!(
-        config.source_repository_author_email(),
-        "verifier@example.com"
-    );
+    assert_eq!(repository.remote, "github");
+    assert_eq!(repository.storage_root, "verified/contracts");
+    assert_eq!(repository.branch.as_deref(), Some("verified-sources"));
+    assert!(!repository.commit_enabled);
+    assert!(!repository.push_enabled);
+    assert_eq!(repository.author_name, "Verifier Bot");
+    assert_eq!(repository.author_email, "verifier@example.com");
     assert_eq!(
         config.registry_index_path().to_string_lossy(),
         "/tmp/verifier-index.sqlite3"

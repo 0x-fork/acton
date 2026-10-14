@@ -39,14 +39,7 @@ pub struct Config {
     toncenter_mainnet_api_key: Option<String>,
     toncenter_testnet_base_url: Option<String>,
     toncenter_testnet_api_key: Option<String>,
-    source_repository_path: Option<PathBuf>,
-    source_repository_remote: String,
-    source_repository_storage_root: String,
-    source_repository_branch: Option<String>,
-    source_repository_commit_enabled: bool,
-    source_repository_push_enabled: bool,
-    source_repository_author_name: String,
-    source_repository_author_email: String,
+    source_repository: SourceRepositorySettings,
     registry_index_path: PathBuf,
     payment_address: Option<String>,
     payment_min_amount_nano: Option<u64>,
@@ -145,43 +138,8 @@ impl Config {
     }
 
     #[must_use]
-    pub fn source_repository_path(&self) -> Option<&Path> {
-        self.source_repository_path.as_deref()
-    }
-
-    #[must_use]
-    pub fn source_repository_remote(&self) -> &str {
-        &self.source_repository_remote
-    }
-
-    #[must_use]
-    pub fn source_repository_storage_root(&self) -> &str {
-        &self.source_repository_storage_root
-    }
-
-    #[must_use]
-    pub fn source_repository_branch(&self) -> Option<&str> {
-        self.source_repository_branch.as_deref()
-    }
-
-    #[must_use]
-    pub const fn source_repository_commit_enabled(&self) -> bool {
-        self.source_repository_commit_enabled
-    }
-
-    #[must_use]
-    pub const fn source_repository_push_enabled(&self) -> bool {
-        self.source_repository_push_enabled
-    }
-
-    #[must_use]
-    pub fn source_repository_author_name(&self) -> &str {
-        &self.source_repository_author_name
-    }
-
-    #[must_use]
-    pub fn source_repository_author_email(&self) -> &str {
-        &self.source_repository_author_email
+    pub const fn source_repository(&self) -> &SourceRepositorySettings {
+        &self.source_repository
     }
 
     #[must_use]
@@ -252,14 +210,7 @@ impl Default for Config {
             toncenter_mainnet_api_key: None,
             toncenter_testnet_base_url: None,
             toncenter_testnet_api_key: None,
-            source_repository_path: None,
-            source_repository_remote: DEFAULT_SOURCE_REPOSITORY_REMOTE.to_owned(),
-            source_repository_storage_root: DEFAULT_SOURCE_REPOSITORY_STORAGE_ROOT.to_owned(),
-            source_repository_branch: None,
-            source_repository_commit_enabled: DEFAULT_SOURCE_REPOSITORY_COMMIT_ENABLED,
-            source_repository_push_enabled: DEFAULT_SOURCE_REPOSITORY_PUSH_ENABLED,
-            source_repository_author_name: DEFAULT_SOURCE_REPOSITORY_AUTHOR_NAME.to_owned(),
-            source_repository_author_email: DEFAULT_SOURCE_REPOSITORY_AUTHOR_EMAIL.to_owned(),
+            source_repository: SourceRepositorySettings::default(),
             registry_index_path: PathBuf::from(DEFAULT_REGISTRY_INDEX_PATH),
             payment_address: None,
             payment_min_amount_nano: None,
@@ -322,7 +273,7 @@ struct ConfigFile {
     #[serde(default)]
     toncenter: ToncenterConfig,
     #[serde(default)]
-    source_repository: SourceRepositoryConfig,
+    source_repository: SourceRepositorySettings,
     #[serde(default)]
     registry_index: RegistryIndexConfig,
     #[serde(default)]
@@ -362,32 +313,7 @@ impl ConfigFile {
             toncenter_mainnet_api_key: self.toncenter.mainnet_api_key,
             toncenter_testnet_base_url: self.toncenter.testnet_base_url,
             toncenter_testnet_api_key: self.toncenter.testnet_api_key,
-            source_repository_path: self.source_repository.path,
-            source_repository_remote: self
-                .source_repository
-                .remote
-                .unwrap_or_else(|| DEFAULT_SOURCE_REPOSITORY_REMOTE.to_owned()),
-            source_repository_storage_root: self
-                .source_repository
-                .storage_root
-                .unwrap_or_else(|| DEFAULT_SOURCE_REPOSITORY_STORAGE_ROOT.to_owned()),
-            source_repository_branch: self.source_repository.branch,
-            source_repository_commit_enabled: self
-                .source_repository
-                .commit_enabled
-                .unwrap_or(DEFAULT_SOURCE_REPOSITORY_COMMIT_ENABLED),
-            source_repository_push_enabled: self
-                .source_repository
-                .push_enabled
-                .unwrap_or(DEFAULT_SOURCE_REPOSITORY_PUSH_ENABLED),
-            source_repository_author_name: self
-                .source_repository
-                .author_name
-                .unwrap_or_else(|| DEFAULT_SOURCE_REPOSITORY_AUTHOR_NAME.to_owned()),
-            source_repository_author_email: self
-                .source_repository
-                .author_email
-                .unwrap_or_else(|| DEFAULT_SOURCE_REPOSITORY_AUTHOR_EMAIL.to_owned()),
+            source_repository: self.source_repository,
             registry_index_path: self
                 .registry_index
                 .path
@@ -443,16 +369,32 @@ struct ToncenterConfig {
     testnet_api_key: Option<String>,
 }
 
-#[derive(Debug, Default, Deserialize)]
-struct SourceRepositoryConfig {
-    path: Option<PathBuf>,
-    remote: Option<String>,
-    storage_root: Option<String>,
-    branch: Option<String>,
-    commit_enabled: Option<bool>,
-    push_enabled: Option<bool>,
-    author_name: Option<String>,
-    author_email: Option<String>,
+#[derive(Clone, Debug, Deserialize)]
+#[serde(default)]
+pub struct SourceRepositorySettings {
+    pub path: Option<PathBuf>,
+    pub remote: String,
+    pub storage_root: String,
+    pub branch: Option<String>,
+    pub commit_enabled: bool,
+    pub push_enabled: bool,
+    pub author_name: String,
+    pub author_email: String,
+}
+
+impl Default for SourceRepositorySettings {
+    fn default() -> Self {
+        Self {
+            path: None,
+            remote: DEFAULT_SOURCE_REPOSITORY_REMOTE.to_owned(),
+            storage_root: DEFAULT_SOURCE_REPOSITORY_STORAGE_ROOT.to_owned(),
+            branch: None,
+            commit_enabled: DEFAULT_SOURCE_REPOSITORY_COMMIT_ENABLED,
+            push_enabled: DEFAULT_SOURCE_REPOSITORY_PUSH_ENABLED,
+            author_name: DEFAULT_SOURCE_REPOSITORY_AUTHOR_NAME.to_owned(),
+            author_email: DEFAULT_SOURCE_REPOSITORY_AUTHOR_EMAIL.to_owned(),
+        }
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]

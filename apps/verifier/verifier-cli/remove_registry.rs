@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     io::{self, Write},
-    path::{Path, PathBuf},
+    path::Path,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -9,29 +9,21 @@ use sha2::{Digest, Sha256};
 use tokio::fs;
 use verifier::{
     blockchain::parse_code_hash,
-    config::Config,
+    config::{Config, SourceRepositorySettings},
     source_storage::{SourceStorageError, git::Git, repository},
 };
 
 use crate::{args::RemoveRegistryArgs, check_repository, error::CliError};
 
-struct SourceRepositorySettings {
-    path: PathBuf,
-    storage_root: String,
-    remote: String,
-    branch: Option<String>,
-    push_enabled: bool,
-    author_name: String,
-    author_email: String,
-}
-
-struct RemoveRegistryRequest {
-    repository: SourceRepositorySettings,
+struct RemoveRegistryRequest<'a> {
+    repository: &'a SourceRepositorySettings,
+    path: &'a Path,
     code_hashes: Vec<String>,
 }
 
-struct RemovalPlan {
-    repository: SourceRepositorySettings,
+struct RemovalPlan<'a> {
+    repository: &'a SourceRepositorySettings,
+    path: &'a Path,
     checked: check_repository::CheckedRepository,
     bundles: Vec<BundleRemoval>,
 }
@@ -43,11 +35,12 @@ struct BundleRemoval {
     files: Vec<String>,
 }
 
-impl RemoveRegistryRequest {
-    fn prepare(args: &RemoveRegistryArgs) -> Result<Self, CliError> {
-        let config = Config::load_from_path(&args.config)?;
-        let path = config
-            .source_repository_path()
+impl<'a> RemoveRegistryRequest<'a> {
+    fn prepare(args: &RemoveRegistryArgs, config: &'a Config) -> Result<Self, CliError> {
+        let repository = config.source_repository();
+        let path = repository
+            .path
+            .as_deref()
             .filter(|path| !path.as_os_str().is_empty())
             .ok_or_else(|| CliError::MissingSourceRepository {
                 config_path: args.config.clone(),
@@ -72,24 +65,17 @@ impl RemoveRegistryRequest {
         }
 
         Ok(Self {
-            repository: SourceRepositorySettings {
-                path: path.to_path_buf(),
-                storage_root: config.source_repository_storage_root().to_owned(),
-                remote: config.source_repository_remote().to_owned(),
-                branch: config.source_repository_branch().map(ToOwned::to_owned),
-                push_enabled: config.source_repository_push_enabled(),
-                author_name: config.source_repository_author_name().to_owned(),
-                author_email: config.source_repository_author_email().to_owned(),
-            },
+            repository,
+            path,
             code_hashes,
         })
     }
 }
 
-impl RemovalPlan {
-    async fn prepare(request: RemoveRegistryRequest) -> Result<Self, CliError> {
+impl<'a> RemovalPlan<'a> {
+    async fn prepare(request: RemoveRegistryRequest<'a>) -> Result<Self, CliError> {
         let checked = check_repository::check(
-            &request.repository.path,
+            request.path,
             &request.repository.storage_root,
             &request.repository.remote,
             request.repository.branch.as_deref(),
@@ -97,13 +83,13 @@ impl RemovalPlan {
         )
         .await?;
 
-        let git = Git::new(&request.repository.path);
+        let git = Git::new(request.path);
         let mut bundles = Vec::with_capacity(request.code_hashes.len());
         for code_hash in request.code_hashes {
             let path =
                 repository::bundle_relative_path(&request.repository.storage_root, &code_hash)?;
             let files = git.tracked_files(&path).await?;
-            let directory = request.repository.path.join(&path);
+            let directory = request.path.join(&path);
             let found =
                 fs::try_exists(&directory)
                     .await
@@ -122,6 +108,7 @@ impl RemovalPlan {
 
         Ok(Self {
             repository: request.repository,
+            path: request.path,
             checked,
             bundles,
         })
@@ -152,7 +139,7 @@ impl RemovalPlan {
             }
         }
         if self.repository.push_enabled && !commits.is_empty() {
-            Git::new(&self.repository.path)
+            Git::new(self.path)
                 .push_head(&self.repository.remote, Some(&self.checked.branch))
                 .await
                 .map_err(|source| CliError::PushFailed {
@@ -170,11 +157,11 @@ impl RemovalPlan {
         bundle: &BundleRemoval,
         parent: &str,
     ) -> Result<Option<String>, CliError> {
-        let git = Git::new(&self.repository.path);
+        let git = Git::new(self.path);
         let files = bundle.files.iter().map(String::as_str).collect::<Vec<_>>();
-        let message = bundle.commit_message(&self.repository.path).await;
+        let message = bundle.commit_message(self.path).await;
         let result: Result<Option<String>, SourceStorageError> = async {
-            let path = self.repository.path.join(&bundle.path);
+            let path = self.path.join(&bundle.path);
             if let Err(source) = fs::remove_dir_all(&path).await
                 && source.kind() != std::io::ErrorKind::NotFound
             {
@@ -257,7 +244,8 @@ impl BundleRemoval {
 }
 
 pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
-    let request = RemoveRegistryRequest::prepare(args)?;
+    let config = Config::load_from_path(&args.config)?;
+    let request = RemoveRegistryRequest::prepare(args, &config)?;
     if !request.repository.push_enabled {
         eprintln!(
             "Warning: push_enabled = false; commits will remain local and will not be pushed."
@@ -280,7 +268,7 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
         println!("Bundles removed from checkout");
     }
     println!("Config: {}", args.config.display());
-    println!("Repository: {}", plan.repository.path.display());
+    println!("Repository: {}", plan.path.display());
     println!("Storage root: {}", plan.repository.storage_root);
     println!("Remote: {}", plan.repository.remote);
     println!("Branch: {}", plan.checked.branch);
