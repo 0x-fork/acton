@@ -17,6 +17,10 @@ impl<'a> Git<'a> {
         Self { path }
     }
 
+    pub(super) const fn path(&self) -> &'a Path {
+        self.path
+    }
+
     /// Runs Git and returns its exit status and raw output, including on failure.
     ///
     /// # Errors
@@ -30,6 +34,61 @@ impl<'a> Git<'a> {
         let mut command = Command::new("git");
         command.args(args).current_dir(self.path);
         command
+    }
+
+    /// Checks that the existing path belongs to a Git work tree.
+    ///
+    /// # Errors
+    /// Returns an error for a missing path, a bare repository or a failed Git command.
+    pub async fn ensure_work_tree(&self) -> Result<(), SourceStorageError> {
+        if !self.path.exists() {
+            return Err(SourceStorageError::InvalidPath {
+                path: self.path.to_path_buf(),
+                message: "path does not exist".to_owned(),
+            });
+        }
+        if self.output(&["rev-parse", "--is-inside-work-tree"]).await? == "true" {
+            return Ok(());
+        }
+        Err(SourceStorageError::InvalidPath {
+            path: self.path.to_path_buf(),
+            message: "path is not inside a git work tree".to_owned(),
+        })
+    }
+
+    /// Returns the local HEAD without contacting a remote.
+    ///
+    /// # Errors
+    /// Returns an error if HEAD does not exist or Git fails.
+    pub async fn head(&self) -> Result<String, SourceStorageError> {
+        self.output(&["rev-parse", "--verify", "HEAD"]).await
+    }
+
+    /// Checks for files committed under a path at HEAD.
+    ///
+    /// # Errors
+    /// Returns an error if HEAD does not exist or Git fails.
+    pub async fn has_committed_files(&self, path: &str) -> Result<bool, SourceStorageError> {
+        let files = self
+            .output(&["ls-tree", "-r", "--name-only", "HEAD", "--", path])
+            .await?;
+        Ok(!files.is_empty())
+    }
+
+    /// Pushes HEAD to an explicit remote branch, using the current branch as a default.
+    ///
+    /// # Errors
+    /// Returns an error for detached HEAD without a configured branch or a failed push.
+    pub async fn push_head(
+        &self,
+        remote: &str,
+        branch: Option<&str>,
+    ) -> Result<(), SourceStorageError> {
+        let branch = match branch {
+            Some(branch) => branch.to_owned(),
+            None => self.current_branch().await?,
+        };
+        self.run(&["push", remote, &format!("HEAD:{branch}")]).await
     }
 
     /// Runs Git and requires a successful exit status.
@@ -241,6 +300,217 @@ mod tests {
         ])
         .await
         .expect("commit fixture");
+    }
+
+    #[tokio::test]
+    async fn work_tree_checks_do_not_initialize_paths_and_head_requires_a_commit() {
+        let dir = repository().await;
+        let git = Git::new(dir.path());
+        git.ensure_work_tree().await.expect("existing work tree");
+        assert!(matches!(
+            git.head().await,
+            Err(SourceStorageError::Git { .. })
+        ));
+        assert!(matches!(
+            git.has_committed_files("missing").await,
+            Err(SourceStorageError::Git { .. })
+        ));
+        commit(&git).await;
+        assert_eq!(
+            git.head().await.expect("HEAD"),
+            git.output(&["log", "-1", "--format=%H"])
+                .await
+                .expect("commit")
+        );
+        assert!(
+            !git.has_committed_files("missing")
+                .await
+                .expect("absent path")
+        );
+
+        let child = dir.path().join("child");
+        fs::create_dir(&child).expect("nested directory");
+        Git::new(&child)
+            .ensure_work_tree()
+            .await
+            .expect("backend accepts a path inside the work tree");
+
+        let outside = tempfile::tempdir().expect("non-repository directory");
+        assert!(matches!(
+            Git::new(outside.path()).ensure_work_tree().await,
+            Err(SourceStorageError::Git { .. })
+        ));
+        let missing = outside.path().join("missing");
+        assert!(matches!(
+            Git::new(&missing).ensure_work_tree().await,
+            Err(SourceStorageError::InvalidPath { .. })
+        ));
+        assert!(!missing.exists(), "checking must not create a checkout");
+
+        Git::new(outside.path())
+            .run(&["init", "--bare"])
+            .await
+            .expect("bare repository");
+        assert!(matches!(
+            Git::new(outside.path()).ensure_work_tree().await,
+            Err(SourceStorageError::InvalidPath { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn commits_bundle_additions_and_deletions_without_including_other_staged_files() {
+        let dir = repository().await;
+        let git = Git::new(dir.path());
+        commit(&git).await;
+        fs::create_dir(dir.path().join("bundle")).expect("bundle directory");
+        for name in ["bundle/first.txt", "bundle/second.txt", "unrelated.txt"] {
+            fs::write(dir.path().join(name), name).expect("source file");
+        }
+        git.run(&["add", "--", "."]).await.expect("stage files");
+        assert!(
+            !git.has_committed_files("bundle/first.txt")
+                .await
+                .expect("staged is not committed")
+        );
+        let timestamp = 1_600_000_000;
+        git.run_with_author(
+            &["commit", "-m", "Bundle additions", "--", "bundle"],
+            "Operator",
+            "operator@example.invalid",
+            timestamp,
+        )
+        .await
+        .expect("commit selected additions");
+        assert_eq!(
+            git.output(&["show", "--format=", "--name-status", "HEAD"])
+                .await
+                .expect("commit files"),
+            "A\tbundle/first.txt\nA\tbundle/second.txt"
+        );
+        assert!(
+            git.has_committed_files("bundle/first.txt")
+                .await
+                .expect("committed file")
+        );
+        assert_eq!(
+            git.output(&["log", "-1", "--format=%an <%ae>%n%cn <%ce>%n%at %ct"])
+                .await
+                .expect("identity"),
+            format!(
+                "Operator <operator@example.invalid>\nOperator <operator@example.invalid>\n{timestamp} {timestamp}"
+            )
+        );
+
+        git.run(&["rm", "--", "bundle/first.txt", "bundle/second.txt"])
+            .await
+            .expect("stage removals");
+        git.run_with_author(
+            &["commit", "-m", "Bundle removals", "--", "bundle"],
+            "Operator",
+            "operator@example.invalid",
+            timestamp,
+        )
+        .await
+        .expect("commit selected removals");
+        assert_eq!(
+            git.output(&["show", "--format=", "--name-status", "HEAD"])
+                .await
+                .expect("commit files"),
+            "D\tbundle/first.txt\nD\tbundle/second.txt"
+        );
+        assert!(
+            !git.has_committed_files("bundle/first.txt")
+                .await
+                .expect("deleted file")
+        );
+        assert_eq!(
+            git.output(&["diff", "--cached", "--name-only"])
+                .await
+                .expect("remaining staged files"),
+            "unrelated.txt"
+        );
+    }
+
+    #[tokio::test]
+    async fn push_uses_selected_remote_and_branch_and_preserves_non_fast_forward_errors() {
+        let dir = repository().await;
+        let git = Git::new(dir.path());
+        commit(&git).await;
+        let remote_dir = tempfile::tempdir().expect("remote directory");
+        let remote = Git::new(remote_dir.path());
+        remote
+            .run(&["init", "--bare"])
+            .await
+            .expect("initialize remote");
+        git.run(&[
+            "remote",
+            "add",
+            "upstream",
+            remote_dir.path().to_str().expect("remote path"),
+        ])
+        .await
+        .expect("configure remote");
+        git.push_head("upstream", None)
+            .await
+            .expect("push current branch");
+        let first = git.head().await.expect("first commit");
+        assert_eq!(
+            remote
+                .output(&["rev-parse", "refs/heads/main"])
+                .await
+                .expect("remote branch"),
+            first
+        );
+
+        git.push_head("upstream", Some("registry"))
+            .await
+            .expect("create target branch from the named local branch");
+
+        git.run(&["checkout", "--detach"])
+            .await
+            .expect("detach HEAD");
+        assert!(matches!(
+            git.push_head("upstream", None).await,
+            Err(SourceStorageError::DetachedHead)
+        ));
+        commit(&git).await;
+        let second = git.head().await.expect("second commit");
+        git.push_head("upstream", Some("registry"))
+            .await
+            .expect("explicit branch works with detached HEAD");
+        assert_eq!(
+            remote
+                .output(&["rev-parse", "refs/heads/registry"])
+                .await
+                .expect("target branch"),
+            second
+        );
+        assert_eq!(
+            remote
+                .output(&["rev-parse", "refs/heads/main"])
+                .await
+                .expect("other branch"),
+            first
+        );
+
+        git.run(&["checkout", "--detach", &first])
+            .await
+            .expect("older HEAD");
+        let error = git
+            .push_head("upstream", Some("registry"))
+            .await
+            .expect_err("no force push");
+        assert!(
+            matches!(&error, SourceStorageError::Git { command, .. } if command == "git push upstream HEAD:registry")
+        );
+        assert!(crate::error::ApiError::from(error).is_payment_retryable());
+        assert_eq!(
+            remote
+                .output(&["rev-parse", "refs/heads/registry"])
+                .await
+                .expect("remote remains ahead"),
+            second
+        );
     }
 
     async fn blob(git: &Git<'_>, path: &Path, bytes: &[u8]) -> String {

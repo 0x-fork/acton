@@ -1,8 +1,9 @@
 pub mod git;
+pub mod repository;
 
 use std::{
     collections::HashSet,
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -21,9 +22,12 @@ use tokio::{
 };
 use utoipa::ToSchema;
 
-use crate::{blockchain::is_valid_code_hash, config::Config};
+use crate::config::Config;
 
-use self::git::Git;
+use self::{
+    git::Git,
+    repository::{bundle_relative_path, checked_join},
+};
 
 #[async_trait]
 pub trait SourceStorage: Send + Sync + 'static {
@@ -191,11 +195,10 @@ impl GitSourceStorage {
     /// here. Checks that must detect changes made after startup belong in
     /// `run_operation_checks` instead.
     async fn run_startup_checks(&self, repo_path: &Path) -> Result<(), SourceStorageError> {
-        ensure_git_repo(repo_path).await?;
-        ensure_source_repository_initialized(repo_path, &self.storage_root).await?;
+        let git = Git::new(repo_path);
+        repository::ensure_initialized(&git, &self.storage_root).await?;
         recover_uncommitted_storage(repo_path, &self.storage_root).await?;
-        Git::new(repo_path).ensure_clean().await?;
-        ensure_current_source_attributes(repo_path, &self.storage_root).await?;
+        repository::ensure_checkout(&git, &self.storage_root).await?;
 
         let shard_dirs = discover_shard_dirs(repo_path, &self.storage_root).await?;
         tracing::debug!(
@@ -234,14 +237,9 @@ impl GitSourceStorage {
         if !self.pending_push.load(Ordering::Acquire) {
             return Ok(());
         }
-        let branch = match &self.branch {
-            Some(branch) => branch.clone(),
-            None => Git::new(repo_path).current_branch().await?,
-        };
-        let refspec = format!("HEAD:{branch}");
         let push_started = Instant::now();
         let result = Git::new(repo_path)
-            .run(&["push", &self.remote, &refspec])
+            .push_head(&self.remote, self.branch.as_deref())
             .await;
         tracing::debug!(
             operation = "verify",
@@ -269,7 +267,9 @@ impl GitSourceStorage {
         let bundle_path = bundle_relative_path(&self.storage_root, &request.code_hash)?;
         let bundle_dir = repo_path.join(&bundle_path);
         let has_existing_bundle = if self.commit_enabled {
-            let committed = git_has_committed_files(repo_path, &bundle_path).await?;
+            let committed = Git::new(repo_path)
+                .has_committed_files(&bundle_path)
+                .await?;
             if !committed
                 && fs::try_exists(&bundle_dir).await.map_err(|source| {
                     SourceStorageError::ReadDir {
@@ -359,7 +359,7 @@ impl GitSourceStorage {
         let created = existing_revision.is_none();
         let revision = match existing_revision {
             Some(revision) => revision,
-            None => Git::new(repo_path).output(&["rev-parse", "HEAD"]).await?,
+            None => Git::new(repo_path).head().await?,
         };
 
         if self.commit_enabled && self.push_enabled {
@@ -445,10 +445,7 @@ impl GitSourceStorage {
             self.push_pending_head(repo_path, None).await?;
         }
 
-        match Git::new(repo_path)
-            .output(&["rev-parse", "--verify", "HEAD"])
-            .await
-        {
+        match Git::new(repo_path).head().await {
             Ok(revision) => Ok(Some(revision)),
             Err(SourceStorageError::Git { .. }) => Ok(None),
             Err(err) => Err(err),
@@ -690,140 +687,6 @@ async fn recover_uncommitted_storage(
     Ok(())
 }
 
-async fn ensure_git_repo(repo_path: &Path) -> Result<(), SourceStorageError> {
-    if !repo_path.exists() {
-        return Err(SourceStorageError::InvalidPath {
-            path: repo_path.to_path_buf(),
-            message: "path does not exist".to_owned(),
-        });
-    }
-
-    let output = Git::new(repo_path)
-        .output(&["rev-parse", "--is-inside-work-tree"])
-        .await?;
-    if output == "true" {
-        return Ok(());
-    }
-
-    Err(SourceStorageError::InvalidPath {
-        path: repo_path.to_path_buf(),
-        message: "path is not inside a git work tree".to_owned(),
-    })
-}
-
-async fn ensure_source_repository_initialized(
-    repo_path: &Path,
-    storage_root: &str,
-) -> Result<(), SourceStorageError> {
-    let source_attributes_rule = source_attributes_rule(storage_root);
-    let roots = Git::new(repo_path)
-        .output(&["rev-list", "--max-parents=0", "HEAD"])
-        .await
-        .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
-    let roots = roots
-        .lines()
-        .filter(|revision| !revision.is_empty())
-        .collect::<Vec<_>>();
-    let [root_revision] = roots.as_slice() else {
-        return Err(unprepared_source_repository(
-            repo_path,
-            format!("expected exactly one root commit, found {}", roots.len()),
-        ));
-    };
-
-    let root_files = Git::new(repo_path)
-        .output(&["ls-tree", "-r", "--name-only", root_revision])
-        .await
-        .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
-    if root_files != ".gitattributes" {
-        return Err(unprepared_source_repository(
-            repo_path,
-            "root commit must contain only `.gitattributes`",
-        ));
-    }
-
-    let root_attributes_object = format!("{root_revision}:.gitattributes");
-    let root_attributes = Git::new(repo_path)
-        .output(&["show", &root_attributes_object])
-        .await
-        .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
-    if root_attributes != source_attributes_rule {
-        return Err(unprepared_source_repository(
-            repo_path,
-            format!("root `.gitattributes` must contain exactly `{source_attributes_rule}`"),
-        ));
-    }
-
-    Ok(())
-}
-
-async fn ensure_current_source_attributes(
-    repo_path: &Path,
-    storage_root: &str,
-) -> Result<(), SourceStorageError> {
-    let source_attributes_rule = source_attributes_rule(storage_root);
-    let source_attributes_check_path = source_attributes_check_path(storage_root);
-    let current_attributes = Git::new(repo_path)
-        .output(&["show", "HEAD:.gitattributes"])
-        .await
-        .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
-    if !has_source_attributes_rule(&current_attributes, &source_attributes_rule) {
-        return Err(unprepared_source_repository(
-            repo_path,
-            format!("current `.gitattributes` must contain `{source_attributes_rule}`"),
-        ));
-    }
-
-    let effective_text_attribute = Git::new(repo_path)
-        .output(&["check-attr", "text", "--", &source_attributes_check_path])
-        .await
-        .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
-    let expected_text_attribute = format!("{source_attributes_check_path}: text: unset");
-    if effective_text_attribute != expected_text_attribute {
-        return Err(unprepared_source_repository(
-            repo_path,
-            format!(
-                "`{source_attributes_rule}` is not effective for `{source_attributes_check_path}`"
-            ),
-        ));
-    }
-
-    Ok(())
-}
-
-fn has_source_attributes_rule(attributes: &str, source_attributes_rule: &str) -> bool {
-    attributes
-        .lines()
-        .any(|line| line.trim() == source_attributes_rule)
-}
-
-fn unprepared_source_repository(
-    repo_path: &Path,
-    message: impl Into<String>,
-) -> SourceStorageError {
-    SourceStorageError::UnpreparedSourceRepository {
-        path: repo_path.to_path_buf(),
-        message: message.into(),
-    }
-}
-
-fn source_attributes_rule(storage_root: &str) -> String {
-    format!("{storage_root}/** -text")
-}
-
-fn source_attributes_check_path(storage_root: &str) -> String {
-    format!("{storage_root}/.verifier-attributes-check")
-}
-
-fn bundle_relative_path(storage_root: &str, code_hash: &str) -> Result<String, SourceStorageError> {
-    if !is_valid_code_hash(code_hash) {
-        return Err(SourceStorageError::InvalidCodeHash);
-    }
-
-    let (prefix, suffix) = code_hash.split_at(2);
-    Ok(format!("{storage_root}/{prefix}/{suffix}"))
-}
-
 async fn write_bundle_files(
     files_dir: &Path,
     files: &[SourceStorageFile],
@@ -974,44 +837,6 @@ async fn read_bundle_files(
     Ok(files)
 }
 
-fn checked_join(root: &Path, relative: &str) -> Result<PathBuf, SourceStorageError> {
-    let relative_path = Path::new(relative);
-    if relative_path.is_absolute() {
-        return Err(SourceStorageError::InvalidPath {
-            path: relative_path.to_path_buf(),
-            message: "path must be relative".to_owned(),
-        });
-    }
-
-    let mut path = root.to_path_buf();
-    for component in relative_path.components() {
-        match component {
-            Component::Normal(component) => path.push(component),
-            Component::CurDir
-            | Component::ParentDir
-            | Component::RootDir
-            | Component::Prefix(_) => {
-                return Err(SourceStorageError::InvalidPath {
-                    path: relative_path.to_path_buf(),
-                    message: "path contains an invalid component".to_owned(),
-                });
-            }
-        }
-    }
-
-    Ok(path)
-}
-
-async fn git_has_committed_files(
-    repo_path: &Path,
-    bundle_path: &str,
-) -> Result<bool, SourceStorageError> {
-    Git::new(repo_path)
-        .output(&["ls-tree", "-r", "--name-only", "HEAD", "--", bundle_path])
-        .await
-        .map(|output| !output.is_empty())
-}
-
 fn commit_message(request: &StoreSourceBundleRequest, manifest_hash: &str) -> String {
     format!(
         "Verify code hash {}\n\ncode_hash: {}\nsource_bundle_hash: {}\nmanifest_hash: {}",
@@ -1069,29 +894,4 @@ struct DiskManifestFile {
     pub is_stdlib: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub has_include_directives: Option<bool>,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn bundle_path_splits_code_hash_after_first_two_characters() {
-        let code_hash = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
-        let path = bundle_relative_path("sources", code_hash)
-            .expect("valid code hash should produce a bundle path");
-
-        assert_eq!(
-            path,
-            "sources/ab/cdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
-        );
-    }
-
-    #[test]
-    fn bundle_path_rejects_invalid_code_hash() {
-        assert!(matches!(
-            bundle_relative_path("sources", "not-a-code-hash"),
-            Err(SourceStorageError::InvalidCodeHash)
-        ));
-    }
 }
