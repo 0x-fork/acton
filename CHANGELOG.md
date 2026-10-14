@@ -23,6 +23,9 @@ All notable changes to this project will be documented in this file.
 
 ### Localnet
 
+- Register genesis ADNL identities before activating the validator, preventing
+  a bootstrap crash when consensus starts during console configuration.
+
 - LiteAPI clients share the pure Rust ADNL/TCP transport from `rston`, with
   bounded connection and request deadlines.
 

@@ -82,6 +82,33 @@ pub(crate) async fn configure_genesis_identity(
         let end = u32::try_from(now.saturating_add(YEAR_SECONDS))
             .context("validator bootstrap key expiry exceeds TON uint32 time")?;
 
+        // Register both ADNL identities before activating the validator. Consensus
+        // can start as soon as its temporary key is added and use the permanent
+        // key as its initial ADNL address, before `add_validator_address` runs.
+        // An unregistered address aborts TON's ADNL peer table process.
+        retry_console_mutation(node, "add_validator_adnl", || {
+            console.add_adnl(
+                &console_context,
+                &endpoint,
+                AddAdnl {
+                    key: validator_adnl,
+                    category: 0,
+                },
+            )
+        })
+        .await?;
+        retry_console_mutation(node, "add_permanent_key_adnl", || {
+            console.add_adnl(
+                &console_context,
+                &endpoint,
+                AddAdnl {
+                    key: validator_key,
+                    category: 0,
+                },
+            )
+        })
+        .await?;
+
         // Genesis installs `validator` in the engine keyring before this process
         // starts. TON's `addpermkey` calls `check_key` before persisting the
         // validator record, so success here also proves the private key is
@@ -106,28 +133,6 @@ pub(crate) async fn configure_genesis_identity(
                     permanent_key: validator_key,
                     temporary_key: validator_key,
                     expire_at: end,
-                },
-            )
-        })
-        .await?;
-        retry_console_mutation(node, "add_validator_adnl", || {
-            console.add_adnl(
-                &console_context,
-                &endpoint,
-                AddAdnl {
-                    key: validator_adnl,
-                    category: 0,
-                },
-            )
-        })
-        .await?;
-        retry_console_mutation(node, "add_permanent_key_adnl", || {
-            console.add_adnl(
-                &console_context,
-                &endpoint,
-                AddAdnl {
-                    key: validator_key,
-                    category: 0,
                 },
             )
         })
