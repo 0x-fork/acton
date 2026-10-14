@@ -115,7 +115,15 @@ interface DnsRecordsResponse {
   readonly records: readonly {
     readonly domain: string
     readonly dns_wallet?: string | null
+    readonly nft_item_address?: string | null
   }[]
+}
+
+/** Renewal data belongs to the DNS item; the wallet record may be absent or temporarily unavailable. */
+export interface DnsDomainDetails {
+  readonly lastRenewedAt: number
+  readonly walletAddress?: string
+  readonly walletLookupFailed: boolean
 }
 
 interface DnsResolvedResponse {
@@ -591,6 +599,38 @@ export class TonClient {
       .filter(entry => entry.entry["@type"] === "dns.entryDataSmcAddress")
       .map(entry => stringValue(entry.entry.smc_address?.account_address))
       .find(address => address !== undefined)
+  }
+
+  /** Loads renewal time from the item contract and accepts wallet records only for that same item. */
+  async getDnsDomainDetails(address: string, domain: string): Promise<DnsDomainDetails> {
+    const url = this.buildUrl(this.v3BaseUrl, "/dns/records")
+    url.searchParams.append("domain", domain)
+
+    const [renewal, dnsRecords] = await Promise.all([
+      this.runGetMethod(address, "get_last_fill_up_time"),
+      this.request<DnsRecordsResponse>(url, "Failed to load TON DNS records").then(
+        records => ({records, failed: false}),
+        () => ({records: undefined, failed: true}),
+      ),
+    ])
+
+    const lastRenewedAt = Number(this.stackNumber(renewal.stack[0]))
+    if (renewal.exit_code !== 0 || !Number.isSafeInteger(lastRenewedAt) || lastRenewedAt <= 0) {
+      throw new Error("get_last_fill_up_time returned an unexpected result")
+    }
+
+    const walletAddress = dnsRecords.records?.records.find(
+      record =>
+        record.domain.toLowerCase() === domain.toLowerCase() &&
+        record.nft_item_address &&
+        addressKey(record.nft_item_address) === addressKey(address),
+    )?.dns_wallet
+
+    return {
+      lastRenewedAt,
+      walletAddress: walletAddress ?? undefined,
+      walletLookupFailed: dnsRecords.failed,
+    }
   }
 
   async getWalletDnsNames(address: string): Promise<readonly string[]> {

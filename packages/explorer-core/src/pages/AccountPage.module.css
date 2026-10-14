@@ -231,6 +231,17 @@
   min-width: 0;
 }
 
+.dnsExpiry {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dnsRemaining {
+  color: var(--acton-color-text-muted);
+}
+
 .accountDetailLink {
   min-width: 0;
   color: var(--acton-color-accent);

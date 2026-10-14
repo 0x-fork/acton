@@ -3,11 +3,20 @@ import {useCallback, useEffect, useMemo, useReducer, useRef, useState} from "rea
 import type {FC, SetStateAction} from "react"
 
 import {codeLookupHashHex} from "@acton/transaction-ui"
-import {Dialog, HighlightedCode, RawDataBlock, TokenAmount} from "@acton/ui"
+import {
+  DateTime,
+  Dialog,
+  formatTimeUntil,
+  HighlightedCode,
+  RawDataBlock,
+  RelativeTime,
+  Skeleton,
+  TokenAmount,
+} from "@acton/ui"
 import {ListChecks, Puzzle, ScrollText, UsersRound} from "lucide-react"
 import {Cell} from "@ton/core"
 
-import type {AccountHistorySortOrder, TonClient} from "../api/client"
+import type {AccountHistorySortOrder, DnsDomainDetails, TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import {resolveAccountCompilerAbi} from "../api/compilerAbiResolver"
 import {sortJettonWalletsForDisplay} from "../api/jettonWallets"
@@ -103,6 +112,8 @@ interface AccountPageProps {
 }
 
 const INITIAL_TRANSACTION_LIMIT = 20
+// The .ton DNS item contract accepts release after 366 days without renewal.
+const DNS_DOMAIN_LIFETIME_SECONDS = 366 * 24 * 60 * 60
 const REMOTE_TRANSACTION_PAGE_SIZE = 20
 const LOCAL_TRANSACTION_PAGE_SIZE = 1000
 const ACTION_PAGE_SIZE = 20
@@ -288,6 +299,12 @@ export const AccountPage: FC<AccountPageProps> = ({
   })
   const [accountTokenInfo, setAccountTokenInfo] = useState<readonly AccountStateTokenInfo[]>([])
   const [currentNftItem, setCurrentNftItem] = useState<NftItem | undefined>()
+  const [dnsDomainState, setDnsDomainState] = useState<{
+    readonly key: string
+    readonly details?: DnsDomainDetails
+    readonly failed?: boolean
+  }>()
+  const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
   const [nftCollectionItemsState, setNftCollectionItemsState] = useState<NftItemsState>({
     items: [],
     nextOffset: 0,
@@ -1832,6 +1849,50 @@ export const AccountPage: FC<AccountPageProps> = ({
     tokenInfoString(nftItemTokenInfo, "name") ||
     contentString(currentNftItem?.content, "name") ||
     (currentNftItem ? `NFT #${currentNftItem.index}` : undefined)
+  const dnsDomainName =
+    currentNftItem !== undefined &&
+    hasAccountInterface(accountInterfaces, "dns") &&
+    nftItemName?.toLowerCase().endsWith(".ton")
+      ? nftItemName
+      : undefined
+  const dnsDomainKey =
+    dnsDomainName === undefined ? undefined : `${accountRequestKey}:${dnsDomainName}`
+
+  useEffect(() => {
+    if (dnsDomainName === undefined || dnsDomainKey === undefined) return
+
+    let active = true
+    void client.getDnsDomainDetails(formattedAddress, dnsDomainName).then(
+      details => {
+        if (active) setDnsDomainState({key: dnsDomainKey, details})
+      },
+      () => {
+        if (active) setDnsDomainState({key: dnsDomainKey, failed: true})
+      },
+    )
+
+    return () => {
+      active = false
+    }
+  }, [client, dnsDomainKey, dnsDomainName, formattedAddress])
+
+  useEffect(() => {
+    if (dnsDomainName === undefined) return
+
+    const interval = globalThis.setInterval(
+      () => setNowSeconds(Math.floor(Date.now() / 1000)),
+      60_000,
+    )
+    return () => globalThis.clearInterval(interval)
+  }, [dnsDomainName])
+
+  const currentDnsDomainState = dnsDomainState?.key === dnsDomainKey ? dnsDomainState : undefined
+  const dnsDetails = currentDnsDomainState?.details
+  const dnsFailed = currentDnsDomainState?.failed === true
+  const dnsExpiresAt =
+    dnsDetails?.lastRenewedAt === undefined
+      ? undefined
+      : dnsDetails.lastRenewedAt + DNS_DOMAIN_LIFETIME_SECONDS
   const nftItemDescription =
     tokenInfoString(nftItemTokenInfo, "description") ||
     contentString(currentNftItem?.content, "description")
@@ -1983,6 +2044,75 @@ export const AccountPage: FC<AccountPageProps> = ({
     : `${styles.topSection} ${styles.topSectionSingle}`
 
   const accountInfoDetails = [
+    ...(dnsDomainName === undefined
+      ? []
+      : [
+          {
+            key: "dns-expiry",
+            label: "Expires",
+            value: dnsFailed ? (
+              "Unavailable"
+            ) : dnsExpiresAt === undefined ? (
+              <Skeleton width="12rem" height="1.25rem" />
+            ) : (
+              <span className={styles.dnsExpiry}>
+                <DateTime display="date-time-seconds" unit="seconds" value={dnsExpiresAt} />
+                <span className={styles.dnsRemaining}>
+                  ·{" "}
+                  {dnsExpiresAt > nowSeconds
+                    ? formatTimeUntil(dnsExpiresAt, nowSeconds)
+                    : "Expired"}
+                </span>
+              </span>
+            ),
+          },
+          {
+            key: "dns-renewed",
+            label: "Last renewed",
+            value: dnsFailed ? (
+              "Unavailable"
+            ) : dnsDetails === undefined ? (
+              <Skeleton width="10rem" height="1.25rem" />
+            ) : (
+              <span className={styles.dnsExpiry}>
+                <DateTime
+                  display="date-time-seconds"
+                  unit="seconds"
+                  value={dnsDetails.lastRenewedAt}
+                />
+                <span className={styles.dnsRemaining}>
+                  ·{" "}
+                  <RelativeTime
+                    mode="relative"
+                    now={nowSeconds}
+                    tooltip={false}
+                    unit="seconds"
+                    value={dnsDetails.lastRenewedAt}
+                  />
+                </span>
+              </span>
+            ),
+          },
+          {
+            key: "dns-wallet",
+            label: "Wallet",
+            value: dnsFailed ? (
+              "Unavailable"
+            ) : dnsDetails === undefined ? (
+              <Skeleton width="12rem" height="1.25rem" />
+            ) : dnsDetails.walletAddress ? (
+              <ExplorerAddressChip
+                address={dnsDetails.walletAddress}
+                onAddressClick={handleSearch}
+                variant="plain"
+              />
+            ) : dnsDetails.walletLookupFailed ? (
+              "Wallet unavailable"
+            ) : (
+              "No wallet record"
+            ),
+          },
+        ]),
     ...(fragmentIdentity?.kind === "username"
       ? [
           {

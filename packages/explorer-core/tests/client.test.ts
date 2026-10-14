@@ -464,6 +464,44 @@ test("domain DNS lookup uses the indexed V3 wallet record when available", async
   }
 })
 
+test("DNS domain details use the item's renewal time and its own wallet record", async () => {
+  const originalFetch = globalThis.fetch
+  const address = "EQBq1lDaKm0RqUAedPvWXzILPzk3tfKiUipgU6nGo7tXXTsU"
+  const walletAddress = "0:39F14BDCC6447BCEA8B6A37B41606301416A944600E83BBC34E843C512AC66A1"
+
+  globalThis.fetch = mockFetch(async input => {
+    const url = new URL(input.toString())
+    if (url.pathname.endsWith("/runGetMethod")) {
+      return Response.json({exit_code: 0, stack: [{type: "num", value: "0x6ad00d4a"}]})
+    }
+
+    return Response.json({
+      records: [
+        {domain: "kiryl.ton", nft_item_address: "0:other-item", dns_wallet: "0:wrong-wallet"},
+        {domain: "kiryl.ton", nft_item_address: address, dns_wallet: walletAddress},
+      ],
+    })
+  })
+
+  try {
+    const client = new TonClient({
+      v2BaseUrl: "https://toncenter.example/api/v2",
+      v3BaseUrl: "https://toncenter.example/api/v3",
+      addressNameBaseUrl: "https://toncenter.example/api",
+    })
+
+    expect(await client.getDnsDomainDetails(address, "kiryl.ton")).toMatchInlineSnapshot(`
+      {
+        "lastRenewedAt": 1792019786,
+        "walletAddress": "0:39F14BDCC6447BCEA8B6A37B41606301416A944600E83BBC34E843C512AC66A1",
+        "walletLookupFailed": false,
+      }
+    `)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("domain DNS lookup falls back to Toncenter V2 when V3 has no records", async () => {
   const originalFetch = globalThis.fetch
   const requests: URL[] = []
