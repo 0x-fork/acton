@@ -100,6 +100,79 @@ impl<'a> Git<'a> {
         Ok(files)
     }
 
+    /// Removes and stages exactly the supplied file paths, without pathspec expansion.
+    ///
+    /// # Errors
+    /// Returns an error if Git cannot remove the files.
+    pub async fn remove_files(&self, files: &[&str]) -> Result<(), SourceStorageError> {
+        let mut args = vec!["--literal-pathspecs", "rm", "--"];
+        args.extend_from_slice(files);
+        self.run(&args).await
+    }
+
+    /// Checks that the entire staged diff consists of exactly the planned deletions.
+    ///
+    /// # Errors
+    /// Returns an error if the staged diff differs from the plan or Git fails.
+    pub async fn ensure_staged_deletions(
+        &self,
+        revision: &str,
+        files: &[&str],
+    ) -> Result<(), SourceStorageError> {
+        let output = self
+            .output_untrimmed(&[
+                "diff",
+                "--cached",
+                "--no-renames",
+                "--name-status",
+                "-z",
+                revision,
+                "--",
+            ])
+            .await?;
+        let fields = output.split_terminator('\0').collect::<Vec<_>>();
+        let mut deleted = Vec::new();
+        for change in fields.chunks(2) {
+            let ["D", path] = change else {
+                return Err(SourceStorageError::Operation(
+                    "staged diff does not match the removal plan".to_owned(),
+                ));
+            };
+            deleted.push(*path);
+        }
+        deleted.sort_unstable();
+        let mut expected = files.to_vec();
+        expected.sort_unstable();
+        if deleted != expected {
+            return Err(SourceStorageError::Operation(
+                "staged diff does not match the removal plan".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Restores only the supplied paths in the index and work tree from a revision.
+    ///
+    /// # Errors
+    /// Returns an error if Git cannot restore the files.
+    pub async fn restore_files(
+        &self,
+        revision: &str,
+        files: &[&str],
+    ) -> Result<(), SourceStorageError> {
+        let mut args = vec![
+            "--literal-pathspecs",
+            "restore",
+            "--source",
+            revision,
+            "--staged",
+            "--worktree",
+            "--",
+        ];
+        args.extend_from_slice(files);
+        self.run(&args).await
+    }
+
     /// Pushes HEAD to an explicit remote branch, using the current branch as a default.
     ///
     /// # Errors

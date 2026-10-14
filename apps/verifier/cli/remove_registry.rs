@@ -3,7 +3,7 @@ use std::{collections::BTreeSet, path::PathBuf};
 use verifier::{
     blockchain::parse_code_hash,
     config::Config,
-    source_storage::{git::Git, repository},
+    source_storage::{SourceStorageError, git::Git, repository},
 };
 
 use crate::{args::RemoveRegistryArgs, check_repository, error::CliError};
@@ -13,8 +13,6 @@ struct SourceRepositorySettings {
     storage_root: String,
     remote: String,
     branch: Option<String>,
-    author_name: String,
-    author_email: String,
 }
 
 struct RemoveRegistryRequest {
@@ -62,8 +60,6 @@ impl RemoveRegistryRequest {
                 storage_root: config.source_repository_storage_root().to_owned(),
                 remote: config.source_repository_remote().to_owned(),
                 branch: config.source_repository_branch().map(ToOwned::to_owned),
-                author_name: config.source_repository_author_name().to_owned(),
-                author_email: config.source_repository_author_email().to_owned(),
             },
             code_hashes,
         })
@@ -99,15 +95,58 @@ impl RemovalPlan {
             bundles,
         })
     }
+
+    fn found_count(&self) -> usize {
+        self.bundles
+            .iter()
+            .filter(|bundle| !bundle.files.is_empty())
+            .count()
+    }
+
+    async fn execute(&self) -> Result<(), CliError> {
+        let files = self
+            .bundles
+            .iter()
+            .flat_map(|bundle| bundle.files.iter().map(String::as_str))
+            .collect::<Vec<_>>();
+        if files.is_empty() {
+            return Ok(());
+        }
+
+        let git = Git::new(&self.repository.path);
+        let result: Result<(), SourceStorageError> = async {
+            git.remove_files(&files).await?;
+            git.ensure_staged_deletions(&self.checked.local_head, &files)
+                .await
+        }
+        .await;
+
+        match result {
+            Ok(()) => Ok(()),
+            Err(operation) => match git.restore_files(&self.checked.local_head, &files).await {
+                Ok(()) => Err(CliError::RemovalFailed {
+                    source: Box::new(operation),
+                }),
+                Err(recovery) => Err(CliError::RecoveryFailed {
+                    operation: Box::new(operation),
+                    recovery: Box::new(recovery),
+                }),
+            },
+        }
+    }
 }
 
 pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
     let plan = RemovalPlan::prepare(RemoveRegistryRequest::prepare(args)?).await?;
     if !args.dry_run {
-        return Err(CliError::RemovalNotImplemented);
+        plan.execute().await?;
     }
 
-    println!("Dry run: registry removal plan");
+    if args.dry_run {
+        println!("Dry run: registry removal plan");
+    } else {
+        println!("Bundles removed from checkout");
+    }
     println!("Config: {}", args.config.display());
     println!("Repository: {}", plan.repository.path.display());
     println!("Storage root: {}", plan.repository.storage_root);
@@ -115,10 +154,6 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
     println!("Branch: {}", plan.checked.branch);
     println!("Local HEAD: {}", plan.checked.local_head);
     println!("Remote HEAD: {}", plan.checked.remote_head);
-    println!(
-        "Author: {} <{}>",
-        plan.repository.author_name, plan.repository.author_email
-    );
     let code_hashes = plan
         .bundles
         .iter()
@@ -129,28 +164,28 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
     for bundle in &plan.bundles {
         let status = if bundle.files.is_empty() {
             "not found"
+        } else if args.dry_run {
+            "found"
         } else {
-            "remove"
+            "removed"
         };
         println!("  {}: {status}", bundle.code_hash);
         println!("    Path: {}", bundle.path);
-        for file in &bundle.files {
-            println!("    Delete: {file}");
+    }
+    let found = plan.found_count();
+    if args.dry_run {
+        println!("Bundles to remove: {found}");
+    } else {
+        println!("Removed bundles: {found}");
+    }
+    println!("Not found: {}", plan.bundles.len() - found);
+    if !args.dry_run {
+        if found == 0 {
+            println!("No bundles found; nothing to remove.");
+        } else {
+            println!("Deletions staged in Git.");
         }
     }
-    let to_remove = plan
-        .bundles
-        .iter()
-        .filter(|bundle| !bundle.files.is_empty())
-        .count();
-    let files = plan
-        .bundles
-        .iter()
-        .map(|bundle| bundle.files.len())
-        .sum::<usize>();
-    println!("Bundles to remove: {to_remove}");
-    println!("Not found: {}", plan.bundles.len() - to_remove);
-    println!("Files to remove: {files}");
 
     Ok(())
 }

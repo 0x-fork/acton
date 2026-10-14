@@ -30,6 +30,13 @@ pub enum CliError {
         local_head: String,
         remote_head: String,
     },
-    #[error("registry removal is not implemented yet; use --dry-run to preview the removal plan")]
-    RemovalNotImplemented,
+    #[error("registry removal failed: {source}; planned files and index entries were restored")]
+    RemovalFailed { source: Box<SourceStorageError> },
+    #[error(
+        "registry removal failed: {operation}; restoring planned files also failed: {recovery}; inspect git status before retrying"
+    )]
+    RecoveryFailed {
+        operation: Box<SourceStorageError>,
+        recovery: Box<SourceStorageError>,
+    },
 }

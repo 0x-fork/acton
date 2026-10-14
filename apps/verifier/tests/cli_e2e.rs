@@ -68,12 +68,11 @@ fn prepares_sorted_unique_hashes_from_hex_and_all_base64_formats() {
     assert!(stdout.contains("Dry run: registry removal plan"));
     assert!(stdout.contains(&format!("  {lower_hash}: not found\n")));
     assert!(stdout.contains(&format!("  {upper_hash}: not found\n")));
-    assert!(stdout.contains("Bundles to remove: 0\nNot found: 2\nFiles to remove: 0\n"));
+    assert!(stdout.contains("Bundles to remove: 0\nNot found: 2\n"));
     assert!(!stdout.contains("Delete:"));
     assert!(stdout.contains("Remote: origin\n"));
     assert!(stdout.contains("Storage root: sources\n"));
     assert!(stdout.contains("Branch: main\n"));
-    assert!(stdout.contains("Author: ton-verifier <ton-verifier@example.invalid>\n"));
     assert!(!stdout.contains("Reason:"));
 }
 
@@ -108,12 +107,8 @@ fn uses_configured_repository_settings() {
         "Storage root: verified/contracts\n",
         "Remote: upstream\n",
         "Branch: registry\n",
-        "Author: Registry Operator <operator@example.invalid>\n",
         &format!("    Path: {}\n", bundle_path("verified/contracts")),
-        &format!(
-            "    Delete: {}/source.tolk\n",
-            bundle_path("verified/contracts")
-        ),
+        &format!("  {CODE_HASH}: found\n"),
     ] {
         assert!(stdout.contains(expected), "{stdout}");
     }
@@ -239,13 +234,16 @@ fn reports_config_parse_and_validation_errors() {
 }
 
 #[test]
-fn refuses_execution_until_removal_is_implemented() {
+fn absent_hashes_succeed_without_commit_or_push() {
     let dir = fixture(MINIMAL_CONFIG);
     let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
-    for hash in [CODE_HASH, &"bb".repeat(32)] {
-        let output = run_preserving(&dir, &repo, &["remove-registry", hash]);
-        assert_failure(&output, "registry removal is not implemented yet");
-    }
+    let hash = "bb".repeat(32);
+    let stdout = assert_success(run_preserving(&dir, &repo, &["remove-registry", &hash]));
+    assert!(stdout.contains(&format!("  {hash}: not found\n")));
+    assert!(stdout.contains("Removed bundles: 0\nNot found: 1\n"));
+    assert!(stdout.contains("No bundles found; nothing to remove.\n"));
+    assert!(!stdout.contains("Commit:"));
+    assert!(!stdout.contains("Push:"));
 }
 
 #[test]
@@ -433,7 +431,7 @@ fn allows_missing_storage_and_bundle_directories() {
     let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
     let stdout = assert_success(output);
     assert!(stdout.contains(&format!("  {CODE_HASH}: not found\n")));
-    assert!(stdout.contains("Bundles to remove: 0\nNot found: 1\nFiles to remove: 0\n"));
+    assert!(stdout.contains("Bundles to remove: 0\nNot found: 1\n"));
     assert!(!repo.join("sources").exists());
 }
 
@@ -595,12 +593,10 @@ fn dry_run_prints_a_stable_complete_plan_for_present_and_absent_bundles() {
          Branch: main\n\
          Local HEAD: {head}\n\
          Remote HEAD: {head}\n\
-         Author: ton-verifier <ton-verifier@example.invalid>\n\
          Code hashes: {CODE_HASH}, {absent_hash}, {second_hash}\n\
-         Bundles:\n  {CODE_HASH}: remove\n    Path: {first}\n    Delete: {first}/abi.json\n    Delete: {first}/manifest.json\n    Delete: {first}/source.tolk\n    Delete: {first}/src/lib.tolk\n  {absent_hash}: not found\n    Path: {absent}\n  {second_hash}: remove\n    Path: {second}\n    Delete: {second}/source.tolk\n\
+         Bundles:\n  {CODE_HASH}: found\n    Path: {first}\n  {absent_hash}: not found\n    Path: {absent}\n  {second_hash}: found\n    Path: {second}\n\
          Bundles to remove: 2\n\
-         Not found: 1\n\
-         Files to remove: 5\n"
+         Not found: 1\n"
     );
     for hashes in [
         vec![second_hash.as_str(), absent_hash.as_str(), CODE_HASH],
@@ -619,20 +615,21 @@ fn dry_run_prints_a_stable_complete_plan_for_present_and_absent_bundles() {
 }
 
 #[test]
-fn plans_only_tracked_files_in_a_valid_repository() {
+fn plans_and_removes_only_tracked_files_in_a_valid_repository() {
     let dir = fixture(MINIMAL_CONFIG);
     let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
     fs::write(repo.join(".git/info/exclude"), "*.cache\n").expect("ignore rules");
     let absent_hash = "bb".repeat(32);
     let absent = bundle_path_for("sources", &absent_hash);
     let selected = bundle_path("sources");
-    for relative in [
+    let ignored = [
         "local.cache".to_owned(),
         format!("{selected}/pending.cache"),
         format!("{selected}/nested/pending.cache"),
         format!("{absent}/pending.cache"),
         format!("{selected}-sibling/pending.cache"),
-    ] {
+    ];
+    for relative in &ignored {
         let path = repo.join(relative);
         fs::create_dir_all(path.parent().expect("parent directory")).expect("ignored directory");
         fs::write(path, "local contents").expect("ignored file");
@@ -643,12 +640,25 @@ fn plans_only_tracked_files_in_a_valid_repository() {
         &["remove-registry", "--dry-run", CODE_HASH, &absent_hash],
     ));
     assert!(stdout.contains(&format!("  {absent_hash}: not found\n")));
-    assert!(stdout.contains("Bundles to remove: 1\nNot found: 1\nFiles to remove: 2\n"));
+    assert!(stdout.contains("Bundles to remove: 1\nNot found: 1\n"));
     assert!(!stdout.contains(".cache"));
+    assert_success(
+        cli(&dir)
+            .args(["remove-registry", CODE_HASH, &absent_hash])
+            .output()
+            .expect("run CLI"),
+    );
+    for relative in &ignored {
+        assert_eq!(
+            fs::read_to_string(repo.join(relative)).expect("ignored contents"),
+            "local contents"
+        );
+    }
+    assert_eq!(git(&repo, &["ls-files"]), ".gitattributes");
 }
 
 #[test]
-fn plans_literal_paths_with_git_pathspec_characters() {
+fn plans_and_removes_literal_paths_with_git_pathspec_characters() {
     for (root, other_root) in [("sources*", "sources-other"), (":(glob)sources", "sources")] {
         let dir = fixture(&format!("{MINIMAL_CONFIG}storage_root = '{root}'\n"));
         let repo = prepare_repository(&dir, "source-repo", root, "origin", "main");
@@ -671,21 +681,284 @@ fn plans_literal_paths_with_git_pathspec_characters() {
             &repo,
             &["remove-registry", "--dry-run", CODE_HASH],
         ));
-        let deletes = stdout
-            .lines()
-            .filter(|line| line.starts_with("    Delete: "))
-            .collect::<Vec<_>>();
-        assert_eq!(
-            deletes,
-            vec![
-                format!("    Delete: {selected}/contract[1]*?.tolk"),
-                format!("    Delete: {selected}/manifest.json"),
-                format!("    Delete: {selected}/source with spaces.tolk "),
-                format!("    Delete: {selected}/source.tolk"),
-            ]
+        assert!(stdout.contains(&format!("  {CODE_HASH}: found\n    Path: {selected}\n")));
+        assert_success(
+            cli(&dir)
+                .args(["remove-registry", CODE_HASH])
+                .output()
+                .expect("run CLI"),
         );
-        assert!(stdout.contains("Files to remove: 4\n"));
+        assert!(!repo.join(selected).exists());
+        assert_eq!(
+            fs::read_to_string(repo.join(format!("{other}/outside.tolk")))
+                .expect("unselected source"),
+            "// not selected"
+        );
+        assert_eq!(git(&repo, &["diff", "--name-only"]), "");
     }
+}
+
+#[test]
+fn removes_selected_bundles_without_changing_head_remote_or_unrelated_files() {
+    let dir = fixture(
+        "[source_repository]\n\
+         path = 'source-repo'\n\
+         storage_root = 'verified/contracts'\n\
+         remote = 'upstream'\n\
+         branch = 'registry'\n\
+         commit_enabled = false\n\
+         push_enabled = false\n",
+    );
+    let root = "verified/contracts";
+    let repo = prepare_repository(&dir, "source-repo", root, "upstream", "registry");
+    let remote = dir.path().join("source-repo.git");
+    let first = bundle_path(root);
+    let second_hash = "bb".repeat(32);
+    let second = bundle_path_for(root, &second_hash);
+    let absent_hash = "ab".repeat(32);
+    let absent = bundle_path_for(root, &absent_hash);
+    let remaining_hash = "cc".repeat(32);
+    let remaining = bundle_path_for(root, &remaining_hash);
+    for (relative, contents) in [
+        (format!("{first}/abi.json"), "{}"),
+        (format!("{first}/src/lib.tolk"), "// nested source"),
+        (format!("{second}/source.tolk"), "// no manifest"),
+        (format!("{first}-sibling/source.tolk"), "// sibling"),
+        (format!("{absent}-sibling/source.tolk"), "// absent sibling"),
+        (format!("{remaining}/source.tolk"), "// remaining bundle"),
+    ] {
+        let path = repo.join(relative);
+        fs::create_dir_all(path.parent().expect("parent")).expect("bundle directory");
+        fs::write(path, contents).expect("source file");
+    }
+    git(&repo, &["add", "--all"]);
+    git(&repo, &["commit", "-m", "Add removal fixtures"]);
+    git(&repo, &["push", "upstream", "HEAD:registry"]);
+    let original = git(&repo, &["rev-parse", "HEAD"]);
+    let remote_before = directory_entries(&remote);
+    let refs_before = git(&repo, &["show-ref"]);
+    let config = fs::read(dir.path().join("config.toml")).expect("config bytes");
+    for filename in ["registry.sqlite", "payments.sqlite", "blocklist.txt"] {
+        fs::write(dir.path().join(filename), "unrelated contents").expect("unrelated file");
+    }
+
+    let stdout = assert_success(
+        cli(&dir)
+            .args([
+                "remove-registry",
+                &second_hash,
+                &absent_hash,
+                CODE_HASH,
+                CODE_HASH,
+            ])
+            .output()
+            .expect("run CLI"),
+    );
+    assert_eq!(git(&repo, &["rev-parse", "HEAD"]), original);
+    assert_eq!(git(&repo, &["show-ref"]), refs_before);
+    assert_eq!(directory_entries(&remote), remote_before);
+    assert_eq!(git(&repo, &["diff", "--name-only"]), "");
+    assert_eq!(
+        git(
+            &repo,
+            &["diff", "--cached", "--no-renames", "--name-status"]
+        ),
+        format!(
+            "D\t{first}/abi.json\nD\t{first}/manifest.json\nD\t{first}/source.tolk\nD\t{first}/src/lib.tolk\nD\t{second}/source.tolk"
+        )
+    );
+    assert!(!repo.join(&first).exists());
+    assert!(!repo.join(second).exists());
+    for (relative, expected) in [
+        (format!("{remaining}/source.tolk"), "// remaining bundle"),
+        (format!("{first}-sibling/source.tolk"), "// sibling"),
+        (format!("{absent}-sibling/source.tolk"), "// absent sibling"),
+    ] {
+        assert_eq!(
+            fs::read_to_string(repo.join(relative)).expect("unselected source"),
+            expected
+        );
+    }
+    assert!(stdout.contains(&format!("  {absent_hash}: not found\n")));
+    assert!(stdout.contains("Removed bundles: 2\nNot found: 1\n"));
+    assert!(stdout.contains("Deletions staged in Git.\n"));
+    for removed_field in [
+        "Commit:",
+        "Push:",
+        "Author:",
+        "source_bundle_hash:",
+        "manifest_hash:",
+    ] {
+        assert!(!stdout.contains(removed_field), "{stdout}");
+    }
+    assert_eq!(
+        fs::read(dir.path().join("config.toml")).expect("config bytes"),
+        config
+    );
+    for filename in ["registry.sqlite", "payments.sqlite", "blocklist.txt"] {
+        assert_eq!(
+            fs::read_to_string(dir.path().join(filename)).expect("unrelated file"),
+            "unrelated contents"
+        );
+    }
+    // Staged deletions remain dirty until the operator commits or restores them.
+    let output = run_preserving(&dir, &repo, &["remove-registry", CODE_HASH]);
+    assert_failure(&output, "uncommitted changes");
+}
+
+#[test]
+fn removes_the_last_bundle_without_creating_a_commit() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    let original = git(&repo, &["rev-parse", "HEAD"]);
+    assert_success(
+        cli(&dir)
+            .args(["remove-registry", CODE_HASH])
+            .output()
+            .expect("run CLI"),
+    );
+    assert_eq!(git(&repo, &["ls-files"]), ".gitattributes");
+    assert!(!repo.join(bundle_path("sources")).exists());
+    assert_eq!(git(&repo, &["rev-parse", "HEAD"]), original);
+    assert_eq!(
+        git(
+            &dir.path().join("source-repo.git"),
+            &["rev-parse", "refs/heads/main"]
+        ),
+        original
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn partial_removal_and_unexpected_staged_changes_restore_only_planned_paths() {
+    for failure in ["remove", "staged-diff"] {
+        let dir = fixture(MINIMAL_CONFIG);
+        let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+        let original = git(&repo, &["rev-parse", "HEAD"]);
+        let bundle = repo.join(bundle_path("sources"));
+        let before = directory_entries(&bundle);
+        let output = cli_with_git_script(
+            &dir,
+            r#"
+if [ "$1" = --literal-pathspecs ] && [ "$2" = rm ]; then
+    if [ "$CLI_TEST_FAILURE" = remove ]; then
+        "$CLI_TEST_REAL_GIT" --literal-pathspecs rm -- "$CLI_TEST_FIRST_FILE"
+    else
+        "$CLI_TEST_REAL_GIT" "$@"
+    fi
+    printf 'unrelated staged contents\n' > unrelated.txt
+    "$CLI_TEST_REAL_GIT" add -- unrelated.txt
+    printf 'unrelated working contents\n' >> unrelated.txt
+    if [ "$CLI_TEST_FAILURE" = remove ]; then
+        echo 'injected removal failure' >&2
+        exit 1
+    fi
+    exit 0
+fi
+"#,
+        )
+        .env("CLI_TEST_FAILURE", failure)
+        .env(
+            "CLI_TEST_FIRST_FILE",
+            format!("{}/source.tolk", bundle_path("sources")),
+        )
+        .args(["remove-registry", CODE_HASH])
+        .output()
+        .expect("run CLI");
+        assert_failure(
+            &output,
+            if failure == "remove" {
+                "injected removal failure"
+            } else {
+                "staged diff does not match the removal plan"
+            },
+        );
+        assert_failure(&output, "planned files and index entries were restored");
+        assert_eq!(git(&repo, &["rev-parse", "HEAD"]), original);
+        assert_eq!(
+            git(
+                &dir.path().join("source-repo.git"),
+                &["rev-parse", "refs/heads/main"]
+            ),
+            original
+        );
+        assert_eq!(directory_entries(&bundle), before);
+        assert_eq!(
+            git(&repo, &["diff", "--cached", "--name-status"]),
+            "A\tunrelated.txt"
+        );
+        assert_eq!(
+            git(&repo, &["show", ":unrelated.txt"]),
+            "unrelated staged contents"
+        );
+        assert_eq!(
+            fs::read_to_string(repo.join("unrelated.txt")).expect("unrelated worktree file"),
+            "unrelated staged contents\nunrelated working contents\n"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn recovery_failure_reports_both_errors_and_leaves_head_unchanged() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    let original = git(&repo, &["rev-parse", "HEAD"]);
+    let output = cli_with_git_script(
+        &dir,
+        r#"
+if [ "$1" = --literal-pathspecs ]; then
+    case "$2" in
+        rm) "$CLI_TEST_REAL_GIT" "$@"; echo 'injected removal failure' >&2; exit 1 ;;
+        restore) echo 'injected restore failure' >&2; exit 1 ;;
+    esac
+fi
+"#,
+    )
+    .args(["remove-registry", CODE_HASH])
+    .output()
+    .expect("run CLI");
+    assert_failure(&output, "injected removal failure");
+    assert_failure(&output, "injected restore failure");
+    assert_failure(&output, "inspect git status before retrying");
+    assert_eq!(git(&repo, &["rev-parse", "HEAD"]), original);
+    assert_eq!(
+        git(
+            &dir.path().join("source-repo.git"),
+            &["rev-parse", "refs/heads/main"]
+        ),
+        original
+    );
+    assert!(!git(&repo, &["diff", "--cached", "--name-only"]).is_empty());
+}
+
+#[cfg(unix)]
+fn executable_script(path: &Path, script: &str) {
+    use std::os::unix::fs::PermissionsExt;
+    fs::write(path, script).expect("test script");
+    fs::set_permissions(path, fs::Permissions::from_mode(0o755)).expect("executable script");
+}
+
+#[cfg(unix)]
+fn cli_with_git_script(dir: &TempDir, script: &str) -> Command {
+    let original_path = std::env::var_os("PATH").expect("PATH");
+    let paths = std::env::split_paths(&original_path).collect::<Vec<_>>();
+    let real_git = paths
+        .iter()
+        .map(|path| path.join("git"))
+        .find(|path| path.is_file())
+        .expect("Git executable");
+    let scripts = dir.path().join("test-bin");
+    fs::create_dir(&scripts).expect("test scripts directory");
+    executable_script(
+        &scripts.join("git"),
+        &format!("#!/bin/sh\nset -eu\n{script}\nexec \"$CLI_TEST_REAL_GIT\" \"$@\"\n"),
+    );
+    let path = std::env::join_paths(std::iter::once(scripts).chain(paths)).expect("test PATH");
+    let mut command = cli(dir);
+    command.env("PATH", path).env("CLI_TEST_REAL_GIT", real_git);
+    command
 }
 
 fn bundle_path(storage_root: &str) -> String {

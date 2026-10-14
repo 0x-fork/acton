@@ -11,7 +11,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum CliCommand {
-    /// Plan removal of selected registry contracts (execution is not implemented yet)
+    /// Remove selected registry bundles from the checkout and stage their deletion
     RemoveRegistry(RemoveRegistryArgs),
 }
 
