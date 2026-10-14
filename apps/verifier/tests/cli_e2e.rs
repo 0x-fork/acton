@@ -78,7 +78,7 @@ fn prepares_sorted_unique_hashes_from_hex_and_all_base64_formats() {
 }
 
 #[test]
-fn uses_configured_repository_settings_and_preserves_reason() {
+fn uses_configured_repository_settings() {
     let dir = fixture(
         "[source_repository]\n\
          path = 'custom repo'\n\
@@ -98,13 +98,7 @@ fn uses_configured_repository_settings_and_preserves_reason() {
         "registry",
     );
     let output = cli(&dir)
-        .args([
-            "remove-registry",
-            "--dry-run",
-            "--reason",
-            "Удаление тестовых публикаций",
-            CODE_HASH,
-        ])
+        .args(["remove-registry", "--dry-run", CODE_HASH])
         .output()
         .expect("run CLI");
     let stdout = assert_success(output);
@@ -115,7 +109,6 @@ fn uses_configured_repository_settings_and_preserves_reason() {
         "Remote: upstream\n",
         "Branch: registry\n",
         "Author: Registry Operator <operator@example.invalid>\n",
-        "Reason: Удаление тестовых публикаций\n",
         &format!("    Path: {}\n", bundle_path("verified/contracts")),
         &format!(
             "    Delete: {}/source.tolk\n",

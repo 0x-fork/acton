@@ -20,14 +20,12 @@ struct SourceRepositorySettings {
 struct RemoveRegistryRequest {
     repository: SourceRepositorySettings,
     code_hashes: Vec<String>,
-    reason: Option<String>,
 }
 
 struct RemovalPlan {
     repository: SourceRepositorySettings,
     checked: check_repository::CheckedRepository,
     bundles: Vec<BundleRemoval>,
-    reason: Option<String>,
 }
 
 struct BundleRemoval {
@@ -68,7 +66,6 @@ impl RemoveRegistryRequest {
                 author_email: config.source_repository_author_email().to_owned(),
             },
             code_hashes,
-            reason: args.reason.clone(),
         })
     }
 }
@@ -100,7 +97,6 @@ impl RemovalPlan {
             repository: request.repository,
             checked,
             bundles,
-            reason: request.reason,
         })
     }
 }
@@ -123,9 +119,6 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
         "Author: {} <{}>",
         plan.repository.author_name, plan.repository.author_email
     );
-    if let Some(reason) = &plan.reason {
-        println!("Reason: {reason}");
-    }
     let code_hashes = plan
         .bundles
         .iter()

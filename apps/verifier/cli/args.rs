@@ -33,8 +33,4 @@ pub struct RemoveRegistryArgs {
     /// Check the checkout and remote, then show the removal plan without making changes
     #[arg(long)]
     pub dry_run: bool,
-
-    /// Optional reason to include in the commit message
-    #[arg(long, value_name = "TEXT")]
-    pub reason: Option<String>,
 }
