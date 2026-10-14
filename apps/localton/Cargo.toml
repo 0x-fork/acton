@@ -63,7 +63,6 @@ ton-fullnode-master = { path = "../../crates/ton-fullnode-master" }
 tower-http = { version = "0.6", features = ["fs"] }
 tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
-tvm-ffi = { path = "../../crates/tvm-ffi" }
 rston = { path = "../../libs/rston", default-features = false, features = ["models", "wallet", "liteclient"] }
 utoipa = { version = "5.5", features = ["axum_extras", "macros"] }
 zip = { version = "4.6", default-features = false, features = ["deflate"] }
