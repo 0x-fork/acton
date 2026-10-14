@@ -12,7 +12,7 @@ license = { workspace = true }
 
 [[bin]]
 name = "verifier-cli"
-path = "cli/main.rs"
+path = "verifier-cli/main.rs"
 
 [[bin]]
 name = "github-app-credential"
