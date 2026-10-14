@@ -113,6 +113,30 @@ fn removal_requires_explicit_backend_shutdown_confirmation() {
 }
 
 #[test]
+fn invalid_utf8_in_piped_confirmation_never_confirms_removal() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    for input in [
+        b"\xd0yes".as_slice(),
+        b"\xd0yes\n",
+        b"\xd0yes\n\n",
+        b"\xd0yes\nno\nyes\n",
+        b"\xd0yes\nyes\n",
+        b"\xd0yes\n\xd1\n",
+    ] {
+        let output = run_preserving_command(
+            &dir,
+            &repo,
+            cli(&dir)
+                .args(["remove-registry", CODE_HASH])
+                .stdin(confirmation_input(input)),
+        );
+        assert_failure(&output, "failed to read backend shutdown confirmation:");
+        assert!(!String::from_utf8_lossy(&output.stderr).contains("Checking repository:"));
+    }
+}
+
+#[test]
 fn prepares_sorted_unique_hashes_from_hex_and_all_base64_formats() {
     let dir = fixture(MINIMAL_CONFIG);
     prepare_repository(&dir, "source-repo", "sources", "origin", "main");

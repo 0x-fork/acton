@@ -14,7 +14,9 @@ pub enum CliError {
     #[error("removal cancelled: backend shutdown was not confirmed")]
     BackendNotConfirmed,
     #[error("failed to read backend shutdown confirmation: {0}")]
-    ConfirmationIo(std::io::Error),
+    ConfirmationIo(#[from] std::io::Error),
+    #[error("failed to read backend shutdown confirmation: {0}")]
+    ConfirmationPrompt(#[from] inquire::error::InquireError),
     #[error("invalid code hash {value:?}: expected a 256-bit code hash in hexadecimal or base64")]
     InvalidCodeHash { value: String },
     #[error(transparent)]

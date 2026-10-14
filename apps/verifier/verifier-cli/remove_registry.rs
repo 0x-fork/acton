@@ -1,10 +1,11 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
-    io::{self, Write},
+    io::{self, IsTerminal, Write},
     path::Path,
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use inquire::Text;
 use sha2::{Digest, Sha256};
 use tokio::fs;
 use verifier::{
@@ -355,12 +356,16 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
 }
 
 fn confirm_backend_stopped() -> Result<(), CliError> {
-    eprint!("Backend must be stopped. Type 'yes' to confirm: ");
-    io::stderr().flush().map_err(CliError::ConfirmationIo)?;
-    let mut confirmation = String::new();
-    io::stdin()
-        .read_line(&mut confirmation)
-        .map_err(CliError::ConfirmationIo)?;
+    let prompt = "Backend must be stopped. Type 'yes' to confirm:";
+    let confirmation = if io::stdin().is_terminal() {
+        Text::new(prompt).prompt()?
+    } else {
+        eprint!("{prompt} ");
+        io::stderr().flush()?;
+        let mut confirmation = String::new();
+        io::stdin().read_line(&mut confirmation)?;
+        confirmation
+    };
     if confirmation.trim() != "yes" {
         return Err(CliError::BackendNotConfirmed);
     }

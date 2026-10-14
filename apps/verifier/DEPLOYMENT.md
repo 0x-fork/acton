@@ -438,7 +438,11 @@ Backend must be stopped. Type 'yes' to confirm:
 ```
 
 Only `yes` continues; an empty answer, another answer or EOF cancels the command
-before repository checks or deletion. This is the operator's confirmation;
+before repository checks or deletion. Interactive input supports Unicode-aware
+editing, including Backspace after typing in another keyboard layout. Esc,
+Ctrl+C and Ctrl+D also cancel the prompt. Piped input is still supported.
+
+This is the operator's confirmation;
 the CLI does not stop the backend or detect its process. A missing bundle is
 reported as `not found`.
 
