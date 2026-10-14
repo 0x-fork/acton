@@ -84,8 +84,10 @@ impl<'a> RemovalPlan<'a> {
         .await?;
 
         let git = Git::new(request.path);
-        let mut bundles = Vec::with_capacity(request.code_hashes.len());
-        for code_hash in request.code_hashes {
+        let total = request.code_hashes.len();
+        let mut bundles = Vec::with_capacity(total);
+        for (index, code_hash) in request.code_hashes.into_iter().enumerate() {
+            eprintln!("[check {}/{total}] Inspecting {code_hash}...", index + 1);
             let path =
                 repository::bundle_relative_path(&request.repository.storage_root, &code_hash)?;
             let files = git.tracked_files(&path).await?;
@@ -121,13 +123,29 @@ impl<'a> RemovalPlan<'a> {
     async fn execute(&self) -> Result<BTreeMap<String, String>, CliError> {
         let mut commits = BTreeMap::new();
         let mut head = self.checked.local_head.clone();
-        for bundle in self.bundles.iter().filter(|bundle| bundle.found) {
+        let total = self.bundles.len();
+        for (index, bundle) in self.bundles.iter().enumerate() {
+            let current = index + 1;
+            let code_hash = &bundle.code_hash;
+            if !bundle.found {
+                eprintln!("[remove {current}/{total}] {code_hash}: not found; skipping");
+                continue;
+            }
+            eprintln!(
+                "[remove {current}/{total}] Removing {code_hash} ({} tracked files)...",
+                bundle.files.len()
+            );
             match self.remove_bundle(bundle, &head).await {
                 Ok(Some(commit)) => {
+                    eprintln!("[remove {current}/{total}] Removed {code_hash}; commit {commit}");
                     head.clone_from(&commit);
                     commits.insert(bundle.code_hash.clone(), commit);
                 }
-                Ok(None) => {}
+                Ok(None) => {
+                    eprintln!(
+                        "[remove {current}/{total}] Removed {code_hash}; no tracked files to commit"
+                    );
+                }
                 Err(source) if commits.is_empty() => return Err(source),
                 Err(source) => {
                     return Err(CliError::PartialRemoval {
@@ -139,6 +157,12 @@ impl<'a> RemovalPlan<'a> {
             }
         }
         if self.repository.push_enabled && !commits.is_empty() {
+            eprintln!(
+                "Pushing {} commits to {}/{}...",
+                commits.len(),
+                self.repository.remote,
+                self.checked.branch
+            );
             Git::new(self.path)
                 .push_head(&self.repository.remote, Some(&self.checked.branch))
                 .await
@@ -148,6 +172,7 @@ impl<'a> RemovalPlan<'a> {
                     head,
                     source: Box::new(source),
                 })?;
+            eprintln!("Push completed.");
         }
         Ok(commits)
     }
@@ -256,6 +281,11 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
     }
     // Check the repository after confirmation, once the operator has stopped the backend.
     let plan = RemovalPlan::prepare(request).await?;
+    let found = plan.found_count();
+    eprintln!(
+        "Removal plan: {found} found, {} not found",
+        plan.bundles.len() - found
+    );
     let commits = if args.dry_run {
         BTreeMap::new()
     } else {
@@ -300,7 +330,6 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
             println!("    Commit: {commit}");
         }
     }
-    let found = plan.found_count();
     if args.dry_run {
         println!("Bundles to remove: {found}");
     } else {

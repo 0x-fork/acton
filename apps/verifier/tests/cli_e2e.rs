@@ -59,14 +59,13 @@ fn confirmation_input(input: &[u8]) -> fs::File {
 
 fn assert_success(output: Output) -> String {
     assert!(output.status.success(), "{output:?}");
-    let stderr = output
-        .stderr
-        .strip_prefix(PUSH_DISABLED_WARNING.as_bytes())
-        .unwrap_or(&output.stderr);
-    assert!(
-        stderr.is_empty() || stderr == CONFIRMATION_PROMPT.as_bytes(),
-        "{output:?}"
-    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr = stderr
+        .strip_prefix(PUSH_DISABLED_WARNING)
+        .unwrap_or(&stderr);
+    let stderr = stderr.strip_prefix(CONFIRMATION_PROMPT).unwrap_or(stderr);
+    assert!(stderr.starts_with("Checking repository: "), "{output:?}");
+    assert!(stderr.contains("\nRemoval plan: "), "{output:?}");
     String::from_utf8(output.stdout).expect("UTF-8 CLI output")
 }
 
@@ -94,7 +93,7 @@ fn removal_requires_read_only_but_dry_run_does_not() {
                 .args(["remove-registry", "--dry-run", CODE_HASH])
                 .stdin(Stdio::null()),
         );
-        assert!(output.stderr.is_empty());
+        assert!(!String::from_utf8_lossy(&output.stderr).contains(CONFIRMATION_PROMPT));
         assert_success(output);
     }
 }
@@ -1042,7 +1041,7 @@ fn disabled_push_keeps_commits_locally_without_contacting_a_remote() {
             &repo,
             &["remove-registry", "--dry-run", CODE_HASH, &second_hash],
         );
-        assert_eq!(output.stderr, PUSH_DISABLED_WARNING.as_bytes());
+        assert!(output.stderr.starts_with(PUSH_DISABLED_WARNING.as_bytes()));
         let stdout = assert_success(output);
         assert!(stdout.contains("Remote HEAD: not checked (push_enabled = false)\n"));
         assert!(stdout.contains("Push enabled: false\n"));
@@ -1052,9 +1051,10 @@ fn disabled_push_keeps_commits_locally_without_contacting_a_remote() {
             .args(["remove-registry", CODE_HASH, &second_hash])
             .output()
             .expect("run CLI");
-        assert_eq!(
-            output.stderr,
-            format!("{PUSH_DISABLED_WARNING}{CONFIRMATION_PROMPT}").as_bytes()
+        assert!(
+            output
+                .stderr
+                .starts_with(format!("{PUSH_DISABLED_WARNING}{CONFIRMATION_PROMPT}").as_bytes())
         );
         let stdout = assert_success(output);
         assert!(!repo.join(&first).exists());

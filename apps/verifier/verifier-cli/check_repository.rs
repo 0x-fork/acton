@@ -17,6 +17,7 @@ pub async fn check(
     expected_branch: Option<&str>,
     check_remote: bool,
 ) -> Result<CheckedRepository, CliError> {
+    eprintln!("Checking repository: {}", path.display());
     let git = Git::new(path);
     git.ensure_work_tree().await?;
     if !git
@@ -45,6 +46,7 @@ pub async fn check(
     repository::check(path, storage_root).await?;
 
     let remote_head = if check_remote {
+        eprintln!("Checking remote: {remote}/{branch}");
         let remote_head = remote_head(&git, remote, &branch).await?;
         if local_head != remote_head {
             return Err(CliError::HeadMismatch {
