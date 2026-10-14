@@ -8,7 +8,7 @@ Use the macros through `rston::prelude`. The `rston` dependency includes
 
 ```toml
 [dependencies]
-rston = "0.4.0"
+rston = "0.5.0"
 ```
 
 ```rust

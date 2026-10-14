@@ -15,7 +15,7 @@ Add `rston` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rston = "0.4.0"
+rston = "0.5.0"
 ```
 
 ## Basic usage
@@ -88,7 +88,7 @@ The `models` feature is enabled by default.
 
 ```toml
 [dependencies]
-rston = { version = "0.4.0", features = ["models"] }
+rston = { version = "0.5.0", features = ["models"] }
 ```
 
 ```rust
@@ -148,7 +148,7 @@ Enable `liteclient` and use Tokio to query the liteservers in a trusted global c
 
 ```toml
 [dependencies]
-rston = { version = "0.4.0", features = ["liteclient"] }
+rston = { version = "0.5.0", features = ["liteclient"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 

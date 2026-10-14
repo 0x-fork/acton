@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-14
+
 ### Breaking changes
 
 - `BlockSignatures` is now an enum with `Ordinary` and `Simplex` variants.

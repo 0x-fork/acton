@@ -13,10 +13,8 @@ fn mainnet_json() -> serde_json::Value {
 #[test]
 fn full_mainnet_config_matches_go_block_identifiers() {
     let config: GlobalConfig = MAINNET_CONFIG.parse().unwrap();
-    let expected: serde_json::Value = serde_json::from_str(include_str!(
-        "fixtures/global_config/go-block-ids.json"
-    ))
-    .unwrap();
+    let expected: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/global_config/go-block-ids.json")).unwrap();
     let validator = config.validator.as_ref().unwrap();
     assert_eq!(
         validator.zero_state,

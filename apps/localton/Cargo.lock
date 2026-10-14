@@ -1879,7 +1879,7 @@ dependencies = [
 
 [[package]]
 name = "rston"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "aes",
  "ahash",
@@ -1916,7 +1916,7 @@ dependencies = [
 
 [[package]]
 name = "rston-proc"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "proc-macro2",
  "quote",

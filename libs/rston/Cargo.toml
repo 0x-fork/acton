@@ -3,7 +3,7 @@ name = "rston"
 description = "TON cells, BoC encoding, dictionaries, Merkle proofs, and blockchain models."
 authors = ["Ivan Kalinin <i.kalinin@dexpa.io>"]
 repository = "https://github.com/ton-blockchain/acton"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 rust-version = "1.88"
 readme = "README.md"
@@ -120,7 +120,7 @@ tl-proto = { version = "0.5.3", optional = true }
 tycho-crypto = { version = "0.4", features = ["tl-proto"], optional = true }
 zeroize = "1"
 
-rston-proc = { version = "=0.4.0", path = "proc" }
+rston-proc = { version = "=0.5.0", path = "proc" }
 
 [dev-dependencies]
 tl-scheme = "0.3"
