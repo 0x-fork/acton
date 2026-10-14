@@ -30,7 +30,7 @@ pub struct RemoveRegistryArgs {
     )]
     pub config: PathBuf,
 
-    /// Prepare the request only (repository checks and removal planning are not implemented yet)
+    /// Check the checkout and remote only (removal planning is not implemented yet)
     #[arg(long)]
     pub dry_run: bool,
 

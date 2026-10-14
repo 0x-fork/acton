@@ -1,5 +1,7 @@
 use std::{
+    collections::BTreeMap,
     fs,
+    path::{Path, PathBuf},
     process::{Command, Output},
 };
 
@@ -23,8 +25,8 @@ fn cli(dir: &TempDir) -> Command {
     command
         .current_dir(dir.path())
         .env_remove("VERIFIER_CONFIG")
-        // Request preparation must work without Git, Node.js or other executables.
-        .env("PATH", "");
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null");
     command
 }
 
@@ -44,6 +46,7 @@ fn assert_failure(output: &Output, expected: &str) {
 #[test]
 fn prepares_sorted_unique_hashes_from_hex_and_all_base64_formats() {
     let dir = fixture(MINIMAL_CONFIG);
+    prepare_repository(&dir, "source-repo", "sources", "origin", "main");
     let lower_hash = "ab".repeat(32);
     let upper_hash = "fb".repeat(32);
     let output = cli(&dir)
@@ -62,14 +65,13 @@ fn prepares_sorted_unique_hashes_from_hex_and_all_base64_formats() {
     let stdout = assert_success(output);
 
     assert!(stdout.contains(&format!("Code hashes: {lower_hash}, {upper_hash}\n")));
-    assert!(stdout.contains("Request prepared only"));
-    assert!(stdout.contains("repository checks and removal planning are not implemented yet"));
+    assert!(stdout.contains("Repository checks passed"));
+    assert!(stdout.contains("removal planning and execution are not implemented yet"));
     assert!(stdout.contains("Remote: origin\n"));
     assert!(stdout.contains("Storage root: sources\n"));
-    assert!(stdout.contains("Branch: current branch (not resolved yet)\n"));
+    assert!(stdout.contains("Branch: main\n"));
     assert!(stdout.contains("Author: ton-verifier <ton-verifier@example.invalid>\n"));
     assert!(!stdout.contains("Reason:"));
-    assert_eq!(fs::read_dir(dir.path()).expect("CLI directory").count(), 1);
 }
 
 #[test]
@@ -84,6 +86,13 @@ fn uses_configured_repository_settings_and_preserves_reason() {
          author_email = 'operator@example.invalid'\n\
          commit_enabled = false\n\
          push_enabled = false\n",
+    );
+    prepare_repository(
+        &dir,
+        "custom repo",
+        "verified/contracts",
+        "upstream",
+        "registry",
     );
     let output = cli(&dir)
         .args([
@@ -112,12 +121,14 @@ fn uses_configured_repository_settings_and_preserves_reason() {
 #[test]
 fn config_path_uses_flag_then_environment_then_default() {
     let dir = fixture(MINIMAL_CONFIG);
+    prepare_repository(&dir, "source-repo", "sources", "origin", "main");
     for (filename, repository) in [("env.toml", "env-repo"), ("flag.toml", "flag-repo")] {
         fs::write(
             dir.path().join(filename),
             format!("[source_repository]\npath = '{repository}'\n"),
         )
         .expect("alternative config");
+        prepare_repository(&dir, repository, "sources", "origin", "main");
     }
 
     for (environment, explicit, expected_repository) in [
@@ -146,6 +157,7 @@ fn rejects_missing_or_empty_source_repository_path() {
     for config in ["", "[source_repository]\npath = ''\n"] {
         let dir = fixture(config);
         let output = cli(&dir)
+            .env("PATH", "")
             .args(["remove-registry", "--dry-run", CODE_HASH])
             .output()
             .expect("run CLI");
@@ -172,6 +184,8 @@ fn rejects_invalid_hashes_without_partial_output() {
     ] {
         for dry_run in [false, true] {
             let mut command = cli(&dir);
+            // Invalid input must fail before Git or any other executable runs.
+            command.env("PATH", "");
             command.arg("remove-registry");
             if dry_run {
                 command.arg("--dry-run");
@@ -226,32 +240,33 @@ fn reports_config_parse_and_validation_errors() {
 #[test]
 fn refuses_execution_until_removal_is_implemented() {
     let dir = fixture(MINIMAL_CONFIG);
-    let output = cli(&dir)
-        .args(["remove-registry", CODE_HASH])
-        .output()
-        .expect("run CLI");
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    let output = run_preserving(&dir, &repo, &["remove-registry", CODE_HASH]);
     assert_failure(&output, "registry removal is not implemented yet");
 }
 
 #[test]
-fn preparation_preserves_repository_and_database_files() {
+fn checks_preserve_repository_and_database_files() {
     let dir = fixture(MINIMAL_CONFIG);
-    fs::create_dir_all(dir.path().join("source-repo/.git")).expect("repository directory");
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
     let files = [
-        ("source-repo/.git/HEAD", "ref: refs/heads/main\n"),
-        ("source-repo/.git/index", "Git index sentinel"),
-        ("source-repo/pending.txt", "uncommitted data"),
         ("verifier-index.sqlite3", "registry sentinel"),
         ("verifier-payments.sqlite3", "payment ledger sentinel"),
     ];
     for (filename, contents) in files {
         fs::write(dir.path().join(filename), contents).expect("sentinel file");
     }
-    let output = cli(&dir)
-        .args(["remove-registry", "--dry-run", CODE_HASH])
-        .output()
-        .expect("run CLI");
-    assert_success(output);
+    let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
+    let stdout = assert_success(output);
+    let head = git(&repo, &["rev-parse", "HEAD"]);
+    assert!(
+        stdout.contains(&format!("Local HEAD: {head}\n")),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains(&format!("Remote HEAD: {head}\n")),
+        "{stdout}"
+    );
 
     for (filename, contents) in files {
         assert_eq!(
@@ -264,4 +279,392 @@ fn preparation_preserves_repository_and_database_files() {
         fs::read_to_string(dir.path().join("config.toml")).expect("preserved config"),
         MINIMAL_CONFIG
     );
+}
+
+#[test]
+fn rejects_missing_checkout_without_creating_it() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let before = directory_entries(dir.path());
+    for dry_run in [false, true] {
+        let mut command = cli(&dir);
+        command.args(["remove-registry", CODE_HASH]);
+        if dry_run {
+            command.arg("--dry-run");
+        }
+        assert_failure(&command.output().expect("run CLI"), "path does not exist");
+        assert_eq!(directory_entries(dir.path()), before);
+    }
+}
+
+#[test]
+fn rejects_non_git_bare_and_unborn_repositories() {
+    for state in ["non-git", "bare", "unborn"] {
+        let dir = fixture(MINIMAL_CONFIG);
+        let repo = dir.path().join("source-repo");
+        fs::create_dir(&repo).expect("repository directory");
+        match state {
+            "bare" => {
+                git(&repo, &["init", "--bare"]);
+            }
+            "unborn" => {
+                git(&repo, &["init", "-b", "main"]);
+            }
+            _ => {}
+        }
+        let before = directory_entries(dir.path());
+        let output = cli(&dir)
+            .args(["remove-registry", "--dry-run", CODE_HASH])
+            .output()
+            .expect("run CLI");
+        let expected = match state {
+            "bare" => "path is not inside a git work tree",
+            "unborn" => "git rev-parse --verify HEAD",
+            _ => "not a git repository",
+        };
+        assert_failure(&output, expected);
+        assert_eq!(directory_entries(dir.path()), before, "{state}");
+    }
+}
+
+#[test]
+fn rejects_checkout_subdirectory() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    fs::write(
+        dir.path().join("config.toml"),
+        "[source_repository]\npath = 'source-repo/sources'\n",
+    )
+    .expect("config");
+    let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
+    assert_failure(&output, "must point to the checkout root");
+}
+
+#[test]
+fn rejects_detached_head_even_with_configured_branch() {
+    for branch in ["", "branch = 'main'\n"] {
+        let dir = fixture(&format!("{MINIMAL_CONFIG}{branch}"));
+        let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+        git(&repo, &["checkout", "--detach"]);
+        let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
+        assert_failure(&output, "has detached HEAD; check out a named branch");
+    }
+}
+
+#[test]
+fn rejects_unexpected_branch() {
+    let dir = fixture(&format!("{MINIMAL_CONFIG}branch = 'registry'\n"));
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
+    assert_failure(&output, "branch mismatch: expected registry, current main");
+}
+
+#[test]
+fn rejects_dirty_checkout_without_startup_recovery() {
+    for state in ["unstaged", "staged", "untracked", "deleted", "mixed"] {
+        let dir = fixture(MINIMAL_CONFIG);
+        let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+        let source = repo.join(bundle_path("sources")).join("source.tolk");
+        match state {
+            "untracked" => fs::write(source.with_file_name("pending.tolk"), "untracked\n"),
+            "deleted" => fs::remove_file(&source),
+            _ => fs::write(&source, "modified\n"),
+        }
+        .expect("dirty checkout");
+        if matches!(state, "staged" | "mixed") {
+            git(&repo, &["add", "--all"]);
+        }
+        if state == "mixed" {
+            fs::write(&source, "unstaged after staging\n").expect("unstaged content");
+            fs::write(source.with_file_name("pending.tolk"), "untracked\n")
+                .expect("untracked content");
+        }
+        let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
+        assert_failure(&output, "has uncommitted changes");
+    }
+}
+
+#[test]
+fn uses_shared_source_repository_validation() {
+    for state in ["invalid-root", "missing-rule", "overridden-rule"] {
+        let dir = fixture(MINIMAL_CONFIG);
+        let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+        let attributes = match state {
+            "overridden-rule" => "sources/** -text\nsources/** text\n",
+            _ => "sources/** text\n",
+        };
+        if state == "invalid-root" {
+            let root = git(&repo, &["rev-list", "--max-parents=0", "HEAD"]);
+            git(&repo, &["checkout", "-b", "invalid-root", &root]);
+        }
+        fs::write(repo.join(".gitattributes"), attributes).expect("attributes");
+        git(&repo, &["add", "--all"]);
+        if state == "invalid-root" {
+            git(
+                &repo,
+                &["commit", "--amend", "-m", "Invalid initial attributes"],
+            );
+        } else {
+            git(&repo, &["commit", "-m", "Invalid current attributes"]);
+        }
+        let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
+        assert_failure(&output, "is not prepared");
+        assert_failure(
+            &output,
+            match state {
+                "invalid-root" => "root `.gitattributes` must contain exactly",
+                "missing-rule" => "current `.gitattributes` must contain",
+                _ => "is not effective",
+            },
+        );
+    }
+}
+
+#[test]
+fn allows_missing_storage_and_bundle_directories() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    let root = git(&repo, &["rev-list", "--max-parents=0", "HEAD"]);
+    git(&repo, &["checkout", "-b", "empty", &root]);
+    git(&repo, &["push", "origin", "HEAD:empty"]);
+    assert!(!repo.join("sources").exists());
+    let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
+    assert_success(output);
+    assert!(!repo.join("sources").exists());
+}
+
+#[test]
+fn rejects_local_head_behind_ahead_or_diverged_from_remote() {
+    for state in ["behind", "ahead", "diverged"] {
+        let dir = fixture(MINIMAL_CONFIG);
+        let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+        let remote = dir.path().join("source-repo.git");
+        let original = git(&repo, &["rev-parse", "HEAD"]);
+        if matches!(state, "behind" | "diverged") {
+            git(&repo, &["checkout", "-b", "other-writer"]);
+            git(
+                &repo,
+                &["commit", "--allow-empty", "-m", "Remote advancement"],
+            );
+            // Push by URL so the local tracking reference stays stale.
+            git(
+                &repo,
+                &["push", remote.to_str().expect("remote path"), "HEAD:main"],
+            );
+            git(&repo, &["checkout", "main"]);
+        }
+        if matches!(state, "ahead" | "diverged") {
+            git(
+                &repo,
+                &["commit", "--allow-empty", "-m", "Local advancement"],
+            );
+        }
+        assert_eq!(
+            git(&repo, &["rev-parse", "refs/remotes/origin/main"]),
+            original
+        );
+        let local_head = git(&repo, &["rev-parse", "HEAD"]);
+        let remote_head = git(&remote, &["rev-parse", "refs/heads/main"]);
+        assert_ne!(local_head, remote_head);
+        for dry_run in [false, true] {
+            let args = if dry_run {
+                vec!["remove-registry", "--dry-run", CODE_HASH]
+            } else {
+                vec!["remove-registry", CODE_HASH]
+            };
+            let output = run_preserving(&dir, &repo, &args);
+            assert_failure(&output, "HEAD does not match origin/main");
+            assert_failure(&output, &format!("local HEAD={local_head}"));
+            assert_failure(&output, &format!("remote HEAD={remote_head}"));
+        }
+    }
+}
+
+#[test]
+fn accepts_matching_remote_even_with_stale_or_missing_tracking_reference() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    let root = git(&repo, &["rev-list", "--max-parents=0", "HEAD"]);
+    git(&repo, &["update-ref", "refs/remotes/origin/main", &root]);
+    for missing in [false, true] {
+        if missing {
+            git(&repo, &["update-ref", "-d", "refs/remotes/origin/main"]);
+        }
+        let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
+        assert_success(output);
+    }
+}
+
+#[test]
+fn rejects_unavailable_remote_and_missing_branch() {
+    for state in ["unavailable", "missing-branch", "unconfigured"] {
+        let dir = fixture(MINIMAL_CONFIG);
+        let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+        let remote = dir.path().join("source-repo.git");
+        match state {
+            "missing-branch" => {
+                git(&remote, &["update-ref", "-d", "refs/heads/main"]);
+            }
+            "unconfigured" => {
+                git(&repo, &["remote", "remove", "origin"]);
+            }
+            _ => {
+                git(
+                    &repo,
+                    &["remote", "set-url", "origin", "../unavailable.git"],
+                );
+            }
+        }
+        let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
+        assert_failure(&output, "git command failed");
+        assert_failure(
+            &output,
+            "git ls-remote --exit-code --refs -- origin refs/heads/main",
+        );
+        assert!(!dir.path().join("unavailable.git").exists());
+    }
+}
+
+#[test]
+fn checks_the_configured_branch_instead_of_remote_head() {
+    let dir = fixture(&format!("{MINIMAL_CONFIG}branch = 'registry/production'\n"));
+    let repo = prepare_repository(
+        &dir,
+        "source-repo",
+        "sources",
+        "origin",
+        "registry/production",
+    );
+    let remote = dir.path().join("source-repo.git");
+    let root = git(&repo, &["rev-list", "--max-parents=0", "HEAD"]);
+    git(&remote, &["update-ref", "refs/heads/unrelated", &root]);
+    git(&remote, &["symbolic-ref", "HEAD", "refs/heads/unrelated"]);
+    let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
+    let stdout = assert_success(output);
+    assert!(stdout.contains("Branch: registry/production\n"), "{stdout}");
+}
+
+fn bundle_path(storage_root: &str) -> String {
+    format!("{storage_root}/aa/{}", &CODE_HASH[2..])
+}
+
+fn git(path: &Path, args: &[&str]) -> String {
+    let output = Command::new("git")
+        .current_dir(path)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_AUTHOR_NAME", "Verifier CLI tests")
+        .env("GIT_AUTHOR_EMAIL", "verifier@example.invalid")
+        .env("GIT_COMMITTER_NAME", "Verifier CLI tests")
+        .env("GIT_COMMITTER_EMAIL", "verifier@example.invalid")
+        .args([
+            "-c",
+            "commit.gpgsign=false",
+            "-c",
+            "core.hooksPath=/dev/null",
+        ])
+        .args(args)
+        .output()
+        .expect("run Git");
+    assert!(output.status.success(), "git {args:?}: {output:?}");
+    String::from_utf8(output.stdout)
+        .expect("UTF-8 Git output")
+        .trim()
+        .to_owned()
+}
+
+fn prepare_repository(
+    dir: &TempDir,
+    name: &str,
+    storage_root: &str,
+    remote: &str,
+    branch: &str,
+) -> PathBuf {
+    let repo = dir.path().join(name);
+    fs::create_dir(&repo).expect("checkout directory");
+    git(&repo, &["init", "-b", branch]);
+    fs::write(
+        repo.join(".gitattributes"),
+        format!("{storage_root}/** -text\n"),
+    )
+    .expect("initial attributes");
+    git(&repo, &["add", ".gitattributes"]);
+    git(&repo, &["commit", "-m", "Initialize source repository"]);
+    let bundle = repo.join(bundle_path(storage_root));
+    fs::create_dir_all(&bundle).expect("bundle directory");
+    fs::write(bundle.join("source.tolk"), "// source fixture\n").expect("source file");
+    // Checkout checks do not require a valid manifest or invoke compilers.
+    fs::write(bundle.join("manifest.json"), "broken manifest\n").expect("manifest file");
+    git(&repo, &["add", "--all"]);
+    git(&repo, &["commit", "-m", "Add fixture bundle"]);
+    let remote_path = dir.path().join(format!("{name}.git"));
+    fs::create_dir(&remote_path).expect("remote directory");
+    git(&remote_path, &["init", "--bare"]);
+    git(
+        &repo,
+        &[
+            "remote",
+            "add",
+            remote,
+            remote_path.to_str().expect("remote path"),
+        ],
+    );
+    git(&repo, &["push", remote, &format!("HEAD:{branch}")]);
+    repo
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum EntrySnapshot {
+    Directory,
+    File(Vec<u8>, u32),
+    Symlink(PathBuf),
+}
+
+fn directory_entries(path: &Path) -> BTreeMap<PathBuf, EntrySnapshot> {
+    let mut entries = BTreeMap::new();
+    for entry in fs::read_dir(path).expect("read fixture directory") {
+        let entry = entry.expect("directory entry");
+        let kind = entry.file_type().expect("entry type");
+        let snapshot = if kind.is_dir() {
+            entries.extend(directory_entries(&entry.path()));
+            EntrySnapshot::Directory
+        } else if kind.is_symlink() {
+            EntrySnapshot::Symlink(fs::read_link(entry.path()).expect("symlink target"))
+        } else {
+            #[cfg(unix)]
+            let mode = {
+                use std::os::unix::fs::PermissionsExt;
+                entry
+                    .metadata()
+                    .expect("file metadata")
+                    .permissions()
+                    .mode()
+            };
+            #[cfg(not(unix))]
+            let mode = 0;
+            EntrySnapshot::File(fs::read(entry.path()).expect("file bytes"), mode)
+        };
+        entries.insert(entry.path(), snapshot);
+    }
+    entries
+}
+
+fn run_preserving(dir: &TempDir, repo: &Path, args: &[&str]) -> Output {
+    let index = repo.join(".git/index");
+    let staged_before = git(repo, &["ls-files", "--stage", "-z"]);
+    let mut before = directory_entries(dir.path());
+    // git status may refresh stat cache; compare staged contents and modes separately.
+    before.remove(&index);
+    let output = cli(dir).args(args).output().expect("run CLI");
+    let mut after = directory_entries(dir.path());
+    after.remove(&index);
+    assert_eq!(
+        after, before,
+        "CLI must preserve checkout, refs, remote and databases"
+    );
+    assert_eq!(
+        git(repo, &["ls-files", "--stage", "-z"]),
+        staged_before,
+        "CLI must preserve staged state"
+    );
+    output
 }

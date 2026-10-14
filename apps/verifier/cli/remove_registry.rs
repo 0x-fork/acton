@@ -2,7 +2,7 @@ use std::{collections::BTreeSet, path::PathBuf};
 
 use verifier::{blockchain::parse_code_hash, config::Config};
 
-use crate::{args::RemoveRegistryArgs, error::CliError};
+use crate::{args::RemoveRegistryArgs, check_repository, error::CliError};
 
 struct SourceRepositorySettings {
     path: PathBuf,
@@ -56,27 +56,27 @@ impl RemoveRegistryRequest {
     }
 }
 
-pub fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
+pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
     let request = RemoveRegistryRequest::prepare(args)?;
+    let checked = check_repository::check(
+        &request.repository.path,
+        &request.repository.storage_root,
+        &request.repository.remote,
+        request.repository.branch.as_deref(),
+    )
+    .await?;
     if !args.dry_run {
         return Err(CliError::RemovalNotImplemented);
     }
 
-    println!(
-        "Request prepared only; repository checks and removal planning are not implemented yet."
-    );
+    println!("Repository checks passed; removal planning and execution are not implemented yet.");
     println!("Config: {}", args.config.display());
     println!("Repository: {}", request.repository.path.display());
     println!("Storage root: {}", request.repository.storage_root);
     println!("Remote: {}", request.repository.remote);
-    println!(
-        "Branch: {}",
-        request
-            .repository
-            .branch
-            .as_deref()
-            .unwrap_or("current branch (not resolved yet)")
-    );
+    println!("Branch: {}", checked.branch);
+    println!("Local HEAD: {}", checked.local_head);
+    println!("Remote HEAD: {}", checked.remote_head);
     println!(
         "Author: {} <{}>",
         request.repository.author_name, request.repository.author_email

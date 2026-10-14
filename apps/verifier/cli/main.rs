@@ -1,4 +1,5 @@
 mod args;
+mod check_repository;
 mod error;
 mod remove_registry;
 
@@ -7,11 +8,12 @@ use std::process::ExitCode;
 use args::{Cli, CliCommand};
 use clap::Parser;
 
-fn main() -> ExitCode {
+#[tokio::main]
+async fn main() -> ExitCode {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        CliCommand::RemoveRegistry(args) => remove_registry::run(&args),
+        CliCommand::RemoveRegistry(args) => remove_registry::run(&args).await,
     };
 
     match result {
