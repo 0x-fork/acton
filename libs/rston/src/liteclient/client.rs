@@ -45,6 +45,7 @@ impl Default for LiteClientOptions {
 pub struct LiteClient {
     inner: tower::util::BoxService<RawWrappedRequest, Vec<u8>, LiteError>,
     pub(super) request_timeout: Duration,
+    pub(super) closed: bool,
     wait_seqno: Option<WaitMasterchainSeqno>,
     pub(super) target: String,
 }
@@ -94,6 +95,7 @@ impl LiteClient {
         Ok(Self {
             inner: WrapRawMessagesLayer.layer(multiplex).boxed(),
             request_timeout: options.request_timeout,
+            closed: false,
             wait_seqno: None,
             target,
         })
@@ -143,6 +145,12 @@ impl LiteClient {
             timeout,
         })
         .and_then(|result| result);
+
+        // A failed request may already have been sent, so return its error rather
+        // than replaying it. The pool can replace this transport for the next query.
+        if result.is_err() && !matches!(result, Err(LiteError::Timeout { .. })) {
+            self.closed = true;
+        }
 
         log::debug!(
             "operation=lite_query node={} duration_ms={} outcome={}",

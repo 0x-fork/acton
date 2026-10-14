@@ -39,6 +39,14 @@ impl TestServer {
         delay: Duration,
         reply: impl Fn(Vec<u8>) -> Vec<u8> + Send + Sync + 'static,
     ) -> Self {
+        Self::with_connection_lifetime(delay, None, reply).await
+    }
+
+    async fn with_connection_lifetime(
+        delay: Duration,
+        lifetime: Option<Duration>,
+        reply: impl Fn(Vec<u8>) -> Vec<u8> + Send + Sync + 'static,
+    ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
         let keys = KeyPair::from(&SecretKey::from_bytes([7; 32]));
@@ -71,7 +79,12 @@ impl TestServer {
                                     Ok(Message::Answer { query_id, answer: reply(query.data) })
                                 }
                             });
-                            let _ = tokio_tower::multiplex::Server::new(LitePeer::new(adnl), service).await;
+                            let server = tokio_tower::multiplex::Server::new(LitePeer::new(adnl), service);
+                            if let Some(lifetime) = lifetime {
+                                let _ = tokio::time::timeout(lifetime, server).await;
+                            } else {
+                                let _ = server.await;
+                            }
                         });
                     }
                     Some(result) = connections.join_next() => result.unwrap(),
@@ -348,3 +361,37 @@ mod blocks;
 
 #[path = "liteclient/transactions.rs"]
 mod transactions;
+
+#[tokio::test]
+async fn pool_reconnects_after_the_server_closes_an_idle_connection() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let requests = Arc::new(AtomicUsize::new(0));
+    let received = requests.clone();
+    let server = TestServer::with_connection_lifetime(
+        Duration::ZERO,
+        Some(Duration::from_millis(100)),
+        move |request| {
+            received.fetch_add(1, Ordering::SeqCst);
+            request
+        },
+    )
+    .await;
+    let config = GlobalConfig {
+        liteservers: vec![server.config.clone()],
+        ..Default::default()
+    };
+    let mut pool = LiteClientPool::new(config, LiteClientOptions::default()).unwrap();
+
+    let first = pool.query_raw([7]).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let disconnected = pool.query_raw([8]).await.is_err();
+    let second = pool.query_raw([9]).await.unwrap();
+
+    expect_test::expect![["first=[7]; disconnected=true; second=[9]; requests=2"]].assert_eq(
+        &format!(
+            "first={first:?}; disconnected={disconnected}; second={second:?}; requests={}",
+            requests.load(Ordering::SeqCst)
+        ),
+    );
+}

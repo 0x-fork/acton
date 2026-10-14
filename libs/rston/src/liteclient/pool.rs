@@ -8,7 +8,8 @@ use crate::tl::{Request, utils::FromResponse};
 /// A pool of lazily connected liteservers selected in config order.
 ///
 /// Each query rotates to the next endpoint. Connection failures skip an endpoint
-/// before sending any request. Once sent, a query is never retried, including
+/// before sending any request. Failed transports are replaced on the next query.
+/// Once sent, a query is never retried, including
 /// state-changing operations and ambiguous timeouts. Subsequent queries can use
 /// another server. Raw and typed queries do not verify blockchain proofs.
 /// High-level methods use one selected connection and verify against explicit
@@ -44,6 +45,14 @@ impl LiteClientPool {
         for _ in 0..self.servers.len() {
             let index = self.next;
             self.next = (index + 1) % self.servers.len();
+
+            if self.servers[index]
+                .1
+                .as_ref()
+                .is_some_and(|client| client.closed)
+            {
+                self.servers[index].1 = None;
+            }
 
             if self.servers[index].1.is_none() {
                 match LiteClient::connect_liteserver(&self.servers[index].0, self.options).await {

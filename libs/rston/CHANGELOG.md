@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- LiteClientPool replaces a failed transport on the next query instead of keeping
+  a permanently disconnected client. Submitted requests are never replayed, and
+  request timeouts still preserve the connection for late responses.
+
 ### Added
 
 - Global configuration accepts both signed and unsigned 32-bit IPv4 integers
