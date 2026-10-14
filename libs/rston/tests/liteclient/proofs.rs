@@ -553,7 +553,10 @@ async fn block_sequence_numbers_preserve_all_unsigned_bits() {
     .await;
     let mut client = server.client().await;
     let checkpoint = VerifiedBlock::from_trusted(known);
-    let proof = client.get_block_proof(&checkpoint, &target).await.unwrap();
+    let proof = client
+        .get_block_proof(&checkpoint, &target, Default::default())
+        .await
+        .unwrap();
     assert_eq!(proof.from.seqno as u32, known.seqno);
     assert_eq!(proof.to.seqno as u32, target.seqno);
 }

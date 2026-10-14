@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Rust libraries
 
+- `rston::liteclient` provides checked block downloads, authenticated headers,
+  block lookup by sequence number or time, and configurable block-proof modes.
+
 - TVM stack types and their cell codec are available in `rston::models::vm`.
   Import stack types directly from this module. Replace `tvm_ffi::serde` codec calls with
   `Load`, `Store`, or `CellBuilder::build_from`; TON Center entry conversions

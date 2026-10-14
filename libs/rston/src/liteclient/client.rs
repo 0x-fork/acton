@@ -36,8 +36,9 @@ impl Default for LiteClientOptions {
 /// LiteAPI queries through an authenticated ADNL/TCP connection.
 ///
 /// The caller supplies a trusted server identity. Responses, including proofs,
-/// from raw and typed queries remain unverified. High-level methods require
-/// explicit trusted blocks and verify their data proofs.
+/// from raw and typed queries remain unverified. High-level data methods require
+/// explicit trusted blocks and verify their data proofs. Block lookup checks
+/// consistency without establishing chain membership.
 /// Requests are never retried automatically.
 /// Dropping the client releases its connection. A failed transport requires a
 /// new connection; a request timeout alone does not discard the connection.

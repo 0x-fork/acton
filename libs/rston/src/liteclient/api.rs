@@ -8,7 +8,8 @@ use crate::boc::Boc;
 use crate::cell::{Cell, CellBuilder, HashBytes};
 use crate::models::vm::Tuple;
 use crate::models::{
-    Account, BlockId, BlockchainConfig, MsgInfo, OwnedMessage, StdAddr, Transaction,
+    Account, Block, BlockId, BlockInfo, BlockchainConfig, MsgInfo, OwnedMessage, ShardIdent,
+    StdAddr, Transaction,
 };
 use crate::tl::common::{AccountId, Int256};
 use crate::tl::request::{self, Request};
@@ -125,7 +126,115 @@ impl From<u64> for MethodId {
     }
 }
 
+/// Select one block lookup criterion. The server supplies the block's hashes;
+/// a lookup does not authenticate its membership in the canonical chain.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum BlockLookup {
+    /// Request an exact sequence number within the selected shard.
+    Seqno(u32),
+    /// Request the first block whose ending logical time exceeds this value.
+    /// The header alone cannot prove that the server chose the first such block.
+    LogicalTime(u64),
+    /// Request the first block generated at or after these Unix seconds.
+    /// The header alone cannot prove that the server chose the first such block.
+    UnixTime(u32),
+}
+
+/// A lookup result whose header matches its identifier and lookup criterion.
+///
+/// Both hashes originate from the server. Authenticate the identifier against
+/// a checkpoint or shard ancestry before treating this as a trusted block.
+#[derive(Debug, Clone)]
+pub struct BlockHeader {
+    /// Server-supplied identity; header proofs cannot authenticate the file hash.
+    pub id: BlockId,
+    /// Decoded header committed by the server-supplied root hash.
+    pub info: BlockInfo,
+}
+
+/// Server-side proof construction choices. These flags do not relax local
+/// verification or promote a returned destination to a verified block.
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
+pub struct BlockProofOptions {
+    /// Set LiteAPI mode bit 1, permitting the protocol's weak target selection.
+    pub allow_weak_target: bool,
+    /// Set mode bit 12: build using the newer requested endpoint's state instead
+    /// of the server's current head. With an explicit target, this selects `0x1001`.
+    pub base_block_from_request: bool,
+}
+
 impl LiteClient {
+    /// Download a block bound to an independently trusted or verified identity.
+    /// Checks the exact serialized file hash, root hash, and header coordinates.
+    /// Referenced model structures remain lazy; state updates may contain pruned cells.
+    pub async fn get_block(&mut self, block: &VerifiedBlock) -> Result<Block, LiteError> {
+        let response: response::BlockData = self
+            .query_typed(Request::GetBlock(request::GetBlock {
+                id: proof::wire_id(block.id()),
+            }))
+            .await?;
+        Ok(response.verify(block)?)
+    }
+
+    /// Authenticate complete BlockInfo against a trusted block's root hash.
+    /// The response identifier must match, including the file hash; the header
+    /// proof itself commits only the root hash. Other block subtrees may be pruned.
+    pub async fn get_block_header(
+        &mut self,
+        block: &VerifiedBlock,
+    ) -> Result<BlockInfo, LiteError> {
+        let response: response::BlockHeader = self
+            .query_typed(Request::GetBlockHeader(request::GetBlockHeader {
+                id: proof::wire_id(block.id()),
+                mode: (),
+                with_state_update: None,
+                with_value_flow: None,
+                with_extra: None,
+                with_shard_hashes: None,
+                with_prev_blk_signatures: None,
+            }))
+            .await?;
+        Ok(response.verify(block)?)
+    }
+
+    /// Resolve an identity and decode its header without establishing chain trust.
+    /// Checks the proof hash, coordinates, shard containment, and the selected
+    /// sequence or time bound. Time lookup cannot prove nearest-block selection.
+    pub async fn lookup_block(
+        &mut self,
+        shard: ShardIdent,
+        lookup: BlockLookup,
+    ) -> Result<BlockHeader, LiteError> {
+        let response: response::BlockHeader = self
+            .query_typed(Request::LookupBlock(request::LookupBlock {
+                mode: (),
+                id: crate::tl::common::BlockId {
+                    workchain: shard.workchain(),
+                    shard: shard.prefix() as i64,
+                    seqno: match lookup {
+                        BlockLookup::Seqno(seqno) => seqno as i32,
+                        _ => 0,
+                    },
+                },
+                seqno: matches!(lookup, BlockLookup::Seqno(_)).then_some(()),
+                lt: match lookup {
+                    BlockLookup::LogicalTime(lt) => Some(lt),
+                    _ => None,
+                },
+                utime: match lookup {
+                    BlockLookup::UnixTime(utime) => Some(utime),
+                    _ => None,
+                },
+                with_state_update: None,
+                with_value_flow: None,
+                with_extra: None,
+                with_shard_hashes: None,
+                with_prev_blk_signatures: None,
+            }))
+            .await?;
+        Ok(response.verify_lookup(shard, lookup)?)
+    }
+
     /// Authenticate the server's current masterchain head from a checkpoint.
     /// Freshness is a server claim; the caller decides acceptable age and seqno.
     pub async fn get_masterchain_info(
@@ -234,6 +343,7 @@ impl LiteClient {
         &mut self,
         known: &VerifiedBlock,
         target: &BlockId,
+        options: BlockProofOptions,
     ) -> Result<response::PartialBlockProof, LiteError> {
         proof::require_masterchain(known.id())?;
         proof::require_masterchain(target)?;
@@ -242,8 +352,8 @@ impl LiteClient {
                 mode: (),
                 known_block: proof::wire_id(known.id()),
                 target_block: Some(proof::wire_id(target)),
-                allow_weak_target: None,
-                base_block_from_request: None,
+                allow_weak_target: options.allow_weak_target.then_some(()),
+                base_block_from_request: options.base_block_from_request.then_some(()),
             }))
             .await?;
         if proof::block_id(&response.from)? != *known.id() {
@@ -280,7 +390,9 @@ impl LiteClient {
                 if current.id() == target {
                     return Ok(current);
                 }
-                let part = self.get_block_proof(&current, target).await?;
+                let part = self
+                    .get_block_proof(&current, target, BlockProofOptions::default())
+                    .await?;
                 links += part.steps.len();
                 if links > 1024 {
                     return Err(ProofError::Invalid("proof chain exceeds 1024 links").into());
@@ -376,6 +488,30 @@ impl LiteClient {
 }
 
 impl LiteClientPool {
+    /// Download and authenticate a block through the next reachable server.
+    /// The file, root, and coordinate checks of [`LiteClient::get_block`] apply.
+    pub async fn get_block(&mut self, block: &VerifiedBlock) -> Result<Block, LiteError> {
+        self.next_client().await?.get_block(block).await
+    }
+
+    /// Authenticate BlockInfo through the next reachable server.
+    pub async fn get_block_header(
+        &mut self,
+        block: &VerifiedBlock,
+    ) -> Result<BlockInfo, LiteError> {
+        self.next_client().await?.get_block_header(block).await
+    }
+
+    /// Resolve a block through the next reachable server. The consistency checks
+    /// of [`LiteClient::lookup_block`] apply; the identity remains untrusted.
+    pub async fn lookup_block(
+        &mut self,
+        shard: ShardIdent,
+        lookup: BlockLookup,
+    ) -> Result<BlockHeader, LiteError> {
+        self.next_client().await?.lookup_block(shard, lookup).await
+    }
+
     /// Authenticate the selected server's head from an explicit checkpoint.
     /// Connection setup is bounded separately from proof-chain verification.
     pub async fn get_masterchain_info(
@@ -427,10 +563,11 @@ impl LiteClientPool {
         &mut self,
         known: &VerifiedBlock,
         target: &BlockId,
+        options: BlockProofOptions,
     ) -> Result<response::PartialBlockProof, LiteError> {
         self.next_client()
             .await?
-            .get_block_proof(known, target)
+            .get_block_proof(known, target, options)
             .await
     }
 

@@ -1,7 +1,8 @@
 //! LiteAPI queries and server services over ADNL/TCP.
 //!
 //! Enable `liteclient` to connect with [`LiteClient`] or distribute queries with
-//! [`LiteClientPool`]. High-level methods verify data against [`VerifiedBlock`].
+//! [`LiteClientPool`]. High-level data methods verify against [`VerifiedBlock`];
+//! block lookup checks consistency without authenticating chain membership.
 //! Raw and typed queries return unverified server responses. Get-method results
 //! authenticate source state, while their output remains server computation.
 //! Verification accepts at most 8 MiB per proof or data BoC payload.
@@ -14,7 +15,10 @@ mod pool;
 mod proof;
 
 pub use crate::tl::utils::FromResponse;
-pub use api::{AccountInfo, GetMethodResult, MethodId, VerifiedBlock};
+pub use api::{
+    AccountInfo, BlockHeader, BlockLookup, BlockProofOptions, GetMethodResult, MethodId,
+    VerifiedBlock,
+};
 pub use client::{LiteClient, LiteClientOptions};
 pub use pool::LiteClientPool;
 pub use proof::ProofError;

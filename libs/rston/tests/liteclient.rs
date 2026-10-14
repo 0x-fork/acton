@@ -342,3 +342,6 @@ fn network_config_rejects_invalid_identity_lengths_and_ports() {
 
 #[path = "liteclient/proofs.rs"]
 mod proofs;
+
+#[path = "liteclient/blocks.rs"]
+mod blocks;

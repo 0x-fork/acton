@@ -217,13 +217,24 @@ Use `VerifiedBlock::from_trusted` if you maintain a separate trusted block check
 
 | Method | Guarantee |
 | --- | --- |
+| `get_block` | Serialized file hash, root hash, and header coordinates match a trusted block |
+| `get_block_header` | Complete BlockInfo matches a trusted root hash and block coordinates |
+| `lookup_block` | Header proof and sequence or time bound match the server-supplied identity; chain membership remains unverified |
 | `get_account` | Account state, balance, transaction cursor, or absence matches the requested block; shard ancestry is checked |
 | `get_config` | Requested masterchain parameters match the committed state; an empty selection requests the complete configuration |
 | `get_transaction` | Transaction inclusion, address, and logical time match the request; pass its containing shard block |
-| `get_block_proof` | Retrieves unverified links; call the response's `verify` method before using its destination |
+| `get_block_proof` | Retrieves unverified links with `BlockProofOptions`; call the response's `verify` method before using its destination |
 | `verify_proof_chain` | Authenticates forward and backward links, validator subsets, Ordinary or Simplex signatures, and a weight strictly above two thirds |
 | `run_get_method` | Authenticates source account state; returned stack values and exit codes remain server claims |
 | `send_message` | Submits an external incoming message once and returns its hash after acknowledgement; acknowledgement does not confirm inclusion |
+
+Use `BlockLookup::Seqno`, `LogicalTime`, or `UnixTime` with `lookup_block(shard, criterion)`.
+Time lookup checks the returned upper bound; it cannot prove that the server chose
+the nearest block. Authenticate a masterchain lookup's `id` with `verify_proof_chain`
+before using it for trusted queries.
+`get_block_proof(known, target, BlockProofOptions::default())` uses mode `1`.
+Set `base_block_from_request: true` to select mode `0x1001`, using the newer requested
+endpoint's state to construct the proof. This does not change local proof verification.
 
 Successful get-method exit codes are zero and one. Other codes return `LiteError::ContractExecution`.
 Arguments and results use `Tuple` in bottom-to-top order.

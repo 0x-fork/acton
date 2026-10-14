@@ -10,6 +10,12 @@
 
 ### Added
 
+- LiteClient and LiteClientPool provide block downloads with file and root hash
+  checks, authenticated block headers, and block lookup by sequence number,
+  logical time, or Unix time. Lookup checks response consistency without
+  establishing chain trust. Block-proof options support explicit request-base
+  mode (`0x1001`) and weak-target selection.
+
 - `global_config` provides the full TON global configuration model, including
   DHT parameters and signed bootstrap descriptors, liteservers, zero state,
   init block, and hardforks. It requires `models` and `serde` and works without

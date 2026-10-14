@@ -12,7 +12,8 @@ use crate::tl::{Request, utils::FromResponse};
 /// state-changing operations and ambiguous timeouts. Subsequent queries can use
 /// another server. Raw and typed queries do not verify blockchain proofs.
 /// High-level methods use one selected connection and verify against explicit
-/// trusted blocks, with the same guarantees as [`LiteClient`].
+/// trusted blocks, with the same guarantees as [`LiteClient`]. Block lookup
+/// checks response consistency without establishing chain membership.
 pub struct LiteClientPool {
     servers: Vec<(ConfigLiteServer, Option<LiteClient>)>,
     next: usize,

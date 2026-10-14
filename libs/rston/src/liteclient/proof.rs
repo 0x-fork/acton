@@ -1,6 +1,6 @@
 //! Offline verification of LiteAPI responses against explicit block identities.
 
-use super::{AccountInfo, GetMethodResult, VerifiedBlock};
+use super::{AccountInfo, BlockHeader, BlockLookup, GetMethodResult, VerifiedBlock};
 use crate::boc::Boc;
 use crate::cell::{Cell, CellBuilder, CellFamily, CellSlice, HashBytes, Load, LoadCell};
 use crate::dict::{AugDict, Dict};
@@ -66,6 +66,81 @@ pub(super) fn require_masterchain(id: &BlockId) -> Result<(), ProofError> {
         ));
     }
     Ok(())
+}
+
+impl response::BlockData {
+    /// Authenticate downloaded bytes against the caller's trusted identity.
+    /// Both the serialized file hash and cell root hash must match. BlockInfo
+    /// coordinates are checked; other model structures remain lazily decoded.
+    pub fn verify(&self, block: &VerifiedBlock) -> Result<Block, ProofError> {
+        if block_id(&self.id)? != *block.id() {
+            return Err(ProofError::Invalid(
+                "block response has a different block id",
+            ));
+        }
+        let root = decode_cell(&self.data)?;
+        if Boc::file_hash(&self.data) != block.id().file_hash {
+            return Err(ProofError::Invalid("block file hash differs from its id"));
+        }
+        if root.repr_hash() != &block.id().root_hash {
+            return Err(ProofError::Invalid("block root hash differs from its id"));
+        }
+        let decoded: Block = root.parse()?;
+        let info = decoded.load_info()?;
+        if info.shard != block.id().shard || info.seqno != block.id().seqno {
+            return Err(ProofError::Invalid(
+                "block header coordinates differ from its id",
+            ));
+        }
+        Ok(decoded)
+    }
+}
+
+impl response::BlockHeader {
+    /// Authenticate a complete header against the caller's trusted identity.
+    /// Other block subtrees may be pruned. The proof commits only the root hash;
+    /// matching the response's file hash does not validate serialized block bytes.
+    pub fn verify(&self, block: &VerifiedBlock) -> Result<BlockInfo, ProofError> {
+        if block_id(&self.id)? != *block.id() {
+            return Err(ProofError::Invalid(
+                "header response has a different block id",
+            ));
+        }
+        let view = checked_block(decode_cell(&self.header_proof)?, block.id())?;
+        require_complete(&view.info)?;
+        Ok(view.load_info()?)
+    }
+
+    /// Check lookup consistency without authenticating membership in a chain.
+    /// The returned root hash is a server claim. Time checks establish only the
+    /// upper lookup bound: this response lacks the predecessor needed to prove
+    /// that the returned block is the first one satisfying the criterion.
+    pub fn verify_lookup(
+        &self,
+        shard: ShardIdent,
+        lookup: BlockLookup,
+    ) -> Result<BlockHeader, ProofError> {
+        let id = block_id(&self.id)?;
+        if !id.shard.is_ancestor_of(&shard) {
+            return Err(ProofError::Invalid(
+                "lookup response is outside the requested shard",
+            ));
+        }
+        let view = checked_block(decode_cell(&self.header_proof)?, &id)?;
+        require_complete(&view.info)?;
+        let info = view.load_info()?;
+        let matches = match lookup {
+            BlockLookup::Seqno(seqno) => id.seqno == seqno,
+            BlockLookup::LogicalTime(lt) => info.end_lt > lt,
+            BlockLookup::UnixTime(utime) => info.gen_utime >= utime,
+        };
+        if !matches {
+            return Err(ProofError::Invalid(
+                "lookup header does not satisfy the requested criterion",
+            ));
+        }
+        Ok(BlockHeader { id, info })
+    }
 }
 
 impl response::AccountState {
