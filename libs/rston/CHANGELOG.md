@@ -10,6 +10,11 @@
 
 ### Added
 
+- LiteClient and LiteClientPool read transaction-history pages from an authenticated
+  account cursor or an explicitly trusted cursor. Pages check transaction hashes,
+  account identifiers, and logical-time links, return oldest-first records with
+  original cells, and expose the authenticated cursor for the next older page.
+
 - LiteClient and LiteClientPool provide block downloads with file and root hash
   checks, authenticated block headers, and block lookup by sequence number,
   logical time, or Unix time. Lookup checks response consistency without

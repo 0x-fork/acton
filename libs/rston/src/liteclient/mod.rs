@@ -17,7 +17,7 @@ mod proof;
 pub use crate::tl::utils::FromResponse;
 pub use api::{
     AccountInfo, BlockHeader, BlockLookup, BlockProofOptions, GetMethodResult, MethodId,
-    VerifiedBlock,
+    TransactionCursor, TransactionPage, TransactionRecord, VerifiedBlock,
 };
 pub use client::{LiteClient, LiteClientOptions};
 pub use pool::LiteClientPool;

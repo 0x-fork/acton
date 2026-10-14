@@ -345,3 +345,6 @@ mod proofs;
 
 #[path = "liteclient/blocks.rs"]
 mod blocks;
+
+#[path = "liteclient/transactions.rs"]
+mod transactions;

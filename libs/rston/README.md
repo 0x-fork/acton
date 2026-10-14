@@ -223,6 +223,7 @@ Use `VerifiedBlock::from_trusted` if you maintain a separate trusted block check
 | `get_account` | Account state, balance, transaction cursor, or absence matches the requested block; shard ancestry is checked |
 | `get_config` | Requested masterchain parameters match the committed state; an empty selection requests the complete configuration |
 | `get_transaction` | Transaction inclusion, address, and logical time match the request; pass its containing shard block |
+| `get_transactions` | History cell hashes, account, and logical-time links match an authenticated cursor; returns oldest-first records and the next older cursor |
 | `get_block_proof` | Retrieves unverified links with `BlockProofOptions`; call the response's `verify` method before using its destination |
 | `verify_proof_chain` | Authenticates forward and backward links, validator subsets, Ordinary or Simplex signatures, and a weight strictly above two thirds |
 | `run_get_method` | Authenticates source account state; returned stack values and exit codes remain server claims |
@@ -239,6 +240,18 @@ endpoint's state to construct the proof. This does not change local proof verifi
 Successful get-method exit codes are zero and one. Other codes return `LiteError::ContractExecution`.
 Arguments and results use `Tuple` in bottom-to-top order.
 Recompute the method locally if your application needs authenticated execution results.
+
+Start transaction history with `state.transaction_cursor()?` from an authenticated
+`get_account` result. `None` means the account has no history. Pass the cursor to
+`get_transactions(&cursor, 16)` and continue with the returned `page.next`.
+Pages include the supplied cursor transaction and return records oldest first.
+Each record retains its original cell, so `record.cell.repr_hash()` is the
+authenticated transaction hash. A short page still has more history if `next`
+is present; an empty server response for a nonempty cursor is an error.
+Requests accept 1..=256 records and at most 8 MiB of transaction BoC data.
+Use `TransactionCursor::from_trusted` only to restore an independently trusted
+address, logical time, and hash. The history chain authenticates transactions
+relative to that cursor; server-reported block identifiers remain unverified.
 
 Offline response `verify` methods use the same checks without a network connection.
 Missing required proofs and pruned required data return errors.

@@ -75,6 +75,89 @@ pub struct AccountInfo {
     pub last_transaction_hash: HashBytes,
 }
 
+impl AccountInfo {
+    /// Start history traversal at this account's authenticated last transaction.
+    /// Accounts without history return `None`. Use an unmodified result of
+    /// [`LiteClient::get_account`]; this does not authenticate caller-created data.
+    pub fn transaction_cursor(&self) -> Result<Option<TransactionCursor>, ProofError> {
+        if self.last_transaction_lt == 0 && self.last_transaction_hash == HashBytes::ZERO {
+            return Ok(None);
+        }
+        let address = match self.account.as_ref().map(|account| &account.address) {
+            Some(crate::models::IntAddr::Std(address)) => address.clone(),
+            _ => {
+                return Err(ProofError::Invalid(
+                    "history cursor has no standard account address",
+                ));
+            }
+        };
+        TransactionCursor::from_trusted(
+            address,
+            self.last_transaction_lt,
+            self.last_transaction_hash,
+        )
+        .map(Some)
+    }
+}
+
+/// One authenticated starting point in an account's transaction hash chain.
+/// Obtain it from [`AccountInfo::transaction_cursor`] or a verified page's `next`.
+/// A cursor proves history relative to its hash, without asserting freshness or
+/// authenticating the server's reported block identifiers.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct TransactionCursor {
+    address: StdAddr,
+    lt: u64,
+    hash: HashBytes,
+}
+
+impl TransactionCursor {
+    /// Restore a cursor whose address, logical time, and hash are independently
+    /// trusted. This is a trust decision, not a cryptographic check. A zero
+    /// cursor denotes no transaction and is rejected; use `None` for history end.
+    pub fn from_trusted(address: StdAddr, lt: u64, hash: HashBytes) -> Result<Self, ProofError> {
+        if address.anycast.is_some() || lt == 0 || hash == HashBytes::ZERO {
+            return Err(ProofError::Invalid("invalid transaction history cursor"));
+        }
+        Ok(Self { address, lt, hash })
+    }
+
+    /// Account to which every transaction in a returned page must belong.
+    pub const fn address(&self) -> &StdAddr {
+        &self.address
+    }
+
+    /// Logical time of the first transaction requested from the server.
+    pub const fn lt(&self) -> u64 {
+        self.lt
+    }
+
+    /// Representation hash against which the first returned cell is checked.
+    pub const fn hash(&self) -> &HashBytes {
+        &self.hash
+    }
+}
+
+/// A transaction authenticated through the history cursor's hash chain.
+#[derive(Debug, Clone)]
+pub struct TransactionRecord {
+    /// Original complete cell, retaining the exact authenticated representation hash.
+    pub cell: Cell,
+    /// Transaction decoded from `cell`, with its address and logical time checked.
+    pub transaction: Transaction,
+}
+
+/// One history page, inclusive of the supplied cursor and ordered oldest first.
+/// A server may return fewer records than requested. Only `next == None` proves
+/// the chain ended; a short page with a cursor must still be paginated.
+#[derive(Debug, Clone)]
+pub struct TransactionPage {
+    /// Authenticated records in ascending logical-time order.
+    pub transactions: Vec<TransactionRecord>,
+    /// Predecessor of the oldest returned transaction, for the next older page.
+    pub next: Option<TransactionCursor>,
+}
+
 /// Server execution output whose source account state has been authenticated.
 ///
 /// The stack and exit code remain server claims: Merkle proofs authenticate
@@ -336,6 +419,28 @@ impl LiteClient {
         Ok(response.verify(block, address, lt)?)
     }
 
+    /// Read up to `count` history records, including the cursor transaction.
+    /// `count` must be 1..=256. Each cell's hash, account, logical time, and
+    /// predecessor link are checked against the cursor. Records are oldest first.
+    /// Empty responses for a nonempty cursor are errors, not history end.
+    /// This does not authenticate block identifiers supplied with the response.
+    pub async fn get_transactions(
+        &mut self,
+        cursor: &TransactionCursor,
+        count: u32,
+    ) -> Result<TransactionPage, LiteError> {
+        proof::check_transaction_count(count)?;
+        let response: response::TransactionList = self
+            .query_typed(Request::GetTransactions(request::GetTransactions {
+                count,
+                account: account_id(cursor.address())?,
+                lt: cursor.lt(),
+                hash: Int256(cursor.hash().0),
+            }))
+            .await?;
+        Ok(response.verify(cursor, count)?)
+    }
+
     /// Retrieve a partial masterchain proof without authenticating its links.
     /// Use [`response::PartialBlockProof::verify`] or [`Self::verify_proof_chain`]
     /// before promoting its destination to a verified block.
@@ -488,6 +593,20 @@ impl LiteClient {
 }
 
 impl LiteClientPool {
+    /// Read and authenticate one history page through the next reachable server.
+    /// The ordering, bounds, and cursor rules of [`LiteClient::get_transactions`] apply.
+    pub async fn get_transactions(
+        &mut self,
+        cursor: &TransactionCursor,
+        count: u32,
+    ) -> Result<TransactionPage, LiteError> {
+        proof::check_transaction_count(count)?;
+        self.next_client()
+            .await?
+            .get_transactions(cursor, count)
+            .await
+    }
+
     /// Download and authenticate a block through the next reachable server.
     /// The file, root, and coordinate checks of [`LiteClient::get_block`] apply.
     pub async fn get_block(&mut self, block: &VerifiedBlock) -> Result<Block, LiteError> {

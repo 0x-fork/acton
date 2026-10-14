@@ -1,6 +1,9 @@
 //! Offline verification of LiteAPI responses against explicit block identities.
 
-use super::{AccountInfo, BlockHeader, BlockLookup, GetMethodResult, VerifiedBlock};
+use super::{
+    AccountInfo, BlockHeader, BlockLookup, GetMethodResult, TransactionCursor, TransactionPage,
+    TransactionRecord, VerifiedBlock,
+};
 use crate::boc::Boc;
 use crate::cell::{Cell, CellBuilder, CellFamily, CellSlice, HashBytes, Load, LoadCell};
 use crate::dict::{AugDict, Dict};
@@ -304,6 +307,86 @@ impl response::TransactionInfo {
             ));
         }
         Ok(transaction)
+    }
+}
+
+pub(super) fn check_transaction_count(count: u32) -> Result<(), ProofError> {
+    if !(1..=256).contains(&count) {
+        return Err(ProofError::Invalid("history page count must be 1..=256"));
+    }
+    Ok(())
+}
+
+impl response::TransactionList {
+    /// Authenticate a page against an independently trusted account cursor.
+    /// The BoC must contain 1..=count complete transactions in newest-first wire
+    /// order. Hashes, account ids, logical times, and predecessor links are checked.
+    /// Returned records are oldest first, with a cursor for further pagination.
+    /// Server-reported block identifiers do not acquire trust from this check.
+    pub fn verify(
+        &self,
+        cursor: &TransactionCursor,
+        count: u32,
+    ) -> Result<TransactionPage, ProofError> {
+        check_transaction_count(count)?;
+        if self.transactions.is_empty() {
+            return Err(ProofError::Invalid(
+                "empty history response for a nonempty cursor",
+            ));
+        }
+        if self.transactions.len() > MAX_PROOF_BYTES {
+            return Err(ProofError::Invalid("history payload exceeds 8 MiB"));
+        }
+        let header = crate::boc::de::BocHeader::decode(
+            &self.transactions,
+            &crate::boc::de::Options {
+                min_roots: Some(1),
+                max_roots: Some(count as usize),
+            },
+        )?;
+        let cells = header.finalize(Cell::empty_context())?;
+        let mut next = Some(cursor.clone());
+        let mut transactions = Vec::with_capacity(header.roots().len());
+        for &root in header.roots() {
+            let expected = next
+                .take()
+                .ok_or(ProofError::Invalid("history continues past chain end"))?;
+            let cell = cells
+                .get(root)
+                .ok_or(ProofError::Invalid("history root cell is missing"))?;
+            // Message bodies can contain application Merkle proofs whose pruned
+            // branches are part of the original committed transaction payload.
+            require_complete_payload(&cell, true)?;
+            if cell.repr_hash() != expected.hash() {
+                return Err(ProofError::Invalid(
+                    "transaction hash does not match history cursor",
+                ));
+            }
+            let transaction: Transaction = cell.parse()?;
+            if transaction.account != cursor.address().address || transaction.lt != expected.lt() {
+                return Err(ProofError::Invalid(
+                    "transaction account or logical time differs from history cursor",
+                ));
+            }
+            if transaction.prev_trans_lt >= transaction.lt
+                || (transaction.prev_trans_lt == 0)
+                    != (transaction.prev_trans_hash == HashBytes::ZERO)
+            {
+                return Err(ProofError::Invalid(
+                    "invalid transaction predecessor cursor",
+                ));
+            }
+            if transaction.prev_trans_lt != 0 {
+                next = Some(TransactionCursor::from_trusted(
+                    cursor.address().clone(),
+                    transaction.prev_trans_lt,
+                    transaction.prev_trans_hash,
+                )?);
+            }
+            transactions.push(TransactionRecord { cell, transaction });
+        }
+        transactions.reverse();
+        Ok(TransactionPage { transactions, next })
     }
 }
 
@@ -907,6 +990,10 @@ fn verify_signatures(
 }
 
 fn require_complete(cell: &Cell) -> Result<(), ProofError> {
+    require_complete_payload(cell, false)
+}
+
+fn require_complete_payload(cell: &Cell, allow_merkle_payloads: bool) -> Result<(), ProofError> {
     // A pruned value authenticates a hash, but cannot supply a complete payload.
     let mut visited = std::collections::HashSet::new();
     let mut pending = vec![cell.as_ref()];
@@ -917,6 +1004,14 @@ fn require_complete(cell: &Cell) -> Result<(), ProofError> {
             ));
         }
         if !visited.insert(*cell.repr_hash()) {
+            continue;
+        }
+        if allow_merkle_payloads
+            && matches!(
+                cell.cell_type(),
+                crate::cell::CellType::MerkleProof | crate::cell::CellType::MerkleUpdate
+            )
+        {
             continue;
         }
         for child in cell.references() {
