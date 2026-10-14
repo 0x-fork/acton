@@ -382,6 +382,86 @@ Keep container memory/process limits and reverse-proxy rate limits enabled.
 The Compose configuration gives active verification tasks up to three minutes
 to finish after `SIGTERM`; interrupted work is recovered on the next startup.
 
+## Remove Verified Bundles
+
+Set `server.read_only = true` in the config used by the CLI and stop the backend.
+For an environment-generated Docker config, set `VERIFIER_READ_ONLY=true` in the
+Compose environment. Run the CLI with the same Compose configuration,
+source repository volume, Git credentials and author settings as the backend:
+
+```bash
+docker compose stop verifier
+docker compose run --rm --no-deps verifier verifier-cli remove-registry --dry-run '<code_hash>'
+docker compose run --rm --no-deps verifier verifier-cli remove-registry '<code_hash>'
+docker compose start verifier
+```
+
+Multiple hashes can be supplied in one invocation. The CLI checks the checkout
+and requires local HEAD to match the configured remote branch. Dry-run leaves
+the repository unchanged and requires neither read-only mode nor confirmation.
+A normal run requires `read_only = true` and prompts:
+
+```text
+Backend must be stopped. Type 'yes' to confirm:
+```
+
+Only `yes` continues; an empty answer, another answer or EOF cancels the command
+before repository checks or deletion. This is the operator's confirmation;
+the CLI does not stop the backend or detect its process. A missing bundle is
+reported as `not found`.
+
+For a local checkout outside Docker, run from `apps/verifier` with its config:
+
+```bash
+cargo run --locked --bin verifier-cli -- remove-registry --config /path/to/config.toml --dry-run '<code_hash>'
+cargo run --locked --bin verifier-cli -- remove-registry --config /path/to/config.toml '<code_hash>'
+```
+
+Removal deletes the complete selected bundle directory, commits each tracked
+bundle separately, and pushes all new commits once. The author and committer
+come from `source_repository.author_name` and `author_email`; the backend's
+`commit_enabled` and `push_enabled` flags do not disable CLI publication.
+Each commit uses this format:
+
+```text
+Revoke verification for code hash <code_hash>
+
+code_hash: <code_hash>
+source_bundle_hash: <source_bundle_hash>
+manifest_hash: <sha256 of the original manifest bytes>
+```
+
+Missing or damaged manifests do not prevent deletion; unavailable metadata is
+written as `unavailable`. Empty directories or directories containing only
+ignored files are removed without creating an empty commit.
+
+Start the backend after successful publication. Its existing startup mechanism
+rebuilds the registry from the new HEAD. The CLI does not start the backend or
+modify the registry database, payment ledger or blocklist. A consumed payment
+remains consumed; removing a bundle does not prohibit future verification unless
+the code hash is also blocked.
+
+If deletion or commit fails before HEAD changes, the CLI restores the current
+bundle's tracked files and index entries. Earlier commits are retained and push
+is skipped. Ignored files cannot be restored from Git. If a commit was created
+before an error, or push failed, the CLI preserves the local commits and reports
+their SHA. A failed push may already have reached the remote.
+
+Keep the backend stopped while inspecting an error or an interrupted CLI run:
+
+```bash
+docker compose run --rm --no-deps verifier git -C /var/lib/verifier/source-repo status
+docker compose run --rm --no-deps verifier git -C /var/lib/verifier/source-repo log -5 --oneline
+docker compose run --rm --no-deps verifier git -C /var/lib/verifier/source-repo ls-remote origin 'refs/heads/<branch>'
+```
+
+Use the configured repository path, remote and branch. After checking the commits
+and remote, retry an outstanding publication with a normal `git push`, then rerun
+removal for any remaining hashes. The CLI refuses to rerun while local and remote
+HEAD differ or the checkout is dirty. If the remote has advanced, reconcile the
+histories before publishing. Starting the backend with uncommitted deletions
+restores those tracked files through startup recovery.
+
 ## Systemd Wrapper
 
 Use systemd to keep Docker Compose running after reboots.

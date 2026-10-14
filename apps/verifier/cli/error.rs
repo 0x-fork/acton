@@ -9,6 +9,12 @@ pub enum CliError {
     Config(#[from] ConfigError),
     #[error("source_repository.path must be set to a non-empty path in config {config_path}")]
     MissingSourceRepository { config_path: PathBuf },
+    #[error("registry removal requires server.read_only = true in config {config_path}")]
+    ReadOnlyRequired { config_path: PathBuf },
+    #[error("removal cancelled: backend shutdown was not confirmed")]
+    BackendNotConfirmed,
+    #[error("failed to read backend shutdown confirmation: {0}")]
+    ConfirmationIo(std::io::Error),
     #[error("invalid code hash {value:?}: expected a 256-bit code hash in hexadecimal or base64")]
     InvalidCodeHash { value: String },
     #[error(transparent)]

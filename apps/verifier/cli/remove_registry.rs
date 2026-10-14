@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
+    io::{self, Write},
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -62,6 +63,12 @@ impl RemoveRegistryRequest {
             .collect::<Result<BTreeSet<_>, _>>()?
             .into_iter()
             .collect();
+
+        if !args.dry_run && !config.read_only() {
+            return Err(CliError::ReadOnlyRequired {
+                config_path: args.config.clone(),
+            });
+        }
 
         Ok(Self {
             repository: SourceRepositorySettings {
@@ -247,7 +254,12 @@ impl BundleRemoval {
 }
 
 pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
-    let plan = RemovalPlan::prepare(RemoveRegistryRequest::prepare(args)?).await?;
+    let request = RemoveRegistryRequest::prepare(args)?;
+    if !args.dry_run {
+        confirm_backend_stopped()?;
+    }
+    // Check the repository after confirmation, once the operator has stopped the backend.
+    let plan = RemovalPlan::prepare(request).await?;
     let commits = if args.dry_run {
         BTreeMap::new()
     } else {
@@ -302,5 +314,18 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
         }
     }
 
+    Ok(())
+}
+
+fn confirm_backend_stopped() -> Result<(), CliError> {
+    eprint!("Backend must be stopped. Type 'yes' to confirm: ");
+    io::stderr().flush().map_err(CliError::ConfirmationIo)?;
+    let mut confirmation = String::new();
+    io::stdin()
+        .read_line(&mut confirmation)
+        .map_err(CliError::ConfirmationIo)?;
+    if confirmation.trim() != "yes" {
+        return Err(CliError::BackendNotConfirmed);
+    }
     Ok(())
 }

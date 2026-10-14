@@ -12,6 +12,8 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum CliCommand {
     /// Remove selected registry bundles, commit each deletion and push
+    ///
+    /// Requires `server.read_only = true` and confirmation that the backend is stopped.
     RemoveRegistry(RemoveRegistryArgs),
 }
 

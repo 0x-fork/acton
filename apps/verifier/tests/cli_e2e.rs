@@ -1,8 +1,12 @@
+mod support;
+
 use std::{
     collections::BTreeMap,
     fs,
+    io::{Seek, Write},
     path::{Path, PathBuf},
-    process::{Command, Output},
+    process::{Command, Output, Stdio},
+    sync::Arc,
 };
 
 use base64::{
@@ -13,21 +17,19 @@ use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 use verifier::{
     code_hash_policy::CodeHashPolicy,
+    compilers::CompileGeneratedSource,
     config::Config,
-    payment::PaymentLedger,
+    payment::{OnchainPaymentVerifier, PaymentLedger},
+    registry::SourceVerificationRegistry,
     registry_index::{IndexedAbiContractsQuery, SqliteVerificationIndex, VerificationIndex},
-    source_bundle::{
-        SourceBundleCompiler, SourceBundleFile, SourceBundleInput, SourceBundleSource,
-        compute_source_bundle_hash,
-    },
-    source_storage::{
-        CompilerMetadata, GitSourceStorage, SourceStorage, SourceStorageFile,
-        StoreSourceBundleRequest,
-    },
+    source_storage::{GitSourceStorage, SourceStorage},
+    state::AppState,
 };
 
 const CODE_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const MINIMAL_CONFIG: &str = "[source_repository]\npath = 'source-repo'\n";
+const MINIMAL_CONFIG: &str =
+    "[server]\nread_only = true\n[source_repository]\npath = 'source-repo'\n";
+const CONFIRMATION_PROMPT: &str = "Backend must be stopped. Type 'yes' to confirm: ";
 
 fn fixture(config: &str) -> TempDir {
     let dir = tempfile::tempdir().expect("temporary CLI directory");
@@ -41,13 +43,24 @@ fn cli(dir: &TempDir) -> Command {
         .current_dir(dir.path())
         .env_remove("VERIFIER_CONFIG")
         .env("GIT_CONFIG_NOSYSTEM", "1")
-        .env("GIT_CONFIG_GLOBAL", "/dev/null");
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .stdin(confirmation_input(b"yes\n"));
     command
+}
+
+fn confirmation_input(input: &[u8]) -> fs::File {
+    let mut file = tempfile::tempfile().expect("confirmation input");
+    file.write_all(input).expect("write confirmation");
+    file.rewind().expect("rewind confirmation");
+    file
 }
 
 fn assert_success(output: Output) -> String {
     assert!(output.status.success(), "{output:?}");
-    assert!(output.stderr.is_empty(), "{output:?}");
+    assert!(
+        output.stderr.is_empty() || output.stderr == CONFIRMATION_PROMPT.as_bytes(),
+        "{output:?}"
+    );
     String::from_utf8(output.stdout).expect("UTF-8 CLI output")
 }
 
@@ -56,6 +69,45 @@ fn assert_failure(output: &Output, expected: &str) {
     assert!(output.stdout.is_empty(), "{output:?}");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains(expected), "{stderr}");
+}
+
+#[test]
+fn removal_requires_read_only_but_dry_run_does_not() {
+    for server in ["", "[server]\nread_only = false\n"] {
+        let dir = fixture(&format!(
+            "{server}[source_repository]\npath = 'source-repo'\n"
+        ));
+        let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+        let output = run_preserving(&dir, &repo, &["remove-registry", CODE_HASH]);
+        assert_failure(&output, "requires server.read_only = true");
+        assert!(!String::from_utf8_lossy(&output.stderr).contains(CONFIRMATION_PROMPT));
+        let output = run_preserving_command(
+            &dir,
+            &repo,
+            cli(&dir)
+                .args(["remove-registry", "--dry-run", CODE_HASH])
+                .stdin(Stdio::null()),
+        );
+        assert!(output.stderr.is_empty());
+        assert_success(output);
+    }
+}
+
+#[test]
+fn removal_requires_explicit_backend_shutdown_confirmation() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    for input in ["", "\n", "no\n", "y\n", "yes please\n"] {
+        let output = run_preserving_command(
+            &dir,
+            &repo,
+            cli(&dir)
+                .args(["remove-registry", CODE_HASH])
+                .stdin(confirmation_input(input.as_bytes())),
+        );
+        assert_failure(&output, CONFIRMATION_PROMPT);
+        assert_failure(&output, "backend shutdown was not confirmed");
+    }
 }
 
 #[test]
@@ -818,7 +870,7 @@ fn plans_and_removes_literal_paths_with_git_pathspec_characters() {
 #[test]
 fn commits_each_bundle_and_pushes_without_changing_unrelated_files() {
     let dir = fixture(
-        "[source_repository]\n\
+        "[server]\nread_only = true\n[source_repository]\n\
          path = 'source-repo'\n\
          storage_root = 'verified/contracts'\n\
          remote = 'upstream'\n\
@@ -1097,7 +1149,7 @@ async fn backend_restart_rebuilds_registry_after_cli_removal_without_changing_pa
     let index_path = dir.path().join("registry.sqlite");
     let ledger_path = dir.path().join("payments.sqlite");
     let config_bytes = format!(
-        "[server]\nblocked_code_hashes = ['{CODE_HASH}']\n\
+        "[server]\nread_only = true\nblocked_code_hashes = ['{CODE_HASH}']\n\
          [source_repository]\npath = '{}'\nbranch = 'main'\ncommit_enabled = true\npush_enabled = true\n\
          [registry_index]\npath = '{}'\n\
          [payment]\nledger_path = '{}'\n\
@@ -1110,16 +1162,13 @@ async fn backend_restart_rebuilds_registry_after_cli_removal_without_changing_pa
     let config = Config::load_from_path(dir.path().join("config.toml")).expect("config");
     let second_hash = "bb".repeat(32);
     let hashes = [CODE_HASH, second_hash.as_str()];
-    let storage = GitSourceStorage::from_config(&config);
+    let storage = Arc::new(GitSourceStorage::from_config(&config));
     for hash in hashes {
-        storage
-            .store_bundle(verified_bundle_request(hash))
-            .await
-            .expect("store verified bundle");
+        store_mock_bundle(Arc::clone(&storage), hash).await;
     }
     let index = SqliteVerificationIndex::open(&index_path).expect("index");
     index
-        .ensure_current(&storage)
+        .ensure_current(storage.as_ref())
         .await
         .expect("initial registry");
     assert_eq!(index.statistics().await.expect("statistics").total, 2);
@@ -1234,63 +1283,48 @@ async fn backend_restart_rebuilds_registry_after_cli_removal_without_changing_pa
     assert_eq!(state, "consumed");
 }
 
-fn verified_bundle_request(code_hash: &str) -> StoreSourceBundleRequest {
-    let compiler = CompilerMetadata {
-        language: "tolk".to_owned(),
-        version: "1.4.2".to_owned(),
-        entrypoint: "main.tolk".to_owned(),
-        params: serde_json::json!({"compiler_version": "1.4.2"}),
-    };
-    let files = vec![
-        SourceStorageFile {
-            path: "main.tolk".to_owned(),
-            content: "fun main() {}".to_owned(),
-            include_in_command: None,
-            is_stdlib: None,
-            has_include_directives: None,
-        },
-        SourceStorageFile {
+async fn store_mock_bundle(storage: Arc<GitSourceStorage>, code_hash: &str) {
+    let compiler = support::mock_compiler::MockCompilerService::with_generated_sources(
+        code_hash,
+        vec![CompileGeneratedSource {
             path: "main.abi.json".to_owned(),
             content: r#"{"name":"Fixture","get_methods":[]}"#.to_owned(),
-            include_in_command: None,
-            is_stdlib: None,
-            has_include_directives: None,
-        },
-    ];
-    let source_bundle_hash = compute_source_bundle_hash(SourceBundleInput {
-        compiler: SourceBundleCompiler {
-            language: &compiler.language,
-            version: &compiler.version,
-            entrypoint: &compiler.entrypoint,
-            params: &compiler.params,
-        },
-        sources: files
-            .iter()
-            .map(|file| SourceBundleSource {
-                path: &file.path,
-                include_in_command: file.include_in_command,
-                is_stdlib: file.is_stdlib,
-                has_include_directives: file.has_include_directives,
-            })
-            .collect(),
-        files: files
-            .iter()
-            .map(|file| SourceBundleFile {
-                path: &file.path,
-                bytes: file.content.as_bytes(),
-            })
-            .collect(),
-    })
-    .expect("source bundle hash");
-    StoreSourceBundleRequest {
-        code_hash: code_hash.to_owned(),
-        source_bundle_hash,
-        payment_tx_hash: None,
-        verified_at: Some(1_600_000_000),
-        compiler,
-        files,
-        source_map: None,
-    }
+        }],
+    );
+    let state = AppState::new(
+        Arc::new(support::mock_blockchain::MockBlockchainClient::new(&[])),
+        Arc::new(compiler),
+        Arc::new(SourceVerificationRegistry::new(
+            storage,
+            Arc::new(SqliteVerificationIndex::in_memory().expect("fixture index")),
+        )),
+        Arc::new(OnchainPaymentVerifier::new(
+            Arc::new(support::StaticPaymentBlockchainClient::new(
+                None,
+                Vec::new(),
+            )),
+            PaymentLedger::in_memory().expect("fixture ledger"),
+            support::PAYMENT_ADDRESS.to_owned(),
+            1,
+        )),
+    )
+    .with_api_key(Some("fixture-key"));
+    let response = support::post_verify_with_api_key(
+        state,
+        vec![
+            support::owned_text_part("code_hash", code_hash),
+            support::text_part("language", "tolk"),
+            support::text_part("compile_params", r#"{"compiler_version":"1.4.2"}"#),
+            support::text_part("sources", r#"[{"path":"main.tolk","is_entrypoint":true}]"#),
+            support::file_part("files", "main.tolk", "text/plain", "fun main() {}"),
+        ],
+        "fixture-key",
+    )
+    .await;
+    let status = response.status();
+    let body = support::response_json::<serde_json::Value>(response).await;
+    assert_eq!(status, axum::http::StatusCode::OK, "{body}");
+    assert_eq!(body["verification_result"], "match");
 }
 
 #[cfg(unix)]
@@ -1466,7 +1500,7 @@ fn remote_advancing_after_checks_rejects_push_without_force() {
     let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
     let remote = dir.path().join("source-repo.git");
     let original = git(&repo, &["rev-parse", "HEAD"]);
-    let tree = git(&repo, &["rev-parse", "HEAD^{tree}"]);
+    let tree = git(&repo, &["show", "-s", "--format=%T", "HEAD"]);
     let competing = git(
         &repo,
         &[
@@ -1644,12 +1678,16 @@ fn directory_entries(path: &Path) -> BTreeMap<PathBuf, EntrySnapshot> {
 }
 
 fn run_preserving(dir: &TempDir, repo: &Path, args: &[&str]) -> Output {
+    run_preserving_command(dir, repo, cli(dir).args(args))
+}
+
+fn run_preserving_command(dir: &TempDir, repo: &Path, command: &mut Command) -> Output {
     let index = repo.join(".git/index");
     let staged_before = git(repo, &["ls-files", "--stage", "-z"]);
     let mut before = directory_entries(dir.path());
     // git status may refresh stat cache; compare staged contents and modes separately.
     before.remove(&index);
-    let output = cli(dir).args(args).output().expect("run CLI");
+    let output = command.output().expect("run CLI");
     let mut after = directory_entries(dir.path());
     after.remove(&index);
     assert_eq!(
