@@ -89,11 +89,9 @@ async fn run_connection(
         return run_pipeline(source, config, tps_stats, opcode_stats, storage).await;
     }
 
-    let mut client = LiteClient::connect_path_with_parallelism(
-        &config.global_config_path,
-        config.parallelism,
-    )
-    .await?;
+    let mut client =
+        LiteClient::connect_path_with_parallelism(&config.global_config_path, config.parallelism)
+            .await?;
     let tip = client.latest().await?;
     tps_stats.set_startup_tip(tip.seqno).await;
     let start_seqno = tip
