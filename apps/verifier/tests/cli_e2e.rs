@@ -65,8 +65,11 @@ fn prepares_sorted_unique_hashes_from_hex_and_all_base64_formats() {
     let stdout = assert_success(output);
 
     assert!(stdout.contains(&format!("Code hashes: {lower_hash}, {upper_hash}\n")));
-    assert!(stdout.contains("Repository checks passed"));
-    assert!(stdout.contains("removal planning and execution are not implemented yet"));
+    assert!(stdout.contains("Dry run: registry removal plan"));
+    assert!(stdout.contains(&format!("  {lower_hash}: not found\n")));
+    assert!(stdout.contains(&format!("  {upper_hash}: not found\n")));
+    assert!(stdout.contains("Bundles to remove: 0\nNot found: 2\nFiles to remove: 0\n"));
+    assert!(!stdout.contains("Delete:"));
     assert!(stdout.contains("Remote: origin\n"));
     assert!(stdout.contains("Storage root: sources\n"));
     assert!(stdout.contains("Branch: main\n"));
@@ -113,6 +116,11 @@ fn uses_configured_repository_settings_and_preserves_reason() {
         "Branch: registry\n",
         "Author: Registry Operator <operator@example.invalid>\n",
         "Reason: Удаление тестовых публикаций\n",
+        &format!("    Path: {}\n", bundle_path("verified/contracts")),
+        &format!(
+            "    Delete: {}/source.tolk\n",
+            bundle_path("verified/contracts")
+        ),
     ] {
         assert!(stdout.contains(expected), "{stdout}");
     }
@@ -241,8 +249,10 @@ fn reports_config_parse_and_validation_errors() {
 fn refuses_execution_until_removal_is_implemented() {
     let dir = fixture(MINIMAL_CONFIG);
     let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
-    let output = run_preserving(&dir, &repo, &["remove-registry", CODE_HASH]);
-    assert_failure(&output, "registry removal is not implemented yet");
+    for hash in [CODE_HASH, &"bb".repeat(32)] {
+        let output = run_preserving(&dir, &repo, &["remove-registry", hash]);
+        assert_failure(&output, "registry removal is not implemented yet");
+    }
 }
 
 #[test]
@@ -428,7 +438,9 @@ fn allows_missing_storage_and_bundle_directories() {
     git(&repo, &["push", "origin", "HEAD:empty"]);
     assert!(!repo.join("sources").exists());
     let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
-    assert_success(output);
+    let stdout = assert_success(output);
+    assert!(stdout.contains(&format!("  {CODE_HASH}: not found\n")));
+    assert!(stdout.contains("Bundles to remove: 0\nNot found: 1\nFiles to remove: 0\n"));
     assert!(!repo.join("sources").exists());
 }
 
@@ -543,8 +555,152 @@ fn checks_the_configured_branch_instead_of_remote_head() {
     assert!(stdout.contains("Branch: registry/production\n"), "{stdout}");
 }
 
+#[test]
+fn dry_run_prints_a_stable_complete_plan_for_present_and_absent_bundles() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    let first = bundle_path("sources");
+    let second_hash = "bb".repeat(32);
+    let second = bundle_path_for("sources", &second_hash);
+    let absent_hash = "ab".repeat(32);
+    let absent = bundle_path_for("sources", &absent_hash);
+    for (relative, contents) in [
+        (format!("{first}/abi.json"), "{}"),
+        (format!("{first}/src/lib.tolk"), "// nested source"),
+        // No manifest: the directory layout alone identifies a bundle.
+        (format!("{second}/source.tolk"), "// second source"),
+        (
+            format!("{first}-sibling/source.tolk"),
+            "// outside selected directory",
+        ),
+        (
+            format!("{absent}-sibling/source.tolk"),
+            "// not the absent bundle",
+        ),
+        (
+            format!(
+                "{}/source.tolk",
+                bundle_path_for("sources", &"cc".repeat(32))
+            ),
+            "// unselected bundle",
+        ),
+    ] {
+        let path = repo.join(relative);
+        fs::create_dir_all(path.parent().expect("parent directory")).expect("source directory");
+        fs::write(path, contents).expect("source file");
+    }
+    git(&repo, &["add", "--all"]);
+    git(&repo, &["commit", "-m", "Add plan fixtures"]);
+    git(&repo, &["push", "origin", "HEAD:main"]);
+    let head = git(&repo, &["rev-parse", "HEAD"]);
+    let expected = format!(
+        "Dry run: registry removal plan\n\
+         Config: config.toml\n\
+         Repository: source-repo\n\
+         Storage root: sources\n\
+         Remote: origin\n\
+         Branch: main\n\
+         Local HEAD: {head}\n\
+         Remote HEAD: {head}\n\
+         Author: ton-verifier <ton-verifier@example.invalid>\n\
+         Code hashes: {CODE_HASH}, {absent_hash}, {second_hash}\n\
+         Bundles:\n  {CODE_HASH}: remove\n    Path: {first}\n    Delete: {first}/abi.json\n    Delete: {first}/manifest.json\n    Delete: {first}/source.tolk\n    Delete: {first}/src/lib.tolk\n  {absent_hash}: not found\n    Path: {absent}\n  {second_hash}: remove\n    Path: {second}\n    Delete: {second}/source.tolk\n\
+         Bundles to remove: 2\n\
+         Not found: 1\n\
+         Files to remove: 5\n"
+    );
+    for hashes in [
+        vec![second_hash.as_str(), absent_hash.as_str(), CODE_HASH],
+        vec![
+            CODE_HASH,
+            absent_hash.as_str(),
+            second_hash.as_str(),
+            CODE_HASH,
+        ],
+    ] {
+        let mut args = vec!["remove-registry", "--dry-run"];
+        args.extend(hashes);
+        let stdout = assert_success(run_preserving(&dir, &repo, &args));
+        assert_eq!(stdout, expected);
+    }
+}
+
+#[test]
+fn plans_only_tracked_files_in_a_valid_repository() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    fs::write(repo.join(".git/info/exclude"), "*.cache\n").expect("ignore rules");
+    let absent_hash = "bb".repeat(32);
+    let absent = bundle_path_for("sources", &absent_hash);
+    let selected = bundle_path("sources");
+    for relative in [
+        "local.cache".to_owned(),
+        format!("{selected}/pending.cache"),
+        format!("{selected}/nested/pending.cache"),
+        format!("{absent}/pending.cache"),
+        format!("{selected}-sibling/pending.cache"),
+    ] {
+        let path = repo.join(relative);
+        fs::create_dir_all(path.parent().expect("parent directory")).expect("ignored directory");
+        fs::write(path, "local contents").expect("ignored file");
+    }
+    let stdout = assert_success(run_preserving(
+        &dir,
+        &repo,
+        &["remove-registry", "--dry-run", CODE_HASH, &absent_hash],
+    ));
+    assert!(stdout.contains(&format!("  {absent_hash}: not found\n")));
+    assert!(stdout.contains("Bundles to remove: 1\nNot found: 1\nFiles to remove: 2\n"));
+    assert!(!stdout.contains(".cache"));
+}
+
+#[test]
+fn plans_literal_paths_with_git_pathspec_characters() {
+    for (root, other_root) in [("sources*", "sources-other"), (":(glob)sources", "sources")] {
+        let dir = fixture(&format!("{MINIMAL_CONFIG}storage_root = '{root}'\n"));
+        let repo = prepare_repository(&dir, "source-repo", root, "origin", "main");
+        let selected = bundle_path(root);
+        let other = bundle_path(other_root);
+        fs::create_dir_all(repo.join(&other)).expect("other storage directory");
+        fs::write(
+            repo.join(format!("{other}/outside.tolk")),
+            "// not selected",
+        )
+        .expect("other source");
+        for filename in ["contract[1]*?.tolk", "source with spaces.tolk "] {
+            fs::write(repo.join(&selected).join(filename), "// selected").expect("source filename");
+        }
+        git(&repo, &["add", "--all"]);
+        git(&repo, &["commit", "-m", "Add literal path fixtures"]);
+        git(&repo, &["push", "origin", "HEAD:main"]);
+        let stdout = assert_success(run_preserving(
+            &dir,
+            &repo,
+            &["remove-registry", "--dry-run", CODE_HASH],
+        ));
+        let deletes = stdout
+            .lines()
+            .filter(|line| line.starts_with("    Delete: "))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            deletes,
+            vec![
+                format!("    Delete: {selected}/contract[1]*?.tolk"),
+                format!("    Delete: {selected}/manifest.json"),
+                format!("    Delete: {selected}/source with spaces.tolk "),
+                format!("    Delete: {selected}/source.tolk"),
+            ]
+        );
+        assert!(stdout.contains("Files to remove: 4\n"));
+    }
+}
+
 fn bundle_path(storage_root: &str) -> String {
-    format!("{storage_root}/aa/{}", &CODE_HASH[2..])
+    bundle_path_for(storage_root, CODE_HASH)
+}
+
+fn bundle_path_for(storage_root: &str, hash: &str) -> String {
+    format!("{storage_root}/{}/{}", &hash[..2], &hash[2..])
 }
 
 fn git(path: &Path, args: &[&str]) -> String {

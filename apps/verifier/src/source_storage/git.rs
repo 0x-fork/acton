@@ -75,6 +75,31 @@ impl<'a> Git<'a> {
         Ok(!files.is_empty())
     }
 
+    /// Returns sorted tracked file paths under a literal directory path.
+    ///
+    /// # Errors
+    /// Returns an error if Git fails or file paths are not UTF-8.
+    pub async fn tracked_files(&self, directory: &str) -> Result<Vec<String>, SourceStorageError> {
+        // A trailing slash selects the directory, not similarly named siblings.
+        let path = format!("{directory}/");
+        let output = self
+            .output_untrimmed(&[
+                "--literal-pathspecs",
+                "ls-files",
+                "--cached",
+                "-z",
+                "--",
+                &path,
+            ])
+            .await?;
+        let mut files = output
+            .split_terminator('\0')
+            .map(ToOwned::to_owned)
+            .collect::<Vec<_>>();
+        files.sort();
+        Ok(files)
+    }
+
     /// Pushes HEAD to an explicit remote branch, using the current branch as a default.
     ///
     /// # Errors

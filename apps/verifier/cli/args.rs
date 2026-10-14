@@ -11,7 +11,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum CliCommand {
-    /// Prepare removal of selected registry contracts (execution is not implemented yet)
+    /// Plan removal of selected registry contracts (execution is not implemented yet)
     RemoveRegistry(RemoveRegistryArgs),
 }
 
@@ -30,7 +30,7 @@ pub struct RemoveRegistryArgs {
     )]
     pub config: PathBuf,
 
-    /// Check the checkout and remote only (removal planning is not implemented yet)
+    /// Check the checkout and remote, then show the removal plan without making changes
     #[arg(long)]
     pub dry_run: bool,
 

@@ -1,6 +1,10 @@
 use std::{collections::BTreeSet, path::PathBuf};
 
-use verifier::{blockchain::parse_code_hash, config::Config};
+use verifier::{
+    blockchain::parse_code_hash,
+    config::Config,
+    source_storage::{git::Git, repository},
+};
 
 use crate::{args::RemoveRegistryArgs, check_repository, error::CliError};
 
@@ -17,6 +21,19 @@ struct RemoveRegistryRequest {
     repository: SourceRepositorySettings,
     code_hashes: Vec<String>,
     reason: Option<String>,
+}
+
+struct RemovalPlan {
+    repository: SourceRepositorySettings,
+    checked: check_repository::CheckedRepository,
+    bundles: Vec<BundleRemoval>,
+    reason: Option<String>,
+}
+
+struct BundleRemoval {
+    code_hash: String,
+    path: String,
+    files: Vec<String>,
 }
 
 impl RemoveRegistryRequest {
@@ -56,35 +73,91 @@ impl RemoveRegistryRequest {
     }
 }
 
+impl RemovalPlan {
+    async fn prepare(request: RemoveRegistryRequest) -> Result<Self, CliError> {
+        let checked = check_repository::check(
+            &request.repository.path,
+            &request.repository.storage_root,
+            &request.repository.remote,
+            request.repository.branch.as_deref(),
+        )
+        .await?;
+
+        let git = Git::new(&request.repository.path);
+        let mut bundles = Vec::with_capacity(request.code_hashes.len());
+        for code_hash in request.code_hashes {
+            let path =
+                repository::bundle_relative_path(&request.repository.storage_root, &code_hash)?;
+            let files = git.tracked_files(&path).await?;
+            bundles.push(BundleRemoval {
+                code_hash,
+                path,
+                files,
+            });
+        }
+
+        Ok(Self {
+            repository: request.repository,
+            checked,
+            bundles,
+            reason: request.reason,
+        })
+    }
+}
+
 pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
-    let request = RemoveRegistryRequest::prepare(args)?;
-    let checked = check_repository::check(
-        &request.repository.path,
-        &request.repository.storage_root,
-        &request.repository.remote,
-        request.repository.branch.as_deref(),
-    )
-    .await?;
+    let plan = RemovalPlan::prepare(RemoveRegistryRequest::prepare(args)?).await?;
     if !args.dry_run {
         return Err(CliError::RemovalNotImplemented);
     }
 
-    println!("Repository checks passed; removal planning and execution are not implemented yet.");
+    println!("Dry run: registry removal plan");
     println!("Config: {}", args.config.display());
-    println!("Repository: {}", request.repository.path.display());
-    println!("Storage root: {}", request.repository.storage_root);
-    println!("Remote: {}", request.repository.remote);
-    println!("Branch: {}", checked.branch);
-    println!("Local HEAD: {}", checked.local_head);
-    println!("Remote HEAD: {}", checked.remote_head);
+    println!("Repository: {}", plan.repository.path.display());
+    println!("Storage root: {}", plan.repository.storage_root);
+    println!("Remote: {}", plan.repository.remote);
+    println!("Branch: {}", plan.checked.branch);
+    println!("Local HEAD: {}", plan.checked.local_head);
+    println!("Remote HEAD: {}", plan.checked.remote_head);
     println!(
         "Author: {} <{}>",
-        request.repository.author_name, request.repository.author_email
+        plan.repository.author_name, plan.repository.author_email
     );
-    if let Some(reason) = request.reason {
+    if let Some(reason) = &plan.reason {
         println!("Reason: {reason}");
     }
-    println!("Code hashes: {}", request.code_hashes.join(", "));
+    let code_hashes = plan
+        .bundles
+        .iter()
+        .map(|bundle| bundle.code_hash.as_str())
+        .collect::<Vec<_>>();
+    println!("Code hashes: {}", code_hashes.join(", "));
+    println!("Bundles:");
+    for bundle in &plan.bundles {
+        let status = if bundle.files.is_empty() {
+            "not found"
+        } else {
+            "remove"
+        };
+        println!("  {}: {status}", bundle.code_hash);
+        println!("    Path: {}", bundle.path);
+        for file in &bundle.files {
+            println!("    Delete: {file}");
+        }
+    }
+    let to_remove = plan
+        .bundles
+        .iter()
+        .filter(|bundle| !bundle.files.is_empty())
+        .count();
+    let files = plan
+        .bundles
+        .iter()
+        .map(|bundle| bundle.files.len())
+        .sum::<usize>();
+    println!("Bundles to remove: {to_remove}");
+    println!("Not found: {}", plan.bundles.len() - to_remove);
+    println!("Files to remove: {files}");
 
     Ok(())
 }

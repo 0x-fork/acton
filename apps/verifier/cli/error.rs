@@ -30,6 +30,6 @@ pub enum CliError {
         local_head: String,
         remote_head: String,
     },
-    #[error("registry removal is not implemented yet; use --dry-run to check the repository only")]
+    #[error("registry removal is not implemented yet; use --dry-run to preview the removal plan")]
     RemovalNotImplemented,
 }
