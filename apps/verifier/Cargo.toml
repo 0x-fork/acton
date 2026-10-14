@@ -11,6 +11,10 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [[bin]]
+name = "verifier-cli"
+path = "cli/main.rs"
+
+[[bin]]
 name = "github-app-credential"
 path = "github-app-credential/main.rs"
 
@@ -64,6 +68,7 @@ too_many_lines = "allow"
 async-trait = "0.1"
 axum = { version = "0.8", features = ["multipart"] }
 base64 = "0.22"
+clap = { version = "4.5", features = ["derive", "env"] }
 dunce = "1.0.5"
 hex = "0.4"
 httpdate = "1"

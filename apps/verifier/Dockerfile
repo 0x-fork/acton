@@ -24,6 +24,7 @@ RUN apt-get update \
 COPY apps/verifier/Cargo.toml apps/verifier/Cargo.lock apps/verifier/rust-toolchain.toml apps/verifier/build.rs ./
 COPY apps/verifier/assets ./assets
 COPY apps/verifier/src ./src
+COPY apps/verifier/cli ./cli
 COPY apps/verifier/github-app-credential ./github-app-credential
 COPY libs/rston /build/libs/rston
 COPY --from=frontend-builder /workspace/packages/verifier-ui/dist /build/packages/verifier-ui/dist
@@ -66,6 +67,7 @@ RUN groupadd --gid 10002 verifier \
 WORKDIR /app
 
 COPY --from=rust-builder /build/apps/verifier/target/release/verifier /usr/local/bin/verifier
+COPY --from=rust-builder /build/apps/verifier/target/release/verifier-cli /usr/local/bin/verifier-cli
 COPY --from=rust-builder /build/apps/verifier/target/release/github-app-credential /usr/local/bin/github-app-credential
 COPY --from=yq /usr/bin/yq /usr/local/bin/yq
 COPY --chown=verifier:verifier --from=compiler-worker /compiler-worker /app/compiler-worker
