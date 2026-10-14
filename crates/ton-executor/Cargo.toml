@@ -19,7 +19,6 @@ hex = { workspace = true }
 rston = { workspace = true }
 rustc-hash = { workspace = true }
 num-bigint = { workspace = true }
-tvm-ffi = { workspace = true }
 parking_lot = { workspace = true }
 
 [lints]

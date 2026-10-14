@@ -31,7 +31,6 @@ ton-node-db = { path = "../ton-node-db" }
 ton-p2p = { path = "../ton-p2p" }
 tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tvm-ffi.workspace = true
 rston.workspace = true
 utoipa.workspace = true
 
