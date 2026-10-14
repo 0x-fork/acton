@@ -105,6 +105,58 @@ pub struct BlockIdExt {
     pub file_hash: Int256,
 }
 
+/// Convert a model identity into its LiteAPI wire representation. The signed
+/// TL int carries all bits of the model's unsigned sequence number.
+#[cfg(feature = "models")]
+impl From<&crate::models::BlockId> for BlockIdExt {
+    fn from(id: &crate::models::BlockId) -> Self {
+        Self {
+            workchain: id.shard.workchain(),
+            shard: id.shard.prefix() as i64,
+            seqno: id.seqno as i32,
+            root_hash: Int256(id.root_hash.0),
+            file_hash: Int256(id.file_hash.0),
+        }
+    }
+}
+
+#[cfg(feature = "models")]
+impl From<crate::models::BlockId> for BlockIdExt {
+    fn from(id: crate::models::BlockId) -> Self {
+        Self::from(&id)
+    }
+}
+
+/// Decode a LiteAPI identity, checking the shard's prefix-marker encoding.
+/// Hashes retain wire byte order, and the sequence number retains all 32 bits.
+/// This validates representation only; callers still authenticate chain membership
+/// and block contents through proofs or an independently trusted checkpoint.
+#[cfg(feature = "models")]
+impl TryFrom<&BlockIdExt> for crate::models::BlockId {
+    type Error = crate::error::ParseBlockIdError;
+
+    fn try_from(id: &BlockIdExt) -> Result<Self, Self::Error> {
+        let shard = crate::models::ShardIdent::new(id.workchain, id.shard as u64)
+            .ok_or(crate::error::ParseBlockIdError::InvalidShardIdent)?;
+
+        Ok(Self {
+            shard,
+            seqno: id.seqno as u32,
+            root_hash: crate::cell::HashBytes(id.root_hash.0),
+            file_hash: crate::cell::HashBytes(id.file_hash.0),
+        })
+    }
+}
+
+#[cfg(feature = "models")]
+impl TryFrom<BlockIdExt> for crate::models::BlockId {
+    type Error = crate::error::ParseBlockIdError;
+
+    fn try_from(id: BlockIdExt) -> Result<Self, Self::Error> {
+        Self::try_from(&id)
+    }
+}
+
 impl fmt::Display for BlockIdExt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

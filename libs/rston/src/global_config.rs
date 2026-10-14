@@ -115,6 +115,7 @@ pub enum ConfigAdnlAddress {
     #[serde(rename = "adnl.address.udp")]
     Udp {
         /// IPv4 bits in network byte order.
+        #[serde(deserialize_with = "read_ipv4_bits")]
         ip: i32,
         /// Nonzero UDP listening port.
         #[serde(deserialize_with = "read_port")]
@@ -309,6 +310,8 @@ impl FromStr for GlobalConfig {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ConfigLiteServer {
     /// IPv4 bits stored as a signed TL `int`, not an address string.
+    /// JSON input also accepts the equivalent unsigned 32-bit representation.
+    #[serde(deserialize_with = "read_ipv4_bits")]
     pub ip: i32,
     /// TCP listening port. Port zero is rejected when deserializing JSON.
     #[serde(deserialize_with = "read_port")]
@@ -343,6 +346,21 @@ pub enum ConfigPublicKey {
         #[serde(with = "public_key_base64")]
         key: [u8; 32],
     },
+}
+
+// Global configs may use signed TL int bits or the equivalent unsigned IPv4
+// integer. Keep the wire representation signed and reject values outside 32 bits.
+fn read_ipv4_bits<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<i32, D::Error> {
+    use serde::de::Error as _;
+
+    let value = i64::deserialize(deserializer)?;
+    if let Ok(signed) = i32::try_from(value) {
+        return Ok(signed);
+    }
+
+    u32::try_from(value)
+        .map(|unsigned| unsigned as i32)
+        .map_err(|_| D::Error::custom("IPv4 integer must fit signed or unsigned 32 bits"))
 }
 
 fn read_port<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u16, D::Error> {

@@ -144,6 +144,20 @@ pub enum ParseIntError {
     Overflow,
 }
 
+/// Failure to convert a decimal GRAM amount into an exact, serializable token value.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, thiserror::Error)]
+pub enum ParseGramError {
+    /// Input is not an unsigned decimal amount with a nonempty integer part.
+    #[error("invalid decimal GRAM amount")]
+    InvalidFormat,
+    /// Input has more fractional digits than the nanogram unit supports.
+    #[error("GRAM amount has more than nine fractional digits")]
+    ExcessPrecision,
+    /// The amount exceeds the maximum value representable by Tokens.
+    #[error("GRAM amount exceeds the 120-bit token range")]
+    Overflow,
+}
+
 /// Error type for hash bytes parsing related errors.
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum ParseHashBytesError {

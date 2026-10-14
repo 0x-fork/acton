@@ -169,3 +169,53 @@ fn selects_only_an_explicit_nonzero_init_block_as_the_trusted_checkpoint() {
     config.validator = None;
     assert!(VerifiedBlock::from_trusted_config(&config).is_err());
 }
+
+#[test]
+fn endpoints_accept_unsigned_ipv4_bits_without_changing_wire_addresses() -> anyhow::Result<()> {
+    use rston::global_config::ConfigLiteServer;
+    use std::fmt::Write as _;
+
+    let mut output = String::new();
+    for raw in [
+        0_i64,
+        2_147_483_647,
+        2_147_483_648,
+        3_232_235_777,
+        4_294_967_295,
+        -2_147_483_648,
+    ] {
+        let mut json = mainnet_json()["liteservers"][0].clone();
+        json["ip"] = raw.into();
+        json["port"] = 1234.into();
+        let lite: ConfigLiteServer = serde_json::from_value(json)?;
+        let adnl: ConfigAdnlAddress = serde_json::from_str(&format!(
+            r#"{{"@type":"adnl.address.udp","ip":{raw},"port":1234}}"#
+        ))?;
+        anyhow::ensure!(lite.socket_addr() == adnl.socket_addr());
+        writeln!(output, "{raw} -> {} ({})", lite.ip, lite.socket_addr())?;
+    }
+
+    for raw in [-2_147_483_649_i64, 4_294_967_296] {
+        let mut json = mainnet_json()["liteservers"][0].clone();
+        json["ip"] = raw.into();
+        writeln!(
+            output,
+            "{raw}: rejected={}",
+            serde_json::from_value::<ConfigLiteServer>(json).is_err()
+        )?;
+    }
+
+    expect_test::expect![[r"
+        0 -> 0 (0.0.0.0:1234)
+        2147483647 -> 2147483647 (127.255.255.255:1234)
+        2147483648 -> -2147483648 (128.0.0.0:1234)
+        3232235777 -> -1062731519 (192.168.1.1:1234)
+        4294967295 -> -1 (255.255.255.255:1234)
+        -2147483648 -> -2147483648 (128.0.0.0:1234)
+        -2147483649: rejected=true
+        4294967296: rejected=true
+    "]]
+    .assert_eq(&output);
+
+    Ok(())
+}

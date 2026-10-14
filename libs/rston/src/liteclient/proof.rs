@@ -16,7 +16,7 @@ use crate::models::{
     ShardHashes, ShardIdent, Signature, SimplexBlockSignatures, StdAddr, Transaction,
     ValidatorBaseInfo, ValidatorInfo,
 };
-use crate::tl::common::{BlockIdExt, BlockLink, Int256, SignatureSet};
+use crate::tl::common::{BlockIdExt, BlockLink, SignatureSet};
 use crate::tl::response;
 
 const MAX_PROOF_BYTES: usize = 8 * 1024 * 1024;
@@ -42,24 +42,12 @@ pub enum ProofError {
 }
 
 pub(super) fn wire_id(id: &BlockId) -> BlockIdExt {
-    BlockIdExt {
-        workchain: id.shard.workchain(),
-        shard: id.shard.prefix() as i64,
-        // TL int carries the unsigned sequence number's complete bit pattern.
-        seqno: id.seqno as i32,
-        root_hash: Int256(id.root_hash.0),
-        file_hash: Int256(id.file_hash.0),
-    }
+    id.into()
 }
 
 pub(super) fn block_id(id: &BlockIdExt) -> Result<BlockId, ProofError> {
-    Ok(BlockId {
-        shard: ShardIdent::new(id.workchain, id.shard as u64)
-            .ok_or(ProofError::Invalid("invalid shard identifier"))?,
-        seqno: id.seqno as u32,
-        root_hash: HashBytes(id.root_hash.0),
-        file_hash: HashBytes(id.file_hash.0),
-    })
+    id.try_into()
+        .map_err(|_| ProofError::Invalid("invalid shard identifier"))
 }
 
 pub(super) fn require_masterchain(id: &BlockId) -> Result<(), ProofError> {

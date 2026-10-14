@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+- Global configuration accepts both signed and unsigned 32-bit IPv4 integers
+  for liteserver and ADNL endpoints, preserving their signed TL wire encoding.
+
+- TL `BlockIdExt` converts to and from the blockchain `BlockId` model through
+  standard conversion traits, checking shard encoding and preserving unsigned
+  sequence-number bit patterns. Conversion alone does not authenticate a block.
+
+- `Tokens::from_gram_str` parses decimal GRAM amounts into nanograms exactly,
+  rejecting invalid syntax, more than nine fractional digits, and amounts
+  outside the 120-bit token range.
+
 ## [0.5.0] - 2026-10-14
 
 ### Breaking changes

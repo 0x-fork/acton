@@ -824,3 +824,53 @@ pub(super) fn request_roundtrip_all_constructors() {
         assert_eq!(decoded, case);
     }
 }
+
+#[cfg(feature = "models")]
+#[test]
+fn block_id_model_conversions_preserve_all_unsigned_bits() {
+    use crate::cell::HashBytes;
+    use crate::models::{BlockId as ModelBlockId, ShardIdent};
+
+    for shard in [
+        ShardIdent::MASTERCHAIN,
+        ShardIdent::new(0, 0x8000000000000000).unwrap(),
+        ShardIdent::new(0, 0xc000000000000000).unwrap(),
+    ] {
+        for seqno in [0, 1, i32::MAX as u32, 0x80000000, u32::MAX] {
+            let model = ModelBlockId {
+                shard,
+                seqno,
+                root_hash: HashBytes([1; 32]),
+                file_hash: HashBytes([2; 32]),
+            };
+            let wire = BlockIdExt::from(&model);
+            assert_eq!(wire, BlockIdExt::from(model));
+            assert_eq!(wire.seqno as u32, seqno);
+            assert_eq!(wire.root_hash.0, [1; 32]);
+            assert_eq!(wire.file_hash.0, [2; 32]);
+            assert_eq!(ModelBlockId::try_from(&wire).unwrap(), model);
+            assert_eq!(ModelBlockId::try_from(wire).unwrap(), model);
+        }
+    }
+}
+
+#[cfg(feature = "models")]
+#[test]
+fn block_id_model_conversions_reject_invalid_shards() {
+    use crate::error::ParseBlockIdError;
+    use crate::models::BlockId as ModelBlockId;
+
+    for (workchain, shard) in [(0, 0), (0, 1), (-1, 0xc000000000000000u64 as i64)] {
+        let wire = BlockIdExt {
+            workchain,
+            shard,
+            seqno: 1,
+            root_hash: Int256([1; 32]),
+            file_hash: Int256([2; 32]),
+        };
+        assert!(matches!(
+            ModelBlockId::try_from(&wire),
+            Err(ParseBlockIdError::InvalidShardIdent)
+        ));
+    }
+}

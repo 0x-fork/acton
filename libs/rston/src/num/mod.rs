@@ -4,7 +4,7 @@ use std::num::NonZeroU8;
 
 pub use self::varuint248::VarUint248;
 use crate::cell::*;
-use crate::error::{Error, ParseIntError};
+use crate::error::{Error, ParseGramError, ParseIntError};
 use crate::util::unlikely;
 
 mod varuint248;
@@ -549,6 +549,65 @@ impl_var_uints! {
     ///
     /// Stored as 4 bits of `len` (`0..=15`), followed by `len` bytes.
     pub struct Tokens(u128[..15]);
+}
+
+impl Tokens {
+    /// Convert a decimal GRAM amount into nanograms without rounding or floats.
+    /// One GRAM equals 1,000,000,000 nanograms. The integer part must be present;
+    /// an optional decimal point may be followed by zero to nine ASCII digits.
+    /// Signs, whitespace, exponents, and separators are rejected. Callers may
+    /// trim user input before calling this method.
+    ///
+    /// Returns an error for excess precision, including extra trailing zeroes,
+    /// or an amount outside the serializable 120-bit token range. The existing
+    /// [`FromStr`](std::str::FromStr) implementation continues to parse nanograms.
+    ///
+    /// ```rust
+    /// use rston::num::Tokens;
+    ///
+    /// let amount = Tokens::from_gram_str("1.05")?;
+    /// assert_eq!(amount.into_inner(), 1_050_000_000);
+    /// # Ok::<(), rston::error::ParseGramError>(())
+    /// ```
+    pub fn from_gram_str(value: &str) -> Result<Self, ParseGramError> {
+        const NANOGRAMS_PER_GRAM: u128 = 1_000_000_000;
+
+        let (integer, fraction) = value.split_once('.').unwrap_or((value, ""));
+        let valid_integer =
+            !integer.is_empty() && integer.bytes().all(|byte| byte.is_ascii_digit());
+        let valid_fraction = fraction.bytes().all(|byte| byte.is_ascii_digit());
+
+        if !valid_integer || !valid_fraction {
+            return Err(ParseGramError::InvalidFormat);
+        }
+
+        if fraction.len() > 9 {
+            return Err(ParseGramError::ExcessPrecision);
+        }
+
+        let grams = integer
+            .parse::<u128>()
+            .map_err(|_| ParseGramError::Overflow)?;
+        let whole_nanograms = grams
+            .checked_mul(NANOGRAMS_PER_GRAM)
+            .ok_or(ParseGramError::Overflow)?;
+
+        let fractional_nanograms = if fraction.is_empty() {
+            0
+        } else {
+            let digits = fraction
+                .parse::<u128>()
+                .map_err(|_| ParseGramError::InvalidFormat)?;
+            let scale = 10u128.pow(9 - fraction.len() as u32);
+            digits * scale
+        };
+
+        let nanograms = whole_nanograms
+            .checked_add(fractional_nanograms)
+            .ok_or(ParseGramError::Overflow)?;
+
+        Self::try_from(nanograms).map_err(|_| ParseGramError::Overflow)
+    }
 }
 
 impl_serde!(VarUint24, u32);
@@ -1242,6 +1301,74 @@ mod tests {
     #[test]
     fn var_uint56_serialization() {
         impl_serialization_tests!(VarUint56, 64);
+    }
+
+    #[test]
+    fn tokens_from_gram_str_parses_exact_nanograms() {
+        for (input, expected) in [
+            ("0", 0),
+            ("0.000000001", 1),
+            ("1", 1_000_000_000),
+            ("1.", 1_000_000_000),
+            ("1.05", 1_050_000_000),
+            ("0001.050000000", 1_050_000_000),
+            ("123456789.123456789", 123_456_789_123_456_789),
+        ] {
+            assert_eq!(
+                Tokens::from_gram_str(input).unwrap().into_inner(),
+                expected,
+                "{input}"
+            );
+        }
+
+        let maximum = Tokens::MAX.into_inner();
+        let maximum_grams = format!("{}.{:09}", maximum / 1_000_000_000, maximum % 1_000_000_000);
+        let amount = Tokens::from_gram_str(&maximum_grams).unwrap();
+        assert_eq!(amount, Tokens::MAX);
+
+        let cell = CellBuilder::build_from(amount).unwrap();
+        assert_eq!(cell.parse::<Tokens>().unwrap(), amount);
+        assert_eq!("1".parse::<Tokens>().unwrap().into_inner(), 1);
+    }
+
+    #[test]
+    fn tokens_from_gram_str_rejects_invalid_precision_and_overflow() {
+        for input in [
+            "", ".5", ".", "-1", "+1", " 1", "1 ", "1e3", "1,5", "1.2.3", "１", "1.a",
+        ] {
+            assert_eq!(
+                Tokens::from_gram_str(input),
+                Err(ParseGramError::InvalidFormat),
+                "{input}"
+            );
+        }
+
+        for input in ["0.0000000001", "1.0000000000"] {
+            assert_eq!(
+                Tokens::from_gram_str(input),
+                Err(ParseGramError::ExcessPrecision),
+                "{input}"
+            );
+        }
+
+        let too_large = Tokens::MAX.into_inner() + 1;
+        let too_large_grams = format!(
+            "{}.{:09}",
+            too_large / 1_000_000_000,
+            too_large % 1_000_000_000
+        );
+        assert_eq!(
+            Tokens::from_gram_str(&too_large_grams),
+            Err(ParseGramError::Overflow)
+        );
+        assert_eq!(
+            Tokens::from_gram_str(&u128::MAX.to_string()),
+            Err(ParseGramError::Overflow)
+        );
+        assert_eq!(
+            Tokens::from_gram_str("99999999999999999999999999999999999999999999"),
+            Err(ParseGramError::Overflow)
+        );
     }
 
     #[test]
