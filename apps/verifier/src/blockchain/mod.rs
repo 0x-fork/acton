@@ -308,35 +308,69 @@ testnet_api_key = "testnet-key"
     }
 
     #[tokio::test]
-    async fn account_lookup_rejects_malformed_hashes_and_normalizes_valid_ones() {
+    async fn account_lookup_uses_first_nonempty_hash_and_rejects_invalid_values() {
         use axum::{Json, Router, routing::get};
-        for (hash, expected) in [
-            ("../unexpected", None),
+        use serde_json::json;
+
+        for (name, accounts, expected) in [
+            ("no accounts", json!([]), Ok(None)),
             (
-                "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=",
-                Some("a".repeat(64)),
+                "only missing or empty hashes",
+                json!([{}, {"code_hash": null}, {"code_hash": ""}, {"code_hash": " \t\n"}]),
+                Ok(None),
+            ),
+            (
+                "malformed hash",
+                json!([{"code_hash": "../unexpected"}]),
+                Err(()),
+            ),
+            (
+                "base64 after empty hashes",
+                json!([
+                    {"code_hash": null},
+                    {"code_hash": " \t\n"},
+                    {"code_hash": " qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo= "}
+                ]),
+                Ok(Some("a".repeat(64))),
+            ),
+            (
+                "first valid hash wins",
+                json!([
+                    {"code_hash": format!(" \t{}\n", "A".repeat(64))},
+                    {"code_hash": "b".repeat(64)},
+                    {"code_hash": "not-a-hash"}
+                ]),
+                Ok(Some("a".repeat(64))),
+            ),
+            (
+                "first nonempty invalid hash must not be skipped",
+                json!([
+                    {"code_hash": ""},
+                    {"code_hash": " not-a-hash "},
+                    {"code_hash": "a".repeat(64)}
+                ]),
+                Err(()),
             ),
         ] {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
                 .await
                 .expect("listener");
             let address = listener.local_addr().expect("address");
-            let router =
-                Router::new().route(
-                    "/api/v3/accountStates",
-                    get(move || async move {
-                        Json(serde_json::json!({"accounts": [{"code_hash": hash}]}))
-                    }),
-                );
+            let router = Router::new().route(
+                "/api/v3/accountStates",
+                get(move || async move { Json(json!({"accounts": accounts})) }),
+            );
             let server = tokio::spawn(async move { axum::serve(listener, router).await });
             let result = ToncenterClient::new(format!("http://{address}"), None)
                 .get_code_hash("0:account")
                 .await;
             server.abort();
-            if let Some(expected) = expected {
-                assert_eq!(result.expect("valid hash"), Some(expected));
-            } else {
-                assert!(matches!(result, Err(BlockchainError::InvalidCodeHash)));
+            match expected {
+                Ok(expected) => assert_eq!(result.expect(name), expected, "{name}"),
+                Err(()) => assert!(
+                    matches!(result, Err(BlockchainError::InvalidCodeHash)),
+                    "{name}: {result:?}"
+                ),
             }
         }
     }

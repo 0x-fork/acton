@@ -6,6 +6,10 @@ use axum::{
     body::Body,
     http::{Request, StatusCode, header},
 };
+use base64::{
+    Engine as _,
+    engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD},
+};
 use serde_json::{Value, json};
 use tower::ServiceExt;
 use verifier::{
@@ -86,14 +90,55 @@ fn config_stores_raw_hashes_and_policy_normalizes_blocked_entries() {
 }
 
 #[test]
+fn policy_accepts_all_supported_hash_encodings_and_rejects_invalid_lookups() {
+    let hash = "fb".repeat(32);
+    let encodings = [
+        hash.clone(),
+        hash.to_uppercase(),
+        format!(" \t{}\n", hash.to_uppercase()),
+        STANDARD.encode([0xfb; 32]),
+        STANDARD_NO_PAD.encode([0xfb; 32]),
+        URL_SAFE.encode([0xfb; 32]),
+        URL_SAFE_NO_PAD.encode([0xfb; 32]),
+    ];
+    for entry in &encodings {
+        let policy = CodeHashPolicy::from_blocked(std::slice::from_ref(entry))
+            .expect("supported blocked hash encoding");
+        for query in &encodings {
+            assert!(
+                policy.is_blocked(query),
+                "entry: {entry:?}, query: {query:?}"
+            );
+        }
+        for query in ["", " \t\n", "not-a-hash", "fb", ALLOWED] {
+            assert!(
+                !policy.is_blocked(query),
+                "entry: {entry:?}, query: {query:?}"
+            );
+        }
+    }
+}
+
+#[test]
 fn invalid_blocked_entries_are_rejected_by_policy_and_application_initialization() {
-    for entry in ["", " ", "not-a-hash", &"a".repeat(63), &"a".repeat(65)] {
+    for entry in [
+        String::new(),
+        " ".to_owned(),
+        "not-a-hash".to_owned(),
+        " not-a-hash ".to_owned(),
+        "a".repeat(63),
+        "a".repeat(65),
+        "g".repeat(64),
+        "é".repeat(32),
+        STANDARD.encode([0; 31]),
+        STANDARD.encode([0; 33]),
+    ] {
         let config = config(&format!(
             "[server]\nblocked_code_hashes = [\"{BLOCKED}\", \"{entry}\"]"
         ))
         .expect("config stores code hashes as raw strings");
-        assert_eq!(config.blocked_code_hashes(), [BLOCKED, entry]);
-        let error = CodeHashPolicy::from_blocked(config.blocked_code_hashes()).expect_err(entry);
+        assert_eq!(config.blocked_code_hashes(), [BLOCKED, &entry]);
+        let error = CodeHashPolicy::from_blocked(config.blocked_code_hashes()).expect_err(&entry);
         assert_eq!(error.entry, entry);
         assert!(matches!(
             AppState::from_config(&config),

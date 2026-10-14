@@ -6,6 +6,10 @@ use axum::{
     body::{Body, to_bytes},
     http::{Method, Request, StatusCode, header},
 };
+use base64::{
+    Engine as _,
+    engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD},
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tower::ServiceExt;
@@ -527,20 +531,32 @@ async fn service_status_reports_read_only_mode() {
 
 #[tokio::test]
 async fn take_ticket_returns_a_payment_bound_to_the_code_hash() {
-    let response = post_take_ticket(app_state(&[], CODE_HASH_ONE), CODE_HASH_ONE_BASE64).await;
+    let code_hash = "fb".repeat(32);
+    for input in [
+        code_hash.clone(),
+        code_hash.to_uppercase(),
+        format!(" \t{}\n", code_hash.to_uppercase()),
+        STANDARD.encode([0xfb; 32]),
+        STANDARD_NO_PAD.encode([0xfb; 32]),
+        URL_SAFE.encode([0xfb; 32]),
+        URL_SAFE_NO_PAD.encode([0xfb; 32]),
+    ] {
+        let response = post_take_ticket(app_state(&[], &code_hash), &input).await;
 
-    assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(
-        response_json::<Value>(response).await,
-        json!({
-            "status": "payment_required",
-            "code_hash": CODE_HASH_ONE,
-            "network": "testnet",
-            "payment_address": "0:1111111111111111111111111111111111111111111111111111111111111111",
-            "amount_nano": "10000000",
-            "comment": format!("acton-verify:v1:{CODE_HASH_ONE}")
-        })
-    );
+        assert_eq!(response.status(), StatusCode::OK, "{input:?}");
+        assert_eq!(
+            response_json::<Value>(response).await,
+            json!({
+                "status": "payment_required",
+                "code_hash": code_hash,
+                "network": "testnet",
+                "payment_address": "0:1111111111111111111111111111111111111111111111111111111111111111",
+                "amount_nano": "10000000",
+                "comment": format!("acton-verify:v1:{code_hash}")
+            }),
+            "{input:?}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -629,13 +645,26 @@ async fn take_ticket_rejects_new_contracts_in_read_only_mode() {
 
 #[tokio::test]
 async fn take_ticket_rejects_an_invalid_code_hash() {
-    let response = post_take_ticket(app_state(&[], CODE_HASH_ONE), "not-a-code-hash").await;
+    for input in [
+        String::new(),
+        " \t\n".to_owned(),
+        "not-a-code-hash".to_owned(),
+        "a".repeat(63),
+        "a".repeat(65),
+        "g".repeat(64),
+        "é".repeat(32),
+        STANDARD.encode([0; 31]),
+        STANDARD.encode([0; 33]),
+    ] {
+        let response = post_take_ticket(app_state(&[], CODE_HASH_ONE), &input).await;
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    assert_eq!(
-        response_json::<Value>(response).await,
-        json!({"error": "code_hash must contain exactly 64 hexadecimal characters"})
-    );
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{input:?}");
+        assert_eq!(
+            response_json::<Value>(response).await,
+            json!({"error": "code_hash must contain exactly 64 hexadecimal characters"}),
+            "{input:?}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -1570,10 +1599,16 @@ async fn verification_status_reports_compiler_queue_progress() {
 
 #[tokio::test]
 async fn verification_status_rejects_missing_target() {
-    let response = get(app_state(&[], CODE_HASH_ONE), "/api/v1/verification/status").await;
+    for path in [
+        "/api/v1/verification/status",
+        "/api/v1/verification/status?code_hash=",
+        "/api/v1/verification/status?code_hash=%20%09%0A",
+    ] {
+        let response = get(app_state(&[], CODE_HASH_ONE), path).await;
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    assert_error_contains(response, "address or code_hash").await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{path}");
+        assert_error_contains(response, "address or code_hash").await;
+    }
 }
 
 #[tokio::test]
