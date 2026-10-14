@@ -30,10 +30,12 @@ pub enum CliError {
         local_head: String,
         remote_head: String,
     },
-    #[error("registry removal failed: {source}; planned files and index entries were restored")]
+    #[error(
+        "registry removal failed: {source}; planned tracked files and index entries were restored"
+    )]
     RemovalFailed { source: Box<SourceStorageError> },
     #[error(
-        "registry removal failed: {operation}; restoring planned files also failed: {recovery}; inspect git status before retrying"
+        "registry removal failed: {operation}; restoring planned tracked files also failed: {recovery}; inspect git status before retrying"
     )]
     RecoveryFailed {
         operation: Box<SourceStorageError>,

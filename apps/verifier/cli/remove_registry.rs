@@ -1,5 +1,6 @@
 use std::{collections::BTreeSet, path::PathBuf};
 
+use tokio::fs;
 use verifier::{
     blockchain::parse_code_hash,
     config::Config,
@@ -29,6 +30,7 @@ struct RemovalPlan {
 struct BundleRemoval {
     code_hash: String,
     path: String,
+    found: bool,
     files: Vec<String>,
 }
 
@@ -82,9 +84,19 @@ impl RemovalPlan {
             let path =
                 repository::bundle_relative_path(&request.repository.storage_root, &code_hash)?;
             let files = git.tracked_files(&path).await?;
+            let directory = request.repository.path.join(&path);
+            let found =
+                fs::try_exists(&directory)
+                    .await
+                    .map_err(|source| SourceStorageError::ReadDir {
+                        path: directory,
+                        source,
+                    })?;
+
             bundles.push(BundleRemoval {
                 code_hash,
                 path,
+                found,
                 files,
             });
         }
@@ -97,10 +109,7 @@ impl RemovalPlan {
     }
 
     fn found_count(&self) -> usize {
-        self.bundles
-            .iter()
-            .filter(|bundle| !bundle.files.is_empty())
-            .count()
+        self.bundles.iter().filter(|bundle| bundle.found).count()
     }
 
     async fn execute(&self) -> Result<(), CliError> {
@@ -109,13 +118,23 @@ impl RemovalPlan {
             .iter()
             .flat_map(|bundle| bundle.files.iter().map(String::as_str))
             .collect::<Vec<_>>();
-        if files.is_empty() {
+        if self.found_count() == 0 {
             return Ok(());
         }
 
         let git = Git::new(&self.repository.path);
         let result: Result<(), SourceStorageError> = async {
-            git.remove_files(&files).await?;
+            for bundle in self.bundles.iter().filter(|bundle| bundle.found) {
+                let path = self.repository.path.join(&bundle.path);
+                if let Err(source) = fs::remove_dir_all(&path).await
+                    && source.kind() != std::io::ErrorKind::NotFound
+                {
+                    return Err(SourceStorageError::RemoveDir { path, source });
+                }
+            }
+            if !files.is_empty() {
+                git.remove_files(&files).await?;
+            }
             git.ensure_staged_deletions(&self.checked.local_head, &files)
                 .await
         }
@@ -123,6 +142,7 @@ impl RemovalPlan {
 
         match result {
             Ok(()) => Ok(()),
+            Err(operation) if files.is_empty() => Err(operation.into()),
             Err(operation) => match git.restore_files(&self.checked.local_head, &files).await {
                 Ok(()) => Err(CliError::RemovalFailed {
                     source: Box::new(operation),
@@ -162,7 +182,7 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
     println!("Code hashes: {}", code_hashes.join(", "));
     println!("Bundles:");
     for bundle in &plan.bundles {
-        let status = if bundle.files.is_empty() {
+        let status = if !bundle.found {
             "not found"
         } else if args.dry_run {
             "found"
@@ -182,7 +202,7 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
     if !args.dry_run {
         if found == 0 {
             println!("No bundles found; nothing to remove.");
-        } else {
+        } else if plan.bundles.iter().any(|bundle| !bundle.files.is_empty()) {
             println!("Deletions staged in Git.");
         }
     }

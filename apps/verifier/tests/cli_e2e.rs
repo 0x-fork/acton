@@ -615,21 +615,28 @@ fn dry_run_prints_a_stable_complete_plan_for_present_and_absent_bundles() {
 }
 
 #[test]
-fn plans_and_removes_only_tracked_files_in_a_valid_repository() {
+fn removes_entire_selected_directories_and_preserves_other_files() {
     let dir = fixture(MINIMAL_CONFIG);
     let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
-    fs::write(repo.join(".git/info/exclude"), "*.cache\n").expect("ignore rules");
-    let absent_hash = "bb".repeat(32);
-    let absent = bundle_path_for("sources", &absent_hash);
+    let ignored_hash = "bb".repeat(32);
+    let ignored_bundle = bundle_path_for("sources", &ignored_hash);
+    let absent_hash = "cc".repeat(32);
     let selected = bundle_path("sources");
-    let ignored = [
-        "local.cache".to_owned(),
+    fs::write(
+        repo.join(".git/info/exclude"),
+        format!("*.cache\n/{ignored_bundle}/manifest.json\n"),
+    )
+    .expect("ignore rules");
+    let removed = [
         format!("{selected}/pending.cache"),
         format!("{selected}/nested/pending.cache"),
-        format!("{absent}/pending.cache"),
+        format!("{ignored_bundle}/manifest.json"),
+    ];
+    let preserved = [
+        "local.cache".to_owned(),
         format!("{selected}-sibling/pending.cache"),
     ];
-    for relative in &ignored {
+    for relative in removed.iter().chain(&preserved) {
         let path = repo.join(relative);
         fs::create_dir_all(path.parent().expect("parent directory")).expect("ignored directory");
         fs::write(path, "local contents").expect("ignored file");
@@ -637,24 +644,115 @@ fn plans_and_removes_only_tracked_files_in_a_valid_repository() {
     let stdout = assert_success(run_preserving(
         &dir,
         &repo,
-        &["remove-registry", "--dry-run", CODE_HASH, &absent_hash],
+        &[
+            "remove-registry",
+            "--dry-run",
+            CODE_HASH,
+            &ignored_hash,
+            &absent_hash,
+        ],
     ));
+    assert!(stdout.contains(&format!("  {ignored_hash}: found\n")));
     assert!(stdout.contains(&format!("  {absent_hash}: not found\n")));
-    assert!(stdout.contains("Bundles to remove: 1\nNot found: 1\n"));
+    assert!(stdout.contains("Bundles to remove: 2\nNot found: 1\n"));
     assert!(!stdout.contains(".cache"));
-    assert_success(
+    let stdout = assert_success(
         cli(&dir)
-            .args(["remove-registry", CODE_HASH, &absent_hash])
+            .args(["remove-registry", CODE_HASH, &ignored_hash, &absent_hash])
             .output()
             .expect("run CLI"),
     );
-    for relative in &ignored {
+    assert!(stdout.contains("Removed bundles: 2\nNot found: 1\n"));
+    assert!(!repo.join(&selected).exists());
+    assert!(!repo.join(ignored_bundle).exists());
+    for relative in &preserved {
         assert_eq!(
             fs::read_to_string(repo.join(relative)).expect("ignored contents"),
             "local contents"
         );
     }
     assert_eq!(git(&repo, &["ls-files"]), ".gitattributes");
+    assert_eq!(
+        git(&repo, &["diff", "--cached", "--name-status"]),
+        format!("D\t{selected}/manifest.json\nD\t{selected}/source.tolk")
+    );
+}
+
+#[test]
+fn removes_directories_without_tracked_files_without_staging_changes() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    let ignored_hash = "bb".repeat(32);
+    let empty_hash = "cc".repeat(32);
+    let ignored_bundle = repo.join(bundle_path_for("sources", &ignored_hash));
+    let empty_bundle = repo.join(bundle_path_for("sources", &empty_hash));
+    fs::write(repo.join(".git/info/exclude"), "*.cache\n").expect("ignore rules");
+    fs::create_dir_all(&ignored_bundle).expect("ignored bundle directory");
+    fs::create_dir_all(&empty_bundle).expect("empty bundle directory");
+    fs::write(ignored_bundle.join("pending.cache"), "local contents").expect("ignored file");
+    let head = git(&repo, &["rev-parse", "HEAD"]);
+    let tracked_bundle = repo.join(bundle_path("sources"));
+    let before = directory_entries(&tracked_bundle);
+    let stdout = assert_success(run_preserving(
+        &dir,
+        &repo,
+        &["remove-registry", "--dry-run", &ignored_hash, &empty_hash],
+    ));
+    assert!(stdout.contains("Bundles to remove: 2\nNot found: 0\n"));
+    let stdout = assert_success(
+        cli(&dir)
+            .args(["remove-registry", &ignored_hash, &empty_hash])
+            .output()
+            .expect("run CLI"),
+    );
+    assert!(stdout.contains("Removed bundles: 2\nNot found: 0\n"));
+    assert!(!stdout.contains("Deletions staged in Git."));
+    assert!(!ignored_bundle.exists());
+    assert!(!empty_bundle.exists());
+    assert_eq!(directory_entries(&tracked_bundle), before);
+    assert_eq!(git(&repo, &["status", "--porcelain=v1"]), "");
+    assert_eq!(git(&repo, &["rev-parse", "HEAD"]), head);
+    assert_eq!(
+        git(
+            &dir.path().join("source-repo.git"),
+            &["rev-parse", "refs/heads/main"]
+        ),
+        head
+    );
+}
+
+#[test]
+fn directory_removal_failure_restores_planned_tracked_files() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    let invalid_hash = "bb".repeat(32);
+    let invalid_bundle = bundle_path_for("sources", &invalid_hash);
+    fs::write(
+        repo.join(".git/info/exclude"),
+        format!("/{invalid_bundle}\n"),
+    )
+    .expect("ignore rules");
+    fs::create_dir_all(repo.join("sources/bb")).expect("shard directory");
+    fs::write(repo.join(&invalid_bundle), "not a directory").expect("invalid bundle path");
+    let tracked_bundle = repo.join(bundle_path("sources"));
+    let before = directory_entries(&tracked_bundle);
+    let head = git(&repo, &["rev-parse", "HEAD"]);
+    let output = cli(&dir)
+        .args(["remove-registry", CODE_HASH, &invalid_hash])
+        .output()
+        .expect("run CLI");
+    assert_failure(&output, "failed to remove directory");
+    assert_failure(
+        &output,
+        "planned tracked files and index entries were restored",
+    );
+    assert_eq!(directory_entries(&tracked_bundle), before);
+    assert_eq!(git(&repo, &["status", "--porcelain=v1"]), "");
+    assert_eq!(git(&repo, &["rev-parse", "HEAD"]), head);
+    assert_eq!(
+        fs::read_to_string(repo.join(invalid_bundle)).expect("invalid bundle path"),
+        "not a directory"
+    );
 }
 
 #[test]
@@ -874,7 +972,10 @@ fi
                 "staged diff does not match the removal plan"
             },
         );
-        assert_failure(&output, "planned files and index entries were restored");
+        assert_failure(
+            &output,
+            "planned tracked files and index entries were restored",
+        );
         assert_eq!(git(&repo, &["rev-parse", "HEAD"]), original);
         assert_eq!(
             git(
