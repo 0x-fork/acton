@@ -65,17 +65,26 @@ example sets the minimum payment to `0.5 GRAM`.
 Set `VERIFIER_READ_ONLY=true` to reject tickets and submissions for new code
 hashes while keeping verified source and metadata lookups available.
 
-Set `VERIFIER_BLOCKED_CODE_HASHES` to a comma-separated list of code hashes to
-deny source/ABI access and verification for those contracts. Hexadecimal hashes
-(case-insensitive) and base64 hashes are accepted; invalid entries prevent startup.
+Set `VERIFIER_BLOCKED_CODE_HASHES_PATH` to a mounted text file to deny source/ABI
+access and verification for the code hashes it contains:
+
+```bash
+-e VERIFIER_BLOCKED_CODE_HASHES_PATH=/etc/verifier/blocked-code-hashes.txt \
+-v "$PWD/blocked-code-hashes.txt:/etc/verifier/blocked-code-hashes.txt:ro"
+```
+
+The UTF-8 file contains one hexadecimal or base64 hash per line. Blank lines and
+surrounding whitespace are ignored; duplicate hashes are combined. No path or an
+empty file means no blocked hashes. An unreadable file or invalid entry prevents
+startup; invalid entries report the file path and line number.
 Ticket and verification requests return `403`; source reads and ABI lookups by
 `code_hash` return `404`, including source lookups by address. Both responses use
 `code_hash_blocked`, including for existing bundles, API keys, and legacy clients.
 `GET/HEAD /api/v1/verification/status` continues to return the actual verification
 status, including for blocked code hashes.
 The blocklist does not modify stored sources or payment history. Restart the service to apply
-changes. This environment variable is used when generating the config; for a
-mounted config, set `server.blocked_code_hashes` directly.
+changes. This environment variable supplies only the path when generating the
+config; for a mounted config, set `server.blocked_code_hashes_path` directly.
 
 Listings, the ABI collection, statistics, and pagination follow the source
 repository. To exclude a contract, delete its bundle from the repository, commit

@@ -33,7 +33,7 @@ pub struct Config {
     bind_addr: SocketAddr,
     api_key: Option<String>,
     read_only: bool,
-    blocked_code_hashes: Vec<String>,
+    blocked_code_hashes_path: Option<PathBuf>,
     logging_level: String,
     toncenter_mainnet_base_url: Option<String>,
     toncenter_mainnet_api_key: Option<String>,
@@ -111,8 +111,8 @@ impl Config {
     }
 
     #[must_use]
-    pub fn blocked_code_hashes(&self) -> &[String] {
-        &self.blocked_code_hashes
+    pub fn blocked_code_hashes_path(&self) -> Option<&Path> {
+        self.blocked_code_hashes_path.as_deref()
     }
 
     #[must_use]
@@ -246,7 +246,7 @@ impl Default for Config {
             bind_addr: default_bind_addr(),
             api_key: None,
             read_only: false,
-            blocked_code_hashes: Vec::new(),
+            blocked_code_hashes_path: None,
             logging_level: DEFAULT_LOG_LEVEL.to_owned(),
             toncenter_mainnet_base_url: None,
             toncenter_mainnet_api_key: None,
@@ -353,7 +353,7 @@ impl ConfigFile {
             bind_addr: self.server.bind_addr.unwrap_or_else(default_bind_addr),
             api_key: self.server.api_key.filter(|api_key| !api_key.is_empty()),
             read_only: self.server.read_only.unwrap_or(false),
-            blocked_code_hashes: self.server.blocked_code_hashes,
+            blocked_code_hashes_path: self.server.blocked_code_hashes_path,
             logging_level: self
                 .logging
                 .level
@@ -427,8 +427,7 @@ struct ServerConfig {
     bind_addr: Option<SocketAddr>,
     api_key: Option<String>,
     read_only: Option<bool>,
-    #[serde(default)]
-    blocked_code_hashes: Vec<String>,
+    blocked_code_hashes_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Default, Deserialize)]

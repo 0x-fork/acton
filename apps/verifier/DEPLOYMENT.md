@@ -118,7 +118,7 @@ Example `/opt/ton-verifier/verifier.env`:
 VERIFIER_LOG_LEVEL=info
 VERIFIER_API_KEY=
 VERIFIER_READ_ONLY=false
-VERIFIER_BLOCKED_CODE_HASHES=
+VERIFIER_BLOCKED_CODE_HASHES_PATH=
 VERIFIER_TONCENTER_MAINNET_BASE_URL=https://toncenter.com
 VERIFIER_TONCENTER_MAINNET_API_KEY=
 VERIFIER_TONCENTER_TESTNET_BASE_URL=https://testnet.toncenter.com
@@ -152,16 +152,45 @@ code hashes. `/api/v1/take_ticket` and `/api/v1/verify` return `503` for new
 contracts, while already verified contracts and all lookup endpoints remain
 available.
 
-Set `VERIFIER_BLOCKED_CODE_HASHES` to comma-separated hexadecimal or base64 code
-hashes to deny source/ABI access and verification for those contracts. Ticket
-and verification requests return `403`; source reads and ABI lookups by
+Set `VERIFIER_BLOCKED_CODE_HASHES_PATH` to the path of a UTF-8 text file containing
+one hexadecimal or base64 code hash per line to deny source/ABI access and
+verification for those contracts. For example, create `blocked-code-hashes.txt`:
+
+```text
+9149ae51c1e4689710cebf7830297b16acfbadb363a920a537893e7ffeeca768
+aedb84b4e1f8cbb7de09bd09a66be3e7ef23be6608957f796a0806cd8edd787a
+```
+
+Mount it read-only and pass the path inside the container in your Compose config:
+
+```yaml
+services:
+  verifier:
+    environment:
+      VERIFIER_BLOCKED_CODE_HASHES_PATH: /etc/verifier/blocked-code-hashes.txt
+    volumes:
+      - ./blocked-code-hashes.txt:/etc/verifier/blocked-code-hashes.txt:ro
+```
+
+For a mounted TOML config, set the path directly:
+
+```toml
+[server]
+blocked_code_hashes_path = "/etc/verifier/blocked-code-hashes.txt"
+```
+
+Blank lines and surrounding whitespace are ignored; hashes are normalized and
+deduplicated. Without a configured path, or with an empty file, no hashes are
+blocked. An unreadable file or an invalid hash prevents startup; invalid hashes
+are reported with the file path and line number. The file is read at startup;
+restart the backend after editing it.
+
+Ticket and verification requests return `403`; source reads and ABI lookups by
 `code_hash` return `404`, including source lookups by address. Both responses use
 `code_hash_blocked`. This also applies to existing bundles, API keys, and legacy
 clients. The blocklist does not modify stored sources or payment history.
 `GET/HEAD /api/v1/verification/status` continues to return the actual verification
 status, including for blocked code hashes.
-The default list is empty. Restart after changing the list; if using a mounted
-TOML config, set `blocked_code_hashes = ["<code_hash>"]` under `[server]`.
 
 The source repository determines the contents of listings, the ABI collection,
 and statistics. To remove an entry from these responses, delete its bundle from

@@ -71,30 +71,51 @@ fn variable(name: &'static str, value: impl Into<OsString>) -> (&'static str, Os
 }
 
 #[test]
-fn generates_blocked_code_hashes_from_environment() {
+fn generates_blocked_code_hashes_path_from_environment() {
     let code_hash = "a".repeat(64);
-    for value in [
+    for filename in [
         None,
-        Some(String::new()),
-        Some(format!(" {},{code_hash}", code_hash.to_uppercase())),
+        Some(""),
+        Some("blocked code hashes.txt"),
+        Some("blocked \"hashes\" \\ list.txt"),
     ] {
         let temp_dir = tempfile::tempdir().expect("config directory");
-        let environment = value
-            .as_ref()
-            .map(|value| variable("VERIFIER_BLOCKED_CODE_HASHES", value))
+        let path = filename
+            .filter(|name| !name.is_empty())
+            .map(|name| temp_dir.path().join(name));
+        if let Some(path) = &path {
+            fs::write(
+                path,
+                format!(" {} \n{code_hash}\n", code_hash.to_uppercase()),
+            )
+            .expect("blocklist file");
+        }
+        let environment = filename
+            .map(|_| {
+                variable(
+                    "VERIFIER_BLOCKED_CODE_HASHES_PATH",
+                    path.clone()
+                        .map_or_else(OsString::new, PathBuf::into_os_string),
+                )
+            })
             .into_iter()
             .collect::<Vec<_>>();
         let output = run_entrypoint(&temp_dir, &environment);
         assert!(output.status.success(), "{output:?}");
         let config = Config::load_from_path(temp_dir.path().join("config.toml"))
-            .expect("generated blocklist");
-        let policy =
-            CodeHashPolicy::from_blocked(config.blocked_code_hashes()).expect("code hash policy");
-        assert_eq!(
-            policy.is_blocked(&code_hash),
-            value.is_some_and(|value| !value.is_empty())
-        );
+            .expect("generated blocklist path");
+        assert_eq!(config.blocked_code_hashes_path(), path.as_deref());
+        let policy = config
+            .blocked_code_hashes_path()
+            .map(CodeHashPolicy::from_file)
+            .transpose()
+            .expect("code hash policy")
+            .unwrap_or_default();
+        assert_eq!(policy.is_blocked(&code_hash), path.is_some());
         assert!(!policy.is_blocked(&"b".repeat(64)));
+        let generated =
+            fs::read_to_string(temp_dir.path().join("config.toml")).expect("config contents");
+        assert!(!generated.contains(&code_hash));
     }
 }
 

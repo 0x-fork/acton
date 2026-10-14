@@ -1257,12 +1257,15 @@ async fn backend_restart_rebuilds_registry_after_cli_removal_without_changing_pa
     git(&repo, &["push", "origin", "HEAD:main"]);
     let index_path = dir.path().join("registry.sqlite");
     let ledger_path = dir.path().join("payments.sqlite");
+    let blocklist_path = dir.path().join("blocked-code-hashes.txt");
+    fs::write(&blocklist_path, CODE_HASH).expect("blocklist");
     let config_bytes = format!(
-        "[server]\nread_only = true\nblocked_code_hashes = ['{CODE_HASH}']\n\
+        "[server]\nread_only = true\nblocked_code_hashes_path = '{}'\n\
          [source_repository]\npath = '{}'\nbranch = 'main'\ncommit_enabled = true\npush_enabled = true\n\
          [registry_index]\npath = '{}'\n\
          [payment]\nledger_path = '{}'\n\
          [compiler]\nnode_bin = '/unavailable-node'\nworker_path = '/unavailable-worker'\n",
+        blocklist_path.display(),
         repo.display(),
         index_path.display(),
         ledger_path.display()
@@ -1377,7 +1380,13 @@ async fn backend_restart_rebuilds_registry_after_cli_removal_without_changing_pa
                 usize::from(present)
             );
         }
-        let policy = CodeHashPolicy::from_blocked(config.blocked_code_hashes()).expect("blocklist");
+        assert_eq!(
+            fs::read_to_string(&blocklist_path).expect("preserved blocklist"),
+            CODE_HASH
+        );
+        let policy =
+            CodeHashPolicy::from_file(config.blocked_code_hashes_path().expect("blocklist path"))
+                .expect("blocklist");
         assert!(policy.is_blocked(CODE_HASH));
         assert!(!policy.is_blocked(&second_hash));
     }

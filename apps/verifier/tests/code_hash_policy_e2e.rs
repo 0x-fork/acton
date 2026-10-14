@@ -1,6 +1,6 @@
 mod support;
 
-use std::{io::Write, sync::Arc};
+use std::{fs, io::Write, sync::Arc};
 
 use axum::{
     body::Body,
@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 use verifier::{
     app,
-    code_hash_policy::CodeHashPolicy,
+    code_hash_policy::{CodeHashPolicy, CodeHashPolicyError},
     compilers::CompileGeneratedSource,
     config::{Config, ConfigError},
     payment::{OnchainPaymentVerifier, PaymentLedger},
@@ -43,42 +43,39 @@ fn config(contents: &str) -> Result<Config, ConfigError> {
 }
 
 fn policy(entries: &[&str]) -> CodeHashPolicy {
-    CodeHashPolicy::from_blocked(
-        &entries
-            .iter()
-            .map(|entry| (*entry).to_owned())
-            .collect::<Vec<_>>(),
-    )
-    .expect("valid policy")
+    let mut file = tempfile::NamedTempFile::new().expect("blocklist file");
+    file.write_all(entries.join("\n").as_bytes())
+        .expect("write blocklist");
+    CodeHashPolicy::from_file(file.path()).expect("valid policy")
 }
 
 #[test]
-fn config_stores_raw_hashes_and_policy_normalizes_blocked_entries() {
-    for config in [
-        Config::default(),
-        config("").expect("defaults"),
-        config("[server]\nblocked_code_hashes = []").expect("empty list"),
-    ] {
-        assert!(config.blocked_code_hashes().is_empty());
-        let policy = CodeHashPolicy::from_blocked(config.blocked_code_hashes())
-            .expect("empty code hash policy");
-        assert!(!policy.is_blocked(BLOCKED));
+fn config_stores_file_path_and_policy_normalizes_blocked_entries() {
+    for config in [Config::default(), config("").expect("defaults")] {
+        assert!(config.blocked_code_hashes_path().is_none());
     }
+    assert!(!CodeHashPolicy::default().is_blocked(BLOCKED));
+    for contents in ["", " \t\r\n\n"] {
+        assert!(!policy(&[contents]).is_blocked(BLOCKED));
+    }
+    let directory = tempfile::tempdir().expect("blocklist directory");
+    let path = directory.path().join("blocked code hashes.txt");
+    fs::write(
+        &path,
+        format!(
+            "\n {} \r\n{BLOCKED_BASE64}\r\n\t\n{BLOCKED}",
+            BLOCKED.to_uppercase()
+        ),
+    )
+    .expect("blocklist");
     let config = config(&format!(
-        "[server]\nblocked_code_hashes = [\" {} \", \"{BLOCKED_BASE64}\", \"{BLOCKED}\"]",
-        BLOCKED.to_ascii_uppercase()
+        "[server]\nblocked_code_hashes_path = '{}'",
+        path.display()
     ))
-    .expect("raw entries");
-    assert_eq!(
-        config.blocked_code_hashes(),
-        [
-            format!(" {} ", BLOCKED.to_ascii_uppercase()),
-            BLOCKED_BASE64.to_owned(),
-            BLOCKED.to_owned(),
-        ]
-    );
-    let policy =
-        CodeHashPolicy::from_blocked(config.blocked_code_hashes()).expect("code hash policy");
+    .expect("blocklist path");
+    assert_eq!(config.blocked_code_hashes_path(), Some(path.as_path()));
+    let policy = CodeHashPolicy::from_file(config.blocked_code_hashes_path().expect("path"))
+        .expect("code hash policy");
     for hash in [
         BLOCKED.to_owned(),
         BLOCKED.to_uppercase(),
@@ -102,8 +99,7 @@ fn policy_accepts_all_supported_hash_encodings_and_rejects_invalid_lookups() {
         URL_SAFE_NO_PAD.encode([0xfb; 32]),
     ];
     for entry in &encodings {
-        let policy = CodeHashPolicy::from_blocked(std::slice::from_ref(entry))
-            .expect("supported blocked hash encoding");
+        let policy = policy(&[entry]);
         for query in &encodings {
             assert!(
                 policy.is_blocked(query),
@@ -122,8 +118,6 @@ fn policy_accepts_all_supported_hash_encodings_and_rejects_invalid_lookups() {
 #[test]
 fn invalid_blocked_entries_are_rejected_by_policy_and_application_initialization() {
     for entry in [
-        String::new(),
-        " ".to_owned(),
         "not-a-hash".to_owned(),
         " not-a-hash ".to_owned(),
         "a".repeat(63),
@@ -133,13 +127,22 @@ fn invalid_blocked_entries_are_rejected_by_policy_and_application_initialization
         STANDARD.encode([0; 31]),
         STANDARD.encode([0; 33]),
     ] {
+        let mut file = tempfile::NamedTempFile::new().expect("blocklist file");
+        write!(file, "{BLOCKED}\n\n{entry}\n").expect("write blocklist");
         let config = config(&format!(
-            "[server]\nblocked_code_hashes = [\"{BLOCKED}\", \"{entry}\"]"
+            "[server]\nblocked_code_hashes_path = '{}'",
+            file.path().display()
         ))
-        .expect("config stores code hashes as raw strings");
-        assert_eq!(config.blocked_code_hashes(), [BLOCKED, &entry]);
-        let error = CodeHashPolicy::from_blocked(config.blocked_code_hashes()).expect_err(&entry);
-        assert_eq!(error.entry, entry);
+        .expect("config stores file path");
+        let error = CodeHashPolicy::from_file(file.path()).expect_err(&entry);
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("{}:3", file.path().display()))
+        );
+        assert!(
+            matches!(error, CodeHashPolicyError::InvalidEntry { line: 3, entry: value, .. } if value == entry.trim())
+        );
         assert!(matches!(
             AppState::from_config(&config),
             Err(StateError::CodeHashPolicy(_))
@@ -148,13 +151,58 @@ fn invalid_blocked_entries_are_rejected_by_policy_and_application_initialization
 }
 
 #[test]
-fn blocked_code_hashes_requires_a_list_of_strings() {
-    for value in ["true", "42", "[42]", "\"hash\""] {
+fn blocked_code_hashes_path_requires_a_string() {
+    for value in ["true", "42", "[42]", "[]", "['hash']"] {
         assert!(matches!(
-            config(&format!("[server]\nblocked_code_hashes = {value}")),
+            config(&format!("[server]\nblocked_code_hashes_path = {value}")),
             Err(ConfigError::Parse { .. })
         ));
     }
+}
+
+#[test]
+fn unreadable_blocklist_prevents_startup_before_opening_databases() {
+    let directory = tempfile::tempdir().expect("blocklist directory");
+    let invalid_utf8 = directory.path().join("invalid-utf8.txt");
+    fs::write(&invalid_utf8, [0xff]).expect("invalid UTF-8 file");
+    for path in [
+        directory.path().join("missing.txt"),
+        directory.path().to_path_buf(),
+        invalid_utf8,
+        "".into(),
+    ] {
+        let index_path = directory.path().join("index.sqlite3");
+        let ledger_path = directory.path().join("payments.sqlite3");
+        let config = config(&format!(
+            "[server]\nblocked_code_hashes_path = '{}'\n[registry_index]\npath = '{}'\n[payment]\nledger_path = '{}'\n",
+            path.display(), index_path.display(), ledger_path.display()
+        )).expect("blocklist config");
+        let error = CodeHashPolicy::from_file(&path).expect_err("unreadable blocklist");
+        assert!(matches!(error, CodeHashPolicyError::Read { .. }));
+        assert!(matches!(
+            AppState::from_config(&config),
+            Err(StateError::CodeHashPolicy(CodeHashPolicyError::Read { .. }))
+        ));
+        assert!(!index_path.exists());
+        assert!(!ledger_path.exists());
+    }
+}
+
+#[test]
+fn large_blocklist_is_fully_validated() {
+    let mut file = tempfile::NamedTempFile::new().expect("blocklist file");
+    for value in 0..20_000 {
+        writeln!(file, "{value:064x}").expect("write code hash");
+    }
+    let policy = CodeHashPolicy::from_file(file.path()).expect("large blocklist");
+    assert!(policy.is_blocked(&format!("{:064x}", 0)));
+    assert!(policy.is_blocked(&format!("{:064x}", 19_999)));
+    assert!(!policy.is_blocked(&format!("{:064x}", 20_000)));
+    writeln!(file, "invalid").expect("invalid final line");
+    assert!(matches!(
+        CodeHashPolicy::from_file(file.path()),
+        Err(CodeHashPolicyError::InvalidEntry { line: 20_001, .. })
+    ));
 }
 
 fn state(
@@ -472,10 +520,12 @@ async fn policy_blocks_direct_access_without_changing_indexed_collections() {
 #[tokio::test]
 async fn runtime_config_applies_policy() {
     let directory = tempfile::tempdir().expect("state directory");
+    let blocklist = directory.path().join("blocked-code-hashes.txt");
+    fs::write(&blocklist, BLOCKED).expect("blocklist");
     let config = config(&format!(
         r#"
 [server]
-blocked_code_hashes = ["{BLOCKED}"]
+blocked_code_hashes_path = "{}"
 [registry_index]
 path = "{}"
 [payment]
@@ -483,11 +533,23 @@ address = "{PAYMENT_ADDRESS}"
 min_amount_nano = 1
 ledger_path = "{}"
 "#,
+        blocklist.display(),
         directory.path().join("index.sqlite3").display(),
         directory.path().join("payment.sqlite3").display()
     ))
     .expect("runtime config");
     let configured = AppState::from_config(&config).expect("configured state");
+    assert_blocked(
+        get(
+            configured.clone(),
+            &format!("/api/v1/verification/source?code_hash={BLOCKED}"),
+        )
+        .await,
+        StatusCode::NOT_FOUND,
+    )
+    .await;
+    // Changes are applied on restart, not during requests.
+    fs::write(&blocklist, "").expect("clear blocklist");
     assert_blocked(
         get(
             configured,
@@ -497,6 +559,19 @@ ledger_path = "{}"
         StatusCode::NOT_FOUND,
     )
     .await;
+    let restarted = AppState::from_config(&config).expect("state with empty blocklist");
+    let response = get(
+        restarted,
+        &format!("/api/v1/verification/source?code_hash={BLOCKED}"),
+    )
+    .await;
+    let body = response_json::<Value>(response).await;
+    assert!(
+        !body["error"]
+            .as_str()
+            .expect("source lookup error")
+            .contains("code_hash_blocked")
+    );
 }
 
 #[tokio::test]

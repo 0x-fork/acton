@@ -1,4 +1,9 @@
-use std::collections::BTreeSet;
+use std::{
+    collections::BTreeSet,
+    fs::File,
+    io::{self, BufRead, BufReader},
+    path::{Path, PathBuf},
+};
 
 use thiserror::Error;
 
@@ -12,20 +17,32 @@ pub struct CodeHashPolicy {
 }
 
 impl CodeHashPolicy {
-    /// Parses hexadecimal or base64 code hashes, ignoring case in hexadecimal hashes.
+    /// Loads one hexadecimal or base64 code hash per line, ignoring blank lines.
+    /// Hashes are normalized and deduplicated. An empty file blocks no hashes.
     ///
     /// # Errors
     ///
-    /// Returns an error if any entry is not a 256-bit code hash.
-    pub fn from_blocked(entries: &[String]) -> Result<Self, CodeHashPolicyError> {
-        let blocked = entries
-            .iter()
-            .map(|entry| {
-                parse_code_hash(entry).ok_or_else(|| CodeHashPolicyError {
-                    entry: entry.clone(),
-                })
-            })
-            .collect::<Result<_, _>>()?;
+    /// Returns an error if the file cannot be read or any nonblank line is not a 256-bit code hash.
+    pub fn from_file(path: &Path) -> Result<Self, CodeHashPolicyError> {
+        let read_error = |source| CodeHashPolicyError::Read {
+            path: path.to_path_buf(),
+            source,
+        };
+        let file = File::open(path).map_err(read_error)?;
+        let mut blocked = BTreeSet::new();
+        for (index, line) in BufReader::new(file).lines().enumerate() {
+            let line = line.map_err(read_error)?;
+            let entry = line.trim();
+            if entry.is_empty() {
+                continue;
+            }
+            let hash = parse_code_hash(entry).ok_or_else(|| CodeHashPolicyError::InvalidEntry {
+                path: path.to_path_buf(),
+                line: index + 1,
+                entry: entry.to_owned(),
+            })?;
+            blocked.insert(hash);
+        }
         Ok(Self { blocked })
     }
 
@@ -36,9 +53,15 @@ impl CodeHashPolicy {
 }
 
 #[derive(Debug, Error)]
-#[error(
-    "invalid server.blocked_code_hashes entry {entry:?}: expected a 256-bit code hash in hexadecimal or base64"
-)]
-pub struct CodeHashPolicyError {
-    pub entry: String,
+pub enum CodeHashPolicyError {
+    #[error("failed to read blocked code hash file {path}: {source}")]
+    Read { path: PathBuf, source: io::Error },
+    #[error(
+        "invalid blocked code hash {entry:?} at {path}:{line}: expected a 256-bit code hash in hexadecimal or base64"
+    )]
+    InvalidEntry {
+        path: PathBuf,
+        line: usize,
+        entry: String,
+    },
 }

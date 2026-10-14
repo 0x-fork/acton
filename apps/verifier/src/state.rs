@@ -41,10 +41,14 @@ impl AppState {
     /// # Errors
     ///
     /// Returns an error when compiler rules, blocked code hashes, or payment settings are
-    /// invalid, or when the registry index or payment ledger cannot be opened.
+    /// invalid, the blocklist cannot be read, or the registry index or payment ledger cannot be opened.
     pub fn from_config(config: &Config) -> Result<Self, StateError> {
         let compiler_policy = CompilerPolicy::from_disabled(config.disabled_compilers())?;
-        let code_hash_policy = CodeHashPolicy::from_blocked(config.blocked_code_hashes())?;
+        let code_hash_policy = config
+            .blocked_code_hashes_path()
+            .map(CodeHashPolicy::from_file)
+            .transpose()?
+            .unwrap_or_default();
         let source_storage = Arc::new(GitSourceStorage::from_config(config));
         let verification_index =
             Arc::new(SqliteVerificationIndex::open(config.registry_index_path())?);

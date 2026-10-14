@@ -197,7 +197,7 @@ write_generated_config() {
         printf 'bind_addr = "%s"\n' "$(toml_escape "${VERIFIER_BIND_ADDR:-0.0.0.0:3000}")"
         write_optional_string api_key "${VERIFIER_API_KEY:-}"
         printf 'read_only = %s\n' "${VERIFIER_READ_ONLY:-false}"
-        write_string_list blocked_code_hashes "${VERIFIER_BLOCKED_CODE_HASHES:-}"
+        write_optional_string blocked_code_hashes_path "${VERIFIER_BLOCKED_CODE_HASHES_PATH:-}"
         printf '\n'
 
         printf '[logging]\n'
