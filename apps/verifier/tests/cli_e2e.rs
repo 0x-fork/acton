@@ -60,11 +60,8 @@ fn confirmation_input(input: &[u8]) -> fs::File {
 fn assert_success(output: Output) -> String {
     assert!(output.status.success(), "{output:?}");
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let stderr = stderr
-        .strip_prefix(PUSH_DISABLED_WARNING)
-        .unwrap_or(&stderr);
-    let stderr = stderr.strip_prefix(CONFIRMATION_PROMPT).unwrap_or(stderr);
-    assert!(stderr.starts_with("Checking repository: "), "{output:?}");
+    assert!(stderr.starts_with("Config: "), "{output:?}");
+    assert!(stderr.contains("Checking repository: "), "{output:?}");
     assert!(stderr.contains("\nRemoval plan: "), "{output:?}");
     String::from_utf8(output.stdout).expect("UTF-8 CLI output")
 }
@@ -134,6 +131,10 @@ fn prepares_sorted_unique_hashes_from_hex_and_all_base64_formats() {
         ])
         .output()
         .expect("run CLI");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Remote: origin\n"));
+    assert!(stderr.contains("Storage root: sources\n"));
+    assert!(stderr.contains("Branch: main\n"));
     let stdout = assert_success(output);
 
     assert!(stdout.contains(&format!("Code hashes: {lower_hash}, {upper_hash}\n")));
@@ -142,9 +143,6 @@ fn prepares_sorted_unique_hashes_from_hex_and_all_base64_formats() {
     assert!(stdout.contains(&format!("  {upper_hash}: not found\n")));
     assert!(stdout.contains("Bundles to remove: 0\nNot found: 2\n"));
     assert!(!stdout.contains("Delete:"));
-    assert!(stdout.contains("Remote: origin\n"));
-    assert!(stdout.contains("Storage root: sources\n"));
-    assert!(stdout.contains("Branch: main\n"));
     assert!(!stdout.contains("Reason:"));
 }
 
@@ -172,13 +170,17 @@ fn uses_configured_repository_settings() {
         .args(["remove-registry", "--dry-run", CODE_HASH])
         .output()
         .expect("run CLI");
-    let stdout = assert_success(output);
-
+    let stderr = String::from_utf8_lossy(&output.stderr);
     for expected in [
         "Repository: custom repo\n",
         "Storage root: verified/contracts\n",
         "Remote: upstream\n",
         "Branch: registry\n",
+    ] {
+        assert!(stderr.contains(expected), "{stderr}");
+    }
+    let stdout = assert_success(output);
+    for expected in [
         &format!("    Path: {}\n", bundle_path("verified/contracts")),
         &format!("  {CODE_HASH}: found\n"),
     ] {
@@ -212,11 +214,13 @@ fn config_path_uses_flag_then_environment_then_default() {
         if let Some(config_path) = explicit {
             command.args(["--config", config_path]);
         }
-        let stdout = assert_success(command.output().expect("run CLI"));
+        let output = command.output().expect("run CLI");
+        let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(
-            stdout.contains(&format!("Repository: {expected_repository}\n")),
-            "{stdout}"
+            stderr.contains(&format!("Repository: {expected_repository}\n")),
+            "{stderr}"
         );
+        assert_success(output);
     }
 }
 
@@ -330,16 +334,17 @@ fn checks_preserve_repository_and_database_files() {
         fs::write(dir.path().join(filename), contents).expect("sentinel file");
     }
     let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
-    let stdout = assert_success(output);
+    let stderr = String::from_utf8_lossy(&output.stderr);
     let head = git(&repo, &["rev-parse", "HEAD"]);
     assert!(
-        stdout.contains(&format!("Local HEAD: {head}\n")),
-        "{stdout}"
+        stderr.contains(&format!("Local HEAD: {head}\n")),
+        "{stderr}"
     );
     assert!(
-        stdout.contains(&format!("Remote HEAD: {head}\n")),
-        "{stdout}"
+        stderr.contains(&format!("Remote HEAD: {head}\n")),
+        "{stderr}"
     );
+    assert_success(output);
 
     for (filename, contents) in files {
         assert_eq!(
@@ -614,8 +619,9 @@ fn checks_the_configured_branch_instead_of_remote_head() {
     git(&remote, &["update-ref", "refs/heads/unrelated", &root]);
     git(&remote, &["symbolic-ref", "HEAD", "refs/heads/unrelated"]);
     let output = run_preserving(&dir, &repo, &["remove-registry", "--dry-run", CODE_HASH]);
-    let stdout = assert_success(output);
-    assert!(stdout.contains("Branch: registry/production\n"), "{stdout}");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Branch: registry/production\n"), "{stderr}");
+    assert_success(output);
 }
 
 #[test]
@@ -655,17 +661,8 @@ fn dry_run_prints_a_stable_complete_plan_for_present_and_absent_bundles() {
     git(&repo, &["add", "--all"]);
     git(&repo, &["commit", "-m", "Add plan fixtures"]);
     git(&repo, &["push", "origin", "HEAD:main"]);
-    let head = git(&repo, &["rev-parse", "HEAD"]);
     let expected = format!(
         "Dry run: registry removal plan\n\
-         Config: config.toml\n\
-         Repository: source-repo\n\
-         Storage root: sources\n\
-         Remote: origin\n\
-         Branch: main\n\
-         Local HEAD: {head}\n\
-         Remote HEAD: {head}\n\
-         Push enabled: true\n\
          Code hashes: {CODE_HASH}, {absent_hash}, {second_hash}\n\
          Bundles:\n  {CODE_HASH}: found\n    Path: {first}\n  {absent_hash}: not found\n    Path: {absent}\n  {second_hash}: found\n    Path: {second}\n\
          Bundles to remove: 2\n\
@@ -1041,21 +1038,19 @@ fn disabled_push_keeps_commits_locally_without_contacting_a_remote() {
             &repo,
             &["remove-registry", "--dry-run", CODE_HASH, &second_hash],
         );
-        assert!(output.stderr.starts_with(PUSH_DISABLED_WARNING.as_bytes()));
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(PUSH_DISABLED_WARNING));
+        assert!(stderr.contains("Remote HEAD: not checked (push_enabled = false)\n"));
+        assert!(stderr.contains("Push enabled: false\n"));
         let stdout = assert_success(output);
-        assert!(stdout.contains("Remote HEAD: not checked (push_enabled = false)\n"));
-        assert!(stdout.contains("Push enabled: false\n"));
         assert!(stdout.contains("Bundles to remove: 2\n"));
 
         let output = cli(&dir)
             .args(["remove-registry", CODE_HASH, &second_hash])
             .output()
             .expect("run CLI");
-        assert!(
-            output
-                .stderr
-                .starts_with(format!("{PUSH_DISABLED_WARNING}{CONFIRMATION_PROMPT}").as_bytes())
-        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(&format!("{PUSH_DISABLED_WARNING}{CONFIRMATION_PROMPT}")));
         let stdout = assert_success(output);
         assert!(!repo.join(&first).exists());
         assert!(!repo.join(&second).exists());

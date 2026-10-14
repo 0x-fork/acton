@@ -83,6 +83,14 @@ impl<'a> RemovalPlan<'a> {
         )
         .await?;
 
+        eprintln!("Branch: {}", checked.branch);
+        eprintln!("Local HEAD: {}", checked.local_head);
+        if let Some(remote_head) = &checked.remote_head {
+            eprintln!("Remote HEAD: {remote_head}");
+        } else {
+            eprintln!("Remote HEAD: not checked (push_enabled = false)");
+        }
+
         let git = Git::new(request.path);
         let total = request.code_hashes.len();
         let mut bundles = Vec::with_capacity(total);
@@ -271,6 +279,13 @@ impl BundleRemoval {
 pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
     let config = Config::load_from_path(&args.config)?;
     let request = RemoveRegistryRequest::prepare(args, &config)?;
+    eprintln!("Config: {}", args.config.display());
+    eprintln!("Repository: {}", request.path.display());
+    eprintln!("Storage root: {}", request.repository.storage_root);
+    eprintln!("Remote: {}", request.repository.remote);
+    eprintln!("Push enabled: {}", request.repository.push_enabled);
+    eprintln!("Dry run: {}", args.dry_run);
+    eprintln!("Unique code hashes: {}", request.code_hashes.len());
     if !request.repository.push_enabled {
         eprintln!(
             "Warning: push_enabled = false; commits will remain local and will not be pushed."
@@ -297,18 +312,6 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
     } else {
         println!("Bundles removed from checkout");
     }
-    println!("Config: {}", args.config.display());
-    println!("Repository: {}", plan.path.display());
-    println!("Storage root: {}", plan.repository.storage_root);
-    println!("Remote: {}", plan.repository.remote);
-    println!("Branch: {}", plan.checked.branch);
-    println!("Local HEAD: {}", plan.checked.local_head);
-    if let Some(remote_head) = &plan.checked.remote_head {
-        println!("Remote HEAD: {remote_head}");
-    } else {
-        println!("Remote HEAD: not checked (push_enabled = false)");
-    }
-    println!("Push enabled: {}", plan.repository.push_enabled);
     let code_hashes = plan
         .bundles
         .iter()
