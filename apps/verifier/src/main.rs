@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use tracing_subscriber::EnvFilter;
 use verifier::{app, config::Config, state::AppState};
 
@@ -60,6 +62,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     let published_payment_transaction_hashes = if config.source_repository().path.is_some() {
         state.ensure_registry_current().await?;
+        let statistics = state.verification_registry().statistics().await?;
+        let languages: BTreeMap<_, _> = statistics
+            .languages
+            .iter()
+            .map(|language| (language.language.as_str(), language.total))
+            .collect();
+        tracing::info!(
+            total = statistics.total,
+            languages = ?languages,
+            "verified contract statistics"
+        );
         state.published_payment_transaction_hashes().await?
     } else {
         Vec::new()
