@@ -574,18 +574,36 @@ impl DhtNodeDescriptor {
         serde_json::from_str(value).context("invalid TON dht.node descriptor")
     }
 
-    /// Reports whether this bootstrap node is reachable through a public IPv4 address.
-    ///
-    /// A config whose discovery nodes are public describes a network outside the
-    /// operator's private LAN. Joining it with a private advertised address leaves
-    /// overlay peers unable to return block proofs, although DHT probes can still
-    /// appear healthy.
-    pub(crate) fn advertises_public_ipv4(&self) -> bool {
-        self.addr_list
-            .addrs
-            .iter()
-            .map(|address| Ipv4Addr::from(address.ip.to_be_bytes()))
-            .any(is_public_ipv4)
+    /// Transfers a validated tool descriptor to the shared network configuration.
+    pub(crate) fn into_global_config_node(self) -> rston::global_config::ConfigDhtNode {
+        use rston::global_config::{
+            ConfigAdnlAddress, ConfigAdnlAddressList, ConfigDhtNode, ConfigPublicKey,
+        };
+
+        ConfigDhtNode {
+            constructor: Default::default(),
+            id: ConfigPublicKey::Ed25519 {
+                key: *self.id.public_key().as_bytes(),
+            },
+            addr_list: ConfigAdnlAddressList {
+                constructor: Default::default(),
+                addrs: self
+                    .addr_list
+                    .addrs
+                    .into_iter()
+                    .map(|address| ConfigAdnlAddress::Udp {
+                        ip: address.ip,
+                        port: address.port,
+                    })
+                    .collect(),
+                version: self.addr_list.version,
+                reinit_date: self.addr_list.reinit_date,
+                priority: self.addr_list.priority,
+                expire_at: self.addr_list.expire_at,
+            },
+            version: self.version,
+            signature: self.signature.0,
+        }
     }
 }
 

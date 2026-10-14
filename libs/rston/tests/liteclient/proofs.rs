@@ -518,8 +518,9 @@ async fn high_level_queries_verify_responses_from_an_adnl_server() {
 async fn high_level_pool_queries_use_the_same_verifier() {
     let fixture = fixture();
     let server = TestServer::start(|_| ACCOUNT.to_vec()).await;
-    let config = rston::liteclient::ConfigGlobal {
+    let config = rston::global_config::GlobalConfig {
         liteservers: vec![server.config.clone()],
+        ..Default::default()
     };
     let mut pool = rston::liteclient::LiteClientPool::new(config, Default::default()).unwrap();
     let block = VerifiedBlock::from_trusted(fixture.head);

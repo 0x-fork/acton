@@ -114,6 +114,34 @@ captured stack, save list, and arity. Encoding emits a standard continuation
 with codepage zero; decoding rejects unsupported continuation constructors.
 Use this module to prepare or read stack data. It does not execute smart contracts.
 
+## Global network configuration
+
+`GlobalConfig` reads and writes the complete standard TON global configuration.
+It includes DHT lookup parameters, optional `network_id`, signed bootstrap descriptors,
+liteservers, and validator checkpoints. Node signatures and advertised addresses remain
+unverified until the consumer checks them.
+
+The module requires `models` and `serde`, which are enabled by default.
+It works without `adnl` or `liteclient`.
+Checkpoint fields use `BlockId`; their hashes are encoded as padded base64 in configuration JSON.
+Missing sections allow endpoint-only or P2P-only files. Applications check the sections they need.
+
+```rust
+use rston::GlobalConfig;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let config: GlobalConfig = std::fs::read_to_string("global.config.json")?.parse()?;
+    if let Some(validator) = &config.validator {
+        println!("Network zero state: {}", validator.zero_state);
+    }
+    println!("Liteservers: {}", config.liteservers.len());
+    Ok(())
+}
+```
+
+Parsing checks protocol constructors, byte lengths, ports, and masterchain checkpoint coordinates.
+It does not establish trust in the source file or verify DHT signatures.
+
 ## LiteAPI queries
 
 Enable `liteclient` and use Tokio to query the liteservers in a trusted global config:
@@ -125,12 +153,13 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
 ```rust
-use rston::liteclient::{ConfigGlobal, LiteClientOptions, LiteClientPool};
+use rston::GlobalConfig;
+use rston::liteclient::{LiteClientOptions, LiteClientPool};
 use rston::tl::{Request, response::MasterchainInfo};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config: ConfigGlobal = std::fs::read_to_string("global.config.json")?.parse()?;
+    let config: GlobalConfig = std::fs::read_to_string("global.config.json")?.parse()?;
     let mut client = LiteClientPool::new(config, LiteClientOptions::default())?;
     let info: MasterchainInfo = client.query_typed(Request::GetMasterchainInfo).await?;
 
@@ -148,22 +177,25 @@ Use the following methods to authenticate data against a trusted block.
 
 ## Verified LiteAPI queries
 
-Start with a complete block identifier from an independently trusted source.
-`VerifiedBlock::from_trusted` records that trust decision; it does not verify the identifier.
+Load a global configuration from an independently trusted source.
+It contains liteservers, the network's `validator.zero_state`, an optional
+`validator.init_block`, and any `validator.hardforks` checkpoints.
+`VerifiedBlock::from_trusted_config` selects the nonzero init block as a trusted checkpoint.
+This records your trust in the file; it does not verify that block cryptographically.
 `get_masterchain_info` verifies a proof chain from your checkpoint to the server's reported head.
 The caller decides whether that head is recent enough.
 
 This example authenticates the head and reads the elector's account state:
 
 ```rust
-use rston::liteclient::{ConfigGlobal, LiteClientOptions, LiteClientPool, VerifiedBlock};
-use rston::models::{BlockId, StdAddr};
+use rston::GlobalConfig;
+use rston::liteclient::{LiteClientOptions, LiteClientPool, VerifiedBlock};
+use rston::models::StdAddr;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config: ConfigGlobal = std::fs::read_to_string("global.config.json")?.parse()?;
-    let checkpoint: BlockId = std::fs::read_to_string("trusted-block.txt")?.trim().parse()?;
-    let checkpoint = VerifiedBlock::from_trusted(checkpoint);
+    let config: GlobalConfig = std::fs::read_to_string("global.config.json")?.parse()?;
+    let checkpoint = VerifiedBlock::from_trusted_config(&config)?;
     let mut client = LiteClientPool::new(config, LiteClientOptions::default())?;
     let head = client.get_masterchain_info(&checkpoint).await?;
     let elector: StdAddr =
@@ -177,9 +209,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-`trusted-block.txt` contains the full identifier in
-`workchain:shard:seqno:root_hash:file_hash` format.
-Both hashes use hexadecimal encoding. Keep the checkpoint with your application's trusted network configuration.
+Endpoint-only configurations still work for raw and typed wire queries.
+An absent init block or an init block at sequence zero cannot start verified queries.
+The zero state identifies the network; verification from genesis is not supported.
+Hardfork entries are retained without automatically selecting or trusting a fork.
+Use `VerifiedBlock::from_trusted` if you maintain a separate trusted block checkpoint.
 
 | Method | Guarantee |
 | --- | --- |
@@ -213,11 +247,11 @@ The default features are `base64`, `serde`, `models`, `sync`, and `wallet`.
 | Feature | Adds |
 | --- | --- |
 | `base64` | Base64 helpers for BoC and byte representations |
-| `serde` | Serde serialization for supported types. Enables `base64` |
+| `serde` | Serde serialization and JSON global configuration with `models`. Enables `base64` |
 | `models` | TON blockchain models |
 | `tl` | LiteAPI wire types and TL encoding, without networking |
 | `adnl` | ADNL/TCP handshake and encrypted frames. Enables `tl` |
-| `liteclient` | Raw, typed, and verified queries, server services, deadlines, pools, and global config. Enables `adnl`, `tl`, and `models` |
+| `liteclient` | Raw, typed, and verified queries, server services, deadlines, and pools. Enables `adnl`, `tl`, `models`, and `serde` |
 | `wallet` | Wallet contracts and signed messages. Enables `models`, `base64`, and `sync` |
 | `sync` | Cells that can be shared across threads |
 | `bigint` | Conversion helpers for `num-bigint` integers |

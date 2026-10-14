@@ -8,9 +8,8 @@ use std::{collections::HashMap, path::Path, time::Duration};
 use async_trait::async_trait;
 use futures::{StreamExt, future::join_all, stream::FuturesUnordered};
 use rston::{
-    liteclient::{
-        ConfigGlobal, ConfigLiteServer, LiteClient as TransportLiteClient, LiteClientOptions,
-    },
+    global_config::{ConfigLiteServer, GlobalConfig},
+    liteclient::{LiteClient as TransportLiteClient, LiteClientOptions},
     tl::{
         common::{BlockId as LiteBlockId, BlockIdExt as LiteBlockIdExt, Int256},
         request::{GetBlock, GetOutMsgQueueSizes, LookupBlock, Request},
@@ -92,7 +91,7 @@ impl LiteClient {
     ///
     /// Returns an error when the config has no liteservers or none of them
     /// accepts an ADNL connection and answers a `getMasterchainInfo` probe.
-    pub async fn connect(config: &ConfigGlobal) -> Result<Self, SourceError> {
+    pub async fn connect(config: &GlobalConfig) -> Result<Self, SourceError> {
         Self::connect_with_parallelism(config, Self::DEFAULT_PARALLEL_CLIENTS).await
     }
 
@@ -106,7 +105,7 @@ impl LiteClient {
     /// Returns an error when the config has no liteservers or none of them
     /// accepts an ADNL connection and answers a `getMasterchainInfo` probe.
     pub async fn connect_with_parallelism(
-        config: &ConfigGlobal,
+        config: &GlobalConfig,
         parallelism: usize,
     ) -> Result<Self, SourceError> {
         if config.liteservers.is_empty() {
@@ -189,7 +188,7 @@ impl LiteClient {
         let source = tokio::fs::read_to_string(path).await.map_err(|error| {
             SourceError::GlobalConfig(format!("failed to read {}: {error}", path.display()))
         })?;
-        let config = source.parse::<ConfigGlobal>().map_err(|error| {
+        let config = source.parse::<GlobalConfig>().map_err(|error| {
             SourceError::GlobalConfig(format!("failed to parse {}: {error}", path.display()))
         })?;
         Self::connect_with_parallelism(&config, parallelism).await

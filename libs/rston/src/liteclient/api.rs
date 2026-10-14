@@ -3,6 +3,7 @@
 use std::time::Instant;
 
 use super::{LiteClient, LiteClientPool, LiteError, ProofError, proof};
+use crate::GlobalConfig;
 use crate::boc::Boc;
 use crate::cell::{Cell, CellBuilder, HashBytes};
 use crate::models::vm::Tuple;
@@ -29,6 +30,23 @@ impl VerifiedBlock {
     /// arbitrary server response here to bootstrap a trustless client.
     pub const fn from_trusted(id: BlockId) -> Self {
         Self(id)
+    }
+
+    /// Trust the init block from an independently trusted global configuration.
+    ///
+    /// The caller owns trust in the file and its network identity. This performs
+    /// no cryptographic verification and never selects a hardfork automatically.
+    /// Missing validator/init sections and sequence-zero init blocks are errors:
+    /// masterchain proof-chain verification requires a nonzero block checkpoint.
+    pub fn from_trusted_config(config: &GlobalConfig) -> Result<Self, ProofError> {
+        let validator = config.validator.as_ref().ok_or(ProofError::Invalid(
+            "global config has no validator section",
+        ))?;
+        let block = validator.init_block.ok_or(ProofError::Invalid(
+            "global config has no validator.init_block",
+        ))?;
+        proof::require_masterchain(&block)?;
+        Ok(Self::from_trusted(block))
     }
 
     /// Read the complete identifier without allowing its hashes to be modified.

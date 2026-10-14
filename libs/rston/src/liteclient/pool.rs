@@ -1,6 +1,8 @@
 //! Round-robin queries across configured liteservers.
 
-use super::{ConfigGlobal, ConfigLiteServer, LiteClient, LiteClientOptions, LiteError};
+use super::{LiteClient, LiteClientOptions, LiteError};
+use crate::GlobalConfig;
+use crate::global_config::ConfigLiteServer;
 use crate::tl::{Request, utils::FromResponse};
 
 /// A pool of lazily connected liteservers selected in config order.
@@ -19,7 +21,7 @@ pub struct LiteClientPool {
 
 impl LiteClientPool {
     /// Create a pool without network access. An empty config returns an error.
-    pub fn new(config: ConfigGlobal, options: LiteClientOptions) -> Result<Self, LiteError> {
+    pub fn new(config: GlobalConfig, options: LiteClientOptions) -> Result<Self, LiteError> {
         if config.liteservers.is_empty() {
             return Err(LiteError::NoServers);
         }

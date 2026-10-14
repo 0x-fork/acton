@@ -5,11 +5,11 @@ use std::time::{Duration, Instant};
 use tokio::net::ToSocketAddrs;
 use tower::{Layer, Service, ServiceExt};
 
-use super::config::ConfigLiteServer;
 use super::layers::WrapRawMessagesLayer;
 use super::peer::LitePeer;
 use super::types::LiteError;
 use crate::adnl::AdnlPeer;
+use crate::global_config::ConfigLiteServer;
 use crate::tl::request::{RawWrappedRequest, Request, WaitMasterchainSeqno};
 use crate::tl::response::Response;
 use crate::tl::utils::FromResponse;

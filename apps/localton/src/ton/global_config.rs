@@ -1,9 +1,7 @@
 //! Typed TON global configuration used by bootstrap, join, and HTTP discovery.
 //!
-//! This module owns the JSON protocol shape instead of letting workflows assemble
-//! arbitrary `serde_json::Value` trees. Constructor names, byte lengths, and required
-//! network entry points are therefore checked before a config reaches official TON
-//! binaries or is persisted as network identity.
+//! The shared protocol model lives in `rston::global_config`. Localton owns file
+//! persistence, node-join requirements, address policy, and fork operations.
 
 use std::{
     fs,
@@ -12,17 +10,25 @@ use std::{
 };
 
 use anyhow::{Context, Result, ensure};
+use rston::{
+    cell::HashBytes,
+    global_config::{
+        ConfigDhtNodes, ConfigLiteServer, ConfigPublicKey, DhtConfig,
+        GlobalConfig as NetworkGlobalConfig, ValidatorConfig,
+    },
+    models::{BlockId, ShardIdent},
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::storage::write_json_atomic;
 
 use super::tools::types::{
-    DhtNodeDescriptor, Ed25519PublicKey, TonBlockHash, TonPublicKey, ZeroStateId, is_public_ipv4,
+    DhtNodeDescriptor, TonBlockHash, TonPublicKey, ZeroStateId, is_public_ipv4,
 };
 
-const MASTERCHAIN_ID: i32 = -1;
-const MASTERCHAIN_SHARD: i64 = i64::MIN;
+#[allow(dead_code)]
+mod schema;
 
 /// An on-disk global config that was parsed and accepted for joining a TON node.
 ///
@@ -49,15 +55,9 @@ impl GlobalConfigFile {
 }
 
 /// Complete `global.config.json` document consumed by TON nodes and clients.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct GlobalConfig {
-    #[serde(rename = "@type")]
-    constructor: GlobalConfigConstructor,
-    dht: DhtConfig,
-    liteservers: Vec<LiteserverConfig>,
-    validator: ValidatorConfig,
-}
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "NetworkGlobalConfig", into = "NetworkGlobalConfig")]
+pub(crate) struct GlobalConfig(NetworkGlobalConfig);
 
 impl GlobalConfig {
     /// Reads one typed global config while preserving the source path in diagnostics.
@@ -78,11 +78,11 @@ impl GlobalConfig {
     pub(crate) fn liteserver_endpoints(
         &self,
     ) -> impl ExactSizeIterator<Item = (Ipv4Addr, u16, TonPublicKey)> + '_ {
-        self.liteservers.iter().map(|liteserver| {
+        self.0.liteservers.iter().map(|liteserver| {
             (
                 Ipv4Addr::from(liteserver.ip as u32),
                 liteserver.port,
-                liteserver.id.public_key(),
+                TonPublicKey::from_bytes(*liteserver.public_key()),
             )
         })
     }
@@ -99,22 +99,38 @@ impl GlobalConfig {
         liteserver_port: u16,
         liteserver_public_key: TonPublicKey,
     ) -> Self {
-        let zero_state = BlockIdExt::zerostate(zero_state);
-        Self {
-            constructor: GlobalConfigConstructor::Global,
-            dht: DhtConfig::local(dht_nodes),
-            liteservers: vec![LiteserverConfig::new(
+        let zero_state = BlockId {
+            shard: ShardIdent::MASTERCHAIN,
+            seqno: 0,
+            root_hash: HashBytes(*zero_state.root_hash().as_bytes()),
+            file_hash: HashBytes(*zero_state.file_hash().as_bytes()),
+        };
+        Self(NetworkGlobalConfig {
+            dht: Some(DhtConfig {
+                constructor: Default::default(),
+                k: 3,
+                a: 3,
+                network_id: None,
+                static_nodes: ConfigDhtNodes {
+                    nodes: dht_nodes
+                        .into_iter()
+                        .map(DhtNodeDescriptor::into_global_config_node)
+                        .collect(),
+                    ..Default::default()
+                },
+            }),
+            liteservers: vec![liteserver(
                 liteserver_ip,
                 liteserver_port,
                 liteserver_public_key,
             )],
-            validator: ValidatorConfig {
-                constructor: ValidatorConfigConstructor::Global,
-                zero_state: zero_state.clone(),
-                init_block: zero_state,
+            validator: Some(ValidatorConfig {
+                zero_state,
+                init_block: Some(zero_state),
                 hardforks: Vec::new(),
-            },
-        }
+            }),
+            ..Default::default()
+        })
     }
 
     /// Parses and fully validates a downloaded global config.
@@ -128,11 +144,11 @@ impl GlobalConfig {
     /// node with an authenticated upstream liteserver before publishing readiness.
     pub(crate) fn validate_for_node_join(&self) -> Result<()> {
         ensure!(
-            !self.dht.static_nodes.nodes.is_empty(),
+            !self.0.dht.as_ref().unwrap().static_nodes.nodes.is_empty(),
             "global config has no DHT entry points"
         );
         ensure!(
-            !self.liteservers.is_empty(),
+            !self.0.liteservers.is_empty(),
             "global config has no liteserver endpoints"
         );
         Ok(())
@@ -145,11 +161,15 @@ impl GlobalConfig {
     /// starts avoids an indefinite `process.initial_sync` proof-download loop.
     pub(crate) fn validate_advertise_ip(&self, advertise_ip: Ipv4Addr) -> Result<()> {
         let public_network = self
+            .0
             .dht
+            .as_ref()
+            .unwrap()
             .static_nodes
             .nodes
             .iter()
-            .any(DhtNodeDescriptor::advertises_public_ipv4);
+            .flat_map(|node| &node.addr_list.addrs)
+            .any(|address| is_public_ipv4(*address.socket_addr().ip()));
 
         if public_network {
             ensure!(
@@ -174,19 +194,20 @@ impl GlobalConfig {
         root_hash: TonBlockHash,
         file_hash: TonBlockHash,
     ) {
-        self.validator.hardforks.push(BlockIdExt {
-            constructor: Some(BlockIdExtConstructor::BlockIdExt),
-            workchain: MASTERCHAIN_ID,
-            shard: MASTERCHAIN_SHARD,
+        self.0.validator.as_mut().unwrap().hardforks.push(BlockId {
+            shard: ShardIdent::MASTERCHAIN,
             seqno,
-            root_hash,
-            file_hash,
+            root_hash: HashBytes(*root_hash.as_bytes()),
+            file_hash: HashBytes(*file_hash.as_bytes()),
         });
     }
 
     /// Returns the masterchain blocks already registered as hardforks.
     pub(crate) fn hardfork_seqnos(&self) -> Vec<u32> {
-        self.validator
+        self.0
+            .validator
+            .as_ref()
+            .unwrap()
             .hardforks
             .iter()
             .map(|block| block.seqno)
@@ -197,139 +218,74 @@ impl GlobalConfig {
     /// published in the native archive. Existing nodes retain their databases;
     /// new nodes must start at or after the last declared hardfork.
     pub(crate) fn use_hardfork_for_bootstrap(&mut self, seqno: u32) -> Result<()> {
-        let fork = self
-            .validator
+        let validator = self.0.validator.as_mut().unwrap();
+        let fork = validator
             .hardforks
             .last()
             .filter(|fork| fork.seqno == seqno)
             .context("Bootstrap block must be the latest registered hardfork")?;
-        self.validator.init_block = fork.clone();
+        validator.init_block = Some(*fork);
         Ok(())
     }
 
     /// Routes this host's chain operations through its own liteserver identity.
     /// DHT and validator sections retain the downloaded network identity.
     pub(crate) fn with_local_liteserver(mut self, port: u16, public_key: TonPublicKey) -> Self {
-        self.liteservers = vec![LiteserverConfig::new(Ipv4Addr::LOCALHOST, port, public_key)];
+        self.0.liteservers = vec![liteserver(Ipv4Addr::LOCALHOST, port, public_key)];
         self
     }
-}
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-enum GlobalConfigConstructor {
-    #[serde(rename = "config.global")]
-    Global,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-struct DhtConfig {
-    #[serde(rename = "@type")]
-    constructor: DhtConfigConstructor,
-    k: i32,
-    a: i32,
-    static_nodes: DhtNodes,
-}
-
-impl DhtConfig {
-    fn local(nodes: Vec<DhtNodeDescriptor>) -> Self {
-        Self {
-            constructor: DhtConfigConstructor::Global,
-            k: 3,
-            a: 3,
-            static_nodes: DhtNodes {
-                constructor: DhtNodesConstructor::Nodes,
-                nodes,
-            },
-        }
+    /// Borrows the complete shared model for transports without dropping network identity.
+    pub(crate) fn network_config(&self) -> &NetworkGlobalConfig {
+        &self.0
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-enum DhtConfigConstructor {
-    #[serde(rename = "dht.config.global")]
-    Global,
-}
+impl TryFrom<NetworkGlobalConfig> for GlobalConfig {
+    type Error = &'static str;
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-struct DhtNodes {
-    #[serde(rename = "@type")]
-    constructor: DhtNodesConstructor,
-    nodes: Vec<DhtNodeDescriptor>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-enum DhtNodesConstructor {
-    #[serde(rename = "dht.nodes")]
-    Nodes,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-struct LiteserverConfig {
-    id: Ed25519PublicKey,
-    ip: i32,
-    port: u16,
-}
-
-impl LiteserverConfig {
-    fn new(ip: Ipv4Addr, port: u16, public_key: TonPublicKey) -> Self {
-        Self {
-            id: Ed25519PublicKey::new(public_key),
-            ip: i32::from_be_bytes(ip.octets()),
-            port,
+    fn try_from(config: NetworkGlobalConfig) -> std::result::Result<Self, Self::Error> {
+        if config.dht.is_none() {
+            return Err("node global config has no DHT section");
         }
+        if config.validator.is_none() {
+            return Err("node global config has no validator section");
+        }
+        Ok(Self(config))
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-struct ValidatorConfig {
-    #[serde(rename = "@type")]
-    constructor: ValidatorConfigConstructor,
-    zero_state: BlockIdExt,
-    init_block: BlockIdExt,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    hardforks: Vec<BlockIdExt>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-enum ValidatorConfigConstructor {
-    #[serde(rename = "validator.config.global")]
-    Global,
-}
-
-/// Extended TON block identifier embedded into validator configuration.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(deny_unknown_fields)]
-struct BlockIdExt {
-    #[serde(rename = "@type", default, skip_serializing_if = "Option::is_none")]
-    constructor: Option<BlockIdExtConstructor>,
-    workchain: i32,
-    shard: i64,
-    seqno: u32,
-    root_hash: TonBlockHash,
-    file_hash: TonBlockHash,
-}
-
-impl BlockIdExt {
-    fn zerostate(state: ZeroStateId) -> Self {
-        Self {
-            constructor: Some(BlockIdExtConstructor::BlockIdExt),
-            workchain: MASTERCHAIN_ID,
-            shard: MASTERCHAIN_SHARD,
-            seqno: 0,
-            root_hash: state.root_hash(),
-            file_hash: state.file_hash(),
-        }
+impl From<GlobalConfig> for NetworkGlobalConfig {
+    fn from(config: GlobalConfig) -> Self {
+        config.0
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
-enum BlockIdExtConstructor {
-    #[serde(rename = "ton.blockIdExt")]
-    BlockIdExt,
+impl utoipa::PartialSchema for GlobalConfig {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        <schema::GlobalConfig as utoipa::PartialSchema>::schema()
+    }
+}
+
+impl ToSchema for GlobalConfig {
+    fn schemas(
+        schemas: &mut Vec<(
+            String,
+            utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
+        )>,
+    ) {
+        schema::GlobalConfig::schemas(schemas);
+    }
+}
+
+fn liteserver(ip: Ipv4Addr, port: u16, public_key: TonPublicKey) -> ConfigLiteServer {
+    ConfigLiteServer {
+        ip: i32::from_be_bytes(ip.octets()),
+        port,
+        id: ConfigPublicKey::Ed25519 {
+            key: *public_key.as_bytes(),
+        },
+    }
 }
 
 #[cfg(test)]
@@ -377,11 +333,39 @@ mod tests {
             "../../../../crates/ton-indexer-liteserver/fixtures/mainnet-global.config.json"
         ))
         .unwrap();
-        config.liteservers.clear();
+        config.0.liteservers.clear();
 
         assert_eq!(
             config.validate_for_node_join().unwrap_err().to_string(),
             "global config has no liteserver endpoints"
         );
+    }
+
+    #[test]
+    fn node_configs_require_dht_and_validator_sections() {
+        assert!(GlobalConfig::from_json_bytes(br#"{"liteservers":[]}"#).is_err());
+    }
+
+    #[test]
+    fn http_schema_describes_the_complete_shared_model() {
+        let schema =
+            serde_json::to_value(<GlobalConfig as utoipa::PartialSchema>::schema()).unwrap();
+        let fields = schema["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        expect_test::expect![[r#"["@type","dht","liteservers","validator"]"#]]
+            .assert_eq(&serde_json::to_string(&fields).unwrap());
+
+        let mut components = Vec::new();
+        <GlobalConfig as ToSchema>::schemas(&mut components);
+        let (_, dht) = components
+            .iter()
+            .find(|(name, _)| name == "DhtConfig")
+            .unwrap();
+        let dht = serde_json::to_value(dht).unwrap();
+        assert!(dht["properties"].get("network_id").is_some());
     }
 }

@@ -14,6 +14,13 @@ use crate::{
 
 use super::{state::prepare_join_state, validator::VALIDATOR_WALLET_WORKCHAIN};
 
+fn test_public_key(seed: u8) -> TonPublicKey {
+    use rston::adnl::crypto::{KeyPair, SecretKey};
+
+    let keys = KeyPair::from(&SecretKey::from_bytes([seed; 32]));
+    TonPublicKey::from_bytes(*keys.public_key.as_bytes())
+}
+
 fn global_config_fixture() -> serde_json::Value {
     let block = serde_json::json!({
         "@type": "ton.blockIdExt",
@@ -57,7 +64,7 @@ fn global_config_fixture() -> serde_json::Value {
         "liteservers": [{
             "id": {
                 "@type": "pub.ed25519",
-                "key": BASE64.encode([5_u8; 32]),
+                "key": test_public_key(5).to_base64(),
             },
             "ip": 1,
             "port": 2,
@@ -96,7 +103,7 @@ fn local_liteserver_config_preserves_upstream_network_endpoints() {
     node_layout.create_dirs().unwrap();
     let local_config = node_layout.global_config;
 
-    let local_key = TonPublicKey::from_bytes([6_u8; 32]);
+    let local_key = test_public_key(6);
     GlobalConfig::load(&layout.global_config)
         .unwrap()
         .with_local_liteserver(38_007, local_key)

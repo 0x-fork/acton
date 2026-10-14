@@ -1580,6 +1580,7 @@ dependencies = [
  "rston-proc",
  "scc",
  "serde",
+ "serde_json",
  "sha2",
  "smallvec",
  "thiserror",

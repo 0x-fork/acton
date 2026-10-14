@@ -10,14 +10,12 @@
 
 mod api;
 mod client;
-pub mod config;
 mod pool;
 mod proof;
 
 pub use crate::tl::utils::FromResponse;
 pub use api::{AccountInfo, GetMethodResult, MethodId, VerifiedBlock};
 pub use client::{LiteClient, LiteClientOptions};
-pub use config::{ConfigGlobal, ConfigLiteServer, ConfigPublicKey};
 pub use pool::LiteClientPool;
 pub use proof::ProofError;
 pub use types::LiteError;

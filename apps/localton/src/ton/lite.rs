@@ -18,7 +18,8 @@ use rston::{
     prelude::HashBytes,
 };
 use rston::{
-    liteclient::{ConfigGlobal, ConfigLiteServer, ConfigPublicKey, LiteClient, LiteClientOptions},
+    global_config::{ConfigLiteServer, ConfigPublicKey, GlobalConfig},
+    liteclient::{LiteClient, LiteClientOptions},
     models::{AccountState, OptionalAccount},
     tl::{
         Int256,
@@ -38,7 +39,7 @@ use serde::{Deserialize, Serialize};
 use ton_hardfork::{HardforkPrevBlock, HardforkSources, ShardSource};
 use tracing::info;
 
-use crate::ton::{global_config::GlobalConfig, tools::types::TonPublicKey};
+use crate::ton::{global_config::GlobalConfig as LocalGlobalConfig, tools::types::TonPublicKey};
 
 /// Requests the result and proof material returned by official `runmethod`.
 ///
@@ -92,8 +93,8 @@ impl LocalLiteClient {
     /// Every endpoint has a bounded connection attempt so one unavailable server
     /// cannot prevent the remaining authenticated endpoints from being tried.
     pub async fn connect(global_config: &Path) -> Result<Self> {
-        let config = GlobalConfig::load(global_config)?;
-        Self::connect_config(liteapi_config(&config)).await
+        let config = LocalGlobalConfig::load(global_config)?;
+        Self::connect_config(config.network_config().clone()).await
     }
 
     /// Connects directly to one host-local liteserver from its typed endpoint identity.
@@ -101,14 +102,15 @@ impl LocalLiteClient {
     /// The liteserver client only needs an address and authentication key, so this
     /// path neither reads nor rewrites the durable network configuration.
     pub async fn connect_node(port: u16, public_key: TonPublicKey) -> Result<Self> {
-        let config = ConfigGlobal {
+        let config = GlobalConfig {
             liteservers: vec![liteapi_liteserver(Ipv4Addr::LOCALHOST, port, public_key)],
+            ..Default::default()
         };
 
         Self::connect_config(config).await
     }
 
-    async fn connect_config(config: ConfigGlobal) -> Result<Self> {
+    async fn connect_config(config: GlobalConfig) -> Result<Self> {
         const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
         if config.liteservers.is_empty() {
@@ -540,16 +542,6 @@ impl LocalLiteClient {
     }
 }
 
-/// Converts Localton's complete network config to the subset consumed by the LiteAPI client.
-fn liteapi_config(config: &GlobalConfig) -> ConfigGlobal {
-    ConfigGlobal {
-        liteservers: config
-            .liteserver_endpoints()
-            .map(|(ip, port, public_key)| liteapi_liteserver(ip, port, public_key))
-            .collect(),
-    }
-}
-
 fn liteapi_liteserver(ip: Ipv4Addr, port: u16, public_key: TonPublicKey) -> ConfigLiteServer {
     ConfigLiteServer {
         ip: i32::from_be_bytes(ip.octets()),
@@ -657,7 +649,7 @@ fn save_state_cache(path: &Path, cell: &Cell) -> Result<()> {
 mod tests {
     use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
 
-    use rston::liteclient::ConfigGlobal;
+    use rston::global_config::GlobalConfig;
 
     use super::{LocalLiteClient, liteapi_liteserver, parse_shard, ton_method_id};
     use crate::ton::tools::types::TonPublicKey;
@@ -720,7 +712,7 @@ mod tests {
         let second_port = second.local_addr().unwrap().port();
         drop((first, second));
 
-        let config = ConfigGlobal {
+        let config = GlobalConfig {
             liteservers: vec![
                 liteapi_liteserver(
                     Ipv4Addr::LOCALHOST,
@@ -733,6 +725,7 @@ mod tests {
                     TonPublicKey::from_bytes([2; 32]),
                 ),
             ],
+            ..Default::default()
         };
         let error = LocalLiteClient::connect_config(config)
             .await

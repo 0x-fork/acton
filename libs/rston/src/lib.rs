@@ -168,6 +168,12 @@ pub use wallet::Wallet;
 #[cfg(feature = "models")]
 pub mod models;
 
+#[cfg(all(feature = "models", feature = "serde"))]
+pub mod global_config;
+
+#[cfg(all(feature = "models", feature = "serde"))]
+pub use global_config::GlobalConfig;
+
 #[cfg(feature = "arbitrary")]
 pub mod arbitrary;
 

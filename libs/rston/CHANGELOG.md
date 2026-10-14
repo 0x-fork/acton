@@ -10,6 +10,12 @@
 
 ### Added
 
+- `global_config` provides the full TON global configuration model, including
+  DHT parameters and signed bootstrap descriptors, liteservers, zero state,
+  init block, and hardforks. It requires `models` and `serde` and works without
+  networking. `VerifiedBlock::from_trusted_config` selects an explicit trusted
+  init block for verified LiteAPI queries.
+
 - High-level LiteClient queries authenticate account state, configuration, and
   transaction inclusion against explicit trusted blocks. Masterchain proof chains
   support Ordinary and Simplex signatures. Get-method results distinguish verified

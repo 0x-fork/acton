@@ -9,10 +9,8 @@ use rston::adnl::{
     AdnlPeer,
     crypto::{KeyPair, SecretKey},
 };
-use rston::liteclient::{
-    ConfigGlobal, ConfigLiteServer, ConfigPublicKey, LiteClient, LiteClientOptions, LiteClientPool,
-    LiteError, peer::LitePeer,
-};
+use rston::global_config::{ConfigLiteServer, ConfigPublicKey, GlobalConfig};
+use rston::liteclient::{LiteClient, LiteClientOptions, LiteClientPool, LiteError, peer::LitePeer};
 use rston::tl::{
     LiteQueryRaw, Message, Request, Response, TlError,
     request::{LiteQuery, WaitMasterchainSeqno},
@@ -264,8 +262,9 @@ async fn request_deadline_expires_without_retrying() {
 async fn pool_rotates_between_servers_and_reconnects_after_disconnect() {
     let first = TestServer::start(|_| vec![1]).await;
     let second = TestServer::start(|_| vec![2]).await;
-    let config = ConfigGlobal {
+    let config = GlobalConfig {
         liteservers: vec![first.config.clone(), second.config.clone()],
+        ..Default::default()
     };
     let mut pool = LiteClientPool::new(config, LiteClientOptions::default()).unwrap();
 
@@ -285,8 +284,9 @@ async fn pool_skips_connection_failures_before_sending() {
     let server = TestServer::start(|_| vec![7]).await;
     let mut failed = server.config.clone();
     failed.port = unavailable_port;
-    let config = ConfigGlobal {
+    let config = GlobalConfig {
         liteservers: vec![failed, server.config.clone()],
+        ..Default::default()
     };
     let mut pool = LiteClientPool::new(config, LiteClientOptions::default()).unwrap();
 
@@ -296,8 +296,9 @@ async fn pool_skips_connection_failures_before_sending() {
 #[test]
 fn pool_rejects_an_empty_server_list() {
     let result = LiteClientPool::new(
-        ConfigGlobal {
+        GlobalConfig {
             liteservers: vec![],
+            ..Default::default()
         },
         LiteClientOptions::default(),
     );
@@ -310,15 +311,15 @@ fn network_config_reads_signed_ips_and_base64_identities() {
     let keys = KeyPair::from(&SecretKey::from_bytes([7; 32]));
     let encoded = base64::engine::general_purpose::STANDARD.encode(keys.public_key.as_bytes());
     let json = format!(
-        r#"{{"liteservers":[{{"ip":-1062731519,"port":1234,"id":{{"@type":"pub.ed25519","key":"{encoded}"}}}}],"validator":{{}}}}"#
+        r#"{{"liteservers":[{{"ip":-1062731519,"port":1234,"id":{{"@type":"pub.ed25519","key":"{encoded}"}}}}]}}"#
     );
 
-    let config: ConfigGlobal = json.parse().unwrap();
+    let config: GlobalConfig = json.parse().unwrap();
     let server = &config.liteservers[0];
 
     assert_eq!(server.socket_addr().to_string(), "192.168.1.1:1234");
     assert_eq!(server.public_key(), keys.public_key.as_bytes());
-    let round_trip: ConfigGlobal =
+    let round_trip: GlobalConfig =
         serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
     assert_eq!(round_trip.liteservers[0].public_key(), server.public_key());
 }
@@ -329,14 +330,14 @@ fn network_config_rejects_invalid_identity_lengths_and_ports() {
     let json = format!(
         r#"{{"liteservers":[{{"ip":0,"port":1234,"id":{{"@type":"pub.ed25519","key":"{short_key}"}}}}]}}"#
     );
-    assert!(json.parse::<ConfigGlobal>().is_err());
+    assert!(json.parse::<GlobalConfig>().is_err());
 
     let key = KeyPair::from(&SecretKey::from_bytes([7; 32]));
     let encoded = base64::engine::general_purpose::STANDARD.encode(key.public_key.as_bytes());
     let json = format!(
         r#"{{"liteservers":[{{"ip":0,"port":0,"id":{{"@type":"pub.ed25519","key":"{encoded}"}}}}]}}"#
     );
-    assert!(json.parse::<ConfigGlobal>().is_err());
+    assert!(json.parse::<GlobalConfig>().is_err());
 }
 
 #[path = "liteclient/proofs.rs"]
