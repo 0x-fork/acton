@@ -55,7 +55,7 @@ fn config_stores_file_path_and_policy_normalizes_blocked_entries() {
         assert!(config.blocked_code_hashes_path().is_none());
     }
     assert!(!CodeHashPolicy::default().is_blocked(BLOCKED));
-    for contents in ["", " \t\r\n\n"] {
+    for contents in ["", " \t\r\n\n", "# Blocked code hashes\n  # Comment\n#"] {
         assert!(!policy(&[contents]).is_blocked(BLOCKED));
     }
     let directory = tempfile::tempdir().expect("blocklist directory");
@@ -63,7 +63,7 @@ fn config_stores_file_path_and_policy_normalizes_blocked_entries() {
     fs::write(
         &path,
         format!(
-            "\n {} \r\n{BLOCKED_BASE64}\r\n\t\n{BLOCKED}",
+            "# Blocked code hashes\n\n {} \r\n  # {ALLOWED}\r\n{BLOCKED_BASE64}\r\n\t\n{BLOCKED}",
             BLOCKED.to_uppercase()
         ),
     )
@@ -128,7 +128,7 @@ fn invalid_blocked_entries_are_rejected_by_policy_and_application_initialization
         STANDARD.encode([0; 33]),
     ] {
         let mut file = tempfile::NamedTempFile::new().expect("blocklist file");
-        write!(file, "{BLOCKED}\n\n{entry}\n").expect("write blocklist");
+        write!(file, "# Blocked code hashes\n{BLOCKED}\n\n{entry}\n").expect("write blocklist");
         let config = config(&format!(
             "[server]\nblocked_code_hashes_path = '{}'",
             file.path().display()
@@ -138,10 +138,10 @@ fn invalid_blocked_entries_are_rejected_by_policy_and_application_initialization
         assert!(
             error
                 .to_string()
-                .contains(&format!("{}:3", file.path().display()))
+                .contains(&format!("{}:4", file.path().display()))
         );
         assert!(
-            matches!(error, CodeHashPolicyError::InvalidEntry { line: 3, entry: value, .. } if value == entry.trim())
+            matches!(error, CodeHashPolicyError::InvalidEntry { line: 4, entry: value, .. } if value == entry.trim())
         );
         assert!(matches!(
             AppState::from_config(&config),

@@ -3,6 +3,7 @@ bind_addr = "127.0.0.1:3000"
 # api_key = "migration-api-key"
 read_only = false
 # Block verification and source/ABI access. One hex or base64 hash per line.
+# Blank lines and lines starting with # after trimming whitespace are ignored.
 # Docker env: VERIFIER_BLOCKED_CODE_HASHES_PATH=/etc/verifier/blocked-code-hashes.txt.
 # blocked_code_hashes_path = "blocked-code-hashes.txt"
 

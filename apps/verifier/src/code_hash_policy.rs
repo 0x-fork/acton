@@ -17,12 +17,13 @@ pub struct CodeHashPolicy {
 }
 
 impl CodeHashPolicy {
-    /// Loads one hexadecimal or base64 code hash per line, ignoring blank lines.
+    /// Loads one hexadecimal or base64 code hash per line, ignoring blank lines
+    /// and lines starting with `#` after trimming whitespace.
     /// Hashes are normalized and deduplicated. An empty file blocks no hashes.
     ///
     /// # Errors
     ///
-    /// Returns an error if the file cannot be read or any nonblank line is not a 256-bit code hash.
+    /// Returns an error if the file cannot be read or any entry is not a 256-bit code hash.
     pub fn from_file(path: &Path) -> Result<Self, CodeHashPolicyError> {
         let read_error = |source| CodeHashPolicyError::Read {
             path: path.to_path_buf(),
@@ -33,7 +34,7 @@ impl CodeHashPolicy {
         for (index, line) in BufReader::new(file).lines().enumerate() {
             let line = line.map_err(read_error)?;
             let entry = line.trim();
-            if entry.is_empty() {
+            if entry.is_empty() || entry.starts_with('#') {
                 continue;
             }
             let hash = parse_code_hash(entry).ok_or_else(|| CodeHashPolicyError::InvalidEntry {

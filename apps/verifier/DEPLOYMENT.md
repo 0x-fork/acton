@@ -157,6 +157,7 @@ one hexadecimal or base64 code hash per line to deny source/ABI access and
 verification for those contracts. For example, create `blocked-code-hashes.txt`:
 
 ```text
+# Blocked code hashes
 9149ae51c1e4689710cebf7830297b16acfbadb363a920a537893e7ffeeca768
 aedb84b4e1f8cbb7de09bd09a66be3e7ef23be6608957f796a0806cd8edd787a
 ```
@@ -179,9 +180,10 @@ For a mounted TOML config, set the path directly:
 blocked_code_hashes_path = "/etc/verifier/blocked-code-hashes.txt"
 ```
 
-Blank lines and surrounding whitespace are ignored; hashes are normalized and
-deduplicated. Without a configured path, or with an empty file, no hashes are
-blocked. An unreadable file or an invalid hash prevents startup; invalid hashes
+Blank lines and lines starting with `#` after trimming whitespace are ignored;
+hashes are normalized and deduplicated. Without a configured path, or with an
+empty file, no hashes are blocked. An unreadable file or an invalid hash prevents
+startup; invalid hashes
 are reported with the file path and line number. The file is read at startup;
 restart the backend after editing it.
 

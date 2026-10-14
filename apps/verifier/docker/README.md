@@ -73,9 +73,10 @@ access and verification for the code hashes it contains:
 -v "$PWD/blocked-code-hashes.txt:/etc/verifier/blocked-code-hashes.txt:ro"
 ```
 
-The UTF-8 file contains one hexadecimal or base64 hash per line. Blank lines and
-surrounding whitespace are ignored; duplicate hashes are combined. No path or an
-empty file means no blocked hashes. An unreadable file or invalid entry prevents
+The UTF-8 file contains one hexadecimal or base64 hash per line. Surrounding
+whitespace is trimmed; blank lines and lines starting with `#` are ignored.
+Duplicate hashes are combined. No path or an empty file means no blocked hashes.
+An unreadable file or invalid entry prevents
 startup; invalid entries report the file path and line number.
 Ticket and verification requests return `403`; source reads and ABI lookups by
 `code_hash` return `404`, including source lookups by address. Both responses use
