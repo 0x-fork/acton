@@ -370,6 +370,7 @@ function NodeTransactionTooltipContent({
             )}
             <div className={styles.storageDiffScroll}>
               <ParsedValueDiffView
+                addressMode="contract"
                 diff={data.storageDiff}
                 contracts={contracts}
                 onContractClick={onContractClick}

@@ -23,6 +23,8 @@ All notable changes to this project will be documented in this file.
 - Contract ABI content expands to its full height without an inner scroll area.
 - Get-method loading placeholders match the height of a single-line result and shimmer while running.
 - Empty decoded maps show their type and `{}` on one line in parsed values and state diffs.
+- Parsed addresses outside transaction details show the full address without an identity letter and align with other field values.
+- Populated parsed maps end after their last value without extra bottom spacing.
 - Storage diffs show newly present values directly without an empty-value transition, using compact corners and filled highlights without outlines.
 - TON DNS domain-deployment messages show a copyable .ton name linked to its resolved wallet address, and message bounce flags are labeled "Can bounce".
 - TON DNS collection storage shows decoded off-chain metadata URLs as copyable links instead of raw payload slices.

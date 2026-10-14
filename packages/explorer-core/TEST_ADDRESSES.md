@@ -8,6 +8,7 @@ These addresses are not fixtures and their balances or recent history can change
 
 | Address | What to verify | Last checked |
 | --- | --- | --- |
+| [`EQCLOTFznUeTZe8kcoXtnBosvmBSGwP1FG89taleCzjEiPm0`](https://actonscan.com/address/EQCLOTFznUeTZe8kcoXtnBosvmBSGwP1FG89taleCzjEiPm0?network=mainnet#contract-storage) | DNS item storage: full collection address aligns with scalar values and its hover tooltip shows bounceable, non-bounceable and raw formats | 2026-10-15 |
 | [`EQC3dNlesgVD8YbAazcauIrXBPfiVhMMr5YYk2in0Mtsz0Bz`](https://actonscan.com/address/EQC3dNlesgVD8YbAazcauIrXBPfiVhMMr5YYk2in0Mtsz0Bz?network=mainnet#contract) | .ton DNS collection: a recent Mint NFT trace shows the decoded domain link in Parsed body and `DnsCollectionOffchainContent.url` as a metadata link in Intact storage | 2026-10-15 |
 | [`EQA0i8-CdGnF_DhUHHf92R1ONH6sIA9vLZ_WLcCIhfBBXwtG`](https://actonscan.com/address/EQA0i8-CdGnF_DhUHHf92R1ONH6sIA9vLZ_WLcCIhfBBXwtG?network=mainnet#nfts) | Promotional NFTs and several Rich Cats collections: blurred artwork, collection names in reveal controls, shared consent for collection items, and no eye button on the GO TON ticket image fallback | 2026-09-30 |
 | [`EQBprCMX83F75A67vjsW5jDJo4CWGDabxSBcCVdLsJ5i4fBc`](https://actonscan.com/address/EQBprCMX83F75A67vjsW5jDJo4CWGDabxSBcCVdLsJ5i4fBc?network=mainnet) | Standalone promotional NFT: image consent is shared between the overview, metadata, owner holdings, and NFT thumbnails in history; no collection reveal option | 2026-09-30 |

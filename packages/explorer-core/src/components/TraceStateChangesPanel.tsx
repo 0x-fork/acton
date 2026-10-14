@@ -95,6 +95,7 @@ export const TraceStateChangesPanel: FC<TraceStateChangesPanelProps> = ({
               <div className={styles.balanceChange}>
                 <span className={styles.balanceLabel}>Balance</span>
                 <ParsedValueDiffView
+                  addressMode="contract"
                   diff={item.balanceDiff}
                   fieldName="balanceGrams"
                   contracts={contracts}
@@ -106,6 +107,7 @@ export const TraceStateChangesPanel: FC<TraceStateChangesPanelProps> = ({
           {item.storageDiff && (
             <div className={styles.storageScroll}>
               <ParsedValueDiffView
+                addressMode="contract"
                 diff={item.storageDiff}
                 contracts={contracts}
                 onCellInspect={onCellInspect}

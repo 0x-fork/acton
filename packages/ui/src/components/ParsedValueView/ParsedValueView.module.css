@@ -73,6 +73,7 @@
   width: min(50rem, 100%);
   grid-template-columns: minmax(0, 1fr);
   row-gap: 0;
+  padding-block-end: 0;
 }
 
 .parsedEntryKey {
@@ -226,6 +227,10 @@
 .parsedMapEntry + .parsedMapEntry {
   padding-block-start: var(--acton-space-2);
   border-block-start: 1px solid var(--acton-color-border);
+}
+
+.parsedMapEntry:last-child {
+  padding-block-end: 0;
 }
 
 .parsedMapSection {

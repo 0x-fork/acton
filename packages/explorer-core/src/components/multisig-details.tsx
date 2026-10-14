@@ -715,6 +715,15 @@ function MultisigOrderActionDetails({
             <ParsedBodySection
               parsedBody={parsedBody}
               onContractClick={onAddressClick}
+              renderAddress={address => (
+                <ExplorerAddressChip
+                  address={address}
+                  onAddressClick={onAddressClick}
+                  resolveName={false}
+                  shorten={false}
+                  variant="inline"
+                />
+              )}
               title="Parsed body"
             />
           </div>

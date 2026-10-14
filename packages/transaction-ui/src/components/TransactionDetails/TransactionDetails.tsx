@@ -548,6 +548,7 @@ function TransactionDetailsContent({
             </div>
             {parsedBody && hasMessageBody && (
               <ParsedBodySection
+                addressMode="contract"
                 key={tx.lt}
                 parsedBody={parsedBody}
                 contracts={contracts}
@@ -610,6 +611,7 @@ function TransactionDetailsContent({
                           <div className={styles.parsedBodyTree}>
                             <div className={styles.parsedBodyContent}>
                               <ParsedValueView
+                                addressMode="contract"
                                 value={parsedStateInitData.value}
                                 contracts={contracts}
                                 onCellInspect={onCellInspect}
@@ -710,6 +712,7 @@ function TransactionDetailsContent({
           {showStorageDiff && storageDiff && (
             <div className={styles.storageDiffDetails} data-testid="storage-diff-details">
               <ParsedValueDiffView
+                addressMode="contract"
                 diff={storageDiff}
                 contracts={contracts}
                 onCellInspect={onCellInspect}

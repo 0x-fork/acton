@@ -9,11 +9,13 @@ import styles from "./ParsedBodySection.module.css"
 export interface ParsedBodySectionProps
   extends Pick<
     ParsedValueViewProps,
+    | "addressMode"
     | "contracts"
     | "formatAddress"
     | "onCellInspect"
     | "onContractClick"
     | "onDomainClick"
+    | "renderAddress"
     | "renderCodeCellDetails"
   > {
   readonly parsedBody: ParsedTransactionBody | undefined
@@ -23,11 +25,13 @@ export interface ParsedBodySectionProps
 
 export function ParsedBodySection({
   parsedBody,
+  addressMode,
   contracts,
   formatAddress,
   onCellInspect,
   onContractClick,
   onDomainClick,
+  renderAddress,
   renderCodeCellDetails,
   defaultExpanded = false,
   title = "Parsed body",
@@ -53,11 +57,13 @@ export function ParsedBodySection({
           <div className={styles.parsedBodyContent}>
             <ParsedValueView
               value={parsedBody.value}
+              addressMode={addressMode}
               contracts={contracts}
               formatAddress={formatAddress}
               onCellInspect={onCellInspect}
               onContractClick={onContractClick}
               onDomainClick={onDomainClick}
+              renderAddress={renderAddress}
               renderCodeCellDetails={renderCodeCellDetails}
               fallbackTypeName={parsedBody.name}
             />

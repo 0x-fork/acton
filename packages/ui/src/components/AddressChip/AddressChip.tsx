@@ -10,7 +10,7 @@ import {Tooltip} from "../Tooltip"
 import styles from "./AddressChip.module.css"
 
 export type AddressChipCopyPlacement = "left" | "right"
-export type AddressChipVariant = "accent" | "plain"
+export type AddressChipVariant = "accent" | "inline" | "plain"
 export type AddressChipAddressFormatter = (address: string) => string
 
 export interface AddressChipTooltipVariant {
@@ -75,6 +75,7 @@ export function AddressChip({
     isClickable ? styles.addressButton : styles.addressText,
     highlighted && styles.addressHighlighted,
     !shorten && styles.addressFull,
+    variant === "inline" && styles.addressInline,
     variant === "plain" && styles.addressPlain,
   )
 
@@ -117,6 +118,7 @@ export function AddressChip({
       className={cx(styles.copyButton, isCopied && styles.copyButtonCopied)}
       label={isCopied ? "Address copied" : "Copy address"}
       icon={isCopied ? <Check /> : <Copy />}
+      size={variant === "inline" ? "compact" : "default"}
       onClick={event => {
         event.stopPropagation()
         void copy()

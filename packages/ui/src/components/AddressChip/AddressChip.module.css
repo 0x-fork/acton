@@ -81,6 +81,12 @@
   font-weight: inherit;
 }
 
+.addressInline {
+  padding-block: 0;
+  padding-inline: var(--acton-space-1);
+  margin-inline: calc(-1 * var(--acton-space-1));
+}
+
 .addressHighlighted {
   background: color-mix(in srgb, var(--acton-color-accent) 18%, transparent);
 }

@@ -13,13 +13,18 @@ import type {ParsedValueDiff, ParsedValueDiffStatus} from "./types"
 
 export interface ParsedValueDiffViewProps extends ContractReferenceOptions {
   readonly diff: ParsedValueDiff
+  readonly addressMode?: ParsedValueViewProps["addressMode"]
+  readonly renderAddress?: ParsedValueViewProps["renderAddress"]
   readonly fieldName?: string
   readonly onCellInspect?: ParsedValueViewProps["onCellInspect"]
   readonly renderCodeCellDetails?: ParsedValueViewProps["renderCodeCellDetails"]
 }
 
 type ParsedValueDiffContext = ContractReferenceOptions &
-  Pick<ParsedValueViewProps, "onCellInspect" | "renderCodeCellDetails">
+  Pick<
+    ParsedValueViewProps,
+    "addressMode" | "onCellInspect" | "renderAddress" | "renderCodeCellDetails"
+  >
 
 const LARGE_COLLECTION_THRESHOLD = 8
 
@@ -171,15 +176,25 @@ function ParsedValueDiffMapRow({
 
 export function ParsedValueDiffView({
   diff,
+  addressMode,
   fieldName,
   contracts,
   formatAddress,
   onContractClick,
   onCellInspect,
+  renderAddress,
   renderCodeCellDetails,
 }: ParsedValueDiffViewProps): React.JSX.Element {
   const [showUnchanged, setShowUnchanged] = useState(false)
-  const context = {contracts, formatAddress, onContractClick, onCellInspect, renderCodeCellDetails}
+  const context = {
+    addressMode,
+    contracts,
+    formatAddress,
+    onContractClick,
+    onCellInspect,
+    renderAddress,
+    renderCodeCellDetails,
+  }
 
   if (diff.kind === "leaf") {
     if (diff.status === "unchanged") {

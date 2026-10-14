@@ -646,6 +646,8 @@ owns shortening, copy feedback, focus behavior, and the compact chip visual.
 - `highlighted`: coordinates the chip with another hovered address or trace node.
 - `variant="plain"`: uses the standard text color, removes address hover styling,
   and keeps the copy action visible.
+- `variant="inline"`: keeps the accent color and aligns the address text with
+  other values in a parsed field grid while retaining symmetric hover padding.
 - `copied`: optional external copied state; the component also owns local feedback.
 - `onCopyAddress`: optional application copy handler. Native clipboard copying is
   used when omitted.
@@ -841,7 +843,12 @@ address, boolean, null, void, array, object, and map nodes recursively.
 - For a scalar with `typeName: "Cell"`, `rawValue`, and a field name containing
   `code` or `cell`, pass `renderCodeCellDetails` to add the shared code-inspector
   action. Keep BoC decoding, source lookup, and disassembly in domain code.
-- Reuse ContractChip metadata and `formatAddress` for address nodes.
+- Address nodes use a full, inline AddressChip by default. Set
+  `addressMode="contract"` when transaction details should show the contract
+  letter and name. Pass `formatAddress` for network-specific address formatting.
+- Pass `renderAddress` when the host has an address component with richer
+  metadata or network-specific tooltip variants; it applies recursively to
+  nested addresses in plain mode.
 - Arrays and maps with more than eight entries start collapsed and use a bounded
   component-owned scroll area when expanded. Objects keep their natural layout.
 - Do not duplicate the recursive array, object, or map layout in callers.
@@ -878,7 +885,8 @@ domain code.
 - Pass `{ name, value }` as `ParsedStorageValue`; richer decoded storage records
   are structurally compatible.
 - Build the diff once outside render when the before/after values are stable.
-- Pass ContractChip metadata and `formatAddress` for address leaves.
+- Address leaves follow ParsedValueView's `addressMode`; set it to `"contract"`
+  for transaction details that should show contract metadata.
 - Provide a `ParsedValueDiff` directly only when comparison already belongs to
   domain code.
 - Array and map diffs hide unchanged entries by default and expose them through

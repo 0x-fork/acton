@@ -289,7 +289,12 @@ function diffSample(label: string, diff: ParsedValueDiff, fieldName?: string) {
     <article className={styles.sample}>
       <span className={styles.sampleLabel}>{label}</span>
       <div className={styles.sampleValue}>
-        <ParsedValueDiffView diff={diff} contracts={contracts} fieldName={fieldName} />
+        <ParsedValueDiffView
+          addressMode="contract"
+          diff={diff}
+          contracts={contracts}
+          fieldName={fieldName}
+        />
       </div>
     </article>
   )
@@ -306,7 +311,7 @@ export const parsedValueDiffViewGallery = {
     "Use buildStorageDiff for named before/after ParsedValue roots, then pass the result to ParsedValueDiffView. Both APIs stay independent of TON cells, ABI symbols, and parser implementations.",
   usage: [
     "Build a diff from two minimal ParsedStorageValue objects or provide a ParsedValueDiff directly.",
-    "Pass ContractChip metadata and address formatting options when diff leaves contain addresses.",
+    "Use contract address mode with ContractChip metadata when diff leaves need identity labels.",
     "Use rawValue on serialized scalar leaves to retain the shared copy action.",
   ],
   avoid: [
@@ -362,7 +367,11 @@ export const parsedValueDiffViewGallery = {
         "A single builder call compares nested objects, arrays, maps, additions, removals, and unchanged leaves.",
       content: (
         <div className={styles.structure}>
-          <ParsedValueDiffView diff={nestedStorageDiff} contracts={contracts} />
+          <ParsedValueDiffView
+            addressMode="contract"
+            diff={nestedStorageDiff}
+            contracts={contracts}
+          />
         </div>
       ),
     },

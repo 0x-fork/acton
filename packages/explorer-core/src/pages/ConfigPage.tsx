@@ -919,7 +919,17 @@ function ConfigParameterValueContent({parameter}: {readonly parameter: NetworkCo
   if (parameter.parsedValue) {
     return (
       <div className={styles.parsedValue}>
-        <ParsedValueView value={parameter.parsedValue} />
+        <ParsedValueView
+          value={parameter.parsedValue}
+          renderAddress={address => (
+            <ExplorerAddressChip
+              address={address}
+              resolveName={false}
+              shorten={false}
+              variant="inline"
+            />
+          )}
+        />
       </div>
     )
   }

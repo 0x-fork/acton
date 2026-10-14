@@ -1,6 +1,7 @@
 import {useId, useState, type ReactNode} from "react"
 import {Binary, Check, Copy, FileCode2} from "lucide-react"
 
+import {AddressChip} from "../AddressChip/AddressChip"
 import {ContractChip, type ContractReferenceOptions} from "../ContractChip/ContractChip"
 import {CountValue} from "../CountValue/CountValue"
 import {DisclosureToggle} from "../DisclosureToggle/DisclosureToggle"
@@ -20,6 +21,10 @@ import styles from "./ParsedValueView.module.css"
 
 export interface ParsedValueViewProps extends ContractReferenceOptions {
   readonly value: ParsedValue
+  /** Contract mode retains identity chips in transaction details. */
+  readonly addressMode?: "plain" | "contract"
+  /** The host may supply its own address component for network-specific formatting and tooltips. */
+  readonly renderAddress?: (address: string) => ReactNode
   readonly fallbackTypeName?: string
   readonly fieldName?: string
   readonly onCellInspect?: (boc: string) => void
@@ -28,7 +33,10 @@ export interface ParsedValueViewProps extends ContractReferenceOptions {
 }
 
 type ParsedValueContext = ContractReferenceOptions &
-  Pick<ParsedValueViewProps, "onCellInspect" | "onDomainClick" | "renderCodeCellDetails">
+  Pick<
+    ParsedValueViewProps,
+    "addressMode" | "onCellInspect" | "onDomainClick" | "renderAddress" | "renderCodeCellDetails"
+  >
 
 const LARGE_COLLECTION_THRESHOLD = 8
 
@@ -93,11 +101,13 @@ function ParsedTypeLabel({typeName}: {readonly typeName: string}) {
 function ParsedValueRow({
   label,
   value,
+  addressMode,
   contracts,
   formatAddress,
   onContractClick,
   onCellInspect,
   onDomainClick,
+  renderAddress,
   renderCodeCellDetails,
 }: ParsedValueContext & {readonly label: string; readonly value: ParsedValue}) {
   const isLargeCollection =
@@ -123,11 +133,13 @@ function ParsedValueRow({
       >
         <ParsedValueView
           value={value}
+          addressMode={addressMode}
           contracts={contracts}
           formatAddress={formatAddress}
           onContractClick={onContractClick}
           onCellInspect={onCellInspect}
           onDomainClick={onDomainClick}
+          renderAddress={renderAddress}
           renderCodeCellDetails={renderCodeCellDetails}
           fieldName={label}
         />
@@ -138,11 +150,13 @@ function ParsedValueRow({
 
 function ParsedMapEntry({
   entry,
+  addressMode,
   contracts,
   formatAddress,
   onContractClick,
   onCellInspect,
   onDomainClick,
+  renderAddress,
   renderCodeCellDetails,
 }: ParsedValueContext & {readonly entry: ParsedValueMapEntry}) {
   return (
@@ -158,11 +172,13 @@ function ParsedMapEntry({
         >
           <ParsedValueView
             value={entry.key}
+            addressMode={addressMode}
             contracts={contracts}
             formatAddress={formatAddress}
             onContractClick={onContractClick}
             onCellInspect={onCellInspect}
             onDomainClick={onDomainClick}
+            renderAddress={renderAddress}
             renderCodeCellDetails={renderCodeCellDetails}
             fieldName={
               entry.key.kind === "scalar" && entry.key.typeName === "uint256" ? "key" : undefined
@@ -187,11 +203,13 @@ function ParsedMapEntry({
         <div className={styles.parsedMapSectionValue}>
           <ParsedValueView
             value={entry.value}
+            addressMode={addressMode}
             contracts={contracts}
             formatAddress={formatAddress}
             onContractClick={onContractClick}
             onCellInspect={onCellInspect}
             onDomainClick={onDomainClick}
+            renderAddress={renderAddress}
             renderCodeCellDetails={renderCodeCellDetails}
           />
         </div>
@@ -376,6 +394,7 @@ function ParsedScalarValue({
 
 export function ParsedValueView({
   value,
+  addressMode = "plain",
   contracts,
   formatAddress,
   onContractClick,
@@ -383,14 +402,17 @@ export function ParsedValueView({
   fieldName,
   onCellInspect,
   onDomainClick,
+  renderAddress,
   renderCodeCellDetails,
 }: ParsedValueViewProps) {
   const context = {
+    addressMode,
     contracts,
     formatAddress,
     onContractClick,
     onCellInspect,
     onDomainClick,
+    renderAddress,
     renderCodeCellDetails,
   }
 
@@ -400,7 +422,24 @@ export function ParsedValueView({
     case "void":
       return <span className={styles.parsedVoid}>void</span>
     case "address":
-      return <ContractChip address={value.value} {...context} />
+      if (addressMode === "plain" && renderAddress) return renderAddress(value.value)
+
+      return addressMode === "contract" ? (
+        <ContractChip
+          address={value.value}
+          contracts={contracts}
+          formatAddress={formatAddress}
+          onContractClick={onContractClick}
+        />
+      ) : (
+        <AddressChip
+          address={value.value}
+          formatAddress={formatAddress}
+          onAddressClick={onContractClick}
+          shorten={false}
+          variant="inline"
+        />
+      )
     case "boolean":
       return (
         <span className={value.value ? styles.booleanTrue : styles.booleanFalse}>

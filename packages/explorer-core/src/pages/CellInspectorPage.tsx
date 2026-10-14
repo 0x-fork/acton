@@ -26,8 +26,7 @@ import {useCallback, useDeferredValue, useEffect, useRef, useState, type FC} fro
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import {getBundledCompilerAbiCatalog} from "../api/compilerAbiCatalog"
-import {formatAddress} from "../components/utils"
-import {useAddressFormat} from "../hooks/useNetworkInfo"
+import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {type ExplorerNavigationClickEvent, useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
@@ -786,25 +785,27 @@ function ResultOutput({
 function ParsedOutput({result}: {readonly result: ParsedInspectionResult}) {
   const routes = useExplorerRoutePaths()
   const openExplorerPath = useOpenExplorerPath()
-  const addressFormat = useAddressFormat()
   const handleContractClick = useCallback(
     (address: string, event?: ExplorerNavigationClickEvent) => {
       openExplorerPath(routes.addressPath(address), event)
     },
     [openExplorerPath, routes],
   )
-  const formatParsedAddress = useCallback(
-    (address: string) => formatAddress(address, false, addressFormat),
-    [addressFormat],
-  )
-
   if (result.parsedValue) {
     return (
       <div className={styles.parsedValue}>
         <ParsedValueView
           value={result.parsedValue}
-          formatAddress={formatParsedAddress}
           onContractClick={handleContractClick}
+          renderAddress={address => (
+            <ExplorerAddressChip
+              address={address}
+              onAddressClick={handleContractClick}
+              resolveName={false}
+              shorten={false}
+              variant="inline"
+            />
+          )}
         />
       </div>
     )

@@ -8,7 +8,6 @@ import {
   ContractSourcePanel,
   decodeStorageDataCell,
   type AbiTab,
-  type ContractData,
   type ContractVerifiedSource,
   type ResolveVerifiedSourceByCodeHash,
 } from "@acton/transaction-ui"
@@ -16,8 +15,7 @@ import {Cell} from "@ton/core"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
-import {useAddressFormat} from "../hooks/useNetworkInfo"
-import {formatAddress, type AddressFormatOptions} from "./utils"
+import {ExplorerAddressChip} from "./ExplorerAddressChip"
 
 import styles from "./ContractCode.module.css"
 
@@ -82,7 +80,6 @@ export const ContractCode: FC<ContractCodeProps> = ({
   const [activeTab, setActiveTab] = useState<ContractCodeTab>(() => readContractHashTab())
   const [activeStorageTab, setActiveStorageTab] = useState<StorageTab>("parsed")
   const [activeAbiTab, setActiveAbiTab] = useState<AbiTab>("view")
-  const addressFormat = useAddressFormat()
   const routes = useExplorerRoutePaths()
 
   const parsedStorage = useMemo(
@@ -111,7 +108,6 @@ export const ContractCode: FC<ContractCodeProps> = ({
       }
     }
   }, [dataBoc])
-  const contracts = useMemo(() => new Map<string, ContractData>(), [])
   const storageUnavailableMessage =
     compilerAbi && compilerAbi.storage?.storage_ty_idx === undefined
       ? "This ABI describes the public interface only and does not define a storage layout"
@@ -181,8 +177,6 @@ export const ContractCode: FC<ContractCodeProps> = ({
             onTabChange={setActiveStorageTab}
             storageData={storageData}
             parsedStorage={parsedStorage}
-            contracts={contracts}
-            addressFormat={addressFormat}
             onContractClick={onContractClick}
             onCellInspect={handleCellInspect}
             resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
@@ -236,8 +230,6 @@ function StoragePanel({
   onTabChange,
   storageData,
   parsedStorage,
-  contracts,
-  addressFormat,
   onContractClick,
   onCellInspect,
   resolveVerifiedSourceByCodeHash,
@@ -252,14 +244,11 @@ function StoragePanel({
     readonly hex: string
   }
   readonly parsedStorage?: ReturnType<typeof decodeStorageDataCell>
-  readonly contracts: Map<string, ContractData>
-  readonly addressFormat: AddressFormatOptions
   readonly onContractClick?: (address: string) => void
   readonly onCellInspect: (boc: string) => void
   readonly resolveVerifiedSourceByCodeHash?: ResolveVerifiedSourceByCodeHash
   readonly unavailableMessage: string
 }): JSX.Element {
-  const formatStorageAddress = (address: string) => formatAddress(address, false, addressFormat)
   const activeStorage =
     activeTab === "base64"
       ? {
@@ -307,9 +296,16 @@ function StoragePanel({
             <div className={styles.storageBlock}>
               <ParsedValueView
                 value={parsedStorage.value}
-                contracts={contracts}
-                formatAddress={formatStorageAddress}
                 onContractClick={onContractClick}
+                renderAddress={address => (
+                  <ExplorerAddressChip
+                    address={address}
+                    onAddressClick={onContractClick}
+                    resolveName={false}
+                    shorten={false}
+                    variant="inline"
+                  />
+                )}
                 onCellInspect={onCellInspect}
                 renderCodeCellDetails={(cell: ParsedCodeCell) => (
                   <CodeCellDetails

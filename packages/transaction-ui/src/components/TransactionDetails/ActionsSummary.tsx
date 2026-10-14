@@ -396,6 +396,7 @@ const renderActionDetails = (
                 </div>
                 {parsedBody && (
                   <ParsedBodySection
+                    addressMode="contract"
                     key={messageBodyHash}
                     parsedBody={parsedBody}
                     contracts={contracts}

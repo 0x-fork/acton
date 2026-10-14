@@ -270,15 +270,19 @@ export const parsedValueViewGallery = {
       id: "parsed-value-addresses",
       title: "Address Values",
       description:
-        "Resolved and unresolved addresses reuse ContractChip while formatting remains caller-owned.",
+        "Full addresses are shown by default; contract mode adds identity metadata when requested.",
       content: (
         <div className={styles.valueGrid}>
+          {valueSample("full address", {kind: "address", value: WALLET_ADDRESS})}
           {valueSample(
             "known contract",
             {kind: "address", value: WALLET_ADDRESS},
-            {contracts, formatAddress: formatFriendlyAddress},
+            {addressMode: "contract", contracts, formatAddress: formatFriendlyAddress},
           )}
-          {valueSample("unknown contract", {kind: "address", value: UNKNOWN_ADDRESS}, {contracts})}
+          {valueSample("unknown contract", {kind: "address", value: UNKNOWN_ADDRESS}, {
+            addressMode: "contract",
+            contracts,
+          })}
         </div>
       ),
     },
@@ -323,10 +327,12 @@ export const parsedValueViewGallery = {
       content: (
         <div className={styles.structureGrid}>
           {valueSample("object → array", nestedValue, {
+            addressMode: "contract",
             contracts,
             formatAddress: formatFriendlyAddress,
           })}
           {valueSample("array → array / object / map", nestedArrayValue, {
+            addressMode: "contract",
             contracts,
             formatAddress: formatFriendlyAddress,
           })}
@@ -340,9 +346,10 @@ export const parsedValueViewGallery = {
         "Map keys and values can be leaf values or nested arrays, objects, and other maps.",
       content: (
         <div className={styles.structureGrid}>
-          {valueSample("map<int, address>", mapValue, {contracts})}
+          {valueSample("map<int, address>", mapValue, {addressMode: "contract", contracts})}
           {valueSample("map<uint256, string>", uint256MapValue)}
           {valueSample("map → object / array / map", nestedMapValue, {
+            addressMode: "contract",
             contracts,
             formatAddress: formatFriendlyAddress,
           })}

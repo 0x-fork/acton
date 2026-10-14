@@ -111,6 +111,7 @@ export function ExternalOutMessageDetails({
           </div>
           {parsedBody ? (
             <ParsedBodySection
+              addressMode="contract"
               parsedBody={parsedBody}
               contracts={contracts}
               onCellInspect={onCellInspect}
