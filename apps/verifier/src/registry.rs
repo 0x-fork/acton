@@ -27,6 +27,9 @@ use crate::{
 
 #[async_trait]
 pub trait VerificationRegistry: Send + Sync + 'static {
+    /// Returns the number of unique code hashes blocked by the loaded policy.
+    fn blocked_code_hashes_count(&self) -> usize;
+
     async fn ensure_current(&self) -> Result<(), RegistryError>;
 
     async fn store_verified_bundle(
@@ -196,6 +199,10 @@ impl SourceVerificationRegistry {
 
 #[async_trait]
 impl VerificationRegistry for SourceVerificationRegistry {
+    fn blocked_code_hashes_count(&self) -> usize {
+        self.code_hash_policy.blocked_count()
+    }
+
     async fn ensure_current(&self) -> Result<(), RegistryError> {
         if self.index_ready.load(Ordering::Acquire) {
             return Ok(());

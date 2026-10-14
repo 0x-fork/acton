@@ -47,6 +47,12 @@ impl CodeHashPolicy {
         Ok(Self { blocked })
     }
 
+    /// Returns the number of unique blocked code hashes.
+    #[must_use]
+    pub(crate) fn blocked_count(&self) -> usize {
+        self.blocked.len()
+    }
+
     #[must_use]
     pub fn is_blocked(&self, code_hash: &str) -> bool {
         parse_code_hash(code_hash).is_some_and(|hash| self.blocked.contains(&hash))

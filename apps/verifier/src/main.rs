@@ -22,7 +22,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         disabled_compilers_config = ?config.disabled_compilers(),
         "compiler deny list"
     );
-    tracing::info!(blocked_code_hashes_path = ?config.blocked_code_hashes_path(), "code hash deny list");
     tracing::info!(
         address = %config.payment_address().unwrap_or("disabled"),
         min_amount_nano = %config
@@ -54,6 +53,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let state = AppState::from_config(&config)?;
+    tracing::info!(
+        blocked_code_hashes_path = ?config.blocked_code_hashes_path(),
+        blocked_code_hashes_count = state.verification_registry().blocked_code_hashes_count(),
+        "code hash deny list"
+    );
     let published_payment_transaction_hashes = if config.source_repository().path.is_some() {
         state.ensure_registry_current().await?;
         state.published_payment_transaction_hashes().await?
