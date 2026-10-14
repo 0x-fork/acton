@@ -570,6 +570,13 @@ async fn git_source_storage_commits_pushes_and_keeps_first_bundle() -> Result<()
             "Verify code hash {CODE_HASH}\n\ncode_hash: {CODE_HASH}\nsource_bundle_hash: {SOURCE_BUNDLE_HASH}\nmanifest_hash: {manifest_hash}"
         )
     );
+    assert_eq!(
+        git_output(
+            &fixture.repo_path,
+            ["log", "-1", "--format=%an <%ae>%n%cn <%ce>"]
+        )?,
+        "Verifier Bot <verifier@example.com>\nVerifier Bot <verifier@example.com>"
+    );
 
     let manifest = serde_json::from_slice::<serde_json::Value>(&manifest_bytes)?;
     assert_eq!(manifest["code_hash"], CODE_HASH);

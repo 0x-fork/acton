@@ -1,3 +1,5 @@
+pub mod git;
+
 use std::{
     collections::HashSet,
     path::{Component, Path, PathBuf},
@@ -5,7 +7,7 @@ use std::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 use async_trait::async_trait;
@@ -15,14 +17,13 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 use tokio::{
     fs,
-    process::Command,
     sync::{Mutex, OnceCell},
 };
 use utoipa::ToSchema;
 
 use crate::{blockchain::is_valid_code_hash, config::Config};
 
-const GIT_COMMAND_TIMEOUT: Duration = Duration::from_mins(1);
+use self::git::Git;
 
 #[async_trait]
 pub trait SourceStorage: Send + Sync + 'static {
@@ -193,7 +194,7 @@ impl GitSourceStorage {
         ensure_git_repo(repo_path).await?;
         ensure_source_repository_initialized(repo_path, &self.storage_root).await?;
         recover_uncommitted_storage(repo_path, &self.storage_root).await?;
-        ensure_source_repository_clean(repo_path).await?;
+        Git::new(repo_path).ensure_clean().await?;
         ensure_current_source_attributes(repo_path, &self.storage_root).await?;
 
         let shard_dirs = discover_shard_dirs(repo_path, &self.storage_root).await?;
@@ -235,11 +236,13 @@ impl GitSourceStorage {
         }
         let branch = match &self.branch {
             Some(branch) => branch.clone(),
-            None => current_branch(repo_path).await?,
+            None => Git::new(repo_path).current_branch().await?,
         };
         let refspec = format!("HEAD:{branch}");
         let push_started = Instant::now();
-        let result = git(repo_path, &["push", &self.remote, &refspec]).await;
+        let result = Git::new(repo_path)
+            .run(&["push", &self.remote, &refspec])
+            .await;
         tracing::debug!(
             operation = "verify",
             target = target.unwrap_or("pending"),
@@ -321,15 +324,18 @@ impl GitSourceStorage {
                 let manifest_hash = write_manifest(&bundle_dir, &request, verified_at).await?;
 
                 if self.commit_enabled {
-                    git(repo_path, &["add", "--", &bundle_path]).await?;
+                    Git::new(repo_path)
+                        .run(&["add", "--", &bundle_path])
+                        .await?;
                     let message = commit_message(&request, &manifest_hash);
-                    git_with_author(
-                        repo_path,
-                        &["commit", "-m", &message, "--", &bundle_path],
-                        self,
-                        verified_at,
-                    )
-                    .await?;
+                    Git::new(repo_path)
+                        .run_with_author(
+                            &["commit", "-m", &message, "--", &bundle_path],
+                            &self.author_name,
+                            &self.author_email,
+                            verified_at,
+                        )
+                        .await?;
                     self.pending_push.store(true, Ordering::Release);
                 }
 
@@ -353,7 +359,7 @@ impl GitSourceStorage {
         let created = existing_revision.is_none();
         let revision = match existing_revision {
             Some(revision) => revision,
-            None => git_output(repo_path, &["rev-parse", "HEAD"]).await?,
+            None => Git::new(repo_path).output(&["rev-parse", "HEAD"]).await?,
         };
 
         if self.commit_enabled && self.push_enabled {
@@ -439,7 +445,10 @@ impl GitSourceStorage {
             self.push_pending_head(repo_path, None).await?;
         }
 
-        match git_output(repo_path, &["rev-parse", "--verify", "HEAD"]).await {
+        match Git::new(repo_path)
+            .output(&["rev-parse", "--verify", "HEAD"])
+            .await
+        {
             Ok(revision) => Ok(Some(revision)),
             Err(SourceStorageError::Git { .. }) => Ok(None),
             Err(err) => Err(err),
@@ -563,7 +572,7 @@ async fn cleanup_uncommitted_bundle(
     bundle_path: &str,
     bundle_dir: &Path,
 ) -> Result<(), SourceStorageError> {
-    let reset_result = git(repo_path, &["reset", "--", bundle_path]).await;
+    let reset_result = Git::new(repo_path).run(&["reset", "--", bundle_path]).await;
     let remove_result = remove_bundle_dir(bundle_dir).await;
     reset_result?;
     remove_result
@@ -643,19 +652,17 @@ async fn recover_uncommitted_storage(
         });
     }
 
-    let changes = git_output_untrimmed(
-        repo_path,
-        &[
+    let changes = Git::new(repo_path)
+        .output_untrimmed(&[
             "status",
             "--porcelain=v1",
             "--untracked-files=all",
             "--",
             storage_root,
-        ],
-    )
-    .await?
-    .trim_end_matches(['\r', '\n'])
-    .to_owned();
+        ])
+        .await?
+        .trim_end_matches(['\r', '\n'])
+        .to_owned();
     if changes.is_empty() {
         return Ok(());
     }
@@ -665,14 +672,21 @@ async fn recover_uncommitted_storage(
         %changes,
         "recovering interrupted source storage writes at startup"
     );
-    git(repo_path, &["reset", "--", storage_root]).await?;
-    if !git_output(repo_path, &["ls-files", "--", storage_root])
+    Git::new(repo_path)
+        .run(&["reset", "--", storage_root])
+        .await?;
+    if !Git::new(repo_path)
+        .output(&["ls-files", "--", storage_root])
         .await?
         .is_empty()
     {
-        git(repo_path, &["checkout", "HEAD", "--", storage_root]).await?;
+        Git::new(repo_path)
+            .run(&["checkout", "HEAD", "--", storage_root])
+            .await?;
     }
-    git(repo_path, &["clean", "-fd", "--", storage_root]).await?;
+    Git::new(repo_path)
+        .run(&["clean", "-fd", "--", storage_root])
+        .await?;
     Ok(())
 }
 
@@ -684,7 +698,9 @@ async fn ensure_git_repo(repo_path: &Path) -> Result<(), SourceStorageError> {
         });
     }
 
-    let output = git_output(repo_path, &["rev-parse", "--is-inside-work-tree"]).await?;
+    let output = Git::new(repo_path)
+        .output(&["rev-parse", "--is-inside-work-tree"])
+        .await?;
     if output == "true" {
         return Ok(());
     }
@@ -695,30 +711,13 @@ async fn ensure_git_repo(repo_path: &Path) -> Result<(), SourceStorageError> {
     })
 }
 
-async fn ensure_source_repository_clean(repo_path: &Path) -> Result<(), SourceStorageError> {
-    let changes = git_output_untrimmed(
-        repo_path,
-        &["status", "--porcelain=v1", "--untracked-files=all"],
-    )
-    .await?
-    .trim_end_matches(['\r', '\n'])
-    .to_owned();
-    if changes.is_empty() {
-        return Ok(());
-    }
-
-    Err(SourceStorageError::DirtySourceRepository {
-        path: repo_path.to_path_buf(),
-        changes,
-    })
-}
-
 async fn ensure_source_repository_initialized(
     repo_path: &Path,
     storage_root: &str,
 ) -> Result<(), SourceStorageError> {
     let source_attributes_rule = source_attributes_rule(storage_root);
-    let roots = git_output(repo_path, &["rev-list", "--max-parents=0", "HEAD"])
+    let roots = Git::new(repo_path)
+        .output(&["rev-list", "--max-parents=0", "HEAD"])
         .await
         .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
     let roots = roots
@@ -732,7 +731,8 @@ async fn ensure_source_repository_initialized(
         ));
     };
 
-    let root_files = git_output(repo_path, &["ls-tree", "-r", "--name-only", root_revision])
+    let root_files = Git::new(repo_path)
+        .output(&["ls-tree", "-r", "--name-only", root_revision])
         .await
         .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
     if root_files != ".gitattributes" {
@@ -743,7 +743,8 @@ async fn ensure_source_repository_initialized(
     }
 
     let root_attributes_object = format!("{root_revision}:.gitattributes");
-    let root_attributes = git_output(repo_path, &["show", &root_attributes_object])
+    let root_attributes = Git::new(repo_path)
+        .output(&["show", &root_attributes_object])
         .await
         .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
     if root_attributes != source_attributes_rule {
@@ -762,7 +763,8 @@ async fn ensure_current_source_attributes(
 ) -> Result<(), SourceStorageError> {
     let source_attributes_rule = source_attributes_rule(storage_root);
     let source_attributes_check_path = source_attributes_check_path(storage_root);
-    let current_attributes = git_output(repo_path, &["show", "HEAD:.gitattributes"])
+    let current_attributes = Git::new(repo_path)
+        .output(&["show", "HEAD:.gitattributes"])
         .await
         .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
     if !has_source_attributes_rule(&current_attributes, &source_attributes_rule) {
@@ -772,12 +774,10 @@ async fn ensure_current_source_attributes(
         ));
     }
 
-    let effective_text_attribute = git_output(
-        repo_path,
-        &["check-attr", "text", "--", &source_attributes_check_path],
-    )
-    .await
-    .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
+    let effective_text_attribute = Git::new(repo_path)
+        .output(&["check-attr", "text", "--", &source_attributes_check_path])
+        .await
+        .map_err(|source| unprepared_source_repository(repo_path, source.to_string()))?;
     let expected_text_attribute = format!("{source_attributes_check_path}: text: unset");
     if effective_text_attribute != expected_text_attribute {
         return Err(unprepared_source_repository(
@@ -910,11 +910,9 @@ async fn read_bundle(
         })?;
     let files_dir = bundle_dir.join("files");
     let files = read_bundle_files(&files_dir, &disk_manifest.files).await?;
-    let storage_revision = git_output(
-        repo_path,
-        &["log", "-n", "1", "--format=%H", "--", bundle_path],
-    )
-    .await?;
+    let storage_revision = Git::new(repo_path)
+        .output(&["log", "-n", "1", "--format=%H", "--", bundle_path])
+        .await?;
     if storage_revision.is_empty() {
         return Err(SourceStorageError::Operation(format!(
             "stored bundle has no storage revision: {bundle_path}"
@@ -1004,115 +1002,14 @@ fn checked_join(root: &Path, relative: &str) -> Result<PathBuf, SourceStorageErr
     Ok(path)
 }
 
-async fn git(repo_path: &Path, args: &[&str]) -> Result<(), SourceStorageError> {
-    let output = git_command(repo_path, args).await?;
-    if output.status.success() {
-        return Ok(());
-    }
-
-    Err(git_error(args, &output))
-}
-
-async fn git_output(repo_path: &Path, args: &[&str]) -> Result<String, SourceStorageError> {
-    git_output_untrimmed(repo_path, args)
-        .await
-        .map(|output| output.trim().to_owned())
-}
-
-async fn git_output_untrimmed(
-    repo_path: &Path,
-    args: &[&str],
-) -> Result<String, SourceStorageError> {
-    let output = git_command(repo_path, args).await?;
-    if !output.status.success() {
-        return Err(git_error(args, &output));
-    }
-
-    String::from_utf8(output.stdout).map_err(|source| SourceStorageError::GitOutputUtf8 {
-        command: git_command_string(args),
-        source,
-    })
-}
-
 async fn git_has_committed_files(
     repo_path: &Path,
     bundle_path: &str,
 ) -> Result<bool, SourceStorageError> {
-    git_output(
-        repo_path,
-        &["ls-tree", "-r", "--name-only", "HEAD", "--", bundle_path],
-    )
-    .await
-    .map(|output| !output.is_empty())
-}
-
-async fn git_with_author(
-    repo_path: &Path,
-    args: &[&str],
-    storage: &GitSourceStorage,
-    verified_at: u64,
-) -> Result<(), SourceStorageError> {
-    let git_date = format!("{verified_at} +0000");
-    let mut command = Command::new("git");
-    command
-        .args(args)
-        .current_dir(repo_path)
-        .env("GIT_AUTHOR_NAME", &storage.author_name)
-        .env("GIT_AUTHOR_EMAIL", &storage.author_email)
-        .env("GIT_AUTHOR_DATE", &git_date)
-        .env("GIT_COMMITTER_NAME", &storage.author_name)
-        .env("GIT_COMMITTER_EMAIL", &storage.author_email)
-        .env("GIT_COMMITTER_DATE", &git_date);
-    let output = run_git_command(command, args, GIT_COMMAND_TIMEOUT).await?;
-
-    if output.status.success() {
-        return Ok(());
-    }
-
-    Err(git_error(args, &output))
-}
-
-async fn git_command(
-    repo_path: &Path,
-    args: &[&str],
-) -> Result<std::process::Output, SourceStorageError> {
-    let mut command = Command::new("git");
-    command.args(args).current_dir(repo_path);
-    run_git_command(command, args, GIT_COMMAND_TIMEOUT).await
-}
-
-// Storage holds a mutex across Git operations. A stalled remote or credential
-// prompt must not block all subsequent writes and registry reads indefinitely.
-async fn run_git_command(
-    mut command: Command,
-    args: &[&str],
-    timeout: Duration,
-) -> Result<std::process::Output, SourceStorageError> {
-    command
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .stdin(std::process::Stdio::null())
-        .kill_on_drop(true);
-    let command_name = git_command_string(args);
-    tokio::time::timeout(timeout, command.output())
+    Git::new(repo_path)
+        .output(&["ls-tree", "-r", "--name-only", "HEAD", "--", bundle_path])
         .await
-        .map_err(|_| SourceStorageError::Git {
-            command: command_name.clone(),
-            status: "timed out".to_owned(),
-            stderr: format!("Git exceeded its {} ms deadline", timeout.as_millis()),
-        })?
-        .map_err(|source| SourceStorageError::GitSpawn {
-            command: command_name,
-            source,
-        })
-}
-
-async fn current_branch(repo_path: &Path) -> Result<String, SourceStorageError> {
-    let branch = git_output(repo_path, &["branch", "--show-current"]).await?;
-    if branch.is_empty() {
-        return Err(SourceStorageError::DetachedHead);
-    }
-
-    Ok(branch)
+        .map(|output| !output.is_empty())
 }
 
 fn commit_message(request: &StoreSourceBundleRequest, manifest_hash: &str) -> String {
@@ -1120,18 +1017,6 @@ fn commit_message(request: &StoreSourceBundleRequest, manifest_hash: &str) -> St
         "Verify code hash {}\n\ncode_hash: {}\nsource_bundle_hash: {}\nmanifest_hash: {}",
         request.code_hash, request.code_hash, request.source_bundle_hash, manifest_hash
     )
-}
-
-fn git_error(args: &[&str], output: &std::process::Output) -> SourceStorageError {
-    SourceStorageError::Git {
-        command: git_command_string(args),
-        status: output.status.to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
-    }
-}
-
-fn git_command_string(args: &[&str]) -> String {
-    format!("git {}", args.join(" "))
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -1208,41 +1093,5 @@ mod tests {
             bundle_relative_path("sources", "not-a-code-hash"),
             Err(SourceStorageError::InvalidCodeHash)
         ));
-    }
-
-    #[tokio::test]
-    async fn git_process_has_closed_stdin_and_disables_credential_prompts() {
-        let mut command = Command::new("node");
-        command.args([
-            "--eval",
-            "process.stdin.on('data', () => { throw new Error('unexpected input') }); \
-             process.stdin.on('end', () => process.stdout.write(process.env.GIT_TERMINAL_PROMPT))",
-        ]);
-        let output = run_git_command(command, &["probe"], Duration::from_secs(3))
-            .await
-            .expect("process completes");
-        assert!(output.status.success());
-        assert_eq!(output.stdout, b"0");
-    }
-
-    #[tokio::test]
-    async fn stalled_git_process_releases_storage_with_retryable_push_context() {
-        let mut command = Command::new("node");
-        command.args(["--eval", "setInterval(() => {}, 1000)"]);
-        let result = tokio::time::timeout(
-            Duration::from_secs(3),
-            run_git_command(
-                command,
-                &["push", "origin", "HEAD:main"],
-                Duration::from_millis(100),
-            ),
-        )
-        .await
-        .expect("deadline must cover a stalled process");
-        let error = result.expect_err("process must time out");
-        assert!(
-            matches!(&error, SourceStorageError::Git { command, status, .. } if command == "git push origin HEAD:main" && status == "timed out")
-        );
-        assert!(crate::error::ApiError::from(error).is_payment_retryable());
     }
 }
