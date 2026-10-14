@@ -13,9 +13,11 @@ pub enum CliError {
     ReadOnlyRequired { config_path: PathBuf },
     #[error("removal cancelled: backend shutdown was not confirmed")]
     BackendNotConfirmed,
-    #[error("failed to read backend shutdown confirmation: {0}")]
+    #[error("removal cancelled: bundle removal was not confirmed")]
+    RemovalNotConfirmed,
+    #[error("failed to read confirmation: {0}")]
     ConfirmationIo(#[from] std::io::Error),
-    #[error("failed to read backend shutdown confirmation: {0}")]
+    #[error("failed to read confirmation: {0}")]
     ConfirmationPrompt(#[from] inquire::error::InquireError),
     #[error("invalid code hash {value:?}: expected a 256-bit code hash in hexadecimal or base64")]
     InvalidCodeHash { value: String },

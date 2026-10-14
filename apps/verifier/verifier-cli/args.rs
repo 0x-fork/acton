@@ -14,6 +14,7 @@ pub enum CliCommand {
     /// Remove selected registry bundles, commit each deletion and push when enabled
     ///
     /// Requires `server.read_only = true` and confirmation that the backend is stopped.
+    /// Prompts again after inspection to confirm the number of bundles to remove.
     RemoveRegistry(RemoveRegistryArgs),
 }
 

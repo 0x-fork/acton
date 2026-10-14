@@ -446,6 +446,19 @@ This is the operator's confirmation;
 the CLI does not stop the backend or detect its process. A missing bundle is
 reported as `not found`.
 
+After inspecting all hashes, the CLI reports how many bundles were found and
+asks for a second confirmation before deleting anything, for example:
+
+```text
+Removal plan: 100 found, 800 not found
+Remove 100 bundles? Type 'yes' to confirm:
+```
+
+Only `yes` proceeds with deletion, commits and the configured push. Any other
+answer or EOF cancels without changing the repository. When piping input,
+provide a separate `yes` line for each confirmation. The second prompt is
+skipped when no bundles were found.
+
 For a local checkout outside Docker, run from `apps/verifier` with its config:
 
 ```bash

@@ -293,7 +293,10 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
         );
     }
     if !args.dry_run {
-        confirm_backend_stopped()?;
+        confirm(
+            "Backend must be stopped. Type 'yes' to confirm:",
+            CliError::BackendNotConfirmed,
+        )?;
     }
     // Check the repository after confirmation, once the operator has stopped the backend.
     let plan = RemovalPlan::prepare(request).await?;
@@ -305,6 +308,12 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
     let commits = if args.dry_run {
         BTreeMap::new()
     } else {
+        if found > 0 {
+            confirm(
+                &format!("Remove {found} bundles? Type 'yes' to confirm:"),
+                CliError::RemovalNotConfirmed,
+            )?;
+        }
         plan.execute().await?
     };
 
@@ -355,8 +364,7 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
     Ok(())
 }
 
-fn confirm_backend_stopped() -> Result<(), CliError> {
-    let prompt = "Backend must be stopped. Type 'yes' to confirm:";
+fn confirm(prompt: &str, cancellation: CliError) -> Result<(), CliError> {
     let confirmation = if io::stdin().is_terminal() {
         Text::new(prompt).prompt()?
     } else {
@@ -367,7 +375,7 @@ fn confirm_backend_stopped() -> Result<(), CliError> {
         confirmation
     };
     if confirmation.trim() != "yes" {
-        return Err(CliError::BackendNotConfirmed);
+        return Err(cancellation);
     }
     Ok(())
 }

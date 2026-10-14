@@ -46,7 +46,7 @@ fn cli(dir: &TempDir) -> Command {
         .env_remove("VERIFIER_CONFIG")
         .env("GIT_CONFIG_NOSYSTEM", "1")
         .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .stdin(confirmation_input(b"yes\n"));
+        .stdin(confirmation_input(b"yes\nyes\n"));
     command
 }
 
@@ -113,6 +113,32 @@ fn removal_requires_explicit_backend_shutdown_confirmation() {
 }
 
 #[test]
+fn removal_requires_confirmation_after_inspecting_all_hashes() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    let absent_hash = "bb".repeat(32);
+    for answer in ["", "\n", "no\n", "y\n", "yes please\n", "no\nyes\n"] {
+        let output = run_preserving_command(
+            &dir,
+            &repo,
+            cli(&dir)
+                .args(["remove-registry", CODE_HASH, &absent_hash, CODE_HASH])
+                .stdin(confirmation_input(format!("yes\n{answer}").as_bytes())),
+        );
+        assert_failure(&output, "bundle removal was not confirmed");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(
+                "Removal plan: 1 found, 1 not found\nRemove 1 bundles? Type 'yes' to confirm: "
+            ),
+            "{stderr}"
+        );
+        assert!(!stderr.contains("[remove "), "{stderr}");
+        assert!(!stderr.contains("Pushing "), "{stderr}");
+    }
+}
+
+#[test]
 fn invalid_utf8_in_piped_confirmation_never_confirms_removal() {
     let dir = fixture(MINIMAL_CONFIG);
     let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
@@ -131,7 +157,7 @@ fn invalid_utf8_in_piped_confirmation_never_confirms_removal() {
                 .args(["remove-registry", CODE_HASH])
                 .stdin(confirmation_input(input)),
         );
-        assert_failure(&output, "failed to read backend shutdown confirmation:");
+        assert_failure(&output, "failed to read confirmation:");
         assert!(!String::from_utf8_lossy(&output.stderr).contains("Checking repository:"));
     }
 }
@@ -338,7 +364,15 @@ fn absent_hashes_succeed_without_commit_or_push() {
     let dir = fixture(MINIMAL_CONFIG);
     let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
     let hash = "bb".repeat(32);
-    let stdout = assert_success(run_preserving(&dir, &repo, &["remove-registry", &hash]));
+    let output = run_preserving_command(
+        &dir,
+        &repo,
+        cli(&dir)
+            .args(["remove-registry", &hash])
+            .stdin(confirmation_input(b"yes\n")),
+    );
+    assert!(!String::from_utf8_lossy(&output.stderr).contains("Remove 0 bundles?"));
+    let stdout = assert_success(output);
     assert!(stdout.contains(&format!("  {hash}: not found\n")));
     assert!(stdout.contains("Removed bundles: 0\nNot found: 1\n"));
     assert!(stdout.contains("No bundles found; nothing to remove.\n"));
