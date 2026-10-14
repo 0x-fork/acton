@@ -20,6 +20,7 @@ struct SourceRepositorySettings {
     storage_root: String,
     remote: String,
     branch: Option<String>,
+    push_enabled: bool,
     author_name: String,
     author_email: String,
 }
@@ -76,6 +77,7 @@ impl RemoveRegistryRequest {
                 storage_root: config.source_repository_storage_root().to_owned(),
                 remote: config.source_repository_remote().to_owned(),
                 branch: config.source_repository_branch().map(ToOwned::to_owned),
+                push_enabled: config.source_repository_push_enabled(),
                 author_name: config.source_repository_author_name().to_owned(),
                 author_email: config.source_repository_author_email().to_owned(),
             },
@@ -91,6 +93,7 @@ impl RemovalPlan {
             &request.repository.storage_root,
             &request.repository.remote,
             request.repository.branch.as_deref(),
+            request.repository.push_enabled,
         )
         .await?;
 
@@ -148,7 +151,7 @@ impl RemovalPlan {
                 }
             }
         }
-        if !commits.is_empty() {
+        if self.repository.push_enabled && !commits.is_empty() {
             Git::new(&self.repository.path)
                 .push_head(&self.repository.remote, Some(&self.checked.branch))
                 .await
@@ -255,6 +258,11 @@ impl BundleRemoval {
 
 pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
     let request = RemoveRegistryRequest::prepare(args)?;
+    if !request.repository.push_enabled {
+        eprintln!(
+            "Warning: push_enabled = false; commits will remain local and will not be pushed."
+        );
+    }
     if !args.dry_run {
         confirm_backend_stopped()?;
     }
@@ -277,7 +285,12 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
     println!("Remote: {}", plan.repository.remote);
     println!("Branch: {}", plan.checked.branch);
     println!("Local HEAD: {}", plan.checked.local_head);
-    println!("Remote HEAD: {}", plan.checked.remote_head);
+    if let Some(remote_head) = &plan.checked.remote_head {
+        println!("Remote HEAD: {remote_head}");
+    } else {
+        println!("Remote HEAD: not checked (push_enabled = false)");
+    }
+    println!("Push enabled: {}", plan.repository.push_enabled);
     let code_hashes = plan
         .bundles
         .iter()
@@ -310,7 +323,11 @@ pub async fn run(args: &RemoveRegistryArgs) -> Result<(), CliError> {
         if found == 0 {
             println!("No bundles found; nothing to remove.");
         } else if !commits.is_empty() {
-            println!("Push: {}/{}", plan.repository.remote, plan.checked.branch);
+            if plan.repository.push_enabled {
+                println!("Push: {}/{}", plan.repository.remote, plan.checked.branch);
+            } else {
+                println!("Push skipped: push_enabled = false; commits kept locally.");
+            }
         }
     }
 

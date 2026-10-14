@@ -11,7 +11,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum CliCommand {
-    /// Remove selected registry bundles, commit each deletion and push
+    /// Remove selected registry bundles, commit each deletion and push when enabled
     ///
     /// Requires `server.read_only = true` and confirmation that the backend is stopped.
     RemoveRegistry(RemoveRegistryArgs),
@@ -32,7 +32,7 @@ pub struct RemoveRegistryArgs {
     )]
     pub config: PathBuf,
 
-    /// Check the checkout and remote, then show the removal plan without making changes
+    /// Show the removal plan without changes; check remote only when push is enabled
     #[arg(long)]
     pub dry_run: bool,
 }

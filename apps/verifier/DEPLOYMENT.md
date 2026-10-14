@@ -397,7 +397,8 @@ docker compose start verifier
 ```
 
 Multiple hashes can be supplied in one invocation. The CLI checks the checkout
-and requires local HEAD to match the configured remote branch. Dry-run leaves
+and, when `push_enabled = true`, requires local HEAD to match the configured
+remote branch. With push disabled, it does not contact the remote. Dry-run leaves
 the repository unchanged and requires neither read-only mode nor confirmation.
 A normal run requires `read_only = true` and prompts:
 
@@ -417,11 +418,19 @@ cargo run --locked --bin verifier-cli -- remove-registry --config /path/to/confi
 cargo run --locked --bin verifier-cli -- remove-registry --config /path/to/config.toml '<code_hash>'
 ```
 
-Removal deletes the complete selected bundle directory, commits each tracked
-bundle separately, and pushes all new commits once. The author and committer
-come from `source_repository.author_name` and `author_email`; the backend's
-`commit_enabled` and `push_enabled` flags do not disable CLI publication.
-Each commit uses this format:
+Removal deletes the complete selected bundle directory and commits each tracked
+bundle separately. `source_repository.push_enabled` controls publication:
+
+- `push_enabled = true`: push all new commits once.
+- `push_enabled = false`: keep local commits without contacting the remote.
+  Subsequent removals can build on these local commits.
+
+When push is disabled, the CLI prints a warning before the shutdown confirmation
+or the dry-run plan.
+
+The CLI always commits tracked deletions, regardless of the backend's
+`commit_enabled` setting. The author and committer come from
+`source_repository.author_name` and `author_email`. Each commit uses this format:
 
 ```text
 Revoke verification for code hash <code_hash>
@@ -440,6 +449,8 @@ rebuilds the registry from the new HEAD. The CLI does not start the backend or
 modify the registry database, payment ledger or blocklist. A consumed payment
 remains consumed; removing a bundle does not prohibit future verification unless
 the code hash is also blocked.
+
+If push is disabled, publish the local commits manually before starting the backend.
 
 If deletion or commit fails before HEAD changes, the CLI restores the current
 bundle's tracked files and index entries. Earlier commits are retained and push

@@ -30,6 +30,8 @@ const CODE_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 const MINIMAL_CONFIG: &str =
     "[server]\nread_only = true\n[source_repository]\npath = 'source-repo'\n";
 const CONFIRMATION_PROMPT: &str = "Backend must be stopped. Type 'yes' to confirm: ";
+const PUSH_DISABLED_WARNING: &str =
+    "Warning: push_enabled = false; commits will remain local and will not be pushed.\n";
 
 fn fixture(config: &str) -> TempDir {
     let dir = tempfile::tempdir().expect("temporary CLI directory");
@@ -57,8 +59,12 @@ fn confirmation_input(input: &[u8]) -> fs::File {
 
 fn assert_success(output: Output) -> String {
     assert!(output.status.success(), "{output:?}");
+    let stderr = output
+        .stderr
+        .strip_prefix(PUSH_DISABLED_WARNING.as_bytes())
+        .unwrap_or(&output.stderr);
     assert!(
-        output.stderr.is_empty() || output.stderr == CONFIRMATION_PROMPT.as_bytes(),
+        stderr.is_empty() || stderr == CONFIRMATION_PROMPT.as_bytes(),
         "{output:?}"
     );
     String::from_utf8(output.stdout).expect("UTF-8 CLI output")
@@ -660,6 +666,7 @@ fn dry_run_prints_a_stable_complete_plan_for_present_and_absent_bundles() {
          Branch: main\n\
          Local HEAD: {head}\n\
          Remote HEAD: {head}\n\
+         Push enabled: true\n\
          Code hashes: {CODE_HASH}, {absent_hash}, {second_hash}\n\
          Bundles:\n  {CODE_HASH}: found\n    Path: {first}\n  {absent_hash}: not found\n    Path: {absent}\n  {second_hash}: found\n    Path: {second}\n\
          Bundles to remove: 2\n\
@@ -876,7 +883,7 @@ fn commits_each_bundle_and_pushes_without_changing_unrelated_files() {
          remote = 'upstream'\n\
          branch = 'registry'\n\
          commit_enabled = false\n\
-         push_enabled = false\n\
+         push_enabled = true\n\
          author_name = 'Cleanup Bot'\n\
          author_email = 'cleanup@example.invalid'\n",
     );
@@ -1005,6 +1012,108 @@ fn commits_each_bundle_and_pushes_without_changing_unrelated_files() {
     }
     let stdout = assert_success(run_preserving(&dir, &repo, &["remove-registry", CODE_HASH]));
     assert!(stdout.contains(&format!("{CODE_HASH}: not found")));
+}
+
+#[test]
+fn disabled_push_keeps_commits_locally_without_contacting_a_remote() {
+    for commit_enabled in [true, false] {
+        let dir = fixture(&format!(
+            "{MINIMAL_CONFIG}commit_enabled = {commit_enabled}\npush_enabled = false\n"
+        ));
+        let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+        let second_hash = "bb".repeat(32);
+        let third_hash = "cc".repeat(32);
+        let first = bundle_path("sources");
+        let second = bundle_path_for("sources", &second_hash);
+        let third = bundle_path_for("sources", &third_hash);
+        for path in [&second, &third] {
+            fs::create_dir_all(repo.join(path)).expect("bundle directory");
+            fs::write(repo.join(path).join("source.tolk"), "// source").expect("source file");
+        }
+        git(&repo, &["add", "--all"]);
+        git(&repo, &["commit", "-m", "Add local removal fixtures"]);
+        git(&repo, &["push", "origin", "HEAD:main"]);
+        let original = git(&repo, &["rev-parse", "HEAD"]);
+        // Any remote lookup or push would fail; offline removal must still work.
+        git(&repo, &["remote", "remove", "origin"]);
+
+        let output = run_preserving(
+            &dir,
+            &repo,
+            &["remove-registry", "--dry-run", CODE_HASH, &second_hash],
+        );
+        assert_eq!(output.stderr, PUSH_DISABLED_WARNING.as_bytes());
+        let stdout = assert_success(output);
+        assert!(stdout.contains("Remote HEAD: not checked (push_enabled = false)\n"));
+        assert!(stdout.contains("Push enabled: false\n"));
+        assert!(stdout.contains("Bundles to remove: 2\n"));
+
+        let output = cli(&dir)
+            .args(["remove-registry", CODE_HASH, &second_hash])
+            .output()
+            .expect("run CLI");
+        assert_eq!(
+            output.stderr,
+            format!("{PUSH_DISABLED_WARNING}{CONFIRMATION_PROMPT}").as_bytes()
+        );
+        let stdout = assert_success(output);
+        assert!(!repo.join(&first).exists());
+        assert!(!repo.join(&second).exists());
+        assert!(repo.join(&third).exists());
+        assert_eq!(git(&repo, &["diff", "--cached", "--name-status"]), "");
+        assert!(stdout.contains("Removed bundles: 2\n"));
+        assert!(!stdout.contains("Push: "));
+        let expected_deletions =
+            format!("D\t{first}/manifest.json\nD\t{first}/source.tolk\nD\t{second}/source.tolk");
+        assert_eq!(git(&repo, &["rev-parse", "HEAD~2"]), original);
+        assert_eq!(git(&repo, &["status", "--porcelain=v1"]), "");
+        assert_eq!(
+            git(&repo, &["diff", "--name-status", &original, "HEAD"]),
+            expected_deletions
+        );
+        assert_eq!(stdout.matches("    Commit: ").count(), 2);
+        assert!(stdout.contains("Push skipped: push_enabled = false; commits kept locally."));
+        // A later invocation can build on the unpublished local commits.
+        assert_success(
+            cli(&dir)
+                .args(["remove-registry", &third_hash])
+                .output()
+                .expect("run CLI again"),
+        );
+        assert_eq!(git(&repo, &["rev-parse", "HEAD~3"]), original);
+        assert!(!repo.join(&third).exists());
+        assert_eq!(
+            git(
+                &dir.path().join("source-repo.git"),
+                &["rev-parse", "refs/heads/main"]
+            ),
+            original
+        );
+    }
+}
+
+#[test]
+fn local_removal_still_checks_checkout_and_branch() {
+    let dir = fixture(&format!(
+        "{MINIMAL_CONFIG}branch = 'main'\npush_enabled = false\n"
+    ));
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    git(&repo, &["remote", "remove", "origin"]);
+    git(&repo, &["checkout", "-b", "other"]);
+    assert_failure(
+        &run_preserving(&dir, &repo, &["remove-registry", CODE_HASH]),
+        "branch mismatch: expected main, current other",
+    );
+    git(&repo, &["checkout", "main"]);
+    fs::write(
+        repo.join(bundle_path("sources")).join("source.tolk"),
+        "// changed",
+    )
+    .expect("dirty source");
+    assert_failure(
+        &run_preserving(&dir, &repo, &["remove-registry", CODE_HASH]),
+        "uncommitted",
+    );
 }
 
 #[test]
