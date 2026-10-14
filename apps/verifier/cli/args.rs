@@ -11,17 +11,17 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum CliCommand {
-    /// Remove selected contracts from the registry (not implemented yet)
+    /// Prepare removal of selected registry contracts (execution is not implemented yet)
     RemoveRegistry(RemoveRegistryArgs),
 }
 
 #[derive(Args)]
 pub struct RemoveRegistryArgs {
-    /// Contract code hashes in hex or base64 (not validated yet)
+    /// Contract code hashes in hex or base64
     #[arg(value_name = "CODE_HASH", required = true, num_args = 1..)]
     pub code_hashes: Vec<String>,
 
-    /// Path to the verifier configuration file (not read yet)
+    /// Path to the verifier configuration file
     #[arg(
         long,
         value_name = "PATH",
@@ -30,11 +30,11 @@ pub struct RemoveRegistryArgs {
     )]
     pub config: PathBuf,
 
-    /// Request an eventual removal plan without applying changes
+    /// Prepare the request only (repository checks and removal planning are not implemented yet)
     #[arg(long)]
     pub dry_run: bool,
 
-    /// Optional reason to include in the eventual commit message
+    /// Optional reason to include in the commit message
     #[arg(long, value_name = "TEXT")]
     pub reason: Option<String>,
 }

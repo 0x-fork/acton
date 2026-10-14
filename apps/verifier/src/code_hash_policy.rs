@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use thiserror::Error;
 
-use crate::blockchain::{is_valid_code_hash, normalize_code_hash};
+use crate::blockchain::parse_code_hash;
 
 /// Code hashes blocked from verification and direct source/ABI reads.
 /// Verification status, listings, and statistics reflect the source repository.
@@ -21,13 +21,9 @@ impl CodeHashPolicy {
         let blocked = entries
             .iter()
             .map(|entry| {
-                let code_hash = normalize_code_hash(entry.trim());
-                if !is_valid_code_hash(&code_hash) {
-                    return Err(CodeHashPolicyError {
-                        entry: entry.clone(),
-                    });
-                }
-                Ok(code_hash)
+                parse_code_hash(entry).ok_or_else(|| CodeHashPolicyError {
+                    entry: entry.clone(),
+                })
             })
             .collect::<Result<_, _>>()?;
         Ok(Self { blocked })
@@ -35,8 +31,7 @@ impl CodeHashPolicy {
 
     #[must_use]
     pub fn is_blocked(&self, code_hash: &str) -> bool {
-        self.blocked
-            .contains(&normalize_code_hash(code_hash.trim()))
+        parse_code_hash(code_hash).is_some_and(|hash| self.blocked.contains(&hash))
     }
 }
 

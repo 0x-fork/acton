@@ -1,20 +1,24 @@
 mod args;
+mod error;
+mod remove_registry;
+
+use std::process::ExitCode;
 
 use args::{Cli, CliCommand};
 use clap::Parser;
 
-fn main() {
+fn main() -> ExitCode {
     let cli = Cli::parse();
 
-    match cli.command {
-        CliCommand::RemoveRegistry(args) => {
-            println!("CLI scaffold: arguments parsed only; remove-registry is not implemented.");
-            println!("Config: {}", args.config.display());
-            println!("Dry run: {}", args.dry_run);
-            if let Some(reason) = args.reason {
-                println!("Reason: {reason}");
-            }
-            println!("Code hashes: {}", args.code_hashes.join(", "));
+    let result = match cli.command {
+        CliCommand::RemoveRegistry(args) => remove_registry::run(&args),
+    };
+
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("verifier-cli: {error}");
+            ExitCode::FAILURE
         }
     }
 }

@@ -140,25 +140,26 @@ impl BlockchainClient for ToncenterClient {
         let code_hash = account_states
             .accounts
             .into_iter()
-            .find_map(|account| non_empty_text(account.code_hash));
-        if code_hash
-            .as_deref()
-            .is_some_and(|hash| !is_valid_code_hash(hash))
-        {
-            return Err(BlockchainError::InvalidCodeHash);
-        }
-        Ok(code_hash)
+            .filter_map(|account| account.code_hash)
+            .find(|hash| !hash.trim().is_empty());
+
+        let Some(code_hash) = code_hash else {
+            return Ok(None);
+        };
+
+        let code_hash = parse_code_hash(&code_hash).ok_or(BlockchainError::InvalidCodeHash)?;
+        Ok(Some(code_hash))
     }
 }
 
-fn non_empty_text(value: Option<String>) -> Option<String> {
-    let value = value?;
-    let value = value.trim();
-    if value.is_empty() {
-        return None;
-    }
-
-    Some(normalize_code_hash(value))
+/// Parses a 256-bit hexadecimal or base64 code hash into lowercase hexadecimal.
+///
+/// Trims surrounding whitespace and accepts standard or URL-safe base64, with or
+/// without padding. Returns `None` for invalid hashes.
+#[must_use]
+pub fn parse_code_hash(value: &str) -> Option<String> {
+    let code_hash = normalize_code_hash(value.trim());
+    is_valid_code_hash(&code_hash).then_some(code_hash)
 }
 
 pub(crate) fn normalize_code_hash(value: &str) -> String {

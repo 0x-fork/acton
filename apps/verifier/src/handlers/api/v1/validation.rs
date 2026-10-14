@@ -1,9 +1,6 @@
 use rston::models::{StdAddr, StdAddrFormat};
 
-use crate::{
-    blockchain::{is_valid_code_hash, normalize_code_hash},
-    error::ApiError,
-};
+use crate::{blockchain::parse_code_hash, error::ApiError};
 
 pub(super) fn optional_address(value: Option<String>) -> Result<Option<String>, ApiError> {
     let Some(address) = non_empty_trimmed(value) else {
@@ -16,13 +13,9 @@ pub(super) fn optional_address(value: Option<String>) -> Result<Option<String>, 
 }
 
 pub(super) fn code_hash(value: &str) -> Result<String, ApiError> {
-    let code_hash = normalize_code_hash(value.trim());
-    if !is_valid_code_hash(&code_hash) {
-        return Err(ApiError::bad_request(
-            "code_hash must contain exactly 64 hexadecimal characters".to_owned(),
-        ));
-    }
-    Ok(code_hash)
+    parse_code_hash(value).ok_or_else(|| {
+        ApiError::bad_request("code_hash must contain exactly 64 hexadecimal characters".to_owned())
+    })
 }
 
 pub(super) fn optional_code_hash(value: Option<String>) -> Result<Option<String>, ApiError> {
