@@ -9,7 +9,22 @@ use base64::{
     Engine as _,
     engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD},
 };
+use sha2::{Digest, Sha256};
 use tempfile::TempDir;
+use verifier::{
+    code_hash_policy::CodeHashPolicy,
+    config::Config,
+    payment::PaymentLedger,
+    registry_index::{IndexedAbiContractsQuery, SqliteVerificationIndex, VerificationIndex},
+    source_bundle::{
+        SourceBundleCompiler, SourceBundleFile, SourceBundleInput, SourceBundleSource,
+        compute_source_bundle_hash,
+    },
+    source_storage::{
+        CompilerMetadata, GitSourceStorage, SourceStorage, SourceStorageFile,
+        StoreSourceBundleRequest,
+    },
+};
 
 const CODE_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const MINIMAL_CONFIG: &str = "[source_repository]\npath = 'source-repo'\n";
@@ -673,7 +688,7 @@ fn removes_entire_selected_directories_and_preserves_other_files() {
     }
     assert_eq!(git(&repo, &["ls-files"]), ".gitattributes");
     assert_eq!(
-        git(&repo, &["diff", "--cached", "--name-status"]),
+        git(&repo, &["diff", "HEAD^", "HEAD", "--name-status"]),
         format!("D\t{selected}/manifest.json\nD\t{selected}/source.tolk")
     );
 }
@@ -722,7 +737,7 @@ fn removes_directories_without_tracked_files_without_staging_changes() {
 }
 
 #[test]
-fn directory_removal_failure_restores_planned_tracked_files() {
+fn directory_removal_failure_preserves_earlier_commits() {
     let dir = fixture(MINIMAL_CONFIG);
     let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
     let invalid_hash = "bb".repeat(32);
@@ -735,20 +750,24 @@ fn directory_removal_failure_restores_planned_tracked_files() {
     fs::create_dir_all(repo.join("sources/bb")).expect("shard directory");
     fs::write(repo.join(&invalid_bundle), "not a directory").expect("invalid bundle path");
     let tracked_bundle = repo.join(bundle_path("sources"));
-    let before = directory_entries(&tracked_bundle);
     let head = git(&repo, &["rev-parse", "HEAD"]);
     let output = cli(&dir)
         .args(["remove-registry", CODE_HASH, &invalid_hash])
         .output()
         .expect("run CLI");
     assert_failure(&output, "failed to remove directory");
-    assert_failure(
-        &output,
-        "planned tracked files and index entries were restored",
-    );
-    assert_eq!(directory_entries(&tracked_bundle), before);
+    assert_failure(&output, "earlier local commits are preserved");
+    assert_failure(&output, "push was not attempted");
+    assert!(!tracked_bundle.exists());
     assert_eq!(git(&repo, &["status", "--porcelain=v1"]), "");
-    assert_eq!(git(&repo, &["rev-parse", "HEAD"]), head);
+    assert_eq!(git(&repo, &["rev-parse", "HEAD^"]), head);
+    assert_eq!(
+        git(
+            &dir.path().join("source-repo.git"),
+            &["rev-parse", "refs/heads/main"]
+        ),
+        head
+    );
     assert_eq!(
         fs::read_to_string(repo.join(invalid_bundle)).expect("invalid bundle path"),
         "not a directory"
@@ -797,7 +816,7 @@ fn plans_and_removes_literal_paths_with_git_pathspec_characters() {
 }
 
 #[test]
-fn removes_selected_bundles_without_changing_head_remote_or_unrelated_files() {
+fn commits_each_bundle_and_pushes_without_changing_unrelated_files() {
     let dir = fixture(
         "[source_repository]\n\
          path = 'source-repo'\n\
@@ -805,7 +824,9 @@ fn removes_selected_bundles_without_changing_head_remote_or_unrelated_files() {
          remote = 'upstream'\n\
          branch = 'registry'\n\
          commit_enabled = false\n\
-         push_enabled = false\n",
+         push_enabled = false\n\
+         author_name = 'Cleanup Bot'\n\
+         author_email = 'cleanup@example.invalid'\n",
     );
     let root = "verified/contracts";
     let repo = prepare_repository(&dir, "source-repo", root, "upstream", "registry");
@@ -833,8 +854,6 @@ fn removes_selected_bundles_without_changing_head_remote_or_unrelated_files() {
     git(&repo, &["commit", "-m", "Add removal fixtures"]);
     git(&repo, &["push", "upstream", "HEAD:registry"]);
     let original = git(&repo, &["rev-parse", "HEAD"]);
-    let remote_before = directory_entries(&remote);
-    let refs_before = git(&repo, &["show-ref"]);
     let config = fs::read(dir.path().join("config.toml")).expect("config bytes");
     for filename in ["registry.sqlite", "payments.sqlite", "blocklist.txt"] {
         fs::write(dir.path().join(filename), "unrelated contents").expect("unrelated file");
@@ -852,19 +871,58 @@ fn removes_selected_bundles_without_changing_head_remote_or_unrelated_files() {
             .output()
             .expect("run CLI"),
     );
-    assert_eq!(git(&repo, &["rev-parse", "HEAD"]), original);
-    assert_eq!(git(&repo, &["show-ref"]), refs_before);
-    assert_eq!(directory_entries(&remote), remote_before);
-    assert_eq!(git(&repo, &["diff", "--name-only"]), "");
+    let head = git(&repo, &["rev-parse", "HEAD"]);
+    let first_commit = git(&repo, &["rev-parse", "HEAD^"]);
+    assert_eq!(git(&repo, &["rev-parse", "HEAD~2"]), original);
+    assert_eq!(git(&remote, &["rev-parse", "refs/heads/registry"]), head);
+    assert_eq!(git(&repo, &["status", "--porcelain=v1"]), "");
     assert_eq!(
         git(
             &repo,
-            &["diff", "--cached", "--no-renames", "--name-status"]
+            &["diff", "--no-renames", "--name-status", &original, &head]
         ),
         format!(
             "D\t{first}/abi.json\nD\t{first}/manifest.json\nD\t{first}/source.tolk\nD\t{first}/src/lib.tolk\nD\t{second}/source.tolk"
         )
     );
+    for (commit, hash, expected_files, manifest_hash) in [
+        (
+            &first_commit,
+            CODE_HASH,
+            format!(
+                "D\t{first}/abi.json\nD\t{first}/manifest.json\nD\t{first}/source.tolk\nD\t{first}/src/lib.tolk"
+            ),
+            hex::encode(Sha256::digest(b"broken manifest\n")),
+        ),
+        (
+            &head,
+            second_hash.as_str(),
+            format!("D\t{second}/source.tolk"),
+            "unavailable".to_owned(),
+        ),
+    ] {
+        assert_eq!(
+            git(
+                &repo,
+                &["diff-tree", "--no-commit-id", "--name-status", "-r", commit]
+            ),
+            expected_files
+        );
+        assert_eq!(
+            git(&repo, &["show", "-s", "--format=%B", commit]),
+            format!(
+                "Revoke verification for code hash {hash}\n\ncode_hash: {hash}\nsource_bundle_hash: unavailable\nmanifest_hash: {manifest_hash}"
+            )
+        );
+        assert_eq!(
+            git(
+                &repo,
+                &["show", "-s", "--format=%an <%ae>%n%cn <%ce>", commit]
+            ),
+            "Cleanup Bot <cleanup@example.invalid>\nCleanup Bot <cleanup@example.invalid>"
+        );
+        assert!(stdout.contains(&format!("    Commit: {commit}\n")));
+    }
     assert!(!repo.join(&first).exists());
     assert!(!repo.join(second).exists());
     for (relative, expected) in [
@@ -879,14 +937,8 @@ fn removes_selected_bundles_without_changing_head_remote_or_unrelated_files() {
     }
     assert!(stdout.contains(&format!("  {absent_hash}: not found\n")));
     assert!(stdout.contains("Removed bundles: 2\nNot found: 1\n"));
-    assert!(stdout.contains("Deletions staged in Git.\n"));
-    for removed_field in [
-        "Commit:",
-        "Push:",
-        "Author:",
-        "source_bundle_hash:",
-        "manifest_hash:",
-    ] {
+    assert!(stdout.contains("Push: upstream/registry\n"));
+    for removed_field in ["Author:", "source_bundle_hash:", "manifest_hash:"] {
         assert!(!stdout.contains(removed_field), "{stdout}");
     }
     assert_eq!(
@@ -899,13 +951,12 @@ fn removes_selected_bundles_without_changing_head_remote_or_unrelated_files() {
             "unrelated contents"
         );
     }
-    // Staged deletions remain dirty until the operator commits or restores them.
-    let output = run_preserving(&dir, &repo, &["remove-registry", CODE_HASH]);
-    assert_failure(&output, "uncommitted changes");
+    let stdout = assert_success(run_preserving(&dir, &repo, &["remove-registry", CODE_HASH]));
+    assert!(stdout.contains(&format!("{CODE_HASH}: not found")));
 }
 
 #[test]
-fn removes_the_last_bundle_without_creating_a_commit() {
+fn commits_and_pushes_removal_of_the_last_bundle() {
     let dir = fixture(MINIMAL_CONFIG);
     let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
     let original = git(&repo, &["rev-parse", "HEAD"]);
@@ -917,13 +968,14 @@ fn removes_the_last_bundle_without_creating_a_commit() {
     );
     assert_eq!(git(&repo, &["ls-files"]), ".gitattributes");
     assert!(!repo.join(bundle_path("sources")).exists());
-    assert_eq!(git(&repo, &["rev-parse", "HEAD"]), original);
+    let head = git(&repo, &["rev-parse", "HEAD"]);
+    assert_eq!(git(&repo, &["rev-parse", "HEAD^"]), original);
     assert_eq!(
         git(
             &dir.path().join("source-repo.git"),
             &["rev-parse", "refs/heads/main"]
         ),
-        original
+        head
     );
 }
 
@@ -1032,6 +1084,426 @@ fi
         original
     );
     assert!(!git(&repo, &["diff", "--cached", "--name-only"]).is_empty());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn backend_restart_rebuilds_registry_after_cli_removal_without_changing_payments() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    git(&repo, &["rm", "-r", "--", "sources"]);
+    git(&repo, &["commit", "-m", "Remove placeholder bundle"]);
+    git(&repo, &["push", "origin", "HEAD:main"]);
+    let index_path = dir.path().join("registry.sqlite");
+    let ledger_path = dir.path().join("payments.sqlite");
+    let config_bytes = format!(
+        "[server]\nblocked_code_hashes = ['{CODE_HASH}']\n\
+         [source_repository]\npath = '{}'\nbranch = 'main'\ncommit_enabled = true\npush_enabled = true\n\
+         [registry_index]\npath = '{}'\n\
+         [payment]\nledger_path = '{}'\n\
+         [compiler]\nnode_bin = '/unavailable-node'\nworker_path = '/unavailable-worker'\n",
+        repo.display(),
+        index_path.display(),
+        ledger_path.display()
+    );
+    fs::write(dir.path().join("config.toml"), &config_bytes).expect("backend config");
+    let config = Config::load_from_path(dir.path().join("config.toml")).expect("config");
+    let second_hash = "bb".repeat(32);
+    let hashes = [CODE_HASH, second_hash.as_str()];
+    let storage = GitSourceStorage::from_config(&config);
+    for hash in hashes {
+        storage
+            .store_bundle(verified_bundle_request(hash))
+            .await
+            .expect("store verified bundle");
+    }
+    let index = SqliteVerificationIndex::open(&index_path).expect("index");
+    index
+        .ensure_current(&storage)
+        .await
+        .expect("initial registry");
+    assert_eq!(index.statistics().await.expect("statistics").total, 2);
+    assert_eq!(
+        index
+            .abi_contracts(IndexedAbiContractsQuery {
+                code_hash: None,
+                limit: 10,
+                offset: 0
+            })
+            .await
+            .expect("ABI collection")
+            .total,
+        2
+    );
+    drop(index);
+    drop(storage);
+
+    drop(PaymentLedger::open(&ledger_path).expect("payment ledger"));
+    let ledger = rusqlite::Connection::open(&ledger_path).expect("ledger fixture");
+    ledger.execute(
+        "insert into payment_transactions values (?1, ?2, 100, 1, 1600000000, 'consumed', 1600000000, 1)",
+        rusqlite::params!["dd".repeat(32), CODE_HASH],
+    ).expect("consumed payment");
+    drop(ledger);
+    let ledger_before = fs::read(&ledger_path).expect("ledger bytes");
+
+    for (removed_index, hash) in hashes.into_iter().enumerate() {
+        let index_before = fs::read(&index_path).expect("registry bytes");
+        let bundle = bundle_path_for("sources", hash);
+        let verify_message = git(&repo, &["log", "-1", "--format=%B", "--", &bundle]);
+        assert_success(
+            cli(&dir)
+                .args(["remove-registry", hash])
+                .output()
+                .expect("run CLI"),
+        );
+        assert_eq!(
+            git(&repo, &["show", "-s", "--format=%B"]),
+            verify_message.replacen("Verify code hash", "Revoke verification for code hash", 1)
+        );
+        assert_eq!(fs::read(&index_path).expect("registry bytes"), index_before);
+        assert_eq!(fs::read(&ledger_path).expect("ledger bytes"), ledger_before);
+        assert_eq!(
+            fs::read_to_string(dir.path().join("config.toml")).expect("config bytes"),
+            config_bytes
+        );
+
+        // Reopen the same storage and persistent index, as backend startup does.
+        let storage = GitSourceStorage::from_config(&config);
+        let index = SqliteVerificationIndex::open(&index_path).expect("reopen registry");
+        index
+            .ensure_current(&storage)
+            .await
+            .expect("rebuild registry on restart");
+        let remaining = hashes.len() - removed_index - 1;
+        assert_eq!(
+            index.statistics().await.expect("statistics").total,
+            remaining
+        );
+        assert_eq!(
+            index.last_verified(10, 0).await.expect("collection").total,
+            remaining
+        );
+        for (position, query_hash) in hashes.into_iter().enumerate() {
+            let present = position > removed_index;
+            assert_eq!(
+                index.status(query_hash).await.expect("status").verified,
+                present
+            );
+            assert_eq!(
+                index
+                    .bundle(query_hash)
+                    .await
+                    .expect("indexed source")
+                    .is_some(),
+                present
+            );
+            assert_eq!(
+                storage
+                    .load_bundle(query_hash)
+                    .await
+                    .expect("stored source")
+                    .is_some(),
+                present
+            );
+            assert_eq!(
+                index
+                    .abi_contracts(IndexedAbiContractsQuery {
+                        code_hash: Some(query_hash.to_owned()),
+                        limit: 10,
+                        offset: 0
+                    })
+                    .await
+                    .expect("ABI")
+                    .total,
+                usize::from(present)
+            );
+        }
+        let policy = CodeHashPolicy::from_blocked(config.blocked_code_hashes()).expect("blocklist");
+        assert!(policy.is_blocked(CODE_HASH));
+        assert!(!policy.is_blocked(&second_hash));
+    }
+    let ledger = rusqlite::Connection::open(&ledger_path).expect("reopen ledger");
+    let state: String = ledger
+        .query_row(
+            "select state from payment_transactions where transaction_hash = ?1",
+            ["dd".repeat(32)],
+            |row| row.get(0),
+        )
+        .expect("payment state");
+    assert_eq!(state, "consumed");
+}
+
+fn verified_bundle_request(code_hash: &str) -> StoreSourceBundleRequest {
+    let compiler = CompilerMetadata {
+        language: "tolk".to_owned(),
+        version: "1.4.2".to_owned(),
+        entrypoint: "main.tolk".to_owned(),
+        params: serde_json::json!({"compiler_version": "1.4.2"}),
+    };
+    let files = vec![
+        SourceStorageFile {
+            path: "main.tolk".to_owned(),
+            content: "fun main() {}".to_owned(),
+            include_in_command: None,
+            is_stdlib: None,
+            has_include_directives: None,
+        },
+        SourceStorageFile {
+            path: "main.abi.json".to_owned(),
+            content: r#"{"name":"Fixture","get_methods":[]}"#.to_owned(),
+            include_in_command: None,
+            is_stdlib: None,
+            has_include_directives: None,
+        },
+    ];
+    let source_bundle_hash = compute_source_bundle_hash(SourceBundleInput {
+        compiler: SourceBundleCompiler {
+            language: &compiler.language,
+            version: &compiler.version,
+            entrypoint: &compiler.entrypoint,
+            params: &compiler.params,
+        },
+        sources: files
+            .iter()
+            .map(|file| SourceBundleSource {
+                path: &file.path,
+                include_in_command: file.include_in_command,
+                is_stdlib: file.is_stdlib,
+                has_include_directives: file.has_include_directives,
+            })
+            .collect(),
+        files: files
+            .iter()
+            .map(|file| SourceBundleFile {
+                path: &file.path,
+                bytes: file.content.as_bytes(),
+            })
+            .collect(),
+    })
+    .expect("source bundle hash");
+    StoreSourceBundleRequest {
+        code_hash: code_hash.to_owned(),
+        source_bundle_hash,
+        payment_tx_hash: None,
+        verified_at: Some(1_600_000_000),
+        compiler,
+        files,
+        source_map: None,
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn commit_failure_restores_current_bundle_and_preserves_completed_commits() {
+    let second_hash = "bb".repeat(32);
+    let third_hash = "cc".repeat(32);
+    for failed_hash in [CODE_HASH, second_hash.as_str()] {
+        let dir = fixture(MINIMAL_CONFIG);
+        let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+        for hash in [&second_hash, &third_hash] {
+            let path = repo.join(bundle_path_for("sources", hash));
+            fs::create_dir_all(&path).expect("bundle directory");
+            fs::write(path.join("source.tolk"), "// source").expect("source");
+        }
+        git(&repo, &["add", "--all"]);
+        git(&repo, &["commit", "-m", "Add more bundles"]);
+        git(&repo, &["push", "origin", "HEAD:main"]);
+        let original = git(&repo, &["rev-parse", "HEAD"]);
+        let failed_bundle = repo.join(bundle_path_for("sources", failed_hash));
+        let before = directory_entries(&failed_bundle);
+        let push_marker = dir.path().join("push-attempted");
+        let output = cli_with_git_script(
+            &dir,
+            r#"
+if [ "$1" = commit ]; then
+    case "$4" in
+        *"$CLI_TEST_FAIL_HASH"*) echo 'injected commit failure' >&2; exit 1 ;;
+    esac
+fi
+if [ "$1" = push ]; then touch "$CLI_TEST_PUSH_MARKER"; fi
+"#,
+        )
+        .env("CLI_TEST_FAIL_HASH", failed_hash)
+        .env("CLI_TEST_PUSH_MARKER", &push_marker)
+        .args(["remove-registry", CODE_HASH, &second_hash, &third_hash])
+        .output()
+        .expect("run CLI");
+        assert_failure(&output, "injected commit failure");
+        assert_failure(
+            &output,
+            "planned tracked files and index entries were restored",
+        );
+        assert_eq!(directory_entries(&failed_bundle), before);
+        assert!(repo.join(bundle_path_for("sources", &third_hash)).exists());
+        assert_eq!(git(&repo, &["status", "--porcelain=v1"]), "");
+        assert_eq!(
+            git(
+                &dir.path().join("source-repo.git"),
+                &["rev-parse", "refs/heads/main"]
+            ),
+            original
+        );
+        assert!(!push_marker.exists());
+        if failed_hash == CODE_HASH {
+            assert_eq!(git(&repo, &["rev-parse", "HEAD"]), original);
+        } else {
+            assert_eq!(git(&repo, &["rev-parse", "HEAD^"]), original);
+            assert!(!repo.join(bundle_path("sources")).exists());
+            assert_failure(&output, &git(&repo, &["rev-parse", "HEAD"]));
+            assert_failure(&output, "earlier local commits are preserved");
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn commit_created_before_command_failure_is_preserved() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    let original = git(&repo, &["rev-parse", "HEAD"]);
+    let output = cli_with_git_script(
+        &dir,
+        r#"
+if [ "$1" = commit ]; then
+    "$CLI_TEST_REAL_GIT" "$@"
+    echo 'failure after commit' >&2
+    exit 1
+fi
+"#,
+    )
+    .args(["remove-registry", CODE_HASH])
+    .output()
+    .expect("run CLI");
+    assert_failure(&output, "failure after commit");
+    assert_failure(&output, "local commit preserved, push was not attempted");
+    assert_failure(&output, &git(&repo, &["rev-parse", "HEAD"]));
+    assert_eq!(git(&repo, &["rev-parse", "HEAD^"]), original);
+    assert_eq!(git(&repo, &["status", "--porcelain=v1"]), "");
+    assert!(!repo.join(bundle_path("sources")).exists());
+    assert_eq!(
+        git(
+            &dir.path().join("source-repo.git"),
+            &["rev-parse", "refs/heads/main"]
+        ),
+        original
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn failed_head_check_skips_recovery_after_a_commit_error() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    let original = git(&repo, &["rev-parse", "HEAD"]);
+    let output = cli_with_git_script(
+        &dir,
+        r#"
+if [ "$1" = commit ]; then
+    "$CLI_TEST_REAL_GIT" "$@"
+    touch "$CLI_TEST_MARKER"
+    echo 'failure after commit' >&2
+    exit 1
+fi
+if [ "$1" = rev-parse ] && [ -f "$CLI_TEST_MARKER" ]; then
+    echo 'HEAD unavailable' >&2
+    exit 1
+fi
+"#,
+    )
+    .env("CLI_TEST_MARKER", dir.path().join("committed"))
+    .args(["remove-registry", CODE_HASH])
+    .output()
+    .expect("run CLI");
+    assert_failure(&output, "failure after commit");
+    assert_failure(&output, "HEAD unavailable");
+    assert_failure(&output, "recovery was skipped");
+    assert_eq!(git(&repo, &["rev-parse", "HEAD^"]), original);
+    assert_eq!(git(&repo, &["status", "--porcelain=v1"]), "");
+    assert!(!repo.join(bundle_path("sources")).exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn push_failure_preserves_commits_even_when_remote_accepted_them() {
+    for accepted in [false, true] {
+        let dir = fixture(MINIMAL_CONFIG);
+        let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+        let remote = dir.path().join("source-repo.git");
+        let original = git(&repo, &["rev-parse", "HEAD"]);
+        let output = cli_with_git_script(
+            &dir,
+            r#"
+if [ "$1" = push ]; then
+    if [ "$CLI_TEST_ACCEPTED" = true ]; then "$CLI_TEST_REAL_GIT" "$@"; fi
+    echo 'injected push failure' >&2
+    exit 1
+fi
+"#,
+        )
+        .env("CLI_TEST_ACCEPTED", accepted.to_string())
+        .args(["remove-registry", CODE_HASH])
+        .output()
+        .expect("run CLI");
+        let head = git(&repo, &["rev-parse", "HEAD"]);
+        assert_failure(&output, "injected push failure");
+        assert_failure(&output, &format!("local commits are preserved at {head}"));
+        assert_failure(&output, "inspect the remote before retrying publication");
+        assert_eq!(git(&repo, &["rev-parse", "HEAD^"]), original);
+        assert_eq!(git(&repo, &["status", "--porcelain=v1"]), "");
+        assert!(!repo.join(bundle_path("sources")).exists());
+        assert_eq!(
+            git(&remote, &["rev-parse", "refs/heads/main"]),
+            if accepted { head } else { original }
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn remote_advancing_after_checks_rejects_push_without_force() {
+    let dir = fixture(MINIMAL_CONFIG);
+    let repo = prepare_repository(&dir, "source-repo", "sources", "origin", "main");
+    let remote = dir.path().join("source-repo.git");
+    let original = git(&repo, &["rev-parse", "HEAD"]);
+    let tree = git(&repo, &["rev-parse", "HEAD^{tree}"]);
+    let competing = git(
+        &repo,
+        &[
+            "commit-tree",
+            &tree,
+            "-p",
+            &original,
+            "-m",
+            "Concurrent publication",
+        ],
+    );
+    git(
+        &repo,
+        &[
+            "push",
+            "origin",
+            &format!("{competing}:refs/heads/competing"),
+        ],
+    );
+    let output = cli_with_git_script(
+        &dir,
+        r#"
+if [ "$1" = push ]; then
+    "$CLI_TEST_REAL_GIT" -C "$CLI_TEST_REMOTE" update-ref refs/heads/main "$CLI_TEST_COMPETING"
+fi
+"#,
+    )
+    .env("CLI_TEST_REMOTE", &remote)
+    .env("CLI_TEST_COMPETING", &competing)
+    .args(["remove-registry", CODE_HASH])
+    .output()
+    .expect("run CLI");
+    assert_failure(&output, "push to origin/main failed");
+    assert_failure(&output, &git(&repo, &["rev-parse", "HEAD"]));
+    assert_eq!(git(&remote, &["rev-parse", "refs/heads/main"]), competing);
+    assert_eq!(git(&repo, &["rev-parse", "HEAD^"]), original);
+    assert_eq!(git(&repo, &["status", "--porcelain=v1"]), "");
 }
 
 #[cfg(unix)]

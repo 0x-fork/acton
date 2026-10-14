@@ -11,7 +11,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum CliCommand {
-    /// Remove selected registry bundles from the checkout and stage their deletion
+    /// Remove selected registry bundles, commit each deletion and push
     RemoveRegistry(RemoveRegistryArgs),
 }
 

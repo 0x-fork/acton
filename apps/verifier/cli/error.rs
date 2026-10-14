@@ -41,4 +41,35 @@ pub enum CliError {
         operation: Box<SourceStorageError>,
         recovery: Box<SourceStorageError>,
     },
+    #[error(
+        "registry removal failed: {operation}; checking HEAD also failed: {check}; recovery was skipped to preserve possible commits; inspect git status and git log before retrying"
+    )]
+    HeadCheckFailed {
+        operation: Box<SourceStorageError>,
+        check: Box<SourceStorageError>,
+    },
+    #[error(
+        "registry removal failed: {source}; HEAD changed to {head}; local commit preserved, push was not attempted; inspect git status and the commit before publishing"
+    )]
+    LocalCommitPreserved {
+        source: Box<SourceStorageError>,
+        head: String,
+    },
+    #[error(
+        "removal stopped at code hash {code_hash}: {source}; earlier local commits are preserved at {head}; remaining bundles were not processed and push was not attempted"
+    )]
+    PartialRemoval {
+        code_hash: String,
+        head: String,
+        source: Box<Self>,
+    },
+    #[error(
+        "push to {remote}/{branch} failed: {source}; local commits are preserved at {head}; inspect the remote before retrying publication"
+    )]
+    PushFailed {
+        remote: String,
+        branch: String,
+        head: String,
+        source: Box<SourceStorageError>,
+    },
 }
