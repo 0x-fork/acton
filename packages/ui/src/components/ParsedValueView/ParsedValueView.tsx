@@ -23,11 +23,12 @@ export interface ParsedValueViewProps extends ContractReferenceOptions {
   readonly fallbackTypeName?: string
   readonly fieldName?: string
   readonly onCellInspect?: (boc: string) => void
+  readonly onDomainClick?: (domain: string, event?: React.MouseEvent<HTMLElement>) => void
   readonly renderCodeCellDetails?: (cell: ParsedCodeCell) => ReactNode
 }
 
 type ParsedValueContext = ContractReferenceOptions &
-  Pick<ParsedValueViewProps, "onCellInspect" | "renderCodeCellDetails">
+  Pick<ParsedValueViewProps, "onCellInspect" | "onDomainClick" | "renderCodeCellDetails">
 
 const LARGE_COLLECTION_THRESHOLD = 8
 
@@ -96,17 +97,29 @@ function ParsedValueRow({
   formatAddress,
   onContractClick,
   onCellInspect,
+  onDomainClick,
   renderCodeCellDetails,
 }: ParsedValueContext & {readonly label: string; readonly value: ParsedValue}) {
   const isLargeCollection =
     (value.kind === "array" && value.items.length > LARGE_COLLECTION_THRESHOLD) ||
     (value.kind === "map" && value.entries.length > LARGE_COLLECTION_THRESHOLD)
+  const isEmptyMap = value.kind === "map" && value.entries.length === 0
+  const isNestedValue =
+    (value.kind === "object" && value.entries.length > 0) ||
+    (value.kind === "array" && value.items.length > 0) ||
+    (value.kind === "map" && value.entries.length > 0)
+  const isDomain = value.kind === "scalar" && value.typeName === "TonDnsDomain"
+  const isOffchainUrl = value.kind === "scalar" && value.typeName === "OffchainUrl"
 
   return (
     <>
-      <div className={styles.parsedEntryKey}>{label}:</div>
       <div
-        className={`${styles.parsedEntryValue} ${isLargeCollection ? styles.parsedLargeCollectionValue : ""}`}
+        className={`${styles.parsedEntryKey} ${isNestedValue ? styles.parsedEntryKeyNested : ""} ${isEmptyMap ? styles.parsedEmptyMapCell : ""}`}
+      >
+        {label}:
+      </div>
+      <div
+        className={`${styles.parsedEntryValue} ${isLargeCollection ? styles.parsedLargeCollectionValue : ""} ${isEmptyMap ? styles.parsedEmptyMapCell : ""} ${isDomain || isOffchainUrl ? styles.parsedLinkedEntryValue : ""}`}
       >
         <ParsedValueView
           value={value}
@@ -114,6 +127,7 @@ function ParsedValueRow({
           formatAddress={formatAddress}
           onContractClick={onContractClick}
           onCellInspect={onCellInspect}
+          onDomainClick={onDomainClick}
           renderCodeCellDetails={renderCodeCellDetails}
           fieldName={label}
         />
@@ -128,6 +142,7 @@ function ParsedMapEntry({
   formatAddress,
   onContractClick,
   onCellInspect,
+  onDomainClick,
   renderCodeCellDetails,
 }: ParsedValueContext & {readonly entry: ParsedValueMapEntry}) {
   return (
@@ -147,6 +162,7 @@ function ParsedMapEntry({
             formatAddress={formatAddress}
             onContractClick={onContractClick}
             onCellInspect={onCellInspect}
+            onDomainClick={onDomainClick}
             renderCodeCellDetails={renderCodeCellDetails}
             fieldName={
               entry.key.kind === "scalar" && entry.key.typeName === "uint256" ? "key" : undefined
@@ -175,6 +191,7 @@ function ParsedMapEntry({
             formatAddress={formatAddress}
             onContractClick={onContractClick}
             onCellInspect={onCellInspect}
+            onDomainClick={onDomainClick}
             renderCodeCellDetails={renderCodeCellDetails}
           />
         </div>
@@ -187,11 +204,13 @@ function ParsedScalarValue({
   value,
   fieldName,
   onCellInspect,
+  onDomainClick,
   renderCodeCellDetails,
 }: {
   readonly value: Extract<ParsedValue, {readonly kind: "scalar"}>
   readonly fieldName?: string
   readonly onCellInspect?: (boc: string) => void
+  readonly onDomainClick?: ParsedValueViewProps["onDomainClick"]
   readonly renderCodeCellDetails?: (cell: ParsedCodeCell) => ReactNode
 }) {
   const [isCodeOpen, setIsCodeOpen] = useState(false)
@@ -210,6 +229,79 @@ function ParsedScalarValue({
       value={displayValue}
     />
   )
+  if (value.typeName === "TonDnsDomain") {
+    const domainValue = onDomainClick ? (
+      <button
+        type="button"
+        className={styles.parsedDomainLink}
+        onClick={event => onDomainClick(value.value, event)}
+        onAuxClick={event => {
+          if (event.button === 1) onDomainClick(value.value, event)
+        }}
+      >
+        {value.value}
+      </button>
+    ) : (
+      <span className={styles.parsedDomainName}>{value.value}</span>
+    )
+
+    return (
+      <InlineActions
+        actions={
+          <CopyInlineAction
+            value={value.value}
+            label="Copy domain"
+            copiedLabel="Domain copied"
+            size="compact"
+          />
+        }
+      >
+        {domainValue}
+      </InlineActions>
+    )
+  }
+  if (value.typeName === "OffchainUrl") {
+    let href: string | undefined
+    try {
+      const parsed = new URL(value.value)
+      if (
+        value.value.trim() === value.value &&
+        (parsed.protocol === "https:" || parsed.protocol === "http:") &&
+        !parsed.username &&
+        !parsed.password
+      ) {
+        href = parsed.toString()
+      }
+    } catch {
+      // An invalid URI remains readable and copyable.
+    }
+
+    return (
+      <InlineActions
+        actions={
+          <CopyInlineAction
+            value={value.value}
+            label="Copy URL"
+            copiedLabel="URL copied"
+            size="compact"
+          />
+        }
+      >
+        {href ? (
+          <a
+            className={styles.parsedExternalLink}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {value.value}
+          </a>
+        ) : (
+          <span className={styles.parsedExternalUrl}>{value.value}</span>
+        )}
+      </InlineActions>
+    )
+  }
   const codeCell =
     value.typeName === "Cell" &&
     value.rawValue &&
@@ -290,9 +382,17 @@ export function ParsedValueView({
   fallbackTypeName,
   fieldName,
   onCellInspect,
+  onDomainClick,
   renderCodeCellDetails,
 }: ParsedValueViewProps) {
-  const context = {contracts, formatAddress, onContractClick, onCellInspect, renderCodeCellDetails}
+  const context = {
+    contracts,
+    formatAddress,
+    onContractClick,
+    onCellInspect,
+    onDomainClick,
+    renderCodeCellDetails,
+  }
 
   switch (value.kind) {
     case "null":
@@ -313,6 +413,7 @@ export function ParsedValueView({
           value={value}
           fieldName={fieldName}
           onCellInspect={onCellInspect}
+          onDomainClick={onDomainClick}
           renderCodeCellDetails={renderCodeCellDetails}
         />
       )
@@ -358,24 +459,25 @@ export function ParsedValueView({
       )
     }
     case "map":
+      if (value.entries.length === 0) {
+        return (
+          <span className={styles.parsedBadge}>
+            {value.typeName ?? "map"} <span className={styles.parsedEmpty}>{"{}"}</span>
+          </span>
+        )
+      }
+
       return (
         <div className={styles.parsedContainer}>
-          {value.entries.length === 0 ? (
-            <>
-              <span className={styles.parsedBadge}>{value.typeName ?? "map"}</span>
-              <span className={styles.parsedEmpty}>{"{}"}</span>
-            </>
-          ) : (
-            <ParsedCollection
-              label={value.typeName ?? "map"}
-              itemCount={value.entries.length}
-              contentClassName={styles.parsedNestedMap}
-            >
-              {value.entries.map(entry => (
-                <ParsedMapEntry key={JSON.stringify(entry.key)} entry={entry} {...context} />
-              ))}
-            </ParsedCollection>
-          )}
+          <ParsedCollection
+            label={value.typeName ?? "map"}
+            itemCount={value.entries.length}
+            contentClassName={styles.parsedNestedMap}
+          >
+            {value.entries.map(entry => (
+              <ParsedMapEntry key={JSON.stringify(entry.key)} entry={entry} {...context} />
+            ))}
+          </ParsedCollection>
         </div>
       )
   }

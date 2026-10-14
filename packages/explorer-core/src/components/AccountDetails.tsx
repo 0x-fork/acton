@@ -6,6 +6,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -90,6 +91,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
+import {AnimatePresence, motion, useReducedMotion} from "framer-motion"
 
 import type {
   AddressInformation,
@@ -390,6 +392,8 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   onTabChange,
 }) => {
   const [activeTab, setActiveTab] = useState<string>("history")
+  const tabHighlightId = useId()
+  const reduceMotion = useReducedMotion()
   const activeTabRef = useRef<HTMLButtonElement>(null)
   const filterPopoverRef = useRef<HTMLDivElement>(null)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
@@ -405,6 +409,9 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   const [transactionFilters, setTransactionFilters] =
     useState<AccountTransactionFilters>(readTransactionFilters)
   const effectiveSortOrder = historySortOrder ?? transactionFilters.sortOrder
+  const selectedTimeFormatIndex = TIME_FORMAT_OPTIONS.findIndex(
+    option => option.value === transactionFilters.timeFormat,
+  )
   const showNftsTab = !nftsLoading && nftItems.length > 0
   const activeCustomTab = customTabs.find(tab => tab.id === activeTab)
   const hasCustomTab = (id: string) => customTabs.some(tab => tab.id === id)
@@ -876,7 +883,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
       } as CSSProperties)
     : undefined
 
-  const renderCustomTab = (tab: AccountDetailsTab) => (
+  const renderTab = (tab: Pick<AccountDetailsTab, "id" | "label" | "icon">) => (
     <button
       key={tab.id}
       type="button"
@@ -884,6 +891,15 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
       className={`${styles.tab} ${activeTab === tab.id ? styles.tabActive : ""}`}
       onClick={() => handleTabClick(tab.id)}
     >
+      {activeTab === tab.id && (
+        <motion.span
+          aria-hidden="true"
+          className={styles.tabHighlight}
+          layoutId={tabHighlightId}
+          style={{borderRadius: 8}}
+          transition={{duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1]}}
+        />
+      )}
       <span className={styles.tabIcon} aria-hidden="true">
         {tab.icon}
       </span>
@@ -894,95 +910,19 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   return (
     <section className={styles.tableCard}>
       <div className={styles.tabs}>
-        <div className={styles.primaryTabs}>
-          <button
-            type="button"
-            ref={activeTab === "history" ? activeTabRef : undefined}
-            className={`${styles.tab} ${activeTab === "history" ? styles.tabActive : ""}`}
-            onClick={() => handleTabClick("history")}
-          >
-            <span className={styles.tabIcon} aria-hidden="true">
-              <History size={18} />
-            </span>
-            History
-          </button>
-          {customTabs.filter(tab => tab.placement !== "after-methods").map(renderCustomTab)}
-          <button
-            type="button"
-            ref={activeTab === "tokens" ? activeTabRef : undefined}
-            className={`${styles.tab} ${activeTab === "tokens" ? styles.tabActive : ""}`}
-            onClick={() => handleTabClick("tokens")}
-          >
-            <span className={styles.tabIcon} aria-hidden="true">
-              <Coins size={18} />
-            </span>
-            Tokens
-          </button>
-          {(showHoldersTab || jettonMaster) && (
-            <button
-              type="button"
-              ref={activeTab === "holders" ? activeTabRef : undefined}
-              className={`${styles.tab} ${activeTab === "holders" ? styles.tabActive : ""}`}
-              onClick={() => handleTabClick("holders")}
-            >
-              <span className={styles.tabIcon} aria-hidden="true">
-                <UsersRound size={18} />
-              </span>
-              Holders
-            </button>
-          )}
-          {showItemsTab && (
-            <button
-              type="button"
-              ref={activeTab === "items" ? activeTabRef : undefined}
-              className={`${styles.tab} ${activeTab === "items" ? styles.tabActive : ""}`}
-              onClick={() => handleTabClick("items")}
-            >
-              <span className={styles.tabIcon} aria-hidden="true">
-                <Layers size={18} />
-              </span>
-              Items
-            </button>
-          )}
-          {showNftsTab && (
-            <button
-              type="button"
-              ref={activeTab === "nfts" ? activeTabRef : undefined}
-              className={`${styles.tab} ${activeTab === "nfts" ? styles.tabActive : ""}`}
-              onClick={() => handleTabClick("nfts")}
-            >
-              <span className={styles.tabIcon} aria-hidden="true">
-                <Image size={18} />
-              </span>
-              Collectibles
-            </button>
-          )}
-          <button
-            type="button"
-            ref={activeTab === "contract" ? activeTabRef : undefined}
-            className={`${styles.tab} ${activeTab === "contract" ? styles.tabActive : ""}`}
-            onClick={() => handleTabClick("contract")}
-          >
-            <span className={styles.tabIcon} aria-hidden="true">
-              <Braces size={18} />
-            </span>
-            Contract
-          </button>
-          {compilerAbi && (
-            <button
-              type="button"
-              ref={activeTab === "get-methods" ? activeTabRef : undefined}
-              className={`${styles.tab} ${activeTab === "get-methods" ? styles.tabActive : ""}`}
-              onClick={() => handleTabClick("get-methods")}
-            >
-              <span className={styles.tabIcon} aria-hidden="true">
-                <SquareFunction size={18} />
-              </span>
-              Methods
-            </button>
-          )}
-          {customTabs.filter(tab => tab.placement === "after-methods").map(renderCustomTab)}
-        </div>
+        <motion.div className={styles.primaryTabs} layoutScroll>
+          {renderTab({id: "history", label: "History", icon: <History size={18} />})}
+          {customTabs.filter(tab => tab.placement !== "after-methods").map(renderTab)}
+          {renderTab({id: "tokens", label: "Tokens", icon: <Coins size={18} />})}
+          {(showHoldersTab || jettonMaster) &&
+            renderTab({id: "holders", label: "Holders", icon: <UsersRound size={18} />})}
+          {showItemsTab && renderTab({id: "items", label: "Items", icon: <Layers size={18} />})}
+          {showNftsTab && renderTab({id: "nfts", label: "Collectibles", icon: <Image size={18} />})}
+          {renderTab({id: "contract", label: "Contract", icon: <Braces size={18} />})}
+          {compilerAbi &&
+            renderTab({id: "get-methods", label: "Methods", icon: <SquareFunction size={18} />})}
+          {customTabs.filter(tab => tab.placement === "after-methods").map(renderTab)}
+        </motion.div>
         {activeTab === "history" && (
           <div className={styles.tabActions}>
             {SHOW_HISTORY_CALENDAR_TAB && (
@@ -1009,122 +949,172 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                 </span>
                 Filters
               </button>
-              {isFiltersOpen && (
-                <div
-                  className={styles.filtersPopover}
-                  style={filtersPopoverStyle}
-                  role="dialog"
-                  aria-label="History filters"
-                >
-                  {actionsSupported && (
+              <AnimatePresence>
+                {isFiltersOpen && (
+                  <motion.div
+                    className={styles.filtersPopover}
+                    style={filtersPopoverStyle}
+                    role="dialog"
+                    aria-label="History filters"
+                    initial={reduceMotion ? false : {opacity: 0, y: -12}}
+                    animate={{opacity: 1, y: 0}}
+                    exit={
+                      reduceMotion
+                        ? {opacity: 0, transition: {duration: 0}}
+                        : {opacity: 0, y: -8, transition: {duration: 0.16}}
+                    }
+                    transition={
+                      reduceMotion ? {duration: 0} : {type: "spring", stiffness: 420, damping: 32}
+                    }
+                  >
+                    {actionsSupported && (
+                      <section className={styles.filterSection}>
+                        <div className={styles.filterSectionTitle}>History view</div>
+                        <div className={styles.segmentedControl}>
+                          <motion.span
+                            aria-hidden="true"
+                            className={styles.segmentedHighlight}
+                            initial={false}
+                            animate={{x: effectiveHistoryMode === "actions" ? "0%" : "100%"}}
+                            transition={{
+                              duration: reduceMotion ? 0 : 0.28,
+                              ease: [0.22, 1, 0.36, 1],
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className={`${styles.segmentedOption} ${
+                              effectiveHistoryMode === "actions" ? styles.segmentedOptionActive : ""
+                            }`}
+                            onClick={() => setHistoryMode("actions")}
+                            aria-pressed={effectiveHistoryMode === "actions"}
+                          >
+                            Actions
+                          </button>
+                          <button
+                            type="button"
+                            className={`${styles.segmentedOption} ${
+                              effectiveHistoryMode === "transactions"
+                                ? styles.segmentedOptionActive
+                                : ""
+                            }`}
+                            onClick={() => setHistoryMode("transactions")}
+                            aria-pressed={effectiveHistoryMode === "transactions"}
+                          >
+                            Transactions
+                          </button>
+                        </div>
+                      </section>
+                    )}
+
                     <section className={styles.filterSection}>
-                      <div className={styles.filterSectionTitle}>History view</div>
+                      <div className={styles.filterSectionTitle}>Actions</div>
+                      <div className={styles.actionFiltersList}>
+                        {actionFilterOptions.length === 0 ? (
+                          <div className={styles.filterEmptyState}>No actions yet</div>
+                        ) : (
+                          actionFilterOptions.map(option => {
+                            const selected = !hiddenActionKeys.has(option.key)
+                            return (
+                              <Tooltip
+                                key={option.key}
+                                content={`${option.label} (${option.count})`}
+                              >
+                                <button
+                                  type="button"
+                                  className={`${styles.actionFilterChip} ${
+                                    selected ? styles.actionFilterChipSelected : ""
+                                  }`}
+                                  onClick={() => toggleActionFilter(option.key)}
+                                  aria-pressed={selected}
+                                >
+                                  {option.label}
+                                </button>
+                              </Tooltip>
+                            )
+                          })
+                        )}
+                      </div>
+                    </section>
+
+                    <section className={styles.filterSection}>
+                      <div className={styles.filterSectionTitle}>Sort</div>
                       <div className={styles.segmentedControl}>
+                        <motion.span
+                          aria-hidden="true"
+                          className={styles.segmentedHighlight}
+                          initial={false}
+                          animate={{x: effectiveSortOrder === "desc" ? "0%" : "100%"}}
+                          transition={{duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1]}}
+                        />
                         <button
                           type="button"
                           className={`${styles.segmentedOption} ${
-                            effectiveHistoryMode === "actions" ? styles.segmentedOptionActive : ""
+                            effectiveSortOrder === "desc" ? styles.segmentedOptionActive : ""
                           }`}
-                          onClick={() => setHistoryMode("actions")}
+                          onClick={() => setSortOrder("desc")}
+                          aria-pressed={effectiveSortOrder === "desc"}
                         >
-                          Actions
+                          Newest first
                         </button>
                         <button
                           type="button"
                           className={`${styles.segmentedOption} ${
-                            effectiveHistoryMode === "transactions"
-                              ? styles.segmentedOptionActive
-                              : ""
+                            effectiveSortOrder === "asc" ? styles.segmentedOptionActive : ""
                           }`}
-                          onClick={() => setHistoryMode("transactions")}
+                          onClick={() => setSortOrder("asc")}
+                          aria-pressed={effectiveSortOrder === "asc"}
                         >
-                          Transactions
+                          Oldest first
                         </button>
                       </div>
                     </section>
-                  )}
 
-                  <section className={styles.filterSection}>
-                    <div className={styles.filterSectionTitle}>Actions</div>
-                    <div className={styles.actionFiltersList}>
-                      {actionFilterOptions.length === 0 ? (
-                        <div className={styles.filterEmptyState}>No actions yet</div>
-                      ) : (
-                        actionFilterOptions.map(option => {
-                          const selected = !hiddenActionKeys.has(option.key)
-                          return (
-                            <Tooltip key={option.key} content={`${option.label} (${option.count})`}>
-                              <button
-                                type="button"
-                                className={`${styles.actionFilterChip} ${
-                                  selected ? styles.actionFilterChipSelected : ""
-                                }`}
-                                onClick={() => toggleActionFilter(option.key)}
-                                aria-pressed={selected}
-                              >
-                                {option.label}
-                              </button>
-                            </Tooltip>
-                          )
-                        })
-                      )}
-                    </div>
-                  </section>
-
-                  <section className={styles.filterSection}>
-                    <div className={styles.filterSectionTitle}>Sort</div>
-                    <div className={styles.segmentedControl}>
-                      <button
-                        type="button"
-                        className={`${styles.segmentedOption} ${
-                          effectiveSortOrder === "desc" ? styles.segmentedOptionActive : ""
-                        }`}
-                        onClick={() => setSortOrder("desc")}
-                      >
-                        Newest first
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.segmentedOption} ${
-                          effectiveSortOrder === "asc" ? styles.segmentedOptionActive : ""
-                        }`}
-                        onClick={() => setSortOrder("asc")}
-                      >
-                        Oldest first
-                      </button>
-                    </div>
-                  </section>
-
-                  <section className={styles.filterSection}>
-                    <div className={styles.filterSectionTitle}>Time format</div>
-                    <div className={styles.timeFormatGrid}>
-                      {TIME_FORMAT_OPTIONS.map(option => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          className={`${styles.timeFormatOption} ${
-                            transactionFilters.timeFormat === option.value
-                              ? styles.timeFormatOptionActive
-                              : ""
-                          }`}
-                          onClick={() => setTimeFormat(option.value)}
-                          aria-pressed={transactionFilters.timeFormat === option.value}
-                        >
-                          <span className={styles.timeFormatLabel}>{option.label}</span>
-                          <span className={styles.timeFormatPreview}>{option.preview}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                  <button
-                    type="button"
-                    className={styles.filtersCloseButton}
-                    onClick={() => setIsFiltersOpen(false)}
-                  >
-                    Close
-                  </button>
-                </div>
-              )}
+                    <section className={styles.filterSection}>
+                      <div className={styles.filterSectionTitle}>Time format</div>
+                      <div className={styles.timeFormatGrid}>
+                        <motion.span
+                          aria-hidden="true"
+                          className={styles.timeFormatHighlight}
+                          initial={false}
+                          animate={{x: `${selectedTimeFormatIndex * 100}%`}}
+                          transition={{duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1]}}
+                        />
+                        <motion.span
+                          aria-hidden="true"
+                          className={styles.timeFormatHighlightMobile}
+                          initial={false}
+                          animate={{y: `${selectedTimeFormatIndex * 100}%`}}
+                          transition={{duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1]}}
+                        />
+                        {TIME_FORMAT_OPTIONS.map(option => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={`${styles.timeFormatOption} ${
+                              transactionFilters.timeFormat === option.value
+                                ? styles.timeFormatOptionActive
+                                : ""
+                            }`}
+                            onClick={() => setTimeFormat(option.value)}
+                            aria-pressed={transactionFilters.timeFormat === option.value}
+                          >
+                            <span className={styles.timeFormatLabel}>{option.label}</span>
+                            <span className={styles.timeFormatPreview}>{option.preview}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                    <button
+                      type="button"
+                      className={styles.filtersCloseButton}
+                      onClick={() => setIsFiltersOpen(false)}
+                    >
+                      Close
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         )}
@@ -1871,7 +1861,7 @@ const ActionHistoryRowView = memo(function ActionHistoryRowView({
         </Cell>
       )}
       <Cell className={styles.actionColumn} data-mobile-area="action">
-        <div className={styles.action}>
+        <div className={`${styles.action} ${info.success ? "" : styles.actionFailed}`}>
           <ActionIcon className={styles.actionIcon} aria-hidden="true" />
           <span
             className={`${styles.actionText} ${styles.opcode}`}
@@ -2202,7 +2192,7 @@ export function ActionHistoryTable({
           : undefined
       }
     >
-      <DataTableTable aria-label="Event overview" layout="auto" rowDividers={false}>
+      <DataTableTable aria-label="Action overview" layout="auto" rowDividers={false}>
         <DataTableHead>
           <DataTableRow>
             {showTimeColumn && <DataTableHeaderCell columnWidth="4rem">Time</DataTableHeaderCell>}

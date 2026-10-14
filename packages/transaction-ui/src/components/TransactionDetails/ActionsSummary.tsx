@@ -43,6 +43,7 @@ interface ActionsSummaryProps {
   readonly contractAddress: string
   readonly additionalMessageBodyAbis?: readonly NonNullable<ContractData["abi"]>[]
   readonly onContractClick?: (address: string) => void
+  readonly onDomainClick?: (domain: string, event?: React.MouseEvent<HTMLElement>) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
 }
 
@@ -220,6 +221,7 @@ const renderActionDetails = (
   contracts: Map<string, ContractData>,
   additionalMessageBodyAbis: readonly NonNullable<ContractData["abi"]>[],
   onContractClick?: (address: string) => void,
+  onDomainClick?: (domain: string, event?: React.MouseEvent<HTMLElement>) => void,
   renderSourceLocation?: (location: SourceLocation) => React.ReactNode,
 ): React.JSX.Element | undefined => {
   const execution = getActionExecutionMeta(executorAction)
@@ -303,7 +305,7 @@ const renderActionDetails = (
                   </span>
                 </div>
                 <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Bounce:</span>
+                  <span className={styles.detailLabel}>Can bounce:</span>
                   <span className={styles.detailValue}>
                     <BooleanValue value={info.bounce} />
                   </span>
@@ -398,6 +400,7 @@ const renderActionDetails = (
                     parsedBody={parsedBody}
                     contracts={contracts}
                     onContractClick={onContractClick}
+                    onDomainClick={onDomainClick}
                     defaultExpanded={true}
                   />
                 )}
@@ -568,6 +571,7 @@ export function ActionsSummary({
   contractAddress,
   additionalMessageBodyAbis = [],
   onContractClick,
+  onDomainClick,
   renderSourceLocation,
 }: ActionsSummaryProps): React.JSX.Element {
   const [selectedActionIndex, setSelectedActionIndex] = useState<number | undefined>()
@@ -714,6 +718,7 @@ export function ActionsSummary({
             contracts,
             additionalMessageBodyAbis,
             onContractClick,
+            onDomainClick,
             renderSourceLocation,
           )}
         </div>

@@ -9,7 +9,12 @@ import styles from "./ParsedBodySection.module.css"
 export interface ParsedBodySectionProps
   extends Pick<
     ParsedValueViewProps,
-    "contracts" | "formatAddress" | "onCellInspect" | "onContractClick" | "renderCodeCellDetails"
+    | "contracts"
+    | "formatAddress"
+    | "onCellInspect"
+    | "onContractClick"
+    | "onDomainClick"
+    | "renderCodeCellDetails"
   > {
   readonly parsedBody: ParsedTransactionBody | undefined
   readonly defaultExpanded?: boolean
@@ -22,6 +27,7 @@ export function ParsedBodySection({
   formatAddress,
   onCellInspect,
   onContractClick,
+  onDomainClick,
   renderCodeCellDetails,
   defaultExpanded = false,
   title = "Parsed body",
@@ -51,6 +57,7 @@ export function ParsedBodySection({
               formatAddress={formatAddress}
               onCellInspect={onCellInspect}
               onContractClick={onContractClick}
+              onDomainClick={onDomainClick}
               renderCodeCellDetails={renderCodeCellDetails}
               fallbackTypeName={parsedBody.name}
             />

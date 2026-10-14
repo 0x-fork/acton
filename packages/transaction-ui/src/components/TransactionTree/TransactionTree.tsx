@@ -125,6 +125,7 @@ interface TransactionTreeProps {
   readonly traceGapError?: string
   readonly onCellInspect?: (boc: string) => void
   readonly onContractClick?: (address: string) => void
+  readonly onDomainClick?: (domain: string, event?: React.MouseEvent<HTMLElement>) => void
   readonly onTransactionSelect?: (tx: TransactionInfo) => void
   readonly onTraceGapLoad?: () => void
   readonly renderAddressChip?: (
@@ -397,6 +398,7 @@ function TransactionTreeComponent({
   traceGapError,
   onCellInspect,
   onContractClick,
+  onDomainClick,
   onTransactionSelect,
   onTraceGapLoad,
   renderAddressChip,
@@ -1579,6 +1581,7 @@ function TransactionTreeComponent({
                 additionalAbis={additionalAbis}
                 onCellInspect={onCellInspect}
                 onContractClick={onContractClick}
+                onDomainClick={onDomainClick}
                 renderAddressChip={renderAddressChip}
               />
             ) : (
@@ -1591,6 +1594,7 @@ function TransactionTreeComponent({
                 allContracts={allContracts}
                 onCellInspect={onCellInspect}
                 onContractClick={onContractClick}
+                onDomainClick={onDomainClick}
                 renderSourceLocation={renderSourceLocation}
                 loadActions={loadActions}
                 renderMessageRouteAction={renderSelectedTransactionMessageRouteAction}

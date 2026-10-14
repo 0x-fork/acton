@@ -30,7 +30,9 @@
 }
 
 .authorizationValue {
+  gap: 10px;
   color: var(--acton-color-text);
+  font-size: var(--acton-font-size-compact);
 }
 
 .enabledDot,

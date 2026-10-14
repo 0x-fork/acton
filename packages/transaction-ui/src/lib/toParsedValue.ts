@@ -14,6 +14,9 @@ export interface ParsedValueTypeContext {
   readonly abi?: ContractABI
   readonly abiCandidates?: readonly ContractABI[]
   readonly nestedPayloadDepth?: number
+  /** The enclosing ABI field identifies protocol-specific remaining-slice formats. */
+  readonly parentStructName?: string
+  readonly fieldName?: string
   readonly decodeRemaining?: (
     slice: Slice,
     context: ParsedValueTypeContext,
@@ -212,7 +215,11 @@ const toParsedValueWithType = (
         typeName: renderTy(context.symbols, context.tyIdx),
         entries: context.symbols.structFieldsOf(context.tyIdx, false).map(field => ({
           key: field.name,
-          value: toParsedValue(objectValue[field.name], withTypeIndex(context, field.ty_idx)),
+          value: toParsedValue(objectValue[field.name], {
+            ...withTypeIndex(context, field.ty_idx),
+            parentStructName: ty.struct_name,
+            fieldName: field.name,
+          }),
         })),
       }
     }

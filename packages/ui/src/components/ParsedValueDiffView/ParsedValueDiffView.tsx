@@ -104,7 +104,9 @@ function renderArrayEntryValue(
     const pillClassName = diff.status === "added" ? styles.diffPillAfter : styles.diffPillBefore
 
     return (
-      <span className={`${styles.diffPill} ${pillClassName}`}>
+      <span
+        className={`${styles.diffPill} ${pillClassName} ${value?.kind === "address" ? styles.diffPillAddress : ""}`}
+      >
         {renderLeafValue(value, context, fieldName)}
       </span>
     )
@@ -127,7 +129,11 @@ function ParsedValueDiffRow({
 
   return (
     <div className={styles.nestedEntry}>
-      <div className={`${styles.entryKey} ${statusClassName ?? ""}`}>{label}:</div>
+      <div
+        className={`${styles.entryKey} ${diff.kind === "object" && diff.entries.length > 0 ? styles.entryKeyNested : ""} ${statusClassName ?? ""}`}
+      >
+        {label}:
+      </div>
       <div className={`${styles.entryValue} ${statusClassName ?? ""}`}>
         {compactEntryChange ? (
           renderArrayEntryValue(diff, context, label)
@@ -184,13 +190,27 @@ export function ParsedValueDiffView({
       )
     }
 
+    if (diff.status === "added" && diff.before === undefined && diff.after !== undefined) {
+      return (
+        <span
+          className={`${styles.diffPill} ${styles.diffPillAfter} ${diff.after.kind === "address" ? styles.diffPillAddress : ""}`}
+        >
+          {renderLeafValue(diff.after, context, fieldName)}
+        </span>
+      )
+    }
+
     return (
       <div className={styles.leafDiff}>
-        <span className={`${styles.diffPill} ${getBeforePillClassName(diff.status) ?? ""}`}>
+        <span
+          className={`${styles.diffPill} ${getBeforePillClassName(diff.status) ?? ""} ${diff.before?.kind === "address" ? styles.diffPillAddress : ""}`}
+        >
           {renderLeafValue(diff.before, context, fieldName)}
         </span>
         <DiffArrow />
-        <span className={`${styles.diffPill} ${getAfterPillClassName(diff.status) ?? ""}`}>
+        <span
+          className={`${styles.diffPill} ${getAfterPillClassName(diff.status) ?? ""} ${diff.after?.kind === "address" ? styles.diffPillAddress : ""}`}
+        >
           {renderLeafValue(diff.after, context, fieldName)}
         </span>
       </div>
@@ -198,6 +218,15 @@ export function ParsedValueDiffView({
   }
 
   const statusClassName = getEntryStatusClassName(diff.status)
+  if (diff.objectKind === "map" && diff.entries.length === 0) {
+    return (
+      <span className={styles.emptyMapValue}>
+        {diff.typeName && <span className={styles.typeLabel}>{diff.typeName}</span>}
+        <span className={`${styles.emptyValue} ${statusClassName ?? ""}`}>{"{}"}</span>
+      </span>
+    )
+  }
+
   const emptyValue = diff.objectKind === "array" ? "[]" : "{}"
   const isCollection = diff.objectKind === "array" || diff.objectKind === "map"
   const unchangedCount = isCollection

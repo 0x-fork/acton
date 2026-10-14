@@ -29,7 +29,7 @@
 }
 
 .visibilityHover:hover .actions,
-.visibilityHover:focus-within .actions {
+.visibilityHover:has(:focus-visible) .actions {
   opacity: 1;
   pointer-events: auto;
 }

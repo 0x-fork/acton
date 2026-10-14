@@ -146,8 +146,10 @@
 
 .tab:focus-visible,
 .editorTab:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--acton-color-focus-ring);
+  position: relative;
+  z-index: 2;
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: -3px;
 }
 
 .code {

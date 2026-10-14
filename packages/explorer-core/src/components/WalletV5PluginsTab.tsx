@@ -1,4 +1,5 @@
 import {useEffect, useMemo, useState} from "react"
+import {Puzzle} from "lucide-react"
 import {
   DataTable,
   DataTableBody,
@@ -8,6 +9,7 @@ import {
   DataTableHeaderCell,
   DataTableRow,
   DataTableTable,
+  EmptyState,
   InfoPopover,
   Skeleton,
 } from "@acton/ui"
@@ -161,7 +163,12 @@ export function WalletV5PluginsTab({
                   </DataTableRow>
                 ))}
                 {extensions.length === 0 && (
-                  <DataTableEmpty colSpan={2}>No plugins installed</DataTableEmpty>
+                  <DataTableEmpty colSpan={2}>
+                    <EmptyState
+                      icon={<Puzzle size={20} aria-hidden="true" />}
+                      title="No plugins installed"
+                    />
+                  </DataTableEmpty>
                 )}
               </DataTableBody>
             </DataTableTable>

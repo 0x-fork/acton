@@ -64,7 +64,7 @@
 }
 
 .table th:first-child {
-  padding-left: var(--acton-space-5);
+  padding-left: var(--acton-space-4);
 }
 
 .table th:last-child {
@@ -130,6 +130,7 @@
 }
 
 .primaryTabs {
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -153,6 +154,7 @@
 }
 
 .tab {
+  position: relative;
   min-height: 34px;
   padding: 0 10px;
   color: var(--acton-color-text-muted);
@@ -188,8 +190,11 @@
 }
 
 .tab:hover {
-  background: var(--acton-color-surface-hover);
   color: var(--acton-color-text);
+}
+
+.tabActions .tab:hover {
+  background: var(--acton-color-surface-hover);
 }
 
 .tab:hover .tabIcon {
@@ -198,6 +203,18 @@
 
 .tabActive {
   color: var(--acton-color-text);
+}
+
+.primaryTabs .tab:focus-visible {
+  outline: 1px solid var(--acton-color-text-muted);
+  outline-offset: -2px;
+}
+
+.tabHighlight {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background: var(--acton-color-surface-active);
 }
 
@@ -301,6 +318,7 @@
 }
 
 .segmentedControl {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 3px;
@@ -310,6 +328,8 @@
 }
 
 .segmentedOption {
+  position: relative;
+  z-index: 1;
   min-height: 34px;
   border: 0;
   border-radius: 9px;
@@ -329,11 +349,21 @@
 }
 
 .segmentedOptionActive {
-  background: var(--acton-color-surface-active);
   color: var(--acton-color-text);
 }
 
+.segmentedHighlight {
+  position: absolute;
+  inset: 3px auto 3px 3px;
+  z-index: 0;
+  width: calc((100% - 6px) / 2);
+  border-radius: 9px;
+  background: var(--acton-color-surface-active);
+  pointer-events: none;
+}
+
 .timeFormatGrid {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
@@ -343,8 +373,26 @@
   background: color-mix(in srgb, var(--acton-color-canvas) 72%, transparent);
 }
 
+.timeFormatHighlight,
+.timeFormatHighlightMobile {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 0;
+  box-sizing: border-box;
+  width: calc(100% / 3);
+  border: 2px solid var(--acton-color-accent);
+  border-radius: 13px;
+  background: var(--acton-color-surface-active);
+  pointer-events: none;
+}
+
+.timeFormatHighlightMobile {
+  display: none;
+}
+
 .timeFormatOption {
   position: relative;
+  z-index: 1;
   min-width: 0;
   min-height: 72px;
   padding: 9px 8px;
@@ -366,7 +414,7 @@
     color var(--acton-duration-fast);
 }
 
-.timeFormatOption:first-child {
+.timeFormatOption:first-of-type {
   border-left: 0;
 }
 
@@ -375,19 +423,8 @@
 }
 
 .timeFormatOptionActive {
-  background: var(--acton-color-surface-active);
+  border-left-color: transparent;
   color: var(--acton-color-text);
-  z-index: 1;
-  box-shadow: none;
-}
-
-.timeFormatOptionActive::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border: 2px solid var(--acton-color-accent);
-  border-radius: 13px;
-  pointer-events: none;
 }
 
 .timeFormatOptionActive + .timeFormatOption {
@@ -518,6 +555,22 @@
 @media (prefers-reduced-motion: reduce) {
   .newTransactionRow {
     animation: none;
+  }
+}
+
+@keyframes historyRowAppear {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .historyContent tbody > tr.row {
+    animation: historyRowAppear 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 }
 
@@ -707,6 +760,14 @@
   font-weight: 400;
   min-width: 0;
   max-width: 100%;
+}
+
+.actionFailed {
+  color: var(--acton-color-danger-text);
+}
+
+:global(.dark-theme) .actionFailed {
+  color: #ed7466;
 }
 
 .actionIcon {
@@ -1233,6 +1294,17 @@ th.valueContainer {
 
   .timeFormatGrid {
     grid-template-columns: 1fr;
+    grid-template-rows: repeat(3, minmax(56px, 1fr));
+  }
+
+  .timeFormatHighlight {
+    display: none;
+  }
+
+  .timeFormatHighlightMobile {
+    display: block;
+    width: 100%;
+    height: calc(100% / 3);
   }
 
   .timeFormatOption {
@@ -1241,8 +1313,13 @@ th.valueContainer {
     border-top: 1px solid var(--acton-color-border);
   }
 
-  .timeFormatOption:first-child {
+  .timeFormatOption:first-of-type {
     border-top: 0;
+  }
+
+  .timeFormatOptionActive,
+  .timeFormatOptionActive + .timeFormatOption {
+    border-top-color: transparent;
   }
 }
 .blurredNftImage {

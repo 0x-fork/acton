@@ -281,6 +281,7 @@ row item.
 
 - `children`: the inline content that owns the hover/focus area.
 - `actions`: one or more `InlineAction` buttons rendered to the right.
+- `actionsClassName`: styles the actions container for a component-specific overlay.
 - `visibility="hover"`: actions are hidden until hover or focus-within, and are
   always visible on coarse pointer devices.
 - `visibility="always"`: actions are always visible.
@@ -829,6 +830,11 @@ address, boolean, null, void, array, object, and map nodes recursively.
 - Pass `fieldName` for isolated scalars when field-sensitive hex or coin display
   rules should apply.
 - Pass `rawValue` on a scalar to enable the shared compact copy action.
+- Use `typeName: "TonDnsDomain"` for a decoded full .ton name. Pass
+  `onDomainClick` from the host to resolve and open it in the current network;
+  without that callback, the name remains copyable text.
+- Use `typeName: "OffchainUrl"` for a decoded metadata URI. HTTP and HTTPS
+  values render as external links; other URI schemes remain copyable text.
 - For a scalar with `typeName: "Cell"` and `rawValue`, pass `onCellInspect` to
   add the shared Cell Inspector action. Keep routing and inspector ownership in
   the host application.

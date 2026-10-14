@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Explorer
+
+- Account tabs smoothly move the active highlight between sections, respecting
+  reduced-motion preferences.
+- Transaction traces present their action summary as Action overview.
+- NFT chips leave more space between artwork and the label.
+- Failed account actions show red icons and labels in history.
+- Account history filters slide into view as a single panel and
+  respect reduced-motion preferences.
+- History view and sort selectors smoothly move their active highlight.
+- Time format selection moves its accent outline between the available formats.
+- Loaded account history rows fade in together.
+- The Time header aligns with the dates in account history.
+- Empty wallet plugin tables use the same empty-state styling as Studio tables.
+- Signature authorization status has more space between its indicator and a smaller label.
+- Contract data tabs use a thin, contained keyboard focus outline.
+- Contract ABI content expands to its full height without an inner scroll area.
+- Get-method loading placeholders match the height of a single-line result and shimmer while running.
+- Empty decoded maps show their type and `{}` on one line in parsed values and state diffs.
+- Storage diffs show newly present values directly without an empty-value transition, using compact corners and filled highlights without outlines.
+- TON DNS domain-deployment messages show a copyable .ton name linked to its resolved wallet address, and message bounce flags are labeled "Can bounce".
+- TON DNS collection storage shows decoded off-chain metadata URLs as copyable links instead of raw payload slices.
+- Parsed field names align with the first line of nested values in account storage and transaction state changes.
+- Contract references show an address only once when no separate name is available.
+- Contract references open without an extra hover tooltip.
+- Contract references reveal their copy action over the trailing address with a leftward background fade and rounded corners, without shifting the chip or leaving the action visible after pointer focus.
+
 ### Rust libraries
 
 - `rston::liteclient` provides checked block downloads, authenticated headers,

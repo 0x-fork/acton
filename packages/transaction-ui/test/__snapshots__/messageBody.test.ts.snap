@@ -295,7 +295,87 @@ exports[`decodeMessageBody decodes a text comment only after receiver and sender
 }
 `;
 
+exports[`decodeMessageBody decodes the domain label in a TON DNS collection deployment 1`] = `
+{
+  "name": "DnsCollectionDeployDomain",
+  "opcode": 0,
+  "value": {
+    "entries": [
+      {
+        "key": "domain",
+        "value": {
+          "kind": "scalar",
+          "typeName": "TonDnsDomain",
+          "value": "petrmakhnev.ton",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "DnsCollectionDeployDomain",
+  },
+}
+`;
+
 exports[`decodeMessageBody returns undefined when no ABI or built-in parser matches 1`] = `undefined`;
+
+exports[`decodeCellWithAbi decodes the TON DNS collection metadata URL from storage 1`] = `
+{
+  "category": "storage",
+  "consumption": {
+    "complete": true,
+    "initialBits": 0,
+    "initialRefs": 2,
+    "remainingBits": 0,
+    "remainingRefs": 0,
+  },
+  "name": "DnsCollectionStorage",
+  "provenance": {
+    "codeHashes": [],
+    "displayName": undefined,
+    "source": "compiler-abi",
+  },
+  "value": {
+    "entries": [
+      {
+        "key": "collectionContent",
+        "value": {
+          "entries": [
+            {
+              "key": "offchainTag",
+              "value": {
+                "kind": "scalar",
+                "typeName": "uint8",
+                "value": "1",
+              },
+            },
+            {
+              "key": "url",
+              "value": {
+                "kind": "scalar",
+                "typeName": "OffchainUrl",
+                "value": "https://example.com/dns.json",
+              },
+            },
+          ],
+          "kind": "object",
+          "typeName": "DnsCollectionOffchainContent",
+        },
+      },
+      {
+        "key": "nftItemCode",
+        "value": {
+          "kind": "scalar",
+          "rawValue": "b5ee9c72010101010002000000",
+          "typeName": "Cell",
+          "value": "<empty cell>",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "DnsCollectionStorage",
+  },
+}
+`;
 
 exports[`decodeCellWithAbi decodes storage maps with bits keys through the compatibility fallback 1`] = `
 {

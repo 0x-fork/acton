@@ -14,7 +14,7 @@ import {
   decodeStorageShardAccount,
   type ValueFlowItem,
 } from "@acton/transaction-ui"
-import {DateTime, formatCountLabel, InlineAction, InlineButton, Tooltip} from "@acton/ui"
+import {DateTime, formatCountLabel, InlineAction, InlineButton, Tooltip, useToast} from "@acton/ui"
 import {
   AlertCircle,
   ArrowLeft,
@@ -50,7 +50,7 @@ import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {TraceStateChangesPanel} from "../components/TraceStateChangesPanel"
 import {TraceOverviewTable, type TraceOverviewData} from "../components/TraceOverviewTable"
-import {hashToHex, normalizeAddress} from "../components/utils"
+import {hashToHex, normalizeAddress, parseAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useAvailableFlowMetrics} from "../hooks/useAvailableFlowMetrics"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
@@ -79,7 +79,7 @@ interface TransactionPageProps {
 export type TransactionTraceTabType =
   | "transactions"
   | "value-flow"
-  | "event-overview"
+  | "action-overview"
   | "state-changes"
   | "details"
 
@@ -93,8 +93,8 @@ export const parseTransactionTraceTabType = (
   if (tab === "state-changes" || tab === "transactions") {
     return tab
   }
-  if (supportsActions && (tab === null || tab === "" || tab === "event-overview")) {
-    return "event-overview"
+  if (supportsActions && (tab === null || tab === "" || tab === "action-overview")) {
+    return "action-overview"
   }
   return "value-flow"
 }
@@ -185,6 +185,7 @@ interface TraceTransactionNodeProps {
   readonly isIntermediateSibling?: boolean
   readonly onCellInspect?: (boc: string) => void
   readonly onContractClick: (address: string) => void
+  readonly onDomainClick?: (domain: string, event?: ExplorerNavigationClickEvent) => void
   readonly getBlockPath: (blockRef: TransactionBlockRef) => string | undefined
   readonly onBlockClick: (
     blockRef: TransactionBlockRef,
@@ -341,6 +342,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const [error, setError] = useState<string | undefined>()
   const {fetchName, updateAddressBook} = useAddressBook()
   const {network} = useNetworkInfo()
+  const {showToast} = useToast()
   const {isFavorite, toggleFavorite} = useFavoriteTransactions()
   const metadataRegistry = useMetadataRegistry()
   const resolveVerifiedSourceByCodeHash = useCallback(
@@ -415,6 +417,35 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       openExplorerPath(currentNavigate, currentRoutes.addressPath(address), event)
     },
     [],
+  )
+  const handleDomainClick = useCallback(
+    (domain: string, event?: ExplorerNavigationClickEvent) => {
+      void client
+        .resolveDnsWalletAddress(domain)
+        .then(walletAddress => {
+          const address = walletAddress ? parseAddress(walletAddress) : undefined
+          if (!address) {
+            showToast({
+              title: "TON DNS name not found",
+              description: `No wallet address is configured for ${domain}`,
+              variant: "error",
+            })
+            return
+          }
+
+          const {navigate: currentNavigate, routes: currentRoutes} = navigationRef.current
+          const path = currentRoutes.addressPath(address.toString(addressFormat))
+          openExplorerPath(currentNavigate, path, event)
+        })
+        .catch(() => {
+          showToast({
+            title: "TON DNS lookup failed",
+            description: `Could not resolve ${domain} on ${network.label}`,
+            variant: "error",
+          })
+        })
+    },
+    [addressFormat, client, network.label, showToast],
   )
   const handleBlockClick = useCallback(
     (blockRef: TransactionBlockRef, event?: ExplorerNavigationClickEvent) => {
@@ -957,7 +988,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
 
   if (loading) {
     return showLoadingSkeleton ? (
-      <TransactionTraceSkeleton activeTab={activeTab} showEventOverview={supportsTraceActions} />
+      <TransactionTraceSkeleton activeTab={activeTab} showActionOverview={supportsTraceActions} />
     ) : null
   }
 
@@ -1021,6 +1052,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       onActionHoverChange={setHoveredAction}
       onCellInspect={handleCellInspect}
       onContractClick={handleContractClick}
+      onDomainClick={handleDomainClick}
       onTransactionSelect={handleTransactionSelect}
       onTraceGapLoad={partialTraceState ? handleTraceGapLoad : undefined}
       onBlockClick={handleBlockClick}
@@ -1066,6 +1098,7 @@ export interface TransactionTraceViewProps {
   readonly onActionHoverChange?: (action: V3Action | undefined) => void
   readonly onCellInspect?: (boc: string) => void
   readonly onContractClick: (address: string, event?: ExplorerNavigationClickEvent) => void
+  readonly onDomainClick?: (domain: string, event?: ExplorerNavigationClickEvent) => void
   readonly onTransactionSelect?: (tx: TransactionInfo) => void
   readonly onTraceGapLoad?: () => void
   readonly onBlockClick: (
@@ -1121,6 +1154,7 @@ function TransactionTraceSession({
   onActionHoverChange,
   onCellInspect,
   onContractClick,
+  onDomainClick,
   onTransactionSelect,
   onTraceGapLoad,
   onBlockClick,
@@ -1263,7 +1297,7 @@ function TransactionTraceSession({
     ),
     [onContractClick],
   )
-  const showEventOverview = supportsTraceActions && client !== undefined
+  const showActionOverview = supportsTraceActions && client !== undefined
 
   return (
     <div className={styles.container}>
@@ -1320,7 +1354,7 @@ function TransactionTraceSession({
               >
                 <TraceTabs
                   activeTab={activeTab}
-                  showEventOverview={showEventOverview}
+                  showActionOverview={showActionOverview}
                   onTabChange={onTabChange}
                 />
 
@@ -1335,8 +1369,8 @@ function TransactionTraceSession({
                     />
                   )}
 
-                  {showEventOverview && (
-                    <RetainedTabPanel active={activeTab === "event-overview"}>
+                  {showActionOverview && (
+                    <RetainedTabPanel active={activeTab === "action-overview"}>
                       <MemoizedActionHistoryTable
                         actions={traceActions}
                         actionMetadata={traceActionMetadata}
@@ -1387,6 +1421,7 @@ function TransactionTraceSession({
                       verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
                       onCellInspect={onCellInspect}
                       onContractClick={onContractClick}
+                      onDomainClick={onDomainClick}
                       getBlockPath={getBlockPath}
                       onBlockClick={onBlockClick}
                       loadActions={loadActions}
@@ -1432,6 +1467,7 @@ function TransactionTraceSession({
                 traceGapError={traceGapError}
                 onCellInspect={onCellInspect}
                 onContractClick={onContractClick}
+                onDomainClick={onDomainClick}
                 onTransactionSelect={onTransactionSelect}
                 onTraceGapLoad={onTraceGapLoad}
                 renderAddressChip={renderTraceAddressChip}
@@ -1455,14 +1491,14 @@ function TransactionTraceSession({
 interface TraceTabsProps {
   readonly activeTab: TransactionTraceTabType
   readonly disabled?: boolean
-  readonly showEventOverview?: boolean
+  readonly showActionOverview?: boolean
   readonly onTabChange?: (tab: TransactionTraceTabType) => void
 }
 
 function TraceTabs({
   activeTab,
   disabled = false,
-  showEventOverview = false,
+  showActionOverview = false,
   onTabChange,
 }: TraceTabsProps): JSX.Element {
   const activeTabRef = useRef<HTMLButtonElement>(null)
@@ -1474,16 +1510,16 @@ function TraceTabs({
 
   return (
     <div className={styles.tabs} aria-hidden={disabled ? "true" : undefined}>
-      {showEventOverview && (
+      {showActionOverview && (
         <button
           type="button"
-          ref={activeTab === "event-overview" ? activeTabRef : undefined}
-          className={`${styles.tab} ${activeTab === "event-overview" ? styles.tabActive : ""}`}
-          onClick={() => onTabChange?.("event-overview")}
+          ref={activeTab === "action-overview" ? activeTabRef : undefined}
+          className={`${styles.tab} ${activeTab === "action-overview" ? styles.tabActive : ""}`}
+          onClick={() => onTabChange?.("action-overview")}
           disabled={disabled}
           tabIndex={disabled ? -1 : undefined}
         >
-          <ListChecks size={16} /> Event overview
+          <ListChecks size={16} /> Action overview
         </button>
       )}
       <button
@@ -1532,12 +1568,12 @@ function TraceTabs({
 
 interface TransactionTraceSkeletonProps {
   readonly activeTab: TransactionTraceTabType
-  readonly showEventOverview?: boolean
+  readonly showActionOverview?: boolean
 }
 
 function TransactionTraceSkeleton({
   activeTab,
-  showEventOverview = false,
+  showActionOverview = false,
 }: TransactionTraceSkeletonProps): JSX.Element {
   return (
     <div className={styles.container} aria-label="Loading transaction trace">
@@ -1561,14 +1597,14 @@ function TransactionTraceSkeleton({
           <div
             className={`${styles.tabsContainer} ${activeTab === "transactions" ? styles.tabsContainerDetached : ""}`}
           >
-            <TraceTabs activeTab={activeTab} showEventOverview={showEventOverview} disabled />
+            <TraceTabs activeTab={activeTab} showActionOverview={showActionOverview} disabled />
 
             <div className={styles.tabContent}>
               {activeTab === "transactions" ? (
                 <TraceDetailsSkeleton />
               ) : activeTab === "state-changes" ? (
                 <StateChangesSkeleton />
-              ) : activeTab === "event-overview" ? (
+              ) : activeTab === "action-overview" ? (
                 <ActionHistorySkeleton />
               ) : activeTab === "details" ? (
                 <TraceOverviewSkeleton />
@@ -1619,7 +1655,7 @@ function ActionHistorySkeleton(): JSX.Element {
         <span>Value</span>
       </div>
       {[0, 1, 2].map(index => (
-        <div key={`event-overview-skeleton-${index}`} className={styles.skeletonEventRow}>
+        <div key={`action-overview-skeleton-${index}`} className={styles.skeletonEventRow}>
           <div className={styles.skeletonEventAction}>
             <span className={`${styles.skeleton} ${styles.skeletonEventIcon}`} />
             <span className={`${styles.skeleton} ${styles.skeletonEventActionText}`} />
@@ -1753,6 +1789,7 @@ const TraceTransactionList: FC<TraceTransactionListProps> = ({
   verifiedSourcesByCodeHash,
   onCellInspect,
   onContractClick,
+  onDomainClick,
   getBlockPath,
   onBlockClick,
   loadActions,
@@ -1781,6 +1818,7 @@ const TraceTransactionList: FC<TraceTransactionListProps> = ({
               visibleTransactionIds={visibleTransactionIds}
               onCellInspect={onCellInspect}
               onContractClick={onContractClick}
+              onDomainClick={onDomainClick}
               getBlockPath={getBlockPath}
               onBlockClick={onBlockClick}
               loadActions={loadActions}
@@ -1817,6 +1855,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
   isIntermediateSibling = false,
   onCellInspect,
   onContractClick,
+  onDomainClick,
   getBlockPath,
   onBlockClick,
   loadActions,
@@ -1901,6 +1940,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
             allContracts={EMPTY_BACKEND_CONTRACTS}
             onCellInspect={onCellInspect}
             onContractClick={onContractClick}
+            onDomainClick={onDomainClick}
             getBlockPath={getBlockPath}
             onBlockClick={onBlockClick}
             loadActions={loadActions}
@@ -1935,6 +1975,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
               isIntermediateSibling={index < children.length - 1}
               onCellInspect={onCellInspect}
               onContractClick={onContractClick}
+              onDomainClick={onDomainClick}
               getBlockPath={getBlockPath}
               onBlockClick={onBlockClick}
               loadActions={loadActions}

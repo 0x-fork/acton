@@ -3,22 +3,31 @@
   max-width: 100%;
   min-width: 0;
   gap: 0;
+  border-radius: var(--acton-radius-control-sm);
   color: var(--acton-color-text);
   font-family: var(--acton-font-sans);
   font-synthesis: none;
-  transition: padding-inline-end var(--acton-duration-fast) var(--acton-ease-standard);
 }
 
-.contractChipActions:hover,
-.contractChipActions:focus-within {
-  padding-inline-end: 1.25rem;
-}
-
-.copyAction {
+.copyActions {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block: 0;
   inset-inline-end: 0;
-  transform: translateY(-50%);
+  padding-inline-start: 1.5rem;
+  padding-inline-end: var(--acton-space-1);
+  border-start-end-radius: inherit;
+  border-end-end-radius: inherit;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--acton-color-surface-raised) 60%
+  );
+}
+
+@media (hover: none), (pointer: coarse) {
+  .contractChipActions {
+    padding-inline-end: 2.75rem;
+  }
 }
 
 .contractChip {

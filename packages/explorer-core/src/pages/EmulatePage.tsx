@@ -1762,7 +1762,7 @@ export function EmulatePage({client, shareApiPath}: EmulatePageProps) {
             checked={bounce}
             onChange={event => setBounce(event.target.checked)}
             disabled={isLoading}
-            label="Bounce"
+            label="Can bounce"
             description="Bounce failed messages back to From"
             className={styles.optionCheckbox}
           />

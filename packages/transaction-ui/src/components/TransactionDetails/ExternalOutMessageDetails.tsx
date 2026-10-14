@@ -17,6 +17,7 @@ interface ExternalOutMessageDetailsProps {
   readonly additionalAbis: readonly ContractABI[]
   readonly onCellInspect?: (boc: string) => void
   readonly onContractClick?: (address: string) => void
+  readonly onDomainClick?: (domain: string, event?: React.MouseEvent<HTMLElement>) => void
   readonly renderAddressChip?: (
     address: string,
     options: {readonly shorten: boolean},
@@ -30,6 +31,7 @@ export function ExternalOutMessageDetails({
   additionalAbis,
   onCellInspect,
   onContractClick,
+  onDomainClick,
   renderAddressChip,
 }: ExternalOutMessageDetailsProps): React.JSX.Element {
   const source = message.info.src.toString()
@@ -113,6 +115,7 @@ export function ExternalOutMessageDetails({
               contracts={contracts}
               onCellInspect={onCellInspect}
               onContractClick={onContractClick}
+              onDomainClick={onDomainClick}
               defaultExpanded={true}
             />
           ) : (

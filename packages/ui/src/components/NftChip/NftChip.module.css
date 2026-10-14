@@ -1,7 +1,7 @@
 .nftChip {
   display: inline-flex;
   align-items: center;
-  gap: var(--acton-space-1);
+  gap: var(--acton-space-2);
   min-width: 0;
   max-width: 100%;
   padding: 2px var(--acton-space-2) 2px 3px;

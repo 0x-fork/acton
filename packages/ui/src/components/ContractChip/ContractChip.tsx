@@ -3,7 +3,6 @@ import type {MouseEvent} from "react"
 import {cx} from "../../lib/cx"
 import {shortenMiddle} from "../../lib/formatting"
 import {CopyInlineAction, InlineActions} from "../InlineActions/InlineActions"
-import {Tooltip} from "../Tooltip"
 
 import styles from "./ContractChip.module.css"
 
@@ -52,13 +51,17 @@ export function ContractChip({
   const displayAddress = getDisplayAddress(address, formatAddress)
   const contractInfo = contracts?.get(address) ?? contracts?.get(displayAddress)
   const shortAddress = shortenMiddle(displayAddress, {start: 6, end: 6})
+  const hasDistinctName =
+    contractInfo !== undefined &&
+    contractInfo.displayName !== displayAddress &&
+    contractInfo.displayName !== shortAddress
   const isClickable = onContractClick !== undefined
 
   const content = contractInfo ? (
     <>
       <span className={styles.contractLetter}>{contractInfo.letter}</span>
       <span className={styles.contractName}>{contractInfo.displayName}</span>
-      <span className={styles.contractAddress}>({shortAddress})</span>
+      {hasDistinctName && <span className={styles.contractAddress}>({shortAddress})</span>}
     </>
   ) : (
     <>
@@ -68,23 +71,21 @@ export function ContractChip({
   )
 
   const chip = isClickable ? (
-    <Tooltip content="Open contract details">
-      <button
-        type="button"
-        className={cx(styles.contractChip, styles.clickable)}
-        onClick={event => {
-          event.stopPropagation()
-          onContractClick?.(displayAddress, event)
-        }}
-        onAuxClick={event => {
-          if (event.button !== 1) return
-          event.stopPropagation()
-          onContractClick?.(displayAddress, event)
-        }}
-      >
-        {content}
-      </button>
-    </Tooltip>
+    <button
+      type="button"
+      className={cx(styles.contractChip, styles.clickable)}
+      onClick={event => {
+        event.stopPropagation()
+        onContractClick?.(displayAddress, event)
+      }}
+      onAuxClick={event => {
+        if (event.button !== 1) return
+        event.stopPropagation()
+        onContractClick?.(displayAddress, event)
+      }}
+    >
+      {content}
+    </button>
   ) : (
     <span className={styles.contractChip}>{content}</span>
   )
@@ -92,9 +93,9 @@ export function ContractChip({
   return (
     <InlineActions
       className={cx(styles.contractChipActions, className)}
+      actionsClassName={styles.copyActions}
       actions={
         <CopyInlineAction
-          className={styles.copyAction}
           value={displayAddress}
           label="Copy address"
           copiedLabel="Address copied"

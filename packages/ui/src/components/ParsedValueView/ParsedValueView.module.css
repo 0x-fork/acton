@@ -85,11 +85,29 @@
   white-space: nowrap;
 }
 
+.parsedEntryKeyNested {
+  align-self: start;
+}
+
 .parsedEntryValue {
   min-width: 0;
   align-self: center;
   color: var(--acton-color-text);
   font-size: var(--acton-font-size-sm);
+  line-height: 1.35;
+}
+
+.parsedLinkedEntryValue {
+  display: flex;
+  align-items: center;
+}
+
+.parsedEmptyMapCell {
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.35;
+}
+
+.parsedEmptyMapCell .parsedBadge {
   line-height: 1.35;
 }
 
@@ -133,6 +151,61 @@
   color: var(--acton-parsed-value-tone, inherit);
   font-family: var(--acton-font-sans);
   font-size: var(--acton-parsed-value-font-size, inherit);
+}
+
+.parsedDomainName,
+.parsedDomainLink,
+.parsedExternalLink,
+.parsedExternalUrl {
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-parsed-value-font-size, inherit);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.parsedDomainName,
+.parsedDomainLink {
+  font-size: var(--acton-font-size-xs);
+}
+
+.parsedDomainName,
+.parsedExternalUrl {
+  color: var(--acton-color-text);
+}
+
+.parsedExternalLink {
+  min-width: 0;
+  color: var(--acton-color-accent);
+  text-decoration: none;
+}
+
+.parsedExternalLink:hover {
+  text-decoration: underline;
+}
+
+.parsedExternalLink:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.parsedDomainLink {
+  color: var(--acton-color-accent);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: start;
+}
+
+.parsedDomainLink:hover {
+  text-decoration: underline;
+}
+
+.parsedDomainLink:focus-visible {
+  outline: 2px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .parsedNull,

@@ -58,7 +58,13 @@
   border-bottom-color: var(--acton-color-surface);
 }
 
-.tab:focus-visible,
+.tab:focus-visible {
+  position: relative;
+  z-index: 2;
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: -3px;
+}
+
 .declaration summary:focus-visible,
 .details summary:focus-visible {
   outline: none;
@@ -104,7 +110,8 @@
 .shellContent .view,
 .shellContent .highlightedCode {
   --acton-highlighted-code-max-height: none;
-  overflow-y: visible;
+  max-height: none;
+  overflow: visible;
 }
 
 .view,
@@ -406,28 +413,10 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-height: 115px;
+  box-sizing: border-box;
+  min-height: 87px;
   padding-top: 12px;
   border-top: 1px dashed var(--acton-color-border);
-}
-
-.resultSkeleton span {
-  display: block;
-  height: 14px;
-  border-radius: 999px;
-  background: var(--acton-color-surface-row);
-}
-
-.resultSkeleton span:nth-child(1) {
-  width: min(280px, 72%);
-}
-
-.resultSkeleton span:nth-child(2) {
-  width: min(420px, 88%);
-}
-
-.resultSkeleton span:nth-child(3) {
-  width: min(210px, 54%);
 }
 
 .decodedResult {

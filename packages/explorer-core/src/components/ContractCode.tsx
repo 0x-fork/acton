@@ -196,7 +196,12 @@ export const ContractCode: FC<ContractCodeProps> = ({
           ) : compilerAbiLoading ? (
             <AbiLoadingSkeleton />
           ) : compilerAbi ? (
-            <AbiPanel activeTab={activeAbiTab} onTabChange={setActiveAbiTab} abi={compilerAbi} />
+            <AbiPanel
+              activeTab={activeAbiTab}
+              onTabChange={setActiveAbiTab}
+              abi={compilerAbi}
+              heightMode="content"
+            />
           ) : (
             <div className={`${styles.empty} ${styles.panelEmpty}`}>
               No ABI registered for this contract

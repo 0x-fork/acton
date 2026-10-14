@@ -75,6 +75,7 @@ export interface TransactionDetailsProps {
   readonly allContracts: readonly BackendContractInfo[]
   readonly onCellInspect?: (boc: string) => void
   readonly onContractClick?: (address: string) => void
+  readonly onDomainClick?: (domain: string, event?: React.MouseEvent<HTMLElement>) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
   readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
   readonly renderMessageRouteAction?: (
@@ -101,6 +102,7 @@ function TransactionDetailsContent({
   allContracts,
   onCellInspect,
   onContractClick,
+  onDomainClick,
   renderSourceLocation,
   loadActions,
   renderMessageRouteAction,
@@ -439,7 +441,7 @@ function TransactionDetailsContent({
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Bounce</div>
+                <div className={styles.multiColumnItemTitle}>Can bounce</div>
                 <div className={styles.multiColumnItemValue}>
                   <BooleanValue value={inMessage.info.bounce} />
                 </div>
@@ -551,6 +553,7 @@ function TransactionDetailsContent({
                 contracts={contracts}
                 onCellInspect={onCellInspect}
                 onContractClick={onContractClick}
+                onDomainClick={onDomainClick}
                 renderCodeCellDetails={renderCodeCellDetails}
               />
             )}
@@ -886,6 +889,7 @@ function TransactionDetailsContent({
               contractAddress={tx.address?.toString() ?? ""}
               additionalMessageBodyAbis={additionalMessageBodyAbis}
               onContractClick={onContractClick}
+              onDomainClick={onDomainClick}
               renderSourceLocation={renderSourceLocation}
             />
           </div>

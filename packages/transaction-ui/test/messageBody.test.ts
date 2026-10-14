@@ -524,6 +524,37 @@ describe("decodeMessageBody", () => {
     ).toMatchSnapshot()
   })
 
+  test("decodes the domain label in a TON DNS collection deployment", () => {
+    const dnsCollectionAbi: ContractABI = {
+      ...counterAbi,
+      contract_name: "DnsCollection",
+      declarations: [
+        {
+          fields: [{name: "domain", ty_idx: 14}],
+          kind: "struct",
+          name: "DnsCollectionDeployDomain",
+          prefix: {prefix_len: 32, prefix_num: 0},
+          ty_idx: 12,
+        },
+      ],
+      incoming_messages: [{body_ty_idx: 12}],
+      unique_types: [
+        ...counterAbi.unique_types.slice(0, 12),
+        {kind: "StructRef", struct_name: "DnsCollectionDeployDomain"},
+        counterAbi.unique_types[13],
+        {kind: "remaining"},
+      ],
+    }
+    const body = beginCell().storeUint(0, 32).storeStringTail("petrmakhnev").endCell()
+
+    expect(
+      decodeMessageBody(
+        internalMessage(body),
+        contractsByAddress([receiverAddress, dnsCollectionAbi]),
+      ),
+    ).toMatchSnapshot()
+  })
+
   test("returns undefined when no ABI or built-in parser matches", () => {
     const receiverAbi = createUintMessageAbi({
       contractName: "InternalReceiver",
@@ -646,6 +677,55 @@ describe("decodeCellWithAbi", () => {
         codeHashes: ["counter-code-hash"],
       },
     })
+  })
+
+  test("decodes the TON DNS collection metadata URL from storage", () => {
+    const dnsCollectionAbi: ContractABI = {
+      ...counterAbi,
+      contract_name: "DnsCollection",
+      declarations: [
+        {
+          fields: [
+            {name: "collectionContent", ty_idx: 16},
+            {name: "nftItemCode", ty_idx: 3},
+          ],
+          kind: "struct",
+          name: "DnsCollectionStorage",
+          ty_idx: 17,
+        },
+        {
+          fields: [
+            {name: "offchainTag", ty_idx: 15},
+            {name: "url", ty_idx: 14},
+          ],
+          kind: "struct",
+          name: "DnsCollectionOffchainContent",
+          ty_idx: 18,
+        },
+      ],
+      incoming_messages: [],
+      storage: {storage_ty_idx: 17},
+      unique_types: [
+        ...counterAbi.unique_types,
+        {kind: "remaining"},
+        {kind: "uintN", n: 8},
+        {kind: "cellOf", inner_ty_idx: 18},
+        {kind: "StructRef", struct_name: "DnsCollectionStorage"},
+        {kind: "StructRef", struct_name: "DnsCollectionOffchainContent"},
+      ],
+    }
+    const content = beginCell()
+      .storeUint(1, 8)
+      .storeStringTail("https://example.com/dns.json")
+      .endCell()
+    const storage = beginCell().storeRef(content).storeRef(beginCell().endCell()).endCell()
+
+    expect(
+      decodeCellWithAbi(storage, {
+        compiler_abi: dnsCollectionAbi,
+        code_hashes: [],
+      }),
+    ).toMatchSnapshot()
   })
 
   test("returns undefined when the cell matches no ABI schema", () => {

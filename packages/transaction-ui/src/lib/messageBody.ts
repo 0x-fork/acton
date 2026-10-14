@@ -574,6 +574,33 @@ const textCommentTailValue = (slice: Slice): ParsedValue => {
   return toParsedValue(slice)
 }
 
+const decodeRemainingBody = (
+  slice: Slice,
+  context: ParsedValueTypeContext,
+): ParsedValue | undefined => {
+  if (context.parentStructName === "DnsCollectionDeployDomain" && context.fieldName === "domain") {
+    const domainLabel = tryReadTextCommentString(slice)
+    if (domainLabel && /^[a-z0-9][a-z0-9-]{2,124}[a-z0-9]$/.test(domainLabel)) {
+      return {kind: "scalar", value: `${domainLabel}.ton`, typeName: "TonDnsDomain"}
+    }
+
+    return textCommentTailValue(slice)
+  }
+
+  if (context.parentStructName === "DnsCollectionOffchainContent" && context.fieldName === "url") {
+    const url = tryReadTextCommentString(slice)
+    const hasOnlyPrintableCharacters = url && Array.from(url).every((character) => {
+      const codePoint = character.codePointAt(0) ?? 0
+      return codePoint >= 0x20 && codePoint !== 0x7f && codePoint !== 0xff_fd
+    })
+    if (hasOnlyPrintableCharacters) {
+      return {kind: "scalar", value: url, typeName: "OffchainUrl"}
+    }
+  }
+
+  return tryDecodeNestedPayloadSlice(slice, context)
+}
+
 const tryDecodeTextCommentSlice = (baseSlice: Slice): ParsedTransactionBody | undefined => {
   if (baseSlice.remainingBits < 32) {
     return undefined
@@ -676,7 +703,7 @@ const tryDecodeSliceWithCandidates = (
           tyIdx: candidate.body_ty_idx,
           abi,
           abiCandidates: nestedPayloadAbis,
-          decodeRemaining: tryDecodeNestedPayloadSlice,
+          decodeRemaining: decodeRemainingBody,
           nestedPayloadDepth: 0,
         }),
       }
@@ -808,7 +835,7 @@ const tryDecodeStorageSliceWithAbi = (
         value: toParsedValue(decoded, {
           symbols: ctx.symbols,
           tyIdx: candidate,
-          decodeRemaining: tryDecodeNestedPayloadSlice,
+          decodeRemaining: decodeRemainingBody,
         }),
       }
     } catch {

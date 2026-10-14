@@ -38,6 +38,7 @@ export type CopyInlineActionProps = Readonly<
 export type InlineActionsProps = Readonly<
   ComponentPropsWithRef<"span"> & {
     readonly actions: ReactNode
+    readonly actionsClassName?: string
     readonly visibility?: ActonInlineActionsVisibility
   }
 >
@@ -128,6 +129,7 @@ export function CopyInlineAction({
 
 export function InlineActions({
   actions,
+  actionsClassName,
   children,
   className,
   ref,
@@ -142,7 +144,9 @@ export function InlineActions({
     >
       <span className={styles.content}>{children}</span>
       {actions !== null && actions !== undefined && (
-        <span className={styles.actions}>{actions}</span>
+        <span className={actionsClassName ? cx(styles.actions, actionsClassName) : styles.actions}>
+          {actions}
+        </span>
       )}
     </span>
   )

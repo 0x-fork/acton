@@ -201,7 +201,7 @@ export function WalletMessageListEditor({
                 contentClassName={`${styles.fields} ${styles.disclosureContent}`}
               >
                 <Checkbox
-                  label="Bounce"
+                  label="Can bounce"
                   checked={draft.bounce}
                   onChange={event => updateMessage(draft.id, {bounce: event.target.checked})}
                   disabled={disabled}

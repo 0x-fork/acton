@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useRef, useState, type ReactNode} from "react"
-import {HighlightedCode, InlineButton, RawDataBlock} from "@acton/ui"
+import {HighlightedCode, InlineButton, RawDataBlock, Skeleton} from "@acton/ui"
 import {
   callGetMethodDynamic,
   DynamicCtx,
@@ -279,9 +279,9 @@ function AbiGetMethodOverview({
 function AbiGetMethodSkeleton() {
   return (
     <div className={styles.resultSkeleton} aria-label="Running get method">
-      <span />
-      <span />
-      <span />
+      <Skeleton width="min(280px, 72%)" height={14} />
+      <Skeleton width="min(420px, 88%)" height={14} />
+      <Skeleton width="min(210px, 54%)" height={14} />
     </div>
   )
 }
