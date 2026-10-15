@@ -127,9 +127,6 @@ function shouldPruneFile(filename, fileRules) {
 
 function prunePackagePaths(rule) {
   const packageDirs = findInstalledPackages(nodeModulesDir, rule.packageName)
-  if (packageDirs.length === 0) {
-    throw new Error(`Could not find installed package ${rule.packageName}`)
-  }
 
   for (const packageDir of packageDirs) {
     const packageJsonPath = path.join(packageDir, "package.json")

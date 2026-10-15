@@ -5,6 +5,7 @@ import test from "node:test";
 import { compileFunc } from "./func.mjs";
 import { compileTact } from "./tact.mjs";
 import { compileTolk } from "./tolk.mjs";
+import { SUPPORTED_TACT_VERSIONS } from "./registry.mjs";
 
 async function fixture(name) {
   const url = new URL(`../fixtures/${name}`, import.meta.url);
@@ -45,7 +46,9 @@ test("FunC reports targets and included sources", async () => {
   assert.deepEqual(result.used_source_paths, ["lib.fc", "main.fc"]);
 });
 
-test("Tact reports only the selected package as an uploaded input", async () => {
+test("Tact reports only the selected package as an uploaded input", {
+  skip: !SUPPORTED_TACT_VERSIONS.includes("1.6.13") && "Tact compiler dependency is not installed",
+}, async () => {
   const input = await fixture("valid-tact.json");
   input.sources.push({
     path: "unused.tact",

@@ -3,8 +3,11 @@ import test from "node:test";
 import { getMethodId } from "@ton/core";
 
 import { generatedTolkAbiSources } from "./tact-abi.mjs";
+import { SUPPORTED_TACT_VERSIONS } from "./registry.mjs";
 
-test("converts a Tact ABI to Tolk types and compiler ABI", async () => {
+const tactTest = SUPPORTED_TACT_VERSIONS.length > 0 ? test : test.skip;
+
+tactTest("converts a Tact ABI to Tolk types and compiler ABI", async () => {
   const tactAbi = {
     name: "StableMaster",
     types: [
@@ -239,7 +242,7 @@ test("converts a Tact ABI to Tolk types and compiler ABI", async () => {
   ]);
 });
 
-test("includes Tact runtime metadata in direct-init storage", async () => {
+tactTest("includes Tact runtime metadata in direct-init storage", async () => {
   const tactAbi = { name: "AddressStorage", types: [] };
   const sources = await generatedTolkAbiSources(
     {
@@ -292,7 +295,7 @@ test("includes Tact runtime metadata in direct-init storage", async () => {
   );
 });
 
-test("uses contract parameters as storage without a deployment bit", async () => {
+tactTest("uses contract parameters as storage without a deployment bit", async () => {
   const tactAbi = { name: "Parameterized", types: [] };
   const sources = await generatedTolkAbiSources(
     {
@@ -323,7 +326,7 @@ test("uses contract parameters as storage without a deployment bit", async () =>
   assert.doesNotMatch(sources[0].content, /tactSystemCell/);
 });
 
-test("splits large Tact storage into continuation cells", async () => {
+tactTest("splits large Tact storage into continuation cells", async () => {
   const tactAbi = { name: "GramxToken", types: [] };
   const sources = await generatedTolkAbiSources(
     {
@@ -382,7 +385,7 @@ test("splits large Tact storage into continuation cells", async () => {
   );
 });
 
-test("splits large Tact messages across multiple continuation cells", async () => {
+tactTest("splits large Tact messages across multiple continuation cells", async () => {
   const fields = Array.from({ length: 7 }, (_, index) => ({
     name: `value${index + 1}`,
     type: {
@@ -434,7 +437,7 @@ test("splits large Tact messages across multiple continuation cells", async () =
   );
 });
 
-test("uses split sizes for structs embedded into messages", async () => {
+tactTest("uses split sizes for structs embedded into messages", async () => {
   const uint256 = {
     kind: "simple",
     type: "uint",
