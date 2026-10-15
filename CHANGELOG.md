@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Verifier
+
+- Verification statistics show the total beside the page title and compiler versions as a share of the registry without a language breakdown.
+
 ### Explorer
 
 - NFT purchases and sale listings show the payment and specific NFT on one line with a directional separator in account history. Purchase prices are neutral on NFT item pages and signed on buyer or seller pages.

@@ -24,8 +24,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -44,14 +42,6 @@ interface StatisticsPageProps {
   readonly api: VerifierApi
 }
 
-interface LanguageStatistics {
-  readonly fill: string
-  readonly label: string
-  readonly language: string
-  readonly total: number
-  readonly versions: readonly VersionRow[]
-}
-
 interface VersionRow {
   readonly total: number
   readonly version: string
@@ -67,20 +57,7 @@ interface HistoryPoint {
   total: number
 }
 
-const LANGUAGE_COLORS: Readonly<Record<string, string>> = {
-  func: "var(--acton-color-warning)",
-  tact: "var(--acton-color-success)",
-  tolk: "var(--acton-color-accent)",
-}
-const LANGUAGE_LABELS: Readonly<Record<string, string>> = {
-  func: "FunC",
-  tact: "Tact",
-  tolk: "Tolk",
-}
-const FALLBACK_LANGUAGE_COLOR = "var(--acton-color-text-subtle)"
 const HISTORY_SERIES_COLOR = "var(--acton-color-accent)"
-const LEGEND_SKELETON_KEYS = ["first", "second", "third"] as const
-const SHOW_SOURCE_BY_LANGUAGE = false
 const CHART_TOOLTIP_STYLE = {
   background: "var(--acton-color-surface-raised)",
   border: "1px solid var(--acton-color-border)",
@@ -92,18 +69,6 @@ const MONTH_TOOLTIP_FORMAT = {display: "month-long", locale: "en", timeZone: "UT
 
 function normalizedCount(value: number): number {
   return Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0
-}
-
-function languageLabel(language: string): string {
-  const value = language.trim()
-  return (
-    LANGUAGE_LABELS[value.toLowerCase()] ??
-    (value ? value[0].toUpperCase() + value.slice(1) : "Unknown")
-  )
-}
-
-function languageColor(language: string): string {
-  return LANGUAGE_COLORS[language.trim().toLowerCase()] ?? FALLBACK_LANGUAGE_COLOR
 }
 
 function monthStart(timestamp: number): number {
@@ -177,43 +142,36 @@ export function StatisticsPage({api}: StatisticsPageProps) {
   }, [loadStatistics])
 
   const total = normalizedCount(statistics?.total ?? 0)
-  const languages = useMemo<readonly LanguageStatistics[]>(
-    () =>
-      [...(statistics?.languages ?? [])]
-        .map(language => {
-          const languageTotal = normalizedCount(language.total)
-          return {
-            fill: languageColor(language.language),
-            label: languageLabel(language.language),
-            language: language.language,
-            total: languageTotal,
-            versions: [...language.versions]
-              .sort((left, right) => normalizedCount(right.total) - normalizedCount(left.total))
-              .map(version => ({
-                total: normalizedCount(version.total),
-                version: version.version || "Unknown",
-              })),
-          }
-        })
-        .sort((left, right) => right.total - left.total),
-    [statistics],
-  )
-  const historySeries = useMemo(() => buildHistorySeries(history?.items ?? []), [history])
-  const compilerLanguages = languages.filter(
+  const tolkStatistics = statistics?.languages.find(
     language => language.language.trim().toLowerCase() === "tolk",
   )
-  const versionCount = compilerLanguages.reduce(
-    (count, language) => count + language.versions.length,
-    0,
-  )
+  const versions: readonly VersionRow[] = [...(tolkStatistics?.versions ?? [])]
+    .sort((left, right) => normalizedCount(right.total) - normalizedCount(left.total))
+    .map(version => ({
+      total: normalizedCount(version.total),
+      version: version.version || "Unknown",
+    }))
+  const historySeries = useMemo(() => buildHistorySeries(history?.items ?? []), [history])
 
   return (
     <section className={styles.container}>
       <header className={styles.hero}>
-        <h1 className={styles.title}>Verification statistics</h1>
-        <p className={styles.subtitle}>
-          Language and compiler coverage across indexed verified contracts.
-        </p>
+        <div>
+          <h1 className={styles.title}>Verification statistics</h1>
+          <p className={styles.subtitle}>Registry growth and compiler version coverage</p>
+        </div>
+        {!error && (
+          <div className={styles.heroTotal} aria-busy={isLoading}>
+            <span className={styles.summaryLabel}>Verified contracts</span>
+            {isLoading ? (
+              <Skeleton width="8rem" height="3rem" radius="md" />
+            ) : (
+              <strong className={styles.totalValue}>
+                <NumberValue value={total} />
+              </strong>
+            )}
+          </div>
+        )}
       </header>
 
       {error ? (
@@ -234,133 +192,12 @@ export function StatisticsPage({api}: StatisticsPageProps) {
         </section>
       ) : (
         <>
-          <section
-            className={styles.summary}
-            aria-busy={isLoading}
-            aria-label={isLoading ? "Loading verification statistics" : undefined}
-          >
-            <div className={styles.totalPanel}>
-              <span className={styles.summaryLabel}>Verified contracts</span>
-              {isLoading ? (
-                <Skeleton width="11rem" height="4.5rem" radius="md" />
-              ) : (
-                <strong className={styles.totalValue}>
-                  <NumberValue value={total} />
-                </strong>
-              )}
-              <span className={styles.totalCaption}>
-                {isLoading ? (
-                  "Reading the verifier registry"
-                ) : (
-                  <>
-                    <span>Across </span>
-                    <CountValue singular="compiler language" value={languages.length} />
-                  </>
-                )}
-              </span>
-            </div>
-
-            {/* biome-ignore lint/suspicious/noUnnecessaryConditions: This section is temporarily hidden behind a local feature flag. */}
-            {SHOW_SOURCE_BY_LANGUAGE && (
-              <div className={styles.distributionPanel}>
-                <div className={styles.sectionHeading}>
-                  <div>
-                    <span className={styles.summaryLabel}>Language distribution</span>
-                    <h2>Verified source by language</h2>
-                  </div>
-                </div>
-
-                <div className={styles.distributionContent}>
-                  <div className={styles.chart}>
-                    {isLoading ? (
-                      <Skeleton shape="circle" width="10rem" height="10rem" />
-                    ) : languages.length > 0 ? (
-                      <>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart accessibilityLayer>
-                            <Pie
-                              data={languages}
-                              dataKey="total"
-                              nameKey="label"
-                              innerRadius="66%"
-                              outerRadius="94%"
-                              paddingAngle={2}
-                              stroke="none"
-                              isAnimationActive={false}
-                            />
-                            <Tooltip
-                              contentStyle={CHART_TOOLTIP_STYLE}
-                              itemStyle={{color: "var(--acton-color-text)"}}
-                              formatter={value => [
-                                formatNumberValue(Array.isArray(value) ? value[0] : value),
-                                "Contracts",
-                              ]}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className={styles.chartCenter} aria-hidden="true">
-                          <strong>
-                            <NumberValue value={total} />
-                          </strong>
-                          <span>Total</span>
-                        </div>
-                      </>
-                    ) : (
-                      <span className={styles.emptyChart}>No data</span>
-                    )}
-                  </div>
-
-                  <div className={styles.languageLegend}>
-                    {isLoading
-                      ? LEGEND_SKELETON_KEYS.map(key => (
-                          <div className={styles.legendSkeleton} key={key}>
-                            <Skeleton width="8rem" />
-                            <Skeleton width="4rem" />
-                          </div>
-                        ))
-                      : languages.map(language => (
-                          <div className={styles.legendRow} key={language.language}>
-                            <div className={styles.legendIdentity}>
-                              <span
-                                className={styles.legendDot}
-                                style={{backgroundColor: language.fill}}
-                                aria-hidden="true"
-                              />
-                              <span>{language.label}</span>
-                            </div>
-                            <div className={styles.legendValue}>
-                              <strong>
-                                <NumberValue value={language.total} />
-                              </strong>
-                              <span>
-                                <Percentage
-                                  maximumFractionDigits={1}
-                                  total={total}
-                                  value={language.total}
-                                />
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </section>
-
           <section className={styles.historySection}>
             <header className={styles.historyHeading}>
               <div>
                 <h2>Verification history</h2>
                 <p>Registry growth and monthly verification activity.</p>
               </div>
-              <span>
-                {isLoading ? (
-                  "Loading"
-                ) : (
-                  <CountValue singular="record" value={history?.items.length ?? 0} />
-                )}
-              </span>
             </header>
 
             <div className={styles.historyGrid} aria-busy={isLoading}>
@@ -497,7 +334,7 @@ export function StatisticsPage({api}: StatisticsPageProps) {
             <header className={styles.compilerHeading}>
               <h2>Tolk compiler versions</h2>
               <span>
-                {isLoading ? "Loading" : <CountValue singular="version" value={versionCount} />}
+                {isLoading ? "Loading" : <CountValue singular="version" value={versions.length} />}
               </span>
             </header>
 
@@ -508,96 +345,67 @@ export function StatisticsPage({api}: StatisticsPageProps) {
                     <DataTableRow>
                       <DataTableHeaderCell columnWidth="40%">Version</DataTableHeaderCell>
                       <DataTableHeaderCell align="right">Contracts</DataTableHeaderCell>
-                      <DataTableHeaderCell align="right">Language share</DataTableHeaderCell>
                       <DataTableHeaderCell align="right">Registry share</DataTableHeaderCell>
                     </DataTableRow>
                   </DataTableHead>
                   <DataTableBody>
                     <DataTableSkeletonRows
-                      columns={4}
+                      columns={3}
                       rows={6}
-                      widths={["8rem", "4rem", "4rem", "4rem"]}
-                      alignments={["left", "right", "right", "right"]}
+                      widths={["8rem", "4rem", "4rem"]}
+                      alignments={["left", "right", "right"]}
                     />
                   </DataTableBody>
                 </DataTableTable>
               </DataTable>
-            ) : compilerLanguages.length === 0 ? (
+            ) : tolkStatistics ? (
+              <DataTable
+                title="Tolk"
+                meta={
+                  <>
+                    <CountValue singular="contract" value={normalizedCount(tolkStatistics.total)} />{" "}
+                    · <CountValue singular="version" value={versions.length} />
+                  </>
+                }
+                minWidth="36rem"
+              >
+                <DataTableTable aria-label="Tolk verified contracts by compiler version">
+                  <DataTableHead>
+                    <DataTableRow>
+                      <DataTableHeaderCell columnWidth="40%">Version</DataTableHeaderCell>
+                      <DataTableHeaderCell align="right">Contracts</DataTableHeaderCell>
+                      <DataTableHeaderCell align="right">Registry share</DataTableHeaderCell>
+                    </DataTableRow>
+                  </DataTableHead>
+                  <DataTableBody>
+                    {versions.length === 0 ? (
+                      <DataTableEmpty colSpan={3}>No versions indexed</DataTableEmpty>
+                    ) : (
+                      versions.map(row => (
+                        <DataTableRow key={row.version} hover>
+                          <DataTableCell mono>{row.version}</DataTableCell>
+                          <DataTableCell align="right" tone="strong">
+                            <NumberValue value={row.total} />
+                          </DataTableCell>
+                          <DataTableCell align="right" tone="muted">
+                            <Percentage maximumFractionDigits={1} total={total} value={row.total} />
+                          </DataTableCell>
+                        </DataTableRow>
+                      ))
+                    )}
+                  </DataTableBody>
+                </DataTableTable>
+              </DataTable>
+            ) : (
               <DataTable title="Tolk" minWidth="36rem">
                 <DataTableTable aria-label="Tolk verified contracts by compiler version">
                   <DataTableBody>
-                    <DataTableEmpty colSpan={4}>
+                    <DataTableEmpty colSpan={3}>
                       No Tolk compiler statistics indexed yet
                     </DataTableEmpty>
                   </DataTableBody>
                 </DataTableTable>
               </DataTable>
-            ) : (
-              <div className={styles.versionTables}>
-                {compilerLanguages.map(language => (
-                  <DataTable
-                    key={language.language}
-                    title={
-                      <span className={styles.languageTitle}>
-                        <span
-                          className={styles.legendDot}
-                          style={{backgroundColor: language.fill}}
-                          aria-hidden="true"
-                        />
-                        {language.label}
-                      </span>
-                    }
-                    meta={
-                      <>
-                        <CountValue singular="contract" value={language.total} /> ·{" "}
-                        <CountValue singular="version" value={language.versions.length} />
-                      </>
-                    }
-                    minWidth="36rem"
-                  >
-                    <DataTableTable
-                      aria-label={`${language.label} verified contracts by compiler version`}
-                    >
-                      <DataTableHead>
-                        <DataTableRow>
-                          <DataTableHeaderCell columnWidth="40%">Version</DataTableHeaderCell>
-                          <DataTableHeaderCell align="right">Contracts</DataTableHeaderCell>
-                          <DataTableHeaderCell align="right">Language share</DataTableHeaderCell>
-                          <DataTableHeaderCell align="right">Registry share</DataTableHeaderCell>
-                        </DataTableRow>
-                      </DataTableHead>
-                      <DataTableBody>
-                        {language.versions.length === 0 ? (
-                          <DataTableEmpty colSpan={4}>No versions indexed</DataTableEmpty>
-                        ) : (
-                          language.versions.map(row => (
-                            <DataTableRow key={`${language.language}:${row.version}`} hover>
-                              <DataTableCell mono>{row.version}</DataTableCell>
-                              <DataTableCell align="right" tone="strong">
-                                <NumberValue value={row.total} />
-                              </DataTableCell>
-                              <DataTableCell align="right" tone="muted">
-                                <Percentage
-                                  maximumFractionDigits={1}
-                                  total={language.total}
-                                  value={row.total}
-                                />
-                              </DataTableCell>
-                              <DataTableCell align="right" tone="muted">
-                                <Percentage
-                                  maximumFractionDigits={1}
-                                  total={total}
-                                  value={row.total}
-                                />
-                              </DataTableCell>
-                            </DataTableRow>
-                          ))
-                        )}
-                      </DataTableBody>
-                    </DataTableTable>
-                  </DataTable>
-                ))}
-              </div>
             )}
           </section>
         </>
