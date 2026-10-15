@@ -348,12 +348,12 @@ mod sync {
 
         #[inline]
         pub fn insert(&self, cell: &Cell) {
-            _ = self.visited.insert(*cell.repr_hash());
+            _ = self.visited.insert_sync(*cell.repr_hash());
         }
 
         #[inline]
         pub fn contains(&self, repr_hash: &HashBytes) -> bool {
-            self.visited.contains(repr_hash)
+            self.visited.contains_sync(repr_hash)
         }
 
         #[inline]
