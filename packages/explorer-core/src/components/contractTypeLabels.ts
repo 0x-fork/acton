@@ -5,7 +5,8 @@ export function getContractTypeLabels(
   compilerAbi?: ContractABI,
   interfaces?: readonly string[],
 ): string[] {
-  const abiContractName = compilerAbi?.contract_name?.trim()
+  const contractName = compilerAbi?.contract_name?.trim()
+  const abiContractName = contractName === "WalletTg" ? "Telegram Wallet" : contractName
   const interfaceLabels = (interfaces ?? [])
     .map(value => getInterfaceLabel(value))
     .filter((value): value is string => value !== undefined)
@@ -55,6 +56,10 @@ function getInterfaceLabel(value: string): string | undefined {
     }
     case "multisig_order_v2": {
       return "Multisig order v2"
+    }
+    case "tg_wallet":
+    case "tg wallet": {
+      return "Telegram Wallet"
     }
     default: {
       return humanizeIdentifier(normalizedInterface)

@@ -128,6 +128,9 @@ describe("Wallet V5 plugin types", () => {
     expect(
       getContractTypeLabels({contract_name: "JettonWallet"} as ContractABI, ["jetton_wallet"]),
     ).toEqual(["JettonWallet"])
+    expect(
+      getContractTypeLabels({contract_name: "WalletTg"} as ContractABI, ["tg_wallet"]),
+    ).toEqual(["Telegram Wallet"])
   })
 
   test("keeps account request failures and omitted accounts distinct from unknown contract types", async () => {

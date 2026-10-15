@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Explorer
 
+- Telegram Wallet accounts show a blue wallet card with their GRAM balance, QR code, and available USD value, and one Telegram Wallet contract label.
 - TON DNS item account summaries show renewal, expiry, and the linked wallet.
 - Account tabs smoothly move the active highlight between sections, respecting
   reduced-motion preferences.

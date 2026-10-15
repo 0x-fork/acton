@@ -41,6 +41,7 @@ import type {
 import {AccountInfo} from "../components/AccountInfo"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
+import {TelegramWalletCard} from "../components/TelegramWalletCard"
 import {
   AccountDetails,
   readAccountHistorySortOrder,
@@ -2001,6 +2002,10 @@ export const AccountPage: FC<AccountPageProps> = ({
 
   const isLockerAccount = codeHashContractType === "locker"
   const isVestingAccount = codeHashContractType === "vesting"
+  const isTelegramWalletAccount =
+    accountState?.status === "active" &&
+    (compilerAbi?.contract_name === "WalletTg" ||
+      hasAccountInterface(accountInterfaces, "tg_wallet"))
   const isWalletV5Account =
     accountState?.status === "active" &&
     (codeHashContractType === "wallet_v5r1" ||
@@ -2031,16 +2036,19 @@ export const AccountPage: FC<AccountPageProps> = ({
       isMultisigAccount ||
       isNominatorPoolAccount ||
       singleNominatorVersion !== undefined ||
+      isTelegramWalletAccount ||
       accountSuspended)
 
   const topSectionClassName = hasHeaderContextCard
-    ? isScheduleAccount ||
-      isMultisigAccount ||
-      isNominatorPoolAccount ||
-      singleNominatorVersion !== undefined ||
-      accountSuspended
-      ? `${styles.topSection} ${styles.topSectionEqual}`
-      : styles.topSection
+    ? isTelegramWalletAccount
+      ? `${styles.topSection} ${styles.topSectionTelegramWallet}`
+      : isScheduleAccount ||
+          isMultisigAccount ||
+          isNominatorPoolAccount ||
+          singleNominatorVersion !== undefined ||
+          accountSuspended
+        ? `${styles.topSection} ${styles.topSectionEqual}`
+        : styles.topSection
     : `${styles.topSection} ${styles.topSectionSingle}`
 
   const accountInfoDetails = [
@@ -2387,6 +2395,12 @@ export const AccountPage: FC<AccountPageProps> = ({
               )}
               {hasHeaderContextCard && (
                 <div className={styles.contextColumn}>
+                  {isTelegramWalletAccount && accountState && (
+                    <TelegramWalletCard
+                      address={formattedAddress}
+                      balanceNanograms={accountState.balance}
+                    />
+                  )}
                   {accountSuspendedUntil !== undefined && (
                     <SuspendedAccountOverview suspendedUntil={accountSuspendedUntil} />
                   )}

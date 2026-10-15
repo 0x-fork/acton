@@ -8,6 +8,7 @@ These addresses are not fixtures and their balances or recent history can change
 
 | Address | What to verify | Last checked |
 | --- | --- | --- |
+| [`UQD-90D8Ab8Pwhr46Ed3WkPUPxt_dOPBcqj8gpr3Rs2uOdYm`](https://actonscan.com/address/UQD-90D8Ab8Pwhr46Ed3WkPUPxt_dOPBcqj8gpr3Rs2uOdYm?network=mainnet) | Telegram Wallet contract type is deduplicated and its blue wallet card shows balance, address, QR code, and USD estimate | 2026-10-15 |
 | [`EQBq1lDaKm0RqUAedPvWXzILPzk3tfKiUipgU6nGo7tXXTsU`](https://actonscan.com/address/EQBq1lDaKm0RqUAedPvWXzILPzk3tfKiUipgU6nGo7tXXTsU?network=mainnet) | .ton DNS item with a renewal timestamp and a wallet DNS record for checking the account summary | 2026-10-15 |
 | [`EQCLOTFznUeTZe8kcoXtnBosvmBSGwP1FG89taleCzjEiPm0`](https://actonscan.com/address/EQCLOTFznUeTZe8kcoXtnBosvmBSGwP1FG89taleCzjEiPm0?network=mainnet#contract-storage) | DNS item storage: full collection address aligns with scalar values and its hover tooltip shows bounceable, non-bounceable and raw formats | 2026-10-15 |
 | [`EQC3dNlesgVD8YbAazcauIrXBPfiVhMMr5YYk2in0Mtsz0Bz`](https://actonscan.com/address/EQC3dNlesgVD8YbAazcauIrXBPfiVhMMr5YYk2in0Mtsz0Bz?network=mainnet#contract) | .ton DNS collection: a recent Mint NFT trace shows the decoded domain link in Parsed body and `DnsCollectionOffchainContent.url` as a metadata link in Intact storage | 2026-10-15 |

@@ -110,6 +110,10 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.topSectionTelegramWallet {
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+
 .topSection > :first-child {
   min-width: 0;
   height: 100%;
