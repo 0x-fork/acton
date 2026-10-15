@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Cell hashing preserves sparse level masks at each significant level. Nested
+  Merkle proofs now produce the same block root hashes as TON nodes.
+
 - LiteClientPool replaces a failed transport on the next query instead of keeping
   a permanently disconnected client. Submitted requests are never replayed, and
   request timeouts still preserve the connection for late responses.

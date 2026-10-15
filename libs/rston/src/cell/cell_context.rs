@@ -197,10 +197,13 @@ impl CellParts<'_> {
 
             let mut hasher = sha2::Sha256::new();
 
+            // The hash descriptor includes only the cell's significant levels.
+            // Filling gaps in a sparse mask (010 -> 011) changes higher hashes
+            // and propagates through enclosing Merkle proofs and updates.
             let level_mask = if is_pruned {
                 level_mask
             } else {
-                LevelMask::from_level(level)
+                LevelMask::new(level_mask.to_byte() & LevelMask::from_level(level).to_byte())
             };
 
             descriptor.d1 &= !(CellDescriptor::LEVEL_MASK | CellDescriptor::STORE_HASHES_MASK);
