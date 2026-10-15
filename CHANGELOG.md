@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 - Account action history rows use compact NFT chips and vertical spacing.
 - Token table headers and rows align with the history table's left edge.
 - Jetton overview cards animate into a narrower layout with a softly textured token background and show an inactive chart when price data is unavailable.
-- NFT overview cards animate into view, show a softly textured artwork background, and link the collection name when metadata provides one.
+- NFT overview cards animate into view, show a softly textured artwork background with a subtle border, and link the collection name when metadata provides one.
 - Known NFT item contracts avoid repeating the NFT item interface in account summaries.
 - Telegram Wallet accounts show a blue wallet card with their GRAM balance, QR code, and available USD value, and one Telegram Wallet contract label.
 - TON DNS item account summaries show renewal, expiry, and the linked wallet.
