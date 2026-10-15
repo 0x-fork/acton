@@ -41,6 +41,8 @@
   position: relative;
   aspect-ratio: 370 / 220;
   overflow: hidden;
+  box-sizing: border-box;
+  border: 1px solid rgb(255 255 255 / 22%);
   border-radius: calc(21 * var(--u));
   background: #08f;
   box-shadow: 0 calc(10 * var(--u)) calc(26 * var(--u)) calc(-14 * var(--u)) #0060e699;
@@ -257,7 +259,8 @@
   width: 100%;
   place-items: center;
   overflow: hidden;
-  border: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--acton-color-border);
   border-radius: calc(21 * var(--u));
   background: #fff;
   color: #000;

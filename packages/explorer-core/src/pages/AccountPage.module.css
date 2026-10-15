@@ -114,6 +114,10 @@
   grid-template-columns: minmax(0, 1fr) 360px;
 }
 
+.topSectionJetton {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 440px);
+}
+
 .topSection > :first-child {
   min-width: 0;
   height: 100%;
@@ -127,8 +131,12 @@
   min-width: 0;
 }
 
-.contextColumn > [data-account-context-card="jetton"],
-.contextColumn > [data-account-context-card="nft"]:only-child {
+.contextColumn > :not([data-account-context-card="telegram-wallet"]):not([data-account-context-card="nft"]) {
+  box-sizing: border-box;
+  border: 1px solid var(--acton-color-border);
+}
+
+.contextColumn > [data-account-context-card="jetton"] {
   flex: 1;
 }
 

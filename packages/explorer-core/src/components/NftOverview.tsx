@@ -17,6 +17,7 @@ interface NftOverviewBaseProps {
 
 interface NftItemOverviewProps extends NftOverviewBaseProps {
   readonly kind: "item"
+  readonly collectionName?: string
   readonly ownerAddress?: string
   readonly collectionAddress?: string
   readonly index: string
@@ -32,9 +33,36 @@ export type NftOverviewProps = NftItemOverviewProps | NftCollectionOverviewProps
 
 export const NftOverview: FC<NftOverviewProps> = props => (
   <div className={styles.card} data-account-context-card="nft">
+    {props.imageSources.length > 0 && (
+      <NftImage
+        sources={props.imageSources}
+        alt=""
+        aria-hidden="true"
+        className={styles.backgroundImage}
+        blurredClassName={styles.backgroundImage}
+      />
+    )}
     <div className={styles.header}>
       <div className={styles.heading}>
         <div className={styles.title}>{props.name}</div>
+        {props.kind === "item" && props.collectionName && (
+          <div className={styles.collectionName}>
+            from{" "}
+            {props.collectionAddress ? (
+              <button
+                type="button"
+                className={styles.collectionLink}
+                onClick={() => {
+                  if (props.collectionAddress) props.onAddressClick(props.collectionAddress)
+                }}
+              >
+                {props.collectionName}
+              </button>
+            ) : (
+              props.collectionName
+            )}
+          </div>
+        )}
         {props.kind === "item" && (
           <button type="button" className={styles.metadataButton} onClick={props.onMetadataClick}>
             Metadata

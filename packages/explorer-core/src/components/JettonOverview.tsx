@@ -35,6 +35,15 @@ export const JettonOverview: FC<JettonOverviewProps> = ({
   onMint,
 }) => (
   <div className={styles.card} data-account-context-card="jetton">
+    {imageSources.length > 0 && (
+      <img
+        src={image}
+        alt=""
+        aria-hidden="true"
+        className={styles.backgroundImage}
+        onError={event => replaceBrokenImageWithFallback(event, imageSources)}
+      />
+    )}
     <div className={styles.header}>
       <img
         src={image}
@@ -62,6 +71,18 @@ export const JettonOverview: FC<JettonOverviewProps> = ({
         )}
       </div>
     </div>
+    {totalSupply !== undefined && (
+      <div className={styles.chartPlaceholder}>
+        <svg viewBox="0 0 392 112" preserveAspectRatio="none" aria-hidden="true">
+          <path className={styles.chartGrid} d="M0 16H392 M0 56H392 M0 96H392" />
+          <path
+            className={styles.chartLine}
+            d="M0 83 L18 78 L32 81 L48 69 L65 74 L83 63 L101 84 L119 76 L135 58 L153 62 L170 48 L189 71 L207 66 L223 76 L241 52 L258 60 L277 47 L294 68 L312 73 L329 56 L346 63 L365 49 L381 57 L392 53"
+          />
+        </svg>
+        <span className={styles.chartUnavailable}>No chart data</span>
+      </div>
+    )}
     {onMint !== undefined && (
       <Button
         type="button"

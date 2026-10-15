@@ -1708,7 +1708,7 @@ function HistoryValueCellLine({
   }
 
   return (
-    <div className={styles.historyValue}>
+    <div className={`${styles.historyValue} ${line.kind === "nft" ? styles.historyNftValue : ""}`}>
       <HistoryTextValue
         line={line}
         className={historyValueToneClass(line.tone)}
@@ -1733,7 +1733,7 @@ function HistoryTextValue({
     const address = line.address
     return (
       <NftChip
-        className={className}
+        className={`${className} ${styles.historyNftChip}`}
         label={line.label}
         image={
           line.imageSources.length > 0 && (

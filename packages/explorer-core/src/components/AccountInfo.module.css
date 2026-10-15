@@ -2,9 +2,10 @@
   position: relative;
   height: 100%;
   background: var(--acton-color-surface-raised);
-  border: 0;
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
   box-shadow: none;
+  box-sizing: border-box;
 }
 
 .cardBody {

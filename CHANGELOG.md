@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Explorer
 
+- Account overview panels have subtle borders around their surfaces.
+- DNS domain item accounts show one contract type when the generic DNS interface is also present.
+- Account action history rows use compact NFT chips and vertical spacing.
+- Token table headers and rows align with the history table's left edge.
+- Jetton overview cards animate into a narrower layout with a softly textured token background and show an inactive chart when price data is unavailable.
+- NFT overview cards show a softly textured artwork background and link the collection name when metadata provides one.
+- Known NFT item contracts avoid repeating the NFT item interface in account summaries.
 - Telegram Wallet accounts show a blue wallet card with their GRAM balance, QR code, and available USD value, and one Telegram Wallet contract label.
 - TON DNS item account summaries show renewal, expiry, and the linked wallet.
 - Account tabs smoothly move the active highlight between sections, respecting

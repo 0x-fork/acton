@@ -82,8 +82,8 @@
 }
 
 .historyContent tbody > tr > td {
-  padding-top: 12px !important;
-  padding-bottom: 12px !important;
+  padding-top: 9px !important;
+  padding-bottom: 9px !important;
 }
 
 .addressWrapper {
@@ -873,6 +873,22 @@ th.valueContainer {
   font-size: var(--acton-font-size-sm);
   font-variant-numeric: tabular-nums;
   line-height: 1.35;
+}
+
+.historyNftValue {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.historyValue .historyNftChip {
+  gap: 6px;
+  padding: 1px 7px 1px 2px;
+}
+
+.historyNftChip > span:first-child:not(:last-child) {
+  width: 18px;
+  height: 18px;
 }
 
 .swapValue {

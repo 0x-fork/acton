@@ -131,6 +131,13 @@ describe("Wallet V5 plugin types", () => {
     expect(
       getContractTypeLabels({contract_name: "WalletTg"} as ContractABI, ["tg_wallet"]),
     ).toEqual(["Telegram Wallet"])
+    expect(
+      getContractTypeLabels({contract_name: "DnsDomainItem"} as ContractABI, ["dns", "nft_item"]),
+    ).toEqual(["DnsDomainItem", "NFT item interface"])
+    expect(
+      getContractTypeLabels({contract_name: "NftV1Item"} as ContractABI, ["nft_item"]),
+    ).toEqual(["NftV1Item"])
+    expect(getContractTypeLabels(undefined, ["dns"])).toEqual(["dns"])
   })
 
   test("keeps account request failures and omitted accounts distinct from unknown contract types", async () => {

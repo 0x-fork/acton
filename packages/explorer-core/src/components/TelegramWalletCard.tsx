@@ -213,7 +213,7 @@ export function TelegramWalletCard({address, balanceNanograms}: TelegramWalletCa
         })
 
   return (
-    <div className={styles.frame}>
+    <div className={styles.frame} data-account-context-card="telegram-wallet">
       <div className={`${styles.wrap} ${flipped ? styles.flipped : ""}`}>
         <div className={styles.turn}>
           <div

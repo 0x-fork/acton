@@ -8,6 +8,7 @@ export function getContractTypeLabels(
   const contractName = compilerAbi?.contract_name?.trim()
   const abiContractName = contractName === "WalletTg" ? "Telegram Wallet" : contractName
   const interfaceLabels = (interfaces ?? [])
+    .filter(value => !(contractName === "DnsDomainItem" && value.trim().toLowerCase() === "dns"))
     .map(value => getInterfaceLabel(value))
     .filter((value): value is string => value !== undefined)
 
@@ -25,10 +26,12 @@ export function getContractTypeLabels(
 }
 
 function contractTypeLabelKey(value: string): string {
-  return value
+  const key = value
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "")
     .replace(/interface$/, "")
+
+  return key === "nftv1item" ? "nftitem" : key
 }
 
 function getInterfaceLabel(value: string): string | undefined {

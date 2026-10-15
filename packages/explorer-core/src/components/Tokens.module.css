@@ -3,6 +3,11 @@
   border-radius: 0;
 }
 
+.embeddedTable th:first-child,
+.embeddedTable td:first-child {
+  padding-left: var(--acton-space-4);
+}
+
 .tokenIdentity {
   display: flex;
   align-items: center;

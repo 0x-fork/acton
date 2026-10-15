@@ -1,15 +1,80 @@
 .card {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
   min-height: 133px;
+  overflow: hidden;
   padding: 20px 24px;
   background: var(--acton-color-surface-raised);
   border: 0;
   border-radius: 12px;
   box-shadow: none;
   box-sizing: border-box;
+  animation: jettonCardAppear 560ms cubic-bezier(0.18, 0.8, 0.2, 1) both;
+}
+
+@keyframes jettonCardAppear {
+  from {
+    opacity: 0;
+    transform: translateX(8px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.card::before,
+.card::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+}
+
+.card::before {
+  z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)'/%3E%3C/svg%3E");
+  opacity: 0.025;
+  mix-blend-mode: screen;
+}
+
+.card::after {
+  z-index: 0;
+  background:
+    radial-gradient(
+      ellipse 70% 90% at 88% 42%,
+      rgb(255 255 255 / 4%),
+      transparent 72%
+    ),
+    linear-gradient(
+      90deg,
+      var(--acton-color-surface-raised) 20%,
+      color-mix(in srgb, var(--acton-color-surface-raised) 82%, transparent) 55%,
+      color-mix(in srgb, var(--acton-color-surface-raised) 58%, transparent)
+    );
+  backdrop-filter: blur(48px) saturate(1.4);
+}
+
+.backgroundImage {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  right: 0;
+  width: 65%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.25);
+  pointer-events: none;
+}
+
+.card > :not(.backgroundImage) {
+  position: relative;
+  z-index: 2;
 }
 
 .header {
@@ -100,6 +165,50 @@
   box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
+.chartPlaceholder {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 96px;
+  overflow: hidden;
+}
+
+.chartPlaceholder svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0.32;
+}
+
+.chartGrid,
+.chartLine {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.chartGrid {
+  stroke: var(--acton-color-text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 2 7;
+  opacity: 0.35;
+}
+
+.chartLine {
+  stroke: var(--acton-color-text-muted);
+  stroke-width: 2;
+}
+
+.chartUnavailable {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 82%, transparent);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+
 .mintButton {
   align-self: flex-start;
   margin-top: auto;
@@ -119,5 +228,11 @@
 
   .header {
     align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
   }
 }

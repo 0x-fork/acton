@@ -1919,6 +1919,10 @@ export const AccountPage: FC<AccountPageProps> = ({
     : undefined
   const nftItemOwnerAddress = currentNftItem?.owner_address
   const nftItemCollectionAddress = currentNftItem ? nftCollectionKey(currentNftItem) : undefined
+  const nftItemCollectionName =
+    contentString(currentNftItem?.content, "collection_name") ||
+    contentString(currentNftItem?.content, "collection") ||
+    contentString(currentNftItem?.collection?.collection_content, "name")
   const nftItemImageHidden = currentNftItem
     ? !isNftImageVisible({...currentNftItem, is_scam: nftItemIsScam, is_nsfw: nftItemIsNsfw})
     : false
@@ -1927,11 +1931,7 @@ export const AccountPage: FC<AccountPageProps> = ({
       key={currentNftItem.address}
       name={nftItemName ?? `NFT #${currentNftItem.index}`}
       hasCollection={nftItemCollectionAddress !== undefined}
-      collectionName={
-        contentString(currentNftItem.content, "collection_name") ||
-        contentString(currentNftItem.content, "collection") ||
-        contentString(currentNftItem.collection?.collection_content, "name")
-      }
+      collectionName={nftItemCollectionName}
       onReveal={scope => revealNftImage(currentNftItem, scope)}
     />
   )
@@ -2048,7 +2048,9 @@ export const AccountPage: FC<AccountPageProps> = ({
           singleNominatorVersion !== undefined ||
           accountSuspended
         ? `${styles.topSection} ${styles.topSectionEqual}`
-        : styles.topSection
+        : tokenInfo === undefined
+          ? styles.topSection
+          : `${styles.topSection} ${styles.topSectionJetton}`
     : `${styles.topSection} ${styles.topSectionSingle}`
 
   const accountInfoDetails = [
@@ -2478,6 +2480,7 @@ export const AccountPage: FC<AccountPageProps> = ({
                     <NftOverview
                       kind="item"
                       name={nftItemName ?? `NFT #${currentNftItem.index}`}
+                      collectionName={nftItemCollectionName}
                       description={nftItemDescription}
                       imageSources={nftItemImageSources}
                       isScam={nftItemIsScam}

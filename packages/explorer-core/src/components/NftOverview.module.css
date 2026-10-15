@@ -1,10 +1,58 @@
 .card {
+  position: relative;
+  isolation: isolate;
   min-width: 0;
   min-height: 133px;
+  overflow: hidden;
   padding: 24px;
   border-radius: 12px;
   background: var(--acton-color-surface-raised);
   box-sizing: border-box;
+}
+
+.card::before,
+.card::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+}
+
+.card::before {
+  z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.72' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)'/%3E%3C/svg%3E");
+  opacity: 0.025;
+  mix-blend-mode: screen;
+}
+
+.card::after {
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 70% 90% at 88% 42%, rgb(255 255 255 / 4%), transparent 72%),
+    linear-gradient(
+      90deg,
+      var(--acton-color-surface-raised) 20%,
+      color-mix(in srgb, var(--acton-color-surface-raised) 82%, transparent) 55%,
+      color-mix(in srgb, var(--acton-color-surface-raised) 58%, transparent)
+    );
+  backdrop-filter: blur(48px) saturate(1.4);
+}
+
+.backgroundImage {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  right: 0;
+  width: 65%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.25);
+  pointer-events: none;
+}
+
+.card > :not(.backgroundImage) {
+  position: relative;
+  z-index: 2;
 }
 
 .header {
@@ -54,6 +102,39 @@
   white-space: nowrap;
 }
 
+.collectionName {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collectionLink {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--acton-color-accent);
+  cursor: pointer;
+  font: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.collectionLink:hover {
+  text-decoration: underline;
+}
+
+.collectionLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
+}
+
 .metadataButton {
   align-self: flex-start;
   min-height: 18px;
@@ -67,6 +148,10 @@
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-normal);
   line-height: 18px;
+}
+
+.collectionName + .metadataButton {
+  margin-top: 4px;
 }
 
 .metadataButton:hover {
