@@ -82,7 +82,11 @@ const TACT_VERSION_GROUPS: &[TactVersionGroup] = &[
 fn compiler_version_matrix_covers_all_npm_aliases() {
     assert_eq!(npm_alias_versions("func"), version_set(ALL_FUNC_VERSIONS));
     assert_eq!(npm_alias_versions("tolk"), version_set(ALL_TOLK_VERSIONS));
+}
 
+#[test]
+#[ignore = "Tact compiler dependencies are temporarily disabled"]
+fn tact_compiler_version_matrix_covers_all_npm_aliases() {
     let tact_versions = TACT_VERSION_GROUPS
         .iter()
         .flat_map(|group| group.versions.iter().copied())
@@ -173,6 +177,7 @@ async fn verify_all_func_npm_versions_with_real_compiler() {
 }
 
 #[tokio::test]
+#[ignore = "Tact compiler dependencies are temporarily disabled"]
 async fn verify_tact_with_real_compiler_and_stores_generated_sources() {
     let state = real_compiler_app_state(&[]);
     let mut input = fixture("valid-tact.json");
@@ -232,6 +237,7 @@ async fn verify_tact_with_real_compiler_and_stores_generated_sources() {
 }
 
 #[tokio::test]
+#[ignore = "Tact compiler dependencies are temporarily disabled"]
 async fn verify_all_tact_npm_versions_with_real_compiler() {
     for group in TACT_VERSION_GROUPS {
         for compiler_version in group.versions {
@@ -249,6 +255,7 @@ async fn verify_all_tact_npm_versions_with_real_compiler() {
 }
 
 #[tokio::test]
+#[ignore = "Tact compiler dependencies are temporarily disabled"]
 async fn verify_tact_accepts_uppercase_package_extension() {
     let state = real_compiler_app_state(&[]);
     let mut input = fixture("valid-tact.json");
