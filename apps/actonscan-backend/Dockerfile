@@ -33,7 +33,9 @@ LABEL org.opencontainers.image.title="actonscan-backend" \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl3 tini wget \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --system --uid 10001 --create-home --home-dir /var/lib/actonscan actonscan
+    && groupadd --system --gid 10003 actonscan \
+    && useradd --system --uid 10003 --gid actonscan --create-home \
+        --home-dir /var/lib/actonscan --shell /usr/sbin/nologin actonscan
 
 WORKDIR /var/lib/actonscan
 
@@ -41,7 +43,7 @@ COPY --from=rust-builder /build/target/release/actonscan-backend /usr/local/bin/
 COPY crates/ton-indexer-liteserver/fixtures/mainnet-global.config.json /etc/actonscan/mainnet-global.config.json
 COPY apps/actonscan-backend/docker/config.toml /etc/actonscan/config.toml
 
-USER actonscan
+USER 10003:10003
 
 ENV ACTONSCAN_CONFIG=/etc/actonscan/config.toml
 
