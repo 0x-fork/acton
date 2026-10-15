@@ -49,6 +49,7 @@ export const SUPPORTED_TACT_VERSIONS = [
 ];
 
 export const SUPPORTED_TOLK_VERSIONS = [
+  "1.5.0",
   "1.4.2",
   "1.4.1",
   "1.4.0",
@@ -116,6 +117,7 @@ const tactLoaders = {
 };
 
 const tolkLoaders = {
+  "1.5.0": () => import("tolk-1.5.0"),
   "1.4.2": () => import("tolk-1.4.2"),
   "1.4.1": () => import("tolk-1.4.1"),
   "1.4.0": () => import("tolk-1.4.0"),

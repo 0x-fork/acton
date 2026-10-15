@@ -2,7 +2,9 @@ import path from "node:path";
 import { getMethodId } from "@ton/core";
 
 import { normalizeSourcePath } from "./common.mjs";
-import { importTolk, SUPPORTED_TOLK_VERSIONS } from "./registry.mjs";
+import { importTolk } from "./registry.mjs";
+
+const TOLK_ABI_COMPILER_VERSION = "1.4.2";
 
 /** @typedef {import("@ton/core").ABIReceiver} ABIReceiver */
 /** @typedef {import("@ton/core").ABIGetter} ABIGetter */
@@ -94,11 +96,6 @@ export async function generatedTolkAbiSources(tactPackage, generatedSources) {
       return undefined;
     }
 
-    const compilerVersion = SUPPORTED_TOLK_VERSIONS[0];
-    if (compilerVersion === undefined) {
-      return undefined;
-    }
-
     const storage = await findTactStorage(
       tactPackage,
       tactAbi,
@@ -113,7 +110,7 @@ export async function generatedTolkAbiSources(tactPackage, generatedSources) {
       "output",
       `${generated.contractName}.types.tolk`,
     );
-    const { runTolkCompiler } = await importTolk(compilerVersion);
+    const { runTolkCompiler } = await importTolk(TOLK_ABI_COMPILER_VERSION);
     const result = await runTolkCompiler({
       entrypointFileName: typesPath,
       allowNoEntrypoint: true,

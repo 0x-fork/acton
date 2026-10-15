@@ -31,7 +31,7 @@ const ALL_FUNC_VERSIONS: &[&str] = &[
 ];
 const ALL_TOLK_VERSIONS: &[&str] = &[
     "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.99.0", "1.0.0",
-    "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.4.1", "1.4.2",
+    "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.4.1", "1.4.2", "1.5.0",
 ];
 const TACT_SOURCE_BASE64: &str = "Y29udHJhY3QgU21va2UgeyBpbml0KCkge30gcmVjZWl2ZSgpIHt9IH0=";
 const TACT_VERSION_GROUPS: &[TactVersionGroup] = &[

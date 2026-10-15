@@ -23,6 +23,7 @@ export async function compileTolk(input) {
       return source.content;
     },
     withSourceMapData: includeSourceMapData,
+    withDebugMarks: includeSourceMapData,
   });
 
   if (result.status === "error") {
