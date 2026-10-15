@@ -131,12 +131,14 @@
   min-width: 0;
 }
 
-.contextColumn > :not([data-account-context-card="telegram-wallet"]):not([data-account-context-card="nft"]) {
+.contextColumn
+  > :not([data-account-context-card="telegram-wallet"]):not([data-account-context-card="nft"]) {
   box-sizing: border-box;
   border: 1px solid var(--acton-color-border);
 }
 
-.contextColumn > [data-account-context-card="jetton"] {
+.contextColumn > [data-account-context-card="jetton"],
+.contextColumn > [data-account-context-card="nft"]:only-child {
   flex: 1;
 }
 
