@@ -2927,7 +2927,11 @@ function getHistoryActionDisplay(
         ),
       )
     case "nft_transfer":
-    case "nft_purchase":
+    case "nft_purchase": {
+      const isNftItemPage = action.details.nft_item
+        ? isSameAddress(action.details.nft_item, context.ownerAddress)
+        : false
+
       return sourceDestinationAction(
         action.details.old_owner ?? null,
         action.details.new_owner,
@@ -2935,8 +2939,9 @@ function getHistoryActionDisplay(
         isIncoming =>
           action.type === "nft_purchase"
             ? valueLines(
-                tonValueLine(action.details.price ?? null, isIncoming ? "negative" : "positive"),
-                actionNftValueLine(
+                tonToNftValueLine(
+                  action.details.price ?? null,
+                  isNftItemPage ? "neutral" : isIncoming ? "negative" : "positive",
                   action.details.nft_item,
                   action.details.nft_item_index,
                   context.metadata,
@@ -2953,13 +2958,23 @@ function getHistoryActionDisplay(
               ),
         "Account",
       )
+    }
     case "nft_put_on_sale":
       return addressAction(
         action.details.sale_address,
         "sale",
         false,
         "Sale",
-        valueLines(tonValueLine(action.details.full_price, "neutral")),
+        valueLines(
+          tonToNftValueLine(
+            action.details.full_price,
+            "neutral",
+            action.details.nft_item,
+            action.details.nft_item_index,
+            context.metadata,
+            action.details.nft_collection,
+          ),
+        ),
       )
     case "nft_put_on_auction":
     case "teleitem_start_auction":
