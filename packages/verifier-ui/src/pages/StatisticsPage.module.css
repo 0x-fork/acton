@@ -196,7 +196,7 @@
 @media (max-width: 640px) {
   .container {
     gap: 18px;
-    padding: 16px 16px 36px;
+    padding: 16px 12px 36px;
   }
 
   .title {

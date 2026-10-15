@@ -1733,7 +1733,7 @@ function HistoryTextValue({
     const address = line.address
     return (
       <NftChip
-        className={`${className} ${styles.historyNftChip}`}
+        className={`${className} ${styles.historyNftChip} ${line.imageSources.length === 0 ? styles.historyNftChipWithoutImage : ""}`}
         label={line.label}
         image={
           line.imageSources.length > 0 && (

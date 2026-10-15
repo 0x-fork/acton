@@ -568,16 +568,6 @@
   animation: traceSkeletonShimmer 1.15s ease-in-out infinite;
 }
 
-.skeletonBreadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 24px;
-  margin-bottom: 4px;
-}
-
-.skeletonBreadcrumbAddress,
-.skeletonBreadcrumbHash,
 .skeletonStatusText,
 .skeletonTime,
 .skeletonFlowAccountName,
@@ -589,16 +579,6 @@
 .skeletonDetailValue,
 .skeletonTreeLabel {
   border-radius: 999px;
-}
-
-.skeletonBreadcrumbAddress {
-  width: min(240px, 42%);
-  height: 16px;
-}
-
-.skeletonBreadcrumbHash {
-  width: min(420px, 54%);
-  height: 16px;
 }
 
 .skeletonStatus {
@@ -1008,7 +988,7 @@
 
 @media (max-width: 520px) {
   .container {
-    padding: 12px 8px 28px;
+    padding: 12px 12px 28px;
     gap: 12px;
   }
 
@@ -1020,34 +1000,42 @@
     margin-top: -4px;
   }
 
+  .treeSection {
+    min-height: 0;
+    padding-top: 12px;
+  }
+
   .overviewCard {
     position: relative;
     padding: 16px;
   }
 
   .overviewHeader {
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 10px;
+    display: grid;
+    grid-template-columns: max-content 20px;
+    grid-template-areas:
+      "status favorite"
+      "date date";
+    justify-content: start;
+    align-items: center;
+    gap: 10px 8px;
   }
 
   .status {
-    width: 100%;
-    padding-right: 32px;
+    grid-area: status;
+    width: auto;
   }
 
   .overviewMeta {
-    width: 100%;
-    justify-content: flex-start;
+    display: contents;
   }
 
   .favoriteAction {
-    position: absolute;
-    top: 10px;
-    right: 10px;
+    grid-area: favorite;
   }
 
   .overviewMeta .value {
+    grid-area: date;
     word-break: normal;
     line-height: 1.35;
   }
@@ -1055,19 +1043,6 @@
   .tabs {
     -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
     mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
-  }
-
-  .skeletonBreadcrumbs {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    min-height: 0;
-    margin-bottom: 0;
-  }
-
-  .skeletonBreadcrumbAddress,
-  .skeletonBreadcrumbHash {
-    width: 100%;
   }
 
   .skeletonTime {

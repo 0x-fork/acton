@@ -363,6 +363,7 @@ button.addressAction + button.addressAction {
 }
 
 .favoriteIconActive {
+  color: #d3a416;
   fill: currentColor;
 }
 
@@ -639,9 +640,9 @@ button.addressAction + button.addressAction {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  width: 132px;
-  min-width: 132px;
-  min-height: 132px;
+  width: 166px;
+  min-width: 166px;
+  min-height: 166px;
   align-self: flex-start;
   border: 0;
   border-radius: 0;
@@ -668,16 +669,7 @@ button.addressAction + button.addressAction {
   right: 24px;
 }
 
-.qrSvg {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  color: var(--acton-color-text);
-}
-
 .qrSkeleton {
-  width: 132px;
-  height: 132px;
   border-radius: 8px;
 }
 
@@ -783,6 +775,16 @@ button.addressAction + button.addressAction {
     padding: 14px 16px;
   }
 
+  .tooltipTrigger {
+    margin-right: 12px;
+  }
+
+  .cardCompactQr .tooltipTrigger {
+    top: 14px;
+    right: 14px;
+    margin-right: 0;
+  }
+
   .rows {
     gap: 8px;
   }
@@ -803,17 +805,31 @@ button.addressAction + button.addressAction {
     flex-wrap: wrap;
   }
 
+  .nameInfoRow .rowValue {
+    align-items: center;
+  }
+
   .assetRow,
   .collectiblesRow {
     width: 100%;
   }
 
+  .assetRow {
+    flex-wrap: wrap;
+  }
+
   .assetLink {
-    align-items: flex-start;
+    flex: 0 0 auto;
+    max-width: 100%;
+    align-items: center;
   }
 
   .assetLink .primaryValue {
     min-width: 0;
+    overflow: hidden;
+    overflow-wrap: normal;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .addressInfoRow .rowValue {

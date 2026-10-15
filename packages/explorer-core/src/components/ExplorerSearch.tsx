@@ -30,6 +30,7 @@ interface ExplorerSearchProps {
   readonly autoFocus?: boolean
   readonly className?: string
   readonly client: TonClient
+  readonly enableShortcut?: boolean
   readonly variant?: ExplorerSearchVariant
 }
 
@@ -65,6 +66,7 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
   autoFocus = false,
   className,
   client,
+  enableShortcut = true,
   variant = "hero",
 }) => {
   const {addressFormat, network} = useNetworkInfo()
@@ -311,7 +313,7 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
   return (
     <SearchInput
       ariaLabel="Explorer search"
-      shortcut="K"
+      shortcut={enableShortcut ? "K" : undefined}
       autoFocus={autoFocus}
       className={className}
       invalid={isInvalid}

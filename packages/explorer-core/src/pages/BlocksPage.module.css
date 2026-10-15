@@ -518,12 +518,39 @@
 
 @media (max-width: 640px) {
   .container {
-    padding: 18px 16px 32px;
+    padding: 18px 12px 32px;
     gap: 14px;
   }
 
   .blocksLayout {
     gap: 14px;
+  }
+
+  .blocksTableGrid {
+    --blocks-table-min-width: 0;
+  }
+
+  .blocksTableGrid thead th:first-child {
+    width: 31% !important;
+  }
+
+  .blocksTableGrid thead th:nth-child(2) {
+    width: 10% !important;
+    font-size: 0;
+  }
+
+  .blocksTableGrid thead th:nth-child(2)::after {
+    content: "TX";
+    font-size: var(--acton-font-size-2xs);
+  }
+
+  .blocksTableGrid thead th:nth-child(3) {
+    width: 59% !important;
+  }
+
+  .blocksTableGrid tbody td:nth-child(3) {
+    font-size: 0.75rem;
+    white-space: nowrap;
   }
 
   .blockDetailRow {

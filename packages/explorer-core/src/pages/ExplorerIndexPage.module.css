@@ -224,7 +224,7 @@
 
 @media (max-width: 768px) {
   .inputPage {
-    padding: 16px;
+    padding: 16px 12px;
   }
 
   .logoTitle {
@@ -237,7 +237,7 @@
     align-items: center;
     justify-content: flex-start;
     min-height: 0;
-    padding-top: clamp(64px, 14vh, 112px);
+    padding-top: clamp(48px, 8vh, 80px);
     padding-bottom: 48px;
   }
 

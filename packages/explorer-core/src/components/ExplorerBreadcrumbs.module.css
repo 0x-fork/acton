@@ -16,7 +16,7 @@
 
 @media (max-width: 520px) {
   .breadcrumbs {
-    margin-top: -8px;
-    margin-bottom: 0;
+    margin-block: 4px 6px;
+    padding-left: 8px;
   }
 }

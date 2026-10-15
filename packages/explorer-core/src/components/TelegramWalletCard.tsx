@@ -1,12 +1,11 @@
-import {useEffect, useMemo, useRef, useState} from "react"
+import {useEffect, useRef, useState} from "react"
 import type {PointerEvent} from "react"
-import {encode} from "uqr"
 
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {normalizeAddress} from "./utils"
 import gemImage from "../assets/gram-gem-white.webp"
-import blueGemImage from "../assets/gram-gem-blue.webp"
 import styles from "./TelegramWalletCard.module.css"
+import {StyledQrCode} from "./StyledQrCode"
 
 const stars = [
   [87.12, 47],
@@ -34,89 +33,6 @@ const stars = [
 interface TelegramWalletCardProps {
   readonly address: string
   readonly balanceNanograms: string
-}
-
-/** Draws the source card's circular QR modules and rounded finder markers. */
-function TelegramWalletQr({address}: {readonly address: string}) {
-  const rootRef = useRef<HTMLSpanElement>(null)
-  const [shown, setShown] = useState(() => matchMedia("(prefers-reduced-motion: reduce)").matches)
-  const value = `ton://transfer/${address}`
-  const qr = useMemo(() => {
-    const {size, data} = encode(value, {ecc: "H", border: 0})
-    const holeSize = Math.ceil(size * 0.22) | 1
-    const holeStart = (size - holeSize) / 2
-    const finders = [
-      [0, 0],
-      [size - 7, 0],
-      [0, size - 7],
-    ] as const
-    const dots: string[] = []
-
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const inFinder = finders.some(
-          ([left, top]) => x >= left && x < left + 7 && y >= top && y < top + 7,
-        )
-        const inLogo =
-          x >= holeStart && x < holeStart + holeSize && y >= holeStart && y < holeStart + holeSize
-        if (data[y][x] && !inFinder && !inLogo) {
-          dots.push(`M${x + 0.5} ${y + 0.08}a.42.42 0 1 0 .001 0`)
-        }
-      }
-    }
-
-    return {size, holeSize, finders, dots: dots.join("")}
-  }, [value])
-
-  useEffect(() => {
-    if (shown || !rootRef.current) return
-
-    let frame = 0
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry?.isIntersecting) {
-        observer.disconnect()
-        frame = requestAnimationFrame(() => setShown(true))
-      }
-    })
-    observer.observe(rootRef.current)
-
-    return () => {
-      observer.disconnect()
-      cancelAnimationFrame(frame)
-    }
-  }, [shown])
-
-  return (
-    <span ref={rootRef} className={`${styles.qr} ${shown ? styles.qrShown : ""}`}>
-      <svg viewBox={`-1 -1 ${qr.size + 2} ${qr.size + 2}`} role="img" aria-label={value}>
-        <path d={qr.dots} fill="currentColor" />
-        {qr.finders.map(([x, y]) => (
-          <g key={`${x}-${y}`}>
-            <rect
-              x={x + 0.5}
-              y={y + 0.5}
-              width="6"
-              height="6"
-              rx="1.9"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1"
-            />
-            <rect x={x + 2} y={y + 2} width="3" height="3" rx="0.9" fill="currentColor" />
-          </g>
-        ))}
-      </svg>
-      <span
-        className={styles.qrLogo}
-        style={{
-          width: `${(qr.holeSize / (qr.size + 2)) * 100}%`,
-          height: `${(qr.holeSize / (qr.size + 2)) * 100}%`,
-        }}
-      >
-        <img src={blueGemImage} alt="" />
-      </span>
-    </span>
-  )
 }
 
 /** Presents the on-chain balance as a Telegram Wallet card on account pages. */
@@ -317,7 +233,7 @@ export function TelegramWalletCard({address, balanceNanograms}: TelegramWalletCa
             aria-label="Return to Telegram Wallet card"
             onClick={() => setFlipped(false)}
           >
-            <TelegramWalletQr address={cardAddress} />
+            <StyledQrCode value={`ton://transfer/${cardAddress}`} size="calc(184 * var(--u))" />
           </button>
         </div>
       </div>

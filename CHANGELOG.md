@@ -10,6 +10,22 @@ All notable changes to this project will be documented in this file.
 
 ### Explorer
 
+- The Blocks page fits recent transactions and block lists on mobile screens, and network TPS values animate between refreshes.
+- Transaction pages show breadcrumb-shaped loading placeholders immediately while the trace loads.
+- Mobile transaction summaries place the favorite action immediately after the status and message-route actions above the route. Transaction detail section labels match field labels on desktop and mobile.
+- Mobile navigation opens a two-column bottom sheet with text-only destinations and concise descriptions, a theme dropdown, animated swipe-down and backdrop dismissal, and mobile pages use narrower side gutters. Mobile search opens promptly without rerendering the current page and uses a short entrance animation.
+- Mobile account actions and loading placeholders align amounts with action names and dates with addresses while allowing long names to wrap.
+- Mobile account history dates align vertically with addresses in the second row.
+- NFT labels without artwork use even horizontal spacing and subtler corners in account history.
+- Mobile search panels have corners that match the inset search field.
+- Mobile token balances keep the amount and symbol together while secondary token links move to the next line when needed.
+- Mobile account QR buttons keep the same top and right inset with or without a context card.
+- Address QR codes appear larger in account panels and popovers, follow the page theme, and retain the address payload and Telegram Wallet-inspired styling.
+- Favorited account stars keep the same yellow fill as other saved items.
+- Address QR codes use the same encoder and visual style as Telegram Wallet cards.
+- Explorer pages give mobile breadcrumbs and account or transaction content consistent side spacing, and the mobile navigation keeps its appearance control inside the scrollable menu.
+- Mobile account and transaction action rows keep full action names visible, while transaction trees indicate horizontal scrolling and the home page uses a shorter top offset.
+- The rename action aligns vertically with account names on mobile.
 - NFT purchases and sale listings show the payment and specific NFT on one line with a directional separator in account history. Purchase prices are neutral on NFT item pages and signed on buyer or seller pages.
 - Account overview panels have subtle borders around their surfaces.
 - DNS domain item accounts show one contract type when the generic DNS interface is also present.

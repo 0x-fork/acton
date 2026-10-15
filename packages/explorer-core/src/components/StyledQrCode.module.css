@@ -1,0 +1,58 @@
+.qr {
+  position: relative;
+  display: block;
+  flex: none;
+  max-width: 100%;
+  color: #000;
+  background: #fff;
+  aspect-ratio: 1;
+}
+
+:global([data-theme="dark"]) .qrAdaptive {
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-raised);
+}
+
+.qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  clip-path: circle(0% at 50% 50%);
+}
+
+.qrShown svg {
+  clip-path: circle(71% at 50% 50%);
+  transition: clip-path 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.qrLogo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.4);
+}
+
+.qrShown .qrLogo {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  transition:
+    transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.18s,
+    opacity 0.2s 0.18s;
+}
+
+.qrLogo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qr svg,
+  .qrLogo {
+    transition: none;
+  }
+}

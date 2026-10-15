@@ -884,6 +884,11 @@ th.valueContainer {
 .historyValue .historyNftChip {
   gap: 6px;
   padding: 1px 7px 1px 2px;
+  border-radius: 6px;
+}
+
+.historyValue .historyNftChipWithoutImage {
+  padding-left: 7px;
 }
 
 .historyNftChip > span:first-child:not(:last-child) {
@@ -1143,10 +1148,13 @@ th.valueContainer {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "action value"
-      "address address"
-      "technical time";
+      "address time";
     gap: 8px 12px;
     padding: 14px 16px;
+  }
+
+  .historyContent tbody > tr:first-child {
+    border-top: 0 !important;
   }
 
   .historyContent tbody > tr > td {
@@ -1159,6 +1167,7 @@ th.valueContainer {
 
   .historyContent tbody > tr > .actionColumn {
     grid-area: action;
+    align-self: start;
   }
 
   .historyContent tbody > tr > td:nth-child(3) {
@@ -1166,7 +1175,8 @@ th.valueContainer {
   }
 
   .historyContent tbody > tr > .technicalColumn {
-    grid-area: technical;
+    grid-row: 3;
+    grid-column: 1 / -1;
     align-self: center;
   }
 
@@ -1183,22 +1193,43 @@ th.valueContainer {
 
   .historyContent tbody > tr > .valueContainer {
     grid-area: value;
-    align-self: center;
+    align-self: start;
+    justify-self: end;
     width: auto;
     min-width: 0;
+  }
+
+  .historyContent tbody > tr:has(.swapValue) {
+    grid-template-areas:
+      "action action"
+      "address address"
+      "value value"
+      "technical time";
+  }
+
+  .historyContent tbody > tr:has(.swapValue) > .technicalColumn {
+    grid-area: technical;
   }
 
   .historyContent .addressWrapper {
     overflow: hidden;
   }
 
+  .historyContent .actionText,
+  .mobileCardTable .actionText {
+    white-space: normal;
+  }
+
   .historyContent .technicalLabel {
     max-width: min(100%, 19rem);
   }
 
-  .historyContent .emptyRow,
-  .historyContent .skeletonRow {
+  .historyContent .emptyRow {
     grid-template-areas: none;
+  }
+
+  .historyContent .skeletonRow > .technicalColumn {
+    display: none;
   }
 
   .historyContent .emptyCell {
@@ -1227,8 +1258,7 @@ th.valueContainer {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "action value"
-      "address address"
-      "technical time";
+      "address time";
     gap: 8px 12px;
     padding: 14px 16px;
     border-top: 1px solid var(--acton-color-border);
@@ -1249,13 +1279,23 @@ th.valueContainer {
 
   .mobileCardTable [data-mobile-area="action"] {
     grid-area: action;
+    align-self: start;
   }
 
   .mobileCardTable [data-mobile-area="value"] {
     grid-area: value;
-    align-self: center;
+    align-self: start;
+    justify-self: end;
     width: auto;
     min-width: 0;
+  }
+
+  .mobileCardTable tbody > tr:has(.swapValue) {
+    grid-template-areas:
+      "action action"
+      "address address"
+      "value value"
+      "technical time";
   }
 
   .mobileCardTable [data-mobile-area="address"] {
@@ -1263,8 +1303,13 @@ th.valueContainer {
   }
 
   .mobileCardTable [data-mobile-area="technical"] {
-    grid-area: technical;
+    grid-row: 3;
+    grid-column: 1 / -1;
     align-self: center;
+  }
+
+  .mobileCardTable tbody > tr:has(.swapValue) > [data-mobile-area="technical"] {
+    grid-area: technical;
   }
 
   .mobileCardTable [data-mobile-area="technical"]:empty {
@@ -1336,6 +1381,19 @@ th.valueContainer {
   .timeFormatOptionActive,
   .timeFormatOptionActive + .timeFormatOption {
     border-top-color: transparent;
+  }
+}
+
+@media (max-width: 360px) {
+  .historyContent tbody > tr:has(.swapValue) > .valueContainer,
+  .mobileCardTable tbody > tr:has(.swapValue) > [data-mobile-area="value"] {
+    width: 100%;
+  }
+
+  .historyContent .swapValue,
+  .mobileCardTable .swapValue {
+    flex-wrap: wrap;
+    white-space: normal;
   }
 }
 .blurredNftImage {

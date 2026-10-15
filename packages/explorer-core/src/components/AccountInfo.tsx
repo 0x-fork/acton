@@ -1,6 +1,5 @@
 import {Check, Edit2, QrCode, Star} from "lucide-react"
-import {QRCodeSVG} from "qrcode.react"
-import {memo, useEffect, useId, useRef, useState} from "react"
+import {useEffect, useId, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {
   Button,
@@ -32,6 +31,7 @@ import {useNetworkInfo, type ExplorerNetworkId} from "../hooks/useNetworkInfo"
 
 import styles from "./AccountInfo.module.css"
 import {NftImage} from "./NftImage"
+import {StyledQrCode} from "./StyledQrCode"
 import {
   TOKEN_IMAGE_SOURCE_KEYS,
   getImageSources,
@@ -43,19 +43,6 @@ import {getContractTypeLabels} from "./contractTypeLabels"
 import {normalizeAddress, toRawAddress} from "./utils"
 
 const TOKEN_PREVIEW_LIMIT = 5
-
-const AddressQrCode = memo<{readonly value: string}>(({value}) => (
-  <QRCodeSVG
-    value={value}
-    size={132}
-    level="M"
-    marginSize={3}
-    bgColor="var(--acton-color-surface-raised)"
-    fgColor="var(--acton-color-text)"
-    title={`QR code for ${value}`}
-    className={styles.qrSvg}
-  />
-))
 
 interface AccountInfoDetail {
   readonly key: string
@@ -277,11 +264,22 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   )
   const cardClassName = hasContextCard ? `${styles.card} ${styles.cardCompactQr}` : styles.card
 
-  const qrCode = stateLoading ? (
-    <div className={`${styles.skeleton} ${styles.qrSkeleton}`} aria-hidden="true" />
-  ) : (
-    <AddressQrCode value={displayAddress} />
-  )
+  const renderQrCode = (size: number) =>
+    stateLoading ? (
+      <div
+        className={`${styles.skeleton} ${styles.qrSkeleton}`}
+        style={{width: size, height: size}}
+        aria-hidden="true"
+      />
+    ) : (
+      <StyledQrCode
+        value={displayAddress}
+        size={size}
+        label={`QR code for ${displayAddress}`}
+        errorCorrection="M"
+        appearance="adaptive"
+      />
+    )
   const addressFormats = (
     <div className={styles.addressFormats}>
       <div className={styles.addressFormatRow}>
@@ -398,7 +396,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                 </div>
               </div>
             ) : displayName ? (
-              <div className={styles.infoRow}>
+              <div className={`${styles.infoRow} ${styles.nameInfoRow}`}>
                 <div className={styles.label}>Name</div>
                 <div className={styles.rowValue}>
                   {hasNameDetails ? (
@@ -803,7 +801,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
               <Popover
                 key={rawAddress}
                 ariaLabel="Address QR code"
-                content={qrCode}
+                content={renderQrCode(198)}
                 interaction="click"
                 placement="bottom"
                 triggerAsChild
@@ -817,7 +815,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
         )}
 
         <div className={styles.qrPanel} aria-label="Address QR code" aria-busy={stateLoading}>
-          {qrCode}
+          {renderQrCode(166)}
         </div>
       </div>
     </div>

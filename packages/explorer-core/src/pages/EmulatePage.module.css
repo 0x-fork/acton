@@ -622,6 +622,16 @@
 }
 
 @media (max-width: 560px) {
+  .page,
+  .secondaryControls,
+  .pageReady .secondaryControls {
+    padding-inline: 12px;
+  }
+
+  .pageReady {
+    padding: 0;
+  }
+
   .title {
     font-size: 26px;
     line-height: 32px;

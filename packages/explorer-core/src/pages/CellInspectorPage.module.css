@@ -386,7 +386,7 @@
 
 @media (max-width: 720px) {
   .container {
-    padding: var(--acton-space-5) var(--acton-space-4) 36px;
+    padding: var(--acton-space-5) 12px 36px;
   }
 
   .workspace {

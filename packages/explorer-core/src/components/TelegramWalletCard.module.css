@@ -275,50 +275,6 @@
   transition-delay: .3s, 0s, 0s;
 }
 
-.qr {
-  position: relative;
-  display: block;
-  width: calc(184 * var(--u));
-  height: calc(184 * var(--u));
-  color: #000;
-  aspect-ratio: 1;
-}
-
-.qr svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  clip-path: circle(0% at 50% 50%);
-}
-
-.qrShown svg {
-  clip-path: circle(71% at 50% 50%);
-  transition: clip-path .6s cubic-bezier(.2, .8, .2, 1);
-}
-
-.qrLogo {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  display: grid;
-  place-items: center;
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(.4);
-}
-
-.qrShown .qrLogo {
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
-  transition: transform .55s cubic-bezier(.34, 1.56, .64, 1) .18s, opacity .2s .18s;
-}
-
-.qrLogo img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
 .flipped .back { visibility: visible; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -332,6 +288,4 @@
   .star,
   .chip::before { animation: none; }
 
-  .qr svg,
-  .qrLogo { transition: none; }
 }

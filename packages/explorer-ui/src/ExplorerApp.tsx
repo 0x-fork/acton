@@ -3,6 +3,7 @@ import * as v from "valibot"
 
 import {FaucetPage} from "@acton/faucet-ui"
 import {Checkbox, Input, Popover, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
+import {useTheme} from "@acton/ui/components/theme-provider"
 import {
   createVerifierApi,
   readVerifiedContractsPage,
@@ -25,10 +26,12 @@ import {
   X,
 } from "lucide-react"
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
-import type {FC, ReactNode} from "react"
+import type {FC, PointerEvent as ReactPointerEvent, ReactNode} from "react"
+import {createPortal} from "react-dom"
 import {
   BrowserRouter,
   Link,
+  NavLink,
   Navigate,
   Route,
   Routes,
@@ -1111,15 +1114,78 @@ const VerifiedContractRoute: FC = () => {
 }
 
 export const ExplorerApp: FC = () => {
+  const {theme, setTheme} = useTheme()
   const [networkState, setNetworkState] = useState<ExplorerNetworkState>(
     readInitialExplorerNetworkState,
   )
   const [mobileHeaderPanel, setMobileHeaderPanel] = useState<"navigation" | "search">()
+  const [mobileNavigationClosing, setMobileNavigationClosing] = useState(false)
   const mobileNavigationRef = useRef<HTMLDivElement>(null)
+  const mobileNavigationPanelRef = useRef<HTMLElement>(null)
+  const mobileNavigationDragRef = useRef({pointerId: -1, startY: 0, startedAt: 0, offset: 0})
   const mobileSearchRef = useRef<HTMLDivElement>(null)
   const mobileNavigationOpen = mobileHeaderPanel === "navigation"
   const mobileSearchOpen = mobileHeaderPanel === "search"
-  const closeMobileHeaderPanels = useCallback(() => setMobileHeaderPanel(undefined), [])
+  const closeMobileHeaderPanels = useCallback(() => {
+    if (
+      mobileNavigationPanelRef.current &&
+      !matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      setMobileNavigationClosing(true)
+      return
+    }
+
+    setMobileHeaderPanel(undefined)
+    setMobileNavigationClosing(false)
+  }, [])
+  const handleMobileNavigationDragStart = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return
+
+    event.currentTarget.setPointerCapture(event.pointerId)
+    mobileNavigationDragRef.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startedAt: performance.now(),
+      offset: 0,
+    }
+  }
+  const handleMobileNavigationDragMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = mobileNavigationDragRef.current
+    if (drag.pointerId !== event.pointerId) return
+
+    drag.offset = Math.max(0, event.clientY - drag.startY)
+    const panel = mobileNavigationPanelRef.current
+    if (!panel) return
+
+    panel.style.animation = "none"
+    panel.style.transition = "none"
+    panel.style.transform = `translate(-50%, ${drag.offset}px)`
+  }
+  const handleMobileNavigationDragEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = mobileNavigationDragRef.current
+    if (drag.pointerId !== event.pointerId) return
+
+    mobileNavigationDragRef.current.pointerId = -1
+    const speed = drag.offset / Math.max(1, performance.now() - drag.startedAt)
+    if (drag.offset > 72 || (drag.offset > 24 && speed > 0.6)) {
+      const panel = mobileNavigationPanelRef.current
+      if (panel) {
+        panel.style.animation = ""
+        panel.style.transition = ""
+        panel.style.transform = ""
+      }
+      closeMobileHeaderPanels()
+      return
+    }
+
+    const panel = mobileNavigationPanelRef.current
+    if (panel) {
+      panel.style.transition = matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "none"
+        : "transform 180ms cubic-bezier(0.22, 1, 0.36, 1)"
+      panel.style.transform = "translate(-50%, 0)"
+    }
+  }
   const selectableNetworks = useMemo<readonly SelectableExplorerNetwork[]>(
     () => [...EXPLORER_NETWORKS, ...networkState.customNetworks],
     [networkState.customNetworks],
@@ -1244,6 +1310,7 @@ export const ExplorerApp: FC = () => {
       if (
         event.target instanceof Node &&
         (mobileNavigationRef.current?.contains(event.target) ||
+          mobileNavigationPanelRef.current?.contains(event.target) ||
           mobileSearchRef.current?.contains(event.target))
       ) {
         return
@@ -1263,6 +1330,77 @@ export const ExplorerApp: FC = () => {
       document.removeEventListener("keydown", handleKeyDown)
     }
   }, [closeMobileHeaderPanels, mobileHeaderPanel])
+
+  useEffect(() => {
+    if (!mobileNavigationOpen) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [mobileNavigationOpen])
+
+  const pageRoutes = useMemo(
+    () => (
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <ExplorerIndexPage
+              client={client}
+              faucetPath={networkId === "testnet" ? "/faucet" : undefined}
+              fillAvailableHeight
+            />
+          }
+        />
+        <Route
+          path="/blocks"
+          element={<BlocksPage key={networkId} client={client} loadNetworkTps={loadNetworkTps} />}
+        />
+        <Route path="/tokens" element={<TokenCatalogPage client={client} />} />
+        <Route path="/config/:seqno" element={<ConfigPage client={client} />} />
+        <Route path="/config" element={<ConfigPage client={client} />} />
+        <Route path="/elections" element={<ValidatorsPage client={client} />} />
+        <Route path="/abi" element={<AbiCatalogPage />} />
+        <Route path="/abi/:slug" element={<AbiDetailsPage />} />
+        <Route path="/sources" element={<SourceCatalogPage client={client} />} />
+        <Route
+          path="/faucet"
+          element={
+            <FaucetPage
+              isTestnetSelected={networkId === "testnet"}
+              selectedNetworkLabel={networkConfig.label}
+              testnetClient={testnetClient}
+              onSwitchToTestnet={() => handleNetworkChange("testnet")}
+            />
+          }
+        />
+        <Route path="/verified" element={<VerifiedContractsRoute />} />
+        <Route path="/verified/statistics" element={<StatisticsPage api={ACTON_VERIFIER_API} />} />
+        <Route path="/verified/:target" element={<VerifiedContractRoute />} />
+        <Route path="/address-converter" element={<AddressConverterPage />} />
+        <Route path="/cell" element={<CellInspectorExplorerPage />} />
+        <Route path="/emulate" element={<EmulateExplorerPage client={client} />} />
+        <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />
+        <Route path="/suspended" element={<SuspendedAddressesPage client={client} />} />
+        <Route path="/block/last" element={<BlockDetailsPage client={client} latest />} />
+        <Route
+          path="/block/:workchain/:shard/:seqno"
+          element={<BlockDetailsPage client={client} />}
+        />
+        <Route path="/address/:address" element={<AccountPage client={client} />} />
+        <Route
+          path="/tx/:hash/trace"
+          element={<TransactionPage client={client} openRetraceOnLoad />}
+        />
+        <Route path="/tx/:hash" element={<TransactionPage client={client} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    ),
+    [client, handleNetworkChange, loadNetworkTps, networkConfig.label, networkId, testnetClient],
+  )
 
   return (
     <BrowserRouter>
@@ -1334,16 +1472,19 @@ export const ExplorerApp: FC = () => {
                           >
                             {mobileSearchOpen ? <X size={18} /> : <Search size={18} />}
                           </button>
-                          {mobileSearchOpen && (
-                            <div id="explorer-mobile-search" className={styles.mobileSearchPanel}>
-                              <ExplorerSearch
-                                autoFocus
-                                className={styles.mobileSearch}
-                                client={client}
-                                variant="header"
-                              />
-                            </div>
-                          )}
+                          <div
+                            id="explorer-mobile-search"
+                            className={styles.mobileSearchPanel}
+                            hidden={!mobileSearchOpen}
+                          >
+                            <ExplorerSearch
+                              autoFocus={mobileSearchOpen}
+                              className={styles.mobileSearch}
+                              client={client}
+                              enableShortcut={false}
+                              variant="header"
+                            />
+                          </div>
                         </div>
                         <Link
                           className={`${styles.headerIconButton} ${styles.desktopHeaderAction}`}
@@ -1375,152 +1516,202 @@ export const ExplorerApp: FC = () => {
                             }
                             aria-controls="explorer-mobile-navigation"
                             aria-expanded={mobileNavigationOpen}
-                            onClick={() =>
-                              setMobileHeaderPanel(current =>
-                                current === "navigation" ? undefined : "navigation",
-                              )
-                            }
+                            onClick={() => {
+                              if (mobileNavigationOpen) {
+                                closeMobileHeaderPanels()
+                                return
+                              }
+
+                              setMobileNavigationClosing(false)
+                              setMobileHeaderPanel("navigation")
+                            }}
                           >
                             {mobileNavigationOpen ? <X size={18} /> : <Menu size={18} />}
                           </button>
-                          {mobileNavigationOpen && (
-                            <nav
-                              id="explorer-mobile-navigation"
-                              className={styles.mobileNavigation}
-                              aria-label="Mobile explorer navigation"
-                            >
-                              <Link to="/blocks" onClick={closeMobileHeaderPanels}>
-                                Blocks
-                              </Link>
-                              <Link to="/tokens" onClick={closeMobileHeaderPanels}>
-                                Tokens
-                              </Link>
-                              <Link to="/config" onClick={closeMobileHeaderPanels}>
-                                Config
-                              </Link>
-                              <Link to="/elections" onClick={closeMobileHeaderPanels}>
-                                Elections
-                              </Link>
-                              {networkId === "mainnet" && (
-                                <Link to="/suspended" onClick={closeMobileHeaderPanels}>
-                                  Suspended addresses
-                                </Link>
-                              )}
-                              <Link to="/abi" onClick={closeMobileHeaderPanels}>
-                                ABI
-                              </Link>
-                              <Link to="/sources" onClick={closeMobileHeaderPanels}>
-                                Sources
-                              </Link>
-                              <Link to="/faucet" onClick={closeMobileHeaderPanels}>
-                                Faucet
-                              </Link>
-                              <Link to="/verified" onClick={closeMobileHeaderPanels}>
-                                Verified contracts
-                              </Link>
-                              <Link to="/address-converter" onClick={closeMobileHeaderPanels}>
-                                Address converter
-                              </Link>
-                              <Link to="/cell" onClick={closeMobileHeaderPanels}>
-                                Cell inspector
-                              </Link>
-                              <Link to="/emulate" onClick={closeMobileHeaderPanels}>
-                                Emulator
-                              </Link>
-                              <Link to="/favorites" onClick={closeMobileHeaderPanels}>
-                                <span>Favorites</span>
-                                <Star size={17} aria-hidden="true" />
-                              </Link>
-                              <a
-                                href="https://github.com/ton-blockchain/acton"
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={closeMobileHeaderPanels}
-                              >
-                                <span>GitHub</span>
-                                <Github size={17} aria-hidden="true" />
-                              </a>
-                              <div className={styles.mobileThemeRow}>
-                                <span>Appearance</span>
-                                <ThemeSwitch />
-                              </div>
-                            </nav>
-                          )}
+                          {mobileNavigationOpen &&
+                            createPortal(
+                              <>
+                                <button
+                                  type="button"
+                                  className={`${styles.mobileNavigationBackdrop} ${mobileNavigationClosing ? styles.mobileNavigationBackdropClosing : ""}`}
+                                  aria-label="Close navigation"
+                                  onClick={closeMobileHeaderPanels}
+                                />
+                                <nav
+                                  id="explorer-mobile-navigation"
+                                  ref={mobileNavigationPanelRef}
+                                  className={`${styles.mobileNavigation} ${mobileNavigationClosing ? styles.mobileNavigationClosing : ""}`}
+                                  aria-label="Mobile explorer navigation"
+                                  onAnimationEnd={event => {
+                                    if (
+                                      event.target === event.currentTarget &&
+                                      mobileNavigationClosing
+                                    ) {
+                                      setMobileHeaderPanel(undefined)
+                                      setMobileNavigationClosing(false)
+                                    }
+                                  }}
+                                >
+                                  <div
+                                    className={styles.mobileNavigationHeader}
+                                    onPointerDown={handleMobileNavigationDragStart}
+                                    onPointerMove={handleMobileNavigationDragMove}
+                                    onPointerUp={handleMobileNavigationDragEnd}
+                                    onPointerCancel={handleMobileNavigationDragEnd}
+                                  />
+                                  <section
+                                    className={styles.mobileNavigationGrid}
+                                    aria-label="Explore"
+                                  >
+                                    {[
+                                      {
+                                        to: "/blocks",
+                                        label: "Blocks",
+                                        description: "Recent activity",
+                                      },
+                                      {
+                                        to: "/tokens",
+                                        label: "Tokens",
+                                        description: "Browse tokens",
+                                      },
+                                      {
+                                        to: "/config",
+                                        label: "Config",
+                                        description: "Network settings",
+                                      },
+                                      {
+                                        to: "/elections",
+                                        label: "Elections",
+                                        description: "Validator rounds",
+                                      },
+                                      {to: "/abi", label: "ABI", description: "Methods & types"},
+                                      {
+                                        to: "/sources",
+                                        label: "Sources",
+                                        description: "Contract code",
+                                      },
+                                      {
+                                        to: "/verified",
+                                        label: "Verified",
+                                        description: "Verified code",
+                                      },
+                                      ...(networkId === "mainnet"
+                                        ? [
+                                            {
+                                              to: "/suspended",
+                                              label: "Suspended",
+                                              description: "Addresses on hold",
+                                            },
+                                          ]
+                                        : []),
+                                    ].map(({to, label, description}) => (
+                                      <NavLink
+                                        key={to}
+                                        to={to}
+                                        className={({isActive}) =>
+                                          `${styles.mobileNavigationLink} ${isActive ? styles.mobileNavigationLinkActive : ""}`
+                                        }
+                                        onClick={closeMobileHeaderPanels}
+                                      >
+                                        <span className={styles.mobileNavigationLinkTitle}>
+                                          {label}
+                                        </span>
+                                        <span className={styles.mobileNavigationLinkDescription}>
+                                          {description}
+                                        </span>
+                                      </NavLink>
+                                    ))}
+                                  </section>
+                                  <section
+                                    className={styles.mobileNavigationGrid}
+                                    aria-label="Tools"
+                                  >
+                                    {[
+                                      {to: "/faucet", label: "Faucet", description: "Testnet GRAM"},
+                                      {
+                                        to: "/address-converter",
+                                        label: "Addresses",
+                                        description: "Convert formats",
+                                      },
+                                      {
+                                        to: "/cell",
+                                        label: "Cell inspector",
+                                        description: "Decode cells",
+                                      },
+                                      {
+                                        to: "/emulate",
+                                        label: "Emulator",
+                                        description: "Run transactions",
+                                      },
+                                    ].map(({to, label, description}) => (
+                                      <NavLink
+                                        key={to}
+                                        to={to}
+                                        className={({isActive}) =>
+                                          `${styles.mobileNavigationLink} ${isActive ? styles.mobileNavigationLinkActive : ""}`
+                                        }
+                                        onClick={closeMobileHeaderPanels}
+                                      >
+                                        <span className={styles.mobileNavigationLinkTitle}>
+                                          {label}
+                                        </span>
+                                        <span className={styles.mobileNavigationLinkDescription}>
+                                          {description}
+                                        </span>
+                                      </NavLink>
+                                    ))}
+                                    <NavLink
+                                      to="/favorites"
+                                      className={({isActive}) =>
+                                        `${styles.mobileNavigationLink} ${isActive ? styles.mobileNavigationLinkActive : ""}`
+                                      }
+                                      onClick={closeMobileHeaderPanels}
+                                    >
+                                      <span className={styles.mobileNavigationLinkTitle}>
+                                        Favorites
+                                      </span>
+                                      <span className={styles.mobileNavigationLinkDescription}>
+                                        Saved addresses
+                                      </span>
+                                    </NavLink>
+                                    <a
+                                      className={styles.mobileNavigationLink}
+                                      href="https://github.com/ton-blockchain/acton"
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      onClick={closeMobileHeaderPanels}
+                                    >
+                                      <span className={styles.mobileNavigationLinkTitle}>
+                                        GitHub
+                                      </span>
+                                      <span className={styles.mobileNavigationLinkDescription}>
+                                        Project source
+                                      </span>
+                                    </a>
+                                  </section>
+                                  <label className={styles.mobileThemeRow}>
+                                    <span>Theme</span>
+                                    <select
+                                      value={theme}
+                                      onChange={event =>
+                                        setTheme(
+                                          event.currentTarget.value === "dark" ? "dark" : "light",
+                                        )
+                                      }
+                                    >
+                                      <option value="light">Light</option>
+                                      <option value="dark">Dark</option>
+                                    </select>
+                                  </label>
+                                </nav>
+                              </>,
+                              document.body,
+                            )}
                         </div>
                       </div>
                     </div>
                   </ExplorerHeaderFrame>
-                  <main className={styles.main}>
-                    <Routes>
-                      <Route
-                        path="/"
-                        element={
-                          <ExplorerIndexPage
-                            client={client}
-                            faucetPath={networkId === "testnet" ? "/faucet" : undefined}
-                            fillAvailableHeight
-                          />
-                        }
-                      />
-                      <Route
-                        path="/blocks"
-                        element={
-                          <BlocksPage
-                            key={networkId}
-                            client={client}
-                            loadNetworkTps={loadNetworkTps}
-                          />
-                        }
-                      />
-                      <Route path="/tokens" element={<TokenCatalogPage client={client} />} />
-                      <Route path="/config/:seqno" element={<ConfigPage client={client} />} />
-                      <Route path="/config" element={<ConfigPage client={client} />} />
-                      <Route path="/elections" element={<ValidatorsPage client={client} />} />
-                      <Route path="/abi" element={<AbiCatalogPage />} />
-                      <Route path="/abi/:slug" element={<AbiDetailsPage />} />
-                      <Route path="/sources" element={<SourceCatalogPage client={client} />} />
-                      <Route
-                        path="/faucet"
-                        element={
-                          <FaucetPage
-                            isTestnetSelected={networkId === "testnet"}
-                            selectedNetworkLabel={networkConfig.label}
-                            testnetClient={testnetClient}
-                            onSwitchToTestnet={() => handleNetworkChange("testnet")}
-                          />
-                        }
-                      />
-                      <Route path="/verified" element={<VerifiedContractsRoute />} />
-                      <Route
-                        path="/verified/statistics"
-                        element={<StatisticsPage api={ACTON_VERIFIER_API} />}
-                      />
-                      <Route path="/verified/:target" element={<VerifiedContractRoute />} />
-                      <Route path="/address-converter" element={<AddressConverterPage />} />
-                      <Route path="/cell" element={<CellInspectorExplorerPage />} />
-                      <Route path="/emulate" element={<EmulateExplorerPage client={client} />} />
-                      <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />
-                      <Route
-                        path="/suspended"
-                        element={<SuspendedAddressesPage client={client} />}
-                      />
-                      <Route
-                        path="/block/last"
-                        element={<BlockDetailsPage client={client} latest />}
-                      />
-                      <Route
-                        path="/block/:workchain/:shard/:seqno"
-                        element={<BlockDetailsPage client={client} />}
-                      />
-                      <Route path="/address/:address" element={<AccountPage client={client} />} />
-                      <Route
-                        path="/tx/:hash/trace"
-                        element={<TransactionPage client={client} openRetraceOnLoad />}
-                      />
-                      <Route path="/tx/:hash" element={<TransactionPage client={client} />} />
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                  </main>
+                  <main className={styles.main}>{pageRoutes}</main>
                 </div>
               </AddressBookProvider>
             </MetadataRegistryProvider>

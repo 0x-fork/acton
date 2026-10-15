@@ -71,61 +71,14 @@ export const DeveloperTransactionListSkeleton: FC<{
   readonly title?: string
   readonly rows?: number
 }> = ({className, title, rows = 5}) => (
-  <DataTable
-    className={className}
-    title={title}
-    minWidth="45rem"
-    aria-label={title ? `Loading ${title}` : "Loading transactions"}
-  >
-    <DataTableTable aria-busy="true" aria-label={title ?? "Loading transactions"} layout="fixed">
-      <DataTableHead>
-        <DataTableRow>
-          <DataTableHeaderCell className={styles.timeCell} columnWidth="6.25rem">
-            Time
-          </DataTableHeaderCell>
-          <DataTableHeaderCell align="right">From</DataTableHeaderCell>
-          <DataTableHeaderCell
-            className={styles.directionCell}
-            columnWidth="3.125rem"
-            aria-label="Direction"
-          />
-          <DataTableHeaderCell>To</DataTableHeaderCell>
-          <DataTableHeaderCell columnWidth="15rem">Opcode</DataTableHeaderCell>
-          <DataTableHeaderCell align="right" columnWidth="12rem">
-            Value
-          </DataTableHeaderCell>
-        </DataTableRow>
-      </DataTableHead>
-      <DataTableBody>
-        <DataTableSkeletonRows
-          columns={6}
-          rows={rows}
-          alignments={["left", "right", "center", "left", "left", "right"]}
-          widths={["3.5rem", "10rem", "1rem", "10rem", "10rem", "5rem"]}
-        />
-      </DataTableBody>
-    </DataTableTable>
-  </DataTable>
-)
-
-export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
-  transactions,
-  className,
-  title,
-  emptyState = "No transactions yet",
-  maxRows,
-  messageNamesByAddress,
-  onTransactionClick,
-  onAddressClick,
-}) => {
-  const allRows = transactions.flatMap(transaction =>
-    buildDeveloperRows(transaction, messageNamesByAddress),
-  )
-  const rows = maxRows === undefined ? allRows : allRows.slice(0, maxRows)
-
-  return (
-    <DataTable className={className} title={title} minWidth="45rem" aria-label={title}>
-      <DataTableTable aria-label={title ?? "Transactions"} layout="fixed">
+  <>
+    <DataTable
+      className={`${className ?? ""} ${styles.desktopTable}`}
+      title={title}
+      minWidth="45rem"
+      aria-label={title ? `Loading ${title}` : "Loading transactions"}
+    >
+      <DataTableTable aria-busy="true" aria-label={title ?? "Loading transactions"} layout="fixed">
         <DataTableHead>
           <DataTableRow>
             <DataTableHeaderCell className={styles.timeCell} columnWidth="6.25rem">
@@ -145,87 +98,238 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
           </DataTableRow>
         </DataTableHead>
         <DataTableBody>
-          {rows.length === 0 ? (
-            <DataTableEmpty colSpan={6}>{emptyState}</DataTableEmpty>
-          ) : (
-            rows.map(row => {
-              const hashHex = hashToHex(getTransactionHash(row.transaction))
-              const canOpenTransaction = hashHex !== undefined && onTransactionClick !== undefined
-              return (
-                <DataTableRow
-                  key={row.key}
-                  interactive={canOpenTransaction}
-                  tabIndex={canOpenTransaction ? 0 : undefined}
-                  onClick={event => {
-                    if (hashHex) {
-                      onTransactionClick?.(hashHex, row.transaction, event)
-                    }
-                  }}
-                  onKeyDown={event => {
-                    if (
-                      hashHex &&
-                      (event.key === "Enter" || event.key === " ") &&
-                      onTransactionClick
-                    ) {
-                      event.preventDefault()
-                      onTransactionClick(hashHex, row.transaction)
-                    }
-                  }}
-                  title={row.statusLabel}
-                >
-                  <DataTableCell className={styles.timeCell} tone="muted">
-                    <RelativeTime value={row.time} unit="seconds" mode="hybrid" />
-                  </DataTableCell>
-                  <DataTableCell align="right">
-                    <EndpointCell
-                      endpoint={row.from}
-                      copyPlacement="left"
-                      onAddressClick={onAddressClick}
-                    />
-                  </DataTableCell>
-                  <DataTableCell className={styles.directionCell} align="center">
-                    <span
-                      className={`${styles.directionBadge} ${
-                        row.direction === "IN" ? styles.directionIn : styles.directionOut
-                      }`}
-                    >
-                      {row.direction}
-                    </span>
-                  </DataTableCell>
-                  <DataTableCell>
-                    <EndpointCell endpoint={row.to} onAddressClick={onAddressClick} />
-                  </DataTableCell>
-                  <DataTableCell tone="muted">
-                    <span className={styles.opcodeValue}>{row.messageName ?? "—"}</span>
-                  </DataTableCell>
-                  <DataTableCell align="right" tone="strong">
-                    <span
-                      className={`${styles.valueText} ${
-                        row.valueKind === "empty" ? styles.valueEmpty : ""
-                      }`}
-                    >
-                      {row.valueNanograms === undefined ? (
-                        row.valueLabel
-                      ) : (
-                        <GramAmount value={row.valueNanograms} useGrouping />
-                      )}
-                    </span>
-                  </DataTableCell>
-                </DataTableRow>
-              )
-            })
-          )}
+          <DataTableSkeletonRows
+            columns={6}
+            rows={rows}
+            alignments={["left", "right", "center", "left", "left", "right"]}
+            widths={["3.5rem", "10rem", "1rem", "10rem", "10rem", "5rem"]}
+          />
         </DataTableBody>
       </DataTableTable>
     </DataTable>
+    <DataTable
+      className={`${className ?? ""} ${styles.mobileTable}`}
+      title={title}
+      minWidth={0}
+      aria-label={title ? `Loading ${title}` : "Loading transactions"}
+    >
+      <DataTableTable aria-busy="true" aria-label={title ?? "Loading transactions"}>
+        <DataTableBody>
+          <DataTableSkeletonRows columns={1} rows={rows} widths={["70%"]} />
+        </DataTableBody>
+      </DataTableTable>
+    </DataTable>
+  </>
+)
+
+export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
+  transactions,
+  className,
+  title,
+  emptyState = "No transactions yet",
+  maxRows,
+  messageNamesByAddress,
+  onTransactionClick,
+  onAddressClick,
+}) => {
+  const allRows = transactions.flatMap(transaction =>
+    buildDeveloperRows(transaction, messageNamesByAddress),
+  )
+  const rows = maxRows === undefined ? allRows : allRows.slice(0, maxRows)
+
+  return (
+    <>
+      <DataTable
+        className={`${className ?? ""} ${styles.desktopTable}`}
+        title={title}
+        minWidth="45rem"
+        aria-label={title}
+      >
+        <DataTableTable aria-label={title ?? "Transactions"} layout="fixed">
+          <DataTableHead>
+            <DataTableRow>
+              <DataTableHeaderCell className={styles.timeCell} columnWidth="6.25rem">
+                Time
+              </DataTableHeaderCell>
+              <DataTableHeaderCell align="right">From</DataTableHeaderCell>
+              <DataTableHeaderCell
+                className={styles.directionCell}
+                columnWidth="3.125rem"
+                aria-label="Direction"
+              />
+              <DataTableHeaderCell>To</DataTableHeaderCell>
+              <DataTableHeaderCell columnWidth="15rem">Opcode</DataTableHeaderCell>
+              <DataTableHeaderCell align="right" columnWidth="12rem">
+                Value
+              </DataTableHeaderCell>
+            </DataTableRow>
+          </DataTableHead>
+          <DataTableBody>
+            {rows.length === 0 ? (
+              <DataTableEmpty colSpan={6}>{emptyState}</DataTableEmpty>
+            ) : (
+              rows.map(row => {
+                const hashHex = hashToHex(getTransactionHash(row.transaction))
+                const canOpenTransaction = hashHex !== undefined && onTransactionClick !== undefined
+                return (
+                  <DataTableRow
+                    key={row.key}
+                    interactive={canOpenTransaction}
+                    tabIndex={canOpenTransaction ? 0 : undefined}
+                    onClick={event => {
+                      if (hashHex) {
+                        onTransactionClick?.(hashHex, row.transaction, event)
+                      }
+                    }}
+                    onKeyDown={event => {
+                      if (
+                        hashHex &&
+                        (event.key === "Enter" || event.key === " ") &&
+                        onTransactionClick
+                      ) {
+                        event.preventDefault()
+                        onTransactionClick(hashHex, row.transaction)
+                      }
+                    }}
+                    title={row.statusLabel}
+                  >
+                    <DataTableCell className={styles.timeCell} tone="muted">
+                      <RelativeTime value={row.time} unit="seconds" mode="hybrid" />
+                    </DataTableCell>
+                    <DataTableCell align="right">
+                      <EndpointCell
+                        endpoint={row.from}
+                        copyPlacement="left"
+                        onAddressClick={onAddressClick}
+                      />
+                    </DataTableCell>
+                    <DataTableCell className={styles.directionCell} align="center">
+                      <span
+                        className={`${styles.directionBadge} ${
+                          row.direction === "IN" ? styles.directionIn : styles.directionOut
+                        }`}
+                      >
+                        {row.direction}
+                      </span>
+                    </DataTableCell>
+                    <DataTableCell>
+                      <EndpointCell endpoint={row.to} onAddressClick={onAddressClick} />
+                    </DataTableCell>
+                    <DataTableCell tone="muted">
+                      <span className={styles.opcodeValue}>{row.messageName ?? "—"}</span>
+                    </DataTableCell>
+                    <DataTableCell align="right" tone="strong">
+                      <span
+                        className={`${styles.valueText} ${
+                          row.valueKind === "empty" ? styles.valueEmpty : ""
+                        }`}
+                      >
+                        {row.valueNanograms === undefined ? (
+                          row.valueLabel
+                        ) : (
+                          <GramAmount value={row.valueNanograms} useGrouping />
+                        )}
+                      </span>
+                    </DataTableCell>
+                  </DataTableRow>
+                )
+              })
+            )}
+          </DataTableBody>
+        </DataTableTable>
+      </DataTable>
+      <DataTable
+        className={`${className ?? ""} ${styles.mobileTable}`}
+        title={title}
+        minWidth={0}
+        aria-label={title}
+      >
+        <DataTableTable aria-label={title ?? "Transactions"}>
+          <DataTableBody>
+            {rows.length === 0 ? (
+              <DataTableEmpty colSpan={1}>{emptyState}</DataTableEmpty>
+            ) : (
+              rows.map(row => {
+                const hashHex = hashToHex(getTransactionHash(row.transaction))
+                const canOpenTransaction = hashHex !== undefined && onTransactionClick !== undefined
+
+                return (
+                  <DataTableRow
+                    key={row.key}
+                    interactive={canOpenTransaction}
+                    tabIndex={canOpenTransaction ? 0 : undefined}
+                    title={row.statusLabel}
+                    onClick={event => {
+                      if (hashHex) onTransactionClick?.(hashHex, row.transaction, event)
+                    }}
+                    onKeyDown={event => {
+                      if (
+                        hashHex &&
+                        (event.key === "Enter" || event.key === " ") &&
+                        onTransactionClick
+                      ) {
+                        event.preventDefault()
+                        onTransactionClick(hashHex, row.transaction)
+                      }
+                    }}
+                  >
+                    <DataTableCell className={styles.mobileCell}>
+                      <div className={styles.mobileRoute}>
+                        <span className={styles.mobileEndpoint}>
+                          <EndpointCell
+                            endpoint={row.from}
+                            copyable={false}
+                            onAddressClick={onAddressClick}
+                          />
+                        </span>
+                        <span
+                          className={`${styles.directionBadge} ${
+                            row.direction === "IN" ? styles.directionIn : styles.directionOut
+                          }`}
+                        >
+                          {row.direction}
+                        </span>
+                        <span className={styles.mobileEndpoint}>
+                          <EndpointCell
+                            endpoint={row.to}
+                            copyable={false}
+                            onAddressClick={onAddressClick}
+                          />
+                        </span>
+                      </div>
+                      <div className={styles.mobileMeta}>
+                        <RelativeTime value={row.time} unit="seconds" mode="hybrid" />
+                        <span className={row.valueKind === "empty" ? styles.valueEmpty : undefined}>
+                          {row.valueNanograms === undefined ? (
+                            row.valueLabel
+                          ) : (
+                            <GramAmount value={row.valueNanograms} useGrouping />
+                          )}
+                        </span>
+                      </div>
+                      {row.messageName ? (
+                        <div className={styles.mobileOpcode} title={row.messageName}>
+                          {row.messageName}
+                        </div>
+                      ) : null}
+                    </DataTableCell>
+                  </DataTableRow>
+                )
+              })
+            )}
+          </DataTableBody>
+        </DataTableTable>
+      </DataTable>
+    </>
   )
 }
 
 const EndpointCell: FC<{
   readonly endpoint: DeveloperEndpoint
+  readonly copyable?: boolean
   readonly copyPlacement?: "left" | "right"
   readonly onAddressClick?: (address: string, event?: ExplorerNavigationClickEvent) => void
-}> = ({endpoint, copyPlacement = "right", onAddressClick}) => {
+}> = ({endpoint, copyable = true, copyPlacement = "right", onAddressClick}) => {
   if (endpoint.kind === "text") {
     return (
       <span className={styles.endpointText} title={endpoint.title}>
@@ -239,6 +343,7 @@ const EndpointCell: FC<{
       <ExplorerAddressChip
         address={endpoint.address}
         fallback={endpoint.fallback}
+        copyable={copyable}
         copyPlacement={copyPlacement}
       />
     )
@@ -248,6 +353,7 @@ const EndpointCell: FC<{
     <ExplorerAddressChip
       address={endpoint.address}
       fallback={endpoint.fallback}
+      copyable={copyable}
       copyPlacement={copyPlacement}
       onAddressClick={onAddressClick}
     />

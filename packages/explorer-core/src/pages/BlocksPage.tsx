@@ -988,7 +988,13 @@ const BlockTableSection: FC<{
   return (
     <DataTable
       title={title}
-      minWidth={blockDisplay === "full" ? "54rem" : showShardFlags ? "42rem" : "32.5rem"}
+      minWidth={
+        blockDisplay === "full"
+          ? "54rem"
+          : showShardFlags
+            ? "42rem"
+            : "var(--blocks-table-min-width, 32.5rem)"
+      }
       aria-label={title}
     >
       <DataTableTable aria-label={title} layout="fixed">
@@ -1246,7 +1252,7 @@ const BlockTableSkeleton: FC<{
 }> = ({title, rows, showShardFlags = false}) => (
   <DataTable
     title={title}
-    minWidth={showShardFlags ? "42rem" : "32.5rem"}
+    minWidth={showShardFlags ? "42rem" : "var(--blocks-table-min-width, 32.5rem)"}
     aria-label={`Loading ${title}`}
   >
     <DataTableTable aria-busy="true" aria-label={title} layout="fixed">

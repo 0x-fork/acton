@@ -13,6 +13,8 @@ export interface ExplorerBreadcrumbItem {
   readonly path?: string
   readonly isAddress?: boolean
   readonly isHash?: boolean
+  readonly loading?: boolean
+  readonly skeletonWidth?: BreadcrumbsItem["skeletonWidth"]
   readonly copy?: Readonly<{
     readonly value: string
     readonly label: string
@@ -96,6 +98,8 @@ export const ExplorerBreadcrumbs: FC<ExplorerBreadcrumbsProps> = ({
         id: `${item.label}-${index}`,
         label: formatItem(item),
         link: path ? createBreadcrumbLink(path) : undefined,
+        loading: item.loading,
+        skeletonWidth: item.skeletonWidth,
       }
     }),
   ]

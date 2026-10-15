@@ -61,7 +61,6 @@ import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import type {ExplorerMetadataRegistry} from "../metadata/types"
 import type {RetraceResultAndCode, RetraceTraceResult} from "../retrace/txTrace/lib/types"
 import TransactionRetracePanel from "../retrace/txTrace/ui/TransactionRetracePanel"
-import {useDelayedLoadingVisibility} from "../hooks/useDelayedLoadingVisibility"
 import {
   createEmulateNavigationState,
   EMULATE_HANDOFF_QUERY_PARAM,
@@ -386,7 +385,6 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const loadedActionsByHashRef = useRef(new Map<string, LoadedTransactionActions>())
   const stateChangesRequestedHashRef = useRef<string | undefined>(undefined)
   const traceLookupHashRef = useRef(traceLookupHash)
-  const showLoadingSkeleton = useDelayedLoadingVisibility(loading, 500)
   const selectedTraceTransaction = useMemo(() => {
     const requestedHash = hash.toLowerCase()
     return traces.find(tx => transactionHashHex(tx).toLowerCase() === requestedHash)
@@ -987,9 +985,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   )
 
   if (loading) {
-    return showLoadingSkeleton ? (
-      <TransactionTraceSkeleton activeTab={activeTab} showActionOverview={supportsTraceActions} />
-    ) : null
+    return <TransactionTraceSkeleton activeTab={activeTab} showActionOverview={supportsTraceActions} />
   }
 
   if (error) {
@@ -1578,10 +1574,12 @@ function TransactionTraceSkeleton({
   return (
     <div className={styles.container} aria-label="Loading transaction trace">
       <div className={styles.content}>
-        <div className={styles.skeletonBreadcrumbs}>
-          <span className={`${styles.skeleton} ${styles.skeletonBreadcrumbAddress}`} />
-          <span className={`${styles.skeleton} ${styles.skeletonBreadcrumbHash}`} />
-        </div>
+        <ExplorerBreadcrumbs
+          items={[
+            {label: "", loading: true, skeletonWidth: "7rem"},
+            {label: "", loading: true, skeletonWidth: "10rem"},
+          ]}
+        />
 
         <div className={styles.preTreeContent}>
           <div className={styles.overviewCard}>

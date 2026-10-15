@@ -61,3 +61,71 @@
 .valueEmpty {
   color: var(--acton-color-text-muted);
 }
+
+.mobileTable {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .desktopTable {
+    display: none;
+  }
+
+  .mobileTable {
+    display: block;
+  }
+
+  .mobileTable tbody td.mobileCell {
+    height: auto;
+    padding: 10px 20px;
+  }
+
+  .mobileRoute {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .mobileEndpoint {
+    display: inline-flex;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 42%;
+    overflow: hidden;
+  }
+
+  .mobileEndpoint:last-child {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+
+  .mobileEndpoint button {
+    padding-inline-start: 0;
+  }
+
+  .mobileMeta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: var(--acton-font-size-compact);
+    font-weight: var(--acton-font-weight-semibold);
+    white-space: nowrap;
+  }
+
+  .mobileMeta time {
+    color: var(--acton-color-text-muted);
+    font-weight: var(--acton-font-weight-normal);
+  }
+
+  .mobileOpcode {
+    margin-top: 8px;
+    color: var(--acton-color-text-muted);
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

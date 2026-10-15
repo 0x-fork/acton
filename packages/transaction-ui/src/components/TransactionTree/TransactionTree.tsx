@@ -1571,6 +1571,8 @@ function TransactionTreeComponent({
         </div>
       </div>
 
+      <span className={styles.mobileScrollHint}>Swipe to explore the trace</span>
+
       {selectedTransaction && (
         <div className={styles.transactionDetails}>
           <div className={styles.transactionDetailsCard}>

@@ -126,7 +126,7 @@
 
 .labeledSectionTitle {
   text-align: left;
-  font-weight: var(--acton-font-weight-emphasis);
+  font-weight: var(--acton-font-weight-utility);
   color: var(--acton-color-text-muted);
   padding: var(--acton-space-1) var(--acton-space-3);
   width: 160px;
@@ -134,7 +134,7 @@
   font-size: 0.8125rem;
   border-right: 1px solid var(--acton-color-border);
   box-sizing: border-box;
-  letter-spacing: 0.5px;
+  letter-spacing: normal;
   display: flex;
   align-items: center;
 }
@@ -548,6 +548,21 @@
 }
 
 @media (max-width: 768px) {
+  .detailRow:has(.messageRouteValue) {
+    position: relative;
+  }
+
+  .detailRow:has(.messageRouteValue) .detailLabel {
+    min-height: 24px;
+  }
+
+  .messageRouteAction {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    margin-left: 0;
+  }
+
   .sectionCopyActions {
     position: static;
     justify-content: flex-start;

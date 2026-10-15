@@ -54,6 +54,10 @@
   display: none;
 }
 
+.mobileScrollHint {
+  display: none;
+}
+
 .treeWrapper {
   height: 100%;
   position: relative;
@@ -364,8 +368,30 @@
 }
 
 @media (max-width: 520px) {
+  .mobileScrollHint {
+    display: block;
+    margin: 4px 8px 12px;
+    color: var(--acton-color-text-muted);
+    font-size: var(--acton-font-size-xs);
+    text-align: right;
+  }
+
   .treeContainer {
-    padding-bottom: 0;
+    padding-bottom: 8px;
+    -webkit-mask-image: none;
+    mask-image: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--acton-color-border-strong) transparent;
+  }
+
+  .treeContainer::-webkit-scrollbar {
+    display: block;
+    height: 5px;
+  }
+
+  .treeContainer::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--acton-color-border-strong);
   }
 
   .transactionDetails {
