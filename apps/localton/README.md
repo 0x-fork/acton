@@ -155,7 +155,7 @@ localton bootstrap --state-dir ./networks/demo
 
 The first run performs these operations:
 
-1. It downloads the official TON `v2026.06` archive for the current platform.
+1. It downloads the official TON `v2026.08` archive for the current platform.
 2. It makes sure that the archive has the pinned SHA-256 digest.
 3. It creates DHT, validator, console, liteserver, and wallet keys.
 4. It creates the zerostate and the configuration for `validator-engine`.
@@ -190,6 +190,45 @@ TON_BIN_DIR=/path/to/ton localton bootstrap
 ```
 
 The bootstrap workflow stores this path in `manifest.json`. Later commands use the stored path.
+
+### Install binaries from a custom GitHub release
+
+Select a repository and an exact release tag:
+
+```bash
+ton_bin_dir=$(localton binaries install --repository my-org/ton --release v2026.08-custom)
+localton bootstrap --ton-bin-dir "$ton_bin_dir"
+```
+
+For a private repository, set `GITHUB_TOKEN` before the install command.
+A fine-grained token needs **Contents: read** permission for that repository.
+The command also accepts `--github-token`.
+Localton does not store the token in its cache or network state.
+
+The default asset name matches the current platform:
+
+| Platform | ZIP asset |
+| --- | --- |
+| macOS arm64 | `ton-mac-arm64.zip` |
+| macOS x86_64 | `ton-mac-x86-64.zip` |
+| Linux arm64 | `ton-linux-arm64.zip` |
+| Linux x86_64 | `ton-linux-x86_64.zip` |
+
+Use `--asset custom-build.zip` to select a different ZIP asset.
+The ZIP root must contain `create-state`, `dht-server`, `fift`, `generate-random-id`,
+`lite-client`, `validator-engine`, and `validator-engine-console`.
+It must also contain the `lib/` and `smartcont/` directories.
+
+Localton verifies custom archives against the SHA-256 digest from GitHub.
+If GitHub provides no digest, supply the expected checksum through `--sha256`.
+An explicit checksum takes precedence over the GitHub digest.
+Without `--sha256`, each install command reads the release metadata, even when the archive is cached.
+With `--sha256`, a complete cached installation also works offline.
+
+Custom installations use `<cache-root>/ton/github/<source-hash>/<platform>/`.
+The source hash includes the repository, tag, asset name, and checksum.
+Different builds therefore keep separate directories.
+The default `localton binaries install` command still uses the pinned official release and its built-in checksum.
 
 ### Shared TON binary cache
 

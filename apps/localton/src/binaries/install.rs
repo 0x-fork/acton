@@ -1,4 +1,4 @@
-//! Downloads, verifies, and extracts one pinned TON release archive.
+//! Downloads, verifies, and extracts a TON release archive.
 //!
 //! Installation writes into a shared per-user cache. The archive is streamed to
 //! a temporary `.part` file, checked against the platform SHA-256 digest, safely
@@ -9,7 +9,7 @@ use std::{
     fs::{self, File},
     io::{self, Read},
     path::{Path, PathBuf},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use anyhow::{Context, Result, bail};
@@ -18,33 +18,57 @@ use futures_util::StreamExt;
 use indicatif::{BinaryBytes, ProgressBar, ProgressStyle};
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
-use tracing::info;
+use tracing::{info, warn};
 use zip::ZipArchive;
-
-use crate::{cache, storage::TON_RELEASE};
 
 use super::{
     REQUIRED_BINARIES,
-    release::{current_asset, platform_id},
+    github::GitHub,
+    release::{ReleaseSource, platform_id},
 };
 
 const DOWNLOAD_LOG_INTERVAL: Duration = Duration::from_secs(5);
 
-/// Resolves the pinned release from the shared cache or installs it once.
+/// Resolves a verified release from the supplied cache or installs it once.
 ///
 /// A release is reusable only when its marker matches the expected checksum and
 /// every required binary and resource directory is present. Installation is
 /// serialized per release and platform, then published from a staging directory.
-pub(super) async fn install_pinned_release() -> Result<PathBuf> {
-    let asset = current_asset()?;
+#[tracing::instrument(skip_all, fields(
+    operation = "install_ton_binaries",
+    repository = %source.repository,
+    release = %source.tag,
+    asset = %source.asset,
+    platform = %platform_id(),
+), err)]
+pub(super) async fn install_release(
+    source: &ReleaseSource,
+    github: &GitHub,
+    cache_root: &Path,
+) -> Result<PathBuf> {
+    let started = Instant::now();
     let platform = platform_id();
-
-    let release_dir = cache::root()?.join("ton").join(TON_RELEASE);
+    let mut github_asset = None;
+    let sha256 = if let Some(digest) = &source.sha256 {
+        digest.clone()
+    } else {
+        info!(outcome = "in_progress", "resolving GitHub release asset");
+        let asset = github.asset(source).await?;
+        let digest = asset.sha256()?;
+        github_asset = Some(asset);
+        digest
+    };
+    let release_dir = source.cache_dir(cache_root, &sha256);
     let install_dir = release_dir.join(&platform);
 
     // The common case must not create or lock anything after the first install.
-    if installation_is_complete(&install_dir, asset.sha256) {
-        info!(cache = %install_dir.display(), "using cached official TON {TON_RELEASE} binaries");
+    if installation_is_complete(&install_dir, &source.tag, &sha256) {
+        info!(
+            cache = %install_dir.display(),
+            duration_ms = started.elapsed().as_millis(),
+            outcome = "cached",
+            "using cached TON binaries"
+        );
         return Ok(install_dir);
     }
 
@@ -55,8 +79,13 @@ pub(super) async fn install_pinned_release() -> Result<PathBuf> {
     let _install_lock = acquire_install_lock(&lock_path).await?;
 
     // Another process can finish the same installation while this one waits.
-    if installation_is_complete(&install_dir, asset.sha256) {
-        info!(cache = %install_dir.display(), "using cached official TON {TON_RELEASE} binaries");
+    if installation_is_complete(&install_dir, &source.tag, &sha256) {
+        info!(
+            cache = %install_dir.display(),
+            duration_ms = started.elapsed().as_millis(),
+            outcome = "cached",
+            "using cached TON binaries"
+        );
         return Ok(install_dir);
     }
 
@@ -66,20 +95,25 @@ pub(super) async fn install_pinned_release() -> Result<PathBuf> {
     remove_path_if_exists(&archive_path)?;
     remove_path_if_exists(&staging_dir)?;
 
-    let url = format!(
-        "https://github.com/ton-blockchain/ton/releases/download/{TON_RELEASE}/{}",
-        asset.file_name
-    );
-    info!("downloading official TON {TON_RELEASE} binaries for {platform}");
+    info!(outcome = "in_progress", "downloading TON binaries");
 
     let install_result: Result<()> = async {
-        download(&url, &archive_path).await?;
+        let request = if source.pinned {
+            github.pinned_download(source)
+        } else {
+            let asset = match github_asset {
+                Some(asset) => asset,
+                None => github.asset(source).await?,
+            };
+            github.download(source, &asset)
+        };
+        download(request, &archive_path).await?;
 
         let actual_hash = sha256_file(&archive_path)?;
-        if actual_hash != asset.sha256 {
+        if actual_hash != sha256 {
             bail!(
                 "TON archive checksum mismatch: expected {}, got {}",
-                asset.sha256,
+                sha256,
                 actual_hash
             );
         }
@@ -95,7 +129,10 @@ pub(super) async fn install_pinned_release() -> Result<PathBuf> {
 
         // The marker is the commit record. It becomes visible together with the
         // validated directory when the staging rename succeeds.
-        fs::write(staging_dir.join(".complete"), marker_contents(asset.sha256))?;
+        fs::write(
+            staging_dir.join(".complete"),
+            marker_contents(&source.tag, &sha256),
+        )?;
 
         remove_path_if_exists(&install_dir)?;
         fs::rename(&staging_dir, &install_dir).with_context(|| {
@@ -112,7 +149,29 @@ pub(super) async fn install_pinned_release() -> Result<PathBuf> {
     let _ = fs::remove_file(&archive_path);
     let _ = remove_path_if_exists(&staging_dir);
 
-    install_result?;
+    match &install_result {
+        Ok(()) => info!(
+            cache = %install_dir.display(),
+            duration_ms = started.elapsed().as_millis(),
+            outcome = "installed",
+            "TON binaries installed"
+        ),
+        Err(_) => warn!(
+            cache = %install_dir.display(),
+            duration_ms = started.elapsed().as_millis(),
+            outcome = "failed",
+            "TON binary installation failed"
+        ),
+    }
+    install_result.with_context(|| {
+        format!(
+            "failed to install {}@{} asset {} into {}",
+            source.repository,
+            source.tag,
+            source.asset,
+            install_dir.display(),
+        )
+    })?;
     Ok(install_dir)
 }
 
@@ -136,13 +195,13 @@ async fn acquire_install_lock(path: &Path) -> Result<File> {
     .context("TON cache lock task failed")?
 }
 
-fn marker_contents(sha256: &str) -> String {
-    format!("{TON_RELEASE}\n{sha256}\n")
+fn marker_contents(tag: &str, sha256: &str) -> String {
+    format!("{tag}\n{sha256}\n")
 }
 
-fn installation_is_complete(path: &Path, sha256: &str) -> bool {
+fn installation_is_complete(path: &Path, tag: &str, sha256: &str) -> bool {
     let marker_matches = fs::read_to_string(path.join(".complete"))
-        .is_ok_and(|marker| marker == marker_contents(sha256));
+        .is_ok_and(|marker| marker == marker_contents(tag, sha256));
 
     marker_matches && validate_installation_contents(path).is_ok()
 }
@@ -180,12 +239,15 @@ fn remove_path_if_exists(path: &Path) -> Result<()> {
     .with_context(|| format!("failed to remove incomplete cache path {}", path.display()))
 }
 
-async fn download(url: &str, path: &Path) -> Result<()> {
-    let response = reqwest::get(url)
+async fn download(request: reqwest::RequestBuilder, path: &Path) -> Result<()> {
+    let response = request
+        .send()
         .await
-        .with_context(|| format!("failed to download {url}"))?
+        .map_err(reqwest::Error::without_url)
+        .context("failed to download TON release asset")?
         .error_for_status()
-        .with_context(|| format!("download failed for {url}"))?;
+        .map_err(reqwest::Error::without_url)
+        .context("TON release asset download failed")?;
 
     let progress = download_progress(response.content_length())?;
     let report_progress_in_logs = progress.is_hidden();
@@ -207,7 +269,8 @@ async fn download(url: &str, path: &Path) -> Result<()> {
                     let Some(chunk) = chunk else {
                         break;
                     };
-                    let chunk = chunk.context("TON binary download stream failed")?;
+                    let chunk = chunk.map_err(reqwest::Error::without_url)
+                        .context("TON binary download stream failed")?;
                     file.write_all(&chunk).await?;
                     progress.inc(chunk.len() as u64);
                 }
@@ -228,9 +291,10 @@ async fn download(url: &str, path: &Path) -> Result<()> {
         Ok(()) => {
             if report_progress_in_logs {
                 info!(
+                    outcome = "downloaded",
                     downloaded = %BinaryBytes(progress.position()),
                     elapsed_seconds = progress.elapsed().as_secs(),
-                    "official TON binaries downloaded"
+                    "TON binaries downloaded"
                 );
             }
             progress.finish_and_clear();
@@ -257,14 +321,14 @@ fn log_download_progress(progress: &ProgressBar) {
             percent,
             speed = %format!("{}/s", BinaryBytes(speed)),
             eta_seconds = progress.eta().as_secs(),
-            "official TON binary download progress"
+            "TON binary download progress"
         );
     } else {
         info!(
             downloaded = %BinaryBytes(downloaded),
             speed = %format!("{}/s", BinaryBytes(speed)),
             elapsed_seconds = progress.elapsed().as_secs(),
-            "official TON binary download progress"
+            "TON binary download progress"
         );
     }
 }
@@ -358,10 +422,18 @@ mod tests {
         }
         fs::create_dir(root.path().join("lib")).unwrap();
         fs::create_dir(root.path().join("smartcont")).unwrap();
-        fs::write(root.path().join(".complete"), marker_contents("digest")).unwrap();
+        fs::write(
+            root.path().join(".complete"),
+            marker_contents("tag", "digest"),
+        )
+        .unwrap();
 
-        assert!(installation_is_complete(root.path(), "digest"));
-        assert!(!installation_is_complete(root.path(), "other-digest"));
+        assert!(installation_is_complete(root.path(), "tag", "digest"));
+        assert!(!installation_is_complete(
+            root.path(),
+            "tag",
+            "other-digest"
+        ));
     }
 
     #[test]

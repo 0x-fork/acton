@@ -32,7 +32,7 @@ pub enum Command {
     Bootstrap(BootstrapArgs),
     /// Join and supervise one independent full node in this state directory
     Join(JoinArgs),
-    /// Manage the pinned official TON binary distribution.
+    /// Install TON binaries from official or custom GitHub releases
     Binaries {
         #[command(subcommand)]
         command: BinariesCommand,
@@ -85,8 +85,45 @@ pub enum Command {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum BinariesCommand {
-    /// Download, verify, and install the pinned TON release without starting a node.
-    Install,
+    /// Download, verify, and install TON binaries without starting a node
+    Install(BinariesInstallArgs),
+}
+
+/// Selects a GitHub release for installation without changing network state.
+/// Credentials are used only for downloading and excluded from debug output.
+#[derive(Clone, Args)]
+pub struct BinariesInstallArgs {
+    /// GitHub repository containing the release, as OWNER/REPO
+    #[arg(long, default_value = "ton-blockchain/ton")]
+    pub repository: String,
+
+    /// Exact release tag
+    #[arg(long, default_value = crate::storage::TON_RELEASE)]
+    pub release: String,
+
+    /// ZIP asset name (defaults to the official name for this platform)
+    #[arg(long)]
+    pub asset: Option<String>,
+
+    /// Expected SHA-256 (otherwise use the pinned or GitHub asset digest)
+    #[arg(long)]
+    pub sha256: Option<String>,
+
+    /// GitHub token with read access to release contents
+    #[arg(long, env = "GITHUB_TOKEN", hide_env_values = true)]
+    pub github_token: Option<String>,
+}
+
+impl std::fmt::Debug for BinariesInstallArgs {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("BinariesInstallArgs")
+            .field("repository", &self.repository)
+            .field("release", &self.release)
+            .field("asset", &self.asset)
+            .field("sha256", &self.sha256)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug, Clone, Args)]
@@ -713,7 +750,7 @@ mod tests {
         assert!(matches!(
             cli.command,
             Command::Binaries {
-                command: BinariesCommand::Install
+                command: BinariesCommand::Install(_)
             }
         ));
     }

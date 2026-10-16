@@ -82,6 +82,9 @@ All notable changes to this project will be documented in this file.
 
 ### Localnet
 
+- Install Localton's TON binaries from custom GitHub releases, including private
+  repositories with token authentication, SHA-256 verification, and isolated caches.
+
 - Register genesis ADNL identities before activating the validator, preventing
   a bootstrap crash when consensus starts during console configuration.
 

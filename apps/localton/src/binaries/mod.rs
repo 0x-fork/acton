@@ -1,4 +1,4 @@
-//! Resolves and validates the official TON binary distribution.
+//! Resolves and validates TON binary distributions.
 //!
 //! [`TonBinaries::resolve`] selects an explicit directory, the installation
 //! persisted for this state directory, or an automatically installed pinned
@@ -12,8 +12,11 @@ use anyhow::{Context, Result, bail};
 
 use crate::storage::{Layout, Manifest, NodeRole, Settings};
 
+mod github;
 mod install;
 mod release;
+
+pub(crate) use release::ReleaseSource;
 
 pub(super) const REQUIRED_BINARIES: &[&str] = &[
     "create-state",
@@ -36,8 +39,19 @@ impl TonBinaries {
     /// This entry point is independent of network state and does not initialize
     /// or start any TON process.
     pub(crate) async fn install_pinned() -> Result<Self> {
+        Self::install(&ReleaseSource::pinned()?, None).await
+    }
+
+    /// Installs a release in a source-specific cache without changing node state.
+    /// The token is used for GitHub requests only and is never persisted.
+    pub(crate) async fn install(source: &ReleaseSource, token: Option<&str>) -> Result<Self> {
         let binaries = Self {
-            root: install::install_pinned_release().await?,
+            root: install::install_release(
+                source,
+                &github::GitHub::new(token)?,
+                &crate::cache::root()?,
+            )
+            .await?,
         };
         binaries.validate()?;
         Ok(binaries)
