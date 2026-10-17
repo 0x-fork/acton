@@ -1,6 +1,9 @@
 name: Check Dependencies with OSV-Scanner
 
 on:
+  schedule:
+    # 12:00 Europe/Moscow every day (09:00 UTC)
+    - cron: "0 9 * * *"
   workflow_call:
   pull_request:
     branches:
