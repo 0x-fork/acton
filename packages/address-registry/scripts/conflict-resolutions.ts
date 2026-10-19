@@ -3,124 +3,126 @@ import type {ConflictResolution} from "./resolve.ts"
 export const CONFLICT_RESOLUTIONS = [
   {
     address: "0:97ad93444915089e812238ff10abe9066d0b03ea3dba2a8630fb9c9f88aa455c",
-    source: "ton-assets",
-    name: "Wallet in Telegram",
-  },
-  {
-    address: "0:1b44ec553616b0e4551037038834bdf0bdaa1f0440e10f3331d9841585612a68",
-    source: "ton-assets",
-    name: "Wallet in Telegram",
-  },
-  {
-    address: "0:cf06c94efdae26faaa1d85092fc4daee78eba09e69c36dac051c1d8ffde35f40",
-    source: "ton-assets",
-    name: "Wallet in Telegram",
+    source: "address-book",
+    name: "Walt 1",
   },
   {
     address: "0:91887059ba56a03790b0696d7a402ac0691dff62fcd398e813f97d3b2736fa58",
-    source: "ton-assets",
-    name: "Wallet in Telegram",
+    source: "address-book",
+    name: "Walt 2",
+  },
+  {
+    address: "0:cf06c94efdae26faaa1d85092fc4daee78eba09e69c36dac051c1d8ffde35f40",
+    source: "address-book",
+    name: "Walt 3",
+  },
+  {
+    address: "0:1b44ec553616b0e4551037038834bdf0bdaa1f0440e10f3331d9841585612a68",
+    source: "address-book",
+    name: "Walt 4",
   },
   {
     address: "0:6db0f022632b6269f0d4dbf8ea60a8448bbc2bcfc6812e31af8cc6405c268af7",
-    source: "ton-assets",
-    name: "Wallet in Telegram",
+    source: "address-book",
+    name: "Walt 5",
   },
   {
     address: "0:dd6ff02c59634745529b99a8d5beeea9f6c38a9188e6a7e96a424e3820c8ac0a",
-    source: "ton-assets",
-    name: "Wallet in Telegram",
+    source: "address-book",
+    name: "Walt 6",
   },
   {
     address: "0:023895aef955024920a291c6f3715e291df1b3dd254eafa8b09e21a2d58d5897",
-    source: "ton-assets",
-    name: "Wallet in Telegram",
+    source: "address-book",
+    name: "Walt 7",
   },
   {
     address: "0:f5066318091a8cfb530ec732104ce38f7783d92a6679ffcc0ce0960b0e94c7d0",
-    source: "ton-assets",
-    name: "Wallet in Telegram",
+    source: "address-book",
+    name: "Walt 8",
   },
   {
     address: "0:0c5684355f5410a923fb7dd59314905dc7ff157b28c9130671c7a4f17007e898",
-    source: "ton-assets",
-    name: "Wallet in Telegram",
+    source: "address-book",
+    name: "Walt 9",
   },
   {
     address: "0:23fe558cdf44249381aef36472e64a5072a24ba97fb61b2f5791da6013aec92d",
-    source: "ton-assets",
-    name: "Wallet in Telegram",
+    source: "address-book",
+    name: "Walt 10",
   },
   {
     address: "0:b7be71ac1b40e436db36721d9c20e82d44e78fc1e86a8ad15e00b1cc16831dcf",
-    source: "ton-assets",
-    name: "Wallet in Telegram",
+    source: "address-book",
+    name: "Walt 11",
   },
   {
     address: "0:55b7223f04dd1f2e1b3f28e4ad628fe6cab60004f280fb0a58cd27fc590b2eac",
-    source: "ton-assets",
-    name: "Wallet in Telegram",
+    source: "address-book",
+    name: "Walt 12",
   },
   {
     address: "0:c3f1da8ecda8f8cd42bace224ea3f1b6971eaa7f54c492d4d190527b4f573f7c",
-    source: "ton-assets",
-    name: "Bybit 1",
+    source: "address-book",
+    name: "ByBit 1",
   },
   {
     address: "0:4a1f3ebcc66bdcefa90245bdf541a50ada1c688a487534b1587abffd93038834",
-    source: "ton-assets",
-    name: "Bybit 2",
+    source: "address-book",
+    name: "ByBit 2",
   },
+  {
+    address: "0:cd525c15904d7b4027eae08b318624260f371ce8c9f4fcca0cdb7b583854107c",
+    source: "address-book",
+    name: "ByBit 3",
+  },
+  {
+    address: "0:ae62a192da96e266161a702cc9f6de91c0c3441f17ceba51bc442dfb2031a30a",
+    source: "address-book",
+    name: "ByBit 4",
+  },
+  {
+    address: "0:e3ce05c4da977132c24a3b102da8b5fbf2ea9173337b49de346e4a4b057f7579",
+    source: "address-book",
+    name: "ByBit 5",
+  },
+  {
+    address: "0:e33ef85d174eb457c072d1ee10215b69ab9b64192f7421302ab1c8e26b7ad4bd",
+    source: "address-book",
+    name: "ByBit 6",
+  },
+  {
+    address: "0:7f97f36dda3f7dedc9e12f8c09c4f89e7fbc17527ab3f67de4c3b155297a56e4",
+    source: "address-book",
+    name: "ByBit 7",
+  },
+  {
+    address: "0:7d133d4e425c8e00de015513a44e66e6d163b21e71720aec7579965e5de28c55",
+    source: "address-book",
+    name: "ByBit 8",
+  },
+  {
+    address: "0:f2dc1860686cd658987e2bed8216532d8c004460dadea907cc7d4ad7236c496b",
+    source: "address-book",
+    name: "ByBit 9",
+  },
+  {
+    address: "0:4a1c20bc9a6f9294f75f1c87a7f383a8b73a483a2e6dcb3630ddbe78b3ccad00",
+    source: "address-book",
+    name: "ByBit 10",
+  },
+  {
+    address: "0:99fbb6a40b0fddbe5fd0e71cab896a825dd5ae6c83dbb8deda0d09735f8e696b",
+    source: "address-book",
+    name: "ByBit 11",
+  },
+
   {
     address: "0:8b070edb01a700f3f6a4624c7e086e036da86060ebb04f19908ee61a3537335f",
     source: "address-book",
     name: "Changelly 1",
   },
-  {
-    address: "0:cd525c15904d7b4027eae08b318624260f371ce8c9f4fcca0cdb7b583854107c",
-    source: "ton-assets",
-    name: "Bybit 3",
-  },
-  {
-    address: "0:ae62a192da96e266161a702cc9f6de91c0c3441f17ceba51bc442dfb2031a30a",
-    source: "ton-assets",
-    name: "Bybit 4",
-  },
-  {
-    address: "0:e3ce05c4da977132c24a3b102da8b5fbf2ea9173337b49de346e4a4b057f7579",
-    source: "ton-assets",
-    name: "Bybit 5",
-  },
-  {
-    address: "0:e33ef85d174eb457c072d1ee10215b69ab9b64192f7421302ab1c8e26b7ad4bd",
-    source: "ton-assets",
-    name: "Bybit 6",
-  },
-  {
-    address: "0:7f97f36dda3f7dedc9e12f8c09c4f89e7fbc17527ab3f67de4c3b155297a56e4",
-    source: "ton-assets",
-    name: "Bybit 7",
-  },
-  {
-    address: "0:7d133d4e425c8e00de015513a44e66e6d163b21e71720aec7579965e5de28c55",
-    source: "ton-assets",
-    name: "Bybit 8",
-  },
-  {
-    address: "0:f2dc1860686cd658987e2bed8216532d8c004460dadea907cc7d4ad7236c496b",
-    source: "ton-assets",
-    name: "Bybit 9",
-  },
-  {
-    address: "0:4a1c20bc9a6f9294f75f1c87a7f383a8b73a483a2e6dcb3630ddbe78b3ccad00",
-    source: "ton-assets",
-    name: "Bybit 10",
-  },
-  {
-    address: "0:99fbb6a40b0fddbe5fd0e71cab896a825dd5ae6c83dbb8deda0d09735f8e696b",
-    source: "acton",
-    name: "Bybit 11",
-  },
+
   {
     address: "0:04f3c1c795ac8905e31734362b149875ab9522ae5383ab7abb2e10da5da8ba82",
     source: "address-book",
@@ -133,33 +135,43 @@ export const CONFLICT_RESOLUTIONS = [
   },
   {
     address: "0:80d4123841167ca989ac912443cc99a4b9c1a87584536427ff6fd85c92395ae9",
-    source: "ton-assets",
-    name: "Kucoin 1",
+    source: "address-book",
+    name: "KuCoin 2",
   },
   {
     address: "0:b37e57033db21d10b950e6143b658c10c3bf425bd193025960aef7f22dbcf4fc",
-    source: "ton-assets",
-    name: "Kucoin 2",
+    source: "address-book",
+    name: "KuCoin 3",
   },
   {
     address: "0:07ce60b7e5f255a88c3707f3fbc79e2cf924ed6b4b7d09c6324f0ba2338a48fa",
-    source: "ton-assets",
-    name: "Kucoin 3",
+    source: "address-book",
+    name: "KuCoin 4",
   },
   {
     address: "0:5f00decb7da51881764dc3959cec60609045f6ca1b89e646bde49d492705d77f",
-    source: "ton-assets",
-    name: "OKX 1",
-  },
-  {
-    address: "0:f9bdc0de461c1a2e002fada9550bbb095c8f9f73668d70c517a9cc7e050f8e5a",
-    source: "ton-assets",
+    source: "address-book",
     name: "OKX 9",
   },
   {
+    address: "0:f9bdc0de461c1a2e002fada9550bbb095c8f9f73668d70c517a9cc7e050f8e5a",
+    source: "address-book",
+    name: "OKX 1",
+  },
+  {
+    address: "0:9b9b739de2527ae72d21083f5198d710c7288453b4733e57ecadb2e189ac829c",
+    source: "address-book",
+    name: "OKX 129",
+  },
+  {
     address: "0:66a1e72196d64d6faf48fa4b2ea861f67b0484d2d14a59caf701d8c286ce44e5",
-    source: "ton-assets",
-    name: "OKX 11",
+    source: "address-book",
+    name: "OKX 10",
+  },
+  {
+    address: "0:6c25b5f2fe5ef1a6a1978f611f61a50883fd50a0822b19176445fca931823263",
+    source: "address-book",
+    name: "OKX 134",
   },
   {
     address: "-1:386e6a793b70ed6235e67560183040734cfb2ef9c3cc720e758b767d6df748ef",
@@ -192,71 +204,70 @@ export const CONFLICT_RESOLUTIONS = [
     name: "Very First Pool 2",
   },
   {
-    address: "0:779dcc815138d9500e449c5291e7f12738c23d575b5310000f6a253bd607384e",
-    source: "ton-assets",
-    name: "STON.fi DEX",
-  },
-  {
-    address: "0:70a4118401bf8d823531a66011020565f02e05ff91ac5f1677769b00d6acd07a",
-    source: "ton-assets",
-    name: "STON.fi DEX",
-  },
-  {
-    address: "0:92e1411ae546892f33b2c8a89ea90390d8ff4cfbb917a643b91e73f706fdb9d1",
-    source: "ton-assets",
-    name: "STON.fi DEX",
-  },
-  {
-    address: "0:1061b9dbd4418ad166fc9a4def116e2f6c74f2bfb70e71f2653d643ceffebfa9",
-    source: "ton-assets",
-    name: "STON.fi DEX",
-  },
-  {
-    address: "0:50fd4050bd1f6bc948ca0f08a3b688b2ca06b65a5fb2266e98f2097493e1c387",
-    source: "ton-assets",
-    name: "STON.fi DEX",
-  },
-  {
-    address: "0:834fd7424f9da975fb0b356d1eeaa3f94f7720abb338520ef6ce419880fd7bb6",
-    source: "ton-assets",
-    name: "STON.fi DEX",
-  },
-  {
-    address: "0:b1d070c9fc3c4bc43490c9fb04a8723c46ceb99f282f766783f516bbad8d7939",
-    source: "ton-assets",
-    name: "STON.fi DEX",
-  },
-  {
-    address: "0:e1e681cfbdf4703eed9b3910460a82c43b859064a2f87e4e430f583275e346f6",
-    source: "ton-assets",
-    name: "STON.fi DEX",
-  },
-  {
-    address: "0:22bf722ec5803a64612e9ce819493b8c0736e98f045b5b0d3df96b04fa2a8a28",
-    source: "ton-assets",
-    name: "STON.fi DEX",
-  },
-  {
-    address: "0:a2ca9a0158d2043e56ab069d3851e3f2123e731f46431f1b9136a275590c7714",
-    source: "ton-assets",
-    name: "STON.fi DEX",
-  },
-  {
-    address: "0:f1fbe8d453d3d4b4796d3d8657ef0773222d123d8dca67c9ef3acd2266f40977",
-    source: "ton-assets",
-    name: "STON.fi DEX",
-  },
-  {
     address: "0:18aa8e2eed51747dae033c079b93883d941cad8f65459f2ee9cd7474b6b8ed5d",
-    source: "ton-assets",
-    name: "DeDust USDT vault",
+    source: "address-book",
+    name: "DeDust Vault",
   },
   {
     address: "0:a9bc094e3b3a9c23f354c7007476ac3fcddd12af6aed4b4168337e47692c5323",
-    source: "ton-assets",
-    name: "DeDust GRAM vault",
+    source: "address-book",
+    name: "DeDust Vault",
   },
-
+  {
+    address: "0:779dcc815138d9500e449c5291e7f12738c23d575b5310000f6a253bd607384e",
+    source: "address-book",
+    name: "StonFi DEX 1",
+  },
+  {
+    address: "0:70a4118401bf8d823531a66011020565f02e05ff91ac5f1677769b00d6acd07a",
+    source: "address-book",
+    name: "StonFi DEX 2",
+  },
+  {
+    address: "0:1061b9dbd4418ad166fc9a4def116e2f6c74f2bfb70e71f2653d643ceffebfa9",
+    source: "address-book",
+    name: "StonFi Router",
+  },
+  {
+    address: "0:22bf722ec5803a64612e9ce819493b8c0736e98f045b5b0d3df96b04fa2a8a28",
+    source: "address-book",
+    name: "StonFi Router",
+  },
+  {
+    address: "0:50fd4050bd1f6bc948ca0f08a3b688b2ca06b65a5fb2266e98f2097493e1c387",
+    source: "address-book",
+    name: "StonFi Router",
+  },
+  {
+    address: "0:834fd7424f9da975fb0b356d1eeaa3f94f7720abb338520ef6ce419880fd7bb6",
+    source: "address-book",
+    name: "StonFi Router",
+  },
+  {
+    address: "0:92e1411ae546892f33b2c8a89ea90390d8ff4cfbb917a643b91e73f706fdb9d1",
+    source: "address-book",
+    name: "StonFi Router",
+  },
+  {
+    address: "0:a2ca9a0158d2043e56ab069d3851e3f2123e731f46431f1b9136a275590c7714",
+    source: "address-book",
+    name: "StonFi Router",
+  },
+  {
+    address: "0:b1d070c9fc3c4bc43490c9fb04a8723c46ceb99f282f766783f516bbad8d7939",
+    source: "address-book",
+    name: "StonFi Router",
+  },
+  {
+    address: "0:e1e681cfbdf4703eed9b3910460a82c43b859064a2f87e4e430f583275e346f6",
+    source: "address-book",
+    name: "StonFi Router",
+  },
+  {
+    address: "0:f1fbe8d453d3d4b4796d3d8657ef0773222d123d8dca67c9ef3acd2266f40977",
+    source: "address-book",
+    name: "StonFi Router",
+  },
   {
     address: "0:9b8ab637507230b99de26a55ea6d9cd4fef0cffcaafe2d1f15e835d5f5d38a43",
     source: "address-book",
@@ -395,7 +406,7 @@ export const CONFLICT_RESOLUTIONS = [
   {
     address: "0:ec85cfc7fd1009362e421b5a0141f510d6540107ab73e7829fda1ef9e97a75e3",
     source: "address-book",
-    name: "Crypto Bot",
+    name: "Crypto Bot 2",
   },
   {
     address: "0:3d2cb74e041df056045d3ba4bef650f938c553db86d1dab1f80bc9c238fe3ffe",
@@ -407,11 +418,7 @@ export const CONFLICT_RESOLUTIONS = [
     source: "ton-assets",
     name: "Rapira",
   },
-  {
-    address: "0:ca1d9edeef40b3a9dbd9082f3767859547c3ce0bf641d09d58e33a3cf06fb309",
-    source: "ton-assets",
-    name: "Binance Hot Wallet",
-  },
+
   {
     address: "0:ad8afecfacc248996885d8be6824280f9f3a7e54c2f6080b7971b9f556c280c4",
     source: "ton-assets",
@@ -561,5 +568,40 @@ export const CONFLICT_RESOLUTIONS = [
     address: "0:85af78e8d035e920117cda654615cdf371d464480b629e110d3c5310d85ab362",
     source: "ton-assets",
     name: "Huobi",
+  },
+  {
+    address: "0:3d1f01190ffb4e35f573ea5252d0f54a479be2122106ca3f40b907b01905675c",
+    source: "address-book",
+    name: "KTON Pool",
+  },
+  {
+    address: "0:8e91b50381c36dd42accdb51f5cb5d96848568b4924f8079b1a5ae7e10f43eda",
+    source: "address-book",
+    name: "Binance 1",
+  },
+  {
+    address: "0:ca1d9edeef40b3a9dbd9082f3767859547c3ce0bf641d09d58e33a3cf06fb309",
+    source: "address-book",
+    name: "Binance 2",
+  },
+  {
+    address: "0:d8cd999fb2b1b384e6ca254c3883375e23111a8b78c015b886286c31bf11e29d",
+    source: "address-book",
+    name: "Pavel Durov 2",
+  },
+  {
+    address: "0:f99b14600ae44d2f12b178e8c6eabd78892ae82c5e45b6898f9deb7eb203f9c4",
+    source: "address-book",
+    name: "Binance 3",
+  },
+  {
+    address: "0:ec5b63fa9ee3f5ce8a4aa0d882623db186a0da9f4701b942d0f0c1f8a3b741b7",
+    source: "address-book",
+    name: "pKTON Pool",
+  },
+  {
+    address: "0:fd8a466aeb13e02a3ce67411b41b44bcd11bd42636f0807acf6570ca73fc2c13",
+    source: "address-book",
+    name: "Durov's Caps",
   },
 ] as const satisfies readonly ConflictResolution[]
