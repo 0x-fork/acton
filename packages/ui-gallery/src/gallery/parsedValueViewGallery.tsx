@@ -279,10 +279,14 @@ export const parsedValueViewGallery = {
             {kind: "address", value: WALLET_ADDRESS},
             {addressMode: "contract", contracts, formatAddress: formatFriendlyAddress},
           )}
-          {valueSample("unknown contract", {kind: "address", value: UNKNOWN_ADDRESS}, {
-            addressMode: "contract",
-            contracts,
-          })}
+          {valueSample(
+            "unknown contract",
+            {kind: "address", value: UNKNOWN_ADDRESS},
+            {
+              addressMode: "contract",
+              contracts,
+            },
+          )}
         </div>
       ),
     },

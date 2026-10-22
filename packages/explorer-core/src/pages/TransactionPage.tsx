@@ -985,7 +985,9 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   )
 
   if (loading) {
-    return <TransactionTraceSkeleton activeTab={activeTab} showActionOverview={supportsTraceActions} />
+    return (
+      <TransactionTraceSkeleton activeTab={activeTab} showActionOverview={supportsTraceActions} />
+    )
   }
 
   if (error) {

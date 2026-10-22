@@ -589,10 +589,12 @@ const decodeRemainingBody = (
 
   if (context.parentStructName === "DnsCollectionOffchainContent" && context.fieldName === "url") {
     const url = tryReadTextCommentString(slice)
-    const hasOnlyPrintableCharacters = url && Array.from(url).every((character) => {
-      const codePoint = character.codePointAt(0) ?? 0
-      return codePoint >= 0x20 && codePoint !== 0x7f && codePoint !== 0xff_fd
-    })
+    const hasOnlyPrintableCharacters =
+      url &&
+      Array.from(url).every(character => {
+        const codePoint = character.codePointAt(0) ?? 0
+        return codePoint >= 0x20 && codePoint !== 0x7f && codePoint !== 0xff_fd
+      })
     if (hasOnlyPrintableCharacters) {
       return {kind: "scalar", value: url, typeName: "OffchainUrl"}
     }

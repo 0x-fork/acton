@@ -17,11 +17,7 @@
   padding-inline-end: var(--acton-space-1);
   border-start-end-radius: inherit;
   border-end-end-radius: inherit;
-  background: linear-gradient(
-    to right,
-    transparent,
-    var(--acton-color-surface-raised) 60%
-  );
+  background: linear-gradient(to right, transparent, var(--acton-color-surface-raised) 60%);
 }
 
 @media (hover: none), (pointer: coarse) {
