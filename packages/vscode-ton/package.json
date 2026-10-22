@@ -639,8 +639,8 @@
     "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.1",
     "typescript": "^7.0.2",
-    "vite": "^8.2.0",
-    "vitest": "^4.1.11"
+    "vite": "^8.2.4",
+    "vitest": "^4.1.12"
   },
   "engines": {
     "vscode": "^1.91.0"
