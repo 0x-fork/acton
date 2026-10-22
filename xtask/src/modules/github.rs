@@ -38,7 +38,7 @@ impl Github {
                     .err()
                     .map(|error| error.to_string())
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<String>>();
 
         if !failures.is_empty() {
             bail!(
@@ -162,7 +162,7 @@ impl Github {
             let expected = expected_conclusions
                 .iter()
                 .map(|conclusion| format!("`{conclusion}`"))
-                .collect::<Vec<_>>()
+                .collect::<Vec<String>>()
                 .join(", ");
             bail!(
                 "workflow `{workflow_name}` for ref `{ref_name}` concluded with `{actual_conclusion}` instead of one of {expected}"

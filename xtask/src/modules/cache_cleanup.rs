@@ -349,7 +349,12 @@ fn plan_cache_cleanup(
             .into_iter()
             .partition(|entry| entry.last_accessed_at.is_some());
 
-    let to_keep = to_keep.into_iter().chain(protected_entries).collect();
+    let to_keep: Vec<ActionsCacheEntry> = to_keep.into_iter().chain(protected_entries).collect();
+
+    if to_keep.is_empty() && !to_delete.is_empty() {
+        println!("Skipping cache deletion because it would leave no cache entries.");
+        return (Vec::new(), to_delete);
+    }
 
     (to_delete, to_keep)
 }
