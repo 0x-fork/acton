@@ -1,12 +1,10 @@
 {
   "mainnet": {
     "TON DNS": ["0:b774d95eb20543f186c06b371ab88ad704f7e256130caf96189368a7d0cb6ccf"],
-    "Telegram usernames": ["0:80d78a35f955a14b679faa887ff4cd5bfc0f43b4a4eea2a7e6927f3701b273c2"],
+    "Telegram Usernames": ["0:80d78a35f955a14b679faa887ff4cd5bfc0f43b4a4eea2a7e6927f3701b273c2"],
     "Anonymous Telegram Numbers": [
       "0:0e41dc1dc3c9067ed24248580e12b3359818d83dee0304fabcf80845eafafdb2"
     ],
-    "VIP DNS": ["0:561b81016cf0efe178fbc653f0cf177b852c87333c302c1e4eeab63ed0105e6a"],
-    "GRAM DNS": ["0:22737ccf71ee3deae9050e16dca36f0556c28a9765945ff889c1a2fcec20714a"],
     "Telegram Gifts": [
       "0:02710a51d9f99d784356744d98190587571493c80f19ab8fe4eeb93f21ac4245",
       "0:03bc9c4cc421c0edf465623a1c7813917fb4702acd2bce355a29ea5000232767",
