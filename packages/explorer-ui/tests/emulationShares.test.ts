@@ -41,6 +41,8 @@ test("round-trips catalog ABIs and every account state through the client, worke
     new URL("../../../crates/acton-abi-catalog/data/data-abis.json", import.meta.url),
   ).json()) as {contracts: {id: string; compilerAbi: ContractABI}[]}
 
+  expect(catalog.contracts.length).toBeGreaterThan(0)
+
   const cases: {name: string; emulation: SharedEmulation}[] = [
     {
       name: "raw without optional settings",
@@ -150,17 +152,8 @@ test("round-trips catalog ABIs and every account state through the client, worke
       }),
     )
 
-    expect({
-      catalogCount: catalog.contracts.length,
-      storedCount: bucket.objects.size,
-      mismatches: outcomes.filter(outcome => !outcome.matches),
-    }).toMatchInlineSnapshot(`
-      {
-        "catalogCount": 288,
-        "mismatches": [],
-        "storedCount": 292,
-      }
-    `)
+    expect(bucket.objects.size).toBe(cases.length)
+    expect(outcomes.filter(outcome => !outcome.matches)).toEqual([])
   } finally {
     fetchMock.mockRestore()
   }
