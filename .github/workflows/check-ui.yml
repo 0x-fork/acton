@@ -9,6 +9,7 @@ on:
       - "biome.jsonc"
       - "bun.lock"
       - "bunfig.toml"
+      - "crates/acton-abi-catalog/**"
       - "package.json"
       - "packages/**"
   push:
@@ -19,6 +20,7 @@ on:
       - "biome.jsonc"
       - "bun.lock"
       - "bunfig.toml"
+      - "crates/acton-abi-catalog/**"
       - "package.json"
       - "packages/**"
   workflow_dispatch:
