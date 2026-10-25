@@ -1782,6 +1782,7 @@ fn prepare_repository(
     let repo = dir.path().join(name);
     fs::create_dir(&repo).expect("checkout directory");
     git(&repo, &["init", "-b", branch]);
+    git(&repo, &["config", "maintenance.auto", "false"]);
     fs::write(
         repo.join(".gitattributes"),
         format!("{storage_root}/** -text\n"),
@@ -1799,6 +1800,7 @@ fn prepare_repository(
     let remote_path = dir.path().join(format!("{name}.git"));
     fs::create_dir(&remote_path).expect("remote directory");
     git(&remote_path, &["init", "--bare"]);
+    git(&remote_path, &["config", "receive.autogc", "false"]);
     git(
         &repo,
         &[
