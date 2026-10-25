@@ -58,4 +58,4 @@ too_many_lines = "allow"
 
 [dependencies]
 teloxide = { version = "0.17", default-features = false, features = ["ctrlc_handler", "macros", "rustls"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.53.3", features = ["macros", "rt-multi-thread"] }
