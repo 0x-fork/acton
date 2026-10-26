@@ -180,7 +180,7 @@ ring = "0.17"
 ed25519-dalek = "2.2.0"
 toml_edit = "0.24.0"
 
-tokio = { version = "1.41", features = ["rt-multi-thread", "macros", "full"] }
+tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros", "full"] }
 keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "linux-native"] }
 
 # acton fmt
