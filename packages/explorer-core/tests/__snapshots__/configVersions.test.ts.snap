@@ -1,0 +1,1517 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`historical network configuration constructors gas prices in parameters 20 and 21: GasLimitsPrices_gas_prices 1`] = `
+{
+  "rawHex": "b5ee9c72410101010033000062dd00000000000000010000000000000002000000000000000300000000000000040000000000000005000000000000000601f091ac",
+  "values": [
+    {
+      "format": "gram",
+      "label": "Gas price",
+      "value": 1n,
+    },
+    {
+      "label": "Gas limit",
+      "value": 2n,
+    },
+    {
+      "label": "Gas credit",
+      "value": 3n,
+    },
+    {
+      "label": "Block gas limit",
+      "value": 4n,
+    },
+    {
+      "format": "gram",
+      "label": "Freeze due limit",
+      "value": 5n,
+    },
+    {
+      "format": "gram",
+      "label": "Delete due limit",
+      "value": 6n,
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors gas prices in parameters 20 and 21: GasLimitsPrices_gas_prices_ext 1`] = `
+{
+  "rawHex": "b5ee9c7241010101003b000072de000000000000000b000000000000000c000000000000000d000000000000000e000000000000000f000000000000001000000000000000117dd2f706",
+  "values": [
+    {
+      "format": "gram",
+      "label": "Gas price",
+      "value": 11n,
+    },
+    {
+      "label": "Gas limit",
+      "value": 12n,
+    },
+    {
+      "label": "Special gas limit",
+      "value": 13n,
+    },
+    {
+      "label": "Gas credit",
+      "value": 14n,
+    },
+    {
+      "label": "Block gas limit",
+      "value": 15n,
+    },
+    {
+      "format": "gram",
+      "label": "Freeze due limit",
+      "value": 16n,
+    },
+    {
+      "format": "gram",
+      "label": "Delete due limit",
+      "value": 17n,
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors gas prices in parameters 20 and 21: GasLimitsPrices_gas_flat_pfx 1`] = `
+{
+  "rawHex": "b5ee9c7241010101004c000094d100000000000000150000000000000016de000000000000001700000000000000180000000000000019000000000000001a000000000000001b000000000000001c000000000000001d948a5d56",
+  "values": [
+    {
+      "label": "Flat gas limit",
+      "value": 21n,
+    },
+    {
+      "format": "gram",
+      "label": "Flat gas price",
+      "value": 22n,
+    },
+    {
+      "children": [
+        {
+          "format": "gram",
+          "label": "Gas price",
+          "value": 23n,
+        },
+        {
+          "label": "Gas limit",
+          "value": 24n,
+        },
+        {
+          "label": "Special gas limit",
+          "value": 25n,
+        },
+        {
+          "label": "Gas credit",
+          "value": 26n,
+        },
+        {
+          "label": "Block gas limit",
+          "value": 27n,
+        },
+        {
+          "format": "gram",
+          "label": "Freeze due limit",
+          "value": 28n,
+        },
+        {
+          "format": "gram",
+          "label": "Delete due limit",
+          "value": 29n,
+        },
+      ],
+      "label": "Other",
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors block limits in parameters 22 and 23: BlockLimits_block_limits 1`] = `
+{
+  "rawHex": "b5ee9c7241010101002a0000505dc3000000010000000200000003c3000000040000000500000006c3000000070000000800000009541b1c57",
+  "values": [
+    {
+      "children": [
+        {
+          "format": "bytes",
+          "label": "Underload",
+          "value": 1,
+        },
+        {
+          "format": "bytes",
+          "label": "Soft limit",
+          "value": 2,
+        },
+        {
+          "format": "bytes",
+          "label": "Hard limit",
+          "value": 3,
+        },
+      ],
+      "label": "Bytes",
+    },
+    {
+      "children": [
+        {
+          "label": "Underload",
+          "value": 4,
+        },
+        {
+          "label": "Soft limit",
+          "value": 5,
+        },
+        {
+          "label": "Hard limit",
+          "value": 6,
+        },
+      ],
+      "label": "Gas",
+    },
+    {
+      "children": [
+        {
+          "label": "Underload",
+          "value": 7,
+        },
+        {
+          "label": "Soft limit",
+          "value": 8,
+        },
+        {
+          "label": "Hard limit",
+          "value": 9,
+        },
+      ],
+      "label": "LT delta",
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors block limits in parameters 22 and 23: BlockLimits_block_limits_v2 1`] = `
+{
+  "rawHex": "b5ee9c7241010101004000007c5ec30000000b0000000c0000000dc30000000e0000000f00000010c3000000110000001200000013c3000000140000001500000016d30000001700000018e551937c",
+  "values": [
+    {
+      "children": [
+        {
+          "format": "bytes",
+          "label": "Underload",
+          "value": 11,
+        },
+        {
+          "format": "bytes",
+          "label": "Soft limit",
+          "value": 12,
+        },
+        {
+          "format": "bytes",
+          "label": "Hard limit",
+          "value": 13,
+        },
+      ],
+      "label": "Bytes",
+    },
+    {
+      "children": [
+        {
+          "label": "Underload",
+          "value": 14,
+        },
+        {
+          "label": "Soft limit",
+          "value": 15,
+        },
+        {
+          "label": "Hard limit",
+          "value": 16,
+        },
+      ],
+      "label": "Gas",
+    },
+    {
+      "children": [
+        {
+          "label": "Underload",
+          "value": 17,
+        },
+        {
+          "label": "Soft limit",
+          "value": 18,
+        },
+        {
+          "label": "Hard limit",
+          "value": 19,
+        },
+      ],
+      "label": "LT delta",
+    },
+    {
+      "children": [
+        {
+          "label": "Underload",
+          "value": 20,
+        },
+        {
+          "label": "Soft limit",
+          "value": 21,
+        },
+        {
+          "label": "Hard limit",
+          "value": 22,
+        },
+      ],
+      "label": "Collated data",
+    },
+    {
+      "children": [
+        {
+          "format": "bytes",
+          "label": "Max bytes",
+          "value": 23,
+        },
+        {
+          "label": "Max msgs",
+          "value": 24,
+        },
+      ],
+      "label": "Imported msg queue",
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors catchain configuration in parameter 28: CatchainConfig_catchain_config 1`] = `
+{
+  "rawHex": "b5ee9c72410101010013000022c100000001000000020000000300000004f03cca76",
+  "values": [
+    {
+      "format": "duration",
+      "label": "MC catchain lifetime",
+      "value": 1,
+    },
+    {
+      "format": "duration",
+      "label": "Shard catchain lifetime",
+      "value": 2,
+    },
+    {
+      "format": "duration",
+      "label": "Shard validators lifetime",
+      "value": 3,
+    },
+    {
+      "label": "Shard validators num",
+      "value": 4,
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors catchain configuration in parameter 28: CatchainConfig_catchain_config_new 1`] = `
+{
+  "rawHex": "b5ee9c72410101010014000024c20100000005000000060000000700000008550b0ab9",
+  "values": [
+    {
+      "label": "Shuffle MC validators",
+      "value": true,
+    },
+    {
+      "format": "duration",
+      "label": "MC catchain lifetime",
+      "value": 5,
+    },
+    {
+      "format": "duration",
+      "label": "Shard catchain lifetime",
+      "value": 6,
+    },
+    {
+      "format": "duration",
+      "label": "Shard validators lifetime",
+      "value": 7,
+    },
+    {
+      "label": "Shard validators num",
+      "value": 8,
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors consensus configuration in parameter 29: ConsensusConfig_consensus_config 1`] = `
+{
+  "rawHex": "b5ee9c72410101010023000042d600000001000000020000000300000004000000050000000600000007000000086ccab443",
+  "values": [
+    {
+      "label": "Round candidates",
+      "value": 1,
+    },
+    {
+      "format": "duration-ms",
+      "label": "Next candidate delay ms",
+      "value": 2,
+    },
+    {
+      "format": "duration-ms",
+      "label": "Consensus timeout ms",
+      "value": 3,
+    },
+    {
+      "label": "Fast attempts",
+      "value": 4,
+    },
+    {
+      "label": "Attempt duration",
+      "value": 5,
+    },
+    {
+      "label": "Catchain max deps",
+      "value": 6,
+    },
+    {
+      "format": "bytes",
+      "label": "Max block bytes",
+      "value": 7,
+    },
+    {
+      "format": "bytes",
+      "label": "Max collated bytes",
+      "value": 8,
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors consensus configuration in parameter 29: ConsensusConfig_consensus_config_new 1`] = `
+{
+  "rawHex": "b5ee9c7241010101002100003ed70101000000020000000300000004000000050000000600000007000000086076ce5e",
+  "values": [
+    {
+      "label": "New catchain ids",
+      "value": true,
+    },
+    {
+      "label": "Round candidates",
+      "value": 1,
+    },
+    {
+      "format": "duration-ms",
+      "label": "Next candidate delay ms",
+      "value": 2,
+    },
+    {
+      "format": "duration-ms",
+      "label": "Consensus timeout ms",
+      "value": 3,
+    },
+    {
+      "label": "Fast attempts",
+      "value": 4,
+    },
+    {
+      "label": "Attempt duration",
+      "value": 5,
+    },
+    {
+      "label": "Catchain max deps",
+      "value": 6,
+    },
+    {
+      "format": "bytes",
+      "label": "Max block bytes",
+      "value": 7,
+    },
+    {
+      "format": "bytes",
+      "label": "Max collated bytes",
+      "value": 8,
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors consensus configuration in parameter 29: ConsensusConfig_consensus_config_v3 1`] = `
+{
+  "rawHex": "b5ee9c72410101010023000042d80101000000020000000300000004000000050000000600000007000000080009b9621530",
+  "values": [
+    {
+      "label": "New catchain ids",
+      "value": true,
+    },
+    {
+      "label": "Round candidates",
+      "value": 1,
+    },
+    {
+      "format": "duration-ms",
+      "label": "Next candidate delay ms",
+      "value": 2,
+    },
+    {
+      "format": "duration-ms",
+      "label": "Consensus timeout ms",
+      "value": 3,
+    },
+    {
+      "label": "Fast attempts",
+      "value": 4,
+    },
+    {
+      "label": "Attempt duration",
+      "value": 5,
+    },
+    {
+      "label": "Catchain max deps",
+      "value": 6,
+    },
+    {
+      "format": "bytes",
+      "label": "Max block bytes",
+      "value": 7,
+    },
+    {
+      "format": "bytes",
+      "label": "Max collated bytes",
+      "value": 8,
+    },
+    {
+      "label": "Proto version",
+      "value": 9,
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors consensus configuration in parameter 29: ConsensusConfig_consensus_config_v4 1`] = `
+{
+  "rawHex": "b5ee9c7241010101002700004ad9030100000002000000030000000400000005000000060000000700000008000a0000000b9e0d5b86",
+  "values": [
+    {
+      "label": "Use quic",
+      "value": true,
+    },
+    {
+      "label": "New catchain ids",
+      "value": true,
+    },
+    {
+      "label": "Round candidates",
+      "value": 1,
+    },
+    {
+      "format": "duration-ms",
+      "label": "Next candidate delay ms",
+      "value": 2,
+    },
+    {
+      "format": "duration-ms",
+      "label": "Consensus timeout ms",
+      "value": 3,
+    },
+    {
+      "label": "Fast attempts",
+      "value": 4,
+    },
+    {
+      "label": "Attempt duration",
+      "value": 5,
+    },
+    {
+      "label": "Catchain max deps",
+      "value": 6,
+    },
+    {
+      "format": "bytes",
+      "label": "Max block bytes",
+      "value": 7,
+    },
+    {
+      "format": "bytes",
+      "label": "Max collated bytes",
+      "value": 8,
+    },
+    {
+      "label": "Proto version",
+      "value": 10,
+    },
+    {
+      "label": "Catchain max blocks coeff",
+      "value": 11,
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors size limits in parameter 43: SizeLimitsConfig_size_limits_config 1`] = `
+{
+  "rawHex": "b5ee9c7241010101001700002a0100000001000000020000000300040000000500068824368f",
+  "values": [
+    {
+      "label": "Max msg bits",
+      "value": 1,
+    },
+    {
+      "label": "Max msg cells",
+      "value": 2,
+    },
+    {
+      "label": "Max library cells",
+      "value": 3,
+    },
+    {
+      "label": "Max VM data depth",
+      "value": 4,
+    },
+    {
+      "label": "Max ext msg size",
+      "value": 5,
+    },
+    {
+      "label": "Max ext msg depth",
+      "value": 6,
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors size limits in parameter 43: SizeLimitsConfig_size_limits_config_v2 1`] = `
+{
+  "rawHex": "b5ee9c724101010100350000650200000001000000020000000300040000000500060000000700000008000000090000000a0000000b0c0000000d8000000740bc66b26f",
+  "values": [
+    {
+      "label": "Max msg bits",
+      "value": 1,
+    },
+    {
+      "label": "Max msg cells",
+      "value": 2,
+    },
+    {
+      "label": "Max library cells",
+      "value": 3,
+    },
+    {
+      "label": "Max VM data depth",
+      "value": 4,
+    },
+    {
+      "label": "Max ext msg size",
+      "value": 5,
+    },
+    {
+      "label": "Max ext msg depth",
+      "value": 6,
+    },
+    {
+      "label": "Max acc state cells",
+      "value": 7,
+    },
+    {
+      "label": "Max MC acc state cells",
+      "value": 8,
+    },
+    {
+      "label": "Max acc public libraries",
+      "value": 9,
+    },
+    {
+      "label": "Defer out queue size limit",
+      "value": 10,
+    },
+    {
+      "label": "Max msg extra currencies",
+      "value": 11,
+    },
+    {
+      "label": "Max acc fixed prefix length",
+      "value": 12,
+    },
+    {
+      "label": "Acc state cells for storage dict",
+      "value": 13,
+    },
+    {
+      "label": "Max transaction library loads",
+      "value": 14,
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors size limits in parameter 43: SizeLimitsConfig_size_limits_config_v3 1`] = `
+{
+  "rawHex": "b5ee9c724101010100450000850300000001000000020000000300040000000500060000000700000008000000090000000a0000000b0c0000000d800000070000000780000008000000088000000940dcd68a6a",
+  "values": [
+    {
+      "label": "Max msg bits",
+      "value": 1,
+    },
+    {
+      "label": "Max msg cells",
+      "value": 2,
+    },
+    {
+      "label": "Max library cells",
+      "value": 3,
+    },
+    {
+      "label": "Max VM data depth",
+      "value": 4,
+    },
+    {
+      "label": "Max ext msg size",
+      "value": 5,
+    },
+    {
+      "label": "Max ext msg depth",
+      "value": 6,
+    },
+    {
+      "label": "Max acc state cells",
+      "value": 7,
+    },
+    {
+      "label": "Max MC acc state cells",
+      "value": 8,
+    },
+    {
+      "label": "Max acc public libraries",
+      "value": 9,
+    },
+    {
+      "label": "Defer out queue size limit",
+      "value": 10,
+    },
+    {
+      "label": "Max msg extra currencies",
+      "value": 11,
+    },
+    {
+      "label": "Max acc fixed prefix length",
+      "value": 12,
+    },
+    {
+      "label": "Acc state cells for storage dict",
+      "value": 13,
+    },
+    {
+      "label": "Max total msg bits",
+      "value": 15,
+    },
+    {
+      "label": "Max total msg cells",
+      "value": 16,
+    },
+    {
+      "label": "Out msg queue size hard limit",
+      "value": 17,
+    },
+    {
+      "label": "Out msg queue size soft limit",
+      "value": 18,
+    },
+    {
+      "label": "Max transaction library loads",
+      "value": 14,
+    },
+  ],
+}
+`;
+
+exports[`historical network configuration constructors validator sets in parameters 32, 34 and 36: ValidatorSet_validators 1`] = `
+{
+  "rawHex": "b5ee9c7241010101005d0000b611000000010000000200010001d0738e81278a111111111111111111111111111111111111111111111111111111111111111100000000000000642222222222222222222222222222222222222222222222222222222222222222b68a7199",
+  "validatorSet": {
+    "main": 1,
+    "total": 1,
+    "utimeSince": 1,
+    "utimeUntil": 2,
+    "validators": [
+      {
+        "adnlAddress": "2222222222222222222222222222222222222222222222222222222222222222",
+        "index": 0,
+        "publicKey": "1111111111111111111111111111111111111111111111111111111111111111",
+        "weight": 100n,
+      },
+    ],
+  },
+}
+`;
+
+exports[`historical network configuration constructors validator sets in parameters 32, 34 and 36: ValidatorSet_validators_ext 1`] = `
+{
+  "rawHex": "b5ee9c7241010201006900012b120000000100000002000100010000000000000064c001009cd0738e81278a11111111111111111111111111111111111111111111111111111111111111110000000000000064222222222222222222222222222222222222222222222222222222222222222277191859",
+  "validatorSet": {
+    "main": 1,
+    "total": 1,
+    "totalWeight": 100n,
+    "utimeSince": 1,
+    "utimeUntil": 2,
+    "validators": [
+      {
+        "adnlAddress": "2222222222222222222222222222222222222222222222222222222222222222",
+        "index": 0,
+        "publicKey": "1111111111111111111111111111111111111111111111111111111111111111",
+        "weight": 100n,
+      },
+    ],
+  },
+}
+`;
+
+exports[`historical network configuration constructors jetton bridges in parameters 79, 81 and 82: JettonBridgeParams_jetton_bridge_params_v0 1`] = `
+{
+  "bridges": [
+    {
+      "bridgeAddress": "-1:3333333333333333333333333333333333333333333333333333333333333333",
+      "burnBridgeFee": 5n,
+      "externalChain": "Ethereum",
+      "kind": "jetton",
+      "oracleAddress": "-1:4444444444444444444444444444444444444444444444444444444444444444",
+      "oracles": [
+        {
+          "address": "-1:0000000000000000000000000000000000000000000000000000000000000011",
+          "externalAddress": "0x0000000000000000000000000000000000000022",
+        },
+      ],
+      "stateFlags": 1,
+    },
+    {
+      "bridgeAddress": "-1:3333333333333333333333333333333333333333333333333333333333333333",
+      "burnBridgeFee": 5n,
+      "externalChain": "BSC",
+      "kind": "jetton",
+      "oracleAddress": "-1:4444444444444444444444444444444444444444444444444444444444444444",
+      "oracles": [
+        {
+          "address": "-1:0000000000000000000000000000000000000000000000000000000000000011",
+          "externalAddress": "0x0000000000000000000000000000000000000022",
+        },
+      ],
+      "stateFlags": 1,
+    },
+    {
+      "bridgeAddress": "-1:3333333333333333333333333333333333333333333333333333333333333333",
+      "burnBridgeFee": 5n,
+      "externalChain": "Polygon",
+      "kind": "jetton",
+      "oracleAddress": "-1:4444444444444444444444444444444444444444444444444444444444444444",
+      "oracles": [
+        {
+          "address": "-1:0000000000000000000000000000000000000000000000000000000000000011",
+          "externalAddress": "0x0000000000000000000000000000000000000022",
+        },
+      ],
+      "stateFlags": 1,
+    },
+  ],
+  "rawHex": "b5ee9c7241010201008b000187003333333333333333333333333333333333333333333333333333333333333333444444444444444444444444444444444444444444444444444444444444444480882c010083a00000000000000000000000000000000000000000000000000000000000000002200000000000000000000000000000000000000000000000000000000000000450f430ae05",
+}
+`;
+
+exports[`historical network configuration constructors jetton bridges in parameters 79, 81 and 82: JettonBridgeParams_jetton_bridge_params_v1 1`] = `
+{
+  "bridges": [
+    {
+      "bridgeAddress": "-1:3333333333333333333333333333333333333333333333333333333333333333",
+      "externalChain": "Ethereum",
+      "externalChainAddress": "0x5555555555555555555555555555555555555555",
+      "kind": "jetton",
+      "oracleAddress": "-1:4444444444444444444444444444444444444444444444444444444444444444",
+      "oracles": [
+        {
+          "address": "-1:0000000000000000000000000000000000000000000000000000000000000011",
+          "externalAddress": "0x0000000000000000000000000000000000000022",
+        },
+      ],
+      "prices": [
+        {
+          "format": "gram",
+          "label": "Bridge burn fee",
+          "value": 6n,
+        },
+        {
+          "format": "gram",
+          "label": "Bridge mint fee",
+          "value": 7n,
+        },
+        {
+          "format": "gram",
+          "label": "Wallet min GRAM for storage",
+          "value": 8n,
+        },
+        {
+          "format": "gram",
+          "label": "Wallet gas consumption",
+          "value": 9n,
+        },
+        {
+          "format": "gram",
+          "label": "Minter min GRAM for storage",
+          "value": 10n,
+        },
+        {
+          "format": "gram",
+          "label": "Discover gas consumption",
+          "value": 11n,
+        },
+      ],
+      "stateFlags": 1,
+    },
+    {
+      "bridgeAddress": "-1:3333333333333333333333333333333333333333333333333333333333333333",
+      "externalChain": "BSC",
+      "externalChainAddress": "0x5555555555555555555555555555555555555555",
+      "kind": "jetton",
+      "oracleAddress": "-1:4444444444444444444444444444444444444444444444444444444444444444",
+      "oracles": [
+        {
+          "address": "-1:0000000000000000000000000000000000000000000000000000000000000011",
+          "externalAddress": "0x0000000000000000000000000000000000000022",
+        },
+      ],
+      "prices": [
+        {
+          "format": "gram",
+          "label": "Bridge burn fee",
+          "value": 6n,
+        },
+        {
+          "format": "gram",
+          "label": "Bridge mint fee",
+          "value": 7n,
+        },
+        {
+          "format": "gram",
+          "label": "Wallet min GRAM for storage",
+          "value": 8n,
+        },
+        {
+          "format": "gram",
+          "label": "Wallet gas consumption",
+          "value": 9n,
+        },
+        {
+          "format": "gram",
+          "label": "Minter min GRAM for storage",
+          "value": 10n,
+        },
+        {
+          "format": "gram",
+          "label": "Discover gas consumption",
+          "value": 11n,
+        },
+      ],
+      "stateFlags": 1,
+    },
+    {
+      "bridgeAddress": "-1:3333333333333333333333333333333333333333333333333333333333333333",
+      "externalChain": "Polygon",
+      "externalChainAddress": "0x5555555555555555555555555555555555555555",
+      "kind": "jetton",
+      "oracleAddress": "-1:4444444444444444444444444444444444444444444444444444444444444444",
+      "oracles": [
+        {
+          "address": "-1:0000000000000000000000000000000000000000000000000000000000000011",
+          "externalAddress": "0x0000000000000000000000000000000000000022",
+        },
+      ],
+      "prices": [
+        {
+          "format": "gram",
+          "label": "Bridge burn fee",
+          "value": 6n,
+        },
+        {
+          "format": "gram",
+          "label": "Bridge mint fee",
+          "value": 7n,
+        },
+        {
+          "format": "gram",
+          "label": "Wallet min GRAM for storage",
+          "value": 8n,
+        },
+        {
+          "format": "gram",
+          "label": "Wallet gas consumption",
+          "value": 9n,
+        },
+        {
+          "format": "gram",
+          "label": "Minter min GRAM for storage",
+          "value": 10n,
+        },
+        {
+          "format": "gram",
+          "label": "Discover gas consumption",
+          "value": 11n,
+        },
+      ],
+      "stateFlags": 1,
+    },
+  ],
+  "rawHex": "b5ee9c724101030100b60002c50133333333333333333333333333333333333333333333333333333333333333334444444444444444444444444444444444444444444444444444444444444444808000000000000000000000002aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaac001020083a00000000000000000000000000000000000000000000000000000000000000002200000000000000000000000000000000000000000000000000000000000000450001210610710810910a10b0572ca95",
+}
+`;
+
+exports[`historical network configuration constructors workchain descriptions inside parameter 12: WorkchainDescr_workchain 1`] = `
+{
+  "parsedValue": {
+    "entries": [
+      {
+        "key": "Workchains",
+        "value": {
+          "entries": [
+            {
+              "key": {
+                "kind": "scalar",
+                "typeName": undefined,
+                "value": "0",
+              },
+              "value": {
+                "entries": [
+                  {
+                    "key": "Enabled since",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "1",
+                    },
+                  },
+                  {
+                    "key": "Monitor min split",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "0",
+                    },
+                  },
+                  {
+                    "key": "Min split",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "0",
+                    },
+                  },
+                  {
+                    "key": "Max split",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "1",
+                    },
+                  },
+                  {
+                    "key": "Basic",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "1",
+                    },
+                  },
+                  {
+                    "key": "Active",
+                    "value": {
+                      "entries": [
+                        {
+                          "key": "Value",
+                          "value": {
+                            "kind": "boolean",
+                            "value": true,
+                          },
+                        },
+                      ],
+                      "kind": "object",
+                      "typeName": "Bool",
+                    },
+                  },
+                  {
+                    "key": "Accept msgs",
+                    "value": {
+                      "entries": [
+                        {
+                          "key": "Value",
+                          "value": {
+                            "kind": "boolean",
+                            "value": true,
+                          },
+                        },
+                      ],
+                      "kind": "object",
+                      "typeName": "Bool",
+                    },
+                  },
+                  {
+                    "key": "Flags",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "0",
+                    },
+                  },
+                  {
+                    "key": "Zerostate root hash",
+                    "value": {
+                      "kind": "scalar",
+                      "rawValue": "1111111111111111111111111111111111111111111111111111111111111111",
+                      "typeName": "bits256",
+                      "value": "0x1111111111111111111111111111111111111111111111111111111111111111",
+                    },
+                  },
+                  {
+                    "key": "Zerostate file hash",
+                    "value": {
+                      "kind": "scalar",
+                      "rawValue": "2222222222222222222222222222222222222222222222222222222222222222",
+                      "typeName": "bits256",
+                      "value": "0x2222222222222222222222222222222222222222222222222222222222222222",
+                    },
+                  },
+                  {
+                    "key": "Version",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "1",
+                    },
+                  },
+                  {
+                    "key": "Format",
+                    "value": {
+                      "entries": [
+                        {
+                          "key": "VM version",
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": undefined,
+                            "value": "1",
+                          },
+                        },
+                        {
+                          "key": "VM mode",
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": "uint",
+                            "value": "0",
+                          },
+                        },
+                      ],
+                      "kind": "object",
+                      "typeName": "Workchain format wfmt basic",
+                    },
+                  },
+                ],
+                "kind": "object",
+                "typeName": "Workchain descr workchain",
+              },
+            },
+          ],
+          "kind": "map",
+          "typeName": "dictionary",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": undefined,
+  },
+  "rawHex": "b5ee9c72410102010062000101c00100b7d05300000000800000f0000888888888888888888888888888888888888888888888888888888888888888911111111111111111111111111111111111111111111111111111111111111100000000880000000800000000000000045d926d01",
+}
+`;
+
+exports[`historical network configuration constructors workchain descriptions inside parameter 12: WorkchainDescr_workchain_v2 1`] = `
+{
+  "parsedValue": {
+    "entries": [
+      {
+        "key": "Workchains",
+        "value": {
+          "entries": [
+            {
+              "key": {
+                "kind": "scalar",
+                "typeName": undefined,
+                "value": "0",
+              },
+              "value": {
+                "entries": [
+                  {
+                    "key": "Enabled since",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "1",
+                    },
+                  },
+                  {
+                    "key": "Monitor min split",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "0",
+                    },
+                  },
+                  {
+                    "key": "Min split",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "0",
+                    },
+                  },
+                  {
+                    "key": "Max split",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "1",
+                    },
+                  },
+                  {
+                    "key": "Basic",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "1",
+                    },
+                  },
+                  {
+                    "key": "Active",
+                    "value": {
+                      "entries": [
+                        {
+                          "key": "Value",
+                          "value": {
+                            "kind": "boolean",
+                            "value": true,
+                          },
+                        },
+                      ],
+                      "kind": "object",
+                      "typeName": "Bool",
+                    },
+                  },
+                  {
+                    "key": "Accept msgs",
+                    "value": {
+                      "entries": [
+                        {
+                          "key": "Value",
+                          "value": {
+                            "kind": "boolean",
+                            "value": true,
+                          },
+                        },
+                      ],
+                      "kind": "object",
+                      "typeName": "Bool",
+                    },
+                  },
+                  {
+                    "key": "Flags",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "0",
+                    },
+                  },
+                  {
+                    "key": "Zerostate root hash",
+                    "value": {
+                      "kind": "scalar",
+                      "rawValue": "1111111111111111111111111111111111111111111111111111111111111111",
+                      "typeName": "bits256",
+                      "value": "0x1111111111111111111111111111111111111111111111111111111111111111",
+                    },
+                  },
+                  {
+                    "key": "Zerostate file hash",
+                    "value": {
+                      "kind": "scalar",
+                      "rawValue": "2222222222222222222222222222222222222222222222222222222222222222",
+                      "typeName": "bits256",
+                      "value": "0x2222222222222222222222222222222222222222222222222222222222222222",
+                    },
+                  },
+                  {
+                    "key": "Version",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "1",
+                    },
+                  },
+                  {
+                    "key": "Format",
+                    "value": {
+                      "entries": [
+                        {
+                          "key": "VM version",
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": undefined,
+                            "value": "1",
+                          },
+                        },
+                        {
+                          "key": "VM mode",
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": "uint",
+                            "value": "0",
+                          },
+                        },
+                      ],
+                      "kind": "object",
+                      "typeName": "Workchain format wfmt basic",
+                    },
+                  },
+                  {
+                    "key": "Split merge timings",
+                    "value": {
+                      "entries": [
+                        {
+                          "key": "Split merge delay",
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": undefined,
+                            "value": "2",
+                          },
+                        },
+                        {
+                          "key": "Split merge interval",
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": undefined,
+                            "value": "3",
+                          },
+                        },
+                        {
+                          "key": "Min split merge interval",
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": undefined,
+                            "value": "4",
+                          },
+                        },
+                        {
+                          "key": "Max split merge delay",
+                          "value": {
+                            "kind": "scalar",
+                            "typeName": undefined,
+                            "value": "5",
+                          },
+                        },
+                      ],
+                      "kind": "object",
+                      "typeName": "Wc split merge timings",
+                    },
+                  },
+                  {
+                    "key": "Persistent state split depth",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "6",
+                    },
+                  },
+                ],
+                "kind": "object",
+                "typeName": "Workchain descr workchain",
+              },
+            },
+          ],
+          "kind": "map",
+          "typeName": "dictionary",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": undefined,
+  },
+  "rawHex": "b5ee9c72410102010074000101c00100dbd05380000000800000f0000888888888888888888888888888888888888888888888888888888888888888911111111111111111111111111111111111111111111111111111111111111100000000880000000800000000000000000000000100000001800000020000000283406ec679d1",
+}
+`;
+
+exports[`historical network configuration constructors simplex versions inside parameter 30: NewConsensusConfig_simplex_config 1`] = `
+{
+  "parsedValue": {
+    "entries": [
+      {
+        "key": "MC",
+        "value": {
+          "entries": [
+            {
+              "key": "Value",
+              "value": {
+                "entries": [
+                  {
+                    "key": "Flags",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "0",
+                    },
+                  },
+                  {
+                    "key": "Use quic",
+                    "value": {
+                      "entries": [
+                        {
+                          "key": "Value",
+                          "value": {
+                            "kind": "boolean",
+                            "value": true,
+                          },
+                        },
+                      ],
+                      "kind": "object",
+                      "typeName": "Bool",
+                    },
+                  },
+                  {
+                    "key": "Target rate ms",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "1",
+                    },
+                  },
+                  {
+                    "key": "Slots per leader window",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "2",
+                    },
+                  },
+                  {
+                    "key": "First block timeout ms",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "3",
+                    },
+                  },
+                  {
+                    "key": "Max leader window desync",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "4",
+                    },
+                  },
+                ],
+                "kind": "object",
+                "typeName": "New consensus config simplex config",
+              },
+            },
+          ],
+          "kind": "object",
+          "typeName": "Maybe just",
+        },
+      },
+      {
+        "key": "Shard",
+        "value": {
+          "entries": [],
+          "kind": "object",
+          "typeName": "Maybe nothing",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "New consensus config all",
+  },
+  "rawHex": "b5ee9c7241010201001900010310a0010024210100000001000000020000000300000004d6fdc44c",
+}
+`;
+
+exports[`historical network configuration constructors simplex versions inside parameter 30: NewConsensusConfig_simplex_config_v2 1`] = `
+{
+  "parsedValue": {
+    "entries": [
+      {
+        "key": "MC",
+        "value": {
+          "entries": [
+            {
+              "key": "Value",
+              "value": {
+                "entries": [
+                  {
+                    "key": "Flags",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "0",
+                    },
+                  },
+                  {
+                    "key": "Protocol version",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "1",
+                    },
+                  },
+                  {
+                    "key": "Use quic",
+                    "value": {
+                      "entries": [
+                        {
+                          "key": "Value",
+                          "value": {
+                            "kind": "boolean",
+                            "value": true,
+                          },
+                        },
+                      ],
+                      "kind": "object",
+                      "typeName": "Bool",
+                    },
+                  },
+                  {
+                    "key": "Slots per leader window",
+                    "value": {
+                      "kind": "scalar",
+                      "typeName": undefined,
+                      "value": "2",
+                    },
+                  },
+                  {
+                    "key": "Noncritical params",
+                    "value": {
+                      "entries": [],
+                      "kind": "map",
+                      "typeName": "dictionary",
+                    },
+                  },
+                ],
+                "kind": "object",
+                "typeName": "New consensus config simplex config",
+              },
+            },
+          ],
+          "kind": "object",
+          "typeName": "Maybe just",
+        },
+      },
+      {
+        "key": "Shard",
+        "value": {
+          "entries": [],
+          "kind": "object",
+          "typeName": "Maybe nothing",
+        },
+      },
+    ],
+    "kind": "object",
+    "typeName": "New consensus config all",
+  },
+  "rawHex": "b5ee9c7241010201000e00010310a001000d22030000000240247141bc",
+}
+`;
