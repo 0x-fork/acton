@@ -59,6 +59,11 @@ jobs:
             echo "changed=true" >> "${GITHUB_OUTPUT}"
           fi
 
+      - name: Update network config test manifests
+        if: steps.changes.outputs.changed == 'true'
+        working-directory: packages/explorer-core
+        run: bun run network-config:fix
+
       - name: Update TL-B display snapshots
         if: steps.changes.outputs.changed == 'true'
         working-directory: packages/explorer-core
@@ -88,6 +93,7 @@ jobs:
             packages/explorer-core/src/config/tlb.generated.json \
             packages/explorer-core/src/config/tlb.parameters.generated.json \
             packages/explorer-core/src/config/editor/schema.generated.json \
+            packages/explorer-core/scripts/config-fields \
             packages/explorer-core/tests/__snapshots__/configTlb.test.ts.snap
           git commit --message "chore(explorer): update TON TL-B schema"
 
