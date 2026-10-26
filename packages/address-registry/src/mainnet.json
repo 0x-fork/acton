@@ -1608,6 +1608,10 @@
     "name": "DeDust Vault"
   },
   {
+    "address": "0:193c98e9c7f542a1a0095bbf2a62d6d42b9f48b217b2b02460cda494729ee4fc",
+    "name": "Orbit Bridge Polygon Minter"
+  },
+  {
     "address": "0:198ee50999b3fe578472a308dec61edb21c74daeba23af458a4a9760801d336e",
     "name": "Nail Bracelets"
   },
@@ -1646,6 +1650,14 @@
   {
     "address": "0:1b44ec553616b0e4551037038834bdf0bdaa1f0440e10f3331d9841585612a68",
     "name": "Walt 4"
+  },
+  {
+    "address": "0:1b589dd8d4780822f70cab5a6b1b56a79430b44f771994053b96e3d3e8b993a6",
+    "name": "Omniston Escrow Minter 1"
+  },
+  {
+    "address": "0:1b973e97afa6feede2c059e6a020ad839fe83cd5888da6ed289077dcf44c18f7",
+    "name": "Orbit Bridge Klaytn Governance"
   },
   {
     "address": "0:1bc702df37bb02d0d4391d3ac56d44b281150f0d9897c1b12b3b7f79a883fdee",
@@ -1768,6 +1780,10 @@
     "name": "OKX 6"
   },
   {
+    "address": "0:253112d360ea06ea433477774b1ea80adf4a25dea218c0c36d11e964b735cffe",
+    "name": "Orbit Bridge Klaytn Minter"
+  },
+  {
     "address": "0:2544ea639b5935996df4afad6a471de5607b1991329755289a1c42213a59d803",
     "name": "Heroic Helmets"
   },
@@ -1874,6 +1890,10 @@
   {
     "address": "0:2d81b8521cea93c63b912cb38069be93eba14f71059335dfc34f7560086d7eb4",
     "name": "Crystal Balls"
+  },
+  {
+    "address": "0:2d91b57ccac23be5eedf68ef0886ed2616d9ac83ea2c8fb826ad383f9a58d545",
+    "name": "Orbit Bridge Vault"
   },
   {
     "address": "0:2ecf5e47d591eb67fa6c56b02b6bb1de6a530855e16ad3082eaa59859e8d5fdc",
@@ -2256,6 +2276,10 @@
     "name": "Plush Pepes"
   },
   {
+    "address": "0:4713df8361a3c2743ab60aa9f7e79193033cc34dda304b9d913d2fb22e621035",
+    "name": "Omniston Escrow Minter 2"
+  },
+  {
     "address": "0:4770fa73c41185869e80d40fccccf12f0487b1a206d71b62c4cf21b938f5232a",
     "name": "OKX 128"
   },
@@ -2480,6 +2504,10 @@
     "name": "Getgems Sales"
   },
   {
+    "address": "0:5987d0a92d9c8d97023b6a6d0f1e9572f13f33749c408651b79b7c4c8b406855",
+    "name": "Symbiosis Bridge"
+  },
+  {
     "address": "0:598fb9e15cd841e0ef6b4429f8a864bcd8365a3d43e5c8cda4e99adbbd0d63dc",
     "name": "STON.fi DEX"
   },
@@ -2518,6 +2546,10 @@
   {
     "address": "0:5b50ac7909a944972d937a40cd7856efe1ed36a63eb1b00a9764fd17fc0a6b2a",
     "name": "Snake Boxes"
+  },
+  {
+    "address": "0:5b77299489782fd852b8c86c079970b69af9e9c31513ed4f6d8fe9e89d75e7ae",
+    "name": "Orbit Bridge Polygon Governance"
   },
   {
     "address": "0:5c3713024f210791c43970addf3bfdc46e37fa25c039249fce255e27a4337eeb",
@@ -2968,6 +3000,10 @@
     "name": "OKX 162"
   },
   {
+    "address": "0:7c98d4e0a06e50c6a84e755162e97d0c3a392618d777ddcb7e446053f594f9a0",
+    "name": "Orbit Bridge Governance"
+  },
+  {
     "address": "0:7cccbcc438540adea4f231880f0fc06ece63706e59e8baa681f343d6facd84ee",
     "name": "Hanging Stars"
   },
@@ -3260,6 +3296,10 @@
     "name": "Morgenshtern"
   },
   {
+    "address": "0:9220c181a6cfeacd11b7b8f62138df1bb9cc82b6ed2661d2f5faee204b3efb20",
+    "name": "StonFi Router pTON Wallet"
+  },
+  {
     "address": "0:922d627d7d8edbd00e4e23bdb0c54a76ee5e1f46573a1af4417857fa3e23e91f",
     "name": "StonFi Router USDT Wallet"
   },
@@ -3534,6 +3574,10 @@
   {
     "address": "0:a4d2072b1edc1355fc7fbee0095beec7889a2d3cfaa9edcf2ce9e128631abbd6",
     "name": "Coinone Withdrawal"
+  },
+  {
+    "address": "0:a5b03f281aefe1eea0943b3b2fccf4956aff5f9a56d2db1e681a787068f508a0",
+    "name": "Split.tg Proxy"
   },
   {
     "address": "0:a62e05ef1701abb5da61f4ab028059ba96f33447696e893ce974152acdf2c523",

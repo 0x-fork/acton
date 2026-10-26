@@ -80,6 +80,10 @@
     "name": "Testgiver TON Bot"
   },
   {
+    "address": "0:9220c181a6cfeacd11b7b8f62138df1bb9cc82b6ed2661d2f5faee204b3efb20",
+    "name": "StonFi Router pTON Wallet"
+  },
+  {
     "address": "0:92e1411ae546892f33b2c8a89ea90390d8ff4cfbb917a643b91e73f706fdb9d1",
     "name": "StonFi Router"
   },
