@@ -604,4 +604,54 @@ export const CONFLICT_RESOLUTIONS = [
     source: "address-book",
     name: "Durov's Caps",
   },
+  {
+    address: "0:193c98e9c7f542a1a0095bbf2a62d6d42b9f48b217b2b02460cda494729ee4fc",
+    source: "address-book",
+    name: "Orbit Bridge Polygon Minter",
+  },
+  {
+    address: "0:1b589dd8d4780822f70cab5a6b1b56a79430b44f771994053b96e3d3e8b993a6",
+    source: "address-book",
+    name: "Omniston Escrow Minter 1",
+  },
+  {
+    address: "0:1b973e97afa6feede2c059e6a020ad839fe83cd5888da6ed289077dcf44c18f7",
+    source: "address-book",
+    name: "Orbit Bridge Klaytn Governance",
+  },
+  {
+    address: "0:253112d360ea06ea433477774b1ea80adf4a25dea218c0c36d11e964b735cffe",
+    source: "address-book",
+    name: "Orbit Bridge Klaytn Minter",
+  },
+  {
+    address: "0:2d91b57ccac23be5eedf68ef0886ed2616d9ac83ea2c8fb826ad383f9a58d545",
+    source: "address-book",
+    name: "Orbit Bridge Vault",
+  },
+  {
+    address: "0:4713df8361a3c2743ab60aa9f7e79193033cc34dda304b9d913d2fb22e621035",
+    source: "address-book",
+    name: "Omniston Escrow Minter 2",
+  },
+  {
+    address: "0:5b77299489782fd852b8c86c079970b69af9e9c31513ed4f6d8fe9e89d75e7ae",
+    source: "address-book",
+    name: "Orbit Bridge Polygon Governance",
+  },
+  {
+    address: "0:7c98d4e0a06e50c6a84e755162e97d0c3a392618d777ddcb7e446053f594f9a0",
+    source: "address-book",
+    name: "Orbit Bridge Governance",
+  },
+  {
+    address: "0:9220c181a6cfeacd11b7b8f62138df1bb9cc82b6ed2661d2f5faee204b3efb20",
+    source: "address-book",
+    name: "StonFi Router pTON Wallet",
+  },
+  {
+    address: "0:a5b03f281aefe1eea0943b3b2fccf4956aff5f9a56d2db1e681a787068f508a0",
+    source: "address-book",
+    name: "Split.tg Proxy",
+  },
 ] as const satisfies readonly ConflictResolution[]
