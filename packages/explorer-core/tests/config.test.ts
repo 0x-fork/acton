@@ -386,7 +386,7 @@ describe("network configuration parser", () => {
     config.set(36, beginCell().store(storeValidatorSet(nextValidatorSet)).endCell())
 
     const sizeLimits: SizeLimitsConfig = {
-      kind: "SizeLimitsConfig_size_limits_config_v2",
+      kind: "SizeLimitsConfig_size_limits_config_v3",
       max_msg_bits: 2_097_152,
       max_msg_cells: 8192,
       max_library_cells: 200,
@@ -401,6 +401,10 @@ describe("network configuration parser", () => {
       max_acc_fixed_prefix_length: 8,
       acc_state_cells_for_storage_dict: 26,
       max_transaction_library_loads: {kind: "Maybe_just", value: 3},
+      max_total_msg_bits: 5_242_880,
+      max_total_msg_cells: 20_480,
+      out_msg_queue_size_hard_limit: 18_000,
+      out_msg_queue_size_soft_limit: 12_000,
     }
     config.set(43, beginCell().store(storeSizeLimitsConfig(sizeLimits)).endCell())
 

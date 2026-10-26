@@ -1016,6 +1016,16 @@ function parseSizeLimitsConfigurationValues(
     },
     {key: "max_total_msg_bits", label: "Max total msg bits", type: "number"},
     {key: "max_total_msg_cells", label: "Max total msg cells", type: "number"},
+    {
+      key: "out_msg_queue_size_hard_limit",
+      label: "Out msg queue size hard limit",
+      type: "number",
+    },
+    {
+      key: "out_msg_queue_size_soft_limit",
+      label: "Out msg queue size soft limit",
+      type: "number",
+    },
   ]
 
   for (const field of fields) {

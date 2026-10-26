@@ -957,6 +957,22 @@ exports[`network configuration parser parses a direct getConfigAll dictionary an
       "value": 26,
     },
     {
+      "label": "Max total msg bits",
+      "value": 5242880,
+    },
+    {
+      "label": "Max total msg cells",
+      "value": 20480,
+    },
+    {
+      "label": "Out msg queue size hard limit",
+      "value": 18000,
+    },
+    {
+      "label": "Out msg queue size soft limit",
+      "value": 12000,
+    },
+    {
       "label": "Max transaction library loads",
       "value": 3,
     },
